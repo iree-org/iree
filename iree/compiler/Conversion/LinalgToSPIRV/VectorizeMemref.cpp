@@ -22,6 +22,7 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -39,7 +40,7 @@ static bool getUsesIfAllTransferOp(Value v,
                                    SmallVectorImpl<Operation *> &uses) {
   assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : v.getUsers()) {
-    if (isa<DeallocOp>(userOp)) continue;
+    if (isa<memref::DeallocOp>(userOp)) continue;
     // Only vectorize memref used by vector transfer ops.
     if (!isa<vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
       uses.clear();
@@ -123,7 +124,7 @@ class MemRefUsageAnalysis {
 
  private:
   void analyzeFunc(FuncOp funcOp);
-  void analyzeAlloc(AllocOp allocOp);
+  void analyzeAlloc(memref::AllocOp allocOp);
   void analyzePlaceholder(IREE::PlaceholderOp placeholderOp);
   void analyzeInterfaceBinding(IREE::HAL::InterfaceBindingSubspanOp bindingOp);
   llvm::DenseMap<Value, unsigned> vectorization_size;
@@ -133,7 +134,7 @@ class MemRefUsageAnalysis {
 MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
   op->walk([&](Operation *op) {
     if (auto func = dyn_cast<FuncOp>(op)) analyzeFunc(func);
-    if (auto alloc = dyn_cast<AllocOp>(op)) analyzeAlloc(alloc);
+    if (auto alloc = dyn_cast<memref::AllocOp>(op)) analyzeAlloc(alloc);
     if (auto placeholder = dyn_cast<IREE::PlaceholderOp>(op))
       analyzePlaceholder(placeholder);
     if (auto bindingOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op))
@@ -170,7 +171,7 @@ void MemRefUsageAnalysis::analyzeInterfaceBinding(
   }
 }
 
-void MemRefUsageAnalysis::analyzeAlloc(AllocOp allocOp) {
+void MemRefUsageAnalysis::analyzeAlloc(memref::AllocOp allocOp) {
   SmallVector<Operation *, 4> vectorUses;
   if (unsigned vectorSize = isMemRefAndVectorizable(allocOp, vectorUses)) {
     vectorization_size.insert(std::make_pair(allocOp, vectorSize));
@@ -239,8 +240,8 @@ class ProcessTransferRead final
     // LoadOp and cast back to the original type.
     if (*vectorMemrefElemSize == *readVecSize) {
       Type elemType = vectorMemrefType.getElementType();
-      Value newLoad =
-          rewriter.create<LoadOp>(loc, elemType, adaptor.source(), indices);
+      Value newLoad = rewriter.create<memref::LoadOp>(
+          loc, elemType, adaptor.source(), indices);
       Type serializedVecType =
           VectorType::get(read.getVectorType().getNumElements(),
                           read.getVectorType().getElementType());
@@ -299,8 +300,8 @@ class ProcessTransferWrite final
                                                         adaptor.vector());
       data = rewriter.create<vector::BitCastOp>(
           loc, vectorMemrefType.getElementType(), data);
-      rewriter.replaceOpWithNewOp<StoreOp>(write, data, adaptor.source(),
-                                           indices);
+      rewriter.replaceOpWithNewOp<memref::StoreOp>(write, data,
+                                                   adaptor.source(), indices);
     } else {
       rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
           write, adaptor.vector(), adaptor.source(), indices);
@@ -343,16 +344,16 @@ Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   return MemRefType::get(newShape, vecType, {}, type.getMemorySpaceAsInt());
 }
 
-class ProcessAlloc final : public MemRefConversionPattern<AllocOp> {
+class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
  public:
-  using MemRefConversionPattern<AllocOp>::MemRefConversionPattern;
+  using MemRefConversionPattern<memref::AllocOp>::MemRefConversionPattern;
   LogicalResult matchAndRewrite(
-      AllocOp alloc, ArrayRef<Value> operands,
+      memref::AllocOp alloc, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = getVectorizedMemRefType(rewriter, alloc.getResult());
     if (!memrefType) return failure();
-    rewriter.replaceOpWithNewOp<AllocOp>(alloc, *memrefType,
-                                         alloc.dynamicSizes());
+    rewriter.replaceOpWithNewOp<memref::AllocOp>(alloc, *memrefType,
+                                                 alloc.dynamicSizes());
     return success();
   }
 };
@@ -450,7 +451,7 @@ void VectorizeMemRefPass::runOnOperation() {
       return !memrefUsageAnalysis->vectorizeMemRef(arg);
     });
   });
-  target.addDynamicallyLegalOp<AllocOp>([&](AllocOp alloc) {
+  target.addDynamicallyLegalOp<memref::AllocOp>([&](memref::AllocOp alloc) {
     return !memrefUsageAnalysis->vectorizeMemRef(alloc);
   });
   target.addDynamicallyLegalOp<IREE::PlaceholderOp>(

@@ -14,7 +14,7 @@ func @conv_16433136(%arg0: memref<1x16x16x4xf32>, %arg1: memref<3x3x4x16xf32>, %
 // CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG: #[[MAP5:.+]] = affine_map<(d0, d1, d2, d3) -> (d3)>
 // CHECK:      func @conv_16433136(%[[INPUT:.+]]: memref<1x16x16x4xf32>, %[[FILTER:.+]]: memref<3x3x4x16xf32>, %[[OUTPUT:.+]]: memref<1x14x14x16xf32>)
-// CHECK:        %[[COLBUFFER:.+]] =   alloca() : memref<1x14x14x3x3x4xf32>
+// CHECK:        %[[COLBUFFER:.+]] = memref.alloca() : memref<1x14x14x3x3x4xf32>
 // CHECK:        linalg.generic {
 // CHECK-SAME:     indexing_maps = [#[[MAP0]], #[[MAP1]]],
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]

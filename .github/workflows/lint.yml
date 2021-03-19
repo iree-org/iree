@@ -22,8 +22,10 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
-      - name: Running bazel_to_cmake
+      - name: Running bazel_to_cmake for IREE core
         run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --verbosity=2
+      - name: Running bazel_to_cmake for IREE TF Integration Tests
+        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --root_dir=integrations/tensorflow/e2e --verbosity=2
       - name: Checking Diff
         run: git diff --exit-code
 

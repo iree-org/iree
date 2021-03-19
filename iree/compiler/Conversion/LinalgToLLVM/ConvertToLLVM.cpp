@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/LinalgToLLVM/LLVMCodeGenOptions.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -612,13 +613,19 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
   }
 };
 
-struct ConvertToLLVMPass
+class ConvertToLLVMPass
     : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
+ public:
+  ConvertToLLVMPass(LLVMCodegenOptions options) : options_(options) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect>();
   }
 
   void runOnOperation() override;
+
+ private:
+  LLVMCodegenOptions options_;
 };
 
 }  // namespace
@@ -711,17 +718,30 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // Once we're done with conversion, remove InterfaceOp.
   module.walk([](IREE::HAL::InterfaceOp op) { op.erase(); });
+
+  // Post conversion patterns.
+  {
+    OwningRewritePatternList postPatterns;
+    if (options_.unfuseFMAOps) {
+      populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
+      (void)applyPatternsAndFoldGreedily(module, std::move(postPatterns));
+    }
+  }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass() {
-  return std::make_unique<ConvertToLLVMPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
+    LLVMCodegenOptions options) {
+  return std::make_unique<ConvertToLLVMPass>(options);
 }
 
 static PassRegistration<ConvertToLLVMPass> pass(
     "iree-codegen-convert-to-llvm",
     "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to "
     "LLVMIR dialect",
-    [] { return std::make_unique<ConvertToLLVMPass>(); });
+    [] {
+      return std::make_unique<ConvertToLLVMPass>(
+          getLLVMCodegenOptionsFromClOptions());
+    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

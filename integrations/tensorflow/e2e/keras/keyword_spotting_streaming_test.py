@@ -18,8 +18,8 @@ import os
 
 from absl import app
 from absl import flags
-from pyiree.tf.support import tf_test_utils
-from pyiree.tf.support import tf_utils
+from iree.tf.support import tf_test_utils
+from iree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 from kws_streaming.layers import modes

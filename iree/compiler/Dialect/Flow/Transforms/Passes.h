@@ -60,8 +60,10 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
-// Flattens tuple values in function signatures and blocks.
-std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
+// Convert operations to equivalent flow.tensor.* ops. This is run after
+// dispatch region creation to catch operations that were left outside of
+// dispatch regions and could be represented as flow.tensor.* ops.
+std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass();
 
 // Legalizes the input types to those supported by the flow dialect.
 // This will fail if types that cannot be supported at all are present, however
@@ -78,11 +80,6 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
 // This converts some input ops directly to flow ops when doing so has a
 // benefit. Other ops are left unmodified and will be outlined later on.
 std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
-
-// Runs post-partitioning conversion passes to legalize the flow dialect.
-// This converts any leftover ops that did not already get converted or outlined
-// to dispatch regions.
-std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
@@ -168,11 +165,10 @@ createStripAndSplatConstantVariablesPass();
 inline void registerFlowPasses() {
   registerInputTransformPassPipeline();
   registerFlowTransformPassPipeline();
-  createFlattenTuplesInCFGPass();
+  createConvertToFlowTensorOpsPass();
   createLegalizeInputTypesPass();
   createHLOPreprocessingPass();
   createPrePartitioningConversionPass();
-  createPostPartitioningConversionPass();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();
   createIdentifyDispatchRegions2Pass();

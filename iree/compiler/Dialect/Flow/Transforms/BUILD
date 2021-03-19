@@ -23,6 +23,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "ConvertToFlowTensorOps.cpp",
         "DeduplicateExecutables.cpp",
         "DestructiveUpdateUtils.cpp",
         "DispatchConfig.cpp",
@@ -30,7 +31,6 @@ cc_library(
         "DispatchabilityAnalysis.cpp",
         "ExpandVariableDynamicDims.cpp",
         "ExportBenchmarkFuncs.cpp",
-        "FlattenTuplesInCFG.cpp",
         "FoldCompatibleDispatchRegions.cpp",
         "FormStreams.cpp",
         "HLOToHLOPreprocessing.cpp",
@@ -71,6 +71,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToStandard",

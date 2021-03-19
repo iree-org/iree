@@ -50,8 +50,8 @@ func @tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 func @generic_op(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x?xf32> {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %d0 = dim %A, %c0 : tensor<?x?xf32>
-  %d1 = dim %A, %c1 : tensor<?x?xf32>
+  %d0 = memref.dim %A, %c0 : tensor<?x?xf32>
+  %d1 = memref.dim %A, %c1 : tensor<?x?xf32>
   %0 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
   %1 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -66,13 +66,14 @@ func @generic_op(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x?xf32> {
     } -> tensor<?x?xf32>
   return %1 : tensor<?x?xf32>
 }
+// CHECK: #[[MULMAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //      CHECK: func @generic_op
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //      CHECK:   flow.dispatch.workgroups
 // CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[ARG1]], %[[D0]], %[[D1]])
 // CHECK-NEXT:     %[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
@@ -80,13 +81,27 @@ func @generic_op(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x?xf32> {
 // CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
-//  CHECK-DAG:     %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG2]] : !flow.dispatch.tensor<readonly:?x?xf32>
-//  CHECK-DAG:     %[[INIT:.+]] = linalg.init_tensor [%[[ARG4]], %[[ARG5]]]
-//  CHECK-DAG:     %[[LOAD3:.+]] = flow.dispatch.tensor.load %[[ARG3]] : !flow.dispatch.tensor<readonly:?xf32>
-//      CHECK:     %[[RESULT:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[LOAD2]], %[[LOAD3]] : tensor<?x?xf32>, tensor<?xf32>)
-// CHECK-SAME:       outs(%[[INIT]] : tensor<?x?xf32>)
-//      CHECK:     flow.dispatch.tensor.store %[[RESULT]], %[[ARG6]]
+//  CHECK-DAG:     %[[WGSIZE_X:.+]] = flow.dispatch.workgroup.size[0]
+//  CHECK-DAG:     %[[WGSIZE_Y:.+]] = flow.dispatch.workgroup.size[1]
+//  CHECK-DAG:     %[[WGID_X:.+]] = flow.dispatch.workgroup.id[0]
+//  CHECK-DAG:     %[[WGID_Y:.+]] = flow.dispatch.workgroup.id[1]
+//  CHECK-DAG:     %[[WGCOUNT_X:.+]] = flow.dispatch.workgroup.count[0]
+//  CHECK-DAG:     %[[WGCOUNT_Y:.+]] = flow.dispatch.workgroup.count[1]
+//      CHECK:     %[[OFFSET_Y:.+]] = affine.apply #[[MULMAP]]()[%[[WGID_Y]], %[[WGSIZE_Y]]]
+//      CHECK:     %[[STEP_Y:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_Y]], %[[WGSIZE_Y]]]
+//      CHECK:     scf.for %[[ARG7:.+]] = %[[OFFSET_Y]]
+// CHECK-SAME:       to %{{.+}} step %[[STEP_Y]]
+//      CHECK:       %[[OFFSET_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGID_X]], %[[WGSIZE_X]]]
+//      CHECK:       %[[STEP_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_X]], %[[WGSIZE_X]]]
+//      CHECK:       scf.for %[[ARG8:.+]] = %[[OFFSET_X]]
+// CHECK-SAME:         to %{{.+}} step %[[STEP_X]]
+//  CHECK-DAG:         %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG2]]
+//  CHECK-DAG:         %[[INIT:.+]] = linalg.init_tensor
+//  CHECK-DAG:         %[[LOAD3:.+]] = flow.dispatch.tensor.load %[[ARG3]]
+//      CHECK:         %[[RESULT:.+]] = linalg.generic
+// CHECK-SAME:           ins(%[[LOAD2]], %[[LOAD3]] : tensor<?x?xf32>, tensor<?xf32>)
+// CHECK-SAME:           outs(%[[INIT]] : tensor<?x?xf32>)
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %[[ARG6]]
 
 // -----
 
@@ -94,8 +109,8 @@ func @fuse_fill_with_producer(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> ten
   %zero = constant 0.0 : f32
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %M = dim %A, %c0 : tensor<?x?xf32>
-  %N = dim %B, %c1 : tensor<?x?xf32>
+  %M = memref.dim %A, %c0 : tensor<?x?xf32>
+  %N = memref.dim %B, %c1 : tensor<?x?xf32>
   %0 = linalg.init_tensor [%M, %N] : tensor<?x?xf32>
   %1 = linalg.fill(%0, %zero) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
   %2 = linalg.matmul ins(%A, %B : tensor<?x?xf32>, tensor<?x?xf32>)
@@ -107,8 +122,8 @@ func @fuse_fill_with_producer(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> ten
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-//       CHECK:     %[[M:.+]] = dim %[[ARG0]], %[[C0]]
-//       CHECK:     %[[N:.+]] = dim %[[ARG1]], %[[C1]]
+//       CHECK:     %[[M:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//       CHECK:     %[[N:.+]] = memref.dim %[[ARG1]], %[[C1]]
 //       CHECK:     flow.dispatch.workgroups[%[[N]], %[[M]], %[[C1]]]
 //  CHECK-SAME:       (%[[M]], %[[N]], %[[ARG0]], %[[ARG1]])
 //  CHECK-NEXT:       (%[[ARG2:[a-zA-Z0-9_]+]]: index
@@ -137,9 +152,9 @@ func @two_dispatches(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tensor<?x?xf
   %one = constant 1.0 : f32
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %M = dim %A, %c0 : tensor<?x?xf32>
-  %N = dim %B, %c1 : tensor<?x?xf32>
-  %K = dim %A, %c1 : tensor<?x?xf32>
+  %M = memref.dim %A, %c0 : tensor<?x?xf32>
+  %N = memref.dim %B, %c1 : tensor<?x?xf32>
+  %K = memref.dim %A, %c1 : tensor<?x?xf32>
   %0 = linalg.init_tensor [%M, %N] : tensor<?x?xf32>
   %1 = linalg.fill(%0, %zero) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
   %2 = linalg.init_tensor [%M, %K] : tensor<?x?xf32>
@@ -161,9 +176,9 @@ func @two_dispatches(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tensor<?x?xf
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:     %[[M:.+]] = dim %[[ARG0]], %[[C0]]
-//   CHECK-DAG:     %[[N:.+]] = dim %[[ARG1]], %[[C1]]
-//   CHECK-DAG:     %[[K:.+]] = dim %[[ARG0]], %[[C1]]
+//   CHECK-DAG:     %[[M:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:     %[[N:.+]] = memref.dim %[[ARG1]], %[[C1]]
+//   CHECK-DAG:     %[[K:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //       CHECK:     %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[K]], %[[M]], %[[C1]]]
 //  CHECK-SAME:       (%[[ARG0]], %[[M]], %[[K]])
 //  CHECK-NEXT:       (%[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
@@ -258,8 +273,8 @@ func @reshapeop(%arg0: tensor<?x?xf32>) -> tensor<?xf32>
 // CHECK-SAME:   (%[[ARG0:.+]]: tensor<?x?xf32>)
 //  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[WORKLOAD:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[D1]]]
 //      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
 // CHECK-SAME:     [%[[WORKLOAD]], %[[C1]], %[[C1]]](%[[ARG0]])
@@ -277,10 +292,10 @@ func @generic_op_4D
   %c1 = constant 1 : index
   %c2 = constant 2 : index
   %c3 = constant 3 : index
-  %d0 = dim %A, %c0 : tensor<?x?x?x?xf32>
-  %d1 = dim %A, %c1 : tensor<?x?x?x?xf32>
-  %d2 = dim %A, %c2 : tensor<?x?x?x?xf32>
-  %d3 = dim %A, %c3 : tensor<?x?x?x?xf32>
+  %d0 = memref.dim %A, %c0 : tensor<?x?x?x?xf32>
+  %d1 = memref.dim %A, %c1 : tensor<?x?x?x?xf32>
+  %d2 = memref.dim %A, %c2 : tensor<?x?x?x?xf32>
+  %d3 = memref.dim %A, %c3 : tensor<?x?x?x?xf32>
   %0 = linalg.init_tensor [%d0, %d1, %d2, %d3] : tensor<?x?x?x?xf32>
   %1 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
@@ -295,6 +310,8 @@ func @generic_op_4D
     } -> tensor<?x?x?x?xf32>
   return %1 : tensor<?x?x?x?xf32>
 }
+// For ops of rank greater than 3 we serialized the higher dimension. When flow
+// supports larger ranks this can be changed.
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //      CHECK: func @generic_op_4D
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>
@@ -302,12 +319,11 @@ func @generic_op_4D
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //  CHECK-DAG:   %[[C2:.+]] = constant 2 : index
 //  CHECK-DAG:   %[[C3:.+]] = constant 3 : index
-//  CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
-//  CHECK-DAG:   %[[D2:.+]] = dim %[[ARG0]], %[[C2]]
-//  CHECK-DAG:   %[[D3:.+]] = dim %[[ARG0]], %[[C3]]
-//      CHECK:   %[[WORKLOAD_Z:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[D1]]]
-//      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[WORKLOAD_Z]]]
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = memref.dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[D3:.+]] = memref.dim %[[ARG0]], %[[C3]]
+//      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D1]]]
 
 // -----
 
@@ -320,14 +336,14 @@ func @always_fuse_reshape
   %c1 = constant 1 : index
   %0 = linalg.tensor_reshape %lhs [affine_map<(d0, d1) -> (d0, d1)>]
     : tensor<?xf32> into tensor<?x4xf32>
-  %m = dim %0, %c0 : tensor<?x4xf32>
-  %n1 = dim %rhs1, %c1 : tensor<4x?xf32>
+  %m = memref.dim %0, %c0 : tensor<?x4xf32>
+  %n1 = memref.dim %rhs1, %c1 : tensor<4x?xf32>
   %init1 = linalg.init_tensor [%m, %n1] : tensor<?x?xf32>
   %fill1 = linalg.fill(%init1, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
   %1 = linalg.matmul
     ins(%0, %rhs1 : tensor<?x4xf32>, tensor<4x?xf32>)
     outs(%fill1 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %n2 = dim %rhs2, %c1 : tensor<4x?xf32>
+  %n2 = memref.dim %rhs2, %c1 : tensor<4x?xf32>
   %init2 = linalg.init_tensor [%m, %n2] : tensor<?x?xf32>
   %fill2 = linalg.fill(%init2, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
   %2= linalg.matmul
@@ -343,12 +359,12 @@ func @always_fuse_reshape
 // CHECK-SAME:   %[[RHS2:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//      CHECK:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
+//      CHECK:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[M:.+]] = affine.apply #[[MAP]]()[%[[D0]]]
-//  CHECK-DAG:   %[[N1:.+]] = dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[N1:.+]] = memref.dim %[[ARG1]], %[[C1]]
 //      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[N1]], %[[M]], %[[C1]]]
 // CHECK-SAME:     (%[[M]], %[[N1]], %[[ARG0]], %[[RHS1]])
-//      CHECK:   %[[N2:.+]] = dim %[[RHS2]], %[[C1]]
+//      CHECK:   %[[N2:.+]] = memref.dim %[[RHS2]], %[[C1]]
 //      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[N2]], %[[M]], %[[C1]]]
 // CHECK-SAME:     (%[[M]], %[[N2]], %[[ARG0]], %[[RHS2]])
 //      CHECK:   return %[[RESULT1]], %[[RESULT2]]
@@ -360,8 +376,8 @@ func @pad_test(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index,
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %0 = tensor.extract %arg1[] : tensor<f32>
-  %1 = dim %arg0, %c0 : tensor<?x?xf32>
-  %2 = dim %arg0, %c1 : tensor<?x?xf32>
+  %1 = memref.dim %arg0, %c0 : tensor<?x?xf32>
+  %2 = memref.dim %arg0, %c1 : tensor<?x?xf32>
   %3 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%1)[%arg2, %arg4]
   %4 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%2)[%arg3, %arg5]
   %5 = linalg.init_tensor [%3, %4] : tensor<?x?xf32>
@@ -380,8 +396,8 @@ func @pad_test(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index,
 //  CHECK-SAME:   %[[ARG5:[a-zA-Z0-9]+]]: index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
-//   CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
+//   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP]]()[%[[ARG2]], %[[ARG4]], %[[D0]]]
 //   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP]]()[%[[ARG3]], %[[ARG5]], %[[D1]]]
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups

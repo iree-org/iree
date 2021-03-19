@@ -36,6 +36,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -191,7 +192,7 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
       if (!resultBuffer) {
         if (auto shapedType = result.value().getType().dyn_cast<ShapedType>()) {
           if (shapedType.hasStaticShape()) {
-            resultBuffer = rewriter.create<AllocOp>(
+            resultBuffer = rewriter.create<memref::AllocOp>(
                 op->getLoc(), getMemrefTypeForTensor(shapedType));
           }
         }
@@ -254,11 +255,11 @@ LogicalResult PadTensorOpConversion::apply(
   SmallVector<Value, 4> sizes, strides;
   int rank = op.getSourceType().getRank();
   for (int i = 0; i < rank; ++i) {
-    sizes.push_back(rewriter.create<DimOp>(loc, inputBuffers[0], i));
+    sizes.push_back(rewriter.create<memref::DimOp>(loc, inputBuffers[0], i));
     strides.push_back(rewriter.create<ConstantIndexOp>(loc, 1));
   }
-  auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0], op.low(),
-                                              sizes, strides);
+  auto subViewOp = rewriter.create<memref::SubViewOp>(loc, resultBuffers[0],
+                                                      op.low(), sizes, strides);
   if (auto cstOp = dyn_cast<ConstantOp>(inputBuffers[0].getDefiningOp())) {
     auto inputConstAttr =
         cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
@@ -293,9 +294,9 @@ struct SubTensorOpConversion
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     auto loc = op.getLoc();
-    auto subViewOp =
-        rewriter.create<SubViewOp>(loc, inputBuffers[0], op.getMixedOffsets(),
-                                   op.getMixedSizes(), op.getMixedStrides());
+    auto subViewOp = rewriter.create<memref::SubViewOp>(
+        loc, inputBuffers[0], op.getMixedOffsets(), op.getMixedSizes(),
+        op.getMixedStrides());
     rewriter.create<linalg::CopyOp>(loc, subViewOp, resultBuffers[0]);
     return success();
   }
@@ -319,9 +320,9 @@ struct SubTensorInsertOpConversion
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     auto loc = op.getLoc();
-    auto subViewOp =
-        rewriter.create<SubViewOp>(loc, resultBuffers[0], op.getMixedOffsets(),
-                                   op.getMixedSizes(), op.getMixedStrides());
+    auto subViewOp = rewriter.create<memref::SubViewOp>(
+        loc, resultBuffers[0], op.getMixedOffsets(), op.getMixedSizes(),
+        op.getMixedStrides());
     if (auto cstOp = inputBuffers[0].getDefiningOp<ConstantOp>()) {
       auto inputConstAttr = cstOp.valueAttr().cast<DenseElementsAttr>();
       if (!inputConstAttr.isSplat()) {
@@ -500,7 +501,7 @@ struct InitTensorOpConversion
       // Allocate a temp buffer and it will get deleted after lowering to loops.
       RankedTensorType type = op.getType();
       auto memrefType = MemRefType::get(type.getShape(), type.getElementType());
-      rewriter.replaceOpWithNewOp<AllocOp>(op, memrefType);
+      rewriter.replaceOpWithNewOp<memref::AllocOp>(op, memrefType);
     } else {
       rewriter.replaceOp(op, outputBuffer);
     }
@@ -531,7 +532,8 @@ struct ExtractElementOpPattern final
       return op.emitError("expected operands[0] to be a MemRefType");
     }
     tensor::ExtractOp::Adaptor adaptor(operands);
-    rewriter.replaceOpWithNewOp<LoadOp>(op, operands[0], adaptor.indices());
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, operands[0],
+                                                adaptor.indices());
     return success();
   }
 };
@@ -799,7 +801,7 @@ static LogicalResult createAndPropagateBufferUsedForResultTensors(
         if (resultBuffer) continue;
         if (auto shapedType = result.value().getType().dyn_cast<ShapedType>()) {
           if (shapedType.hasStaticShape()) {
-            resultBuffer = builder.create<AllocOp>(
+            resultBuffer = builder.create<memref::AllocOp>(
                 op->getLoc(), getMemrefTypeForTensor(shapedType));
           }
         }
@@ -848,7 +850,8 @@ namespace {
 struct ConvertHLOToLinalgOnBuffersPass
     : public PassWrapper<ConvertHLOToLinalgOnBuffersPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, IREEDialect>();
+    registry
+        .insert<linalg::LinalgDialect, IREEDialect, memref::MemRefDialect>();
   }
 
   void runOnFunction() override;

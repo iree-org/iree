@@ -18,6 +18,7 @@ iree_cc_library(
     "DispatchConfig.h"
     "Passes.h"
   SRCS
+    "ConvertToFlowTensorOps.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchConfig.cpp"
@@ -25,7 +26,6 @@ iree_cc_library(
     "DispatchabilityAnalysis.cpp"
     "ExpandVariableDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
-    "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
     "FormStreams.cpp"
     "HLOToHLOPreprocessing.cpp"
@@ -44,6 +44,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMemRef
     MLIRPass
     MLIRSCF
     MLIRSCFToStandard

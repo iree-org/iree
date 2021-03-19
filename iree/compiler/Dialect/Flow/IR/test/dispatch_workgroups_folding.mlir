@@ -66,7 +66,7 @@ func @convertDimOfDispatchInputLoadToDispatchShape(%arg0: !flow.dispatch.tensor<
   // CHECK-NEXT: "test.sink"(%[[DIM]]) : (index) -> ()
   %tensor = flow.dispatch.tensor.load %arg0 : !flow.dispatch.tensor<readonly:?xf32> -> tensor<?xf32>
   %c0 = constant 0 : index
-  %dim = dim %tensor, %c0 : tensor<?xf32>
+  %dim = memref.dim %tensor, %c0 : tensor<?xf32>
   "test.sink"(%dim) : (index) -> ()
   return
 }

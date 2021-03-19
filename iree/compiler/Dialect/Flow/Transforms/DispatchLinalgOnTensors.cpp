@@ -400,6 +400,12 @@ static void tryToTieOperandsAndResults(
           insertOp.dest().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
       if (!loadOp) return nullptr;
       return loadOp.source().cast<BlockArgument>();
+    } else if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(tieOp)) {
+      unsigned resultIndex = storeOp.value().cast<OpResult>().getResultNumber();
+      auto loadOp = linalgOp.getOutputTensors()[resultIndex]
+                        .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+      if (!loadOp) return nullptr;
+      return loadOp.source().cast<BlockArgument>();
     }
 
     return nullptr;
@@ -531,7 +537,8 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
     if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
       for (unsigned i = 0; i < rt.getRank(); ++i) {
         if (!rt.isDynamicDim(i)) continue;
-        auto dim = builder.createOrFold<DimOp>(dispatchOp.getLoc(), operand, i);
+        auto dim = builder.createOrFold<memref::DimOp>(dispatchOp.getLoc(),
+                                                       operand, i);
         operandDynamicDims.push_back(dim);
       }
     }
@@ -605,13 +612,11 @@ struct TileAndDistributeOnTensorsPattern
     SmallVector<Value, 4> count = llvm::to_vector<4>(
         llvm::map_range(linalgOp.createLoopRanges(rewriter, loc),
                         [](Range r) { return r.size; }));
-    // NOTE: Special treatment for convolution, which have more than 3 parallel
-    // dimensions. We want to ignore the batch dimension and tile along the
-    // next three.
-    // TODO(#5048): figure out a better way to avoid this special case.
-    if (isa<linalg::ConvInputNHWCFilterHWCFOp,
-            linalg::DepthwiseConvInputNHWCFilterHWCOp>(op)) {
-      count.erase(count.begin());
+    size_t numParrallelLoops = getNumOuterParallelLoops(op);
+    if (numParrallelLoops > kNumMaxParallelDims) {
+      count.erase(
+          count.begin(),
+          std::next(count.begin(), numParrallelLoops - kNumMaxParallelDims));
     }
     count.resize(getNumTilableLoops(op));
     auto workload = convertToWorkload(rewriter, loc, count);
@@ -659,9 +664,10 @@ struct TileAndDistributeOnTensorsPattern
 
     tiledLinalgOp.op.getOperation()->removeAttr(kRootOpAttr);
 
-    rewriter.replaceOpWithIf(
-        op, dispatchOp.getResults(),
-        [&](OpOperand &operand) { return !isa<DimOp>(operand.getOwner()); });
+    rewriter.replaceOpWithIf(op, dispatchOp.getResults(),
+                             [&](OpOperand &operand) {
+                               return !isa<memref::DimOp>(operand.getOwner());
+                             });
     return success();
   }
 };
@@ -675,7 +681,7 @@ static Optional<SmallVector<Value, 4>> getResultShape(PatternRewriter &rewriter,
     return llvm::to_vector<4>(llvm::map_range(
         llvm::seq<int64_t>(0, v.getType().cast<ShapedType>().getRank()),
         [&](int64_t dim) -> Value {
-          return rewriter.create<DimOp>(loc, v, dim);
+          return rewriter.create<memref::DimOp>(loc, v, dim);
         }));
   };
   if (op->getNumResults() != 1) return llvm::None;
@@ -709,7 +715,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
         llvm::all_of(op->getUsers(), [](Operation *user) {
           return isDispatchableOp(user) ||
                  user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ||
-                 isa<IREE::Flow::DispatchWorkgroupsOp, DimOp>(user);
+                 isa<IREE::Flow::DispatchWorkgroupsOp, memref::DimOp>(user);
         })) {
       return failure();
     }
@@ -761,7 +767,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     rewriter.replaceOpWithIf(op, dispatchOp.getOperation()->getResults(),
                              [&](OpOperand &operand) {
                                Operation *user = operand.getOwner();
-                               return !isa<DimOp>(user);
+                               return !isa<memref::DimOp>(user);
                              });
     return success();
   }
@@ -841,6 +847,23 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
                             builder.getI64ArrayAttr(fusionGroups));
       }
     }
+
+    // As a second step mark all the element-wise linalg ops not fused as roots
+    // so that they get tiled and distributed.
+    for (linalg::LinalgOp linalgOp : linalgOps) {
+      Operation *op = linalgOp.getOperation();
+      if (!isa<linalg::GenericOp>(op) ||
+          getNumOuterParallelLoops(linalgOp) == 0 ||
+          llvm::any_of(linalgOp.getIndexingMaps(), [](AffineMap &map) {
+            return !map.isProjectedPermutation();
+          })) {
+        continue;
+      }
+
+      if (op->hasAttr(kRootOpAttr) || op->hasAttr(kFusionGroupsAttr)) continue;
+      unsigned currGroupNum = numRootOps++;
+      op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(currGroupNum));
+    }
   }
 }
 
@@ -894,15 +917,10 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           }));
     }
 
-    // NOTE: Special treatment for convolution, which have more than 3
-    // parallel dimensions. We want to ignore the batch dimension and tile
-    // along the next three. That means setting the first position to zero.
-    // TODO(#5048): figure out a better way to avoid this special case.
-    bool isConvOp = isa<linalg::ConvInputNHWCFilterHWCFOp,
-                        linalg::DepthwiseConvInputNHWCFilterHWCOp>(op);
-
+    // For ops with more than 3 parallel dimensions, we want to ignore the
+    // higher dimension and tile along last three dimensions.
     for (size_t dim = 0; dim < numTiledLoops; ++dim) {
-      useTileSizes[(isConvOp ? numParallelDims : numTiledLoops) - dim - 1] =
+      useTileSizes[numParallelDims - dim - 1] =
           buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupSizeOp>(builder, dim);
     }
     return useTileSizes;

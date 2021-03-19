@@ -21,9 +21,10 @@ import unittest
 
 # TODO: No idea why pytype cannot find names from this module.
 # pytype: disable=name-error
-from pyiree.compiler.xla import *
+# pytype: disable=module-attr
+import iree.compiler.xla
 
-if not is_available():
+if not iree.compiler.xla.is_available():
   print(f"Skipping test {__file__} because the IREE XLA compiler "
         f"is not installed")
   sys.exit(0)
@@ -33,14 +34,16 @@ class CompilerTest(unittest.TestCase):
 
   def testImportBinaryPbFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.pb")
-    text = compile_file(path, import_only=True).decode("utf-8")
+    text = iree.compiler.xla.compile_file(path,
+                                          import_only=True).decode("utf-8")
     logging.info("%s", text)
     self.assertIn("mhlo.constant", text)
     self.assertIn("iree.module.export", text)
 
   def testCompileBinaryPbFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.pb")
-    binary = compile_file(path, target_backends=DEFAULT_TESTING_BACKENDS)
+    binary = iree.compiler.xla.compile_file(
+        path, target_backends=iree.compiler.xla.DEFAULT_TESTING_BACKENDS)
     logging.info("Binary length = %d", len(binary))
     self.assertIn(b"main", binary)
 
@@ -49,7 +52,9 @@ class CompilerTest(unittest.TestCase):
     with tempfile.NamedTemporaryFile("wt", delete=False) as f:
       try:
         f.close()
-        output = compile_file(path, import_only=True, output_file=f.name)
+        output = iree.compiler.xla.compile_file(path,
+                                                import_only=True,
+                                                output_file=f.name)
         self.assertIsNone(output)
         with open(f.name, "rt") as f_read:
           text = f_read.read()
@@ -63,9 +68,10 @@ class CompilerTest(unittest.TestCase):
     with tempfile.NamedTemporaryFile("wt", delete=False) as f:
       try:
         f.close()
-        output = compile_file(path,
-                              output_file=f.name,
-                              target_backends=DEFAULT_TESTING_BACKENDS)
+        output = iree.compiler.xla.compile_file(
+            path,
+            output_file=f.name,
+            target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
         self.assertIsNone(output)
         with open(f.name, "rb") as f_read:
           binary = f_read.read()
@@ -78,7 +84,8 @@ class CompilerTest(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.pb")
     with open(path, "rb") as f:
       content = f.read()
-    text = compile_str(content, import_only=True).decode("utf-8")
+    text = iree.compiler.xla.compile_str(content,
+                                         import_only=True).decode("utf-8")
     logging.info("%s", text)
     self.assertIn("mhlo.constant", text)
 
@@ -86,14 +93,15 @@ class CompilerTest(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.pb")
     with open(path, "rb") as f:
       content = f.read()
-    binary = compile_str(content, target_backends=DEFAULT_TESTING_BACKENDS)
+    binary = iree.compiler.xla.compile_str(
+        content, target_backends=iree.compiler.xla.DEFAULT_TESTING_BACKENDS)
     logging.info("Binary length = %d", len(binary))
     self.assertIn(b"main", binary)
 
   def testImportHloTextFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.hlo")
-    text = compile_file(path, import_only=True,
-                        import_format="hlo_text").decode("utf-8")
+    text = iree.compiler.xla.compile_file(
+        path, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
     self.assertIn("mhlo.constant", text)
     self.assertIn("iree.module.export", text)
@@ -102,8 +110,8 @@ class CompilerTest(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.hlo")
     with open(path, "rt") as f:
       content = f.read()
-    text = compile_str(content, import_only=True,
-                       import_format="hlo_text").decode("utf-8")
+    text = iree.compiler.xla.compile_str(
+        content, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
     self.assertIn("mhlo.constant", text)
     self.assertIn("iree.module.export", text)
@@ -112,8 +120,8 @@ class CompilerTest(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.hlo")
     with open(path, "rb") as f:
       content = f.read()
-    text = compile_str(content, import_only=True,
-                       import_format="hlo_text").decode("utf-8")
+    text = iree.compiler.xla.compile_str(
+        content, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
     self.assertIn("mhlo.constant", text)
     self.assertIn("iree.module.export", text)

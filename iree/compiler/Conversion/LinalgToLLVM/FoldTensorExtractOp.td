@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOLLVM_FOLDTENSOREXTRACTOP
 #define IREE_COMPILER_CONVERSION_LINALGTOLLVM_FOLDTENSOREXTRACTOP
 
-include "mlir/Dialect/StandardOps/IR/Ops.td"
+include "mlir/Dialect/MemRef/IR/MemRefOps.td"
 include "mlir/Dialect/Tensor/IR/TensorOps.td"
 
 // Canonicalize unnecessary tensor_load when the load is used just for

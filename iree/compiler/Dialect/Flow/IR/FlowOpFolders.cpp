@@ -25,6 +25,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -97,7 +98,11 @@ namespace {
 static bool hasUsersInStreamAfterUpdate(Value value, Operation *updateOp) {
   for (auto user : value.getUsers()) {
     if (user == updateOp) continue;
-    if (user->isBeforeInBlock(updateOp)) continue;
+    if (user->getBlock() != updateOp->getBlock() ||
+        user->isBeforeInBlock(updateOp)) {
+      // From a dominating block or earlier in the block, cannot be a consumer.
+      continue;
+    }
     return true;
   }
   return false;
@@ -374,10 +379,10 @@ namespace {
 // shapex.ranked_dim(flow.dispatch.shape(%x), %const)
 // ``
 struct ConvertDimOfDispatchInputLoadToDispatchShape
-    : public OpRewritePattern<DimOp> {
+    : public OpRewritePattern<memref::DimOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(DimOp op,
+  LogicalResult matchAndRewrite(memref::DimOp op,
                                 PatternRewriter &rewriter) const override {
     auto loadOp = op.memrefOrTensor().getDefiningOp<DispatchTensorLoadOp>();
     if (!loadOp) return failure();

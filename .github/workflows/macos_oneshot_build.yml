@@ -40,7 +40,7 @@ jobs:
         run: |
           # TODO: Find a cross-platform way to invoke install/strip (it does
           # not exist on Windows).
-          package_dir="./iree-install/python_packages/iree_rt"
+          package_dir="./iree-install/python_packages/iree_runtime"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
             rm -Rf ./iree-install && \
             python ./main_checkout/build_tools/cmake/cmake_ci.py \

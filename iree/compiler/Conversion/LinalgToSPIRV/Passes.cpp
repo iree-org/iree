@@ -180,7 +180,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
            Type elementType, ArrayRef<Value> dynamicSizes) {
           MemRefType allocType = MemRefType::get(staticShape, elementType, {},
                                                  getWorkgroupMemorySpace());
-          return builder.create<AllocOp>(loc, allocType, dynamicSizes);
+          return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
         };
     addLinalgBufferizePasses(pm.nest<ModuleOp>(), allocationFn);
   } else {

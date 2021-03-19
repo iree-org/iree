@@ -34,6 +34,7 @@
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
@@ -62,7 +63,7 @@ spirv::PointerType getPushConstantStorageType(unsigned elementCount,
   auto arrayType = spirv::ArrayType::get(
       SPIRVTypeConverter::getIndexType(builder.getContext()), elementCount,
       /*stride=*/4);
-  auto structType = spirv::StructType::get({arrayType}, /*LayoutInfo=*/0);
+  auto structType = spirv::StructType::get({arrayType}, /*offsetInfo=*/0);
   return spirv::PointerType::get(structType, spirv::StorageClass::PushConstant);
 }
 
@@ -391,7 +392,7 @@ void TransferToCoopMatLoadStore<vector::TransferReadOp>::replaceTransferOp(
     Value strideValue, Value coloumnMajor,
     ConversionPatternRewriter &rewriter) const {
   Value load = rewriter.create<spirv::CooperativeMatrixLoadNVOp>(
-      loc, matType, ptr, strideValue, coloumnMajor, IntegerAttr());
+      loc, matType, ptr, strideValue, coloumnMajor, spirv::MemoryAccessAttr());
   rewriter.replaceOp(op, load);
 }
 
@@ -402,7 +403,7 @@ void TransferToCoopMatLoadStore<vector::TransferWriteOp>::replaceTransferOp(
     ConversionPatternRewriter &rewriter) const {
   rewriter.create<spirv::CooperativeMatrixStoreNVOp>(
       loc, ptr, rewriter.getRemappedValue(op.vector()), strideValue,
-      coloumnMajor, IntegerAttr());
+      coloumnMajor, spirv::MemoryAccessAttr());
   rewriter.eraseOp(op);
 }
 
@@ -511,8 +512,8 @@ LogicalResult ScalarizeVectorTransferRead::matchAndRewrite(
                                 adaptor.indices().end());
   for (int i = 0; i < vectorType.getDimSize(0); ++i) {
     indices.back() = rewriter.createOrFold<ConstantIndexOp>(loc, i);
-    scalars.push_back(
-        rewriter.create<LoadOp>(loc, scalarType, readOp.source(), indices));
+    scalars.push_back(rewriter.create<memref::LoadOp>(
+        loc, scalarType, readOp.source(), indices));
   }
 
   rewriter.replaceOpWithNewOp<spirv::CompositeConstructOp>(readOp, vectorType,
@@ -578,8 +579,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   ///   SPIR-V
   /// - tensor_to_memref can become a no-op since tensors are lowered to
   ///   !spv.array
-  patterns.insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<TensorToMemrefOp>>(
-      typeConverter, context);
+  patterns
+      .insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<memref::BufferCastOp>>(
+          typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
       spirv::SPIRVConversionTarget::get(targetAttr);

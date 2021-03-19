@@ -70,6 +70,14 @@ echo "Building with Ninja"
 cd "${CMAKE_BUILD_DIR?}"
 ninja
 
+# Limit parallelism dramatically to avoid exhausting GPU memory
+# TODO(#5162): Handle this more robustly
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
+
+# Only test drivers that use the GPU, since we run all tests on non-GPU machines
+# as well.
 echo "Testing with CTest"
-ctest -R 'tensorflow_e2e|bindings/python|integrations/tensorflow/' \
-  --output-on-failure
+ctest --output-on-failure \
+   --tests-regex "^integrations/tensorflow/" \
+   --label-regex "^driver=vulkan$|^driver=cuda$" \
+   --label-exclude "^nokokoro$"

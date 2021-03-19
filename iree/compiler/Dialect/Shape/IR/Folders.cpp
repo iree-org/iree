@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Utils/PatternUtils.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -249,7 +250,7 @@ LogicalResult elideTieShapeUsagePattern(TieShapeOp op,
     if (auto carryingOp = dyn_cast<ShapeCarryingInterface>(use.getOwner())) {
       carryingOp->setOperand(use.getOperandNumber(), operands.operand());
       didAnything = true;
-    } else if (auto dimOp = dyn_cast<DimOp>(use.getOwner())) {
+    } else if (auto dimOp = dyn_cast<memref::DimOp>(use.getOwner())) {
       auto index = dimOp.getConstantIndex();
       if (index.hasValue()) {
         rewriter.replaceOpWithNewOp<RankedDimOp>(dimOp, op.shape(),

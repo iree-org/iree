@@ -55,17 +55,17 @@ void buildMNIST(ModelBuilder &modelBuilder, StringLiteral funcName, unsigned B,
   OpBuilder b(&func.getBody());
   ScopedContext scope(b, func.getLoc());
   Value input = func.getArgument(0);
-  Value batchSize = std_dim(input, 0);
-  Value h1Weights = std_alloc(modelBuilder.getMemRefType({W0, W1}, f32));
-  Value h2Weights = std_alloc(modelBuilder.getMemRefType({W1, W2}, f32));
-  Value h3Weights = std_alloc(modelBuilder.getMemRefType({W2, W3}, f32));
-  Value bias1 = std_alloc(modelBuilder.getMemRefType({W1}, f32));
-  Value bias2 = std_alloc(modelBuilder.getMemRefType({W2}, f32));
-  Value bias3 = std_alloc(modelBuilder.getMemRefType({W3}, f32));
+  Value batchSize = memref_dim(input, 0);
+  Value h1Weights = memref_alloc(modelBuilder.getMemRefType({W0, W1}, f32));
+  Value h2Weights = memref_alloc(modelBuilder.getMemRefType({W1, W2}, f32));
+  Value h3Weights = memref_alloc(modelBuilder.getMemRefType({W2, W3}, f32));
+  Value bias1 = memref_alloc(modelBuilder.getMemRefType({W1}, f32));
+  Value bias2 = memref_alloc(modelBuilder.getMemRefType({W2}, f32));
+  Value bias3 = memref_alloc(modelBuilder.getMemRefType({W3}, f32));
   Value outputBlock1 =
-      std_alloc(modelBuilder.getMemRefType({-1, W1}, f32), batchSize);
+      memref_alloc(modelBuilder.getMemRefType({-1, W1}, f32), batchSize);
   Value outputBlock2 =
-      std_alloc(modelBuilder.getMemRefType({-1, W2}, f32), batchSize);
+      memref_alloc(modelBuilder.getMemRefType({-1, W2}, f32), batchSize);
   Value outputBlock3 = func.getArgument(1);
 
   Value flt_0 = modelBuilder.constant_f32(0.0f);
@@ -85,14 +85,14 @@ void buildMNIST(ModelBuilder &modelBuilder, StringLiteral funcName, unsigned B,
 
   // TODO(ntv): tensor->buffer, drop all alloc/fill/dealloc.
   // Vexing parses.
-  (std_dealloc(h1Weights));
-  (std_dealloc(h2Weights));
-  (std_dealloc(h3Weights));
-  (std_dealloc(bias1));
-  (std_dealloc(bias2));
-  (std_dealloc(bias3));
-  (std_dealloc(outputBlock1));
-  (std_dealloc(outputBlock2));
+  (memref_dealloc(h1Weights));
+  (memref_dealloc(h2Weights));
+  (memref_dealloc(h3Weights));
+  (memref_dealloc(bias1));
+  (memref_dealloc(bias2));
+  (memref_dealloc(bias3));
+  (memref_dealloc(outputBlock1));
+  (memref_dealloc(outputBlock2));
 
   (std_ret());
 }

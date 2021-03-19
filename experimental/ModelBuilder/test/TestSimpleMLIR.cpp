@@ -51,34 +51,34 @@ void testValueVectorAdd() {
     OpBuilder b(&f.getBody());
     ScopedContext scope(b, f.getLoc());
 
-    // CHECK: %[[A:.*]] = alloc() : memref<vector<8x128xf32>>
-    // CHECK: %[[B:.*]] = alloc() : memref<vector<8x128xf32>>
-    // CHECK: %[[C:.*]] = alloc() : memref<vector<8x128xf32>>
-    auto bufferA = std_alloc(typeA);
-    auto bufferB = std_alloc(typeB);
-    auto bufferC = std_alloc(typeC);
+    // CHECK: %[[A:.*]] = memref.alloc() : memref<vector<8x128xf32>>
+    // CHECK: %[[B:.*]] = memref.alloc() : memref<vector<8x128xf32>>
+    // CHECK: %[[C:.*]] = memref.alloc() : memref<vector<8x128xf32>>
+    auto bufferA = memref_alloc(typeA);
+    auto bufferB = memref_alloc(typeB);
+    auto bufferC = memref_alloc(typeC);
 
-    StdIndexedValue A(bufferA), B(bufferB), C(bufferC);
+    MemRefIndexedValue A(bufferA), B(bufferB), C(bufferC);
 
     // CHECK: %[[C1:.*]] = constant 1.000000e+00 : f32
     // CHECK: %[[S1:.*]] = vector.broadcast %[[C1]] : f32 to vector<8x128xf32>
-    // CHECK: store %[[S1]], %[[A]][] : memref<vector<8x128xf32>>
+    // CHECK: memref.store %[[S1]], %[[A]][] : memref<vector<8x128xf32>>
     auto one = std_constant_float(llvm::APFloat(1.0f), f32);
     A() = (vector_broadcast(mnVectorType, one));
 
     // CHECK: %[[C2:.*]] = constant 2.000000e+00 : f32
     // CHECK: %[[S2:.*]] = vector.broadcast %[[C2]] : f32 to vector<8x128xf32>
-    // CHECK: store %[[S2]], %[[B]][] : memref<vector<8x128xf32>>
+    // CHECK: memref.store %[[S2]], %[[B]][] : memref<vector<8x128xf32>>
     auto two = std_constant_float(llvm::APFloat(2.0f), f32);
     B() = (vector_broadcast(mnVectorType, two));
 
-    // CHECK-DAG: %[[a:.*]] = load %[[A]][] : memref<vector<8x128xf32>>
-    // CHECK-DAG: %[[b:.*]] = load %[[B]][] : memref<vector<8x128xf32>>
+    // CHECK-DAG: %[[a:.*]] = memref.load %[[A]][] : memref<vector<8x128xf32>>
+    // CHECK-DAG: %[[b:.*]] = memref.load %[[B]][] : memref<vector<8x128xf32>>
     //     CHECK: %[[c:.*]] = addf %[[a]], %[[b]] : vector<8x128xf32>
-    //     CHECK: store %[[c]], %[[C]][] : memref<vector<8x128xf32>>
+    //     CHECK: memref.store %[[c]], %[[C]][] : memref<vector<8x128xf32>>
     C() = A() + B();
 
-    // CHECK: %[[p:.*]] = load %[[C]][] : memref<vector<8x128xf32>>
+    // CHECK: %[[p:.*]] = memref.load %[[C]][] : memref<vector<8x128xf32>>
     // CHECK: vector.print %[[p]] : vector<8x128xf32>
     (vector_print(C()));
 
@@ -111,17 +111,20 @@ void testMemRefVectorAdd() {
     ScopedContext scope(b, f.getLoc());
 
     // CHECK-DAG: %[[z:.*]] = constant 0 : index
-    // CHECK-DAG: %[[a:.*]] = load %[[A]][%[[z]]] : memref<1xvector<8x128xf32>>
-    // CHECK-DAG: %[[b:.*]] = load %[[B]][%[[z]]] : memref<1xvector<8x128xf32>>
+    // CHECK-DAG: %[[a:.*]] = memref.load %[[A]][%[[z]]] :
+    // memref<1xvector<8x128xf32>> CHECK-DAG: %[[b:.*]] = memref.load
+    // %[[B]][%[[z]]] : memref<1xvector<8x128xf32>>
     //     CHECK: %[[c:.*]] = addf %[[a]], %[[b]] : vector<8x128xf32>
-    //     CHECK: store %[[c]], %[[C]][%[[z]]] : memref<1xvector<8x128xf32>>
-    StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
+    //     CHECK: memref.store %[[c]], %[[C]][%[[z]]] :
+    //     memref<1xvector<8x128xf32>>
+    MemRefIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
         C(f.getArgument(2));
     Value idx_0 = std_constant_index(0);
     C(idx_0) = A(idx_0) + B(idx_0);
 
-    // CHECK: %[[p:.*]] = load %[[C]][%[[z]]] : memref<1xvector<8x128xf32>>
-    // CHECK: vector.print %[[p]] : vector<8x128xf32>
+    // CHECK: %[[p:.*]] = memref.load %[[C]][%[[z]]] :
+    // memref<1xvector<8x128xf32>> CHECK: vector.print %[[p]] :
+    // vector<8x128xf32>
     (vector_print(C(idx_0)));
 
     std_ret();

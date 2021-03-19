@@ -13,10 +13,10 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
   // CHECK: %[[C0:.+]] = constant 0 : index
   // CHECK: %[[TId:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
   // CHECK: %[[Index:.+]] = addi %[[TId]], %[[C0]] : index
-  // CHECK-DAG: %[[A:.+]] = load %arg0[%[[Index]]] : memref<32xf32>
-  // CHECK-DAG: %[[B:.+]] = load %arg1[%{{.*}}] : memref<32xf32>
+  // CHECK-DAG: %[[A:.+]] = memref.load %arg0[%[[Index]]] : memref<32xf32>
+  // CHECK-DAG: %[[B:.+]] = memref.load %arg1[%{{.*}}] : memref<32xf32>
   // CHECK: %[[C:.+]] = addf %[[A]], %[[B]] : f32
-  // CHECK: store %[[C]], %arg2[%{{.*}}] : memref<32xf32>
+  // CHECK: memref.store %[[C]], %arg2[%{{.*}}] : memref<32xf32>
 }
 
 // -----
@@ -25,9 +25,9 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
 
 module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @copy(%arg0: memref<4096x4096xf32>) attributes {spv.entry_point_abi = {local_size = dense<[128, 1, 1]> : vector<3xi32>}} {
-    %a = alloc() : memref<128x32xf32, 3>
+    %a = memref.alloc() : memref<128x32xf32, 3>
     %c0 = constant 0 : index
-    %sv = subview %arg0[%c0, %c0] [128, 32] [1, 1]  : memref<4096x4096xf32> to memref<128x32xf32, #map0>
+    %sv = memref.subview %arg0[%c0, %c0] [128, 32] [1, 1]  : memref<4096x4096xf32> to memref<128x32xf32, #map0>
     linalg.copy(%sv, %a) {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<128x32xf32, #map0>, memref<128x32xf32, 3>
     return
   }
@@ -36,8 +36,8 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     // CHECK: %[[C1024:.+]] = constant 1024 : index
     // CHECK: %[[C8:.+]] = constant 8 : index
     // CHECK: %[[C0:.+]] = constant 0 : index
-    // CHECK: %[[ALLOC:.+]] = alloc() : memref<128x32xf32, 3>
-    // CHECK: %[[DST:.+]]  = subview %{{.+}}[0, 0] [128, 32] [1, 1]  : memref<4096x4096xf32> to memref<128x32xf32, #map0>
+    // CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<128x32xf32, 3>
+    // CHECK: %[[DST:.+]]  = memref.subview %{{.+}}[0, 0] [128, 32] [1, 1]  : memref<4096x4096xf32> to memref<128x32xf32, #map0>
     // CHECK: %[[TIDx:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
     // CHECK: %[[DIMx:.+]] = "gpu.block_dim"() {dimension = "x"} : () -> index
     // CHECK: %[[TIDy:.+]] = "gpu.thread_id"() {dimension = "y"} : () -> index
@@ -54,8 +54,8 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     // CHECK:   %[[SIZEx:.+]] = divi_signed %[[IV]], %[[C8]] : index
     // CHECK:   %[[MOD:.+]] = remi_signed %[[IV]], %[[C8]] : index
     // CHECK:   %[[SIZEy:.+]] = affine.apply #[[MAP1]](%[[MOD]])
-    // CHECK:   %[[SVs:.+]] = subview %[[DST]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, #map0> to memref<1x4xf32
-    // CHECK:   %[[SVd:.+]] = subview %[[ALLOC]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, 3> to memref<1x4xf32
+    // CHECK:   %[[SVs:.+]] = memref.subview %[[DST]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, #map0> to memref<1x4xf32
+    // CHECK:   %[[SVd:.+]] = memref.subview %[[ALLOC]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, 3> to memref<1x4xf32
     // CHECK:   %[[LOAD:.+]] = vector.transfer_read %[[SVs]][%c0, %c0], %cst {{.*}} : memref<1x4xf32, {{.*}}>, vector<1x4xf32>
     // CHECK:   vector.transfer_write %[[LOAD]], %[[SVd]][%[[C0]], %[[C0]]] {{.*}} : vector<1x4xf32>, memref<1x4xf32
 }
@@ -73,10 +73,10 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
   // CHECK-LABEL: func @transfer_ops
   //  CHECK-SAME: (%[[ARG0:.*]]: memref<32x32xf32>, %[[ARG1:.*]]: vector<1x1xf32>
   //       CHECK:   %[[C0:.*]] = constant 0 : index
-  //       CHECK:   %[[LOAD:.*]] = load %[[ARG0]][%[[C0]], %[[C0]]] : memref<32x32xf32>
+  //       CHECK:   %[[LOAD:.*]] = memref.load %[[ARG0]][%[[C0]], %[[C0]]] : memref<32x32xf32>
   //       CHECK:   %[[B:.*]] = vector.broadcast %[[LOAD]] : f32 to vector<1x1xf32>
   //       CHECK:   %[[EXT:.*]] = vector.extract %[[ARG1]][0, 0] : vector<1x1xf32>
-  //       CHECK:   store %[[EXT]], %[[ARG0]][%[[C0]], %[[C0]]] : memref<32x32xf32>
+  //       CHECK:   memref.store %[[EXT]], %[[ARG0]][%[[C0]], %[[C0]]] : memref<32x32xf32>
   //       CHECK:   return %[[B]] : vector<1x1xf32>
 }
 

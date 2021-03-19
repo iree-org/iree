@@ -45,7 +45,7 @@ func @runTimeFallback(%arg0 : tensor<?x2xf32>, %arg1 : !shapex.ranked_shape<[?,2
   // CHECK: %[[RESULT:.+]] = "unknown_op"
   // @expected-remark @+1 {{unable to materialize shape calculation}}
   %1 = "unknown_op"(%0) : (tensor<?x2xf32>) -> (tensor<?x2xf32>)
-  // CHECK: %[[DIM:.+]] = dim %[[RESULT]], %[[C0]]
+  // CHECK: %[[DIM:.+]] = memref.dim %[[RESULT]], %[[C0]]
   // CHECK: %[[RESULT_SHAPE:.+]] = shapex.make_ranked_shape %[[DIM]]
   // CHECK: return %[[RESULT]], %[[RESULT_SHAPE]]
   %2 = shapex.get_ranked_shape %1 : tensor<?x2xf32> -> !shapex.ranked_shape<[?,2]>

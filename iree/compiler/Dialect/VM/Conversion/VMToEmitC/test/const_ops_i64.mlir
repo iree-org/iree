@@ -4,7 +4,7 @@
 vm.module @my_module {
   // CHECK-LABEL: vm.func @const_i64_zero
   vm.func @const_i64_zero() -> i64 {
-    // CHECK: %zero = "emitc.const"() {value = 0 : i64} : () -> i64
+    // CHECK: %[[ZERO:.+]] = "emitc.const"() {value = 0 : i64} : () -> i64
     %zero = vm.const.i64.zero : i64
     vm.return %zero : i64
   }

@@ -18,6 +18,8 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 // Order matters.
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanEnums.h.inc"

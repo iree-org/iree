@@ -24,7 +24,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-CHECK_FRAMEWORK_TESTS = ["bert_encoder_unrolled_fake_weights.mlir"]
+CHECK_FRAMEWORK_TESTS = [
+    "bert_encoder_unrolled_fake_weights.mlir",
+    "mobilenetv2_fake_weights.mlir",
+]
 
 iree_lit_test_suite(
     name = "lit",
@@ -58,4 +61,27 @@ iree_check_single_backend_test_suite(
     srcs = CHECK_FRAMEWORK_TESTS,
     driver = "vmla",
     target_backend = "vmla",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
+    srcs = CHECK_FRAMEWORK_TESTS,
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+        "-iree-codegen-spirv-experimental-linalg-on-tensors",
+        "-iree-spirv-enable-vectorization",
+    ],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_linalg_on_tensors_dylib-llvm-aot_dylib",
+    srcs = CHECK_FRAMEWORK_TESTS,
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+        "-iree-codegen-llvm-experimental-linalg-on-tensors",
+    ],
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
 )

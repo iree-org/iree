@@ -38,8 +38,8 @@ package(
         deps = [
             "//third_party/py/absl:app",
             "//third_party/py/absl/flags",
+            "//third_party/py/iree:pylib_tf_support",
             "//third_party/py/numpy",
-            "//third_party/py/pyiree:pylib_tf_support",
             "//third_party/py/tensorflow",
             "//util/debuginfo:signalsafe_addr2line_installer",
         ],
@@ -135,13 +135,17 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    tags = [
+        # Kokoro doesn't have kws_streaming installed
+        "nokokoro",
+    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],
@@ -172,13 +176,17 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    tags = [
+        # Kokoro doesn't have kws_streaming installed
+        "nokokoro",
+    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],
@@ -216,13 +224,17 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    tags = [
+        # Kokoro doesn't have kws_streaming installed
+        "nokokoro",
+    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],
@@ -238,8 +250,8 @@ py_binary(
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],

@@ -36,9 +36,9 @@ fi
 # Ninja gets confused. See https://github.com/google/pytype/issues/198
 BASE=$(echo "${FILES?}" | grep -vP '^(\./)?integrations/*')
 IREE_TF=$(echo "${FILES?}" | \
-          grep -P '^(\./)?integrations/tensorflow/bindings/python/pyiree/tf/.*')
+          grep -P '^(\./)?integrations/tensorflow/bindings/python/iree/tf/.*')
 IREE_XLA=$(echo "${FILES?}" | \
-           grep -P '^(\./)?integrations/tensorflow/bindings/python/pyiree/xla/.*')
+           grep -P '^(\./)?integrations/tensorflow/bindings/python/iree/xla/.*')
 COMPILER=$(echo "${FILES?}" | \
            grep -P '^(\./)?integrations/tensorflow/compiler/.*')
 E2E=$(echo "${FILES?}" | grep -P '^(\./)?integrations/tensorflow/e2e/.*')
@@ -71,11 +71,11 @@ echo "Checking .py files outside of integrations/"
 check_files "${MAX_CODE?}" "${BASE?}"
 MAX_CODE="$?"
 
-echo "Checking .py files in integrations/tensorflow/bindings/python/pyiree/tf/.*"
+echo "Checking .py files in integrations/tensorflow/bindings/python/iree/tf/.*"
 check_files "${MAX_CODE?}" "${IREE_TF?}"
 MAX_CODE="$?"
 
-echo "Checking .py files in integrations/tensorflow/bindings/python/pyiree/xla/.*"
+echo "Checking .py files in integrations/tensorflow/bindings/python/iree/xla/.*"
 check_files "${MAX_CODE?}" "${IREE_XLA?}"
 MAX_CODE="$?"
 
