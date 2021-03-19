@@ -331,6 +331,7 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   // fall back to convertToGPU which will map one element to one thread. To
   // avoid a mismatch in the number of workgroup dispatched, we pick a tile size
   // to have one element per thread.
+  // TODO: Remove this once we switch to linalg on tensor path.
   if (options.enableVectorization) {
     sizes.append({4 * subgroupSize, 2 * subgroupSize});
   }
