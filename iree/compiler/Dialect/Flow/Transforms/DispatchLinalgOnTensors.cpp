@@ -917,10 +917,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           }));
     }
 
-    // NOTE: Special treatment for convolution, which have more than 3
-    // parallel dimensions. We want to ignore the batch dimension and tile
-    // along the next three. That means setting the first position to zero.
-    // TODO(#5048): figure out a better way to avoid this special case.
+    // For ops with more than 3 parallel dimensions, we want to ignore the
+    // higher dimension and tile along last three dimensions.
     for (size_t dim = 0; dim < numTiledLoops; ++dim) {
       useTileSizes[numParallelDims - dim - 1] =
           buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupSizeOp>(builder, dim);

@@ -326,15 +326,21 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   config.workgroupSize[2] = 1;
   ShapedType outputShape = op.getOutputShapedType(0);
 
-  SmallVector<int64_t, 4> sizes;
-  // When Vectororization is not enabled the convertToGPU pass assumes that that
-  // tile size is equal to the workgroup size.
+  SmallVector<int64_t, 4> candidateTileSizes;
+  // When Vectororization is not enabled we skil the second level of tiling and
+  // fall back to convertToGPU which will map one element to one thread. To
+  // avoid a mismatch in the number of workgroup dispatched, we pick a tile size
+  // to have one element per thread.
+  // TODO: Remove this once we switch to linalg on tensor path.
   if (options.enableVectorization) {
-    sizes.append({4 * subgroupSize, 2 * subgroupSize});
+    candidateTileSizes.append({4 * subgroupSize, 2 * subgroupSize});
   }
-  sizes.push_back(subgroupSize);
+  candidateTileSizes.push_back(subgroupSize);
+  // Use the first tile size that can divide the shape. If the shape is not
+  // aligned on any of the tile sizes pick the smallest tile of one element per
+  // thread.
   int64_t lowerTs = config.workgroupSize[0];
-  for (int64_t size : sizes) {
+  for (int64_t size : candidateTileSizes) {
     if (outputShape.getShape().back() % size != 0) continue;
     lowerTs = size;
     break;
@@ -343,10 +349,10 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   size_t numLoops = getNumOuterParallelLoops(op);
   ts.resize(numLoops, 1);
   ts.back() = lowerTs;
-  tileSizes.emplace_back(ts);
-  tileSizes.emplace_back();
+  tileSizes.emplace_back(ts); // Workgroup level.
+  tileSizes.emplace_back();   // Subgroup level.
   ts.back() = lowerTs / subgroupSize;
-  tileSizes.emplace_back(ts);
+  tileSizes.emplace_back(ts); // Thread level.
   // Vectorize only if we are processing more than one element per thread.
   config.vectorize = options.enableVectorization && (ts.back() > 1);
   return success();
