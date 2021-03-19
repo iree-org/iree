@@ -62,6 +62,10 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-codegen-spirv-experimental-linalg-on-tensors"
+    "-iree-spirv-enable-vectorization"
 )
 
 iree_check_single_backend_test_suite(

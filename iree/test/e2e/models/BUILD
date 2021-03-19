@@ -75,6 +75,11 @@ iree_check_single_backend_test_suite(
     srcs = [
         "mobilenetv2_fake_weights.mlir",
     ],
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+        "-iree-codegen-spirv-experimental-linalg-on-tensors",
+        "-iree-spirv-enable-vectorization",
+    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
