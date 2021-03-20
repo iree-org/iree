@@ -33,7 +33,11 @@ namespace TF {
 // passes in the right order.
 void buildTFImportPassPipeline(OpPassManager &pm);
 
+void buildMHLOImportPassPipeline(OpPassManager &pm);
+
 void registerTFImportPassPipeline();
+
+void registerMHLOImportPassPipeline();
 
 //===----------------------------------------------------------------------===//
 // IREE-specific Passes For TensorFlow Import
@@ -75,6 +79,7 @@ void registerAllDialects(mlir::DialectRegistry &registry);
 
 inline void registerAllPasses() {
   registerTFImportPassPipeline();
+  registerMHLOImportPassPipeline();
 
   createConvertToMHLOPass();
   createFlattenTuplesInCFGPass();
