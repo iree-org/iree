@@ -103,7 +103,7 @@ def get_pixel4_default_target_list(batch_config=None):
           name="vulkan-spirv",
           mako_tag="vlk",
           compilation_flags=[
-              "--iree-spirv-enable-vectorization",
+              # "--iree-spirv-enable-vectorization",
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
           ])
   ]
@@ -124,12 +124,13 @@ def get_s20_default_target_list(batch_config=None):
                      "--iree-llvm-target-triple=aarch64-none-linux-android29"
                  ],
                  runtime_flags=["--dylib_worker_count=1"]),
-      TargetInfo(name="vulkan-spirv",
-                 mako_tag="vlk",
-                 compilation_flags=[
-                     "--iree-spirv-enable-vectorization",
-                     "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
-                 ])
+      TargetInfo(
+          name="vulkan-spirv",
+          mako_tag="vlk",
+          compilation_flags=[
+              # "--iree-spirv-enable-vectorization",
+              "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
+          ])
   ]
   for target in targets:
     if target.mako_tag in batch_config:
