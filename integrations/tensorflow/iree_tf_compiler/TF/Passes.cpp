@@ -152,7 +152,6 @@ void buildMHLOImportPassPipeline(OpPassManager &pm) {
   pm.addPass(iree_compiler::Shape::createConvertHLOToShapePass());
 }
 
-
 void registerMHLOImportPassPipeline() {
   mlir::PassPipelineRegistration<> pipeline(
       "iree-mhlo-import-pipeline",
