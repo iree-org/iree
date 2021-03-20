@@ -644,15 +644,10 @@ iree_status_allocate_f(iree_status_code_t code, const char* file, uint32_t line,
   return ret;
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_allocate_vf(iree_status_code_t code, const char* file,
-                        uint32_t line, const char* format, va_list varargs_0) {
-  // Issue #5184
-  // make a copy so we can walk the arguments once to determine storage size
-  // and once to copy the values.
-  va_list varargs_1;
-  va_copy(varargs_1, varargs_0);
-
+iree_status_t _iree_status_allocate_vf(iree_status_code_t code,
+                                       const char* file, uint32_t line,
+                                       const char* format, va_list varargs_0,
+                                       va_list varargs_1) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
   // Annotations disabled; ignore the format string/args.
   return iree_status_allocate(code, file, line, iree_string_view_empty());
@@ -697,6 +692,20 @@ iree_status_allocate_vf(iree_status_code_t code, const char* file,
   iree_status_attach_stack_trace(storage, /*skip_frames=*/1);
   return (iree_status_t)((uintptr_t)storage | (code & IREE_STATUS_CODE_MASK));
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_allocate_vf(iree_status_code_t code, const char* file,
+                        uint32_t line, const char* format, va_list varargs_0) {
+  // Issue #5184
+  // make a copy so we can walk the arguments once to determine storage size
+  // and once to copy the values.
+  va_list varargs_1;
+  va_copy(varargs_1, varargs_0);
+  iree_status_t ret =
+      _iree_status_allocate_vf(code, file, line, format, varargs_0, varargs_1);
+  va_end(varargs_1);
+  return ret;
 }
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
@@ -803,15 +812,9 @@ IREE_PRINTF_ATTRIBUTE(2, 3)
   return ret;
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_annotate_vf(iree_status_t base_status, const char* format,
-                        va_list varargs_0) {
-  // Issue #5184
-  // make a copy so we can walk the arguments once to determine storage size
-  // and once to copy the values.
-  va_list varargs_1;
-  va_copy(varargs_1, varargs_0);
-
+iree_status_t _iree_status_annotate_vf(iree_status_t base_status,
+                                       const char* format, va_list varargs_0,
+                                       va_list varargs_1) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
   return base_status;
 #else
@@ -858,6 +861,20 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
   return iree_status_append_payload(base_status, storage,
                                     (iree_status_payload_t*)payload);
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_annotate_vf(iree_status_t base_status, const char* format,
+                        va_list varargs_0) {
+  // Issue #5184
+  // make a copy so we can walk the arguments once to determine storage size
+  // and once to copy the values.
+  va_list varargs_1;
+  va_copy(varargs_1, varargs_0);
+  iree_status_t ret =
+      _iree_status_annotate_vf(base_status, format, varargs_0, varargs_1);
+  va_end(varargs_1);
+  return ret;
 }
 
 IREE_API_EXPORT bool IREE_API_CALL
