@@ -93,6 +93,7 @@ cc_binary(
         "//iree_tf_compiler/TF",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo_to_mlir_hlo",
         "@org_tensorflow//tensorflow/compiler/xla/service:hlo_parser",

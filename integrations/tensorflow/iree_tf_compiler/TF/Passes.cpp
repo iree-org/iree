@@ -127,6 +127,10 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.nest<ModuleOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createVerifyFullyConvertedPass());
 
+  buildMHLOImportPassPipeline(pm);
+}
+
+void buildMHLOImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
   // Convert control flow and flatten tuples (like tuple<tensor<...>, ...>)
   //----------------------------------------------------------------------------
@@ -146,6 +150,15 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   // shapes until these can be done properly upstream.
   ////////////////////////////////////////////////////////////////////////////
   pm.addPass(iree_compiler::Shape::createConvertHLOToShapePass());
+}
+
+void registerMHLOImportPassPipeline() {
+  mlir::PassPipelineRegistration<> pipeline(
+      "iree-mhlo-import-pipeline",
+      "Run IREE-specific passes for importing MHLO code into IREE",
+      [](OpPassManager &passManager) {
+        buildMHLOImportPassPipeline(passManager);
+      });
 }
 
 void registerTFImportPassPipeline() {

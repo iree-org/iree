@@ -18,6 +18,7 @@
 #include <fstream>
 #include <iostream>
 
+#include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
@@ -28,6 +29,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/xla/hlo_to_mlir_hlo.h"
 #include "tensorflow/compiler/xla/service/hlo.pb.h"
@@ -216,6 +218,17 @@ int main(int argc, char **argv) {
   // Save temp output.
   if (!saveTempIreeImport.empty()) {
     if (failed(saveToFile(saveTempIreeImport))) return 10;
+  }
+
+  // Run passes.
+  PassManager pm(&context, PassManager::Nesting::Implicit);
+  applyPassManagerCLOptions(pm);
+
+  iree_integrations::TF::buildMHLOImportPassPipeline(pm);
+  if (failed(pm.run(*module))) {
+    llvm::errs()
+        << "Running iree-xla-import pass pipeline failed (see diagnostics)\n";
+    return 2;
   }
 
   // Save output.

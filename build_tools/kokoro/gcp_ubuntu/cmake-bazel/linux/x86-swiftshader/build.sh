@@ -70,4 +70,6 @@ ninja
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 echo "Testing with CTest"
-ctest --output-on-failure -L 'integrations/tensorflow' --label-exclude "^nokokoro$"
+ctest --output-on-failure \
+   --tests-regex "^integrations/tensorflow/|^bindings/python/" \
+   --label-exclude "^nokokoro$"
