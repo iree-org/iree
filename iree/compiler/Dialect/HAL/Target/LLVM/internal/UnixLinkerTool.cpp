@@ -84,7 +84,7 @@ class UnixLinkerTool : public LinkerTool {
 
         // Avoids including any libc/startup files that initialize the CRT as
         // we don't use any of that. Our shared libraries must be freestanding.
-        "-nostdlib",  // -nodefaultlibs + -nostartfiles
+        // "-nostdlib",  // -nodefaultlibs + -nostartfiles
 
         // Statically link all dependencies so we don't have any runtime deps.
         // We cannot have any imports in the module we produce.
@@ -94,11 +94,16 @@ class UnixLinkerTool : public LinkerTool {
         // We need hermetic binaries that pull in no imports; the MLIR LLVM
         // lowering paths introduce a bunch, though, so this is what we are
         // stuck with.
-        "-shared",
+        // "-shared",
         "-undefined suppress",
 
         "-o " + artifacts.libraryFile.path,
     };
+
+    if (!(targetTriple.isOSDarwin() || targetTriple.isiOS())) {
+      flags.push_back("-nostdlib");
+      flags.push_back("-static");
+    }
 
     if (targetTriple.isOSDarwin() || targetTriple.isiOS()) {
       flags.push_back("-dylib");
