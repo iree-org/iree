@@ -690,8 +690,7 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 iree_status_allocate_vf(iree_status_code_t code, const char* file,
-                        uint32_t line, const char* format, va_list varargs_0,
-                        va_list varargs_1);
+                        uint32_t line, const char* format, va_list varargs_0);
 
 // Clones |status| into a new status instance.
 // No payloads, if present, will be cloned.
@@ -724,7 +723,7 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 iree_status_annotate_vf(iree_status_t base_status, const char* format,
-                        va_list varargs_0, va_list varargs_1);
+                        va_list varargs_0);
 
 // Formats the status as a multi-line string containing all associated payloads.
 // Note that this may contain PII such as file paths and must only be used for
