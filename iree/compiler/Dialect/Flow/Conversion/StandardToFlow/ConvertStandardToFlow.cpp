@@ -27,21 +27,31 @@ namespace iree_compiler {
 
 namespace {
 
-struct ExtractElementOpLowering : public OpRewritePattern<tensor::ExtractOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::ExtractOp op,
-                                PatternRewriter &rewriter) const override {
-    auto tensorType = op.tensor().getType().dyn_cast<TensorType>();
-    if (!tensorType) {
-      return rewriter.notifyMatchFailure(op, "expected tensor types");
-    }
+/// tensor::ExtractOp will be lowered to IREE::Flow::TensorLoadOp. If the type
+/// is i1, it's not valid to load. In this case, we need to cast it to i8 before
+/// the load, and truncate the value after the load.
+struct ExtractElementOpLowering
+    : public OpConversionPattern<tensor::ExtractOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      tensor::ExtractOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override {
     // tensor<i1> is not valid to load, it needs to be converted to i8 or
     // something else instead.
+    auto tensorType = op.tensor().getType().cast<TensorType>();
     if (tensorType.getElementType().isInteger(1)) {
-      return rewriter.notifyMatchFailure(op, "expected non-i1 type");
+      auto i1Type = rewriter.getI1Type();
+      auto i8Type = rewriter.getIntegerType(8);
+      auto convertedOperand = rewriter.createOrFold<ZeroExtendIOp>(
+          op.getLoc(), args[0],
+          RankedTensorType::get(tensorType.getShape(), i8Type));
+      auto i8Value = rewriter.createOrFold<IREE::Flow::TensorLoadOp>(
+          op.getLoc(), i8Type, convertedOperand, op.indices());
+      rewriter.replaceOpWithNewOp<TruncateIOp>(op, i1Type, i8Value);
+    } else {
+      rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
+          op, tensorType.getElementType(), op.tensor(), op.indices());
     }
-    rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
-        op, tensorType.getElementType(), op.tensor(), op.indices());
     return success();
   }
 };
@@ -50,10 +60,7 @@ struct ExtractElementOpLowering : public OpRewritePattern<tensor::ExtractOp> {
 
 void setupDirectStandardToFlowLegality(MLIRContext *context,
                                        ConversionTarget &conversionTarget) {
-  conversionTarget.addDynamicallyLegalOp<tensor::ExtractOp>(
-      [](tensor::ExtractOp op) {
-        return !op.tensor().getType().isa<TensorType>();
-      });
+  conversionTarget.addIllegalOp<tensor::ExtractOp>();
 }
 
 void populateStandardToFlowPatterns(MLIRContext *context,

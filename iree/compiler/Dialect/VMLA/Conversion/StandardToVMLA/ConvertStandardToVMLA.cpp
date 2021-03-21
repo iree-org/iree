@@ -175,6 +175,37 @@ class CmpFOpConversion
   }
 };
 
+class ZeroExtendIOpConversion
+    : public VMLAOpConversion<mlir::ZeroExtendIOp, IREE::VMLA::CmpOp> {
+ public:
+  using VMLAOpConversion::VMLAOpConversion;
+
+  LogicalResult matchAndRewrite(
+      mlir::ZeroExtendIOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto srcType = srcOp.getOperand().getType().dyn_cast<ShapedType>();
+    auto dstType = srcOp.getResult().getType().dyn_cast<ShapedType>();
+    if (!srcType || !dstType) return failure();
+    if ((srcType.getElementTypeBitWidth() == 1 &&
+         dstType.getElementTypeBitWidth() == 8) ||
+        (srcType.getElementTypeBitWidth() == 8 &&
+         dstType.getElementTypeBitWidth() == 1)) {
+      auto dst = VMLAConversionTarget::allocateOutputBuffer(
+          srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
+      auto bitMask = rewriter.createOrFold<mlir::ConstantIntOp>(
+          srcOp.getLoc(), 1, rewriter.getI32Type());
+      rewriter.createOrFold<IREE::VMLA::AndBroadcastOp>(
+          srcOp.getLoc(), operands[0], bitMask, dst,
+          TypeAttr::get(rewriter.getIntegerType(8)), false);
+      rewriter.replaceOp(srcOp, {dst});
+      return success();
+    } else {
+      // Unhandled.
+      return failure();
+    }
+  }
+};
+
 }  // namespace
 
 void populateStandardToVMLAPatterns(MLIRContext *context,
@@ -183,6 +214,7 @@ void populateStandardToVMLAPatterns(MLIRContext *context,
   patterns.insert<ConstantOpConversion>(typeConverter, context);
   patterns.insert<CmpIOpConversion>(typeConverter, context);
   patterns.insert<CmpFOpConversion>(typeConverter, context);
+  patterns.insert<ZeroExtendIOpConversion>(typeConverter, context);
 
   patterns.insert<VMLAOpConversion<mlir::ReturnOp, mlir::ReturnOp>>(
       typeConverter, context);
