@@ -111,7 +111,22 @@ def get_pixel4_default_target_list(batch_config=None):
           compilation_flags=[
               "--iree-spirv-enable-vectorization",
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
-          ])
+          ]),
+      TargetInfo(name="dylib-llvm-aot",
+                 mako_tag="cpu2",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+                     "--iree-flow-dispatch-linalg-on-tensors",
+                     "--iree-codegen-llvm-experimental-linalg-on-tensors"
+                 ],
+                 runtime_flags=["--dylib_worker_count=1"]),
+      TargetInfo(name="vulkan-spirv",
+                 mako_tag="vlk2",
+                 compilation_flags=[
+                     "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
+                     "--iree-flow-dispatch-linalg-on-tensors",
+                     "--iree-codegen-spirv-experimental-linalg-on-tensors"
+                 ])
   ]
   for target in targets:
     if target.mako_tag in batch_config:
@@ -130,11 +145,27 @@ def get_s20_default_target_list(batch_config=None):
                      "--iree-llvm-target-triple=aarch64-none-linux-android29"
                  ],
                  runtime_flags=["--dylib_worker_count=1"]),
-      TargetInfo(name="vulkan-spirv",
-                 mako_tag="vlk",
+      TargetInfo(
+          name="vulkan-spirv",
+          mako_tag="vlk",
+          compilation_flags=[
+              "--iree-spirv-enable-vectorization",
+              "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
+          ]),
+      TargetInfo(name="dylib-llvm-aot",
+                 mako_tag="cpu2",
                  compilation_flags=[
-                     "--iree-spirv-enable-vectorization",
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+                     "--iree-flow-dispatch-linalg-on-tensors",
+                     "--iree-codegen-llvm-experimental-linalg-on-tensors"
+                 ],
+                 runtime_flags=["--dylib_worker_count=1"]),
+      TargetInfo(name="vulkan-spirv",
+                 mako_tag="vlk2",
+                 compilation_flags=[
                      "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
+                     "--iree-flow-dispatch-linalg-on-tensors",
+                     "--iree-codegen-spirv-experimental-linalg-on-tensors"
                  ])
   ]
   for target in targets:
