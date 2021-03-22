@@ -1,6 +1,6 @@
 // RUN: iree-opt -allow-unregistered-dialect -iree-codegen-convert-to-llvm -split-input-file %s | IreeFileCheck %s
 
-// CHECK-LABEL: llvm.func @binding_ptrs
+// CHECK-LABEL: llvm.func internal @binding_ptrs
 func @binding_ptrs() {
   // CHECK-DAG: %[[C72:.+]] = llvm.mlir.constant(72 : index) : i64
   %c72 = constant 72 : index
@@ -28,7 +28,7 @@ hal.interface @io attributes {push_constants = 2 : i32, sym_visibility = "privat
 
 // -----
 
-// CHECK-LABEL: llvm.func @tie_shape
+// CHECK-LABEL: llvm.func internal @tie_shape
 func @tie_shape() {
   %c72 = constant 72 : index
   // ...

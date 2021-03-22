@@ -112,7 +112,7 @@ typedef struct {
 // The provided |max_version| is the maximum version the caller supports;
 // callees must return NULL if their lowest available version is greater
 // than the max version supported by the caller.
-typedef const iree_hal_executable_library_header_t* (
+typedef const iree_hal_executable_library_header_t** (
     *iree_hal_executable_library_query_fn_t)(
     iree_hal_executable_library_version_t max_version);
 
@@ -204,12 +204,12 @@ typedef struct {
   // Optional table of export function entry point names 1:1 with entry_points.
   // These names are only used for tracing/debugging and can be omitted to save
   // binary size.
-  const char** entry_point_names;
+  const char* const* entry_point_names;
   // Optional table of entry point tags that describe the entry point in a
   // human-readable format useful for verbose logging. The string values, when
   // present, may be attached to tracing/debugging events related to the entry
   // point.
-  const char** entry_point_tags;
+  const char* const* entry_point_tags;
 
   // TODO(benvanik): optional import declarations.
 } iree_hal_executable_library_v0_t;

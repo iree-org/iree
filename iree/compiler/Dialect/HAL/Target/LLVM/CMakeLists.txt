@@ -19,8 +19,10 @@ iree_cc_library(
     LLVM
   HDRS
     "LLVMAOTTarget.h"
+    "LibraryBuilder.h"
   SRCS
     "LLVMAOTTarget.cpp"
+    "LibraryBuilder.cpp"
   DEPS
     ::LLVMIRPasses
     ::LLVMTargetOptions

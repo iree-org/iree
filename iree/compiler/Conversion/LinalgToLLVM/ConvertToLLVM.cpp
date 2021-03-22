@@ -350,15 +350,26 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
 
     // Clone the function as an LLVMFuncOp and convert all interior types.
     auto llvmFuncType = LLVM::LLVMFunctionType::get(
-        LLVM::LLVMVoidType::get(rewriter.getContext()), abiInputTypes);
+        IntegerType::get(rewriter.getContext(), 32), abiInputTypes);
     auto llvmFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
         stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
-        LLVM::Linkage::External, funcAttrs);
+        LLVM::Linkage::Internal, funcAttrs);
     rewriter.inlineRegionBefore(stdFuncOp.getBody(), llvmFuncOp.getBody(),
                                 llvmFuncOp.end());
     if (failed(rewriter.convertRegionTypes(
             &llvmFuncOp.getBody(), *typeConverter, &signatureConverter))) {
       return failure();
+    }
+
+    // Add default zero return value.
+    // TODO(ataei): do something meaningful with the return value; non-zero will
+    // have the runtime bail out with an error.
+    for (auto returnOp :
+         llvm::make_early_inc_range(llvmFuncOp.getOps<mlir::ReturnOp>())) {
+      rewriter.setInsertionPoint(returnOp);
+      auto returnValue =
+          rewriter.createOrFold<mlir::ConstantIntOp>(returnOp.getLoc(), 0, 32);
+      rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, returnValue);
     }
 
     rewriter.eraseOp(stdFuncOp);
@@ -563,7 +574,7 @@ class RemoveMakeRankedShape : public ConvertToLLVMPattern {
   }
 };
 
-// Upateds memref descriptors shape and strides informations and fold tie_shape
+// Updates memref descriptors shape and strides informations and fold tie_shape
 // into updated memref descriptor.
 class ConvertTieShapePattern : public ConvertToLLVMPattern {
  public:

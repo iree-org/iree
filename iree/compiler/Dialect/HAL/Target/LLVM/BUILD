@@ -32,9 +32,11 @@ cc_library(
     name = "LLVM",
     srcs = [
         "LLVMAOTTarget.cpp",
+        "LibraryBuilder.cpp",
     ],
     hdrs = [
         "LLVMAOTTarget.h",
+        "LibraryBuilder.h",
     ],
     deps = [
         ":LLVMIRPasses",

@@ -57,8 +57,9 @@ class WasmLinkerTool : public LinkerTool {
     return "";
   }
 
-  LogicalResult configureModule(llvm::Module *llvmModule,
-                                ArrayRef<StringRef> entryPointNames) override {
+  LogicalResult configureModule(
+      llvm::Module *llvmModule,
+      ArrayRef<llvm::Function *> exportedFuncs) override {
     for (auto &func : *llvmModule) {
       // Enable frame pointers to ensure that stack unwinding works.
       func.addFnAttr("frame-pointer", "all");
@@ -66,13 +67,6 @@ class WasmLinkerTool : public LinkerTool {
       // -ffreestanding-like behavior.
       func.addFnAttr("no-builtins");
     }
-
-    // https://lld.llvm.org/WebAssembly.html#exports
-    for (auto entryPointName : entryPointNames) {
-      auto *entryPointFn = llvmModule->getFunction(entryPointName);
-      entryPointFn->addFnAttr("wasm-export-name", entryPointName);
-    }
-
     return success();
   }
 
