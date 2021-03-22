@@ -48,10 +48,6 @@ Builds IREE documentation. Defaults to `OFF`.
 
 Builds IREE sample projects. Defaults to `ON`.
 
-#### `IREE_BUILD_DEBUGGER`:BOOL
-
-Builds the IREE debugger app. Defaults to `OFF`.
-
 #### `IREE_BUILD_PYTHON_BINDINGS`:BOOL
 
 Builds the IREE python bindings. Defaults to `OFF`.

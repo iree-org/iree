@@ -40,6 +40,5 @@ cd build
                       -DIREE_BUILD_TESTS=ON \
                       -DIREE_BUILD_SAMPLES=OFF \
                       -DIREE_BUILD_DOCS=ON \
-                      -DIREE_BUILD_DEBUGGER=OFF \
                       -DIREE_BUILD_PYTHON_BINDINGS=ON ..
 "$CMAKE_BIN" --build .
