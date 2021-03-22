@@ -520,7 +520,8 @@ LogicalResult getConvOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
                                     const SPIRVCodegenOptions &options,
                                     TileSizesListType &tileSizes,
                                     LaunchConfigInfo &config) {
-  if (targetEnv.getVendorID() == spirv::Vendor::ARM &&
+  if (options.enableVectorization &&
+      targetEnv.getVendorID() == spirv::Vendor::ARM &&
       succeeded(getMaliSpecificConfig(op, tileSizes, config))) {
     return success();
   }
