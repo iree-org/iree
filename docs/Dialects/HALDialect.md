@@ -130,8 +130,8 @@ repeatedly.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`memory_types` | ::mlir::IntegerAttr | valid MemoryType
-`buffer_usage` | ::mlir::IntegerAttr | valid BufferUsage
+`memory_types` | mlir::iree_compiler::IREE::HAL::MemoryTypeBitfieldAttr | valid MemoryType
+`buffer_usage` | mlir::iree_compiler::IREE::HAL::BufferUsageBitfieldAttr | valid BufferUsage
 `value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Operands:
@@ -166,8 +166,8 @@ allocator has specific alignment requirements or minimum allocation sizes.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`memory_types` | ::mlir::IntegerAttr | valid MemoryType
-`buffer_usage` | ::mlir::IntegerAttr | valid BufferUsage
+`memory_types` | mlir::iree_compiler::IREE::HAL::MemoryTypeBitfieldAttr | valid MemoryType
+`buffer_usage` | mlir::iree_compiler::IREE::HAL::BufferUsageBitfieldAttr | valid BufferUsage
 
 #### Operands:
 
@@ -295,8 +295,8 @@ devices.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`memory_types` | ::mlir::IntegerAttr | valid MemoryType
-`buffer_usage` | ::mlir::IntegerAttr | valid BufferUsage
+`memory_types` | mlir::iree_compiler::IREE::HAL::MemoryTypeBitfieldAttr | valid MemoryType
+`buffer_usage` | mlir::iree_compiler::IREE::HAL::BufferUsageBitfieldAttr | valid BufferUsage
 
 #### Operands:
 
@@ -604,8 +604,8 @@ allocation and a buffer view wrapper.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`memory_types` | ::mlir::IntegerAttr | valid MemoryType
-`buffer_usage` | ::mlir::IntegerAttr | valid BufferUsage
+`memory_types` | mlir::iree_compiler::IREE::HAL::MemoryTypeBitfieldAttr | valid MemoryType
+`buffer_usage` | mlir::iree_compiler::IREE::HAL::BufferUsageBitfieldAttr | valid BufferUsage
 `value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Operands:
@@ -958,8 +958,8 @@ Returns a command buffer from the device pool ready to begin recording.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`modes` | ::mlir::IntegerAttr | valid CommandBufferMode
-`command_categories` | ::mlir::IntegerAttr | valid CommandCategory
+`modes` | mlir::iree_compiler::IREE::HAL::CommandBufferModeBitfieldAttr | valid CommandBufferMode
+`command_categories` | mlir::iree_compiler::IREE::HAL::CommandCategoryBitfieldAttr | valid CommandCategory
 
 #### Operands:
 
@@ -1177,9 +1177,9 @@ provided will be affected.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`source_stage_mask` | ::mlir::IntegerAttr | valid ExecutionStage
-`target_stage_mask` | ::mlir::IntegerAttr | valid ExecutionStage
-`flags` | ::mlir::IntegerAttr | valid ExecutionBarrierFlag
+`source_stage_mask` | mlir::iree_compiler::IREE::HAL::ExecutionStageBitfieldAttr | valid ExecutionStage
+`target_stage_mask` | mlir::iree_compiler::IREE::HAL::ExecutionStageBitfieldAttr | valid ExecutionStage
+`flags` | mlir::iree_compiler::IREE::HAL::ExecutionBarrierFlagBitfieldAttr | valid ExecutionBarrierFlag
 
 #### Operands:
 
@@ -1530,7 +1530,7 @@ executables that use the same set layouts can be reduced.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`usage_type` | ::mlir::IntegerAttr | IREE HAL DescriptorSetLayoutType
+`usage_type` | ::mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutUsageTypeAttr | IREE HAL DescriptorSetLayoutType
 `bindings` | ::mlir::ArrayAttr | HAL descriptor set layout binding array attribute
 
 #### Operands:
@@ -1570,7 +1570,7 @@ possibly lazy-initialized descriptor set layout.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`usage_type` | ::mlir::IntegerAttr | IREE HAL DescriptorSetLayoutType
+`usage_type` | ::mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutUsageTypeAttr | IREE HAL DescriptorSetLayoutType
 `bindings` | ::mlir::ArrayAttr | HAL descriptor set layout binding array attribute
 
 #### Operands:
@@ -1673,7 +1673,7 @@ device is not known at compile-time.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`model` | ::mlir::IntegerAttr | IREE HAL MemoryModel
+`model` | ::mlir::iree_compiler::IREE::HAL::MemoryModelAttr | IREE HAL MemoryModel
 
 #### Operands:
 
@@ -1823,7 +1823,7 @@ executable format in `iree/hal/executable_format.h`.
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
 `sym_name` | ::mlir::StringAttr | string attribute
-`format` | ::mlir::IntegerAttr | IREE HAL Executable format
+`format` | ::mlir::iree_compiler::IREE::HAL::ExecutableFormatAttr | IREE HAL Executable format
 `data` | ::mlir::DenseIntElementsAttr | 8-bit signless integer elements attribute
 
 ### `hal.executable.create` (::mlir::iree_compiler::IREE::HAL::ExecutableCreateOp)
@@ -2101,8 +2101,8 @@ the scheduler.
 `sym_name` | ::mlir::StringAttr | string attribute
 `set` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 `binding` | ::mlir::IntegerAttr | 32-bit signless integer attribute
-`type` | ::mlir::IntegerAttr | IREE HAL DescriptorType
-`access` | ::mlir::IntegerAttr | valid MemoryAccess
+`type` | ::mlir::iree_compiler::IREE::HAL::DescriptorTypeAttr | IREE HAL DescriptorType
+`access` | mlir::iree_compiler::IREE::HAL::MemoryAccessBitfieldAttr | valid MemoryAccess
 
 ### `hal.interface.binding.subspan` (::mlir::iree_compiler::IREE::HAL::InterfaceBindingSubspanOp)
 
@@ -2546,8 +2546,8 @@ command buffer barrier operations.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`source_scope` | ::mlir::IntegerAttr | valid AccessScope
-`target_scope` | ::mlir::IntegerAttr | valid AccessScope
+`source_scope` | mlir::iree_compiler::IREE::HAL::AccessScopeBitfieldAttr | valid AccessScope
+`target_scope` | mlir::iree_compiler::IREE::HAL::AccessScopeBitfieldAttr | valid AccessScope
 
 #### Operands:
 
@@ -2581,8 +2581,8 @@ command buffer barrier operations.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`source_scope` | ::mlir::IntegerAttr | valid AccessScope
-`target_scope` | ::mlir::IntegerAttr | valid AccessScope
+`source_scope` | mlir::iree_compiler::IREE::HAL::AccessScopeBitfieldAttr | valid AccessScope
+`target_scope` | mlir::iree_compiler::IREE::HAL::AccessScopeBitfieldAttr | valid AccessScope
 
 #### Results:
 

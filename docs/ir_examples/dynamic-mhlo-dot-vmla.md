@@ -30,34 +30,6 @@ func @dot(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>) -> tensor<?x?xf32> attri
   return %0 : tensor<?x?xf32>
 }
 ```
-### IR Dump After Canonicalizer
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
-### IR Dump After Inliner
-```
-module  {
-  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-    return %0 : tensor<?x?xf32>
-  }
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::FlattenTuplesInCFGPass
-```
-module  {
-  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-    return %0 : tensor<?x?xf32>
-  }
-}
-
-```
 ### IR Dump After mlir::iree_compiler::IREE::SIP::MaterializeReflectionAttrsPass
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -92,14 +64,6 @@ module  {
 }
 
 ```
-### IR Dump After mlir::mhlo::{anonymous}::LegalizeControlFlowPass
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::HLOToHLOPreprocessing
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -117,14 +81,6 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 
 ```
 ### IR Dump After TosaToSCF
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
-### IR Dump After SCFToStandard
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -158,13 +114,11 @@ module  {
 }
 
 ```
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
+### IR Dump After SCFToStandard
 ```
-module  {
-  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-    return %0 : tensor<?x?xf32>
-  }
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
 }
 
 ```
@@ -186,7 +140,7 @@ module  {
 }
 
 ```
-### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::FlattenTuplesInCFGPass
+### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -285,6 +239,20 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::PrePartitioningConversionPass
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
+  %1 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
+  %2 = shapex.make_ranked_shape %1, %0 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %3 = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  %4 = shapex.tie_shape %arg2, %arg3 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  %5 = "mhlo.dot"(%3, %4) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  %6 = shapex.tie_shape %5, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  return %6, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+}
+
+```
+### IR Dump After Canonicalizer
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -483,26 +451,6 @@ module  {
     %12 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3](%1, %0, %arg2, %4, %5, %arg0, %6, %7) : (index, index, tensor<?x?xf32>{%8, %9}, index, index, tensor<?x?xf32>{%10, %11}, index, index) -> tensor<?x?xf32>{%1, %0}
     return %12, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   }
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::PostPartitioningConversionPass
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-  %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
-  %1 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
-  %2 = shapex.make_ranked_shape %1, %0 : (index, index) -> !shapex.ranked_shape<[?,?]>
-  %3 = muli %1, %0 : index
-  %4 = shapex.ranked_dim %arg3[0] : !shapex.ranked_shape<[?,?]> -> index
-  %5 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
-  %6 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
-  %7 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-  %8 = shapex.ranked_dim %arg3[0] : !shapex.ranked_shape<[?,?]> -> index
-  %9 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
-  %10 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
-  %11 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-  %12 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3](%1, %0, %arg2, %4, %5, %arg0, %6, %7) : (index, index, tensor<?x?xf32>{%8, %9}, index, index, tensor<?x?xf32>{%10, %11}, index, index) -> tensor<?x?xf32>{%1, %0}
-  return %12, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
 }
 
 ```

@@ -575,7 +575,7 @@ operation ::= `vmla.cmp` $predicate`,` $lhs`,` $rhs`,` `out` $dst attr-dict `:` 
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`predicate` | ::mlir::IntegerAttr | IREE VMLA comparison op predicate
+`predicate` | ::mlir::iree_compiler::IREE::VMLA::CmpPredicateAttr | IREE VMLA comparison op predicate
 `element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
