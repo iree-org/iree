@@ -719,3 +719,44 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   linalg.indexed_generic
 //       CHECK:     %[[VAL:.+]] = memref.load %[[ARG0]]
 //       CHECK:     linalg.yield %[[VAL]]
+
+// -----
+
+func @pooling_nhwc_sum() {
+  %c2 = constant 2 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:f32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : !flow.dispatch.tensor<readonly:1x4x6x1xf32>
+  %2 = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
+  %3 = linalg.init_tensor [2, 3] : tensor<2x3xf32>
+  %4 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:f32> -> tensor<f32>
+  %5 = tensor.extract %4[] : tensor<f32>
+  %6 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:1x4x6x1xf32> -> tensor<1x4x6x1xf32>
+  %7 = linalg.init_tensor [1, 2, 2, 1] : tensor<1x2x2x1xf32>
+  %8 = linalg.fill(%7, %5) : tensor<1x2x2x1xf32>, f32 -> tensor<1x2x2x1xf32>
+  %9 = linalg.pooling_nhwc_sum {
+    dilations = dense<1> : vector<2xi64>,
+    strides = dense<[2, 3]> : vector<2xi64>
+  } ins(%6, %3 : tensor<1x4x6x1xf32>, tensor<2x3xf32>)
+   outs(%8 : tensor<1x2x2x1xf32>) -> tensor<1x2x2x1xf32>
+  flow.dispatch.tensor.store %9, %2 : tensor<1x2x2x1xf32> -> !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
+  hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @pooling_nhwc_sum
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : memref<1x4x6x1xf32>
+//   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : memref<f32>
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : memref<1x2x2x1xf32>
+//       CHECK:   %[[WINDOW:.+]] = memref.alloc() : memref<2x3xf32>
+//       CHECK:   %[[INIT_VAL:.+]] = memref.load %[[INIT]][] : memref<f32>
+//       CHECK:   linalg.fill(%[[RET0]], %[[INIT_VAL]]) : memref<1x2x2x1xf32>, f32
+//       CHECK:   linalg.pooling_nhwc_sum
+//  CHECK-SAME:     dilations = dense<1> : vector<2xi64>
+//  CHECK-SAME:     strides = dense<[2, 3]> : vector<2xi64>
+//  CHECK-SAME:     ins(%[[INPUT]], %[[WINDOW]] : memref<1x4x6x1xf32>, memref<2x3xf32>)
+//  CHECK-SAME:    outs(%[[RET0]] : memref<1x2x2x1xf32>)

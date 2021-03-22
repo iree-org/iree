@@ -220,7 +220,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         "pad.mlir",
         "reduce.mlir",
-        # "reduce_window.mlir",
+        "reduce_window.mlir",
         "remainder.mlir",
         "reshape.mlir",
         "reverse.mlir",
@@ -279,7 +279,7 @@ iree_check_single_backend_test_suite(
         "negate.mlir",
         "pad.mlir",
         "reduce.mlir",
-        # "reduce_window.mlir",
+        "reduce_window.mlir",
         "remainder.mlir",
         "reshape.mlir",
         "reverse.mlir",

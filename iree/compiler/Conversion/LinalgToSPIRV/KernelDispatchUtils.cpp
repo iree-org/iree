@@ -691,12 +691,14 @@ static LogicalResult getPoolingOpLaunchConfig(
   // be able to figure out which dimensions of the output correspond to the
   // pooled dimension and which are not. Need to fix that, but for now just use
   // a working heuristic.
-  SmallVector<int64_t, 4> ts(std::min<int64_t>(
-      op.getOutput(0).getType().template cast<ShapedType>().getRank(), 3));
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
-  ts[ts.size() - 2] = tileSizeY;
-  ts[ts.size() - 1] = tileSizeX;
+  SmallVector<int64_t, 4> ts;
+  if (options.usingLinalgOnTensors) {
+    ts.assign({0, tileSizeY, tileSizeX, 1});
+  } else {
+    ts.assign({0, tileSizeY, tileSizeX});
+  }
   tileSizes.emplace_back(std::move(ts));
   config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();

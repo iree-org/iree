@@ -232,6 +232,22 @@ static LogicalResult convertConstantOp(OpBuilder &b, ConstantOp constantOp,
   return success();
 }
 
+/// Converts a linalg.init_tensor op to memref.alloc op. This provides a shaped
+/// operand for pooling ops. The op will be deleted after going to loops.
+static LogicalResult convertInitTensorOp(
+    OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn,
+    linalg::InitTensorOp initTensorOp, BlockAndValueMapping &bvm) {
+  if (bvm.contains(initTensorOp.getResult())) return success();
+  RankedTensorType tensorType = initTensorOp.getType();
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPointAfter(initTensorOp);
+  Value alloc = allocationFn(b, initTensorOp.getLoc(), tensorType.getShape(),
+                             tensorType.getElementType(),
+                             llvm::to_vector<4>(initTensorOp.sizes()));
+  bvm.map(initTensorOp.getResult(), alloc);
+  return success();
+}
+
 /// Avoids creating an allocation if the result tensor can just be aliased to
 /// use the same buffer (`inputBuffer`) that `srcTensor` is mapped to. This can
 /// be done if `srcTensor` has a single use, which is the operation which is
@@ -667,6 +683,9 @@ void LinalgBufferizePass::runOnFunction() {
         })
         .Case<linalg::TensorReshapeOp>([&](linalg::TensorReshapeOp reshapeOp) {
           return convertTensorReshapeOp(b, allocationFn, reshapeOp, bvm);
+        })
+        .Case<linalg::InitTensorOp>([&](linalg::InitTensorOp initTensorOp) {
+          return convertInitTensorOp(b, allocationFn, initTensorOp, bvm);
         })
         .Case<tensor::ExtractOp>([&](tensor::ExtractOp extractOp) {
           return convertTensorExtractOp(b, extractOp, bvm);
