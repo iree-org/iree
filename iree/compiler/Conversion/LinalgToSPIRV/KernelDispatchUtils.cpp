@@ -667,7 +667,13 @@ LogicalResult getOpLaunchConfig(linalg::DepthwiseConvInputNHWCFilterHWCFOp op,
                                   .getInt();
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
-  SmallVector<int64_t, 4> ts = {1, tileSizeY, tileSizeX};
+  SmallVector<int64_t, 4> ts;
+  if (options.usingLinalgOnTensors) {
+    // There are five parallel loops in depthwise_conv_2d_input_nhwc_filter_hwcf
+    ts.assign({0, 0, 1, tileSizeY, tileSizeX});
+  } else {
+    ts.assign({1, tileSizeY, tileSizeX});
+  }
   tileSizes.emplace_back(std::move(ts));
   config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
