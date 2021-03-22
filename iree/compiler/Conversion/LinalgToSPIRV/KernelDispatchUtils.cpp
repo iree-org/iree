@@ -348,6 +348,19 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   ts.resize(numLoops, 1);
   ts.back() = lowerTs;
   tileSizes.emplace_back(ts);  // Workgroup level.
+  // If the shape is not exactly aligned on the tile size skip the second level
+  // of tiling as it expect the number of iteration to be exactly equal to the
+  // number of processors.
+  if (outputShape.getShape().back() % lowerTs != 0) return success();
+
+  // Skip vectorization for non-minor identity inputs as it generates
+  // transfer_read ops with permutation maps that we currently cannot lower.
+  // TODO: Remove this restriction once the lowering of the permutation map is
+  // supported in core.
+  for (unsigned i = 0, e = op.getNumInputs(); i < e; i++) {
+    if (!op.getInputIndexingMap(i).isMinorIdentity()) return success();
+  }
+
   tileSizes.emplace_back();    // Subgroup level.
   ts.back() = lowerTs / subgroupSize;
   tileSizes.emplace_back(ts);  // Thread level.
