@@ -25,7 +25,7 @@ $ ./build_tools/riscv/riscv_bootstrap.sh
 ```
 
 * RISC-V toolchain is built from https://github.com/llvm/llvm-project
-* RISC-V QEMU is built from https://github.com/sifive/qemu/tree/v5.1.0-rvv-zfh-pmp
+* RISC-V QEMU is built from https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh
 
 ## Configure and build
 
@@ -38,7 +38,7 @@ $ cmake -G Ninja -B ../iree-build-host/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COM
 $ cmake --build ../iree-build-host/ --target install
 ```
 
-Debugging note: if `IREE_LLVMAOT_LINKER_PATH` is set for targeting Android then the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
+Debugging note: if `IREE_LLVMAOT_LINKER_PATH` is set for targeting RISC-V then the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
 
 ### Target configuration
 
@@ -123,7 +123,7 @@ Then run on the RISC-V QEMU:
 
 ```shell
 $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
-  -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+  -cpu rv64 \
   -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
   ../iree-build-riscv/iree/tools/iree-run-module -driver=dylib \
   -module_file=/tmp/iree-run-module-llvm_aot.vmfb \
@@ -138,4 +138,29 @@ I ../iree/tools/utils/vm_util.cc:227] Creating driver and device for 'dylib'...
 EXEC @abs
 I ../iree/tools/utils/vm_util.cc:172] result[0]: Buffer<sint32[]>
 i32=5
+```
+
+#### Enable RVV code-gen [Experimental]
+Through IREE's vectorization pass and LLVM backend, we can generate RVV VLS(Vector Length Specific) style codes.
+
+```shell
+../iree-build-host/install/bin/iree-translate \
+-iree-mlir-to-vm-bytecode-module \
+-iree-hal-target-backends=dylib-llvm-aot \
+-iree-llvm-target-triple=riscv64 \
+-iree-llvm-target-cpu=sifive-7-rv64 \
+-iree-llvm-target-abi=lp64d \
+-iree-llvm-target-cpu-features="+m,+a,+d,+experimental-v" \
+-riscv-v-vector-bits-min=128 -riscv-v-fixed-length-vector-lmul-max=8 \
+/path/to/input.mlir -o /tmp/output-rvv.vmfb
+```
+
+Then run on the RISC-V QEMU:
+
+```shell
+$ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
+  -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+  -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
+  ../iree-build-riscv/iree/tools/iree-run-module -driver=dylib \
+  -flagfile=/path/to/flagfile
 ```
