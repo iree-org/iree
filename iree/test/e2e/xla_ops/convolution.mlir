@@ -403,7 +403,7 @@ func @conv2d_1452x2223_dilated_valid() {
   return
 }
 
-func @depthwise_conv() {
+func @depthwise_conv_non_1_channel_multiplier() {
   %arg0 = iree.unfoldable_constant dense<1.0> : tensor<2x4x5x2xf32>
   %arg1 = iree.unfoldable_constant dense<1.0> : tensor<2x2x2x3xf32>
   %res = "mhlo.convolution"(%arg0, %arg1) {
