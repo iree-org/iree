@@ -1,4 +1,4 @@
-6ec136281086b71da32b5fb068bd6e46b78a5c79 third_party/abseil-cpp
+6f9d96a1f41439ac172ee2ef7ccd8edf0e5d068c third_party/abseil-cpp
 39c8d58a76ce7c3398786ee96a452668e8392af7 third_party/benchmark
 5916273f79a21551890fd3d56fc5375a78d1598d third_party/cpuinfo
 4fb0ff7069bd88ee85902f4d0bb62794e5f6d021 third_party/flatcc
