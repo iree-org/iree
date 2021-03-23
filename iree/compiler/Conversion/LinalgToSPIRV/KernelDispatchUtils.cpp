@@ -122,12 +122,14 @@ static void getMaliBestMatMulTileSizes(
     int64_t dstSize) {
   const int64_t smallMatrixSizeThreshold = 512 * 512;
   if (elementType.isF16()) {
-    // When the destination is smaller than the threshold, we prefer smaller
-    // tiles to increase parallelism.
+    // For smaller destination size we cannot fill out the GPU with bigger tile
+    // sizes. Instead we pick smaller tiles along M and N to increase the number
+    // of workgroups and a larger K tile size since we have lower pressure and
+    // need extra instructions to hide latency.
     // TODO: The threshold needs to be fine tuned by doing exploration based on
     // matrix shapes.
     if (dstSize <= smallMatrixSizeThreshold) {
-      tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 8}, {8, 2, 1}}));
+      tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {8, 2, 1}}));
     } else {
       tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {8, 2, 1}}));
       tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {8, 2, 1}}));
