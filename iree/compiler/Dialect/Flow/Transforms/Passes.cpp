@@ -199,13 +199,19 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   if (clEnableLinalgOnTensorsDispatch) {
     // TODO(benvanik): move up to input; requires pre-partitioning conversion
     // to be reworked first.
-    passManager.addNestedPass<FuncOp>(createHLOToLinalgOnTensorsPass(true));
+    passManager.addNestedPass<FuncOp>(
+        mlir::iree_compiler::createHLOToLinalgOnTensorsPass(true));
 
-    passManager.addNestedPass<FuncOp>(createLinalgFoldUnitExtentDimsPass());
-    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-    passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
-    passManager.addNestedPass<FuncOp>(createConvertToFlowTensorOpsPass());
-    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(
+        mlir::createConvertElementwiseToLinalgPass());
+    passManager.addNestedPass<FuncOp>(
+        mlir::createLinalgFoldUnitExtentDimsPass());
+    passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(
+        mlir::iree_compiler::createFusionOfTensorOpsPass());
+    passManager.addNestedPass<FuncOp>(
+        IREE::Flow::createConvertToFlowTensorOpsPass());
+    passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
     passManager.addNestedPass<FuncOp>(
         IREE::Flow::createDispatchLinalgOnTensorsPass());
@@ -249,10 +255,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(
         IREE::Flow::createInjectDispatchTracingPass());
   }
-
-  // Convert any leftover ops outside of dispatch regions to flow ops.
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createPostPartitioningConversionPass());
 
   //----------------------------------------------------------------------------
   // Stream formation.

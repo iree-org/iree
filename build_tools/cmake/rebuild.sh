@@ -35,11 +35,19 @@ else
   mkdir build
 fi
 cd build
-"$CMAKE_BIN" -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                      -DIREE_BUILD_COMPILER=ON \
-                      -DIREE_BUILD_TESTS=ON \
-                      -DIREE_BUILD_SAMPLES=OFF \
-                      -DIREE_BUILD_DOCS=ON \
-                      -DIREE_BUILD_DEBUGGER=OFF \
-                      -DIREE_BUILD_PYTHON_BINDINGS=ON ..
+
+CMAKE_ARGS=(
+  "-G" "Ninja"
+  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+
+  # Enable docs build on the CI. The additional builds are pretty fast and
+  # give us early warnings for some types of website publication errors.
+  "-DIREE_BUILD_DOCS=ON"
+
+  # Enable building the python bindings on CI. Most heavy targets are gated on
+  # IREE_ENABLE_TENSORFLOW, so what's left here should be fast.
+  "-DIREE_BUILD_PYTHON_BINDINGS=ON"
+)
+
+"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" ..
 "$CMAKE_BIN" --build .

@@ -17,6 +17,7 @@ iree_cc_library(
     "FlatbufferUtils.h"
     "GraphUtils.h"
     "PatternUtils.h"
+    "TracingUtils.h"
   SRCS
     "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
@@ -29,8 +30,8 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::base::flatcc
+    iree::base::tracing
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )
 

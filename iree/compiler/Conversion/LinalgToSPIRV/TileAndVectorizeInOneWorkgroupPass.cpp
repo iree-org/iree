@@ -391,6 +391,7 @@ static void populateTilingConvFilterPatterns(
 
   patterns.insert<
       linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
       linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions, marker);
 }

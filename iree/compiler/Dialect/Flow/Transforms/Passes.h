@@ -81,11 +81,6 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
 // benefit. Other ops are left unmodified and will be outlined later on.
 std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
 
-// Runs post-partitioning conversion passes to legalize the flow dialect.
-// This converts any leftover ops that did not already get converted or outlined
-// to dispatch regions.
-std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass();
-
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
 
@@ -174,7 +169,6 @@ inline void registerFlowPasses() {
   createLegalizeInputTypesPass();
   createHLOPreprocessingPass();
   createPrePartitioningConversionPass();
-  createPostPartitioningConversionPass();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();
   createIdentifyDispatchRegions2Pass();

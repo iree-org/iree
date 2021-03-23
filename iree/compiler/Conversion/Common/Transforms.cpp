@@ -317,10 +317,9 @@ LogicalResult defineWorkgroupCountRegion(
     OpBuilder &builder, FuncOp funcOp,
     WorkgroupCountRegionBuilder regionBuilder) {
   IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
-  if (!entryPointOp)
+  if (!entryPointOp) {
     return funcOp.emitOpError("unable to find corresponding entry point op");
-  if (entryPointOp.getBody())
-    return entryPointOp.emitOpError("cannot override workgroup_count_region");
+  }
   Location loc = entryPointOp.getLoc();
 
   OpBuilder::InsertionGuard guard(builder);

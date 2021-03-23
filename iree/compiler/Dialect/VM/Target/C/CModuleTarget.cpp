@@ -176,7 +176,7 @@ static LogicalResult translateOpToC(Operation &op,
   if (auto returnOp = dyn_cast<IREE::VM::ReturnOp>(op))
     return translateReturnOpToC(returnOp, emitter, resultNames);
   // Fall back to generic emitc printer
-  if (succeeded(emitter.emitOperation(op))) {
+  if (succeeded(emitter.emitOperation(op, /*trailingSemicolon=*/true))) {
     return success();
   }
 

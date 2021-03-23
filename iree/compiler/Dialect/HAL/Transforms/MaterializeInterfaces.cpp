@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "llvm/ADT/StringSet.h"
+#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -148,6 +149,28 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
   }
 
   return interfaceOp;
+}
+
+// Converts a value to/from one supported by the ABI from/to an arbitrary tensor
+// type.
+//
+// Ideally we'd use some type-aware conversion to handle signed/unsigned
+// saturation vs. truncation. As an example, we'd want to zero-extend an
+// unsigned i4 to a signed i8. We also don't want to use HLO ops here, but the
+// standard ops (trunci, zexti, etc) are not supported by subsequent lowerings
+// and just cause pain.
+//
+// Example: `tensor<4xi8>` -> `tensor<4xi1>`
+//      or  `tensor<4xi1>` -> `tensor<4xi8>`
+static Value convertABITensorType(Location loc, Value sourceValue,
+                                  TensorType targetType, OpBuilder &builder) {
+  auto sourceType = sourceValue.getType().cast<TensorType>();
+  if (sourceType == targetType) {
+    return sourceValue;
+  }
+  // TODO(benvanik): use a type converter or a dialect interface.
+  return builder.createOrFold<mhlo::ConvertOp>(loc, sourceValue,
+                                               targetType.getElementType());
 }
 
 // Creates a new entry function that uses the hal.interface bindings to marshal

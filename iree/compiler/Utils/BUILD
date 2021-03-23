@@ -30,9 +30,11 @@ cc_library(
         "FlatbufferUtils.h",
         "GraphUtils.h",
         "PatternUtils.h",
+        "TracingUtils.h",
     ],
     deps = [
         "//iree/base:flatcc",
+        "//iree/base:tracing",
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
@@ -41,6 +43,5 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
-        "@mlir-hlo//:hlo",
     ],
 )

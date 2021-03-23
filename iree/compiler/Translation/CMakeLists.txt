@@ -45,6 +45,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
+    iree::compiler::Utils
     ${IREE_VM_CONDITIONAL_TARGETS}
   PUBLIC
 )

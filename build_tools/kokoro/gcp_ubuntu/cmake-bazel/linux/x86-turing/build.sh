@@ -61,7 +61,6 @@ echo "Configuring CMake"
    -DIREE_BUILD_COMPILER=ON \
    -DIREE_BUILD_TESTS=ON \
    -DIREE_BUILD_SAMPLES=OFF \
-   -DIREE_BUILD_DEBUGGER=OFF \
    -DIREE_BUILD_XLA_COMPILER=ON \
    -DIREE_BUILD_TFLITE_COMPILER=ON \
    -DIREE_BUILD_TENSORFLOW_COMPILER=ON .
@@ -78,6 +77,6 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
 # as well.
 echo "Testing with CTest"
 ctest --output-on-failure \
-   --tests-regex "^integrations/tensorflow/" \
+   --tests-regex "^integrations/tensorflow/|^bindings/python/" \
    --label-regex "^driver=vulkan$|^driver=cuda$" \
    --label-exclude "^nokokoro$"

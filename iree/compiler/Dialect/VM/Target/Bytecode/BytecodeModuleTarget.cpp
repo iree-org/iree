@@ -28,6 +28,7 @@
 #include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/schemas/bytecode_module_def_builder.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -137,6 +138,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
 
   PassManager passManager(context);
   mlir::applyPassManagerCLOptions(passManager);
+  passManager.addInstrumentation(std::make_unique<PassTracing>());
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
 
   if (targetOptions.optimize) {
