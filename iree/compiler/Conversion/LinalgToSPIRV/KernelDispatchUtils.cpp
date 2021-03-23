@@ -360,8 +360,10 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   // If the shape is not exactly aligned on the tile size skip the second level
   // of tiling as it expect the number of iteration to be exactly equal to the
   // number of processors.
-  if (!vectorize || outputShape.getShape().back() % lowerTs != 0)
+  if (!vectorize || outputShape.getShape().back() % lowerTs != 0) {
+    config.vectorize = false;
     return success();
+  }
 
   tileSizes.emplace_back();    // Subgroup level.
   ts.back() = lowerTs / subgroupSize;
