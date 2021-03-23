@@ -275,7 +275,7 @@ struct FoldGPUProcessIDUsesPass
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     populateFoldGPUProcessorIDUsesPatterns(context, patterns);
     (void)applyPatternsAndFoldGreedily(getOperation().getInnerModule(),
                                        std::move(patterns));

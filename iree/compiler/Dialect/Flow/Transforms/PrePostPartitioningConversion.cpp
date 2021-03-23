@@ -41,7 +41,7 @@ class PrePartitioningConversionPass
   void runOnFunction() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
 
     conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
 

@@ -38,7 +38,7 @@ class CleanupTieShapePattern : public OpRewritePattern<Shape::TieShapeOp> {
 class CleanupShapePlaceholdersPass
     : public PassWrapper<CleanupShapePlaceholdersPass, FunctionPass> {
   void runOnFunction() override {
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     patterns.insert<CleanupTieShapePattern>(&getContext());
     (void)applyPatternsAndFoldGreedily(getFunction(), std::move(patterns));
   }

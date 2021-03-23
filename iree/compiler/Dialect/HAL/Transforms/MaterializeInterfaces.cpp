@@ -527,7 +527,7 @@ class MaterializeInterfacesPass
       }
 
       // Convert interface-related flow.dispatch.* ops to their hal.* versions.
-      OwningRewritePatternList patterns;
+      OwningRewritePatternList patterns(&getContext());
       patterns.insert<ConverterDispatchWorkgroupInfoPattern<
                           IREE::Flow::DispatchWorkgroupIDOp,
                           IREE::HAL::InterfaceWorkgroupIDOp>,

@@ -194,7 +194,7 @@ struct ConvertHLOToLinalgOnTensorsPass
   }
 
   void runOnFunction() override {
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     MLIRContext *context = &getContext();
     populateHLOToLinalgOnTensorsConversionPatterns(context, patterns);
     if (useLinalgOnTensorsPath) {

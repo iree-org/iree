@@ -60,7 +60,7 @@ struct DecomposeHLOClampPass
 
   void runOnFunction() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     patterns.insert<DecomposeClampOp>(context);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

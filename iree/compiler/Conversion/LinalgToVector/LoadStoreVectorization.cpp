@@ -230,7 +230,7 @@ struct LoadStoreVectorizationPass
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     // clang-format off
     patterns.insert<
         VectorizeGenericOp,

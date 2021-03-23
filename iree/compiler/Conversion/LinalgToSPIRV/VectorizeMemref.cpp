@@ -440,7 +440,7 @@ void VectorizeMemRefPass::runOnOperation() {
 
   memrefUsageAnalysis = &getAnalysis<MemRefUsageAnalysis>();
 
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(&getContext());
   patterns.insert<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
                   ProcessAlloc, ProcessPlaceHolder, ProcessInterfaceBinding>(
       context, *memrefUsageAnalysis);

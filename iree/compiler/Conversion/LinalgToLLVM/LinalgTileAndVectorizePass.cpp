@@ -136,7 +136,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
 
   // Promotes workgroups subviews to a full-tile allocated on the stack.
   if (clEnablePromoteWorkgroupToFullTiles) {
-    OwningRewritePatternList promotionPatterns;
+    OwningRewritePatternList promotionPatterns(&getContext());
     promotionPatterns.insert<PromoteMatmulSubviewsPattern>(
         context,
         linalg::LinalgPromotionOptions().setAllocationDeallocationFns(
@@ -151,7 +151,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   // Workgroup first level of tiling.
   {
     // First level of tiling patterns. (workgroups memory)
-    OwningRewritePatternList l1patterns;
+    OwningRewritePatternList l1patterns(&getContext());
     l1patterns.insert<TileWorkgroups>(
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
@@ -173,7 +173,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
 
   // Second level of tiling. (workgroups memory -> vectors)
   {
-    OwningRewritePatternList l2patterns;
+    OwningRewritePatternList l2patterns(&getContext());
     l2patterns.insert<TileWorkgroups>(
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
@@ -192,7 +192,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
 
   // Apply canonicalization.
   {
-    OwningRewritePatternList canonicalizationPatterns;
+    OwningRewritePatternList canonicalizationPatterns(&getContext());
     canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
     AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                context);
@@ -207,10 +207,10 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
 
   // Apply vectorization patterns.
   {
-    OwningRewritePatternList vectorizationPatterns;
+    OwningRewritePatternList vectorizationPatterns(&getContext());
     linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
                                         linalg::CopyOp, linalg::FillOp>(
-        vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
+        vectorizationPatterns, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
             Identifier::get(getVectorizeMarker(), context)));
     if (failed(applyPatternsAndFoldGreedily(
@@ -232,7 +232,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     vector::VectorTransformsOptions vectorTransformsOptions =
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
-    OwningRewritePatternList vectorContractLoweringPatterns;
+    OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
     vectorContractLoweringPatterns
         .insert<ContractionOpToOuterProductOpLowering,
                 ContractionOpToMatmulOpLowering, ContractionOpLowering>(
@@ -247,16 +247,15 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   {
     VectorTransferToSCFOptions vectorToSCFOptions =
         VectorTransferToSCFOptions().setUnroll(true);
-    OwningRewritePatternList vectorToLoopsPatterns;
-    populateVectorToSCFConversionPatterns(vectorToLoopsPatterns, context,
+    OwningRewritePatternList vectorToLoopsPatterns(&getContext());
+    populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);
     // Hosit hierarchical tiling indexing and other loop invariant transfer
     // ops computation.
     linalg::hoistRedundantVectorTransfers(funcOp);
 
     // TODO(ataei): Move this to common vector dialect patterns.
-    populateStdLegalizationPatternsForSPIRVLowering(context,
-                                                    vectorToLoopsPatterns);
+    populateStdLegalizationPatternsForSPIRVLowering(vectorToLoopsPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorToLoopsPatterns)))) {
       return signalPassFailure();

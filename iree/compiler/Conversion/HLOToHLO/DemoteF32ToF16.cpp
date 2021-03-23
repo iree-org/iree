@@ -172,9 +172,9 @@ void ConvertF32ToF16Pass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
 
   FloatTypeConverter converter;
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(&getContext());
   patterns.insert<GenericTypeConvert>(context, converter);
-  populateFuncOpTypeConversionPattern(patterns, context, converter);
+  populateFuncOpTypeConversionPattern(patterns, converter);
   F32ToF16ConversionTarget target(*context);
   target.markUnknownOpDynamicallyLegal();
   if (failed(applyFullConversion(moduleOp, target, std::move(patterns))))

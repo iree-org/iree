@@ -59,12 +59,10 @@ void mlir::ModelRunner::compile(
   if (target == Target::CPUTarget) {
     // Lower vector operations progressively into more elementary
     // vector operations before running the regular compiler passes.
-    mlir::OwningRewritePatternList patterns;
-    mlir::vector::populateVectorSlicesLoweringPatterns(patterns,
-                                                       module->getContext());
+    mlir::OwningRewritePatternList patterns(module->getContext());
+    mlir::vector::populateVectorSlicesLoweringPatterns(patterns);
     mlir::vector::populateVectorContractLoweringPatterns(
-        patterns, module->getContext(),
-        compilationOptions.vectorTransformsOptions);
+        patterns, compilationOptions.vectorTransformsOptions);
     (void)mlir::applyPatternsAndFoldGreedily(*module, std::move(patterns));
   }
   runLoweringPass(compilationOptions.loweringPasses

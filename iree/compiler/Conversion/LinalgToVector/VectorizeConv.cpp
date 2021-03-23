@@ -347,7 +347,7 @@ struct VectorizeLinalgConvPass
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     patterns.insert<VectorizeLinalgConv, VectorizeLinalgDepthwiseConv>(context);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

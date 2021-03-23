@@ -320,66 +320,6 @@ module {
 
 // -----
 
-#map0 = affine_map<(d0, d1) -> (d0, d1)>
-#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d2)>
-
-module {
-  func @store_reshape_src_and_result_2() {
-    %c0 = constant 0 : index
-    %shape = linalg.init_tensor[2, 4] : tensor<2x4xf32>
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
-      {operand_result_index = 0 : i32} : tensor<2x4xf32>
-    %1 = linalg.generic {
-       indexing_maps = [#map0, #map0],
-       iterator_types = ["parallel", "parallel"]}
-     ins(%0 : tensor<2x4xf32>)
-    outs(%shape : tensor<2x4xf32>) {
-    ^bb0(%arg0: f32, %s: f32):  // no predecessors
-      %2 = math.tanh %arg0 : f32
-      linalg.yield %2 : f32
-    } -> tensor<2x4xf32>
-    %3 = linalg.tensor_reshape %1 [#map1, #map2]
-      : tensor<2x4xf32> into tensor<1x2x4xf32>
-    %4 = linalg.tensor_reshape %1 [#map1, #map2]
-      : tensor<2x4xf32> into tensor<1x2x4xf32>
-    %5 = linalg.tensor_reshape %1 [#map1, #map2]
-      : tensor<2x4xf32> into tensor<1x2x4xf32>
-    hal.interface.store.tensor %3, @legacy_io::@ret0, offset = %c0
-      {operand_result_index = 1 : i32} : tensor<1x2x4xf32>
-    hal.interface.store.tensor %4, @legacy_io::@ret1, offset = %c0
-      {operand_result_index = 2 : i32} : tensor<1x2x4xf32>
-    hal.interface.store.tensor %5, @legacy_io::@ret2, offset = %c0
-      {operand_result_index = 3 : i32} : tensor<1x2x4xf32>
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer",
-      access="Read"
-    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer",
-      access="Write|Discard"
-    hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer",
-      access="Write|Discard"
-    hal.interface.binding @ret2, set=0, binding=3, type="StorageBuffer",
-      access="Write|Discard"
-  }
-}
-
-// CHECK-LABEL: func @store_reshape_src_and_result_2
-//   CHECK-DAG:   %[[T0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret2, operand_result_index = 3 : i32} : memref<1x2x4xf32>
-//   CHECK-DAG:   %[[T1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret2, operand_result_index = 3 : i32} : memref<2x4xf32>
-//   CHECK-DAG:   %[[T2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32} : memref<1x2x4xf32>
-//   CHECK-DAG:   %[[T3:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 1 : i32} : memref<1x2x4xf32>
-//   CHECK-DAG:   %[[T4:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<2x4xf32>
-//       CHECK:   linalg.generic
-//  CHECK-SAME:     ins(%[[T4]] :
-//  CHECK-SAME:     outs(%[[T1]] :
-//       CHECK:   linalg.copy(%[[T0]], %[[T3]])
-//       CHECK:   linalg.copy(%[[T0]], %[[T2]])
-//       CHECK:   return
-
-// -----
-
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
 #map2 = affine_map<(d0, d1) -> (d0, d1)>

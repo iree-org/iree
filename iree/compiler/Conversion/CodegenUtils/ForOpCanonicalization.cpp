@@ -217,7 +217,7 @@ struct ForOpCanonicalizationPass
     : PassWrapper<ForOpCanonicalizationPass, FunctionPass> {
   void runOnFunction() override {
     FuncOp fn = getFunction();
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     patterns.insert<CanonicalizeForOpInductionVarShape,
                     PackForOpInductionVarVector>(fn.getContext());
     (void)applyPatternsAndFoldGreedily(fn, std::move(patterns));
