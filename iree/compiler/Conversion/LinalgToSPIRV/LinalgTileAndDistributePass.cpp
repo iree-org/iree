@@ -120,7 +120,24 @@ class LinalgTileAndDistributePass
           llvm::dbgs() << "}\n";
         }
       });
+      // Annotate the linalg op with the original types.
+      for (linalg::LinalgOp op : linalgOps) {
+        const char inputTypeAttrName[] = "iree.codegen.original_input_types";
+        const char outputTypeAttrName[] = "iree.codegen.original_output_types";
 
+        SmallVector<Type> inputTypes;
+        SmallVector<Type> outputTypes;
+        for (Type type : op.getInputBufferTypes()) inputTypes.push_back(type);
+        for (Type type : op.getOutputBufferTypes()) outputTypes.push_back(type);
+        if (!inputTypes.empty()) {
+          op->setAttr(inputTypeAttrName,
+                      Builder(op).getTypeArrayAttr(inputTypes));
+        }
+        if (!outputTypes.empty()) {
+          op->setAttr(outputTypeAttrName,
+                      Builder(op).getTypeArrayAttr(outputTypes));
+        }
+      }
       TileAndFuseOptions tileAndFuseOptions = {
           getWorkgroupDistributionOptions(), allocateWorkgroupMemory};
       if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
