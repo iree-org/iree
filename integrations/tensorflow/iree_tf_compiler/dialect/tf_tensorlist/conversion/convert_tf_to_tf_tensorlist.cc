@@ -98,8 +98,8 @@ void ConvertTFToTFTensorListPass::runOnOperation() {
   // The MLIR type conversion infrastructure doesn't handle this situation well.
   // It only knows how to handle blindly convert one type to another type.
 
-  OwningRewritePatternList patterns;
-  populateWithGenerated(&getContext(), patterns);
+  OwningRewritePatternList patterns(&getContext());
+  populateWithGenerated(patterns);
   patterns.insert<ConvertTfTensorlistConcatV2>(&getContext());
 
   ConversionTarget target(getContext());

@@ -462,7 +462,7 @@ class ConcretizeTileAmongWorkgroupsPass
     // 4. Replace hal.interface.workgroup symbolic ops with constant values.
 
     {
-      OwningRewritePatternList patterns;
+      OwningRewritePatternList patterns(&getContext());
       patterns.insert<ConcretizeWorkgroupSizeOp, ConcretizeWorkgroupCountOp>(
           &context, workloadSize, tileSize);
 
@@ -530,7 +530,7 @@ class ConcretizeTileAmongWorkgroupsPass
     // 6. Canonicalization and clean up.
 
     if (inlineTripOneLoops) {
-      OwningRewritePatternList patterns;
+      OwningRewritePatternList patterns(&getContext());
       patterns.insert<RemoveTripOneLoop>(&context, workloadSize, tileSize);
 
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));

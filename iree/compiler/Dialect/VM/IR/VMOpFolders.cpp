@@ -284,9 +284,37 @@ void GlobalStoreIndirectRefOp::getCanonicalizationPatterns(
 // Constants
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+template <typename GeneralOp, typename ZeroOp>
+struct FoldZeroConstInteger final : public OpRewritePattern<GeneralOp> {
+  using OpRewritePattern<GeneralOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(GeneralOp constOp,
+                                PatternRewriter &rewriter) const override {
+    if (matchPattern(constOp.result(), m_Zero())) {
+      rewriter.replaceOpWithNewOp<ZeroOp>(constOp);
+      return success();
+    }
+    return failure();
+  }
+};
+
+}  // namespace
+
 OpFoldResult ConstI32Op::fold(ArrayRef<Attribute> operands) { return value(); }
 
+void ConstI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                             MLIRContext *context) {
+  results.insert<FoldZeroConstInteger<ConstI32Op, ConstI32ZeroOp>>(context);
+}
+
 OpFoldResult ConstI64Op::fold(ArrayRef<Attribute> operands) { return value(); }
+
+void ConstI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                             MLIRContext *context) {
+  results.insert<FoldZeroConstInteger<ConstI64Op, ConstI64ZeroOp>>(context);
+}
 
 OpFoldResult ConstI32ZeroOp::fold(ArrayRef<Attribute> operands) {
   return IntegerAttr::get(getResult().getType(), 0);

@@ -58,10 +58,10 @@ void LinalgVectorizationPass::runOnFunction() {
   MLIRContext *context = &getContext();
   // Apply vectorization patterns.
   {
-    OwningRewritePatternList vectorizationPatterns;
+    OwningRewritePatternList vectorizationPatterns(&getContext());
     linalg::insertVectorizationPatterns<linalg::GenericOp,
                                         linalg::ContractionOpInterface>(
-        vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
+        vectorizationPatterns, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(ArrayRef<Identifier>(
             Identifier::get(getWorkgroupMarker(), context))));
     (void)applyPatternsAndFoldGreedily(funcOp,
@@ -84,22 +84,21 @@ void LinalgVectorizationPass::runOnFunction() {
 
   // Apply unrolling patterns.
   {
-    OwningRewritePatternList vectorUnrollPatterns;
+    OwningRewritePatternList vectorUnrollPatterns(&getContext());
     vectorUnrollPatterns.insert<vector::UnrollVectorPattern>(
         context, vector::UnrollVectorOptions().setNativeShapeFn(getShape));
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorUnrollPatterns));
 
-    OwningRewritePatternList canonicalizationPatterns1;
+    OwningRewritePatternList canonicalizationPatterns1(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(
-        canonicalizationPatterns1, funcOp.getContext());
+        canonicalizationPatterns1);
     vector::populateVectorToVectorTransformationPatterns(
-        canonicalizationPatterns1, funcOp.getContext());
+        canonicalizationPatterns1);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns1));
 
-    OwningRewritePatternList canonicalizationPatterns2;
-    vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2,
-                                                 funcOp.getContext());
+    OwningRewritePatternList canonicalizationPatterns2(&getContext());
+    vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns2));
 

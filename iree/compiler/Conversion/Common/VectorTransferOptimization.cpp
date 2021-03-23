@@ -64,9 +64,8 @@ struct VectorTransferOptimizationPass
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
-    OwningRewritePatternList patterns;
-    mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(
-        patterns, funcOp.getContext());
+    OwningRewritePatternList patterns(&getContext());
+    mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
     vector::transferOpflowOpt(funcOp);

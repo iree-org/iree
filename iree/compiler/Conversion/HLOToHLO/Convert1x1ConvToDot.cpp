@@ -130,7 +130,7 @@ struct Convert1x1ConvToDotPass
 
   void runOnFunction() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     patterns.insert<Convert1x1ConvolutionToDotOp>(context);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

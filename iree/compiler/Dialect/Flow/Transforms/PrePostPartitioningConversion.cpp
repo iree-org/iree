@@ -69,7 +69,7 @@ class PrePartitioningConversionPass
   void runOnFunction() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
 
     conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
 
@@ -118,7 +118,7 @@ class PostPartitioningConversionPass
   void runOnFunction() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(getContext());
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
 
     // We have completed all flow op creation at this point.
     conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();

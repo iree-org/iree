@@ -108,7 +108,7 @@ struct RemoveDeadMemAllocs : RewritePattern {
 struct BufferAllocViewCleanUpPass
     : public PassWrapper<BufferAllocViewCleanUpPass, FunctionPass> {
   void runOnFunction() override {
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     patterns.insert<FoldReshapeIntoInterfaceTensorLoad>(&getContext());
     patterns.insert<RemoveDeadMemAllocs>();
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));

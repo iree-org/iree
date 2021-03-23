@@ -64,10 +64,10 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 //   CHECK-DAG:     %[[WGY:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
 //       CHECK:     hal.return %[[WGX]], %[[WGY]], %[[C1]]
 //   CHECK-NOT:   hal.interface.workgroup.size
-//   CHECK-DAG:   %[[C0:.+]] = constant 0
-//   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[C16:.+]] = constant 16
-//   CHECK-DAG:   %[[C8:.+]] = constant 8
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C16:.+]] = constant 16 : index
+//   CHECK-DAG:   %[[C8:.+]] = constant 8 : index
 //   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
 //   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @legacy_io::@arg2

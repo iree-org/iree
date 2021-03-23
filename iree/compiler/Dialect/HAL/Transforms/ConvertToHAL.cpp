@@ -71,7 +71,7 @@ class ConvertToHALPass
     HALTypeConverter typeConverter(conversionInterfaces);
     HALConversionTarget conversionTarget(context, typeConverter);
 
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
 
     setupIREEToHALLegality(context, conversionTarget);
     populateIREEToHALPatterns(context, patterns);

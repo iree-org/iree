@@ -32,10 +32,9 @@ module {
 // -----
 
 module {
-  func @fuse_store_reshape() {
+  func @fuse_store_reshape(%arg0: tensor<100xi32>) {
     %c0 = constant 0 : index
-    %c42 = constant dense<42> : tensor<100xi32>
-    %0 = linalg.tensor_reshape %c42 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<100xi32> into tensor<4x25xi32>
+    %0 = linalg.tensor_reshape %arg0 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<100xi32> into tensor<4x25xi32>
     hal.interface.store.tensor %0, @legacy_io::@ret0, offset = %c0 : tensor<4x25xi32>
     return
   }
@@ -45,8 +44,8 @@ module {
 }
 
 // CHECK-LABEL: func @fuse_store_reshape
-//       CHECK:   %[[C42:.+]] = constant dense<{{.+}}> : tensor<100xi32>
-//       CHECK:   hal.interface.store.tensor %[[C42]]
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]*]]: tensor<100xi32>
+//       CHECK:   hal.interface.store.tensor %[[ARG0]]
 
 // -----
 

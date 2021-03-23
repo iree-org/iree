@@ -308,7 +308,7 @@ static void populateVectorizationPatterns(MLIRContext *context,
                                           OwningRewritePatternList &patterns) {
   linalg::insertVectorizationPatterns<linalg::FillOp, linalg::GenericOp,
                                       linalg::ContractionOpInterface>(
-      patterns, context, linalg::LinalgVectorizationOptions(),
+      patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), context)));
 }
@@ -330,23 +330,21 @@ static void populateVectorUnrollPatterns(MLIRContext *context,
 
 static void applyVectorTransformation(FuncOp funcOp) {
   {
-    OwningRewritePatternList vectorUnrollPatterns;
+    OwningRewritePatternList vectorUnrollPatterns(funcOp.getContext());
     populateVectorUnrollPatterns(funcOp.getContext(), vectorUnrollPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorUnrollPatterns));
 
-    OwningRewritePatternList canonicalizationPatterns1;
+    OwningRewritePatternList canonicalizationPatterns1(funcOp.getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(
-        canonicalizationPatterns1, funcOp.getContext());
+        canonicalizationPatterns1);
     vector::populateVectorToVectorTransformationPatterns(
-        canonicalizationPatterns1, funcOp.getContext());
-    vector::populateSplitVectorTransferPatterns(canonicalizationPatterns1,
-                                                funcOp.getContext());
+        canonicalizationPatterns1);
+    vector::populateSplitVectorTransferPatterns(canonicalizationPatterns1);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns1));
 
-    OwningRewritePatternList canonicalizationPatterns2;
-    vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2,
-                                                 funcOp.getContext());
+    OwningRewritePatternList canonicalizationPatterns2(funcOp.getContext());
+    vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns2));
     LLVM_DEBUG({
@@ -450,7 +448,7 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
       // The promotion patterns are put separate from the tiling patterns to
       // make sure that the allocated scratchspace memory is constant sizes
       // which requires some folding to trigger.
-      OwningRewritePatternList promotionPatterns;
+      OwningRewritePatternList promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
       applyCanonicalizationPatternsForTiling(context, funcOp);
@@ -464,7 +462,7 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
 
     if (launchConfig.useVectorize()) {
       {
-        OwningRewritePatternList secondLevelTilingPatterns;
+        OwningRewritePatternList secondLevelTilingPatterns(&getContext());
         populateTilingToSubgroupPatterns(context, launchConfig,
                                          secondLevelTilingPatterns);
         (void)applyPatternsAndFoldGreedily(
@@ -480,7 +478,7 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
       }
 
       {
-        OwningRewritePatternList thirdLevelTilingPatterns;
+        OwningRewritePatternList thirdLevelTilingPatterns(&getContext());
         populateTilingToInvocationPatterns(context, launchConfig,
                                            thirdLevelTilingPatterns);
         (void)applyPatternsAndFoldGreedily(funcOp,
@@ -496,7 +494,7 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
       }
 
       {
-        OwningRewritePatternList tilingPatterns;
+        OwningRewritePatternList tilingPatterns(&getContext());
         auto marker = getLinalgMatchAndReplaceMarker(
             getConvFilterTileMarker(), getVectorizeMarker(), context);
         populateTilingConvFilterPatterns(context, tilingPatterns, launchConfig,
@@ -515,7 +513,7 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
       }
 
       {
-        OwningRewritePatternList vectorizationPatterns;
+        OwningRewritePatternList vectorizationPatterns(&getContext());
         populateVectorizationPatterns(context, launchConfig,
                                       vectorizationPatterns);
         populateVectorizeLinalgConvPatterns(context, vectorizationPatterns);
@@ -555,9 +553,8 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
                            linalg::DepthwiseConvInputNHWCFilterHWCOp>(op));
       });
 
-      OwningRewritePatternList patterns;
-      linalg::populateLinalgNamedOpsGeneralizationPatterns(context, patterns,
-                                                           marker);
+      OwningRewritePatternList patterns(&getContext());
+      linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns, marker);
 
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 

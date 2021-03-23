@@ -284,7 +284,7 @@ class ConvertShapeToShapex
     conversionTarget.addLegalDialect<iree_compiler::ShapeDialect>();
 
     // Patterns.
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     patterns.insert<ConvertConstShapeOp>(context);
     patterns.insert<ConvertShapeOfOp>(context);
     patterns.insert<ConvertGetExtent>(context);

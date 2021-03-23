@@ -930,7 +930,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     // Use the workgroup size as a proxy for tile size here. At the flow level
     // this represents the "workload" per processors and is not necessarily tied
     // to the workgroup size specified by the backend.
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
             .setDistributionOptions(workgroupDistributionOptions)
@@ -945,7 +945,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
             ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
 
     // Add canonicalization patterns.
-    linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);
+    linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     patterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(context);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
@@ -962,7 +962,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Move other operations into their own dispatch regions.
   {
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     patterns.insert<MakeDispatchWorkgroupsOp>();
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
@@ -979,7 +979,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Run necessary canonicalization patterns before destructive updates.
   {
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     // This is needed because tiling and distribution may create
     // subtensor_insert ops whose source operands come from tensor.cast ops.
     // Those tensor.cast ops cast tensors into a more dynamic shape, in order
