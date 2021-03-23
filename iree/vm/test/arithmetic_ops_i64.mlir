@@ -4,19 +4,7 @@ vm.module @arithmetic_ops_i64 {
   // ExtI64: Native integer arithmetic
   //===--------------------------------------------------------------------===//
 
-  // TODO: The CModuleTarget enforces exports to be ordered.
   vm.export @test_add_i64
-  vm.export @test_and_i64
-  vm.export @test_div_i64s
-  vm.export @test_div_i64u
-  vm.export @test_mul_i64
-  vm.export @test_not_i64
-  vm.export @test_or_i64
-  vm.export @test_rem_i64s
-  vm.export @test_rem_i64u
-  vm.export @test_sub_i64
-  vm.export @test_xor_i64
-
   vm.func @test_add_i64() {
     %c1 = vm.const.i64 1 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -26,6 +14,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_sub_i64
   vm.func @test_sub_i64() {
     %c1 = vm.const.i64 3 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -37,6 +26,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_mul_i64
   vm.func @test_mul_i64() {
     %c1 = vm.const.i64 2 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -46,6 +36,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_div_i64s
   vm.func @test_div_i64s() {
     %c1 = vm.const.i64 4 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -57,6 +48,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_div_i64u
   vm.func @test_div_i64u() {
     %c1 = vm.const.i64 4 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -68,6 +60,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_rem_i64s
   vm.func @test_rem_i64s() {
     %c1 = vm.const.i64 -3 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -79,6 +72,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_rem_i64u
   vm.func @test_rem_i64u() {
     %c1 = vm.const.i64 3 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -90,6 +84,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_not_i64
   vm.func @test_not_i64() {
     %c1 = vm.const.i64 0 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -99,6 +94,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_and_i64
   vm.func @test_and_i64() {
     %c1 = vm.const.i64 5 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -110,6 +106,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_or_i64
   vm.func @test_or_i64() {
     %c1 = vm.const.i64 5 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64
@@ -121,6 +118,7 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_xor_i64
   vm.func @test_xor_i64() {
     %c1 = vm.const.i64 5 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64

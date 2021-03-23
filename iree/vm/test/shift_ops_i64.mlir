@@ -20,7 +20,7 @@ vm.module @shift_ops_i64 {
     %c1dno = iree.do_not_optimize(%c1) : i64
     %v = vm.shr.i64.s %c1dno, 2 : i64
     %c2 = vm.const.i64 -1 : i64
-    vm.check.eq %v, %c2, "-1>>-1=-1" : i64
+    vm.check.eq %v, %c2, "-1>>2=-1" : i64
     vm.return
   }
 
