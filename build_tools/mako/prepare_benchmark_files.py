@@ -13,6 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Prepares files for
+#   * compile_android_modules.py
+#   * benchmark_modules_on_android.py
+#
+# The script assumes model artifacts are in google bucket and they are zipped in
+# tar.gz format.
+
 import subprocess
 
 import configuration
@@ -26,9 +33,8 @@ def main() -> None:
         f"gs://iree-model-artifacts/{model_benchmark.model_artifacts_name}", "."
     ],
                    check=True)
-    subprocess.run(
-        args=["tar", "-xvf", model_benchmark.model_artifacts_name],
-        check=True)
+    subprocess.run(args=["tar", "-xvf", model_benchmark.model_artifacts_name],
+                   check=True)
     subprocess.run(args=[
         "cp", model_benchmark.flagfile_path,
         configuration.get_flagfile_name(model_benchmark.name)
