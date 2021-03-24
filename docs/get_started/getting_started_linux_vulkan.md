@@ -117,10 +117,10 @@ Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-translate`:
 ```shell
 # -- CMake --
 $ cmake --build ../iree-build/ --target iree_tools_iree-translate
-$ ../iree-build/iree/tools/iree-translate -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv ./iree/tools/test/simple.mlir -o /tmp/module.vmfb
+$ ../iree-build/iree/tools/iree-translate -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv ./iree/tools/test/iree-run-module.mlir -o /tmp/module.vmfb
 
 # -- Bazel --
-$ bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv $PWD/iree/tools/test/simple.mlir -o /tmp/module.vmfb
+$ bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv $PWD/iree/tools/test/iree-run-module.mlir -o /tmp/module.vmfb
 ```
 
 > Tip:<br>
