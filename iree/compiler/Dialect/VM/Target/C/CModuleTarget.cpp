@@ -305,7 +305,7 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
   // struct argument name here must not be changed.
   output << moduleName << "_state_t* state) {\n";
 
-  // We forward declare all result variables including results
+  // We forward declare all result variables.
   for (auto &op : funcOp.getOps()) {
     for (auto result : op.getResults()) {
       if (failed(emitter.emitVariableDeclaration(result,
