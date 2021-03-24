@@ -34,8 +34,10 @@ struct PassTracing : public PassInstrumentation {
   // Note: we could also trace pipelines and analyses.
 
   void runBeforePass(Pass *pass, Operation *op) override {
-    IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, pass->getName().data(),
-                                        pass->getName().size());
+    static std::string fileName = __FILE__;
+    IREE_TRACE_ZONE_BEGIN_EXTERNAL(z0, fileName.data(), fileName.size(),
+                                   __LINE__, pass->getName().data(),
+                                   pass->getName().size(), NULL, 0);
     passTraceZonesStack.push_back(z0);
   }
   void runAfterPass(Pass *pass, Operation *op) override {
