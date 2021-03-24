@@ -1794,7 +1794,7 @@ module  {
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertToLLVMPass
 ```
 module  {
-  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+  llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
     %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
     %1 = llvm.mlir.constant(1024 : index) : i64
     %2 = llvm.mlir.constant(32 : index) : i64
@@ -2205,7 +2205,8 @@ module  {
     %368 = llvm.add %163, %2  : i64
     llvm.br ^bb5(%368 : i64)
   ^bb25:  // pred: ^bb5
-    llvm.return
+    %369 = llvm.mlir.constant(0 : i32) : i32
+    llvm.return %369 : i32
   }
 }
 
@@ -2213,7 +2214,7 @@ module  {
 ### IR Dump After Canonicalizer
 ```
 module  {
-  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+  llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
     %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
     %1 = llvm.mlir.constant(1024 : index) : i64
     %2 = llvm.mlir.constant(32 : index) : i64
@@ -2624,7 +2625,8 @@ module  {
     %368 = llvm.add %163, %2  : i64
     llvm.br ^bb5(%368 : i64)
   ^bb25:  // pred: ^bb5
-    llvm.return
+    %369 = llvm.mlir.constant(0 : i32) : i32
+    llvm.return %369 : i32
   }
 }
 
@@ -2632,7 +2634,7 @@ module  {
 ### IR Dump After CSE
 ```
 module  {
-  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+  llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
     %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
     %1 = llvm.mlir.constant(1024 : index) : i64
     %2 = llvm.mlir.constant(32 : index) : i64
@@ -2971,7 +2973,8 @@ module  {
     %296 = llvm.add %128, %2  : i64
     llvm.br ^bb5(%296 : i64)
   ^bb25:  // pred: ^bb5
-    llvm.return
+    %297 = llvm.mlir.constant(0 : i32) : i32
+    llvm.return %297 : i32
   }
 }
 
@@ -2989,7 +2992,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
     hal.return %c1_1, %c1_0, %c1 : index, index, index
   }
   module  {
-    llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+    llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
       %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
       %1 = llvm.mlir.constant(1024 : index) : i64
       %2 = llvm.mlir.constant(32 : index) : i64
@@ -3328,7 +3331,8 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %296 = llvm.add %128, %2  : i64
       llvm.br ^bb5(%296 : i64)
     ^bb25:  // pred: ^bb5
-      llvm.return
+      %297 = llvm.mlir.constant(0 : i32) : i32
+      llvm.return %297 : i32
     }
   }
 }
@@ -3354,7 +3358,7 @@ module  {
         hal.return %c1_1, %c1_0, %c1 : index, index, index
       }
       module  {
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+        llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -3693,7 +3697,8 @@ module  {
           %296 = llvm.add %128, %2  : i64
           llvm.br ^bb5(%296 : i64)
         ^bb25:  // pred: ^bb5
-          llvm.return
+          %297 = llvm.mlir.constant(0 : i32) : i32
+          llvm.return %297 : i32
         }
       }
     }
@@ -3881,7 +3886,7 @@ module  {
         hal.return %c1_1, %c1_0, %c1 : index, index, index
       }
       module  {
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+        llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -4220,7 +4225,8 @@ module  {
           %296 = llvm.add %128, %2  : i64
           llvm.br ^bb5(%296 : i64)
         ^bb25:  // pred: ^bb5
-          llvm.return
+          %297 = llvm.mlir.constant(0 : i32) : i32
+          llvm.return %297 : i32
         }
       }
     }
@@ -4297,7 +4303,7 @@ module  {
         hal.return %c1_1, %c1_0, %c1 : index, index, index
       }
       module  {
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+        llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -4636,7 +4642,8 @@ module  {
           %296 = llvm.add %128, %2  : i64
           llvm.br ^bb5(%296 : i64)
         ^bb25:  // pred: ^bb5
-          llvm.return
+          %297 = llvm.mlir.constant(0 : i32) : i32
+          llvm.return %297 : i32
         }
       }
     }
@@ -4709,7 +4716,7 @@ module  {
         hal.return %c1, %c1, %c1 : index, index, index
       }
       module  {
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+        llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -5048,7 +5055,8 @@ module  {
           %296 = llvm.add %128, %2  : i64
           llvm.br ^bb5(%296 : i64)
         ^bb25:  // pred: ^bb5
-          llvm.return
+          %297 = llvm.mlir.constant(0 : i32) : i32
+          llvm.return %297 : i32
         }
       }
     }
@@ -5277,7 +5285,7 @@ module  {
         hal.return %c1, %c1, %c1 : index, index, index
       }
       module  {
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+        llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -5616,7 +5624,8 @@ module  {
           %296 = llvm.add %128, %2  : i64
           llvm.br ^bb5(%296 : i64)
         ^bb25:  // pred: ^bb5
-          llvm.return
+          %297 = llvm.mlir.constant(0 : i32) : i32
+          llvm.return %297 : i32
         }
       }
     }
@@ -5832,7 +5841,7 @@ module  {
         hal.return %c1, %c1, %c1 : index, index, index
       }
       module  {
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+        llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -6171,7 +6180,8 @@ module  {
           %296 = llvm.add %128, %2  : i64
           llvm.br ^bb5(%296 : i64)
         ^bb25:  // pred: ^bb5
-          llvm.return
+          %297 = llvm.mlir.constant(0 : i32) : i32
+          llvm.return %297 : i32
         }
       }
     }
@@ -6288,7 +6298,7 @@ module  {
         hal.return %c1, %c1, %c1 : index, index, index
       }
       module  {
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
+        llvm.func internal @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) -> i32 {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -6627,7 +6637,8 @@ module  {
           %296 = llvm.add %128, %2  : i64
           llvm.br ^bb5(%296 : i64)
         ^bb25:  // pred: ^bb5
-          llvm.return
+          %297 = llvm.mlir.constant(0 : i32) : i32
+          llvm.return %297 : i32
         }
       }
     }
@@ -6835,7 +6846,7 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
+  hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6882xi8>, format = 1145850178 : i32} {
   }
 }
 
@@ -7066,7 +7077,7 @@ module  {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6882xi8>, format = 1145850178 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
@@ -7271,7 +7282,7 @@ module  {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6882xi8>, format = 1145850178 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
@@ -7363,7 +7374,7 @@ module  {
       vm.return %ref_0 : !vm.ref<!hal.executable_layout>
     }
     vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6882xi8>
     vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -7519,7 +7530,7 @@ vm.module @module {
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
   vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6882xi8>
   vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -7674,7 +7685,7 @@ vm.module @module {
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
   vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6882xi8>
   vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -8075,7 +8086,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6882xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8234,7 +8245,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6882xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8393,7 +8404,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6882xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8532,7 +8543,7 @@ vm.module @module {
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
   vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
   vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6882xi8>
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -8671,7 +8682,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6882xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
