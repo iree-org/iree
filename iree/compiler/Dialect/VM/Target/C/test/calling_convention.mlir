@@ -16,7 +16,8 @@ vm.module @calling_convention_test {
 
   // CHECK: iree_status_t calling_convention_test_no_in_i32_return_impl(int32_t *out0, calling_convention_test_state_t* state) {
   vm.func @no_in_i32_return() -> (i32) {
-    // CHECK-NEXT: int32_t v1 = vm_const_i32(32);
+    // CHECK-NEXT: int32_t v1;
+    // CHECK-NEXT: v1 = 32;
     %0 = vm.const.i32 32 : i32
     // CHECK-NEXT: *out0 = v1;
     // CHECK-NEXT: return iree_ok_status();
@@ -25,7 +26,8 @@ vm.module @calling_convention_test {
 
   // CHECK: iree_status_t calling_convention_test_i32_in_i32_return_impl(int32_t v1, int32_t *out0, calling_convention_test_state_t* state) {
   vm.func @i32_in_i32_return(%arg0 : i32) -> (i32) {
-    // CHECK-NEXT: int32_t v2 = vm_const_i32(32);
+    // CHECK-NEXT: int32_t v2;
+    // CHECK-NEXT: v2 = 32;
     %0 = vm.const.i32 32 : i32
     // CHECK-NEXT: *out0 = v2;
     // CHECK-NEXT: return iree_ok_status();
