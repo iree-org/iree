@@ -829,3 +829,33 @@ func @read_only_subtensor() {
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[SV1]], %[[SV1]], %[[SV2]], %[[SV2]] :
 //  CHECK-SAME:         outs(%[[SV3]] :
+
+// -----
+
+func @reshape_read_only() {
+  %c0 = constant 0 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@wo0[%c0] : !flow.dispatch.tensor<writeonly:?xf32>
+  %2 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1) -> (d0, d1)>]
+      : tensor<?x?xf32> into tensor<?xf32>
+  %4 = memref.dim %3, %c0 : tensor<?xf32>
+  %5 = linalg.init_tensor [%4] : tensor<?xf32>
+  %6 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%3 : tensor<?xf32>) outs(%5 : tensor<?xf32>) {
+      ^bb0(%arg0 : f32, %arg1 : f32):
+         %7 = addf %arg0, %arg0 : f32
+         linalg.yield %7 : f32
+      } -> tensor<?xf32>
+  flow.dispatch.tensor.store %6, %1 : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>
+  return
+}
+// CHECK-LABEL: func @reshape_read_only
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@ro0
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan @legacy_io::@wo0
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[INPUT]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[RESHAPE]] : memref<?xf32>)
+//  CHECK-SAME:     outs(%[[OUTPUT]] : memref<?xf32>)
