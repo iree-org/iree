@@ -4,9 +4,7 @@ vm.module @assignment_ops {
   // Conditional assignment
   //===--------------------------------------------------------------------===//
 
-  // TODO: The CModuleTarget enforces exports to be ordered.
   vm.export @test_select_i32
-
   vm.func @test_select_i32() {
     %c0 = vm.const.i32 0 : i32
     %c0dno = iree.do_not_optimize(%c0) : i32

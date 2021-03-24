@@ -300,12 +300,18 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   };
 
   // exports
-  // TODO: Add sorting the module export table by name. This is already
-  //       supported in the ByteCodeModuleTarget using `llvm::sort`.
   std::string exportName = moduleName + "_exports_";
   output << "static const iree_vm_native_export_descriptor_t " << exportName
          << "[] = {\n";
-  for (auto exportOp : moduleOp.getOps<IREE::VM::ExportOp>()) {
+
+  // sort export ops
+  SmallVector<IREE::VM::ExportOp, 4> exportOps(
+      moduleOp.getOps<IREE::VM::ExportOp>());
+  llvm::sort(exportOps, [](auto &lhs, auto &rhs) {
+    return lhs.export_name().compare(rhs.export_name()) < 0;
+  });
+
+  for (auto exportOp : exportOps) {
     auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
     if (!funcOp) {
       return exportOp.emitError("Couldn't find referenced FuncOp");
@@ -327,7 +333,15 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string importName = moduleName + "_imports_";
   output << "static const iree_vm_native_import_descriptor_t " << importName
          << "[] = {\n";
-  for (auto importOp : moduleOp.getOps<IREE::VM::ImportOp>()) {
+
+  // sort import ops
+  SmallVector<IREE::VM::ImportOp, 4> importOps(
+      moduleOp.getOps<IREE::VM::ImportOp>());
+  llvm::sort(importOps, [](auto &lhs, auto &rhs) {
+    return lhs.getName().compare(rhs.getName()) < 0;
+  });
+
+  for (auto importOp : importOps) {
     output << "{" << printCStringView(importOp.getName().str()) << "},\n";
   }
   output << "};\n";
@@ -337,7 +351,17 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string functionName = moduleName + "_funcs_";
   output << "static const iree_vm_native_function_ptr_t " << functionName
          << "[] = {\n";
-  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
+
+  // sort func ops
+  SmallVector<IREE::VM::FuncOp, 4> funcOps(moduleOp.getOps<IREE::VM::FuncOp>());
+  llvm::sort(funcOps, [&moduleOp](auto &lhs, auto &rhs) {
+    std::string lhsStr =
+        buildFunctionName(moduleOp, lhs, /*implSufffix=*/false);
+    std::string rhsStr =
+        buildFunctionName(moduleOp, rhs, /*implSufffix=*/false);
+    return lhsStr.compare(rhsStr) < 0;
+  });
+  for (auto funcOp : funcOps) {
     output << "{"
            << "(iree_vm_native_function_shim_t)";
 
