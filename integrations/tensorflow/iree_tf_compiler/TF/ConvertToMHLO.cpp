@@ -58,15 +58,15 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
 
     // Lower TF Patterns must be separate from canonocalization patterns as
     // they are sometimes inversions of eachother.
-    OwningRewritePatternList lowerTfPatterns;
+    OwningRewritePatternList lowerTfPatterns(&getContext());
     mlir::TF::PopulateLoweringTFPatterns(context, &lowerTfPatterns);
 
-    OwningRewritePatternList canonicalizePatterns;
+    OwningRewritePatternList canonicalizePatterns(&getContext());
     for (auto *op : context->getRegisteredOperations()) {
       op->getCanonicalizationPatterns(canonicalizePatterns, context);
     }
 
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     // Note that the `OperationConverter` orders patterns lexicographically by:
     // 1) Ascending legalization depth (i.e., minimum number of patterns
     // necessary to arrive at conversion target).
@@ -98,10 +98,10 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     DenseSet<Operation *> prevUnconvertedOps;
     DenseSet<Operation *> unconvertedOps;
 
-    FrozenRewritePatternList frozenPatterns(std::move(patterns));
-    FrozenRewritePatternList frozenCanonicalizePatterns(
+    FrozenRewritePatternSet frozenPatterns(std::move(patterns));
+    FrozenRewritePatternSet frozenCanonicalizePatterns(
         std::move(canonicalizePatterns));
-    FrozenRewritePatternList frozenTfPatterns(std::move(lowerTfPatterns));
+    FrozenRewritePatternSet frozenTfPatterns(std::move(lowerTfPatterns));
     while (true) {
       if (failed(
               applyPatternsAndFoldGreedily(op, frozenCanonicalizePatterns))) {

@@ -33,9 +33,9 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
   }
     // CHECK: #[[MAP1:.+]] = affine_map<(d0) -> (d0 * 4)>
 
-    // CHECK: %[[C1024:.+]] = constant 1024 : index
-    // CHECK: %[[C8:.+]] = constant 8 : index
-    // CHECK: %[[C0:.+]] = constant 0 : index
+    // CHECK-DAG: %[[C1024:.+]] = constant 1024 : index
+    // CHECK-DAG: %[[C8:.+]] = constant 8 : index
+    // CHECK-DAG: %[[C0:.+]] = constant 0 : index
     // CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<128x32xf32, 3>
     // CHECK: %[[DST:.+]]  = memref.subview %{{.+}}[0, 0] [128, 32] [1, 1]  : memref<4096x4096xf32> to memref<128x32xf32, #map0>
     // CHECK: %[[TIDx:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index

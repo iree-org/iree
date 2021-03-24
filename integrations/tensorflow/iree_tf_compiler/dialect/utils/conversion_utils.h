@@ -55,7 +55,7 @@ class ConversionPass : public PassWrapper<T, OperationPass<ModuleOp>> {
 
   LogicalResult run() {
     auto module = this->getOperation();
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&this->getContext());
     Converter typeConverter;
 
     // Lower to the standard string operations.
@@ -82,10 +82,8 @@ class ConversionPass : public PassWrapper<T, OperationPass<ModuleOp>> {
              llvm::all_of(op.getResultTypes(), func);
     });
 
-    populateFuncOpTypeConversionPattern(patterns, &this->getContext(),
-                                        typeConverter);
-    populateCallOpTypeConversionPattern(patterns, &this->getContext(),
-                                        typeConverter);
+    populateFuncOpTypeConversionPattern(patterns, typeConverter);
+    populateCallOpTypeConversionPattern(patterns, typeConverter);
 
     auto result = applyPartialConversion(module.getOperation(), target,
                                          std::move(patterns));

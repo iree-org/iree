@@ -348,7 +348,7 @@ class ConvertVMToEmitCPass
   void runOnOperation() override {
     ConversionTarget target(getContext());
 
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     populateVMToCPatterns(&getContext(), patterns);
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();

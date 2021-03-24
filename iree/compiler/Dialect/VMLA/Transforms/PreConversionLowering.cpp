@@ -470,14 +470,14 @@ class PreConversionLoweringPass
 
     // These patterns should be run greedily as they are not dialect
     // conversions.
-    OwningRewritePatternList greedyPatterns;
+    OwningRewritePatternList greedyPatterns(&getContext());
     mhlo::PopulateComplexLoweringPatterns(context, &greedyPatterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(greedyPatterns)))) {
       return signalPassFailure();
     }
 
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     ConversionTarget target(*context);
     target.addLegalDialect<StandardOpsDialect>();
     target.addLegalDialect<IREE::VMLA::VMLADialect>();
@@ -503,7 +503,7 @@ class PreConversionLoweringPass
     }
 
     {
-      OwningRewritePatternList greedyPatterns;
+      OwningRewritePatternList greedyPatterns(&getContext());
       greedyPatterns.insert<CanonicalizeTranspose>(context);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(greedyPatterns)))) {

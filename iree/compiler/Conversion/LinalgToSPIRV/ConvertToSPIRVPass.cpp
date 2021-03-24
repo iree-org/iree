@@ -539,27 +539,25 @@ void ConvertToSPIRVPass::runOnOperation() {
   SPIRVTypeConverter typeConverter(targetAttr);
   ScfToSPIRVContext scfToSPIRVContext;
 
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(&getContext());
   // Pull in GPU patterns to convert processor ID ops and loop ops.
-  populateGPUToSPIRVPatterns(context, typeConverter, patterns);
+  populateGPUToSPIRVPatterns(typeConverter, patterns);
   // Pull in SCF patterns to convert control flow ops.
-  populateSCFToSPIRVPatterns(context, typeConverter, scfToSPIRVContext,
-                             patterns);
+  populateSCFToSPIRVPatterns(typeConverter, scfToSPIRVContext, patterns);
   // Pull in standard patterns to convert arithmetic ops and others.
-  populateStandardToSPIRVPatterns(context, typeConverter, patterns);
+  populateStandardToSPIRVPatterns(typeConverter, patterns);
   // Pull in standard patterns to convert tensor operations to SPIR-V. These are
   // primarily used to handle tensor-type constants and contain a
   // threshold. Only those constants that are below the threshold are converted
   // to SPIR-V. In IREE we want to control this threshold at Flow level. So set
   // this value arbitrarily high to make sure that everything within a dispatch
   // region is converted.
-  mlir::populateTensorToSPIRVPatterns(context, typeConverter,
-                                      std::numeric_limits<int64_t>::max() / 8,
-                                      patterns);
+  mlir::populateTensorToSPIRVPatterns(
+      typeConverter, std::numeric_limits<int64_t>::max() / 8, patterns);
   // Pull in vector patterns to convert vector ops.
-  mlir::populateVectorToSPIRVPatterns(context, typeConverter, patterns);
+  mlir::populateVectorToSPIRVPatterns(typeConverter, patterns);
   // Pull in builtin func to spv.func conversion.
-  populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
+  populateBuiltinFuncToSPIRVPatterns(typeConverter, patterns);
   auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
   populateVectorToSPIRVPatterns(context, typeConverter, patterns,
                                 cooperativeMatrixAnalysis);
@@ -593,7 +591,7 @@ void ConvertToSPIRVPass::runOnOperation() {
     functions.push_back(fn);
   }
 
-  FrozenRewritePatternList frozenPatterns(std::move(patterns));
+  FrozenRewritePatternSet frozenPatterns(std::move(patterns));
   for (FuncOp fn : functions)
     if (failed(applyFullConversion(fn, *target, frozenPatterns)))
       return signalPassFailure();

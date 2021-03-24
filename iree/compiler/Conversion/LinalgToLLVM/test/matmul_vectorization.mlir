@@ -52,14 +52,14 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
 // CHECK-PROMOTED: #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>
 // CHECK-PROMOTED: func @matmul_128x128x128
 // CHECK-PROMOTED: (%[[ARG0:.+]]: memref<128x128xf32>, %[[ARG1:.+]]: memref<128x128xf32>, %[[ARG2:.+]]: memref<128x128xf32>) {
-// CHECK-PROMOTED: %[[KDIM_SIZE:.+]] = constant 128 : index
-// CHECK-PROMOTED: %[[WORGKROUP_SIZE:.+]] = constant 64 : index
-// CHECK-PROMOTED: %[[VECTOR_SIZE:.+]] = constant 4 : index
-// CHECK-PROMOTED: %[[L1_SIZE:.+]] = constant 32 : index
-// CHECK-PROMOTED: %[[START:.+]] = constant 0 : index
-// CHECK-PROMOTED: %[[C1:.+]] = constant 1 : index
-// CHECK-PROMOTED: %[[C1:.+]] = constant 2 : index
-// CHECK-PROMOTED: %[[C1:.+]] = constant 3 : index
+// CHECK-PROMOTED-DAG: %[[KDIM_SIZE:.+]] = constant 128 : index
+// CHECK-PROMOTED-DAG: %[[WORGKROUP_SIZE:.+]] = constant 64 : index
+// CHECK-PROMOTED-DAG: %[[VECTOR_SIZE:.+]] = constant 4 : index
+// CHECK-PROMOTED-DAG: %[[L1_SIZE:.+]] = constant 32 : index
+// CHECK-PROMOTED-DAG: %[[START:.+]] = constant 0 : index
+// CHECK-PROMOTED-DAG: %[[C1:.+]] = constant 1 : index
+// CHECK-PROMOTED-DAG: %[[C1:.+]] = constant 2 : index
+// CHECK-PROMOTED-DAG: %[[C1:.+]] = constant 3 : index
 // CHECK-PROMOTED: %[[A_PROMOTED_TILE:.+]] = memref.alloca() : memref<64x64xf32>
 // CHECK-PROMOTED: %[[B_PROMOTED_TILE:.+]] = memref.alloca() : memref<128x64xf32>
 // CHECK-PROMOTED: %[[C_PROMOTED_TILE:.+]] = memref.alloca() : memref<64x128xf32>

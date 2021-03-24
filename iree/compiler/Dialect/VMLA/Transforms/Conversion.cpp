@@ -85,14 +85,13 @@ class ConversionPass
     conversionTarget.addIllegalDialect<mhlo::MhloDialect>();
     conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
 
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
     populateStandardToVMLAPatterns(context, conversionPatterns, typeConverter);
     populateHLOToVMLAPatterns(context, conversionPatterns, typeConverter);
     populateHALToVMLAPatterns(context, conversionPatterns, typeConverter);
 
     // Ensure FuncOp signatures are updated.
-    populateFuncOpTypeConversionPattern(conversionPatterns, context,
-                                        typeConverter);
+    populateFuncOpTypeConversionPattern(conversionPatterns, typeConverter);
 
     // We allow the shape dialect to persist, making specific dim queries
     // illegal (which allows them to fold away). These patterns allow dimension

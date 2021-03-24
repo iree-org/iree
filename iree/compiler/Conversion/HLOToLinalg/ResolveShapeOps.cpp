@@ -98,7 +98,7 @@ struct ResolveShapeOpsPass
 void ResolveShapeOpsPass::runOnFunction() {
   MLIRContext *context = &getContext();
 
-  OwningRewritePatternList dimPatterns;
+  OwningRewritePatternList dimPatterns(&getContext());
   dimPatterns.insert<StdDimResolver>(context);
 
   // Set up a target to convert all std.dim ops. We need a conversion target
@@ -111,7 +111,7 @@ void ResolveShapeOpsPass::runOnFunction() {
     return signalPassFailure();
   }
 
-  OwningRewritePatternList shapePatterns;
+  OwningRewritePatternList shapePatterns(&getContext());
   shapePatterns.insert<TieShapeElider>(context);
   Shape::RankedDimOp::getCanonicalizationPatterns(shapePatterns, context);
 

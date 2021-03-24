@@ -146,7 +146,7 @@ class ConvertTFToTFStringsPass
 
 void populateTFToTFStringsPatterns(MLIRContext *ctx,
                                    OwningRewritePatternList &patterns) {
-  populateWithGenerated(ctx, patterns);
+  populateWithGenerated(patterns);
   patterns.insert<GatherV2OpLowering>(ctx);
   patterns.insert<StringFormatOpLowering>(ctx);
 }

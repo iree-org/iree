@@ -402,7 +402,7 @@ class ConvertVMLAToVMPass
         StringRef(vmla_imports_create()->data, vmla_imports_create()->size),
         innerModuleOp);
 
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
 
     SymbolTable importSymbols(innerModuleOp);

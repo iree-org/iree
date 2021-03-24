@@ -661,6 +661,7 @@ def VM_ConstI32Op :
     VM_ConstIntegerOp<I32, "const.i32", VM_OPC_ConstI32, "int32_t"> {
   let summary = [{32-bit integer constant operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_ConstI64Op :
@@ -668,6 +669,7 @@ def VM_ConstI64Op :
                       [VM_ExtI64]> {
   let summary = [{64-bit integer constant operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 class VM_ConstIntegerZeroOp<I type, string mnemonic, VM_OPC opcode,
