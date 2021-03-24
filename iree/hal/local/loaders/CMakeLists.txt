@@ -16,14 +16,12 @@ iree_cc_library(
   HDRS
     "legacy_library_loader.h"
   SRCS
-    "legacy_library_loader.cc"
+    "legacy_library_loader.c"
   DEPS
     iree::base::api
     iree::base::core_headers
-    iree::base::dynamic_library
     iree::base::flatcc
-    iree::base::internal::file_io
-    iree::base::internal::file_path
+    iree::base::internal::dynamic_library
     iree::base::tracing
     iree::hal::api
     iree::hal::local

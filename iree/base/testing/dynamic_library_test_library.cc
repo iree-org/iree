@@ -13,9 +13,7 @@
 // limitations under the License.
 
 #ifdef __cplusplus
-#define IREE_API_EXPORT extern "C"
-#else
-#define IREE_API_EXPORT
+extern "C" {
 #endif  // __cplusplus
 
 #if defined(_WIN32)
@@ -24,4 +22,8 @@
 #define IREE_SYM_EXPORT __attribute__((visibility("default")))
 #endif  // _WIN32
 
-IREE_API_EXPORT int IREE_SYM_EXPORT times_two(int value) { return value * 2; }
+int IREE_SYM_EXPORT times_two(int value) { return value * 2; }
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus

@@ -121,19 +121,17 @@ cc_library(
         "vulkan_headers.h",
     ],
     hdrs = [
-        "dynamic_symbol_tables.h",
         "dynamic_symbols.h",
+    ],
+    textual_hdrs = [
+        "dynamic_symbol_tables.h",
     ],
     deps = [
         "//iree/base:core_headers",
-        "//iree/base:dynamic_library",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/base/internal:dynamic_library",
         "//iree/hal/vulkan/util:ref_ptr",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
         "@iree_vulkan_headers//:vulkan_headers",
     ],
 )

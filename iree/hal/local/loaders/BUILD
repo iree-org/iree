@@ -25,7 +25,7 @@ package(
 
 cc_library(
     name = "legacy_library_loader",
-    srcs = ["legacy_library_loader.cc"],
+    srcs = ["legacy_library_loader.c"],
     hdrs = ["legacy_library_loader.h"],
     defines = [
         "IREE_HAL_HAVE_LEGACY_LIBRARY_LOADER=1",
@@ -33,11 +33,9 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:core_headers",
-        "//iree/base:dynamic_library",
         "//iree/base:flatcc",
         "//iree/base:tracing",
-        "//iree/base/internal:file_io",
-        "//iree/base/internal:file_path",
+        "//iree/base/internal:dynamic_library",
         "//iree/hal:api",
         "//iree/hal/local",
         "//iree/schemas:dylib_executable_def_c_fbs",

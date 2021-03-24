@@ -17,8 +17,7 @@
 
 #include <string>
 
-#include "absl/strings/string_view.h"
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 
 namespace iree {
 namespace file_io {
@@ -27,33 +26,13 @@ namespace file_io {
 //
 // Returns an OK status if the file definitely exists.
 // Errors can include PermissionDeniedError, NotFoundError, etc.
-Status FileExists(const std::string& path);
+iree_status_t FileExists(const char* path);
 
 // Synchronously reads a file's contents into a string.
-Status GetFileContents(const std::string& path, std::string* out_contents);
+iree_status_t GetFileContents(const char* path, std::string* out_contents);
 
 // Synchronously writes a string into a file, overwriting its contents.
-Status SetFileContents(const std::string& path, absl::string_view content);
-
-// Deletes the file at the provided path.
-Status DeleteFile(const std::string& path);
-
-// Moves a file from 'source_path' to 'destination_path'.
-//
-// This may simply rename the file, but may fall back to a full copy and delete
-// of the original if renaming is not possible (for example when moving between
-// physical storage locations).
-Status MoveFile(const std::string& source_path,
-                const std::string& destination_path);
-
-// Gets a platform and environment-dependent path for temporary files.
-std::string GetTempPath();
-
-// TODO(#3845): remove this when dylibs no longer need temp files.
-// Gets a temporary file name and returns its absolute path.
-// The particular path chosen is platform and environment-dependent.
-// Unique characters will be automatically inserted after |base_name|.
-Status GetTempFile(absl::string_view base_name, std::string* out_path);
+iree_status_t SetFileContents(const char* path, iree_const_byte_span_t content);
 
 }  // namespace file_io
 }  // namespace iree
