@@ -17,7 +17,7 @@
 
 #include <stdint.h>
 
-#include "iree/vm/api.h"
+#include "iree/base/api.h"
 
 //===------------------------------------------------------------------===//
 // Globals

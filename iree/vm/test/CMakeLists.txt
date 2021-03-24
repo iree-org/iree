@@ -83,9 +83,9 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    comparison_ops_i64
+    comparison_ops
   SRC
-    "comparison_ops_i64.mlir"
+    "comparison_ops.mlir"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -93,9 +93,9 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    comparison_ops
+    comparison_ops_i64
   SRC
-    "comparison_ops.mlir"
+    "comparison_ops_i64.mlir"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC

@@ -306,6 +306,9 @@ cc_library(
     hdrs = [
         "ops.h",
     ],
+    deps = [
+        "//iree/base:api",
+    ],
 )
 
 cc_library(
