@@ -248,7 +248,7 @@ static LogicalResult convertInitTensorOp(
   return success();
 }
 
-/// Walks the use-def chain and see if this value ceoms from a read-only tensor.
+/// Walks the use-def chain and see if this value comes from a read-only tensor.
 static bool isFromReadOnlyTensor(Value v) {
   auto definingOp = v.getDefiningOp();
   if (!definingOp) return false;
