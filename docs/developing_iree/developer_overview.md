@@ -232,31 +232,4 @@ function.
 ### Useful Vulkan driver flags
 
 For IREE's Vulkan runtime driver, there are a few useful flags defined in
-[vulkan_driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/vulkan/vulkan_driver_module.cc):
-
-#### `--vulkan_renderdoc`
-
-This flag tells IREE to load RenderDoc, connect to it's in-application API, and
-trigger capturing on its own. For example, this command runs `iree-run-mlir` on
-a simple MLIR file with some sample input values and saves a RenderDoc capture
-to the default location on your system (e.g. `/tmp/RenderDoc/`):
-
-```shell
-$ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/renderdoc/lib/path \
-  ../iree-build/iree/tools/iree-run-mlir \
-    $PWD/iree/samples/vulkan/simple_mul.mlir \
-    -iree-hal-target-backends=vulkan-spirv \
-    -function-input="4xf32=1,2,3,4" \
-    -function-input="4xf32=2,4,6,8" \
-    -run-arg="--vulkan_renderdoc"
-```
-
-This flag also works for other IREE execution tools like `iree-run-module`,
-`iree-check-module`.
-
-You can also launch IREE's headless programs through RenderDoc itself, just be
-sure to set the command line arguments appropriately. Saving capture settings in
-RenderDoc can help if you find yourself doing this frequently.
-
-Note: RenderDoc version 1.7 or higher is needed to record captures from IREE's
-headless compute programs.
+[driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/vulkan/registration/driver_module.cc):
