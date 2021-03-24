@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,33 +14,28 @@
 
 include(CMakeParseArguments)
 
-# iree_bytecode_module()
-#
-# CMake function to imitate Bazel's iree_bytecode_module rule.
+# iree_c_module()
 #
 # Parameters:
 # NAME: Name of target (see Note).
-# SRC: Source file to compile into a bytecode module.
-# FLAGS: Flags to pass to the translation tool (list of strings). The
-#     default flag set is "-iree-mlir-to-vm-bytecode-module".
+# SRC: MLIR source file to compile into a c module.
+# H_FILE_OUTPUT: The H header file to output.
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
 #     tool is "iree-translate".
-# CC_NAMESPACE: Wraps everything in a C++ namespace.
-# PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
-#     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
-#     will be in ${PACKAGE}/internal.
+# FLAGS: Flags to pass to the translation tool (list of strings). The
+#     default flag set is "-iree-vm-ir-to-c-module".
 # TESTONLY: When added, this target will only be built if user passes
 #    -DIREE_BUILD_TESTS=ON to CMake.
 #
 # Note:
-# By default, iree_bytecode_module will create a library named ${NAME}_cc,
-# and alias target iree::${NAME}_cc. The iree:: form should always be used.
+# By default, iree_c_module will create a library named ${NAME},
+# and alias target iree::${NAME}. The iree:: form should always be used.
 # This is to reduce namespace pollution.
-function(iree_bytecode_module)
+function(iree_c_module)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY"
-    "NAME;SRC;TRANSLATE_TOOL;CC_NAMESPACE"
+    "TESTONLY"
+    "NAME;SRC;H_FILE_OUTPUT;TRANSLATE_TOOL"
     "FLAGS"
     ${ARGN}
   )
@@ -49,11 +44,19 @@ function(iree_bytecode_module)
     return()
   endif()
 
+  # Replace dependencies passed by ::name with iree::package::name
+  iree_package_ns(_PACKAGE_NS)
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+
+  # Prefix the library with the package name, so we get: iree_package_name.
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+
   # Set defaults for FLAGS and TRANSLATE_TOOL
   if(DEFINED _RULE_FLAGS)
     set(_FLAGS ${_RULE_FLAGS})
   else()
-    set(_FLAGS "-iree-mlir-to-vm-bytecode-module")
+    set(_FLAGS "-iree-vm-ir-to-c-module")
   endif()
   if(DEFINED _RULE_TRANSLATE_TOOL)
     set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
@@ -66,42 +69,34 @@ function(iree_bytecode_module)
   set(_ARGS "${_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
   list(APPEND _ARGS "-o")
-  list(APPEND _ARGS "${_RULE_NAME}.vmfb")
+  list(APPEND _ARGS "${_RULE_H_FILE_OUTPUT}")
 
-  # Depending on the binary instead of the target here given we might not have
-  # a target in this CMake invocation when cross-compiling.
   add_custom_command(
-    OUTPUT "${_RULE_NAME}.vmfb"
+    OUTPUT "${_RULE_H_FILE_OUTPUT}"
     COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
     # Changes to either the translation tool or the input source should
     # trigger rebuilding.
     DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} ${_RULE_SRC}
   )
 
-  if(_RULE_TESTONLY)
-    set(_TESTONLY_ARG "TESTONLY")
-  endif()
-  if(_RULE_PUBLIC)
-    set(_PUBLIC_ARG "PUBLIC")
-  endif()
+  set(_GEN_TARGET "${_NAME}_gen")
+  add_custom_target(
+    ${_GEN_TARGET}
+    DEPENDS
+      ${_RULE_H_FILE_OUTPUT}
+  )
+  
+  add_library(${_NAME} INTERFACE)
+  add_dependencies(${_NAME} ${_GEN_TARGET})
 
-  if(DEFINED _RULE_CC_NAMESPACE)
-    iree_cc_embed_data(
-      NAME
-        "${_RULE_NAME}_cc"
-      IDENTIFIER
-        "${_RULE_NAME}"
-      GENERATED_SRCS
-        "${_RULE_NAME}.vmfb"
-      CC_FILE_OUTPUT
-        "${_RULE_NAME}.cc"
-      H_FILE_OUTPUT
-        "${_RULE_NAME}.h"
-      CPP_NAMESPACE
-        "${_RULE_CC_NAMESPACE}"
-      FLATTEN
-      "${_PUBLIC_ARG}"
-      "${_TESTONLY_ARG}"
-    )
+  # Alias the iree_package_name library to iree::package::name.
+  # This lets us more clearly map to Bazel and makes it possible to
+  # disambiguate the underscores in paths vs. the separators.
+  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  iree_package_dir(_PACKAGE_DIR)
+  if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
+    # If the library name matches the package then treat it as a default.
+    # For example, foo/bar/ library 'bar' would end up as 'foo::bar'.
+    add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
 endfunction()

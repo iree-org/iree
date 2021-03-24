@@ -30,162 +30,126 @@ iree_cc_test(
     iree::vm::cc
     iree::vm::ops
     iree::vm::shims
-    ::arithmetic_ops_cc
-    ::arithmetic_ops_i64_cc
-    ::assignment_ops_cc
-    ::assignment_ops_i64_cc
-    ::comparison_ops_cc
-    ::comparison_ops_i64_cc
-    ::control_flow_ops_cc
-    ::conversion_ops_cc
-    ::conversion_ops_i64_cc
-    ::global_ops_cc
-    ::shift_ops_cc
-    ::shift_ops_i64_cc
+    ::arithmetic_ops
+    ::arithmetic_ops_i64
+    ::assignment_ops
+    ::assignment_ops_i64
+    ::comparison_ops
+    ::comparison_ops_i64
+    ::control_flow_ops
+    ::conversion_ops
+    ::conversion_ops_i64
+    ::global_ops
+    ::shift_ops
+    ::shift_ops_i64
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     arithmetic_ops
   SRC
     "../arithmetic_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "arithmetic_ops.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     arithmetic_ops_i64
   SRC
     "../arithmetic_ops_i64.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "arithmetic_ops_i64.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     assignment_ops
   SRC
     "../assignment_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "assignment_ops.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     assignment_ops_i64
   SRC
     "../assignment_ops_i64.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "assignment_ops_i64.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     comparison_ops
   SRC
     "../comparison_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "comparison_ops.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     comparison_ops_i64
   SRC
     "../comparison_ops_i64.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "comparison_ops_i64.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     control_flow_ops
   SRC
     "../control_flow_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "control_flow_ops.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     conversion_ops
   SRC
     "../conversion_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "conversion_ops.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     conversion_ops_i64
   SRC
     "../conversion_ops_i64.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "conversion_ops_i64.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     global_ops
   SRC
     "../global_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "global_ops.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     shift_ops
   SRC
     "../shift_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "shift_ops.h"
 )
 
-iree_bytecode_module(
+iree_c_module(
   NAME
     shift_ops_i64
   SRC
     "../shift_ops_i64.mlir"
-  CC_NAMESPACE
-    "iree::vm::test::emitc"
-  FLAGS
-    "-iree-vm-ir-to-c-module"
-  PUBLIC
+  H_FILE_OUTPUT
+    "shift_ops_i64.h"
 )
 
 endif()
