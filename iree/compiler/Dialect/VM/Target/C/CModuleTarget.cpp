@@ -248,6 +248,8 @@ static LogicalResult translateReturnOpToC(
 static LogicalResult translateOpToC(Operation &op,
                                     mlir::emitc::CppEmitter &emitter,
                                     SmallVector<std::string, 4> resultNames) {
+  if (auto branchOp = dyn_cast<IREE::VM::BranchOp>(op))
+    return translateBranchOp(branchOp, emitter);
   if (auto callOp = dyn_cast<IREE::VM::CallOp>(op))
     return translateCallOpToC(callOp, emitter);
   if (auto condBranchOp = dyn_cast<IREE::VM::CondBranchOp>(op))
