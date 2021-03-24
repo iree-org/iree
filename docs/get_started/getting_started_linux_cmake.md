@@ -120,7 +120,7 @@ Translate a source MLIR into an IREE module:
 
 ```shell
 # Assuming in IREE source root
-$ ./build/iree/tools/iree-translate \
+$ ../iree-build/iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-llvm-target-triple=x86_64-linux-gnu \
     -iree-hal-target-backends=dylib-llvm-aot \
@@ -131,10 +131,10 @@ $ ./build/iree/tools/iree-translate \
 Then run the compiled module using the `dylib` HAL driver:
 
 ```shell
-$ ./build/iree/tools/iree-run-module -driver=dylib \
-          -module_file=/tmp/simple-llvm_aot.vmfb \
-          -entry_function=abs \
-          -function_inputs="i32=-5"
+$ ../iree-build/iree/tools/iree-run-module -driver=dylib \
+    -module_file=/tmp/simple-llvm_aot.vmfb \
+    -entry_function=abs \
+    -function_inputs="i32=-5"
 
 EXEC @abs
 i32=5
