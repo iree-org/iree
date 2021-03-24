@@ -113,11 +113,11 @@ $ ./bazel-bin/iree/tools/iree-translate --help
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-mlir.mlir)
 and execute a function in the compiled module:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
+$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/iree-run-mlir.mlir \
   -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 

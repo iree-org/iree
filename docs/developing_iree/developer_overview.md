@@ -118,7 +118,7 @@ For example, to translate `simple.mlir` to an IREE module:
 $ ../iree-build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmla \
-  $PWD/iree/tools/test/simple.mlir \
+  $PWD/iree/tools/test/iree-run-module.mlir \
   -o /tmp/simple.vmfb
 ```
 
@@ -176,11 +176,11 @@ does some additional work that usually must be explicit, like marking every
 function as exported by default and running all of them.
 
 For example, to execute the contents of
-[iree/tools/test/simple.mlir](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir):
+[iree/tools/test/iree-run-mlir.mlir](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-mlir.mlir):
 
 ```shell
 $ ../iree-build/iree/tools/iree-run-mlir \
-  $PWD/iree/tools/test/simple.mlir \
+  $PWD/iree/tools/test/iree-run-mlir.mlir \
   -function-input="i32=-2" \
   -iree-hal-target-backends=vmla
 ```
