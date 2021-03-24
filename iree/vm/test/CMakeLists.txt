@@ -23,6 +23,7 @@ iree_cc_embed_data(
     "assignment_ops.vmfb"
     "assignment_ops_i64.vmfb"
     "comparison_ops.vmfb"
+    "comparison_ops_i64.vmfb"
     "control_flow_ops.vmfb"
     "conversion_ops.vmfb"
     "conversion_ops_i64.vmfb"
@@ -75,6 +76,16 @@ iree_bytecode_module(
     assignment_ops_i64
   SRC
     "assignment_ops_i64.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    comparison_ops_i64
+  SRC
+    "comparison_ops_i64.mlir"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
