@@ -35,16 +35,6 @@ include(iree_installed_test)
 # This will also add it to ctest list as iree_${NAME}.
 #
 # Usage:
-# iree_cc_library(
-#   NAME
-#     awesome
-#   HDRS
-#     "a.h"
-#   SRCS
-#     "a.cc"
-#   PUBLIC
-# )
-#
 # iree_cc_test(
 #   NAME
 #     awesome_test
