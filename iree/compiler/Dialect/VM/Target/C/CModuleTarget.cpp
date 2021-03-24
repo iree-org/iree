@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
 #include "emitc/Target/Cpp.h"
-#include "iree/base/api.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
@@ -309,11 +308,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   SmallVector<IREE::VM::ExportOp, 4> exportOps(
       moduleOp.getOps<IREE::VM::ExportOp>());
   llvm::sort(exportOps, [](auto &lhs, auto &rhs) {
-    iree_string_view_t lhsName = iree_make_string_view(
-        lhs.export_name().data(), lhs.export_name().size());
-    iree_string_view_t rhsName = iree_make_string_view(
-        rhs.export_name().data(), rhs.export_name().size());
-    return iree_string_view_compare(lhsName, rhsName) < 0;
+    return lhs.export_name().compare(rhs.export_name()) < 0;
   });
 
   for (auto exportOp : exportOps) {
@@ -343,11 +338,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   SmallVector<IREE::VM::ImportOp, 4> importOps(
       moduleOp.getOps<IREE::VM::ImportOp>());
   llvm::sort(importOps, [](auto &lhs, auto &rhs) {
-    iree_string_view_t lhsName =
-        iree_make_string_view(lhs.getName().data(), lhs.getName().size());
-    iree_string_view_t rhsName =
-        iree_make_string_view(rhs.getName().data(), rhs.getName().size());
-    return iree_string_view_compare(lhsName, rhsName) < 0;
+    return lhs.getName().compare(rhs.getName()) < 0;
   });
 
   for (auto importOp : importOps) {
@@ -368,11 +359,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
         buildFunctionName(moduleOp, lhs, /*implSufffix=*/false);
     std::string rhsStr =
         buildFunctionName(moduleOp, rhs, /*implSufffix=*/false);
-    iree_string_view_t lhsName =
-        iree_make_string_view(lhsStr.data(), lhsStr.size());
-    iree_string_view_t rhsName =
-        iree_make_string_view(rhsStr.data(), rhsStr.size());
-    return iree_string_view_compare(lhsName, rhsName) < 0;
+    return lhsStr.compare(rhsStr) < 0;
   });
   for (auto funcOp : funcOps) {
     output << "{"

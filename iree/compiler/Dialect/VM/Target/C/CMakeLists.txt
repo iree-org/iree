@@ -35,7 +35,6 @@ if(${IREE_ENABLE_EMITC})
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Conversion::VMToEmitC
       iree::compiler::Dialect::VM::Target::CallingConventionUtils
-      iree::base::api
     INCLUDES
       "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
     PUBLIC
