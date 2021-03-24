@@ -298,8 +298,7 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     }
 
     for (auto &op : block.getOperations()) {
-      auto serializableOp =
-          dyn_cast<IREE::VM::VMSerializableOp>(op);
+      auto serializableOp = dyn_cast<IREE::VM::VMSerializableOp>(op);
       if (!serializableOp) {
         op.emitOpError() << "is not serializable";
         return llvm::None;
