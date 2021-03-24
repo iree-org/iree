@@ -63,5 +63,6 @@ jobs:
             `./scripts/git/update_to_llvm_syncpoint.py`
 
             Automated submodule bump from .github/workflows/update_llvm_dependent_submodules.yml
+          author: "Submodule Update Action <iree-github-actions-bot@google.com>"
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
           branch: "auto_submodule_update"
