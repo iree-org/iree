@@ -16,9 +16,6 @@
 
 #include <cstddef>
 
-#include "absl/memory/memory.h"
-#include "absl/strings/str_cat.h"
-#include "absl/types/span.h"
 #include "iree/base/attributes.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
@@ -164,16 +161,32 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
 
-  std::unique_ptr<iree::DynamicLibrary> loader_library;
-  IREE_RETURN_IF_ERROR(DynamicLibrary::Load(
-      absl::MakeSpan(kVulkanLoaderSearchNames), &loader_library));
-  auto syms = make_ref<DynamicSymbols>();
-  syms->loader_library_ = std::move(loader_library);
+  iree_dynamic_library_t* loader_library = NULL;
+  iree_status_t status = iree_dynamic_library_load_from_files(
+      IREE_ARRAYSIZE(kVulkanLoaderSearchNames), kVulkanLoaderSearchNames,
+      IREE_DYNAMIC_LIBRARY_FLAG_NONE, iree_allocator_system(), &loader_library);
+  if (iree_status_is_not_found(status)) {
+    iree_status_ignore(status);
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "Vulkan runtime library not available; ensure installed and on path");
+  } else if (!iree_status_is_ok(status)) {
+    return status;
+  }
 
-  auto* loader_library_ptr = syms->loader_library_.get();
-  IREE_RETURN_IF_ERROR(ResolveFunctions(
-      syms.get(), [loader_library_ptr](const char* function_name) {
-        return loader_library_ptr->GetSymbol<PFN_vkVoidFunction>(function_name);
+  auto syms = make_ref<DynamicSymbols>();
+  syms->loader_library_ = loader_library;
+
+  IREE_RETURN_IF_ERROR(
+      ResolveFunctions(syms.get(), [loader_library](const char* function_name) {
+        PFN_vkVoidFunction fn = NULL;
+        iree_status_t status = iree_dynamic_library_lookup_symbol(
+            loader_library, function_name, (void**)&fn);
+        if (!iree_status_is_ok(status)) {
+          IREE_IGNORE_ERROR(status);
+          return (PFN_vkVoidFunction)NULL;
+        }
+        return fn;
       }));
   syms->FixupExtensionFunctions();
   return syms;
@@ -229,7 +242,11 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
 
 DynamicSymbols::DynamicSymbols() = default;
 
-DynamicSymbols::~DynamicSymbols() = default;
+DynamicSymbols::~DynamicSymbols() {
+  if (loader_library_) {
+    iree_dynamic_library_release(loader_library_);
+  }
+}
 
 void DynamicSymbols::FixupExtensionFunctions() {
   this->vkGetSemaphoreCounterValue = this->vkGetSemaphoreCounterValue

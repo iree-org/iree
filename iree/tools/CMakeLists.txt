@@ -115,6 +115,7 @@ iree_cc_binary(
   DEPS
     flatcc::runtime
     iree::base::internal::file_io
+    iree::base::status
     iree::schemas::bytecode_module_def_c_fbs
 )
 

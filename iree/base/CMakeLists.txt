@@ -50,26 +50,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    dynamic_library
-  HDRS
-    "dynamic_library.h"
-  SRCS
-    "dynamic_library_posix.cc"
-    "dynamic_library_win32.cc"
-  DEPS
-    ::core_headers
-    ::logging
-    ::status
-    ::tracing
-    absl::memory
-    absl::span
-    absl::strings
-    iree::base::internal::file_path
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     flatcc
   HDRS
     "flatcc.h"

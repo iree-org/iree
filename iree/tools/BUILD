@@ -73,6 +73,7 @@ cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.cc"],
     deps = [
+        "//iree/base:status",
         "//iree/base/internal:file_io",
         "//iree/schemas:bytecode_module_def_c_fbs",
     ],
