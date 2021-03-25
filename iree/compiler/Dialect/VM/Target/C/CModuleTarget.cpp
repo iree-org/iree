@@ -147,8 +147,85 @@ static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
+static LogicalResult translateBranchOp(IREE::VM::BranchOp branchOp,
+                                       mlir::emitc::CppEmitter &emitter) {
+  auto &output = emitter.ostream();
+  Block &successor = *branchOp.getSuccessor();
+
+  for (auto pair :
+       llvm::zip(branchOp.getOperands(), successor.getArguments())) {
+    auto &operand = std::get<0>(pair);
+    auto &argument = std::get<1>(pair);
+    output << emitter.getOrCreateName(argument) << " = "
+           << emitter.getOrCreateName(operand) << ";\n";
+  }
+
+  output << "goto ";
+  if (!(emitter.hasBlockLabel(successor))) {
+    return branchOp.emitOpError() << "Unable to find label for successor block";
+  }
+  output << emitter.getOrCreateName(successor) << ";\n";
+  return success();
+}
+
 static LogicalResult translateCallOpToC(IREE::VM::CallOp callOp,
                                         mlir::emitc::CppEmitter &emitter) {
+  return success();
+}
+
+static LogicalResult translateCondBranchOp(IREE::VM::CondBranchOp condBranchOp,
+                                           mlir::emitc::CppEmitter &emitter) {
+  llvm::raw_ostream &output = emitter.ostream();
+
+  Block &trueSuccessor = *condBranchOp.getTrueDest();
+  Block &falseSuccessor = *condBranchOp.getFalseDest();
+
+  output << "if (" << emitter.getOrCreateName(condBranchOp.getCondition())
+         << ") {\n";
+
+  // If condition is true.
+  for (auto pair : llvm::zip(condBranchOp.getTrueOperands(),
+                             trueSuccessor.getArguments())) {
+    auto &operand = std::get<0>(pair);
+    auto &argument = std::get<1>(pair);
+    output << emitter.getOrCreateName(argument) << " = "
+           << emitter.getOrCreateName(operand) << ";\n";
+  }
+
+  output << "goto ";
+  if (!(emitter.hasBlockLabel(trueSuccessor))) {
+    return condBranchOp.emitOpError()
+           << "Unable to find label for successor block";
+  }
+  output << emitter.getOrCreateName(trueSuccessor) << ";\n";
+  output << "} else {\n";
+  // If condition is false.
+  for (auto pair : llvm::zip(condBranchOp.getFalseOperands(),
+                             falseSuccessor.getArguments())) {
+    auto &operand = std::get<0>(pair);
+    auto &argument = std::get<1>(pair);
+    output << emitter.getOrCreateName(argument) << " = "
+           << emitter.getOrCreateName(operand) << ";\n";
+  }
+
+  output << "goto ";
+  if (!(emitter.hasBlockLabel(falseSuccessor))) {
+    return condBranchOp.emitOpError()
+           << "Unable to find label for successor block";
+  }
+  output << emitter.getOrCreateName(falseSuccessor) << ";\n";
+  output << "}\n";
+  return success();
+}
+
+static LogicalResult translateFailOp(IREE::VM::FailOp failOp,
+                                     mlir::emitc::CppEmitter &emitter) {
+  llvm::raw_ostream &output = emitter.ostream();
+
+  auto status = failOp.status();
+
+  output << "return vm_fail_or_ok(" << emitter.getOrCreateName(status)
+         << ", iree_make_cstring_view(\"" << failOp.message() << "\"));\n";
   return success();
 }
 
@@ -171,8 +248,14 @@ static LogicalResult translateReturnOpToC(
 static LogicalResult translateOpToC(Operation &op,
                                     mlir::emitc::CppEmitter &emitter,
                                     SmallVector<std::string, 4> resultNames) {
+  if (auto branchOp = dyn_cast<IREE::VM::BranchOp>(op))
+    return translateBranchOp(branchOp, emitter);
   if (auto callOp = dyn_cast<IREE::VM::CallOp>(op))
     return translateCallOpToC(callOp, emitter);
+  if (auto condBranchOp = dyn_cast<IREE::VM::CondBranchOp>(op))
+    return translateCondBranchOp(condBranchOp, emitter);
+  if (auto failOp = dyn_cast<IREE::VM::FailOp>(op))
+    return translateFailOp(failOp, emitter);
   if (auto returnOp = dyn_cast<IREE::VM::ReturnOp>(op))
     return translateReturnOpToC(returnOp, emitter, resultNames);
   // Fall back to generic emitc printer
@@ -222,9 +305,45 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
   // struct argument name here must not be changed.
   output << moduleName << "_state_t* state) {\n";
 
+  // We forward declare all result variables.
   for (auto &op : funcOp.getOps()) {
-    if (failed(translateOpToC(op, emitter, resultNames))) {
-      return failure();
+    for (auto result : op.getResults()) {
+      if (failed(emitter.emitVariableDeclaration(result,
+                                                 /*trailingSemicolon=*/true))) {
+        return op.emitError() << "Unable to declare result variable for op";
+      }
+    }
+  }
+
+  auto &blocks = funcOp.getBlocks();
+  // Create label names for basic blocks.
+  for (auto &block : blocks) {
+    emitter.getOrCreateName(block);
+  }
+
+  // Emit variables for basic block arguments.
+  for (auto it = std::next(blocks.begin()); it != blocks.end(); ++it) {
+    Block &block = *it;
+    for (auto &arg : block.getArguments()) {
+      if (emitter.hasValueInScope(arg)) return failure();
+      if (failed(emitter.emitType(arg.getType()))) {
+        return failure();
+      }
+      output << " " << emitter.getOrCreateName(arg) << ";\n";
+    }
+  }
+
+  for (auto &block : blocks) {
+    // Only print a label if there is more than one block.
+    if (blocks.size() > 1) {
+      if (failed(emitter.emitLabel(block))) {
+        return funcOp.emitOpError() << "Unable to print label for basic block";
+      }
+    }
+    for (Operation &op : block.getOperations()) {
+      if (failed(translateOpToC(op, emitter, resultNames))) {
+        return failure();
+      }
     }
   }
 
@@ -300,12 +419,18 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   };
 
   // exports
-  // TODO: Add sorting the module export table by name. This is already
-  //       supported in the ByteCodeModuleTarget using `llvm::sort`.
   std::string exportName = moduleName + "_exports_";
   output << "static const iree_vm_native_export_descriptor_t " << exportName
          << "[] = {\n";
-  for (auto exportOp : moduleOp.getOps<IREE::VM::ExportOp>()) {
+
+  // sort export ops
+  SmallVector<IREE::VM::ExportOp, 4> exportOps(
+      moduleOp.getOps<IREE::VM::ExportOp>());
+  llvm::sort(exportOps, [](auto &lhs, auto &rhs) {
+    return lhs.export_name().compare(rhs.export_name()) < 0;
+  });
+
+  for (auto exportOp : exportOps) {
     auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
     if (!funcOp) {
       return exportOp.emitError("Couldn't find referenced FuncOp");
@@ -327,7 +452,15 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string importName = moduleName + "_imports_";
   output << "static const iree_vm_native_import_descriptor_t " << importName
          << "[] = {\n";
-  for (auto importOp : moduleOp.getOps<IREE::VM::ImportOp>()) {
+
+  // sort import ops
+  SmallVector<IREE::VM::ImportOp, 4> importOps(
+      moduleOp.getOps<IREE::VM::ImportOp>());
+  llvm::sort(importOps, [](auto &lhs, auto &rhs) {
+    return lhs.getName().compare(rhs.getName()) < 0;
+  });
+
+  for (auto importOp : importOps) {
     output << "{" << printCStringView(importOp.getName().str()) << "},\n";
   }
   output << "};\n";
@@ -337,7 +470,17 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string functionName = moduleName + "_funcs_";
   output << "static const iree_vm_native_function_ptr_t " << functionName
          << "[] = {\n";
-  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
+
+  // sort func ops
+  SmallVector<IREE::VM::FuncOp, 4> funcOps(moduleOp.getOps<IREE::VM::FuncOp>());
+  llvm::sort(funcOps, [&moduleOp](auto &lhs, auto &rhs) {
+    std::string lhsStr =
+        buildFunctionName(moduleOp, lhs, /*implSufffix=*/false);
+    std::string rhsStr =
+        buildFunctionName(moduleOp, rhs, /*implSufffix=*/false);
+    return lhsStr.compare(rhsStr) < 0;
+  });
+  for (auto funcOp : funcOps) {
     output << "{"
            << "(iree_vm_native_function_shim_t)";
 
@@ -425,7 +568,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 // Adapted from BytecodeModuleTarget and extended by C specific passes
 static LogicalResult canonicalizeModule(
     IREE::VM::ModuleOp moduleOp, IREE::VM::CTargetOptions targetOptions) {
-  OwningRewritePatternList patterns(&getContext());
+  OwningRewritePatternList patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
   target.addLegalOp<IREE::DoNotOptimizeOp>();
@@ -435,11 +578,9 @@ static LogicalResult canonicalizeModule(
   for (auto *op : context->getRegisteredOperations()) {
     // Non-serializable ops must be removed prior to serialization.
     if (op->hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
-      // TODO(simon-camp): reenable pass once support for control flow ops has
-      // landed
-      // op->getCanonicalizationPatterns(patterns, context);
-      // target.setOpAction(OperationName(op->name, context),
-      //                    ConversionTarget::LegalizationAction::Illegal);
+      op->getCanonicalizationPatterns(patterns, context);
+      target.setOpAction(OperationName(op->name, context),
+                         ConversionTarget::LegalizationAction::Illegal);
     }
 
     // Debug ops must not be present when stripping.
@@ -461,11 +602,9 @@ static LogicalResult canonicalizeModule(
 
   if (targetOptions.optimize) {
     // TODO(benvanik): does this run until it quiesces?
-    // TODO(simon-camp): reenable pass once support for control flow ops has
-    // landed
-    // modulePasses.addPass(mlir::createInlinerPass());
+    modulePasses.addPass(mlir::createInlinerPass());
     modulePasses.addPass(mlir::createCSEPass());
-    // modulePasses.addPass(mlir::createCanonicalizerPass());
+    modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
   // In the the Bytecode module the order is:
@@ -522,7 +661,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   output << "\n";
 
   mlir::emitc::CppEmitter emitter(output, /*restrictToC=*/true,
-                                  /*forwardDeclareVariables=*/false);
+                                  /*forwardDeclareVariables=*/true);
   mlir::emitc::CppEmitter::Scope scope(emitter);
 
   // build struct definitions

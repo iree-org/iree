@@ -70,11 +70,11 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
     // If the operation has attributes, we need to explicitely build the args
     // attribute of the emitc call op. This consists of index attributes for
     // the operands, followed by the source op attributes themselves.
-    if (op.getAttrs().size() > 0) {
+    if (op->getAttrs().size() > 0) {
       SmallVector<Attribute, 4> args_ =
           indexSequence(operands.size(), op.getContext());
 
-      for (NamedAttribute attr : op.getAttrs()) {
+      for (NamedAttribute attr : op->getAttrs()) {
         args_.push_back(attr.second);
       }
 
@@ -280,12 +280,6 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::CmpNZI32Op>>(context,
                                                           "vm_cmp_nz_i32");
 
-  // Check
-  // TODO(simon-camp): These conversions to macro calls should be deleted once
-  // support for control flow ops has landed in the c module target
-  patterns.insert<CallOpConversion<IREE::VM::CheckEQOp>>(context,
-                                                         "VM_CHECK_EQ");
-
   // ExtI64: Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI64Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI64ZeroOp>>(context);
@@ -369,7 +363,12 @@ class ConvertVMToEmitCPass
     target.addLegalOp<IREE::VM::ExportOp>();
 
     // Control flow ops
+    target.addLegalOp<IREE::VM::BranchOp>();
     target.addLegalOp<IREE::VM::CallOp>();
+    target.addLegalOp<IREE::VM::CondBranchOp>();
+    // Note: We translate the fail op to two function calls in the end, but we
+    // can't simply convert it here because it is a terminator.
+    target.addLegalOp<IREE::VM::FailOp>();
     target.addLegalOp<IREE::VM::ReturnOp>();
 
     if (failed(

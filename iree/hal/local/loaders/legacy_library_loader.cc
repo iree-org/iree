@@ -31,12 +31,9 @@
 //===----------------------------------------------------------------------===//
 
 // Verifies the structure of the flatbuffer so that we can avoid doing so during
-// runtime. There are still some conditions we must be aware of (such as omitted
-// names on functions with internal linkage), however we shouldn't need to
-// bounds check anything within the flatbuffer after this succeeds.
+// runtime.
 static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
-    iree_const_byte_span_t flatbuffer_data,
-    iree_host_size_t expected_entry_point_count) {
+    iree_const_byte_span_t flatbuffer_data) {
   // Special handling for valid but mismatching flatbuffers.
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16 ||
       !flatbuffers_has_identifier(flatbuffer_data.data,
@@ -58,47 +55,10 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
   iree_DyLibExecutableDef_table_t executable_def =
       iree_DyLibExecutableDef_as_root(flatbuffer_data.data);
 
-  flatbuffers_string_vec_t entry_points_vec =
-      iree_DyLibExecutableDef_entry_points_get(executable_def);
-  size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
-  if (entry_point_count != expected_entry_point_count) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "executable provides %zu entry points but caller "
-                            "provided %zu; must match",
-                            entry_point_count, expected_entry_point_count);
-  }
-
-  for (size_t i = 0; i < entry_point_count; ++i) {
-    if (!flatbuffers_string_len(
-            flatbuffers_string_vec_at(entry_points_vec, i))) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "executable entry point %zu has no name", i);
-    }
-  }
-
   if (!flatbuffers_uint8_vec_len(
           iree_DyLibExecutableDef_library_embedded_get(executable_def))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "executable library_embedded is missing/empty");
-  }
-
-  switch (iree_DyLibExecutableDef_sanitized_kind_get(executable_def)) {
-    case iree_SanitizerKind_None:
-      break;
-#if !defined(IREE_SANITIZER_ADDRESS)
-    case iree_SanitizerKind_Address:
-      return iree_make_status(
-          IREE_STATUS_UNAVAILABLE,
-          "Executable library is compiled with ASAN support but the host "
-          "runtime is not compiled with it enabled; add -fsanitize=address to "
-          "the runtime compilation options");
-#endif  // !IREE_SANITIZER_ADDRESS
-    default:
-      return iree_make_status(
-          IREE_STATUS_UNAVAILABLE,
-          "Executable library requires a sanitizer the host runtime is not "
-          "compiled to enable/understand: %u",
-          (uint32_t)iree_DyLibExecutableDef_sanitized_kind_get(executable_def));
   }
 
   return iree_ok_status();
@@ -120,11 +80,13 @@ typedef struct {
   iree_string_view_t temp_files[8];
 
   // Loaded platform dynamic library.
-  iree::DynamicLibrary* library;
+  iree::DynamicLibrary* handle;
 
-  // Resolved entry points from the dynamic library.
-  iree_host_size_t entry_fn_count;
-  iree_hal_executable_dispatch_v0_t entry_fns[];
+  // Queried metadata from the library.
+  union {
+    const iree_hal_executable_library_header_t** header;
+    const iree_hal_executable_library_v0_t* v0;
+  } library;
 } iree_hal_legacy_executable_t;
 
 extern const iree_hal_local_executable_vtable_t
@@ -168,9 +130,9 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
       absl::string_view(reinterpret_cast<const char*>(embedded_library_vec),
                         flatbuffers_uint8_vec_len(embedded_library_vec))));
 
-  std::unique_ptr<iree::DynamicLibrary> library;
+  std::unique_ptr<iree::DynamicLibrary> handle;
   IREE_RETURN_IF_ERROR(
-      iree::DynamicLibrary::Load(library_temp_path.c_str(), &library));
+      iree::DynamicLibrary::Load(library_temp_path.c_str(), &handle));
 
   flatbuffers_string_t debug_database_filename =
       iree_DyLibExecutableDef_debug_database_filename_get(executable->def);
@@ -197,30 +159,63 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
         absl::string_view(
             reinterpret_cast<const char*>(debug_database_embedded_vec),
             flatbuffers_uint8_vec_len(debug_database_embedded_vec))));
-    library->AttachDebugDatabase(debug_database_path);
+    handle->AttachDebugDatabase(debug_database_path);
   }
 
-  executable->library = library.release();
+  executable->handle = handle.release();
 
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_legacy_executable_resolve_symbols(
+static iree_status_t iree_hal_legacy_executable_query_library(
     iree_hal_legacy_executable_t* executable) {
-  flatbuffers_string_vec_t entry_points_vec =
-      iree_DyLibExecutableDef_entry_points_get(executable->def);
-  for (iree_host_size_t i = 0; i < executable->entry_fn_count; ++i) {
-    flatbuffers_string_t entry_point_str =
-        flatbuffers_string_vec_at(entry_points_vec, i);
-    void* symbol = executable->library->GetSymbol(entry_point_str);
-    if (!symbol) {
-      return iree_make_status(
-          IREE_STATUS_NOT_FOUND,
-          "symbol %s not exported by the dynamic library, check visibility",
-          entry_point_str);
-    }
-    executable->entry_fns[i] = (iree_hal_executable_dispatch_v0_t)symbol;
+  // Get the exported symbol used to get the library metadata.
+  iree_hal_executable_library_query_fn_t query_fn =
+      (iree_hal_executable_library_query_fn_t)executable->handle->GetSymbol(
+          IREE_HAL_EXECUTABLE_LIBRARY_EXPORT_NAME);
+  if (!query_fn) {
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "executable metadata query function not found in library");
   }
+
+  // Query for a compatible version of the library.
+  executable->library.header =
+      query_fn(IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+  if (!executable->library.header) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "executable does not support this version of the runtime (%d)",
+        IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+  }
+  const iree_hal_executable_library_header_t* header =
+      *executable->library.header;
+
+  // Ensure that if the library is built for a particular sanitizer that we also
+  // were compiled with that sanitizer enabled.
+  switch (header->sanitizer) {
+    case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_NONE:
+      // Always safe even if the host has a sanitizer enabled; it just means
+      // that we won't be able to catch anything from within the executable,
+      // however checks outside will (often) still trigger when guard pages are
+      // dirtied/etc.
+      break;
+#if !defined(IREE_SANITIZER_ADDRESS)
+    case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_ADDRESS:
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "executable library is compiled with ASAN support but the host "
+          "runtime is not compiled with it enabled; add -fsanitize=address to "
+          "the runtime compilation options");
+#endif  // !IREE_SANITIZER_ADDRESS
+    default:
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "executable library requires a sanitizer the host runtime is not "
+          "compiled to enable/understand: %u",
+          (uint32_t)header->sanitizer);
+  }
+
   return iree_ok_status();
 }
 
@@ -235,36 +230,21 @@ static iree_status_t iree_hal_legacy_executable_create(
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  flatbuffers_string_vec_t entry_points_vec =
-      iree_DyLibExecutableDef_entry_points_get(executable_def);
-  iree_host_size_t entry_point_count =
-      flatbuffers_string_vec_len(entry_points_vec);
-  if (entry_point_count != executable_layout_count) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "executable provides %zu entry points but caller "
-                            "provided %zu; must match",
-                            entry_point_count, executable_layout_count);
-  }
-
   iree_hal_legacy_executable_t* executable = NULL;
   iree_host_size_t total_size =
-      sizeof(*executable) + entry_point_count * sizeof(*executable->entry_fns) +
+      sizeof(*executable) +
       executable_layout_count * sizeof(iree_hal_local_executable_layout_t);
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
     iree_hal_local_executable_layout_t** executable_layouts_ptr =
         (iree_hal_local_executable_layout_t**)(((uint8_t*)executable) +
-                                               sizeof(*executable) +
-                                               entry_point_count *
-                                                   sizeof(
-                                                       *executable->entry_fns));
+                                               sizeof(*executable));
     iree_hal_local_executable_initialize(
         &iree_hal_legacy_executable_vtable, executable_layout_count,
         executable_layouts, executable_layouts_ptr, host_allocator,
         &executable->base);
     executable->def = executable_def;
-    executable->entry_fn_count = entry_point_count;
   }
   if (iree_status_is_ok(status)) {
     // Attempt to extract the embedded flatbuffer library and load it.
@@ -275,8 +255,19 @@ static iree_status_t iree_hal_legacy_executable_create(
         iree_hal_legacy_executable_extract_and_load(executable, host_allocator);
   }
   if (iree_status_is_ok(status)) {
-    // Attempt to resolve symbols for all entry points.
-    status = iree_hal_legacy_executable_resolve_symbols(executable);
+    // Query metadata and get the entry point function pointers.
+    status = iree_hal_legacy_executable_query_library(executable);
+  }
+  if (iree_status_is_ok(status)) {
+    // Check to make sure that the entry point count matches the layouts
+    // provided.
+    if (executable->library.v0->entry_point_count != executable_layout_count) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "executable provides %u entry points but caller "
+                              "provided %zu; must match",
+                              executable->library.v0->entry_point_count,
+                              executable_layout_count);
+    }
   }
 
   if (iree_status_is_ok(status)) {
@@ -302,7 +293,7 @@ static void iree_hal_legacy_executable_destroy(
   //     two test cases, one for each function in the same executable
   //     first test case passes, second fails to open the file (already open)
 #else
-  delete executable->library;
+  delete executable->handle;
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   for (iree_host_size_t i = 0; i < executable->temp_file_count; ++i) {
@@ -325,17 +316,19 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
     const iree_hal_vec3_t* workgroup_id) {
   iree_hal_legacy_executable_t* executable =
       (iree_hal_legacy_executable_t*)base_executable;
+  const iree_hal_executable_library_v0_t* library = executable->library.v0;
 
-  if (IREE_UNLIKELY(ordinal >= executable->entry_fn_count)) {
+  if (IREE_UNLIKELY(ordinal >= library->entry_point_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "entry point ordinal out of bounds");
   }
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  flatbuffers_string_t entry_point_str = flatbuffers_string_vec_at(
-      iree_DyLibExecutableDef_entry_points_get(executable->def), ordinal);
-  iree_string_view_t entry_point_name = iree_make_string_view(
-      entry_point_str, flatbuffers_string_len(entry_point_str));
+  iree_string_view_t entry_point_name = iree_string_view_empty();
+  if (library->entry_point_names != NULL) {
+    entry_point_name =
+        iree_make_cstring_view(library->entry_point_names[ordinal]);
+  }
   if (iree_string_view_is_empty(entry_point_name)) {
     entry_point_name = iree_make_cstring_view("unknown_dylib_call");
   }
@@ -343,7 +336,7 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
                                       entry_point_name.size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-  executable->entry_fns[ordinal](dispatch_state, workgroup_id);
+  library->entry_points[ordinal](dispatch_state, workgroup_id);
 
   IREE_TRACE_ZONE_END(z0);
 
@@ -419,10 +412,9 @@ static iree_status_t iree_hal_legacy_library_loader_try_load(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Verify and fetch the executable flatbuffer wrapper.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_dylib_executable_flatbuffer_verify(
-              executable_spec->executable_data,
-              executable_spec->executable_layout_count));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                    iree_hal_dylib_executable_flatbuffer_verify(
+                                        executable_spec->executable_data));
   iree_DyLibExecutableDef_table_t executable_def =
       iree_DyLibExecutableDef_as_root(executable_spec->executable_data.data);
 

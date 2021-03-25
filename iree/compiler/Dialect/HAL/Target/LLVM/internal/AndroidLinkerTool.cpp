@@ -107,8 +107,9 @@ class AndroidLinkerTool : public LinkerTool {
         .str();
   }
 
-  LogicalResult configureModule(llvm::Module *llvmModule,
-                                ArrayRef<StringRef> entryPointNames) override {
+  LogicalResult configureModule(
+      llvm::Module *llvmModule,
+      ArrayRef<llvm::Function *> exportedFuncs) override {
     for (auto &func : *llvmModule) {
       // Enable frame pointers to ensure that stack unwinding works, e.g. in
       // Tracy. In principle this could also be achieved by enabling unwind
@@ -120,16 +121,6 @@ class AndroidLinkerTool : public LinkerTool {
       // -ffreestanding-like behavior.
       func.addFnAttr("no-builtins");
     }
-
-    // TODO(benvanik): switch to executable libraries w/ internal functions.
-    for (auto entryPointName : entryPointNames) {
-      auto *entryPointFn = llvmModule->getFunction(entryPointName);
-      entryPointFn->setLinkage(
-          llvm::GlobalValue::LinkageTypes::ExternalLinkage);
-      entryPointFn->setVisibility(
-          llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
-    }
-
     return success();
   }
 

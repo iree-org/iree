@@ -1,6 +1,6 @@
 // RUN: iree-opt -allow-unregistered-dialect -iree-codegen-convert-to-llvm -split-input-file %s | IreeFileCheck %s
 
-// CHECK-LABEL: llvm.func @workgroup_id
+// CHECK-LABEL: llvm.func internal @workgroup_id
 func @workgroup_id() {
   // CHECK: %[[PTR:.+]] = llvm.load %arg1 : !llvm.ptr<array<3 x i32>>
   // CHECK: %[[Z32:.+]] = llvm.extractvalue %[[PTR]][2] : !llvm.array<3 x i32>
@@ -13,7 +13,7 @@ func @workgroup_id() {
 
 // -----
 
-// CHECK-LABEL: llvm.func @workgroup_size
+// CHECK-LABEL: llvm.func internal @workgroup_size
 func @workgroup_size() {
   // CHECK: %[[STATE:.+]] = llvm.load %arg0 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
   // CHECK: %[[SIZE_PTR:.+]] = llvm.extractvalue %[[STATE]][1] : !llvm.struct<"iree_hal_executable_dispatch_state_v0_t"
@@ -27,7 +27,7 @@ func @workgroup_size() {
 
 // -----
 
-// CHECK-LABEL: llvm.func @workgroup_count
+// CHECK-LABEL: llvm.func internal @workgroup_count
 func @workgroup_count() {
   // CHECK: %[[STATE:.+]] = llvm.load %arg0 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
   // CHECK: %[[COUNT_PTR:.+]] = llvm.extractvalue %[[STATE]][0] : !llvm.struct<"iree_hal_executable_dispatch_state_v0_t"

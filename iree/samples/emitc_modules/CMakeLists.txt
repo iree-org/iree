@@ -13,18 +13,13 @@
 # limitations under the License.
 
 if(${IREE_ENABLE_EMITC})
-  # TODO(simon-camp): We are only interested in the output of iree-translate, i.e. add_module.vmfb
-  # TODO(marbre): Use a custom command or rather implement a new CMake function.
-  iree_bytecode_module(
+  iree_c_module(
     NAME
       add_module
     SRC
       "add.mlir"
-    CC_NAMESPACE
-      "iree::samples::custom_modules"
-    FLAGS
-      "-iree-vm-ir-to-c-module"
-    PUBLIC
+    H_FILE_OUTPUT
+      "add_module.h"
   )
 
   iree_cc_test(
@@ -33,7 +28,7 @@ if(${IREE_ENABLE_EMITC})
     SRCS
       "add_module_test.cc"
     DEPS
-      ::add_module_cc
+      ::add_module
       iree::base::api
       iree::base::status
       iree::testing::gtest

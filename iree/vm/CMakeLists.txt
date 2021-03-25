@@ -265,6 +265,8 @@ iree_cc_library(
     ops
   HDRS
     "ops.h"
+  DEPS
+    iree::base::api
   PUBLIC
 )
 

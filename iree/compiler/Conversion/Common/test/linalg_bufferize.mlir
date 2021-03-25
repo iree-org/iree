@@ -760,3 +760,102 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //  CHECK-SAME:     strides = dense<[2, 3]> : vector<2xi64>
 //  CHECK-SAME:     ins(%[[INPUT]], %[[WINDOW]] : memref<1x4x6x1xf32>, memref<2x3xf32>)
 //  CHECK-SAME:    outs(%[[RET0]] : memref<1x2x2x1xf32>)
+
+// -----
+
+func @read_only_subtensor() {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+  %2 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %3 = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+  %4 = flow.dispatch.tensor.load %3 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+  %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+  %dim0 = memref.dim %2, %c0 : tensor<?x?xf32>
+  %dim1 = memref.dim %2, %c1 : tensor<?x?xf32>
+  scf.for %arg0 = %5 to %dim0 step %6 {
+    %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+    %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+    scf.for %arg1 = %7 to %dim1 step %8 {
+      %9 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %dim0]
+      %10 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %dim1]
+      %11 = subtensor %2[%arg0, %arg1] [%9, %10] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+      %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %dim0]
+      %13 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %dim1]
+      %14 = subtensor %2[%arg0, %arg1] [%12, %13] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+      %15 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %dim0]
+      %16 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %dim1]
+      %17 = subtensor %4[%arg0, %arg1] [%15, %16] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+      %18 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %dim0]
+      %19 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %dim1]
+      %20 = subtensor %4[%arg0, %arg1] [%18, %19] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+      %21 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %dim0]
+      %22 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %dim1]
+      %23 = linalg.init_tensor [%21, %22] : tensor<?x?xf32>
+      %24 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%11, %14, %17, %20 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>) outs(%23 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+      ^bb0(%arg2: f32, %arg3: f32, %arg4: f32, %arg5: f32, %arg6: f32):  // no predecessors
+        %25 = mulf %arg4, %arg5 : f32
+        %26 = mulf %arg2, %arg3 : f32
+        %27 = addf %26, %25 : f32
+        %28 = math.sqrt %27 : f32
+        linalg.yield %28 : f32
+      } -> tensor<?x?xf32>
+      flow.dispatch.tensor.store %24, %0, offsets = [%arg0, %arg1], sizes = [%21, %22], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+    }
+  }
+  return
+}hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
+  hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @read_only_subtensor
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : memref<?x?xf32>
+//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : memref<?x?xf32>
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : memref<?x?xf32>
+//       CHECK:   scf.for
+//       CHECK:     scf.for
+//   CHECK-DAG:       %[[SV1:.+]] = memref.subview %[[ARG0]]
+//   CHECK-DAG:       %[[SV2:.+]] = memref.subview %[[ARG1]]
+//   CHECK-DAG:       %[[SV3:.+]] = memref.subview %[[RET0]]
+//       CHECK:       linalg.generic
+//  CHECK-SAME:         ins(%[[SV1]], %[[SV1]], %[[SV2]], %[[SV2]] :
+//  CHECK-SAME:         outs(%[[SV3]] :
+
+// -----
+
+func @reshape_read_only() {
+  %c0 = constant 0 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@wo0[%c0] : !flow.dispatch.tensor<writeonly:?xf32>
+  %2 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1) -> (d0, d1)>]
+      : tensor<?x?xf32> into tensor<?xf32>
+  %4 = memref.dim %3, %c0 : tensor<?xf32>
+  %5 = linalg.init_tensor [%4] : tensor<?xf32>
+  %6 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%3 : tensor<?xf32>) outs(%5 : tensor<?xf32>) {
+      ^bb0(%arg0 : f32, %arg1 : f32):
+         %7 = addf %arg0, %arg0 : f32
+         linalg.yield %7 : f32
+      } -> tensor<?xf32>
+  flow.dispatch.tensor.store %6, %1 : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>
+  return
+}
+// CHECK-LABEL: func @reshape_read_only
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@ro0
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan @legacy_io::@wo0
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[INPUT]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[RESHAPE]] : memref<?xf32>)
+//  CHECK-SAME:     outs(%[[OUTPUT]] : memref<?xf32>)

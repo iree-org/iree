@@ -5,7 +5,6 @@ vm.module @conversion_ops_i64 {
   //===----------------------------------------------------------------------===//
 
   vm.export @test_trunc_i64_i32
-
   vm.func @test_trunc_i64_i32() {
     %c1 = vm.const.i64 9223372036854775807 : i64
     %c1dno = iree.do_not_optimize(%c1) : i64

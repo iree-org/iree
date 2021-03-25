@@ -17,6 +17,8 @@
 
 #include <stdint.h>
 
+#include "iree/base/api.h"
+
 //===------------------------------------------------------------------===//
 // Globals
 //===------------------------------------------------------------------===//
@@ -125,17 +127,17 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
 }
 
 //===------------------------------------------------------------------===//
-// Additional ops
+// Control flow ops
 //===------------------------------------------------------------------===//
-// Check ops
-// TODO(simon-camp): These macros should be removed once control flow ops are
-// supported in the c module target.
-// Note that this will fail if message contains a comma
-#define VM_CHECK_EQ(a, b, message)                                          \
-  if (a != b) {                                                             \
-    return iree_status_allocate(IREE_STATUS_FAILED_PRECONDITION, "<vm>", 0, \
-                                iree_make_cstring_view(#message));          \
+
+static inline iree_status_t vm_fail_or_ok(int32_t status_code,
+                                          iree_string_view_t message) {
+  if (status_code != 0) {
+    return iree_status_allocate(IREE_STATUS_FAILED_PRECONDITION, "<vm>", 0,
+                                message);
   }
+  return iree_ok_status();
+}
 
 //===------------------------------------------------------------------===//
 // ExtI64: Conditional assignment

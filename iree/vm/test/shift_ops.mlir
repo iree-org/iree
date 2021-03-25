@@ -20,7 +20,7 @@ vm.module @shift_ops {
     %c1dno = iree.do_not_optimize(%c1) : i32
     %v = vm.shr.i32.s %c1dno, 2 : i32
     %c2 = vm.const.i32 -1 : i32
-    vm.check.eq %v, %c2, "-1>>-1=-1" : i32
+    vm.check.eq %v, %c2, "-1>>2=-1" : i32
     vm.return
   }
 

@@ -18,15 +18,18 @@
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
-#include "iree/vm/test/emitc/arithmetic_ops.vmfb"
-#include "iree/vm/test/emitc/arithmetic_ops_i64.vmfb"
-#include "iree/vm/test/emitc/assignment_ops.vmfb"
-#include "iree/vm/test/emitc/assignment_ops_i64.vmfb"
-#include "iree/vm/test/emitc/conversion_ops.vmfb"
-#include "iree/vm/test/emitc/conversion_ops_i64.vmfb"
-#include "iree/vm/test/emitc/global_ops.vmfb"
-#include "iree/vm/test/emitc/shift_ops.vmfb"
-#include "iree/vm/test/emitc/shift_ops_i64.vmfb"
+#include "iree/vm/test/emitc/arithmetic_ops.h"
+#include "iree/vm/test/emitc/arithmetic_ops_i64.h"
+#include "iree/vm/test/emitc/assignment_ops.h"
+#include "iree/vm/test/emitc/assignment_ops_i64.h"
+#include "iree/vm/test/emitc/comparison_ops.h"
+#include "iree/vm/test/emitc/comparison_ops_i64.h"
+#include "iree/vm/test/emitc/control_flow_ops.h"
+#include "iree/vm/test/emitc/conversion_ops.h"
+#include "iree/vm/test/emitc/conversion_ops_i64.h"
+#include "iree/vm/test/emitc/global_ops.h"
+#include "iree/vm/test/emitc/shift_ops.h"
+#include "iree/vm/test/emitc/shift_ops_i64.h"
 
 namespace {
 
@@ -57,6 +60,9 @@ std::vector<TestParams> GetModuleTestParams() {
       {arithmetic_ops_i64_descriptor_, arithmetic_ops_i64_create},
       {assignment_ops_descriptor_, assignment_ops_create},
       {assignment_ops_i64_descriptor_, assignment_ops_i64_create},
+      {comparison_ops_descriptor_, comparison_ops_create},
+      {comparison_ops_i64_descriptor_, comparison_ops_i64_create},
+      {control_flow_ops_descriptor_, control_flow_ops_create},
       {conversion_ops_descriptor_, conversion_ops_create},
       {conversion_ops_i64_descriptor_, conversion_ops_i64_create},
       {global_ops_descriptor_, global_ops_create},

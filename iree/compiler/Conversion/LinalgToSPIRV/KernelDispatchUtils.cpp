@@ -122,12 +122,14 @@ static void getMaliBestMatMulTileSizes(
     int64_t dstSize) {
   const int64_t smallMatrixSizeThreshold = 512 * 512;
   if (elementType.isF16()) {
-    // When the destination is smaller than the threshold, we prefer smaller
-    // tiles to increase parallelism.
+    // For smaller destination size we cannot fill out the GPU with bigger tile
+    // sizes. Instead we pick smaller tiles along M and N to increase the number
+    // of workgroups and a larger K tile size since we have lower pressure and
+    // need extra instructions to hide latency.
     // TODO: The threshold needs to be fine tuned by doing exploration based on
     // matrix shapes.
     if (dstSize <= smallMatrixSizeThreshold) {
-      tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 8}, {8, 2, 1}}));
+      tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {8, 2, 1}}));
     } else {
       tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {8, 2, 1}}));
       tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {8, 2, 1}}));
@@ -317,6 +319,14 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
+  // Skip vectorization for non-minor identity inputs as it generates
+  // transfer_read ops with permutation maps that we currently cannot lower.
+  // TODO: Remove this restriction once the lowering of the permutation map is
+  // supported in core.
+  bool vectorize = options.enableVectorization &&
+                   llvm::all_of(op.getIndexingMaps(), [](AffineMap &map) {
+                     return map.isMinorIdentity();
+                   });
   int64_t subgroupSize =
       targetEnv.getResourceLimits().subgroup_size().getValue().getSExtValue();
   config.workgroupSize[0] = subgroupSize;
@@ -330,9 +340,10 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   // avoid a mismatch in the number of workgroup dispatched, we pick a tile size
   // to have one element per thread.
   // TODO: Remove this once we switch to linalg on tensor path.
-  if (options.enableVectorization) {
+  if (vectorize) {
     candidateTileSizes.append({4 * subgroupSize, 2 * subgroupSize});
   }
+
   candidateTileSizes.push_back(subgroupSize);
   // Use the first tile size that can divide the shape. If the shape is not
   // aligned on any of the tile sizes pick the smallest tile of one element per
@@ -351,21 +362,16 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   // If the shape is not exactly aligned on the tile size skip the second level
   // of tiling as it expect the number of iteration to be exactly equal to the
   // number of processors.
-  if (outputShape.getShape().back() % lowerTs != 0) return success();
-
-  // Skip vectorization for non-minor identity inputs as it generates
-  // transfer_read ops with permutation maps that we currently cannot lower.
-  // TODO: Remove this restriction once the lowering of the permutation map is
-  // supported in core.
-  for (unsigned i = 0, e = op.getNumInputs(); i < e; i++) {
-    if (!op.getInputIndexingMap(i).isMinorIdentity()) return success();
+  if (!vectorize || outputShape.getShape().back() % lowerTs != 0) {
+    config.vectorize = false;
+    return success();
   }
 
   tileSizes.emplace_back();    // Subgroup level.
   ts.back() = lowerTs / subgroupSize;
   tileSizes.emplace_back(ts);  // Thread level.
   // Vectorize only if we are processing more than one element per thread.
-  config.vectorize = options.enableVectorization && (ts.back() > 1);
+  config.vectorize = vectorize && (ts.back() > 1);
   return success();
 }
 

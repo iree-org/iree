@@ -1,6 +1,6 @@
 // RUN: iree-opt -allow-unregistered-dialect -iree-codegen-convert-to-llvm -split-input-file %s | IreeFileCheck %s
 
-// CHECK-LABEL: llvm.func @constant_values
+// CHECK-LABEL: llvm.func internal @constant_values
 func @constant_values() {
   // CHECK: %[[STATE:.+]] = llvm.load %arg0 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
   // CHECK: %[[PTR_BASE:.+]] = llvm.extractvalue %[[STATE]][3]

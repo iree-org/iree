@@ -248,6 +248,28 @@ static LogicalResult convertInitTensorOp(
   return success();
 }
 
+/// Walks the use-def chain and see if this value comes from a read-only tensor.
+static bool isFromReadOnlyTensor(Value v) {
+  auto definingOp = v.getDefiningOp();
+  if (!definingOp) return false;
+  return TypeSwitch<Operation *, bool>(definingOp)
+      .Case<ConstantOp>([&](ConstantOp constantOp) { return true; })
+      .Case<linalg::TensorReshapeOp>([&](linalg::TensorReshapeOp reshapeOp) {
+        return isFromReadOnlyTensor(reshapeOp.src());
+      })
+      .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
+        return isFromReadOnlyTensor(subTensorOp.source());
+      })
+      .Case<IREE::Flow::DispatchTensorLoadOp>(
+          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
+            return loadOp.source()
+                       .getType()
+                       .cast<IREE::Flow::DispatchTensorType>()
+                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
+          })
+      .Default([&](Operation *op) { return false; });
+}
+
 /// Avoids creating an allocation if the result tensor can just be aliased to
 /// use the same buffer (`inputBuffer`) that `srcTensor` is mapped to. This can
 /// be done if `srcTensor` has a single use, which is the operation which is
@@ -266,9 +288,9 @@ static LogicalResult createAliasingBufferOrAllocationForResult(
     }
     return success();
   }
-  // Case 2: If the input tensor has only one use (this operation, then no need
-  // to create a copy either.
-  if (srcTensor.hasOneUse()) {
+  // Case 2: If the input tensor has only one use (this operation) or is from a
+  // read-only tensor, then no need to create a copy either.
+  if (srcTensor.hasOneUse() || isFromReadOnlyTensor(srcTensor)) {
     bvm.map(resultTensor, inputBuffer);
     return success();
   }
@@ -341,13 +363,6 @@ static LogicalResult convertSubTensorOp(
       loc, subViewResultType, inputBuffer, op.offsets(), op.sizes(),
       op.strides(), op.static_offsets(), op.static_sizes(),
       op.static_strides());
-  // For now special case the constant source case (where sub-tensor can
-  // directly be replaced by a subview). All this needs to be cleaned up soon.
-  // TODO(GH-5013): This should fall out naturally when doing buffer planning.
-  if (srcTensor.getDefiningOp<ConstantOp>()) {
-    bvm.map(resultTensor, subViewOp);
-    return success();
-  }
   auto allocationDynamicSizes = llvm::to_vector<4>(
       llvm::map_range(subViewOp.getOrCreateRanges(b, loc), [](Range range) {
         assert(matchPattern(range.stride, m_One()) &&
