@@ -22,11 +22,11 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
         %0 = iree.placeholder for "interace buffer"
           {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x6x14xf32>
         %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<2x16x16x6xf32>
+          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<2x15x14x6xf32>
         %2 = iree.placeholder for "interace buffer"
           {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x13x11x14xf32>
         linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-           ins (%1, %0: memref<2x16x16x6xf32>, memref<3x4x6x14xf32>)
+           ins (%1, %0: memref<2x15x14x6xf32>, memref<3x4x6x14xf32>)
           outs (%2: memref<2x13x11x14xf32>)
         return
       }
@@ -277,7 +277,7 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding_fusion attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x16x16x6xf32>,
+      signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x15x14x6xf32>,
         !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
       spv.target_env =
@@ -289,13 +289,13 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
         %0 = iree.placeholder for "interace buffer"
           {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x6x14xf32>
         %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<2x16x16x6xf32>
+          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<2x15x14x6xf32>
         %2 = iree.placeholder for "interace buffer"
           {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x13x11x14xf32>
         %cst = constant 0.000000e+00 : f32
         linalg.fill(%2, %cst) : memref<2x13x11x14xf32>, f32
         linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-           ins (%1, %0: memref<2x16x16x6xf32>, memref<3x4x6x14xf32>)
+           ins (%1, %0: memref<2x15x14x6xf32>, memref<3x4x6x14xf32>)
           outs (%2: memref<2x13x11x14xf32>)
         return
       }
