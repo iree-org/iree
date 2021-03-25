@@ -24,13 +24,18 @@ iree-opt -iree-transformation-pipeline \
 ```
 ### Input IR
 
+{% raw %}
 ```
 func @dot(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>) -> tensor<?x?xf32> attributes { iree.module.export } {
   %0 = "mhlo.dot"(%lhs, %rhs) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::SIP::MaterializeReflectionAttrsPass
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -38,7 +43,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -46,7 +55,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -54,7 +67,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After SymbolDCE
+
+{% raw %}
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -64,7 +81,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::HLOToHLOPreprocessing
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -72,7 +93,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After RemoveShapeConstraints
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -80,7 +105,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After TosaToSCF
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -88,7 +117,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After TosaToStandard
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -96,7 +129,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After TosaToLinalgOnTensors
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -104,7 +141,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -114,7 +155,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After SCFToStandard
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -122,7 +167,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -130,7 +179,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Inliner
+
+{% raw %}
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -140,7 +193,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
+
+{% raw %}
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -150,7 +207,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -158,7 +219,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -166,7 +231,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::LegalizeInputTypesPass
+
+{% raw %}
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -176,7 +245,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::ExpandVariableDynamicDimsPass
+
+{% raw %}
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -186,7 +259,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ExpandFunctionDynamicDimsPass
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
@@ -197,7 +274,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
@@ -210,7 +291,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
@@ -224,7 +309,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -238,7 +327,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::PrePartitioningConversionPass
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -252,7 +345,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -266,7 +363,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::DispatchabilityAnalysisPass
+
+{% raw %}
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
@@ -282,7 +383,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::IdentifyDispatchRegions2Pass
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -307,7 +412,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -330,7 +439,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::FoldCompatibleDispatchRegionsPass
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -353,7 +466,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineDispatchRegionsPass
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -398,7 +515,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -418,7 +539,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::DeduplicateExecutablesPass
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -454,7 +579,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -474,7 +603,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -490,7 +623,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::HoistUnstreamableOps
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -506,7 +643,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -522,7 +663,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::FormStreamsPass
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -551,7 +696,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineLargeConstantsPass
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -596,7 +745,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -620,7 +773,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -640,7 +797,11 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After SymbolDCE
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -676,7 +837,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -711,7 +876,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::IdentifyConstantPoolsPass
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -746,7 +915,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeConstantPoolBuffersPass
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -781,7 +954,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -816,7 +993,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After SymbolDCE
+
+{% raw %}
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -851,7 +1032,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeInterfacesPass
+
+{% raw %}
 ```
 module  {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -912,7 +1097,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::PropagateConstantWorkgroupInfoPass
+
+{% raw %}
 ```
 hal.executable.target @vmla, filter="vmla" {
   hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>}
@@ -948,7 +1137,11 @@ hal.executable.target @vmla, filter="vmla" {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 module  {
   func @dot_ex_dispatch_0() {
@@ -981,7 +1174,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::mhlo::{anonymous}::LegalizeControlFlowPass
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -999,7 +1196,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::mhlo::{anonymous}::LegalizeControlFlowPass
+
+{% raw %}
 ```
 func private @dot_ex_dispatch_0_impl(%arg0: index, %arg1: index, %arg2: tensor<?x?xf32>, %arg3: index, %arg4: index, %arg5: tensor<?x?xf32>, %arg6: index, %arg7: index) -> tensor<?x?xf32> {
   %0 = shapex.make_ranked_shape %arg3, %arg4 : (index, index) -> !shapex.ranked_shape<[?,?]>
@@ -1011,7 +1212,11 @@ func private @dot_ex_dispatch_0_impl(%arg0: index, %arg1: index, %arg2: tensor<?
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @dot_ex_dispatch_0_impl(%arg0: index, %arg1: index, %arg2: tensor<?x?xf32>, %arg3: index, %arg4: index, %arg5: tensor<?x?xf32>, %arg6: index, %arg7: index) -> tensor<?x?xf32> {
   %0 = shapex.make_ranked_shape %arg3, %arg4 : (index, index) -> !shapex.ranked_shape<[?,?]>
@@ -1023,7 +1228,11 @@ func private @dot_ex_dispatch_0_impl(%arg0: index, %arg1: index, %arg2: tensor<?
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1041,7 +1250,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1061,7 +1274,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Inliner
+
+{% raw %}
 ```
 module  {
   func @dot_ex_dispatch_0() {
@@ -1088,7 +1305,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After SymbolDCE
+
+{% raw %}
 ```
 module  {
   func @dot_ex_dispatch_0() {
@@ -1115,7 +1336,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1135,7 +1360,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1155,7 +1384,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::DropCompilerHintsPass
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1175,7 +1408,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VMLA::UnrollReductionsPass
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1195,7 +1432,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::{anonymous}::Convert1x1ConvToDotPass
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1215,7 +1456,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VMLA::{anonymous}::PreConversionLoweringPass
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1253,7 +1498,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1285,7 +1534,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1329,7 +1582,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
@@ -1370,7 +1627,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %0 = hal.interface.load.constant offset = 5 : index
@@ -1411,7 +1672,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0() {
   %0 = hal.interface.load.constant offset = 5 : index
@@ -1452,7 +1717,11 @@ func @dot_ex_dispatch_0() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VMLA::ConversionPass
+
+{% raw %}
 ```
 module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) {
@@ -1519,7 +1788,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) {
   %0 = vmla.interface.const %arg0 {offset = 5 : index} : index
@@ -1573,7 +1846,11 @@ func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) {
   %c1 = constant 1 : index
@@ -1622,7 +1899,11 @@ func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::MarkPublicSymbolsExportedPass
+
+{% raw %}
 ```
 module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) attributes {iree.module.export} {
@@ -1673,7 +1954,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) attributes {iree.module.export} {
@@ -1724,7 +2009,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::ConversionPass
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -1963,7 +2252,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::HoistInlinedRodataPass
+
+{% raw %}
 ```
 vm.module @module {
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -2200,7 +2493,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::GlobalInitializationPass
+
+{% raw %}
 ```
 vm.module @module {
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -2437,7 +2734,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
   %c1 = vm.const.i32 1 : i32
@@ -2477,7 +2778,11 @@ vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Inliner
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -2704,7 +3009,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -2928,7 +3237,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After SymbolDCE
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -2977,7 +3290,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::SinkDefiningOpsPass
+
+{% raw %}
 ```
 vm.module @module {
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -3024,7 +3341,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::TranslateExecutablesPass
+
+{% raw %}
 ```
 hal.executable.target @vmla, filter="vmla" {
   hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>}
@@ -3076,7 +3397,11 @@ hal.executable.target @vmla, filter="vmla" {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::{anonymous}::ConvertToHALPass
+
+{% raw %}
 ```
 module  {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -3191,7 +3516,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ExpandFunctionRankedShapeDimsPass
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = shapex.make_ranked_shape %arg1, %arg2 : (index, index) -> !shapex.ranked_shape<[?,?]>
@@ -3253,7 +3582,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c4 = constant 4 : index
@@ -3296,7 +3629,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c4 = constant 4 : index
@@ -3334,7 +3671,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::{anonymous}::PublicABIGenerationPass
+
+{% raw %}
 ```
 module  {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -3454,7 +3795,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::LinkExecutablesPass
+
+{% raw %}
 ```
 module  {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -3574,7 +3919,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::ResolveEntryPointOrdinalsPass
+
+{% raw %}
 ```
 module  {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
@@ -3696,7 +4045,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
@@ -3736,7 +4089,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
@@ -3776,7 +4133,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c50331680_i32 = constant 50331680 : i32
@@ -3795,7 +4156,11 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c50331680_i32 = constant 50331680 : i32
@@ -3814,7 +4179,11 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c0 = constant 0 : index
@@ -3828,7 +4197,11 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c0 = constant 0 : index
@@ -3842,7 +4215,11 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeResourceCachesPass
+
+{% raw %}
 ```
 module  {
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
@@ -3992,7 +4369,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
+
+{% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
@@ -4001,7 +4382,11 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
+
+{% raw %}
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
@@ -4011,7 +4396,11 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
+
+{% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
   %dev = hal.ex.shared_device : !hal.device
@@ -4034,7 +4423,11 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
@@ -4077,7 +4470,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
+
+{% raw %}
 ```
 func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c50331680_i32 = constant 50331680 : i32
@@ -4096,7 +4493,11 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
+
+{% raw %}
 ```
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c0 = constant 0 : index
@@ -4110,7 +4511,11 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After ConvertAffineToStandard
+
+{% raw %}
 ```
 module  {
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
@@ -4268,7 +4673,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MemoizeDeviceQueriesPass
+
+{% raw %}
 ```
 module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
@@ -4432,7 +4841,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @_device_match_id_0_initializer() -> i1 {
   %dev = hal.ex.shared_device : !hal.device
@@ -4441,7 +4854,11 @@ func private @_device_match_id_0_initializer() -> i1 {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func private @_device_match_id_0_initializer() -> i1 {
   %dev = hal.ex.shared_device : !hal.device
@@ -4450,7 +4867,11 @@ func private @_device_match_id_0_initializer() -> i1 {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+
+{% raw %}
 ```
 func private @_device_match_id_0_initializer() -> i1 {
   %dev = hal.ex.shared_device : !hal.device
@@ -4459,7 +4880,11 @@ func private @_device_match_id_0_initializer() -> i1 {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
@@ -4468,7 +4893,11 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
@@ -4477,7 +4906,11 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+
+{% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
@@ -4486,7 +4919,11 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
@@ -4496,7 +4933,11 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
@@ -4506,7 +4947,11 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+
+{% raw %}
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
@@ -4516,7 +4961,11 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
   %dev = hal.ex.shared_device : !hal.device
@@ -4534,7 +4983,11 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
   %dev = hal.ex.shared_device : !hal.device
@@ -4552,7 +5005,11 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+
+{% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
   %dev = hal.ex.shared_device : !hal.device
@@ -4570,7 +5027,11 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
   %c5 = vm.const.i32 5 : i32
@@ -4607,7 +5068,11 @@ vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Inliner
+
+{% raw %}
 ```
 vm.module @module {
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -4654,7 +5119,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 vm.module @module {
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -4701,7 +5170,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.module @module {
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -4748,7 +5221,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::DropCompilerHintsPass
+
+{% raw %}
 ```
 vm.module @module {
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -4795,7 +5272,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::OrdinalAllocationPass
+
+{% raw %}
 ```
 vm.module @module attributes {ordinal_counts = #vm.ordinal_counts<import_funcs = 7, export_funcs = 1, internal_funcs = 1, global_bytes = 0, global_refs = 0, rodatas = 0, rwdatas = 0>} {
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) attributes {ordinal = 0 : i32} {
@@ -4842,7 +5323,11 @@ vm.module @module attributes {ordinal_counts = #vm.ordinal_counts<import_funcs =
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::SerializeExecutablesPass
+
+{% raw %}
 ```
 hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
   hal.interface @legacy_io attributes {push_constants = 6 : i32} {
@@ -4855,7 +5340,11 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
@@ -4893,7 +5382,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
@@ -4931,7 +5424,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
@@ -4969,7 +5466,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c50331680_i32 = constant 50331680 : i32
@@ -4988,7 +5489,11 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c50331680_i32 = constant 50331680 : i32
@@ -5007,7 +5512,11 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+
+{% raw %}
 ```
 func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c50331680_i32 = constant 50331680 : i32
@@ -5026,7 +5535,11 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c0 = constant 0 : index
@@ -5040,7 +5553,11 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c0 = constant 0 : index
@@ -5054,7 +5571,11 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+
+{% raw %}
 ```
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c0 = constant 0 : index
@@ -5068,7 +5589,11 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After SymbolDCE
+
+{% raw %}
 ```
 module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
@@ -5176,7 +5701,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @_device_match_id_0_initializer() -> i1 {
   %dev = hal.ex.shared_device : !hal.device
@@ -5185,7 +5714,11 @@ func private @_device_match_id_0_initializer() -> i1 {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
@@ -5194,7 +5727,11 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
@@ -5204,7 +5741,11 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
   %dev = hal.ex.shared_device : !hal.device
@@ -5222,7 +5763,11 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
@@ -5260,7 +5805,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c50331680_i32 = constant 50331680 : i32
@@ -5279,7 +5828,11 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %c0 = constant 0 : index
@@ -5293,7 +5846,11 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
@@ -5401,7 +5958,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::ConversionPass
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -5569,7 +6130,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::HoistInlinedRodataPass
+
+{% raw %}
 ```
 vm.module @module {
   vm.global.i32 @_device_match_id_0 init(@_device_match_id_0_initializer) : i32
@@ -5735,7 +6300,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::GlobalInitializationPass
+
+{% raw %}
 ```
 vm.module @module {
   vm.global.i32 @_device_match_id_0 mutable : i32
@@ -5913,7 +6482,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @__init() {
   %0 = vm.call @_device_match_id_0_initializer() : () -> i32
@@ -5928,7 +6501,11 @@ vm.func @__init() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %zero = vm.const.i32.zero : i32
@@ -5945,7 +6522,11 @@ vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_v
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
   %c50331680 = vm.const.i32 50331680 : i32
@@ -5969,7 +6550,11 @@ vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!h
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
   %c4 = vm.const.i32 4 : i32
@@ -6008,7 +6593,11 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
   %c1447906369 = vm.const.i32 1447906369 : i32
@@ -6028,7 +6617,11 @@ vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.exe
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_layout> {
   %c6 = vm.const.i32 6 : i32
@@ -6039,7 +6632,11 @@ vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_l
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
   %c1 = vm.const.i32 1 : i32
@@ -6053,7 +6650,11 @@ vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descript
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func private @_device_match_id_0_initializer() -> i32 {
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6063,7 +6664,11 @@ vm.func private @_device_match_id_0_initializer() -> i32 {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @__init() {
   %c1 = vm.const.i32 1 : i32
@@ -6100,7 +6705,11 @@ vm.func @__init() {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %zero = vm.const.i32.zero : i32
@@ -6129,7 +6738,11 @@ vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_v
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
   %c50331680 = vm.const.i32 50331680 : i32
@@ -6153,7 +6766,11 @@ vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!h
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Canonicalizer
+
+{% raw %}
 ```
 vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
   %c4 = vm.const.i32 4 : i32
@@ -6192,7 +6809,11 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After Inliner
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -6361,7 +6982,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After CSE
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -6530,7 +7155,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After SymbolDCE
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -6682,7 +7311,11 @@ module  {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::VM::SinkDefiningOpsPass
+
+{% raw %}
 ```
 vm.module @module {
   vm.global.i32 @_device_match_id_0 mutable : i32
@@ -6832,7 +7465,11 @@ vm.module @module {
 }
 
 ```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::DropCompilerHintsPass
+
+{% raw %}
 ```
 module  {
   vm.module @module {
@@ -6984,3 +7621,4 @@ module  {
 }
 
 ```
+{% endraw %}
