@@ -17,14 +17,17 @@ executables that can be run on the target platform.
 
 ### Install RISC-V Tools
 
-Execute the following script to download RISC-V toolchain and QEMU:
+Execute the following script to download the prebuilt RISC-V toolchain and QEMU:
 
 ```shell
 # In IREE source root
 $ ./build_tools/riscv/riscv_bootstrap.sh
 ```
 
-* RISC-V toolchain is built from https://github.com/llvm/llvm-project
+NOTE: If you want to build the tools by yourself:
+* RISC-V toolchain is built from https://github.com/llvm/llvm-project (main branch).<br>
+-- Currently, our LLVM compiler is built on GNU toolchain, including libgcc, GNU linker, and C libraries. You need to build GNU toolchain first.<br>
+-- Clone GNU toolchain from: https://github.com/riscv/riscv-gnu-toolchain (master branch). Switch the "riscv-binutils" submodule to `rvv-1.0.x-zfh ` branch manually.
 * RISC-V QEMU is built from https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh
 
 ## Configure and build
