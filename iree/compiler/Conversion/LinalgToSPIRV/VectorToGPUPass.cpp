@@ -180,7 +180,7 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
     return !(hasMarker(copy, getCopyToWorkgroupMemoryMarker()));
   });
   target->markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-  OwningRewritePatternList tileAndDistributePattern;
+  OwningRewritePatternList tileAndDistributePattern(&getContext());
   populateLinalgTileAndDistributePatterns(context, tileAndDistributePattern);
   if (failed(applyPartialConversion(funcOp, *target,
                                     std::move(tileAndDistributePattern)))) {
@@ -196,9 +196,9 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizePatterns));
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
-  OwningRewritePatternList vectorizationPatterns;
+  OwningRewritePatternList vectorizationPatterns(&getContext());
   linalg::insertVectorizationPatterns<linalg::CopyOp>(
-      vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
+      vectorizationPatterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), context), {}));
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
@@ -366,7 +366,7 @@ class ExtractStridedLowering
 // Lower vector ops to instructions that can be later converted to SPIR-V.
 void ConvertVectorToGPUPass::lowerVectorOps(FuncOp funcOp,
                                             MLIRContext *context) {
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(&getContext());
   patterns.insert<VectorContractLowering, VectorTransferReadToLoad,
                   VectorTransferWriteToStore, ExtractStridedLowering,
                   ElementwiseLowering>(context);
@@ -381,7 +381,7 @@ void ConvertVectorToGPUPass::runOnOperation() {
   lowerVectorOps(funcOp, context);
 
   auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(&getContext());
   patterns.insert<UnaryAndBinaryOpPattern<AddFOp>, VectorTransferReadConversion,
                   VectorTransferWriteConversion>(context,
                                                  cooperativeMatrixAnalysis);

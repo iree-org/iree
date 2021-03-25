@@ -350,15 +350,26 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
 
     // Clone the function as an LLVMFuncOp and convert all interior types.
     auto llvmFuncType = LLVM::LLVMFunctionType::get(
-        LLVM::LLVMVoidType::get(rewriter.getContext()), abiInputTypes);
+        IntegerType::get(rewriter.getContext(), 32), abiInputTypes);
     auto llvmFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
         stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
-        LLVM::Linkage::External, funcAttrs);
+        LLVM::Linkage::Internal, funcAttrs);
     rewriter.inlineRegionBefore(stdFuncOp.getBody(), llvmFuncOp.getBody(),
                                 llvmFuncOp.end());
     if (failed(rewriter.convertRegionTypes(
             &llvmFuncOp.getBody(), *typeConverter, &signatureConverter))) {
       return failure();
+    }
+
+    // Add default zero return value.
+    // TODO(ataei): do something meaningful with the return value; non-zero will
+    // have the runtime bail out with an error.
+    for (auto returnOp :
+         llvm::make_early_inc_range(llvmFuncOp.getOps<mlir::ReturnOp>())) {
+      rewriter.setInsertionPoint(returnOp);
+      auto returnValue =
+          rewriter.createOrFold<mlir::ConstantIntOp>(returnOp.getLoc(), 0, 32);
+      rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, returnValue);
     }
 
     rewriter.eraseOp(stdFuncOp);
@@ -563,7 +574,7 @@ class RemoveMakeRankedShape : public ConvertToLLVMPattern {
   }
 };
 
-// Upateds memref descriptors shape and strides informations and fold tie_shape
+// Updates memref descriptors shape and strides informations and fold tie_shape
 // into updated memref descriptor.
 class ConvertTieShapePattern : public ConvertToLLVMPattern {
  public:
@@ -633,26 +644,24 @@ class ConvertToLLVMPass
 void ConvertToLLVMPass::runOnOperation() {
   // Run Vector -> Vector transformations ahead of conversion to LLVM.
   {
-    OwningRewritePatternList patterns;
-    vector::populateVectorToVectorCanonicalizationPatterns(patterns,
-                                                           &getContext());
-    vector::populateVectorSlicesLoweringPatterns(patterns, &getContext());
-    vector::populateVectorContractLoweringPatterns(patterns, &getContext());
+    OwningRewritePatternList patterns(&getContext());
+    vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+    vector::populateVectorSlicesLoweringPatterns(patterns);
+    vector::populateVectorContractLoweringPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
   {
-    OwningRewritePatternList vectorToLoopsPatterns;
+    OwningRewritePatternList vectorToLoopsPatterns(&getContext());
     populateVectorToSCFConversionPatterns(
-        vectorToLoopsPatterns, &getContext(),
-        VectorTransferToSCFOptions().setUnroll(true));
+        vectorToLoopsPatterns, VectorTransferToSCFOptions().setUnroll(true));
     (void)applyPatternsAndFoldGreedily(getOperation(),
                                        std::move(vectorToLoopsPatterns));
   }
 
   // math dialect elementry functions -> polynomial form.
   {
-    OwningRewritePatternList mathPatterns;
-    populateMathPolynomialApproximationPatterns(mathPatterns, &getContext());
+    OwningRewritePatternList mathPatterns(&getContext());
+    populateMathPolynomialApproximationPatterns(mathPatterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(mathPatterns));
   }
 
@@ -663,12 +672,12 @@ void ConvertToLLVMPass::runOnOperation() {
     return success();
   });
 
-  OwningRewritePatternList patterns;
-  populateAffineToStdConversionPatterns(patterns, &getContext());
-  populateLoopToStdConversionPatterns(patterns, &getContext());
-  populateExpandTanhPattern(patterns, &getContext());
+  OwningRewritePatternList patterns(&getContext());
+  populateAffineToStdConversionPatterns(patterns);
+  populateLoopToStdConversionPatterns(patterns);
+  populateExpandTanhPattern(patterns);
   populateStdToLLVMConversionPatterns(converter, patterns);
-  populateVectorToSCFConversionPatterns(patterns, &getContext());
+  populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
   populateLinalgToLLVMConversionPatterns(converter, patterns);
@@ -721,7 +730,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // Post conversion patterns.
   {
-    OwningRewritePatternList postPatterns;
+    OwningRewritePatternList postPatterns(&getContext());
     if (options_.unfuseFMAOps) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
       (void)applyPatternsAndFoldGreedily(module, std::move(postPatterns));

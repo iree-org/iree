@@ -184,12 +184,12 @@ struct ConvertToNVVMPass
     // which need to be lowered further, which is not supported by a single
     // conversion pass.
     {
-      OwningRewritePatternList patterns;
-      populateGpuRewritePatterns(m.getContext(), patterns);
+      OwningRewritePatternList patterns(&getContext());
+      populateGpuRewritePatterns(patterns);
       (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
     }
     {
-      OwningRewritePatternList llvmPatterns;
+      OwningRewritePatternList llvmPatterns(&getContext());
       llvmPatterns.insert<ConvertFunc, ConvertIREEBindingOp>(m.getContext(),
                                                              converter);
       llvmPatterns

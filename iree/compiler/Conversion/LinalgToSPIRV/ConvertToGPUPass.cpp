@@ -824,7 +824,7 @@ void ConvertToGPUPass::runOnOperation() {
   // Let the rest fall through.
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(&getContext());
 
   patterns.insert<
       MapLinalgOpToGlobalInvocationId<linalg::CopyOp>,
@@ -845,7 +845,7 @@ void ConvertToGPUPass::runOnOperation() {
       MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCSumOp>,
       RemoveLinalgRange, SerializeParallelLoopPattern>(
       context, options.usingLinalgOnTensors);
-  FrozenRewritePatternList frozenPatterns(std::move(patterns));
+  FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
   for (FuncOp funcOp : getOperation().getInnerModule().getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;

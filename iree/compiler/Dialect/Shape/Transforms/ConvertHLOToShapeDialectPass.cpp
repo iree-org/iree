@@ -72,7 +72,7 @@ class ConvertHLOToShapePass
 
   void runOnFunction() override {
     ConversionTarget conversionTarget(getContext());
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
 
     conversionTarget.addLegalDialect<ShapeDialect>();
     conversionTarget.addLegalDialect<StandardOpsDialect>();

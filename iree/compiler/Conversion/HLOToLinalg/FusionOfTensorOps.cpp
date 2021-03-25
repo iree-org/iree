@@ -73,18 +73,19 @@ struct FusionOfTensorOpsPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList fusionPatterns, interfacePatterns;
+    OwningRewritePatternList fusionPatterns(&getContext());
+    OwningRewritePatternList interfacePatterns(&getContext());
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
     interfacePatterns.insert<FuseWithHALInterfaceLoadTensor,
                              FuseWithHALInterfaceStoreTensor>(context);
-    FrozenRewritePatternList frozenInterfacePatterns(
+    FrozenRewritePatternSet frozenInterfacePatterns(
         std::move(interfacePatterns));
 
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        frozenInterfacePatterns);
 
-    populateLinalgTensorOpsFusionPatterns(context, fusionPatterns);
+    populateLinalgTensorOpsFusionPatterns(fusionPatterns);
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));
 

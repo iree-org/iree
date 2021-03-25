@@ -385,9 +385,41 @@ if(${IREE_BUILD_COMPILER})
     HOSTONLY
   )
 
-  add_custom_target(IreeFileCheck ALL
-    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
+  # IreeFileCheck
+  # We could encapsulate this in iree_sh_binary, but we only have one use of it
+  # in the project and this file is already not covered by Bazel->CMake
+
+  # Symlink the shell script into the build tree as the expected executable name
+  add_custom_command(
+    OUTPUT
+      IreeFileCheck
+    COMMAND
+      ${CMAKE_COMMAND} -E create_symlink
+      ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh
+      IreeFileCheck
   )
+
+  # CMake always needs to custom targets to drive custom commands. We have to
+  # give it a different name.
+  add_custom_target(_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck)
+
+  # But custom target doesn't have the TARGET_FILE property, which we need, so
+  # wrap it yet again in an executable. This is marke as an imported executable
+  # because otherwise CMake would try to compile it as C++. The executable
+  # target has to have a different name than the output file of the custom
+  # command... (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
+  add_executable(IreeFileCheck_exe IMPORTED GLOBAL)
+  set_property(
+    TARGET
+    IreeFileCheck_exe
+    PROPERTY IMPORTED_LOCATION
+    "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck"
+  )
+  add_dependencies(IreeFileCheck_exe _IreeFileCheck_Driver)
+  # Finally do our normal aliasing trick to make this accessible as a qualified
+  # target name throughout the project.
+  add_executable(iree_tools_IreeFileCheck ALIAS IreeFileCheck_exe)
+
   if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
     add_custom_target(BundledLLVMFileCheck ALL
       COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck

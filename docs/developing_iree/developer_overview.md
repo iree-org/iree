@@ -118,7 +118,7 @@ For example, to translate `simple.mlir` to an IREE module:
 $ ../iree-build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmla \
-  $PWD/iree/tools/test/simple.mlir \
+  $PWD/iree/tools/test/iree-run-module.mlir \
   -o /tmp/simple.vmfb
 ```
 
@@ -176,11 +176,11 @@ does some additional work that usually must be explicit, like marking every
 function as exported by default and running all of them.
 
 For example, to execute the contents of
-[iree/tools/test/simple.mlir](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir):
+[iree/tools/test/iree-run-mlir.mlir](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-mlir.mlir):
 
 ```shell
 $ ../iree-build/iree/tools/iree-run-mlir \
-  $PWD/iree/tools/test/simple.mlir \
+  $PWD/iree/tools/test/iree-run-mlir.mlir \
   -function-input="i32=-2" \
   -iree-hal-target-backends=vmla
 ```
@@ -232,31 +232,4 @@ function.
 ### Useful Vulkan driver flags
 
 For IREE's Vulkan runtime driver, there are a few useful flags defined in
-[vulkan_driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/vulkan/vulkan_driver_module.cc):
-
-#### `--vulkan_renderdoc`
-
-This flag tells IREE to load RenderDoc, connect to it's in-application API, and
-trigger capturing on its own. For example, this command runs `iree-run-mlir` on
-a simple MLIR file with some sample input values and saves a RenderDoc capture
-to the default location on your system (e.g. `/tmp/RenderDoc/`):
-
-```shell
-$ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/renderdoc/lib/path \
-  ../iree-build/iree/tools/iree-run-mlir \
-    $PWD/iree/samples/vulkan/simple_mul.mlir \
-    -iree-hal-target-backends=vulkan-spirv \
-    -function-input="4xf32=1,2,3,4" \
-    -function-input="4xf32=2,4,6,8" \
-    -run-arg="--vulkan_renderdoc"
-```
-
-This flag also works for other IREE execution tools like `iree-run-module`,
-`iree-check-module`.
-
-You can also launch IREE's headless programs through RenderDoc itself, just be
-sure to set the command line arguments appropriately. Saving capture settings in
-RenderDoc can help if you find yourself doing this frequently.
-
-Note: RenderDoc version 1.7 or higher is needed to record captures from IREE's
-headless compute programs.
+[driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/vulkan/registration/driver_module.cc):

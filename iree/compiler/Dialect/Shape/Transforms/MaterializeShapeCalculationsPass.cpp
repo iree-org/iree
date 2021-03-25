@@ -57,7 +57,7 @@ class MaterializeShapeCalculationsPass
     target.addLegalDialect<StandardOpsDialect>();
 
     setupMaterializeShapeCalculationsLegality(target);
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
     populateMaterializeShapeCalculationsConversionPatterns(conversionPatterns,
                                                            context);
     if (failed(applyPartialConversion(getOperation(), target,
@@ -69,7 +69,7 @@ class MaterializeShapeCalculationsPass
     // And then canonicalize shape ops.
     // TODO(laurenzo): I would prefer to get the list of ops in the dialect
     // versus doing this, but I don't know that is possible.
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     CastCompatibleShapeOp::getCanonicalizationPatterns(patterns, context);
     GetRankedShapeOp::getCanonicalizationPatterns(patterns, context);
     MakeRankedShapeOp::getCanonicalizationPatterns(patterns, context);

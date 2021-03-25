@@ -99,11 +99,11 @@ $ ../iree-build/iree/tools/iree-translate --help
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-mlir.mlir)
 and execute a function in the compiled module:
 
 ```shell
-$ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
+$ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/iree-run-mlir.mlir \
   -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 

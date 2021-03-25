@@ -129,9 +129,13 @@ LogicalResult getInputOutputTypesForAllTiles(
     linalg::LinalgOp rootOp, SmallVectorImpl<Type> &inputTypes,
     SmallVectorImpl<Type> &outputTypes) {
   for (Value inputBuffer : rootOp.getInputBuffers()) {
-    auto subviewOp = inputBuffer.getDefiningOp<memref::SubViewOp>();
-    if (!subviewOp) return failure();
-    inputTypes.push_back(subviewOp.getViewSource().getType());
+    if (auto subviewOp = inputBuffer.getDefiningOp<memref::SubViewOp>()) {
+      inputTypes.push_back(subviewOp.getViewSource().getType());
+    } else if (auto allocOp = inputBuffer.getDefiningOp<memref::AllocOp>()) {
+      inputTypes.push_back(allocOp.getType());
+    } else {
+      return failure();
+    }
   }
 
   for (Value outputBuffer : rootOp.getOutputBuffers()) {
@@ -462,7 +466,7 @@ class ConcretizeTileAmongWorkgroupsPass
     // 4. Replace hal.interface.workgroup symbolic ops with constant values.
 
     {
-      OwningRewritePatternList patterns;
+      OwningRewritePatternList patterns(&getContext());
       patterns.insert<ConcretizeWorkgroupSizeOp, ConcretizeWorkgroupCountOp>(
           &context, workloadSize, tileSize);
 
@@ -530,7 +534,7 @@ class ConcretizeTileAmongWorkgroupsPass
     // 6. Canonicalization and clean up.
 
     if (inlineTripOneLoops) {
-      OwningRewritePatternList patterns;
+      OwningRewritePatternList patterns(&getContext());
       patterns.insert<RemoveTripOneLoop>(&context, workloadSize, tileSize);
 
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));

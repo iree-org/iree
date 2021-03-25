@@ -120,7 +120,7 @@ class ConversionPass
       }
     }
 
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
     populateIREEToVMPatterns(context, typeConverter, conversionPatterns);
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
     conversionPatterns.insert<ElideTieShapeOp>(context);

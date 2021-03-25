@@ -4,9 +4,7 @@ vm.module @assignment_ops_i64 {
   // ExtI64: Conditional assignment
   //===--------------------------------------------------------------------===//
 
-  // TODO: The CModuleTarget enforces exports to be ordered.
   vm.export @test_select_i64
-
   vm.func @test_select_i64() {
     %c0 = vm.const.i32 0 : i32
     %c0dno = iree.do_not_optimize(%c0) : i32

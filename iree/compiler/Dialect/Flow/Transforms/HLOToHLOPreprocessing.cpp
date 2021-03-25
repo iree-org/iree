@@ -796,7 +796,7 @@ struct HLOToHLOPreprocessing
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns;
+    OwningRewritePatternList conversionPatterns(&getContext());
     // Note that various input modalities may do their own legalization of
     // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
     // whether it was legalized away at a higher level.
@@ -810,7 +810,7 @@ struct HLOToHLOPreprocessing
       return signalPassFailure();
     }
 
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList patterns(&getContext());
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);

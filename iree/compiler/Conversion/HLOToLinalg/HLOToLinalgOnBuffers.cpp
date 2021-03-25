@@ -825,6 +825,8 @@ static LogicalResult createAndPropagateBufferUsedForResultTensors(
 // Canonicalization patterns.
 //===----------------------------------------------------------------------===//
 
+// TODO(hanchung): Revisit the pattern, this seems no longer needed because the
+// reshape ops are folded in tensors world.
 // Folds linalg.reshape op that directly reshaping an iree.placeholder op into
 // the iree.placeholder op itself.
 class FoldReshapeIntoPlaceholder final
@@ -900,7 +902,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
     return signalPassFailure();
   }
 
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(&getContext());
   populateHLOToLinalgOnBuffersConversionPatterns(context, patterns,
                                                  resultTensorToBufferMap);
   patterns.insert<HALInterfaceLoadTensorOpEraser, ShapeOpPattern>(
@@ -940,7 +942,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
 
   // Perform additional canonicalizations.
   {
-    OwningRewritePatternList foldingPatterns;
+    OwningRewritePatternList foldingPatterns(&getContext());
     foldingPatterns.insert<FoldReshapeIntoPlaceholder>(context);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(foldingPatterns));
   }

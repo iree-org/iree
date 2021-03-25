@@ -298,14 +298,13 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     }
 
     for (auto &op : block.getOperations()) {
-      auto *serializableOp =
-          op.getAbstractOperation()->getInterface<IREE::VM::VMSerializableOp>();
+      auto serializableOp = dyn_cast<IREE::VM::VMSerializableOp>(op);
       if (!serializableOp) {
         op.emitOpError() << "is not serializable";
         return llvm::None;
       }
       if (failed(encoder.beginOp(&op)) ||
-          failed(serializableOp->encode(&op, symbolTable, encoder)) ||
+          failed(serializableOp.encode(symbolTable, encoder)) ||
           failed(encoder.endOp(&op))) {
         op.emitOpError() << "failed to encode";
         return llvm::None;

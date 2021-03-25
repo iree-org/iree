@@ -58,7 +58,7 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 void UnfusedFMAOpsPass::runOnFunction() {
   auto funcOp = getOperation();
   auto context = funcOp.getContext();
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(&getContext());
   populateUnfusedFMAOpsPassPatterns(context, patterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }

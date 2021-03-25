@@ -88,7 +88,7 @@ def main(args) -> None:
       for target in phone.targets:
         module_name = configuration.get_module_name(model_benchmark.name,
                                                     phone.name, target.mako_tag)
-        flagfile_name = f"{model_benchmark.name}_flagfile"
+        flagfile_name = configuration.get_flagfile_name(model_benchmark.name)
         mako_log.append(benchmark(module_name, flagfile_name, target))
       mako_log.append(
           get_mako_metadata(args.git_hash, timestamp, phone.benchmark_key))

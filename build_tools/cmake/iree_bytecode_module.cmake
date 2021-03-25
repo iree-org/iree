@@ -21,8 +21,10 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: Name of target (see Note).
 # SRC: Source file to compile into a bytecode module.
-# FLAGS: Flags to pass to the translation tool (list of strings).
-# TRANSLATE_TOOL: Translation tool to invoke (CMake target).
+# FLAGS: Flags to pass to the translation tool (list of strings). The
+#     default flag set is "-iree-mlir-to-vm-bytecode-module".
+# TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
+#     tool is "iree-translate".
 # CC_NAMESPACE: Wraps everything in a C++ namespace.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC

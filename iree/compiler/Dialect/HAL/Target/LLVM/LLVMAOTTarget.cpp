@@ -20,6 +20,7 @@
 #include "iree/compiler/Conversion/LinalgToLLVM/LLVMCodeGenOptions.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -169,15 +170,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto libraryName =
         targetOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
-    // TODO(#3737): don't add functions we don't want to serialize to the
-    // module. Right now workgroup count calculation functions end up in here
-    // as std.func ops and not just the llvm.func ops we expect.
-    auto illegalFuncOps =
-        llvm::to_vector<4>(targetOp.getInnerModule().getOps<FuncOp>());
-    for (auto funcOp : illegalFuncOps) {
-      funcOp.erase();
-    }
-
+    // Specialize the module to the target triple.
+    // The executable will have been cloned into other ExecutableTargetOps for
+    // other triples so it's fine to mutate in-place.
     llvm::Triple targetTriple(options_.targetTriple);
     targetOp.getInnerModule()->setAttr(
         LLVM::LLVMDialect::getTargetTripleAttrName(),
@@ -192,14 +187,52 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                      "dialect to the native llvm::Module";
     }
 
+    // Configure the functions in the module. This may override defaults set
+    // during the MLIR->LLVM conversion.
+    for (auto &func : *llvmModule) {
+      // Enable frame pointers to ensure that stack unwinding works, e.g. in
+      // Tracy. In principle this could also be achieved by enabling unwind
+      // tables, but we tried that and that didn't work in Tracy (which uses
+      // libbacktrace), while enabling frame pointers worked.
+      // https://github.com/google/iree/issues/3957
+      func.addFnAttr("frame-pointer", "all");
+
+      // -ffreestanding-like behavior.
+      func.addFnAttr("no-builtins");
+    }
+
+    // Build the IREE HAL executable library metadata. The runtime uses this to
+    // find the entry point functions and their information.
+    LibraryBuilder libraryBuilder(
+        llvmModule.get(), LibraryBuilder::Mode::INCLUDE_REFLECTION_ATTRS,
+        LibraryBuilder::Version::V_0);
     switch (options_.sanitizerKind) {
-      case SanitizerKind::kNone:
+      case SanitizerKind::kNone: {
+        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
         break;
+      }
       case SanitizerKind::kAddress: {
-        for (auto &function : llvmModule->getFunctionList())
+        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::ADDRESS);
+        for (auto &function : llvmModule->getFunctionList()) {
           function.addFnAttr(llvm::Attribute::SanitizeAddress);
+        }
       } break;
     }
+    for (auto entryPointOp :
+         targetOp.getBlock().getOps<ExecutableEntryPointOp>()) {
+      auto *llvmFunc = llvmModule->getFunction(entryPointOp.getName());
+      llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
+      llvmFunc->setDSOLocal(true);
+      libraryBuilder.addEntryPoint(entryPointOp.getName(), "", llvmFunc);
+    }
+    auto *queryLibraryFunc =
+        libraryBuilder.build("iree_hal_executable_library_query");
+
+    // The query function must be exported for dynamic libraries.
+    queryLibraryFunc->setVisibility(
+        llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
+    queryLibraryFunc->setLinkage(
+        llvm::GlobalValue::LinkageTypes::ExternalLinkage);
 
     // Try to grab a linker tool based on the options (and target environment).
     auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
@@ -211,11 +244,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
     // Configure the module with any code generation options required later by
     // linking (such as initializer functions).
-    auto entryPointNames = llvm::to_vector<8>(
-        llvm::map_range(targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
-                        [&](auto op) { return op.getName(); }));
-    if (failed(
-            linkerTool->configureModule(llvmModule.get(), entryPointNames))) {
+    if (failed(linkerTool->configureModule(llvmModule.get(),
+                                           {queryLibraryFunc}))) {
       return targetOp.emitError()
              << "failed to configure LLVM module for target linker";
     }
@@ -298,21 +328,12 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                   << linkArtifacts.libraryFile.path;
     }
 
-    // Entry point names up from.
-    // TODO(#3580): these won't be needed in the executable_library world.
-    auto entryPointsRef = builder.createStringVec(llvm::map_range(
-        targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
-        [&](ExecutableEntryPointOp op) { return op.getName(); }));
-
     iree_DyLibExecutableDef_start_as_root(builder);
-    iree_DyLibExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_DyLibExecutableDef_library_embedded_add(builder, libraryEmbeddedRef);
     iree_DyLibExecutableDef_debug_database_filename_add(
         builder, debugDatabaseFilenameRef);
     iree_DyLibExecutableDef_debug_database_embedded_add(builder,
                                                         debugDatabaseRef);
-    iree_DyLibExecutableDef_sanitized_kind_add(
-        builder, static_cast<unsigned char>(options_.sanitizerKind));
     iree_DyLibExecutableDef_end_as_root(builder);
 
     uint32_t executableFormat =

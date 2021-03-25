@@ -76,15 +76,21 @@ class ModelBenchmarkInfo:
 
   Attributes:
     name: The name of the model.
+    model_artifacts_name: The filename of model artifacts which locates in
+      Google bucket iree-model-artifacts.
     model_path: A path to MLIR input file. This can be a relative path.
+    flagfile_path: A path to flagfile. This can be a relative path.
     phones: A list of PhoneBenchmarkInfo that the benchmarking targets on.
   """
 
-  def __init__(self, name, model_path, phones):
+  def __init__(self, name, model_artifacts_name, model_path, flagfile_path,
+               phones):
     if "_" in name:
       raise ValueError("The target name contains invalid char '_'")
     self.name = name
+    self.model_artifacts_name = model_artifacts_name
     self.model_path = model_path
+    self.flagfile_path = flagfile_path
     self.phones = phones
 
 
@@ -144,7 +150,11 @@ def get_s20_default_target_list(batch_config=None):
 MODEL_BENCHMARKS = [
     ModelBenchmarkInfo(
         name="mobile-bert",
+        model_artifacts_name=
+        "iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz",
         model_path="tmp/iree/modules/MobileBertSquad/iree_input.mlir",
+        flagfile_path=
+        "tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile",
         phones=[
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="5538704950034432",
@@ -159,7 +169,9 @@ MODEL_BENCHMARKS = [
         ]),
     ModelBenchmarkInfo(
         name="mobilenet-v2",
+        model_artifacts_name="mobilenet-v2.tar.gz",
         model_path="mobilenet-v2/iree_input.mlir",
+        flagfile_path="mobilenet-v2/flagfile",
         phones=[
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="6338759231537152",
@@ -173,6 +185,10 @@ MODEL_BENCHMARKS = [
                                })),
         ])
 ]
+
+
+def get_flagfile_name(model_name):
+  return f"{model_name}_flagfile"
 
 
 def get_module_name(model_name, phone_name, mako_tag):

@@ -45,7 +45,7 @@ namespace iree_compiler {
 /// easier.
 void applyCanonicalizationPatternsForTiling(MLIRContext *context,
                                             Operation *op) {
-  OwningRewritePatternList canonicalizationPatterns;
+  OwningRewritePatternList canonicalizationPatterns(context);
   canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
   scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
@@ -344,7 +344,7 @@ LogicalResult defineWorkgroupCountRegion(
 
 LogicalResult materializeStaticLaunchInformation(
     FuncOp funcOp, ArrayRef<int64_t> workloadPerWorkgroup) {
-  OwningRewritePatternList patterns;
+  OwningRewritePatternList patterns(funcOp.getContext());
   patterns.insert<SetWorkgroupSizePattern>(funcOp.getContext(),
                                            workloadPerWorkgroup);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

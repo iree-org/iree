@@ -62,9 +62,8 @@ class FoldTensorExtractOpPass
 }  // namespace
 
 void FoldTensorExtractOpPass::runOnOperation() {
-  MLIRContext *context = &getContext();
-  OwningRewritePatternList patterns;
-  populateWithGenerated(context, patterns);
+  OwningRewritePatternList patterns(&getContext());
+  populateWithGenerated(patterns);
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     signalPassFailure();
 }

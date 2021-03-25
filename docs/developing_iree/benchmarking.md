@@ -22,7 +22,7 @@ To use `iree-benchmark-module`, generate an IREE module for the target backend:
 $ bazel run //iree/tools:iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vmla \
-  $PWD/iree/tools/test/simple.mlir \
+  $PWD/iree/tools/test/iree-benchmark-module.mlir \
   -o /tmp/module.fb
 ```
 

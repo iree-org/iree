@@ -42,8 +42,9 @@ class WindowsLinkerTool : public LinkerTool {
     return "";
   }
 
-  LogicalResult configureModule(llvm::Module *llvmModule,
-                                ArrayRef<StringRef> entryPointNames) override {
+  LogicalResult configureModule(
+      llvm::Module *llvmModule,
+      ArrayRef<llvm::Function *> exportedFuncs) override {
     auto &ctx = llvmModule->getContext();
 
     // Create a _DllMainCRTStartup replacement that does not initialize the CRT.
@@ -76,16 +77,11 @@ class WindowsLinkerTool : public LinkerTool {
     // directives embedded in the object file) and in a compatible calling
     // convention.
     // TODO(benvanik): switch to executable libraries w/ internal functions.
-    for (auto entryPointName : entryPointNames) {
-      auto *entryPointFn = llvmModule->getFunction(entryPointName);
-      entryPointFn->setCallingConv(llvm::CallingConv::X86_StdCall);
-      entryPointFn->setDLLStorageClass(
+    for (auto func : exportedFuncs) {
+      func->setCallingConv(llvm::CallingConv::X86_StdCall);
+      func->setDLLStorageClass(
           llvm::GlobalValue::DLLStorageClassTypes::DLLExportStorageClass);
-      entryPointFn->setLinkage(
-          llvm::GlobalValue::LinkageTypes::ExternalLinkage);
-      entryPointFn->setVisibility(
-          llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
-      entryPointFn->addFnAttr(llvm::Attribute::UWTable);
+      func->addFnAttr(llvm::Attribute::UWTable);
     }
 
     return success();

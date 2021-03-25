@@ -62,12 +62,7 @@ function(iree_lit_test)
   set(_DATA_DEP_PATHS)
   foreach(_DATA_DEP ${_RULE_DATA})
     string(REPLACE "::" "_" _DATA_DEP_NAME ${_DATA_DEP})
-    # TODO(*): iree_sh_binary so we can avoid this.
-    if("${_DATA_DEP_NAME}" STREQUAL "iree_tools_IreeFileCheck")
-      list(APPEND _DATA_DEP_PATHS "${CMAKE_SOURCE_DIR}/iree/tools/IreeFileCheck.sh")
-    else()
-      list(APPEND _DATA_DEP_PATHS $<TARGET_FILE:${_DATA_DEP_NAME}>)
-    endif()
+    list(APPEND _DATA_DEP_PATHS $<TARGET_FILE:${_DATA_DEP_NAME}>)
   endforeach(_DATA_DEP)
 
   iree_package_ns(_PACKAGE_NS)
