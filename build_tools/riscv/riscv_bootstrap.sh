@@ -31,10 +31,10 @@ fi
 echo "The riscv tool prefix path: ${PREBUILT_DIR}"
 
 if [[ "${OSTYPE}" == "linux-gnu" ]]; then
-  RISCV_CLANG_TOOLCHAIN_FILE_ID=1d5AIeSTTOSUTFs6XPEhdcY9THgjtXtjQ
-  RISCV_CLANG_TOOLCHAIN_FILE_NAME=riscv-llvm-toolchain.tar.bz2
-  QEMU_FILE_ID=1gU4ycMrKtm3nrJ8Kmg4TSTJQefJbQQDQ
-  QEMU_FILE_NAME=riscv-qemu-e5994807-linux-ubuntu.tar.gz
+  RISCV_CLANG_TOOLCHAIN_FILE_ID=13q6sYVlae-hRrgj7SNlvbJFYI3Q8sCI4
+  RISCV_CLANG_TOOLCHAIN_FILE_NAME=rvv-llvm-toolchain.tar.bz2
+  QEMU_FILE_ID=1JkLana7CGeD2wfwn8shHQxcYrv3j1l9s
+  QEMU_FILE_NAME=riscv-qemu-v5.2.0-rvv-rvb-zfh-856da0e-linux-ubuntu.tar.gz
 
   TOOLCHAIN_PATH_PREFIX=${PREBUILT_DIR}/toolchain/clang/linux/RISCV
   QEMU_PATH_PREFIX=${PREBUILT_DIR}/qemu/linux/RISCV
