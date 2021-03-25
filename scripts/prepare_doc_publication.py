@@ -161,7 +161,7 @@ def process_file(basedir, relpath, filename):
 
   full_path = os.path.join(basedir, relpath, filename)
   base_name = os.path.splitext(filename)[0]
-  with open(full_path, 'r') as f:
+  with open(full_path, 'r', encoding="utf8") as f:
     content = f.read()
 
   # Directly return if the file already has front matter.
@@ -233,7 +233,7 @@ def process_file(basedir, relpath, filename):
                             '> Note\n> {: .label .label-blue }\n> ')
 
   # Update in place.
-  with open(full_path, 'w') as f:
+  with open(full_path, 'w', encoding="utf8") as f:
     f.write(f'{prefix}{content}')
 
 
