@@ -90,7 +90,7 @@ iree-opt -iree-transformation-pipeline \\
   echo -e '```' >> ${filepath}
 
   echo -e "### Input IR\n" >> ${filepath}
-  echo -e '```' >> ${filepath}
+  echo -e '{% raw %}\n```' >> ${filepath}
   cat ${example} >> ${filepath}
 
   tmpfile=$(mktemp)
@@ -101,12 +101,43 @@ iree-opt -iree-transformation-pipeline \\
     -mlir-disable-threading \
     -mlir-elide-elementsattrs-if-larger=8 \
     ${example} 1>/dev/null 2>${tmpfile}
-  # Turn pass comment into headers
-  sed 's!^// \*\*\* IR Dump After \(.*\) \*\*\*$!```\n### IR Dump After \1\n```!' \
+
+  # Reformat the IR dump into markdown.
+  #   * Add "###"" subheader sections for each IR snippet
+  #   * Wrap each IR snippet in {% raw %} {% endraw %} to block jekyll from
+  #     running liquid template replacement within the code blocks
+  #
+  # Before:
+  #    // *** IR Dump After {PASS_NAME_A} ***
+  #    module { foo }
+  #
+  #    // *** IR Dump After {PASS_NAME_B} ***
+  #    module { bar }
+  #
+  # After:
+  #    ### IR Dump After {PASS_NAME_A}
+  #
+  #    {% raw %}
+  #    ```
+  #    module { foo }
+  #    ```
+  #    {% endraw %}
+  #
+  #    ### IR Dump After {PASS_NAME_B}
+  #
+  #    {% raw %}
+  #    ```
+  #    module { bar }
+  #    ```
+  #    {% endraw %}
+
+  # Turn pass comment into headers and insert raw/endraw liquid template tags
+  sed 's!^// \*\*\* IR Dump After \(.*\) \*\*\*$!```\n{% endraw %}\n\n### IR Dump After \1\n\n{% raw %}\n```!' \
     ${tmpfile} >> ${filepath}
   # Remove extra empty lines
   sed -i '/^$/N;/^\n$/D' ${filepath}
-  echo -e '```' >> ${filepath}
+  # TODO(scotttodd): Remove extra newlines between } and ``` at the end of IR blocks
+  echo -e '```\n{% endraw %}' >> ${filepath}
 }
 
 mkdir -p ${BUILD_DIR}/doc/ir_examples
