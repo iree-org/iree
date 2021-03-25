@@ -607,12 +607,16 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
   %5 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
   %6 = muli %4, %5 : index
   %7 = shapex.make_ranked_shape %4, %5 : (index, index) -> !shapex.ranked_shape<[?,?]>
-  %8 = flow.ex.stream.fragment(%6, %4, %5, %arg2, %3, %2, %arg0, %1, %0) : (index, index, index, tensor<?x?xf32>{%3, %2}, index, index, tensor<?x?xf32>{%1, %0}, index, index) -> tensor<?x?xf32>{%4, %5} =
+  %8 = shapex.ranked_dim %arg3[0] : !shapex.ranked_shape<[?,?]> -> index
+  %9 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
+  %10 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
+  %11 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
+  %12 = flow.ex.stream.fragment(%6, %4, %5, %arg2, %3, %2, %arg0, %1, %0) : (index, index, index, tensor<?x?xf32>{%8, %9}, index, index, tensor<?x?xf32>{%10, %11}, index, index) -> tensor<?x?xf32>{%4, %5} =
       (%arg4: index, %arg5: index, %arg6: index, %arg7: tensor<?x?xf32>, %arg8: index, %arg9: index, %arg10: tensor<?x?xf32>, %arg11: index, %arg12: index) -> tensor<?x?xf32> {
-    %9 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg4](%arg5, %arg6, %arg7, %arg8, %arg9, %arg10, %arg11, %arg12) : (index, index, tensor<?x?xf32>{%arg8, %arg9}, index, index, tensor<?x?xf32>{%arg11, %arg12}, index, index) -> tensor<?x?xf32>{%arg5, %arg6}
-    flow.return %9 : tensor<?x?xf32>
+    %13 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg4](%arg5, %arg6, %arg7, %arg8, %arg9, %arg10, %arg11, %arg12) : (index, index, tensor<?x?xf32>{%arg8, %arg9}, index, index, tensor<?x?xf32>{%arg11, %arg12}, index, index) -> tensor<?x?xf32>{%arg5, %arg6}
+    flow.return %13 : tensor<?x?xf32>
   }
-  return %8, %7 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  return %12, %7 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
 }
 
 ```
@@ -2436,11 +2440,11 @@ vm.module @module {
 ### IR Dump After Canonicalizer
 ```
 vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-  %c5 = vm.const.i32 5 : i32
-  %c4 = vm.const.i32 4 : i32
-  %c3 = vm.const.i32 3 : i32
   %c1 = vm.const.i32 1 : i32
   %zero = vm.const.i32.zero : i32
+  %c4 = vm.const.i32 4 : i32
+  %c5 = vm.const.i32 5 : i32
+  %c3 = vm.const.i32 3 : i32
   %c2 = vm.const.i32 2 : i32
   %0 = vm.call @vmla.interface.const(%arg0, %c5) : (!vm.ref<!vmla.interface>, i32) -> i32
   %1 = vm.call @vmla.interface.const(%arg0, %c4) : (!vm.ref<!vmla.interface>, i32) -> i32
@@ -2478,11 +2482,11 @@ vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i
 module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c5 = vm.const.i32 5 : i32
-      %c4 = vm.const.i32 4 : i32
-      %c3 = vm.const.i32 3 : i32
       %c1 = vm.const.i32 1 : i32
       %zero = vm.const.i32.zero : i32
+      %c4 = vm.const.i32 4 : i32
+      %c5 = vm.const.i32 5 : i32
+      %c3 = vm.const.i32 3 : i32
       %c2 = vm.const.i32 2 : i32
       %0 = vm.call @vmla.interface.const(%arg0, %c5) : (!vm.ref<!vmla.interface>, i32) -> i32
       %1 = vm.call @vmla.interface.const(%arg0, %c4) : (!vm.ref<!vmla.interface>, i32) -> i32
@@ -2705,11 +2709,11 @@ module  {
 module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c5 = vm.const.i32 5 : i32
-      %c4 = vm.const.i32 4 : i32
-      %c3 = vm.const.i32 3 : i32
       %c1 = vm.const.i32 1 : i32
       %zero = vm.const.i32.zero : i32
+      %c4 = vm.const.i32 4 : i32
+      %c5 = vm.const.i32 5 : i32
+      %c3 = vm.const.i32 3 : i32
       %c2 = vm.const.i32 2 : i32
       %0 = vm.call @vmla.interface.const(%arg0, %c5) : (!vm.ref<!vmla.interface>, i32) -> i32
       %1 = vm.call @vmla.interface.const(%arg0, %c4) : (!vm.ref<!vmla.interface>, i32) -> i32
@@ -2929,11 +2933,11 @@ module  {
 module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c5 = vm.const.i32 5 : i32
-      %c4 = vm.const.i32 4 : i32
-      %c3 = vm.const.i32 3 : i32
       %c1 = vm.const.i32 1 : i32
       %zero = vm.const.i32.zero : i32
+      %c4 = vm.const.i32 4 : i32
+      %c5 = vm.const.i32 5 : i32
+      %c3 = vm.const.i32 3 : i32
       %c2 = vm.const.i32 2 : i32
       %0 = vm.call @vmla.interface.const(%arg0, %c5) : (!vm.ref<!vmla.interface>, i32) -> i32
       %1 = vm.call @vmla.interface.const(%arg0, %c4) : (!vm.ref<!vmla.interface>, i32) -> i32
@@ -3252,10 +3256,10 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 ### IR Dump After Canonicalizer
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-  %c1 = constant 1 : index
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %0 = muli %arg1, %arg5 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3295,10 +3299,10 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 ### IR Dump After CSE
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-  %c1 = constant 1 : index
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %0 = muli %arg1, %arg5 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3389,10 +3393,10 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-    %c1 = constant 1 : index
     %c4 = constant 4 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %0 = muli %arg1, %arg5 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3509,10 +3513,10 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-    %c1 = constant 1 : index
     %c4 = constant 4 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %0 = muli %arg1, %arg5 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3629,10 +3633,10 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-    %c1 = constant 1 : index
     %c4 = constant 4 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %0 = muli %arg1, %arg5 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3695,10 +3699,10 @@ module  {
 ### IR Dump After Canonicalizer
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-  %c1 = constant 1 : index
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %0 = muli %arg1, %arg5 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3735,10 +3739,10 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 ### IR Dump After CSE
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-  %c1 = constant 1 : index
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %0 = muli %arg1, %arg5 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3925,10 +3929,10 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-    %c1 = constant 1 : index
     %c4 = constant 4 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %0 = muli %arg1, %arg5 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
@@ -4033,10 +4037,10 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-  %c1 = constant 1 : index
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %0 = muli %arg1, %arg5 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -4198,10 +4202,10 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-    %c1 = constant 1 : index
     %c4 = constant 4 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %0 = muli %arg1, %arg5 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
@@ -4362,10 +4366,10 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
-    %c1 = constant 1 : index
     %c4 = constant 4 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %0 = muli %arg1, %arg5 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
@@ -4855,9 +4859,9 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %0 = muli %arg1, %c4 : index
@@ -4893,9 +4897,9 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %0 = muli %arg1, %c4 : index
@@ -4931,9 +4935,9 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %0 = muli %arg1, %c4 : index
@@ -5112,9 +5116,9 @@ module  {
   }
   func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
     %c4 = constant 4 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %0 = muli %arg1, %c4 : index
@@ -5222,9 +5226,9 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 ```
 func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
   %c4 = constant 4 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %0 = muli %arg1, %c4 : index
@@ -5337,9 +5341,9 @@ module  {
   }
   func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %arg4: index, %arg5: index) -> (!hal.buffer, index, index) attributes {iree.module.export = "dot$raw", noinline} {
     %c4 = constant 4 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %0 = muli %arg1, %c4 : index
@@ -5453,9 +5457,9 @@ module  {
     }
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
       %c4 = vm.const.i32 4 : i32
-      %c2 = vm.const.i32 2 : i32
       %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %0 = vm.mul.i32 %arg1, %c4 : i32
@@ -5620,9 +5624,9 @@ vm.module @module {
   }
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
     %c4 = vm.const.i32 4 : i32
-    %c2 = vm.const.i32 2 : i32
     %zero = vm.const.i32.zero : i32
     %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %0 = vm.mul.i32 %arg1, %c4 : i32
@@ -5786,9 +5790,9 @@ vm.module @module {
   }
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
     %c4 = vm.const.i32 4 : i32
-    %c2 = vm.const.i32 2 : i32
     %zero = vm.const.i32.zero : i32
     %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %0 = vm.mul.i32 %arg1, %c4 : i32
@@ -5969,14 +5973,14 @@ vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!h
 ```
 vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
   %c4 = vm.const.i32 4 : i32
+  %zero = vm.const.i32.zero : i32
+  %c1 = vm.const.i32 1 : i32
+  %c2 = vm.const.i32 2 : i32
   %c50 = vm.const.i32 50 : i32
   %c15 = vm.const.i32 15 : i32
-  %c1 = vm.const.i32 1 : i32
   %c3 = vm.const.i32 3 : i32
   %c20 = vm.const.i32 20 : i32
   %c5 = vm.const.i32 5 : i32
-  %zero = vm.const.i32.zero : i32
-  %c2 = vm.const.i32 2 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
   %0 = vm.mul.i32 %arg1, %c4 : i32
@@ -6038,10 +6042,10 @@ vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_l
 ### IR Dump After Canonicalizer
 ```
 vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
-  %zero = vm.const.i32.zero : i32
   %c1 = vm.const.i32 1 : i32
-  %c2 = vm.const.i32 2 : i32
+  %zero = vm.const.i32.zero : i32
   %c7 = vm.const.i32 7 : i32
+  %c2 = vm.const.i32 2 : i32
   %c6 = vm.const.i32 6 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call.variadic @hal.descriptor_set_layout.create(%ref, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
@@ -6062,10 +6066,10 @@ vm.func private @_device_match_id_0_initializer() -> i32 {
 ### IR Dump After Canonicalizer
 ```
 vm.func @__init() {
-  %zero = vm.const.i32.zero : i32
   %c1 = vm.const.i32 1 : i32
-  %c2 = vm.const.i32 2 : i32
+  %zero = vm.const.i32.zero : i32
   %c7 = vm.const.i32 7 : i32
+  %c2 = vm.const.i32 2 : i32
   %c6 = vm.const.i32 6 : i32
   %c1447906369 = vm.const.i32 1447906369 : i32
   %null = vm.const.ref.zero : !vm.ref<!hal.executable>
@@ -6099,9 +6103,9 @@ vm.func @__init() {
 ### IR Dump After Canonicalizer
 ```
 vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-  %c50331680 = vm.const.i32 50331680 : i32
   %zero = vm.const.i32.zero : i32
   %c1 = vm.const.i32 1 : i32
+  %c50331680 = vm.const.i32 50331680 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
   %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
@@ -6153,14 +6157,14 @@ vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!h
 ```
 vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
   %c4 = vm.const.i32 4 : i32
+  %zero = vm.const.i32.zero : i32
+  %c1 = vm.const.i32 1 : i32
+  %c2 = vm.const.i32 2 : i32
   %c50 = vm.const.i32 50 : i32
   %c15 = vm.const.i32 15 : i32
-  %c1 = vm.const.i32 1 : i32
   %c3 = vm.const.i32 3 : i32
   %c20 = vm.const.i32 20 : i32
   %c5 = vm.const.i32 5 : i32
-  %zero = vm.const.i32.zero : i32
-  %c2 = vm.const.i32 2 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
   %0 = vm.mul.i32 %arg1, %c4 : i32
@@ -6200,14 +6204,14 @@ module  {
     vm.rodata @_dot_ex_dispatch_0_vmla_binary_vmla opaque<"_", "0xDEADBEEF"> : vector<1518xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
       %c4 = vm.const.i32 4 : i32
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
-      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
-      %zero = vm.const.i32.zero : i32
-      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %0 = vm.mul.i32 %arg1, %c4 : i32
@@ -6256,9 +6260,9 @@ module  {
     }
     vm.export @dot$async
     vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-      %c50331680 = vm.const.i32 50331680 : i32
       %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
       %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
@@ -6320,10 +6324,10 @@ module  {
     vm.import @hal.semaphore.fail(%semaphore : !vm.ref<!hal.semaphore>, %status : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
-      %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
+      %zero = vm.const.i32.zero : i32
       %c7 = vm.const.i32 7 : i32
+      %c2 = vm.const.i32 2 : i32
       %c6 = vm.const.i32 6 : i32
       %c1447906369 = vm.const.i32 1447906369 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
@@ -6369,14 +6373,14 @@ module  {
     vm.rodata @_dot_ex_dispatch_0_vmla_binary_vmla opaque<"_", "0xDEADBEEF"> : vector<1518xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
       %c4 = vm.const.i32 4 : i32
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
-      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
-      %zero = vm.const.i32.zero : i32
-      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %0 = vm.mul.i32 %arg1, %c4 : i32
@@ -6425,9 +6429,9 @@ module  {
     }
     vm.export @dot$async
     vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-      %c50331680 = vm.const.i32 50331680 : i32
       %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
       %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
@@ -6489,10 +6493,10 @@ module  {
     vm.import @hal.semaphore.fail(%semaphore : !vm.ref<!hal.semaphore>, %status : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
-      %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
+      %zero = vm.const.i32.zero : i32
       %c7 = vm.const.i32 7 : i32
+      %c2 = vm.const.i32 2 : i32
       %c6 = vm.const.i32 6 : i32
       %c1447906369 = vm.const.i32 1447906369 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
@@ -6538,14 +6542,14 @@ module  {
     vm.rodata @_dot_ex_dispatch_0_vmla_binary_vmla opaque<"_", "0xDEADBEEF"> : vector<1518xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) attributes {noinline} {
       %c4 = vm.const.i32 4 : i32
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
-      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
-      %zero = vm.const.i32.zero : i32
-      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %0 = vm.mul.i32 %arg1, %c4 : i32
@@ -6594,9 +6598,9 @@ module  {
     }
     vm.export @dot$async
     vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-      %c50331680 = vm.const.i32 50331680 : i32
       %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
       %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
@@ -6641,10 +6645,10 @@ module  {
     vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
-      %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
+      %zero = vm.const.i32.zero : i32
       %c7 = vm.const.i32 7 : i32
+      %c2 = vm.const.i32 2 : i32
       %c6 = vm.const.i32 6 : i32
       %c1447906369 = vm.const.i32 1447906369 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
@@ -6797,10 +6801,10 @@ vm.module @module {
     %0 = vm.call @hal.device.match.id(%ref, %_utf8_vmla_EC74E8E47AC10E22) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
     vm.global.store.i32 %0, @_device_match_id_0 : i32
     %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-    %zero = vm.const.i32.zero : i32
     %c1 = vm.const.i32 1 : i32
-    %c2 = vm.const.i32 2 : i32
+    %zero = vm.const.i32.zero : i32
     %c7 = vm.const.i32 7 : i32
+    %c2 = vm.const.i32 2 : i32
     %c6 = vm.const.i32 6 : i32
     %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
     vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
@@ -6948,10 +6952,10 @@ module  {
       %0 = vm.call @hal.device.match.id(%ref, %_utf8_vmla_EC74E8E47AC10E22) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
       vm.global.store.i32 %0, @_device_match_id_0 : i32
       %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
+      %zero = vm.const.i32.zero : i32
       %c7 = vm.const.i32 7 : i32
+      %c2 = vm.const.i32 2 : i32
       %c6 = vm.const.i32 6 : i32
       %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
       vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>

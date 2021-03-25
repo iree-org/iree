@@ -1231,9 +1231,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
   func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %c1024 = constant 1024 : index
     %cst = constant 0.000000e+00 : f32
     %c8 = constant 8 : index
-    %c1024 = constant 1024 : index
     %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1287,9 +1287,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
   func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %c1024 = constant 1024 : index
     %cst = constant 0.000000e+00 : f32
     %c8 = constant 8 : index
-    %c1024 = constant 1024 : index
     %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1334,9 +1334,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After mlir::iree_compiler::{anonymous}::ResolveShapeOpsPass
 ```
 func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  %c1024 = constant 1024 : index
   %cst = constant 0.000000e+00 : f32
   %c8 = constant 8 : index
-  %c1024 = constant 1024 : index
   %c16 = constant 16 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
@@ -1376,9 +1376,9 @@ func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
   func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %c1024 = constant 1024 : index
     %cst = constant 0.000000e+00 : f32
     %c8 = constant 8 : index
-    %c1024 = constant 1024 : index
     %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1429,9 +1429,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
   func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %c1024 = constant 1024 : index
     %cst = constant 0.000000e+00 : f32
     %c8 = constant 8 : index
-    %c1024 = constant 1024 : index
     %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1482,9 +1482,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
   func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %c1024 = constant 1024 : index
     %cst = constant 0.000000e+00 : f32
     %c8 = constant 8 : index
-    %c1024 = constant 1024 : index
     %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1533,26 +1533,26 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
   spv.module Logical GLSL450 {
     spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
     spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-    spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-    spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
     spv.func @dot_ex_dispatch_0() "None" attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
-      %0 = spv.Constant 0.000000e+00 : f32
-      %1 = spv.Constant 8 : i32
-      %2 = spv.Constant 1024 : i32
+      %0 = spv.Constant 1024 : i32
+      %1 = spv.Constant 0.000000e+00 : f32
+      %2 = spv.Constant 8 : i32
       %3 = spv.Constant 16 : i32
       %4 = spv.Constant 0 : i32
       %5 = spv.Constant 1 : i32
-      %6 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-      %7 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-      %8 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+      %6 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+      %7 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+      %8 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
       %9 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
       %10 = spv.Load "Input" %9 : vector<3xi32>
       %11 = spv.CompositeExtract %10[0 : i32] : vector<3xi32>
       %12 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
       %13 = spv.Load "Input" %12 : vector<3xi32>
       %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-      %15 = spv.IMul %14, %1 : i32
+      %15 = spv.IMul %14, %2 : i32
       %16 = spv.IMul %11, %3 : i32
       %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
       %18 = spv.Load "Input" %17 : vector<3xi32>
@@ -1560,7 +1560,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
       %20 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
       %21 = spv.Load "Input" %20 : vector<3xi32>
       %22 = spv.CompositeExtract %21[1 : i32] : vector<3xi32>
-      %23 = spv.SLessThan %22, %1 : i32
+      %23 = spv.SLessThan %22, %2 : i32
       %24 = spv.SLessThan %19, %3 : i32
       %25 = spv.LogicalAnd %23, %24 : i1
       spv.mlir.selection {
@@ -1577,7 +1577,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
         %34 = spv.IMul %33, %27 : i32
         %35 = spv.IAdd %32, %34 : i32
         %36 = spv.AccessChain %6[%28, %35] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        spv.Store "StorageBuffer" %36, %0 : f32
+        spv.Store "StorageBuffer" %36, %1 : f32
         spv.Branch ^bb2
       ^bb2:  // 2 preds: ^bb0, ^bb1
         spv.mlir.merge
@@ -1588,7 +1588,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
         spv.mlir.loop {
           spv.Branch ^bb1(%4 : i32)
         ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
-          %27 = spv.SLessThan %26, %2 : i32
+          %27 = spv.SLessThan %26, %0 : i32
           spv.BranchConditional %27, ^bb2, ^bb3
         ^bb2:  // pred: ^bb1
           %28 = spv.IAdd %15, %22 : i32
@@ -1660,26 +1660,26 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" {
-    %0 = spv.Constant 0.000000e+00 : f32
-    %1 = spv.Constant 8 : i32
-    %2 = spv.Constant 1024 : i32
+    %0 = spv.Constant 1024 : i32
+    %1 = spv.Constant 0.000000e+00 : f32
+    %2 = spv.Constant 8 : i32
     %3 = spv.Constant 16 : i32
     %4 = spv.Constant 0 : i32
     %5 = spv.Constant 1 : i32
-    %6 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %7 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %6 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %9 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %10 = spv.Load "Input" %9 : vector<3xi32>
     %11 = spv.CompositeExtract %10[0 : i32] : vector<3xi32>
     %12 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %13 = spv.Load "Input" %12 : vector<3xi32>
     %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-    %15 = spv.IMul %14, %1 : i32
+    %15 = spv.IMul %14, %2 : i32
     %16 = spv.IMul %11, %3 : i32
     %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %18 = spv.Load "Input" %17 : vector<3xi32>
@@ -1687,7 +1687,7 @@ spv.module Logical GLSL450 {
     %20 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %21 = spv.Load "Input" %20 : vector<3xi32>
     %22 = spv.CompositeExtract %21[1 : i32] : vector<3xi32>
-    %23 = spv.SLessThan %22, %1 : i32
+    %23 = spv.SLessThan %22, %2 : i32
     %24 = spv.SLessThan %19, %3 : i32
     %25 = spv.LogicalAnd %23, %24 : i1
     spv.mlir.selection {
@@ -1704,7 +1704,7 @@ spv.module Logical GLSL450 {
       %34 = spv.IMul %33, %27 : i32
       %35 = spv.IAdd %32, %34 : i32
       %36 = spv.AccessChain %6[%28, %35] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-      spv.Store "StorageBuffer" %36, %0 : f32
+      spv.Store "StorageBuffer" %36, %1 : f32
       spv.Branch ^bb2
     ^bb2:  // 2 preds: ^bb0, ^bb1
       spv.mlir.merge
@@ -1715,7 +1715,7 @@ spv.module Logical GLSL450 {
       spv.mlir.loop {
         spv.Branch ^bb1(%4 : i32)
       ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
-        %27 = spv.SLessThan %26, %2 : i32
+        %27 = spv.SLessThan %26, %0 : i32
         spv.BranchConditional %27, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
         %28 = spv.IAdd %15, %22 : i32
@@ -1783,36 +1783,36 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" {
-    %0 = spv.Constant 0.000000e+00 : f32
-    %1 = spv.Constant 8 : i32
-    %2 = spv.Constant 16 : i32
-    %3 = spv.Constant 1 : i32
-    %4 = spv.Constant 1024 : i32
-    %5 = spv.Constant 0 : i32
+    %0 = spv.Constant 1024 : i32
+    %1 = spv.Constant 0.000000e+00 : f32
+    %2 = spv.Constant 8 : i32
+    %3 = spv.Constant 16 : i32
+    %4 = spv.Constant 0 : i32
+    %5 = spv.Constant 1 : i32
     %6 = spv.Constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
     %13 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %14 = spv.Load "Input" %13 : vector<3xi32>
     %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-    %16 = spv.IMul %15, %1 : i32
-    %17 = spv.IMul %12, %2 : i32
+    %16 = spv.IMul %15, %2 : i32
+    %17 = spv.IMul %12, %3 : i32
     %18 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %19 = spv.Load "Input" %18 : vector<3xi32>
     %20 = spv.CompositeExtract %19[0 : i32] : vector<3xi32>
     %21 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %22 = spv.Load "Input" %21 : vector<3xi32>
     %23 = spv.CompositeExtract %22[1 : i32] : vector<3xi32>
-    %24 = spv.SLessThan %23, %1 : i32
-    %25 = spv.SLessThan %20, %2 : i32
+    %24 = spv.SLessThan %23, %2 : i32
+    %25 = spv.SLessThan %20, %3 : i32
     %26 = spv.LogicalAnd %24, %25 : i1
     spv.mlir.selection {
       spv.BranchConditional %26, ^bb1, ^bb2
@@ -1821,8 +1821,8 @@ spv.module Logical GLSL450 {
       %28 = spv.IAdd %17, %20 : i32
       %29 = spv.IMul %27, %6 : i32
       %30 = spv.IAdd %29, %28 : i32
-      %31 = spv.AccessChain %7[%5, %30] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-      spv.Store "StorageBuffer" %31, %0 : f32
+      %31 = spv.AccessChain %7[%4, %30] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+      spv.Store "StorageBuffer" %31, %1 : f32
       spv.Branch ^bb2
     ^bb2:  // 2 preds: ^bb0, ^bb1
       spv.mlir.merge
@@ -1831,32 +1831,32 @@ spv.module Logical GLSL450 {
       spv.BranchConditional %26, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       spv.mlir.loop {
-        spv.Branch ^bb1(%5 : i32)
+        spv.Branch ^bb1(%4 : i32)
       ^bb1(%27: i32):  // 2 preds: ^bb0, ^bb2
-        %28 = spv.SLessThan %27, %4 : i32
+        %28 = spv.SLessThan %27, %0 : i32
         spv.BranchConditional %28, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
         %29 = spv.IAdd %16, %23 : i32
-        %30 = spv.IMul %29, %4 : i32
+        %30 = spv.IMul %29, %0 : i32
         %31 = spv.IAdd %30, %27 : i32
-        %32 = spv.AccessChain %8[%5, %31] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %32 = spv.AccessChain %8[%4, %31] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %33 = spv.Load "StorageBuffer" %32 : f32
         %34 = spv.IAdd %17, %20 : i32
         %35 = spv.IMul %27, %6 : i32
         %36 = spv.IAdd %35, %34 : i32
-        %37 = spv.AccessChain %9[%5, %36] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %37 = spv.AccessChain %9[%4, %36] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %38 = spv.Load "StorageBuffer" %37 : f32
         %39 = spv.IMul %29, %6 : i32
         %40 = spv.IAdd %39, %34 : i32
-        %41 = spv.AccessChain %7[%5, %40] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %41 = spv.AccessChain %7[%4, %40] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %42 = spv.Load "StorageBuffer" %41 : f32
         %43 = spv.FMul %33, %38 : f32
         %44 = spv.FAdd %42, %43 : f32
         %45 = spv.IMul %29, %6 : i32
         %46 = spv.IAdd %45, %34 : i32
-        %47 = spv.AccessChain %7[%5, %46] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %47 = spv.AccessChain %7[%4, %46] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         spv.Store "StorageBuffer" %47, %44 : f32
-        %48 = spv.IAdd %27, %3 : i32
+        %48 = spv.IAdd %27, %5 : i32
         spv.Branch ^bb1(%48 : i32)
       ^bb3:  // pred: ^bb1
         spv.mlir.merge
@@ -1877,34 +1877,34 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" {
-    %0 = spv.Constant 0.000000e+00 : f32
-    %1 = spv.Constant 8 : i32
-    %2 = spv.Constant 16 : i32
-    %3 = spv.Constant 1 : i32
-    %4 = spv.Constant 1024 : i32
-    %5 = spv.Constant 0 : i32
+    %0 = spv.Constant 1024 : i32
+    %1 = spv.Constant 0.000000e+00 : f32
+    %2 = spv.Constant 8 : i32
+    %3 = spv.Constant 16 : i32
+    %4 = spv.Constant 0 : i32
+    %5 = spv.Constant 1 : i32
     %6 = spv.Constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
     %13 = spv.Load "Input" %10 : vector<3xi32>
     %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-    %15 = spv.IMul %14, %1 : i32
-    %16 = spv.IMul %12, %2 : i32
+    %15 = spv.IMul %14, %2 : i32
+    %16 = spv.IMul %12, %3 : i32
     %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %18 = spv.Load "Input" %17 : vector<3xi32>
     %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
     %20 = spv.Load "Input" %17 : vector<3xi32>
     %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-    %22 = spv.SLessThan %21, %1 : i32
-    %23 = spv.SLessThan %19, %2 : i32
+    %22 = spv.SLessThan %21, %2 : i32
+    %23 = spv.SLessThan %19, %3 : i32
     %24 = spv.LogicalAnd %22, %23 : i1
     spv.mlir.selection {
       spv.BranchConditional %24, ^bb1, ^bb2
@@ -1913,8 +1913,8 @@ spv.module Logical GLSL450 {
       %26 = spv.IAdd %16, %19 : i32
       %27 = spv.IMul %25, %6 : i32
       %28 = spv.IAdd %27, %26 : i32
-      %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-      spv.Store "StorageBuffer" %29, %0 : f32
+      %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+      spv.Store "StorageBuffer" %29, %1 : f32
       spv.Branch ^bb2
     ^bb2:  // 2 preds: ^bb0, ^bb1
       spv.mlir.merge
@@ -1923,29 +1923,29 @@ spv.module Logical GLSL450 {
       spv.BranchConditional %24, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       spv.mlir.loop {
-        spv.Branch ^bb1(%5 : i32)
+        spv.Branch ^bb1(%4 : i32)
       ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-        %26 = spv.SLessThan %25, %4 : i32
+        %26 = spv.SLessThan %25, %0 : i32
         spv.BranchConditional %26, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
         %27 = spv.IAdd %15, %21 : i32
-        %28 = spv.IMul %27, %4 : i32
+        %28 = spv.IMul %27, %0 : i32
         %29 = spv.IAdd %28, %25 : i32
-        %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %31 = spv.Load "StorageBuffer" %30 : f32
         %32 = spv.IAdd %16, %19 : i32
         %33 = spv.IMul %25, %6 : i32
         %34 = spv.IAdd %33, %32 : i32
-        %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %36 = spv.Load "StorageBuffer" %35 : f32
         %37 = spv.IMul %27, %6 : i32
         %38 = spv.IAdd %37, %32 : i32
-        %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %40 = spv.Load "StorageBuffer" %39 : f32
         %41 = spv.FMul %31, %36 : f32
         %42 = spv.FAdd %40, %41 : f32
         spv.Store "StorageBuffer" %39, %42 : f32
-        %43 = spv.IAdd %25, %3 : i32
+        %43 = spv.IAdd %25, %5 : i32
         spv.Branch ^bb1(%43 : i32)
       ^bb3:  // pred: ^bb1
         spv.mlir.merge
@@ -1966,34 +1966,34 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" {
-    %0 = spv.Constant 0.000000e+00 : f32
-    %1 = spv.Constant 8 : i32
-    %2 = spv.Constant 16 : i32
-    %3 = spv.Constant 1 : i32
-    %4 = spv.Constant 1024 : i32
-    %5 = spv.Constant 0 : i32
+    %0 = spv.Constant 1024 : i32
+    %1 = spv.Constant 0.000000e+00 : f32
+    %2 = spv.Constant 8 : i32
+    %3 = spv.Constant 16 : i32
+    %4 = spv.Constant 0 : i32
+    %5 = spv.Constant 1 : i32
     %6 = spv.Constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
     %13 = spv.Load "Input" %10 : vector<3xi32>
     %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-    %15 = spv.IMul %14, %1 : i32
-    %16 = spv.IMul %12, %2 : i32
+    %15 = spv.IMul %14, %2 : i32
+    %16 = spv.IMul %12, %3 : i32
     %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %18 = spv.Load "Input" %17 : vector<3xi32>
     %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
     %20 = spv.Load "Input" %17 : vector<3xi32>
     %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-    %22 = spv.SLessThan %21, %1 : i32
-    %23 = spv.SLessThan %19, %2 : i32
+    %22 = spv.SLessThan %21, %2 : i32
+    %23 = spv.SLessThan %19, %3 : i32
     %24 = spv.LogicalAnd %22, %23 : i1
     spv.mlir.selection {
       spv.BranchConditional %24, ^bb1, ^bb2
@@ -2002,8 +2002,8 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
       %26 = spv.IAdd %16, %19 : i32
       %27 = spv.IMul %25, %6 : i32
       %28 = spv.IAdd %27, %26 : i32
-      %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-      spv.Store "StorageBuffer" %29, %0 : f32
+      %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+      spv.Store "StorageBuffer" %29, %1 : f32
       spv.Branch ^bb2
     ^bb2:  // 2 preds: ^bb0, ^bb1
       spv.mlir.merge
@@ -2012,29 +2012,29 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
       spv.BranchConditional %24, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       spv.mlir.loop {
-        spv.Branch ^bb1(%5 : i32)
+        spv.Branch ^bb1(%4 : i32)
       ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-        %26 = spv.SLessThan %25, %4 : i32
+        %26 = spv.SLessThan %25, %0 : i32
         spv.BranchConditional %26, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
         %27 = spv.IAdd %15, %21 : i32
-        %28 = spv.IMul %27, %4 : i32
+        %28 = spv.IMul %27, %0 : i32
         %29 = spv.IAdd %28, %25 : i32
-        %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %31 = spv.Load "StorageBuffer" %30 : f32
         %32 = spv.IAdd %16, %19 : i32
         %33 = spv.IMul %25, %6 : i32
         %34 = spv.IAdd %33, %32 : i32
-        %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %36 = spv.Load "StorageBuffer" %35 : f32
         %37 = spv.IMul %27, %6 : i32
         %38 = spv.IAdd %37, %32 : i32
-        %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %40 = spv.Load "StorageBuffer" %39 : f32
         %41 = spv.FMul %31, %36 : f32
         %42 = spv.FAdd %40, %41 : f32
         spv.Store "StorageBuffer" %39, %42 : f32
-        %43 = spv.IAdd %25, %3 : i32
+        %43 = spv.IAdd %25, %5 : i32
         spv.Branch ^bb1(%43 : i32)
       ^bb3:  // pred: ^bb1
         spv.mlir.merge
@@ -2066,34 +2066,34 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
     spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
       spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
       spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-      spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-      spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-      spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
       spv.func @dot_ex_dispatch_0() "None" {
-        %0 = spv.Constant 0.000000e+00 : f32
-        %1 = spv.Constant 8 : i32
-        %2 = spv.Constant 16 : i32
-        %3 = spv.Constant 1 : i32
-        %4 = spv.Constant 1024 : i32
-        %5 = spv.Constant 0 : i32
+        %0 = spv.Constant 1024 : i32
+        %1 = spv.Constant 0.000000e+00 : f32
+        %2 = spv.Constant 8 : i32
+        %3 = spv.Constant 16 : i32
+        %4 = spv.Constant 0 : i32
+        %5 = spv.Constant 1 : i32
         %6 = spv.Constant 64 : i32
-        %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-        %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-        %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+        %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+        %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+        %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
         %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
         %11 = spv.Load "Input" %10 : vector<3xi32>
         %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
         %13 = spv.Load "Input" %10 : vector<3xi32>
         %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-        %15 = spv.IMul %14, %1 : i32
-        %16 = spv.IMul %12, %2 : i32
+        %15 = spv.IMul %14, %2 : i32
+        %16 = spv.IMul %12, %3 : i32
         %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
         %18 = spv.Load "Input" %17 : vector<3xi32>
         %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
         %20 = spv.Load "Input" %17 : vector<3xi32>
         %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-        %22 = spv.SLessThan %21, %1 : i32
-        %23 = spv.SLessThan %19, %2 : i32
+        %22 = spv.SLessThan %21, %2 : i32
+        %23 = spv.SLessThan %19, %3 : i32
         %24 = spv.LogicalAnd %22, %23 : i1
         spv.mlir.selection {
           spv.BranchConditional %24, ^bb1, ^bb2
@@ -2102,8 +2102,8 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
           %26 = spv.IAdd %16, %19 : i32
           %27 = spv.IMul %25, %6 : i32
           %28 = spv.IAdd %27, %26 : i32
-          %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-          spv.Store "StorageBuffer" %29, %0 : f32
+          %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          spv.Store "StorageBuffer" %29, %1 : f32
           spv.Branch ^bb2
         ^bb2:  // 2 preds: ^bb0, ^bb1
           spv.mlir.merge
@@ -2112,29 +2112,29 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
           spv.BranchConditional %24, ^bb1, ^bb2
         ^bb1:  // pred: ^bb0
           spv.mlir.loop {
-            spv.Branch ^bb1(%5 : i32)
+            spv.Branch ^bb1(%4 : i32)
           ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-            %26 = spv.SLessThan %25, %4 : i32
+            %26 = spv.SLessThan %25, %0 : i32
             spv.BranchConditional %26, ^bb2, ^bb3
           ^bb2:  // pred: ^bb1
             %27 = spv.IAdd %15, %21 : i32
-            %28 = spv.IMul %27, %4 : i32
+            %28 = spv.IMul %27, %0 : i32
             %29 = spv.IAdd %28, %25 : i32
-            %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
             %31 = spv.Load "StorageBuffer" %30 : f32
             %32 = spv.IAdd %16, %19 : i32
             %33 = spv.IMul %25, %6 : i32
             %34 = spv.IAdd %33, %32 : i32
-            %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
             %36 = spv.Load "StorageBuffer" %35 : f32
             %37 = spv.IMul %27, %6 : i32
             %38 = spv.IAdd %37, %32 : i32
-            %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
             %40 = spv.Load "StorageBuffer" %39 : f32
             %41 = spv.FMul %31, %36 : f32
             %42 = spv.FAdd %40, %41 : f32
             spv.Store "StorageBuffer" %39, %42 : f32
-            %43 = spv.IAdd %25, %3 : i32
+            %43 = spv.IAdd %25, %5 : i32
             spv.Branch ^bb1(%43 : i32)
           ^bb3:  // pred: ^bb1
             spv.mlir.merge
@@ -2180,34 +2180,34 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
-            %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
+            %0 = spv.Constant 1024 : i32
+            %1 = spv.Constant 0.000000e+00 : f32
+            %2 = spv.Constant 8 : i32
+            %3 = spv.Constant 16 : i32
+            %4 = spv.Constant 0 : i32
+            %5 = spv.Constant 1 : i32
             %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %2 : i32
+            %16 = spv.IMul %12, %3 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
+            %22 = spv.SLessThan %21, %2 : i32
+            %23 = spv.SLessThan %19, %3 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
             spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
@@ -2216,8 +2216,8 @@ module  {
               %26 = spv.IAdd %16, %19 : i32
               %27 = spv.IMul %25, %6 : i32
               %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
+              %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              spv.Store "StorageBuffer" %29, %1 : f32
               spv.Branch ^bb2
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
@@ -2226,29 +2226,29 @@ module  {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%4 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-                %26 = spv.SLessThan %25, %4 : i32
+                %26 = spv.SLessThan %25, %0 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
                 %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
+                %28 = spv.IMul %27, %0 : i32
                 %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %31 = spv.Load "StorageBuffer" %30 : f32
                 %32 = spv.IAdd %16, %19 : i32
                 %33 = spv.IMul %25, %6 : i32
                 %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %36 = spv.Load "StorageBuffer" %35 : f32
                 %37 = spv.IMul %27, %6 : i32
                 %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %40 = spv.Load "StorageBuffer" %39 : f32
                 %41 = spv.FMul %31, %36 : f32
                 %42 = spv.FAdd %40, %41 : f32
                 spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
+                %43 = spv.IAdd %25, %5 : i32
                 spv.Branch ^bb1(%43 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
@@ -2378,13 +2378,13 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ### IR Dump After Canonicalizer
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
-  %c1 = constant 1 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
+  %c2048 = constant 2048 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -2410,13 +2410,13 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ### IR Dump After CSE
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
-  %c1 = constant 1 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
+  %c2048 = constant 2048 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -2462,34 +2462,34 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
-            %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
+            %0 = spv.Constant 1024 : i32
+            %1 = spv.Constant 0.000000e+00 : f32
+            %2 = spv.Constant 8 : i32
+            %3 = spv.Constant 16 : i32
+            %4 = spv.Constant 0 : i32
+            %5 = spv.Constant 1 : i32
             %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %2 : i32
+            %16 = spv.IMul %12, %3 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
+            %22 = spv.SLessThan %21, %2 : i32
+            %23 = spv.SLessThan %19, %3 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
             spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
@@ -2498,8 +2498,8 @@ module  {
               %26 = spv.IAdd %16, %19 : i32
               %27 = spv.IMul %25, %6 : i32
               %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
+              %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              spv.Store "StorageBuffer" %29, %1 : f32
               spv.Branch ^bb2
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
@@ -2508,29 +2508,29 @@ module  {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%4 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-                %26 = spv.SLessThan %25, %4 : i32
+                %26 = spv.SLessThan %25, %0 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
                 %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
+                %28 = spv.IMul %27, %0 : i32
                 %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %31 = spv.Load "StorageBuffer" %30 : f32
                 %32 = spv.IAdd %16, %19 : i32
                 %33 = spv.IMul %25, %6 : i32
                 %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %36 = spv.Load "StorageBuffer" %35 : f32
                 %37 = spv.IMul %27, %6 : i32
                 %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %40 = spv.Load "StorageBuffer" %39 : f32
                 %41 = spv.FMul %31, %36 : f32
                 %42 = spv.FAdd %40, %41 : f32
                 spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
+                %43 = spv.IAdd %25, %5 : i32
                 spv.Branch ^bb1(%43 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
@@ -2553,13 +2553,13 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-    %c2048 = constant 2048 : index
-    %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
-    %c1 = constant 1 : index
+    %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
+    %c2048 = constant 2048 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -2629,34 +2629,34 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
-            %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
+            %0 = spv.Constant 1024 : i32
+            %1 = spv.Constant 0.000000e+00 : f32
+            %2 = spv.Constant 8 : i32
+            %3 = spv.Constant 16 : i32
+            %4 = spv.Constant 0 : i32
+            %5 = spv.Constant 1 : i32
             %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %2 : i32
+            %16 = spv.IMul %12, %3 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
+            %22 = spv.SLessThan %21, %2 : i32
+            %23 = spv.SLessThan %19, %3 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
             spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
@@ -2665,8 +2665,8 @@ module  {
               %26 = spv.IAdd %16, %19 : i32
               %27 = spv.IMul %25, %6 : i32
               %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
+              %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              spv.Store "StorageBuffer" %29, %1 : f32
               spv.Branch ^bb2
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
@@ -2675,29 +2675,29 @@ module  {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%4 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-                %26 = spv.SLessThan %25, %4 : i32
+                %26 = spv.SLessThan %25, %0 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
                 %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
+                %28 = spv.IMul %27, %0 : i32
                 %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %31 = spv.Load "StorageBuffer" %30 : f32
                 %32 = spv.IAdd %16, %19 : i32
                 %33 = spv.IMul %25, %6 : i32
                 %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %36 = spv.Load "StorageBuffer" %35 : f32
                 %37 = spv.IMul %27, %6 : i32
                 %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %40 = spv.Load "StorageBuffer" %39 : f32
                 %41 = spv.FMul %31, %36 : f32
                 %42 = spv.FAdd %40, %41 : f32
                 spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
+                %43 = spv.IAdd %25, %5 : i32
                 spv.Branch ^bb1(%43 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
@@ -2720,13 +2720,13 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-    %c2048 = constant 2048 : index
-    %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
-    %c1 = constant 1 : index
+    %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
+    %c2048 = constant 2048 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -2793,34 +2793,34 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
-            %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
+            %0 = spv.Constant 1024 : i32
+            %1 = spv.Constant 0.000000e+00 : f32
+            %2 = spv.Constant 8 : i32
+            %3 = spv.Constant 16 : i32
+            %4 = spv.Constant 0 : i32
+            %5 = spv.Constant 1 : i32
             %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %2 : i32
+            %16 = spv.IMul %12, %3 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
+            %22 = spv.SLessThan %21, %2 : i32
+            %23 = spv.SLessThan %19, %3 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
             spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
@@ -2829,8 +2829,8 @@ module  {
               %26 = spv.IAdd %16, %19 : i32
               %27 = spv.IMul %25, %6 : i32
               %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
+              %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              spv.Store "StorageBuffer" %29, %1 : f32
               spv.Branch ^bb2
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
@@ -2839,29 +2839,29 @@ module  {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%4 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-                %26 = spv.SLessThan %25, %4 : i32
+                %26 = spv.SLessThan %25, %0 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
                 %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
+                %28 = spv.IMul %27, %0 : i32
                 %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %31 = spv.Load "StorageBuffer" %30 : f32
                 %32 = spv.IAdd %16, %19 : i32
                 %33 = spv.IMul %25, %6 : i32
                 %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %36 = spv.Load "StorageBuffer" %35 : f32
                 %37 = spv.IMul %27, %6 : i32
                 %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %40 = spv.Load "StorageBuffer" %39 : f32
                 %41 = spv.FMul %31, %36 : f32
                 %42 = spv.FAdd %40, %41 : f32
                 spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
+                %43 = spv.IAdd %25, %5 : i32
                 spv.Branch ^bb1(%43 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
@@ -2884,13 +2884,13 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-    %c2048 = constant 2048 : index
-    %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
-    %c1 = constant 1 : index
+    %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
+    %c2048 = constant 2048 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -2940,13 +2940,13 @@ module  {
 ### IR Dump After Canonicalizer
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-  %c2048 = constant 2048 : index
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
-  %c1 = constant 1 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
+  %c2048 = constant 2048 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -2972,13 +2972,13 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ### IR Dump After CSE
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-  %c2048 = constant 2048 : index
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
-  %c1 = constant 1 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
+  %c2048 = constant 2048 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -3111,34 +3111,34 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
-            %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
+            %0 = spv.Constant 1024 : i32
+            %1 = spv.Constant 0.000000e+00 : f32
+            %2 = spv.Constant 8 : i32
+            %3 = spv.Constant 16 : i32
+            %4 = spv.Constant 0 : i32
+            %5 = spv.Constant 1 : i32
             %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %2 : i32
+            %16 = spv.IMul %12, %3 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
+            %22 = spv.SLessThan %21, %2 : i32
+            %23 = spv.SLessThan %19, %3 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
             spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
@@ -3147,8 +3147,8 @@ module  {
               %26 = spv.IAdd %16, %19 : i32
               %27 = spv.IMul %25, %6 : i32
               %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
+              %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              spv.Store "StorageBuffer" %29, %1 : f32
               spv.Branch ^bb2
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
@@ -3157,29 +3157,29 @@ module  {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%4 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-                %26 = spv.SLessThan %25, %4 : i32
+                %26 = spv.SLessThan %25, %0 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
                 %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
+                %28 = spv.IMul %27, %0 : i32
                 %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %31 = spv.Load "StorageBuffer" %30 : f32
                 %32 = spv.IAdd %16, %19 : i32
                 %33 = spv.IMul %25, %6 : i32
                 %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %36 = spv.Load "StorageBuffer" %35 : f32
                 %37 = spv.IMul %27, %6 : i32
                 %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %40 = spv.Load "StorageBuffer" %39 : f32
                 %41 = spv.FMul %31, %36 : f32
                 %42 = spv.FAdd %40, %41 : f32
                 spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
+                %43 = spv.IAdd %25, %5 : i32
                 spv.Branch ^bb1(%43 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
@@ -3202,13 +3202,13 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-    %c2048 = constant 2048 : index
-    %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
-    %c1 = constant 1 : index
+    %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
+    %c2048 = constant 2048 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -3300,13 +3300,13 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-  %c2048 = constant 2048 : index
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
-  %c1 = constant 1 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
+  %c2048 = constant 2048 : index
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -3416,34 +3416,34 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
-            %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
+            %0 = spv.Constant 1024 : i32
+            %1 = spv.Constant 0.000000e+00 : f32
+            %2 = spv.Constant 8 : i32
+            %3 = spv.Constant 16 : i32
+            %4 = spv.Constant 0 : i32
+            %5 = spv.Constant 1 : i32
             %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %2 : i32
+            %16 = spv.IMul %12, %3 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
+            %22 = spv.SLessThan %21, %2 : i32
+            %23 = spv.SLessThan %19, %3 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
             spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
@@ -3452,8 +3452,8 @@ module  {
               %26 = spv.IAdd %16, %19 : i32
               %27 = spv.IMul %25, %6 : i32
               %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
+              %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              spv.Store "StorageBuffer" %29, %1 : f32
               spv.Branch ^bb2
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
@@ -3462,29 +3462,29 @@ module  {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%4 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-                %26 = spv.SLessThan %25, %4 : i32
+                %26 = spv.SLessThan %25, %0 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
                 %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
+                %28 = spv.IMul %27, %0 : i32
                 %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %31 = spv.Load "StorageBuffer" %30 : f32
                 %32 = spv.IAdd %16, %19 : i32
                 %33 = spv.IMul %25, %6 : i32
                 %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %36 = spv.Load "StorageBuffer" %35 : f32
                 %37 = spv.IMul %27, %6 : i32
                 %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %40 = spv.Load "StorageBuffer" %39 : f32
                 %41 = spv.FMul %31, %36 : f32
                 %42 = spv.FAdd %40, %41 : f32
                 spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
+                %43 = spv.IAdd %25, %5 : i32
                 spv.Branch ^bb1(%43 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
@@ -3507,13 +3507,13 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-    %c2048 = constant 2048 : index
-    %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
-    %c1 = constant 1 : index
+    %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
+    %c2048 = constant 2048 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -3622,34 +3622,34 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94246133136608__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246133136320__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94246132787216__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567980128__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744567977760__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94744566468224__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
-            %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
+            %0 = spv.Constant 1024 : i32
+            %1 = spv.Constant 0.000000e+00 : f32
+            %2 = spv.Constant 8 : i32
+            %3 = spv.Constant 16 : i32
+            %4 = spv.Constant 0 : i32
+            %5 = spv.Constant 1 : i32
             %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94246132787216__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94246133136320__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94246133136608__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94744566468224__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94744567977760__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94744567980128__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %2 : i32
+            %16 = spv.IMul %12, %3 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
+            %22 = spv.SLessThan %21, %2 : i32
+            %23 = spv.SLessThan %19, %3 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
             spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
@@ -3658,8 +3658,8 @@ module  {
               %26 = spv.IAdd %16, %19 : i32
               %27 = spv.IMul %25, %6 : i32
               %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
+              %29 = spv.AccessChain %7[%4, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              spv.Store "StorageBuffer" %29, %1 : f32
               spv.Branch ^bb2
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
@@ -3668,29 +3668,29 @@ module  {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%4 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-                %26 = spv.SLessThan %25, %4 : i32
+                %26 = spv.SLessThan %25, %0 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
                 %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
+                %28 = spv.IMul %27, %0 : i32
                 %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %30 = spv.AccessChain %8[%4, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %31 = spv.Load "StorageBuffer" %30 : f32
                 %32 = spv.IAdd %16, %19 : i32
                 %33 = spv.IMul %25, %6 : i32
                 %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %35 = spv.AccessChain %9[%4, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %36 = spv.Load "StorageBuffer" %35 : f32
                 %37 = spv.IMul %27, %6 : i32
                 %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                %39 = spv.AccessChain %7[%4, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
                 %40 = spv.Load "StorageBuffer" %39 : f32
                 %41 = spv.FMul %31, %36 : f32
                 %42 = spv.FAdd %40, %41 : f32
                 spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
+                %43 = spv.IAdd %25, %5 : i32
                 spv.Branch ^bb1(%43 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
@@ -3713,13 +3713,13 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-    %c2048 = constant 2048 : index
-    %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
-    %c1 = constant 1 : index
+    %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
+    %c2048 = constant 2048 : index
     %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
@@ -3923,12 +3923,12 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
 ### IR Dump After Canonicalizer
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %c4 = constant 4 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3954,12 +3954,12 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ### IR Dump After CSE
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %c4 = constant 4 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -3985,12 +3985,12 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %c4 = constant 4 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -4153,12 +4153,12 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-    %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
+    %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %c4 = constant 4 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
@@ -4254,12 +4254,12 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 ### IR Dump After Canonicalizer
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-  %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
+  %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %c4 = constant 4 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
@@ -4360,12 +4360,12 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
-    %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
+    %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %c4 = constant 4 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
@@ -4467,12 +4467,12 @@ module  {
       vm.return %0 : !vm.ref<!hal.executable>
     }
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-      %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
+      %c131072 = vm.const.i32 131072 : i32
       %c8192 = vm.const.i32 8192 : i32
-      %c2 = vm.const.i32 2 : i32
       %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %c4 = vm.const.i32 4 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -4624,12 +4624,12 @@ vm.module @module {
     vm.return %0 : !vm.ref<!hal.executable>
   }
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-    %c131072 = vm.const.i32 131072 : i32
     %c262144 = vm.const.i32 262144 : i32
+    %c131072 = vm.const.i32 131072 : i32
     %c8192 = vm.const.i32 8192 : i32
-    %c2 = vm.const.i32 2 : i32
     %zero = vm.const.i32.zero : i32
     %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
     %c4 = vm.const.i32 4 : i32
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -4780,12 +4780,12 @@ vm.module @module {
     vm.return %0 : !vm.ref<!hal.executable>
   }
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-    %c131072 = vm.const.i32 131072 : i32
     %c262144 = vm.const.i32 262144 : i32
+    %c131072 = vm.const.i32 131072 : i32
     %c8192 = vm.const.i32 8192 : i32
-    %c2 = vm.const.i32 2 : i32
     %zero = vm.const.i32.zero : i32
     %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
     %c4 = vm.const.i32 4 : i32
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -4949,18 +4949,18 @@ vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!h
 ### IR Dump After Canonicalizer
 ```
 vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-  %c131072 = vm.const.i32 131072 : i32
   %c262144 = vm.const.i32 262144 : i32
+  %c131072 = vm.const.i32 131072 : i32
   %c8192 = vm.const.i32 8192 : i32
+  %zero = vm.const.i32.zero : i32
+  %c1 = vm.const.i32 1 : i32
+  %c2 = vm.const.i32 2 : i32
   %c4 = vm.const.i32 4 : i32
   %c50 = vm.const.i32 50 : i32
   %c15 = vm.const.i32 15 : i32
-  %c1 = vm.const.i32 1 : i32
   %c3 = vm.const.i32 3 : i32
   %c20 = vm.const.i32 20 : i32
   %c5 = vm.const.i32 5 : i32
-  %zero = vm.const.i32.zero : i32
-  %c2 = vm.const.i32 2 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
   %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -5016,10 +5016,10 @@ vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_l
 ### IR Dump After Canonicalizer
 ```
 vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
-  %zero = vm.const.i32.zero : i32
   %c1 = vm.const.i32 1 : i32
-  %c2 = vm.const.i32 2 : i32
+  %zero = vm.const.i32.zero : i32
   %c7 = vm.const.i32 7 : i32
+  %c2 = vm.const.i32 2 : i32
   %c6 = vm.const.i32 6 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call.variadic @hal.descriptor_set_layout.create(%ref, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
@@ -5041,10 +5041,10 @@ vm.func private @_device_match_id_0_initializer() -> i32 {
 ```
 vm.func @__init() {
   %c1 = vm.const.i32 1 : i32
-  %c2 = vm.const.i32 2 : i32
-  %c7 = vm.const.i32 7 : i32
-  %c6 = vm.const.i32 6 : i32
   %zero = vm.const.i32.zero : i32
+  %c7 = vm.const.i32 7 : i32
+  %c2 = vm.const.i32 2 : i32
+  %c6 = vm.const.i32 6 : i32
   %c1397773893 = vm.const.i32 1397773893 : i32
   %null = vm.const.ref.zero : !vm.ref<!hal.executable>
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -5124,18 +5124,18 @@ vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!h
 ### IR Dump After Canonicalizer
 ```
 vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-  %c131072 = vm.const.i32 131072 : i32
   %c262144 = vm.const.i32 262144 : i32
+  %c131072 = vm.const.i32 131072 : i32
   %c8192 = vm.const.i32 8192 : i32
+  %zero = vm.const.i32.zero : i32
+  %c1 = vm.const.i32 1 : i32
+  %c2 = vm.const.i32 2 : i32
   %c4 = vm.const.i32 4 : i32
   %c50 = vm.const.i32 50 : i32
   %c15 = vm.const.i32 15 : i32
-  %c1 = vm.const.i32 1 : i32
   %c3 = vm.const.i32 3 : i32
   %c20 = vm.const.i32 20 : i32
   %c5 = vm.const.i32 5 : i32
-  %zero = vm.const.i32.zero : i32
-  %c2 = vm.const.i32 2 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
   %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -5168,18 +5168,18 @@ module  {
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
     vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spirv opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-      %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
+      %c131072 = vm.const.i32 131072 : i32
       %c8192 = vm.const.i32 8192 : i32
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %c4 = vm.const.i32 4 : i32
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
-      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
-      %zero = vm.const.i32.zero : i32
-      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -5281,10 +5281,10 @@ module  {
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
-      %c7 = vm.const.i32 7 : i32
-      %c6 = vm.const.i32 6 : i32
       %zero = vm.const.i32.zero : i32
+      %c7 = vm.const.i32 7 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c6 = vm.const.i32 6 : i32
       %c1397773893 = vm.const.i32 1397773893 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -5328,18 +5328,18 @@ module  {
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
     vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spirv opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-      %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
+      %c131072 = vm.const.i32 131072 : i32
       %c8192 = vm.const.i32 8192 : i32
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %c4 = vm.const.i32 4 : i32
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
-      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
-      %zero = vm.const.i32.zero : i32
-      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -5441,10 +5441,10 @@ module  {
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
-      %c7 = vm.const.i32 7 : i32
-      %c6 = vm.const.i32 6 : i32
       %zero = vm.const.i32.zero : i32
+      %c7 = vm.const.i32 7 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c6 = vm.const.i32 6 : i32
       %c1397773893 = vm.const.i32 1397773893 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -5488,18 +5488,18 @@ module  {
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
     vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spirv opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-      %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
+      %c131072 = vm.const.i32 131072 : i32
       %c8192 = vm.const.i32 8192 : i32
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %c4 = vm.const.i32 4 : i32
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
-      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
-      %zero = vm.const.i32.zero : i32
-      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -5582,10 +5582,10 @@ module  {
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
-      %c7 = vm.const.i32 7 : i32
-      %c6 = vm.const.i32 6 : i32
       %zero = vm.const.i32.zero : i32
+      %c7 = vm.const.i32 7 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c6 = vm.const.i32 6 : i32
       %c1397773893 = vm.const.i32 1397773893 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -5639,8 +5639,8 @@ vm.module @module {
     %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
     vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-    %c131072 = vm.const.i32 131072 : i32
     %c262144 = vm.const.i32 262144 : i32
+    %c131072 = vm.const.i32 131072 : i32
     %zero = vm.const.i32.zero : i32
     %c2 = vm.const.i32 2 : i32
     vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_2, %_executable_layout_0, %zero, [(%zero, %arg0, %zero, %c131072), (%c1, %arg1, %zero, %c262144), (%c2, %ref_1, %zero, %c8192)]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...)
@@ -5727,10 +5727,10 @@ vm.module @module {
     vm.global.store.i32 %0, @_device_match_id_0 : i32
     %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %c1 = vm.const.i32 1 : i32
-    %c2 = vm.const.i32 2 : i32
-    %c7 = vm.const.i32 7 : i32
-    %c6 = vm.const.i32 6 : i32
     %zero = vm.const.i32.zero : i32
+    %c7 = vm.const.i32 7 : i32
+    %c2 = vm.const.i32 2 : i32
+    %c6 = vm.const.i32 6 : i32
     %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
     vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
     %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
@@ -5779,8 +5779,8 @@ module  {
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
+      %c131072 = vm.const.i32 131072 : i32
       %zero = vm.const.i32.zero : i32
       %c2 = vm.const.i32 2 : i32
       vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_2, %_executable_layout_0, %zero, [(%zero, %arg0, %zero, %c131072), (%c1, %arg1, %zero, %c262144), (%c2, %ref_1, %zero, %c8192)]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...)
@@ -5867,10 +5867,10 @@ module  {
       vm.global.store.i32 %0, @_device_match_id_0 : i32
       %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
-      %c7 = vm.const.i32 7 : i32
-      %c6 = vm.const.i32 6 : i32
       %zero = vm.const.i32.zero : i32
+      %c7 = vm.const.i32 7 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c6 = vm.const.i32 6 : i32
       %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
       vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
       %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>

@@ -80,7 +80,7 @@ $ cmake -G Ninja -B ../iree-build-host/ -DCMAKE_INSTALL_PREFIX=../iree-build-hos
 $ cmake --build ../iree-build-host/ --target install
 ```
 
-Debugging note: 
+Debugging note:
   * If `IREE_LLVMAOT_LINKER_PATH` is set for targeting Android then
 the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
   * If you experience the build error similar to issue [#4915](https://github.com/google/iree/issues/4915), update the cmake configuration CLI to
@@ -155,7 +155,7 @@ Translate a source MLIR into IREE module:
 $ ../iree-build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmla \
-  $PWD/iree/tools/test/simple.mlir \
+  $PWD/iree/tools/test/iree-run-module.mlir \
   -o /tmp/simple-vmla.vmfb
 ```
 
@@ -193,7 +193,7 @@ Translate a source MLIR into IREE module:
 $ ../iree-build-host/install/bin/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
-    $PWD/iree/tools/test/simple.mlir \
+    $PWD/iree/tools/test/iree-run-module.mlir \
     -o /tmp/simple-vulkan.vmfb
 ```
 
@@ -270,7 +270,7 @@ $ ../iree-build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=aarch64-linux-android \
-  $PWD/iree/tools/test/simple.mlir \
+  $PWD/iree/tools/test/iree-run-module.mlir \
   -o /tmp/simple-llvm_aot.vmfb
 ```
 
