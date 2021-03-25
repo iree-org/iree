@@ -14,6 +14,10 @@
 
 iree_add_all_subdirs()
 
+if(${IREE_BUILD_BINDINGS_TFLITE_JAVA})
+  add_subdirectory(java/com/google/iree)
+endif()
+
 iree_cc_library(
   NAME
     shim
