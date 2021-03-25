@@ -304,7 +304,7 @@ class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
 class ElementwiseLowering : public RewritePattern {
  public:
   ElementwiseLowering(MLIRContext *context)
-      : RewritePattern(0, MatchAnyOpTypeTag()) {}
+      : RewritePattern(MatchAnyOpTypeTag(), 0, context) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {

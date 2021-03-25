@@ -597,10 +597,11 @@ namespace {
 struct TileAndDistributeOnTensorsPattern
     : public linalg::LinalgBaseTilingPattern {
   using Base = linalg::LinalgBaseTilingPattern;
-  TileAndDistributeOnTensorsPattern(linalg::LinalgTilingOptions options,
+  TileAndDistributeOnTensorsPattern(MLIRContext *context,
+                                    linalg::LinalgTilingOptions options,
                                     linalg::LinalgTransformationFilter marker,
                                     PatternBenefit benefit = 1)
-      : Base(options, marker, benefit) {}
+      : Base(context, options, marker, benefit) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
@@ -706,8 +707,8 @@ static Optional<SmallVector<Value, 4>> getResultShape(PatternRewriter &rewriter,
 /// element-wise operations is not beneficial. These are handled appropriately
 /// by the backends.
 struct MakeDispatchWorkgroupsOp : public RewritePattern {
-  MakeDispatchWorkgroupsOp(PatternBenefit benefit = 1)
-      : RewritePattern(benefit, MatchAnyOpTypeTag()) {}
+  MakeDispatchWorkgroupsOp(MLIRContext *context, PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
@@ -942,7 +943,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     assert(linalgTilingOptions.distribution.hasValue());
 
     patterns.insert<TileAndDistributeOnTensorsPattern>(
-        linalgTilingOptions,
+        context, linalgTilingOptions,
         // TODO(nicolavasilache): use refactored `getWorkgroupMarker()`
         linalg::LinalgTransformationFilter(
             ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
@@ -965,8 +966,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Move other operations into their own dispatch regions.
   {
-    OwningRewritePatternList patterns(&getContext());
-    patterns.insert<MakeDispatchWorkgroupsOp>();
+    OwningRewritePatternList patterns(context);
+    patterns.insert<MakeDispatchWorkgroupsOp>(context);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
