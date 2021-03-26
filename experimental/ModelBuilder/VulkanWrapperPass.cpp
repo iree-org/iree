@@ -88,7 +88,7 @@ void AddVulkanLaunchWrapper::runOnOperation() {
 }
 
 LogicalResult AddVulkanLaunchWrapper::declareVulkanLaunchFunc(Location loc) {
-  OpBuilder builder(getOperation().getBody()->getTerminator());
+  auto builder = OpBuilder::atBlockEnd(getOperation().getBody());
 
   SmallVector<Type, 8> vulkanLaunchTypes(3, builder.getIndexType());
   vulkanLaunchTypes.insert(vulkanLaunchTypes.end(), args.begin(), args.end());

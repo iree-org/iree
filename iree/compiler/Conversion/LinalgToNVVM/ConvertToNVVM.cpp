@@ -175,10 +175,8 @@ struct ConvertToNVVMPass
     ModuleOp m = getOperation();
 
     /// Customize the bitwidth used for the device side index computations.
-    LowerToLLVMOptions options = {/*useBarePtrCallConv =*/false,
-                                  /*emitCWrappers =*/false,
-                                  /*indexBitwidth =*/64,
-                                  /*useAlignedAlloc =*/false};
+    LowerToLLVMOptions options(m.getContext(), DataLayout(m));
+    options.overrideIndexBitwidth(64);
     LLVMTypeConverter converter(m.getContext(), options);
     // Apply in-dialect lowering first. In-dialect lowering will replace ops
     // which need to be lowered further, which is not supported by a single

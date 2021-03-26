@@ -194,8 +194,7 @@ func @two_dispatches(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tensor<?x?xf
 //       CHECK:          flow.dispatch.tensor.store %[[RESULT]], %[[ARG5]]
 //       CHECK:          flow.return
 //       CHECK:     }
-//   CHECK-DAG:     %[[M_2:.+]] = memref.dim %[[RESULT1]], %[[C0]]
-//       CHECK:     flow.dispatch.workgroups[%[[N]], %[[M_2]], %[[C1]]]
+//       CHECK:     flow.dispatch.workgroups[%[[N]], %[[M]], %[[C1]]]
 //       CHECK:       %[[ZERO:.+]] = constant 0.0
 //       CHECK:       scf.for
 //       CHECK:         scf.for

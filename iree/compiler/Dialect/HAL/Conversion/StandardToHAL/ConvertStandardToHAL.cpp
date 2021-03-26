@@ -28,7 +28,7 @@ void populateStandardStructuralToHALPatterns(MLIRContext *context,
 void setupStandardToHALLegality(MLIRContext *context,
                                 ConversionTarget &conversionTarget,
                                 TypeConverter &typeConverter) {
-  conversionTarget.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
+  conversionTarget.addLegalOp<mlir::ModuleOp>();
 
   // We need to rewrite certain types on operands/results so use the default
   // dynamic legality checker to force any ops using such types to run through

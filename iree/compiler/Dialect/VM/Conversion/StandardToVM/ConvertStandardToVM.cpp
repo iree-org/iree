@@ -23,6 +23,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -54,23 +55,9 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
       rewriter.eraseBlock(&block);
     }
     rewriter.replaceOp(srcOp, {});
-    return success();
-  }
-};
-
-class ModuleTerminatorOpConversion
-    : public OpConversionPattern<ModuleTerminatorOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      ModuleTerminatorOp srcOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    // Do not attempt to convert the top level module's terminator.
-    // This mechanism can only support rewriting non top-level modules.
-    if (!isa<IREE::VM::ModuleOp>(srcOp->getParentOp())) {
-      return failure();
-    }
-    rewriter.replaceOpWithNewOp<IREE::VM::ModuleTerminatorOp>(srcOp);
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToEnd(&newModuleOp.getBodyRegion().front());
+    rewriter.create<IREE::VM::ModuleTerminatorOp>(srcOp.getLoc());
     return success();
   }
 };
@@ -397,8 +384,7 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                   TypeConverter &typeConverter,
                                   OwningRewritePatternList &patterns) {
   patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
-                  CondBranchOpConversion, ModuleOpConversion,
-                  ModuleTerminatorOpConversion, FuncOpConversion,
+                  CondBranchOpConversion, ModuleOpConversion, FuncOpConversion,
                   ReturnOpConversion, CastingOpConversion<IndexCastOp>,
                   CastingOpConversion<TruncateIOp>, SelectI32OpConversion>(
       typeConverter, context);
