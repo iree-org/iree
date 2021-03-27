@@ -45,10 +45,12 @@ def detect_unix_platform_config(bazelrc):
     else:
       print(
           "WARNING: CC and CXX are not set, which can cause mismatches between "
-          "flag configurations and compiler. Recommend setting them explicitly.")
+          "flag configurations and compiler. Recommend setting them explicitly."
+      )
 
     if cxx is not None and "clang" in cxx:
-      print(f"Choosing generic_clang config because CXX is set to clang ({cxx})")
+      print(
+          f"Choosing generic_clang config because CXX is set to clang ({cxx})")
       print(f"build --config=generic_clang", file=bazelrc)
       print(f"build:release --config=generic_clang_release", file=bazelrc)
     else:
@@ -56,6 +58,7 @@ def detect_unix_platform_config(bazelrc):
             f"not recognized as clang ({cxx})")
       print(f"build --config=generic_gcc", file=bazelrc)
       print(f"build:release --config=generic_gcc_release", file=bazelrc)
+
 
 def write_platform(bazelrc):
   if platform.system() == "Windows":
