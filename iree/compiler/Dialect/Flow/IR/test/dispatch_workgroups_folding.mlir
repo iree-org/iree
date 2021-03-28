@@ -73,9 +73,9 @@ func @convertDimOfDispatchInputLoadToDispatchShape(%arg0: !flow.dispatch.tensor<
 
 // -----
 
-// CHECK-LABEL: @inlineWithTiedResults
+// CHECK-LABEL: @inlineWithTiedResults1
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
-func @inlineWithTiedResults(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
+func @inlineWithTiedResults1(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
   // CHECK-NOT: constant 128
   %cst = constant 128 : index
   // CHECK-DAG: %[[X:.+]] = constant 100
@@ -87,6 +87,33 @@ func @inlineWithTiedResults(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
   %0 = flow.dispatch.workgroups[%x, %y](%cst, %arg0) : (index, tensor<1x4xf32>) -> %arg0 = (
     %cst_capture: index,
     %arg0_capture: !flow.dispatch.tensor<readwrite:1x4xf32>
+  ) {
+    //      CHECK: %[[INLINED_CST:.+]] = constant 128 : index
+    // CHECK-NEXT: "test.sink"(%[[INLINED_CST]])
+    "test.sink"(%cst_capture) : (index) -> ()
+    // CHECK-NEXT: "test.sink"(%[[ARG0_INNER]])
+    "test.sink"(%arg0_capture) : (!flow.dispatch.tensor<readwrite:1x4xf32>) -> ()
+    flow.return
+  }
+  return %0 : tensor<1x4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @inlineWithTiedResults2
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
+func @inlineWithTiedResults2(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
+  // CHECK-NOT: constant 128
+  %cst = constant 128 : index
+  // CHECK-DAG: %[[X:.+]] = constant 100
+  %x = constant 100 : index
+  // CHECK-DAG: %[[Y:.+]] = constant 50
+  %y = constant 50 : index
+  //      CHECK: flow.dispatch.workgroups[%[[X]], %[[Y]]](%[[ARG0]]) : (tensor<1x4xf32>) -> %[[ARG0]] =
+  // CHECK-NEXT:   (%[[ARG0_INNER:.+]]: !flow.dispatch.tensor<readwrite:1x4xf32>)
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0, %cst) : (tensor<1x4xf32>, index) -> %arg0 = (
+    %arg0_capture: !flow.dispatch.tensor<readwrite:1x4xf32>,
+    %cst_capture: index
   ) {
     //      CHECK: %[[INLINED_CST:.+]] = constant 128 : index
     // CHECK-NEXT: "test.sink"(%[[INLINED_CST]])
