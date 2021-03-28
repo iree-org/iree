@@ -335,7 +335,7 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 /// Order the operations such that they could be inlined into the dispatch
 /// region in that order to satisfy dependencies.
 static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
-  LLVM_DEBUG({
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "Ops to be inlined : \n";
     for (auto op : ops) {
       llvm::dbgs() << "\t";
@@ -384,7 +384,7 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   readyOps.assign(leafOps.begin(), leafOps.end());
   while (!readyOps.empty()) {
     SmallVector<Operation *> nextReadyOps;
-    LLVM_DEBUG({
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "ReadyOps :\n";
       for (auto readyOp : readyOps) {
         llvm::dbgs() << "\t";
@@ -411,7 +411,7 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
     std::swap(nextReadyOps, readyOps);
   }
 
-  LLVM_DEBUG({
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "Ops to be inlined (sorted) : \n";
     for (auto op : orderedOps) {
       llvm::dbgs() << "\t";
