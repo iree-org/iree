@@ -460,6 +460,11 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
   // The cloned operations form a DAG. Return the cloned operations so the
   // leaves come first, and can be cloned in-order into the dispatch region.
   clonedOps = orderOperations(clonedOps);
+  // Reverse the values. This is not for correctness, but more for readability
+  // of the IR.
+  llvm::SetVector<Value> reversedValues;
+  reversedValues.insert(valuesDefinedAbove.rbegin(), valuesDefinedAbove.rend());
+  std::swap(reversedValues, valuesDefinedAbove);
 }
 
 /// Modifies `dispatchOp` to attach operand-result tie information when
