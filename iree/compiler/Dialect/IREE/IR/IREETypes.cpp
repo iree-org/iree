@@ -211,33 +211,38 @@ void excludeTiedOperandAndResultIndices(
   // the indices by - if 2 operands before operand N were removed then we know
   // it needs to be -2. This is nasty but that's why we have this helper
   // function.
-  llvm::BitVector excludedOperands(
-      *std::max_element(excludedOperandIndices.begin(),
-                        excludedOperandIndices.end()) +
-          1,
-      false);
+  unsigned numBits = 1;
+  if (!excludedOperandIndices.empty()) {
+    numBits += *std::max_element(excludedOperandIndices.begin(),
+                                 excludedOperandIndices.end());
+  }
+  llvm::BitVector excludedOperands(numBits, false);
   for (unsigned i = 0; i < excludedOperandIndices.size(); ++i) {
     excludedOperands[excludedOperandIndices[i]] = true;
   }
 
   for (auto it : llvm::enumerate(oldTiedOperandIndices)) {
     unsigned resultIndex = it.index();
-    if (llvm::count(excludedResultIndices, resultIndex)) {
+    if (llvm::is_contained(excludedResultIndices, resultIndex)) {
       continue;  // result removed
     }
 
     int64_t tiedOperandIndex = it.value();
     if (tiedOperandIndex != TiedOpInterface::kUntiedIndex) {
+      // Check whether this operand is removed. If so, untie. We need to do this
+      // before calculating the new operand index given `excludedOperandIndices`
+      // contains the old indices.
+      if (llvm::is_contained(excludedOperandIndices, tiedOperandIndex)) {
+        tiedOperandIndex = TiedOpInterface::kUntiedIndex;
+      }
+
       // Count up the number of removed operands prior to this one.
       unsigned offset = 0;
       for (unsigned i = 0; i < tiedOperandIndex; ++i) {
         if (i < excludedOperands.size() && excludedOperands[i]) ++offset;
       }
-      tiedOperandIndex -= offset;
 
-      if (llvm::count(excludedOperandIndices, tiedOperandIndex)) {
-        tiedOperandIndex = TiedOpInterface::kUntiedIndex;  // operand removed
-      }
+      tiedOperandIndex -= offset;
     }
     tiedOperandIndices.push_back(tiedOperandIndex);
   }
