@@ -207,7 +207,6 @@ void excludeTiedOperandAndResultIndices(
   SmallVector<int64_t, 4> oldTiedOperandIndices = tiedOperandIndices;
   tiedOperandIndices.clear();
 
-
   // To adjust operand indices we need to know the how many operands to offset
   // the indices by - if 2 operands before operand N were removed then we know
   // it needs to be -2. This is nasty but that's why we have this helper
