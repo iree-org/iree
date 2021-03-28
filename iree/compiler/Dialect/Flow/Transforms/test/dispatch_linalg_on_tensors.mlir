@@ -275,4 +275,4 @@ func @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: tensor<1
 // CHECK-NEXT:   %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:     ins(%[[INPUT1_LOAD]], %[[INPUT2_LOAD]], %[[OFFSET_LOAD]] : tensor<1000xf32>, tensor<1000xf32>, tensor<f32>)
 // CHECK-SAME:     outs(%[[FILL]] : tensor<f32>)
-// 		  CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT]]
+//      CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT]]
