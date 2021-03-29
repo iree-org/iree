@@ -332,11 +332,11 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
   return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
 }
 
-/// Order the operations such that they could be inlined into the dispatch
-/// region in that order to satisfy dependencies.
+/// Reorders the operations in `ops` such that they could be inlined into the
+/// dispatch region in that order to satisfy dependencies.
 static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "Ops to be inlined : \n";
+    llvm::dbgs() << "Ops to be inlined :\n";
     for (auto op : ops) {
       llvm::dbgs() << "\t";
       op->print(llvm::dbgs());
@@ -346,24 +346,21 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
 
   llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
       insertAfterMap;
-  llvm::SetVector<Operation *> allOps(ops.begin(), ops.end());
-  llvm::SetVector<Operation *> leafOps = allOps;
+  llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
   // For each operation compute the list of operations in `ops` that use its
   // results. Also compute the operations that form the leafs of the DAG of
   // operations in `ops`.
   for (auto op : ops) {
-    // insertAfterList.emplace_back(ElementTy{op, {}});
-    // ElementTy &element = insertAfterList.back();
     for (auto operand : op->getOperands()) {
       auto definingOp = operand.getDefiningOp();
       if (!definingOp) continue;
       insertAfterMap[definingOp].push_back(op);
-      if (allOps.count(definingOp)) leafOps.remove(op);
+      if (leafOps.count(definingOp)) leafOps.remove(op);
     }
   }
 
   // The leaves are at the head of the ordered list.
-  SmallVector<Operation *, 16> orderedOps = llvm::to_vector<4>(leafOps);
+  SmallVector<Operation *, 16> orderedOps = llvm::to_vector<16>(leafOps);
   orderedOps.reserve(ops.size());
   llvm::SmallPtrSet<Operation *, 16> processed;
   processed.insert(leafOps.begin(), leafOps.end());
@@ -380,8 +377,7 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
   // number of uses of each operation). Given that the size of `ops` is at max
   // O(10), and not O(100), this is assumed to be reasonable.
-  SmallVector<Operation *, 16> readyOps = orderedOps;
-  readyOps.assign(leafOps.begin(), leafOps.end());
+  SmallVector<Operation *, 16> readyOps = llvm::to_vector<16>(leafOps);
   while (!readyOps.empty()) {
     SmallVector<Operation *> nextReadyOps;
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
