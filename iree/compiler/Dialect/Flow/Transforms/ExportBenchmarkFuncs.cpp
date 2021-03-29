@@ -135,9 +135,29 @@ class ExportBenchmarkFuncsPass
       // Create one dummy input variable per input.
       SmallVector<IREE::Flow::VariableOp, 4> dummyInputVariableOps;
       for (auto inputType : execFuncOp.getType().getInputs()) {
-        dummyInputVariableOps.push_back(
-            createDummyInputVariableOp(loc, inputType, moduleBuilder));
+        auto dispatchTensorType =
+            inputType.dyn_cast<Flow::DispatchTensorType>();
+        // TODO(ataei): Remove this once we have flow.dispatch.tensor as the
+        // only argument type.
+        if (dispatchTensorType) {
+          if (dispatchTensorType.getAccess() != TensorAccess::WriteOnly) {
+            dummyInputVariableOps.push_back(createDummyInputVariableOp(
+                loc, dispatchTensorType.asTensorType(), moduleBuilder));
+          }
+        } else {
+          dummyInputVariableOps.push_back(
+              createDummyInputVariableOp(loc, inputType, moduleBuilder));
+        }
       }
+
+      // TODO(ataei): DispatchEntryOp ops has signature as an optional
+      // FunctionType attribute, but it always populated maybe signature should
+      // be required and verified? For now we just skip ones with no signature
+      // FunctionType.
+      if (!dispatchEntryOp.signature().hasValue()) continue;
+      auto dispatchOpFuncType =
+          dispatchEntryOp.signature().getValue().dyn_cast<FunctionType>();
+      if (!dispatchOpFuncType) continue;
 
       // Create a `() -> ()` entry point op the benchmark tool can run.
       std::string funcName = std::string(execFuncOp.getName()) + "_benchmark";
@@ -166,7 +186,7 @@ class ExportBenchmarkFuncsPass
       auto dummyWorkload = blockBuilder.create<ConstantIndexOp>(loc, 0);
       auto dispatchOp = blockBuilder.create<DispatchOp>(
           loc, dispatchEntryOp, ValueRange{dummyWorkload},
-          execFuncOp.getType().getResults(), ValueRange{}, args, ValueRange{},
+          dispatchOpFuncType.getResults(), ValueRange{}, args, ValueRange{},
           ArrayRef<int64_t>{});
 
       // Sink all results with do_not_optimize to ensure that DCE does not
