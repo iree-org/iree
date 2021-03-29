@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "convert_to_nvvm.mlir"
+    "distribute_to_thread.mlir"
     "pipeline_test.mlir"
   DATA
     iree::tools::IreeFileCheck

@@ -28,6 +28,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "convert_to_nvvm.mlir",
+            "distribute_to_thread.mlir",
             "pipeline_test.mlir",
         ],
         include = ["*.mlir"],

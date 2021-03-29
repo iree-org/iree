@@ -14,13 +14,18 @@ iree_cc_library(
   NAME
     LinalgToNVVM
   HDRS
+    "KernelConfig.h"
     "Passes.h"
   SRCS
     "ConvertToNVVM.cpp"
+    "KernelConfig.cpp"
     "Passes.cpp"
+    "TileAndDistribute.cpp"
   DEPS
     MLIRGPU
     MLIRGPUToNVVMTransforms
+    MLIRIR
+    MLIRLinalg
     MLIRLinalgTransforms
     MLIRNVVMIR
     MLIRPass
