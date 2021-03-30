@@ -360,7 +360,7 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   }
 
   // The leaves are at the head of the ordered list.
-  SmallVector<Operation *> orderedOps(leafOps.begin, leafOps.end());
+  SmallVector<Operation *> orderedOps(leafOps.begin(), leafOps.end());
   orderedOps.reserve(ops.size());
   llvm::SmallPtrSet<Operation *, 16> processed;
   processed.insert(leafOps.begin(), leafOps.end());
