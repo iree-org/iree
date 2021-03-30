@@ -46,12 +46,6 @@ static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
     llvm::cl::CommaSeparated);
 
-// TODO(ravishankarm): Remove this option after addressing fusion.
-static llvm::cl::opt<bool> clLinalgOnTensorsEnableForceFusion(
-    "iree-flow-dispatch-linalg-on-tensors-enable-fusion-always",
-    llvm::cl::desc("Option to force fuse linalg operations on tensors"),
-    llvm::cl::init(false));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -824,7 +818,6 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 /// `consumer`.
 static bool isProducerFusableWithConsumer(linalg::LinalgOp producer,
                                           linalg::LinalgOp consumer) {
-  if (clLinalgOnTensorsEnableForceFusion) return true;
   // Fuse if the dependence from producer to consumer is to the `outs` operand
   // of the consumer and the producer is a parallel operation
   llvm::DenseSet<Value> producerResults(producer.getOperation()->result_begin(),
