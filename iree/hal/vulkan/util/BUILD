@@ -61,7 +61,6 @@ cc_test(
         ":intrusive_list",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/memory",
     ],
 )
 

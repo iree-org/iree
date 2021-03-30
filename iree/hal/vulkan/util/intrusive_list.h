@@ -43,7 +43,7 @@
 //
 // Usage (unique_ptr):
 //   IntrusiveList<std::unique_ptr<MyElement>> list;
-//   list.push_back(absl::make_unique<MyElement>());
+//   list.push_back(std::make_unique<MyElement>());
 //   std::unique_ptr<MyElement> elm = list.take(list.front());
 //
 // This type is thread-unsafe.

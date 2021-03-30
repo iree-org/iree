@@ -14,8 +14,9 @@
 
 #include "bindings/python/iree/runtime/host_types.h"
 
+#include <memory>
+
 #include "absl/container/inlined_vector.h"
-#include "absl/memory/memory.h"
 #include "bindings/python/iree/runtime/hal.h"
 #include "bindings/python/iree/runtime/status_utils.h"
 #include "iree/base/signature_parser.h"
@@ -145,9 +146,9 @@ class PyMappedMemory {
                        buffer.raw_ptr(), IREE_HAL_MEMORY_ACCESS_READ,
                        0 /* element_offset */, byte_length, &mapped_memory),
                    "Could not map memory");
-    return absl::make_unique<PyMappedMemory>(std::move(desc), mapped_memory,
-                                             std::move(buffer),
-                                             std::move(parent_keep_alive));
+    return std::make_unique<PyMappedMemory>(std::move(desc), mapped_memory,
+                                            std::move(buffer),
+                                            std::move(parent_keep_alive));
   }
 
   py::buffer_info ToBufferInfo() {

@@ -14,7 +14,8 @@
 
 #include "bindings/python/iree/runtime/function_abi.h"
 
-#include "absl/memory/memory.h"
+#include <memory>
+
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "bindings/python/iree/runtime/hal.h"
@@ -431,7 +432,7 @@ std::unique_ptr<FunctionAbi> FunctionAbi::Create(
     HalDevice& device, std::shared_ptr<HostTypeFactory> host_type_factory,
     AttributeLookup lookup) {
   auto abi =
-      absl::make_unique<FunctionAbi>(device, std::move(host_type_factory));
+      std::make_unique<FunctionAbi>(device, std::move(host_type_factory));
 
   // Fetch key attributes for the raw ABI.
   auto raw_version = lookup("fv");

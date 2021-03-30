@@ -77,7 +77,6 @@ EXPLICIT_TARGET_MAPPING = {
 def _convert_absl_target(target):
   # Default to a pattern substitution approach.
   # Take "absl::" and append the name part of the full target identifier, e.g.
-  #   "@com_google_absl//absl/memory"         -> "absl::memory"
   #   "@com_google_absl//absl/types:optional" -> "absl::optional"
   #   "@com_google_absl//absl/types:span"     -> "absl::span"
   if ":" in target:
