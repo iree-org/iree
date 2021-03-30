@@ -18,7 +18,6 @@ iree_lit_test_suite(
     "deduplicate_executables.mlir"
     "dispatch_linalg_on_tensors.mlir"
     "dispatch_linalg_on_tensors_dynamic.mlir"
-    "dispatch_linalg_on_tensors_force.mlir"
     "expand_variable_dynamic_dims.mlir"
     "export_benchmark_funcs.mlir"
     "fold_compatible_dispatch_regions.mlir"
