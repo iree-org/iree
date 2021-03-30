@@ -64,7 +64,15 @@ static bool isNoOp(Operation *op) { return isa<Shape::MakeRankedShapeOp>(op); }
 
 // If the op's result is an identity of its first operand, it is an
 // identity.
-static bool isIdentityOp(Operation *op) { return isa<Shape::TieShapeOp>(op); }
+static bool isIdentityOp(Operation *op) {
+  if (auto reshapeOp = dyn_cast<IREE::Flow::TensorReshapeOp>(op)) {
+    // Reshape ops where the operand has a single use (this op) can be treated
+    // as identity ops since the source can reuse the result.
+    auto srcDefiningOp = reshapeOp.source().getDefiningOp();
+    return srcDefiningOp && srcDefiningOp->hasOneUse();
+  }
+  return isa<Shape::TieShapeOp>(op);
+}
 
 // HACK: until we are doing buffer allocation we need to pin tied buffers all
 // the way up the stream from the outputs.
@@ -540,6 +548,42 @@ static LogicalResult recordTensorClone(Value device, Value commandBuffer,
   return success();
 }
 
+/// Convert a `flow.tensor.reshape` to a copy if it is not an identity
+/// operation. If not an identity (i.e. it cannot be proved that the source
+/// buffer can be reused for the target buffer), then a copy is needed for
+/// correctness.
+static LogicalResult recordTensorReshape(Value device, Value commandBuffer,
+                                         IREE::Flow::TensorReshapeOp &reshapeOp,
+                                         BufferSet &bufferSet,
+                                         ConversionPatternRewriter &rewriter) {
+  if (isIdentityOp(reshapeOp)) return success();
+  auto &sourceBuffer = bufferSet.rangeMap[reshapeOp.source()];
+  auto &resultBuffer = bufferSet.rangeMap[reshapeOp.result()];
+
+  auto source = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      reshapeOp.getLoc(), reshapeOp.source(), sourceBuffer.buffer, rewriter);
+  auto result = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      reshapeOp.getLoc(), reshapeOp.result(), resultBuffer.buffer, rewriter);
+  if (!source.hasValue() || !result.hasValue()) {
+    return reshapeOp.emitOpError()
+           << "cannot create adaptors for tensor reshape operands/results";
+  }
+
+  auto zeroOffset =
+      rewriter.createOrFold<mlir::ConstantIndexOp>(reshapeOp.getLoc(), 0);
+  SmallVector<Value, 4> offsets(
+      reshapeOp.source().getType().cast<ShapedType>().getRank(), zeroOffset);
+  auto sourceRange = source->computeRange(offsets, *source->getShapeDims());
+
+  if (!sourceRange) return failure();
+  rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
+      reshapeOp.getLoc(), commandBuffer, source->getBuffer(), zeroOffset,
+      result->getBuffer(), zeroOffset, sourceRange->length);
+
+  recordFullExecutionBarrier(commandBuffer, reshapeOp.getLoc(), rewriter);
+  return success();
+}
+
 /// Convert a flow.tensor.slice to a copy.
 // TODO(benvanik, ravishankarm): The copy is not necessary. If there are no
 // other uses of this buffer you could just return the original buffer with an
@@ -636,7 +680,10 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
                                           BufferSet &bufferSet,
                                           ConversionPatternRewriter &rewriter) {
   for (auto &op : streamBlock) {
-    if (auto dispatchOp = dyn_cast<IREE::Flow::DispatchOp>(op)) {
+    if (isNoOp(&op) || isIdentityOp(&op)) {
+      // No work to perform. For identity ops, all buffers have been pushed
+      // to "real" ops.
+    } else if (auto dispatchOp = dyn_cast<IREE::Flow::DispatchOp>(op)) {
       if (failed(recordDispatch(device, commandBuffer, dispatchOp, bufferSet,
                                 rewriter))) {
         return failure();
@@ -644,6 +691,11 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
     } else if (auto cloneOp = dyn_cast<IREE::Flow::TensorCloneOp>(op)) {
       if (failed(recordTensorClone(device, commandBuffer, cloneOp, bufferSet,
                                    rewriter))) {
+        return failure();
+      }
+    } else if (auto reshapeOp = dyn_cast<IREE::Flow::TensorReshapeOp>(op)) {
+      if (failed(recordTensorReshape(device, commandBuffer, reshapeOp,
+                                     bufferSet, rewriter))) {
         return failure();
       }
     } else if (auto sliceOp = dyn_cast<IREE::Flow::TensorSliceOp>(op)) {
@@ -658,9 +710,6 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
       }
     } else if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(op)) {
       // No-op; handled by the buffer allocation.
-    } else if (isNoOp(&op) || isIdentityOp(&op)) {
-      // No work to perform. For identity ops, all buffers have been pushed
-      // to "real" ops.
     } else if (isa<ConstantOp>(op)) {
       // HACK: all this code is going away soon.
       auto newOp = rewriter.clone(op);

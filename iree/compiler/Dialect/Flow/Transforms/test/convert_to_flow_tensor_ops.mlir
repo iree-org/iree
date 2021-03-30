@@ -40,3 +40,28 @@ func @subtensor_convert(%arg0 : tensor<?x24x48xf32>, %arg1 : index) ->
 //   CHECK-DAG:   %[[UNMODIFIED2:.+]] = subtensor %[[SLICE2]][0, 0, 0] [%[[D1]], 12, 24] [1, 2, 2]
 //   CHECK-DAG:   %[[UNMODIFIED3:.+]] = subtensor %[[ARG0]][0, %[[ARG1]], 0]
 //       CHECK:   return %[[UNMODIFIED1]], %[[UNMODIFIED2]], %[[UNMODIFIED3]]
+
+// -----
+
+func @tensor_reshape(%arg0 : tensor<?x4x?x5x?x6xf32>, %arg1 : tensor<20x?x40xf32>)
+    -> (tensor<?x5x?xf32>, tensor<5x4x?x4x2x4x5xf32>)
+{
+  %0 = linalg.tensor_reshape %arg0
+      [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+       affine_map<(d0, d1, d2, d3, d4, d5) -> (d3)>,
+       affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5)>]
+      : tensor<?x4x?x5x?x6xf32> into tensor<?x5x?xf32>
+  %1 = linalg.tensor_reshape %arg1
+      [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1)>,
+       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d2, d3)>,
+       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6)>]
+      : tensor<20x?x40xf32> into tensor<5x4x?x4x2x4x5xf32>
+  return %0, %1 : tensor<?x5x?xf32>, tensor<5x4x?x4x2x4x5xf32>
+}
+// CHECK-LABEL: func @tensor_reshape
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x4x?x5x?x6xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<20x?x40xf32>
+//   CHECK-DAG:   %[[R0:.+]] = flow.tensor.reshape %[[ARG0]]
+//   CHECK-DAG:   %[[R1:.+]] = flow.tensor.reshape %[[ARG1]]
+//       CHECK:   return %[[R0]], %[[R1]]
+
