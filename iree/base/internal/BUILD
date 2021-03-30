@@ -90,36 +90,29 @@ cc_test(
 )
 
 cc_library(
-    name = "file_handle_win32",
-    srcs = ["file_handle_win32.cc"],
-    hdrs = ["file_handle_win32.h"],
+    name = "dynamic_library",
+    srcs = [
+        "dynamic_library_posix.c",
+        "dynamic_library_win32.c",
+    ],
+    hdrs = ["dynamic_library.h"],
     deps = [
+        ":file_path",
+        ":internal",
         "//iree/base:core_headers",
-        "//iree/base:status",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
+        "//iree/base:threading",
+        "//iree/base:tracing",
     ],
 )
 
 cc_library(
     name = "file_io",
+    srcs = ["file_io.cc"],
     hdrs = ["file_io.h"],
     deps = [
+        "//iree/base:api",
         "//iree/base:core_headers",
-        "//iree/base:status",
-        "//iree/base/internal:file_io_internal",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "file_io_hdrs",
-    hdrs = ["file_io.h"],
-    deps = [
-        "//iree/base:status",
-        "@com_google_absl//absl/strings",
+        "//iree/base:tracing",
     ],
 )
 
@@ -128,28 +121,8 @@ cc_test(
     srcs = ["file_io_test.cc"],
     deps = [
         ":file_io",
-        "//iree/base:logging",
-        "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
-    name = "file_io_internal",
-    srcs = [
-        "file_io_posix.cc",
-        "file_io_win32.cc",
-    ],
-    deps = [
-        ":file_handle_win32",
-        ":file_io_hdrs",
-        "//iree/base:core_headers",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
     ],
 )
 

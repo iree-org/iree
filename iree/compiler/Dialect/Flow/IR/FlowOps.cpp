@@ -1022,8 +1022,7 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
 
   auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
-  excludeTiedOperandAndResultIndices(
-      excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
+
   // TODO(benvanik): all this offset stuff is confusing and should be reworked.
   // We should probably have absolute indices and relative indices, or just one
   // or the other, and not be crossing the streams. The way things are offset
@@ -1037,6 +1036,11 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
       newTiedOperandIndices[i] -= tiedOperandOffset;
     }
   }
+
+  // This need to happen *after* accounting for tied operand offset, given that
+  // all excluded operand/result indices are relative ranges.
+  excludeTiedOperandAndResultIndices(
+      excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
   auto newOp = OpBuilder(getContext())
                    .create<DispatchWorkgroupsOp>(

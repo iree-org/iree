@@ -64,26 +64,6 @@ cc_library(
 #===------------------------------------------------------------------------===#
 
 cc_library(
-    name = "dynamic_library",
-    srcs = [
-        "dynamic_library_posix.cc",
-        "dynamic_library_win32.cc",
-    ],
-    hdrs = ["dynamic_library.h"],
-    deps = [
-        ":core_headers",
-        ":logging",
-        ":status",
-        ":tracing",
-        "//build_tools:default_linkopts",
-        "//iree/base/internal:file_path",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
     name = "flatcc",
     hdrs = ["flatcc.h"],
     deps = [

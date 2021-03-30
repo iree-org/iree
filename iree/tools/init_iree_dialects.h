@@ -23,7 +23,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/Sequence/IR/SequenceDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
@@ -38,7 +37,6 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format off
   registry.insert<IREE::Flow::FlowDialect,
                   IREE::HAL::HALDialect,
-                  IREE::Sequence::SequenceDialect,
                   ShapeDialect,
                   IREEDialect,
                   IREE::VM::VMDialect,

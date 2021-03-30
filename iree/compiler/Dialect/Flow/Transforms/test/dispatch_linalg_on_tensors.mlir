@@ -260,32 +260,75 @@ func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32
 
 // -----
 
-func @reduce(%arg0: tensor<1x7x7x1280xf32>) -> tensor<1x1280xf32> {
+func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
   %cst = constant 0.000000e+00 : f32
-  %0 = linalg.init_tensor [1, 1280] : tensor<1x1280xf32>
-  %1 = linalg.fill(%0, %cst) : tensor<1x1280xf32>, f32 -> tensor<1x1280xf32>
-  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (0, d1, d2, d0)>, affine_map<(d0, d1, d2) -> (0, d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%arg0 : tensor<1x7x7x1280xf32>) outs(%1 : tensor<1x1280xf32>) {
+  %0 = linalg.init_tensor [1280] : tensor<1280xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<1280xf32>, f32 -> tensor<1280xf32>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%arg0 : tensor<7x7x1280xf32>) outs(%1 : tensor<1280xf32>) {
   ^bb0(%arg1: f32, %arg2: f32):
     %3 = addf %arg1, %arg2 : f32
     linalg.yield %3 : f32
-  } -> tensor<1x1280xf32>
-  return %2 : tensor<1x1280xf32>
+  } -> tensor<1280xf32>
+  return %2 : tensor<1280xf32>
 }
 
-//      CHECK: func @reduce
-// CHECK-SAME: (%[[INPUT:.+]]: tensor<1x7x7x1280xf32>)
+//  CHECK-DAG: #[[SIZE_MAP0:.+]] = affine_map<(d0) -> (1, -d0 + 1280)>
 
-//      CHECK: %[[FILL:.+]] = flow.dispatch.workgroups[{{.+}}]() : () -> tensor<1x1280xf32> =
-// CHECK-NEXT:     (%{{.+}}: !flow.dispatch.tensor<writeonly:1x1280xf32>) {
-//      CHECK:   linalg.init_tensor [1, 1280] : tensor<1x1280xf32>
-// CHECK-NEXT:   linalg.fill
+//      CHECK: func @tile_parallel_reduction
+// CHECK-SAME: (%[[INPUT:.+]]: tensor<7x7x1280xf32>)
 
-//      CHECK: %[[REDUCE:.+]] = flow.dispatch.workgroups[{{.+}}](%[[INPUT]], %[[FILL]]) : (tensor<1x7x7x1280xf32>, tensor<1x1280xf32>) -> %[[FILL]] =
-// CHECK-NEXT:     (%[[ARG1:.+]]: !flow.dispatch.tensor<readonly:1x7x7x1280xf32>, %[[ARG2:.+]]: !flow.dispatch.tensor<readwrite:1x1280xf32>) {
-//      CHECK:   %[[IN:.+]] = flow.dispatch.tensor.load %[[ARG1]]
-//      CHECK:   %[[OUT:.+]] = flow.dispatch.tensor.load %[[ARG2]]
-//      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:     ins(%[[IN]] : tensor<1x7x7x1280xf32>) outs(%[[OUT]] : tensor<1x1280xf32>)
-//      CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[ARG2]]
+//  CHECK-DAG: %[[C1:.+]] = constant 1 : index
+//  CHECK-DAG: %[[C1280:.+]] = constant 1280 : index
+//      CHECK: %[[REDUCE:.+]] = flow.dispatch.workgroups[%[[C1280]], %[[C1]], %[[C1]]](%[[INPUT]]) : (tensor<7x7x1280xf32>) -> tensor<1280xf32> =
+// CHECK-NEXT:     (%[[ARG1:.+]]: !flow.dispatch.tensor<readonly:7x7x1280xf32>, %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:1280xf32>) {
+//  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//  CHECK-DAG:   %[[C7:.+]] = constant 7 : index
+//      CHECK:   scf.for %[[IV:.+]] = %{{.+}} to %{{.+}} step %{{.+}}
+//      CHECK:     %[[SIZE0:.+]] = affine.min #[[SIZE_MAP0]](%[[IV]])
+//      CHECK:     %[[IN:.+]] = flow.dispatch.tensor.load %[[ARG1]]
+// CHECK-SAME:       sizes = [%[[C7]], %[[C7]], %[[SIZE0]]]
+//      CHECK:     %[[INIT:.+]] = linalg.init_tensor [%[[SIZE0]]] : tensor<?xf32>
+// CHECK-NEXT:     %[[OUT:.+]] = linalg.fill(%[[INIT]]
+//      CHECK:     %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:       ins(%[[IN]] : tensor<7x7x?xf32>) outs(%[[OUT]] : tensor<?xf32>)
+//      CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG2]]
 
-//      CHECK: return %[[REDUCE]] : tensor<1x1280xf32>
+//      CHECK: return %[[REDUCE]]
+
+// -----
+
+func @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: tensor<1000xf32>, %offset: tensor<f32>) -> tensor<f32> {
+  %zero = constant 0.0 : f32
+  %init = linalg.init_tensor [] : tensor<f32>
+  %fill = linalg.fill(%init, %zero) : tensor<f32>, f32 -> tensor<f32>
+  %reduce = linalg.generic {
+              indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>, affine_map<(d0) -> ()>],
+              iterator_types = ["reduction"]}
+            ins(%input1, %input2, %offset : tensor<1000xf32>, tensor<1000xf32>, tensor<f32>)
+            outs(%fill : tensor<f32>) {
+  ^bb0(%arg1: f32, %arg2: f32, %arg3: f32, %arg4: f32):
+    %555 = addf %arg1, %arg2 : f32
+    %556 = subf %555, %arg3 : f32
+    %557 = math.exp %556 : f32
+    %558 = addf %557, %arg4 : f32
+    linalg.yield %558 : f32
+  } -> tensor<f32>
+  return %reduce : tensor<f32>
+}
+
+// CHECK-LABEL: func @fuse_non_tiled_reduction_fill
+
+//      CHECK: %[[C1:.+]] = constant 1 : index
+//      CHECK: flow.dispatch.workgroups[%[[C1]], %[[C1]], %[[C1]]]({{.+}}) : (tensor<1000xf32>, tensor<1000xf32>, tensor<f32>) -> tensor<f32> =
+// CHECK-NEXT:     (%[[INPUT1:[a-z0-9]+]]: !flow.dispatch.tensor<readonly:1000xf32>,
+// CHECK-SAME:      %[[INPUT2:[a-z0-9]+]]: !flow.dispatch.tensor<readonly:1000xf32>,
+// CHECK-SAME:      %[[OFFSET:[a-z0-9]+]]: !flow.dispatch.tensor<readonly:f32>,
+// CHECK-SAME:      %[[OUTPUT:[a-z0-9]+]]: !flow.dispatch.tensor<writeonly:f32>) {
+//      CHECK:   %[[INPUT1_LOAD:.+]] = flow.dispatch.tensor.load %[[INPUT1]]
+// CHECK-NEXT:   %[[INPUT2_LOAD:.+]] = flow.dispatch.tensor.load %[[INPUT2]]
+// CHECK-NEXT:   %[[OFFSET_LOAD:.+]] = flow.dispatch.tensor.load %[[OFFSET]]
+// CHECK-NEXT:   %[[FILL:.+]] = linalg.fill
+// CHECK-NEXT:   %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:     ins(%[[INPUT1_LOAD]], %[[INPUT2_LOAD]], %[[OFFSET_LOAD]] : tensor<1000xf32>, tensor<1000xf32>, tensor<f32>)
+// CHECK-SAME:     outs(%[[FILL]] : tensor<f32>)
+//      CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT]]

@@ -80,18 +80,18 @@ cc_library(
     name = "dynamic_symbols",
     srcs = [
         "cuda_headers.h",
-        "dynamic_symbols.cc",
-        "dynamic_symbols_tables.h",
+        "dynamic_symbols.c",
     ],
     hdrs = [
         "dynamic_symbols.h",
     ],
+    textual_hdrs = [
+        "dynamic_symbol_tables.h",
+    ],
     deps = [
         "//iree/base:core_headers",
-        "//iree/base:dynamic_library",
-        "//iree/base:status",
         "//iree/base:tracing",
-        "@com_google_absl//absl/types:span",
+        "//iree/base/internal:dynamic_library",
         "@cuda_headers",
     ],
 )

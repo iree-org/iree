@@ -568,7 +568,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 // Adapted from BytecodeModuleTarget and extended by C specific passes
 static LogicalResult canonicalizeModule(
     IREE::VM::ModuleOp moduleOp, IREE::VM::CTargetOptions targetOptions) {
-  OwningRewritePatternList patterns(&getContext());
+  OwningRewritePatternList patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
   target.addLegalOp<IREE::DoNotOptimizeOp>();

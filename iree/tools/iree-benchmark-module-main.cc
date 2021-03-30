@@ -121,7 +121,8 @@ Status GetModuleContentsFromFlags(std::string* out_contents) {
     *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
                                 std::istreambuf_iterator<char>()};
   } else {
-    IREE_RETURN_IF_ERROR(file_io::GetFileContents(module_file, out_contents));
+    IREE_RETURN_IF_ERROR(
+        file_io::GetFileContents(module_file.c_str(), out_contents));
   }
   return OkStatus();
 }

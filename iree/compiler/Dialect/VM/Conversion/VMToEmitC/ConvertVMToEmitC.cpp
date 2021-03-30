@@ -70,11 +70,11 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
     // If the operation has attributes, we need to explicitely build the args
     // attribute of the emitc call op. This consists of index attributes for
     // the operands, followed by the source op attributes themselves.
-    if (op.getAttrs().size() > 0) {
+    if (op->getAttrs().size() > 0) {
       SmallVector<Attribute, 4> args_ =
           indexSequence(operands.size(), op.getContext());
 
-      for (NamedAttribute attr : op.getAttrs()) {
+      for (NamedAttribute attr : op->getAttrs()) {
         args_.push_back(attr.second);
       }
 

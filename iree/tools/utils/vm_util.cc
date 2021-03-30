@@ -42,6 +42,10 @@ Status ValidateFunctionAbi(const iree_vm_function_t& function) {
 
   iree_string_view_t sig_fv =
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("fv"));
+  if (sig_fv.size == 0) {
+    // Ignore functions without reflection information.
+    return OkStatus();
+  }
   if (absl::string_view{sig_fv.data, sig_fv.size} != "1") {
     auto function_name = iree_vm_function_name(&function);
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -49,6 +53,7 @@ Status ValidateFunctionAbi(const iree_vm_function_t& function) {
                             (int)function_name.size, function_name.data,
                             (int)sig_fv.size, sig_fv.data);
   }
+
   return OkStatus();
 }
 
@@ -182,7 +187,7 @@ Status ParseToVariantListFromFile(
     iree_hal_allocator_t* allocator, const std::string& filename,
     iree_vm_list_t** out_list) {
   std::string contents;
-  IREE_RETURN_IF_ERROR(file_io::GetFileContents(filename, &contents));
+  IREE_RETURN_IF_ERROR(file_io::GetFileContents(filename.c_str(), &contents));
   absl::InlinedVector<absl::string_view, 4> input_views(
       absl::StrSplit(contents, '\n', absl::SkipEmpty()));
   return ParseToVariantList(descs, allocator, input_views, out_list);

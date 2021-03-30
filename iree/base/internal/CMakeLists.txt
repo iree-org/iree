@@ -76,16 +76,18 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    file_handle_win32
+    dynamic_library
   HDRS
-    "file_handle_win32.h"
+    "dynamic_library.h"
   SRCS
-    "file_handle_win32.cc"
+    "dynamic_library_posix.c"
+    "dynamic_library_win32.c"
   DEPS
-    absl::memory
-    absl::strings
+    ::file_path
+    ::internal
     iree::base::core_headers
-    iree::base::status
+    iree::base::threading
+    iree::base::tracing
   PUBLIC
 )
 
@@ -94,24 +96,12 @@ iree_cc_library(
     file_io
   HDRS
     "file_io.h"
+  SRCS
+    "file_io.cc"
   DEPS
-    absl::memory
-    absl::span
-    absl::strings
+    iree::base::api
     iree::base::core_headers
-    iree::base::internal::file_io_internal
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    file_io_hdrs
-  HDRS
-    "file_io.h"
-  DEPS
-    absl::strings
-    iree::base::status
+    iree::base::tracing
   PUBLIC
 )
 
@@ -122,28 +112,8 @@ iree_cc_test(
     "file_io_test.cc"
   DEPS
     ::file_io
-    absl::strings
-    iree::base::logging
-    iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    file_io_internal
-  SRCS
-    "file_io_posix.cc"
-    "file_io_win32.cc"
-  DEPS
-    ::file_handle_win32
-    ::file_io_hdrs
-    absl::memory
-    absl::strings
-    iree::base::core_headers
-    iree::base::status
-    iree::base::tracing
-  PUBLIC
 )
 
 iree_cc_library(

@@ -14,9 +14,7 @@
 
 #include "iree/hal/local/loaders/legacy_library_loader.h"
 
-#include "iree/base/dynamic_library.h"
-#include "iree/base/internal/file_io.h"
-#include "iree/base/internal/file_path.h"
+#include "iree/base/internal/dynamic_library.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/local/local_executable.h"
@@ -74,13 +72,11 @@ typedef struct {
   // Flatbuffer definition referencing the executable memory.
   iree_DyLibExecutableDef_table_t def;
 
-  // Temporary files created as part of extraction.
-  // Strings are allocated from the host allocator.
-  iree_host_size_t temp_file_count;
-  iree_string_view_t temp_files[8];
-
   // Loaded platform dynamic library.
-  iree::DynamicLibrary* handle;
+  iree_dynamic_library_t* handle;
+
+  // Name used for the file field in tracy and debuggers.
+  iree_string_view_t identifier;
 
   // Queried metadata from the library.
   union {
@@ -94,45 +90,14 @@ extern const iree_hal_local_executable_vtable_t
 
 static iree_status_t iree_hal_legacy_executable_extract_and_load(
     iree_hal_legacy_executable_t* executable, iree_allocator_t host_allocator) {
-  // Write the embedded library out to a temp file, since all of the dynamic
-  // library APIs work with files. We could instead use in-memory files on
-  // platforms where that is convenient.
-  //
-  // TODO(#3845): use dlopen on an fd with either dlopen(/proc/self/fd/NN),
-  // fdlopen, or android_dlopen_ext to avoid needing to write the file to disk.
-  // Can fallback to memfd_create + dlopen where available, and fallback from
-  // that to disk (maybe just windows/mac).
-  std::string library_temp_path;
-  IREE_RETURN_IF_ERROR(
-      iree::file_io::GetTempFile("dylib_executable", &library_temp_path));
-
-// Add platform-specific file extensions so opinionated dynamic library
-// loaders are more likely to find the file:
-#if defined(IREE_PLATFORM_WINDOWS)
-  library_temp_path += ".dll";
-#else
-  library_temp_path += ".so";
-#endif  // IREE_PLATFORM_WINDOWS
-
-  iree_string_view_t library_temp_file = iree_string_view_empty();
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_clone(host_allocator,
-                           iree_make_const_byte_span(library_temp_path.data(),
-                                                     library_temp_path.size()),
-                           (void**)&library_temp_file.data));
-  library_temp_file.size = library_temp_path.size();
-  executable->temp_files[executable->temp_file_count++] = library_temp_file;
-
   flatbuffers_uint8_vec_t embedded_library_vec =
       iree_DyLibExecutableDef_library_embedded_get(executable->def);
-  IREE_RETURN_IF_ERROR(iree::file_io::SetFileContents(
-      library_temp_path,
-      absl::string_view(reinterpret_cast<const char*>(embedded_library_vec),
-                        flatbuffers_uint8_vec_len(embedded_library_vec))));
-
-  std::unique_ptr<iree::DynamicLibrary> handle;
-  IREE_RETURN_IF_ERROR(
-      iree::DynamicLibrary::Load(library_temp_path.c_str(), &handle));
+  IREE_RETURN_IF_ERROR(iree_dynamic_library_load_from_memory(
+      iree_make_cstring_view("aot"),
+      iree_make_const_byte_span(
+          embedded_library_vec,
+          flatbuffers_uint8_vec_len(embedded_library_vec)),
+      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &executable->handle));
 
   flatbuffers_string_t debug_database_filename =
       iree_DyLibExecutableDef_debug_database_filename_get(executable->def);
@@ -140,44 +105,22 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
       iree_DyLibExecutableDef_debug_database_embedded_get(executable->def);
   if (flatbuffers_string_len(debug_database_filename) &&
       flatbuffers_uint8_vec_len(debug_database_embedded_vec)) {
-    IREE_TRACE_SCOPE0("DyLibExecutable::AttachDebugDatabase");
-    iree_string_view_t library_temp_path_sv = iree_make_string_view(
-        library_temp_path.data(), library_temp_path.size());
-    iree_string_view_t debug_database_filename_sv =
-        iree_make_string_view(debug_database_filename,
-                              flatbuffers_string_len(debug_database_filename));
-    char* debug_database_path = NULL;
-    IREE_RETURN_IF_ERROR(iree_file_path_join(
-        iree_file_path_dirname(library_temp_path_sv),
-        debug_database_filename_sv, host_allocator, &debug_database_path));
-    iree_string_view_t debug_database_path_sv =
-        iree_make_cstring_view(debug_database_path);
-    executable->temp_files[executable->temp_file_count++] =
-        debug_database_path_sv;
-    IREE_IGNORE_ERROR(iree::file_io::SetFileContents(
-        debug_database_path,
-        absl::string_view(
-            reinterpret_cast<const char*>(debug_database_embedded_vec),
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_attach_symbols_from_memory(
+        executable->handle,
+        iree_make_const_byte_span(
+            debug_database_embedded_vec,
             flatbuffers_uint8_vec_len(debug_database_embedded_vec))));
-    handle->AttachDebugDatabase(debug_database_path);
   }
-
-  executable->handle = handle.release();
-
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_legacy_executable_query_library(
     iree_hal_legacy_executable_t* executable) {
   // Get the exported symbol used to get the library metadata.
-  iree_hal_executable_library_query_fn_t query_fn =
-      (iree_hal_executable_library_query_fn_t)executable->handle->GetSymbol(
-          IREE_HAL_EXECUTABLE_LIBRARY_EXPORT_NAME);
-  if (!query_fn) {
-    return iree_make_status(
-        IREE_STATUS_NOT_FOUND,
-        "executable metadata query function not found in library");
-  }
+  iree_hal_executable_library_query_fn_t query_fn = NULL;
+  IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(
+      executable->handle, IREE_HAL_EXECUTABLE_LIBRARY_EXPORT_NAME,
+      (void**)&query_fn));
 
   // Query for a compatible version of the library.
   executable->library.header =
@@ -215,6 +158,8 @@ static iree_status_t iree_hal_legacy_executable_query_library(
           "compiled to enable/understand: %u",
           (uint32_t)header->sanitizer);
   }
+
+  executable->identifier = iree_make_cstring_view(header->name);
 
   return iree_ok_status();
 }
@@ -286,22 +231,7 @@ static void iree_hal_legacy_executable_destroy(
   iree_allocator_t host_allocator = executable->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  // Leak the library when tracing, since the profiler may still be reading it.
-  // TODO(benvanik): move to an atexit handler instead, verify with ASAN/MSAN
-  // TODO(scotttodd): Make this compatible with testing:
-  //     two test cases, one for each function in the same executable
-  //     first test case passes, second fails to open the file (already open)
-#else
-  delete executable->handle;
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
-  for (iree_host_size_t i = 0; i < executable->temp_file_count; ++i) {
-    iree_string_view_t file_path = executable->temp_files[i];
-    iree::file_io::DeleteFile(std::string(file_path.data, file_path.size))
-        .IgnoreError();
-    iree_allocator_free(host_allocator, (void*)file_path.data);
-  }
+  iree_dynamic_library_release(executable->handle);
 
   iree_hal_local_executable_deinitialize(
       (iree_hal_local_executable_t*)base_executable);
@@ -332,8 +262,9 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
   if (iree_string_view_is_empty(entry_point_name)) {
     entry_point_name = iree_make_cstring_view("unknown_dylib_call");
   }
-  IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, entry_point_name.data,
-                                      entry_point_name.size);
+  IREE_TRACE_ZONE_BEGIN_EXTERNAL(
+      z0, executable->identifier.data, executable->identifier.size, ordinal,
+      entry_point_name.data, entry_point_name.size, NULL, 0);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   library->entry_points[ordinal](dispatch_state, workgroup_id);
