@@ -187,6 +187,13 @@ static bool isRootOp(Operation *op) {
       return true;
     }
   }
+
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+    return llvm::all_of(genericOp.getIndexingMaps(), [](AffineMap map) {
+      return map.isProjectedPermutation();
+    });
+  }
+
   return isa<linalg::ConvInputNHWCFilterHWCFOp,
              linalg::DepthwiseConvInputNHWCFilterHWCOp,
              linalg::DepthwiseConvInputNHWCFilterHWCFOp,
@@ -280,12 +287,12 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 // IREE-only.
 static void pullInProducersInSameGroup(
     PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
-    ValueRange shapedOperands, linalg::TiledLinalgOp &tiledLinalgOp,
-    int64_t groupNum) {
+    linalg::LinalgOp tiledOp, ValueRange tiledOpOperands,
+    ArrayRef<Operation *> tiledLoops, int64_t groupNum) {
   // Scoped within DispatchWorkgroupOp.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
-  for (auto en : llvm::enumerate(shapedOperands)) {
+  for (auto en : llvm::enumerate(tiledOpOperands)) {
     if (auto producer = en.value().getDefiningOp<linalg::LinalgOp>()) {
       ArrayAttr opGroupAttr =
           producer.getOperation()->getAttrOfType<ArrayAttr>(kFusionGroupsAttr);
@@ -297,20 +304,29 @@ static void pullInProducersInSameGroup(
       }
 
       Operation *clonedOpToFuse = rewriter.clone(*producer);
+
       static_cast<PatternRewriterWithScopedReplaceOp &>(rewriter)
           .replaceOpWithinScope(producer, clonedOpToFuse->getResults(),
                                 &dispatchOp.getRegion().front());
-      // TODO: this is incorrect on general pattern failures, try pattern within
-      // pattern.
-      OpResult opResult = en.value().cast<OpResult>();
-      auto maybeFusionInfo = linalg::fuseProducerOfTensor(
-          rewriter, clonedOpToFuse->getResult(opResult.getResultNumber()),
-          tiledLinalgOp.op.getShapedOpOperand(en.index()));
-      if (!maybeFusionInfo.hasValue()) {
-        rewriter.replaceOp(clonedOpToFuse, producer->getResults());
+
+      if (tiledLoops.empty()) {
+        // The root op wasn't tiled. We are done then; just to remove the
+        // attribute.
+        clonedOpToFuse->removeAttr(kFusionGroupsAttr);
+      } else {
+        // TODO: this is incorrect on general pattern failures, try pattern
+        // within pattern.
+        OpResult opResult = en.value().cast<OpResult>();
+        auto maybeFusionInfo = linalg::fuseProducerOfTensor(
+            rewriter, clonedOpToFuse->getResult(opResult.getResultNumber()),
+            tiledOp.getShapedOpOperand(en.index()));
+        if (!maybeFusionInfo.hasValue()) {
+          rewriter.replaceOp(clonedOpToFuse, producer->getResults());
+        } else {
+          maybeFusionInfo->fusedProducer.getOperation()->removeAttr(
+              kFusionGroupsAttr);
+        }
       }
-      maybeFusionInfo->fusedProducer.getOperation()->removeAttr(
-          kFusionGroupsAttr);
     }
   }
 }
@@ -658,12 +674,13 @@ struct TileAndDistributeOnTensorsPattern
       rewriter.eraseOp(dispatchOp);
       return failure();
     }
-    // Keep track of the shapedOperands for fusion.
+    // Keep track of the tiledOpOperands for fusion.
     SmallVector<Value, 4> shapedOperands(clonedLinalgOp.getShapedOperands());
     rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
 
-    pullInProducersInSameGroup(rewriter, dispatchOp, shapedOperands,
-                               tiledLinalgOp, rootOpAttr.getInt());
+    pullInProducersInSameGroup(rewriter, dispatchOp, tiledLinalgOp.op,
+                               shapedOperands, tiledLinalgOp.loops,
+                               rootOpAttr.getInt());
 
     tiledLinalgOp.op.getOperation()->removeAttr(kRootOpAttr);
 
@@ -712,9 +729,11 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     if (!isDispatchableOp(op)) return failure();
-    // If this is a dispatchable op that is always fused into dispatch ops, and
-    // all its uses are dispatchable ops, dont do anything.
-    if (isAlwaysFusedIntoDispatchOp(op) &&
+
+    // If this is a dispatchable op that is to be fused into dispatch ops, and
+    // all its uses are dispatchable ops, don't do anything.
+    if ((op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr) ||
+         isAlwaysFusedIntoDispatchOp(op)) &&
         llvm::all_of(op->getUsers(), [](Operation *user) {
           return isDispatchableOp(user) ||
                  user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ||
@@ -766,6 +785,17 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
                                                       workload, op);
     IREE::Flow::DispatchWorkgroupsOp dispatchOp = en.first;
     dispatchOp.result_dimsMutable().assign(resultDynamicDims);
+
+    // If this is a root op for fusion, try to pull in the ops to be fused
+    // together with it.
+    if (auto rootOpAttr = op->getAttrOfType<IntegerAttr>(kRootOpAttr)) {
+      linalg::LinalgOp clonedLinalgOp = cast<linalg::LinalgOp>(en.second);
+      SmallVector<Value, 4> shapedOperands(clonedLinalgOp.getShapedOperands());
+
+      pullInProducersInSameGroup(
+          rewriter, dispatchOp, clonedLinalgOp, shapedOperands,
+          /*tiledLoops=*/ArrayRef<Operation *>(), rootOpAttr.getInt());
+    }
 
     rewriter.replaceOpWithIf(op, dispatchOp.getOperation()->getResults(),
                              [&](OpOperand &operand) {
@@ -824,17 +854,20 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
   for (Block &block : funcOp) {
     auto linalgOps = block.getOps<linalg::LinalgOp>();
 
-    // Start with a root operation. Everything will be "fused with it".
-    for (linalg::LinalgOp linalgOp : linalgOps) {
+    // Tiling and fusion in linalg works by tiling the last operation in the
+    // fusion group and then pull producer ops into the tiled loops. So go in
+    // the reverse order here.
+    for (linalg::LinalgOp linalgOp : llvm::reverse(linalgOps)) {
+      // Start with a root operation and fuse its producers.
       Operation *op = linalgOp.getOperation();
       if (!isRootOp(op)) continue;
+      if (op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) continue;
       unsigned currGroupNum = numRootOps++;
       op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(currGroupNum));
       for (auto operand : linalgOp.getShapedOperands()) {
         auto producer = operand.getDefiningOp<linalg::LinalgOp>();
         if (!producer) continue;
         Operation *producerOp = producer.getOperation();
-        if (producerOp->hasAttr(kRootOpAttr)) continue;
         if (!isProducerFusableWithConsumer(producer, op)) continue;
 
         SmallVector<int64_t, 2> fusionGroups = {};
@@ -850,23 +883,6 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
                             builder.getI64ArrayAttr(fusionGroups));
       }
     }
-
-    // As a second step mark all the element-wise linalg ops not fused as roots
-    // so that they get tiled and distributed.
-    for (linalg::LinalgOp linalgOp : linalgOps) {
-      Operation *op = linalgOp.getOperation();
-      if (!isa<linalg::GenericOp>(op) ||
-          getNumOuterParallelLoops(linalgOp) == 0 ||
-          llvm::any_of(linalgOp.getIndexingMaps(), [](AffineMap &map) {
-            return !map.isProjectedPermutation();
-          })) {
-        continue;
-      }
-
-      if (op->hasAttr(kRootOpAttr) || op->hasAttr(kFusionGroupsAttr)) continue;
-      unsigned currGroupNum = numRootOps++;
-      op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(currGroupNum));
-    }
   }
 }
 
@@ -879,6 +895,12 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   context->allowUnregisteredDialects(true);
 
   decideFusableLinalgOps(funcOp);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 
   // Distribution strategy along at most 3 dimensions with WorkgroupIdOp in
   // range [0, WorkgroupSizeOp).
