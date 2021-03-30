@@ -334,7 +334,7 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 
 /// Reorders the operations in `ops` such that they could be inlined into the
 /// dispatch region in that order to satisfy dependencies.
-static SmallVector<Operation *, 16> orderOperations(ArrayRef<Operation *> ops) {
+static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "Ops to be inlined :\n";
     for (auto op : ops) {
@@ -360,7 +360,7 @@ static SmallVector<Operation *, 16> orderOperations(ArrayRef<Operation *> ops) {
   }
 
   // The leaves are at the head of the ordered list.
-  SmallVector<Operation *> orderedOps = llvm::to_vector<4>(leafOps);
+  SmallVector<Operation *> orderedOps(leafOps.begin, leafOps.end());
   orderedOps.reserve(ops.size());
   llvm::SmallPtrSet<Operation *, 16> processed;
   processed.insert(leafOps.begin(), leafOps.end());
@@ -377,16 +377,8 @@ static SmallVector<Operation *, 16> orderOperations(ArrayRef<Operation *> ops) {
   // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
   // number of uses of each operation). Given that the size of `ops` is at max
   // O(10), and not O(100), this is assumed to be reasonable.
-  SmallVector<Operation *> readyOps = llvm::to_vector<4>(leafOps);
+  SmallVector<Operation *> readyOps = orderedOps;
   while (!readyOps.empty()) {
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "ReadyOps :\n";
-      for (auto readyOp : readyOps) {
-        llvm::dbgs() << "\t";
-        readyOp->print(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      }
-    });
     auto op = readyOps.pop_back_val();
     // Check all uses of `op` within `ops`. If all of the operations that define
     // the operands of the user have been added to `orderedOps`, then the user
