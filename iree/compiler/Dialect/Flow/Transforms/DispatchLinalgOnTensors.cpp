@@ -360,7 +360,7 @@ static SmallVector<Operation *, 16> orderOperations(ArrayRef<Operation *> ops) {
   }
 
   // The leaves are at the head of the ordered list.
-  SmallVector<Operation *, 16> orderedOps = llvm::to_vector<16>(leafOps);
+  SmallVector<Operation *> orderedOps = llvm::to_vector<4>(leafOps);
   orderedOps.reserve(ops.size());
   llvm::SmallPtrSet<Operation *, 16> processed;
   processed.insert(leafOps.begin(), leafOps.end());
@@ -377,7 +377,7 @@ static SmallVector<Operation *, 16> orderOperations(ArrayRef<Operation *> ops) {
   // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
   // number of uses of each operation). Given that the size of `ops` is at max
   // O(10), and not O(100), this is assumed to be reasonable.
-  SmallVector<Operation *, 16> readyOps = llvm::to_vector<16>(leafOps);
+  SmallVector<Operation *> readyOps = llvm::to_vector<4>(leafOps);
   while (!readyOps.empty()) {
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "ReadyOps :\n";
@@ -388,6 +388,9 @@ static SmallVector<Operation *, 16> orderOperations(ArrayRef<Operation *> ops) {
       }
     });
     auto op = readyOps.pop_back_val();
+    // Check all uses of `op` within `ops`. If all of the operations that define
+    // the operands of the user have been added to `orderedOps`, then the user
+    // is ready to be scheduled.
     for (auto insertAfterOp : insertAfterMap[op]) {
       if (processed.count(insertAfterOp)) continue;
       if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
@@ -409,7 +412,8 @@ static SmallVector<Operation *, 16> orderOperations(ArrayRef<Operation *> ops) {
       llvm::dbgs() << "\n";
     }
   });
-  assert(orderedOps.size() == ops.size());
+  assert(orderedOps.size() == ops.size() &&
+         "ordering of inlined operations failed");
   return orderedOps;
 }
 
@@ -527,8 +531,9 @@ static void tryToTieOperandsAndResults(
   }
 }
 
-void replaceAllUsesWithinDispatchOp(IREE::Flow::DispatchWorkgroupsOp dispatchOp,
-                                    Value value, Value replacement) {
+static void replaceAllUsesWithinDispatchOp(
+    IREE::Flow::DispatchWorkgroupsOp dispatchOp, Value value,
+    Value replacement) {
   SmallPtrSet<Operation *, 4> usesOutsideDispatch;
   for (Operation *user : value.getUsers()) {
     if (isa<IREE::Flow::DispatchWorkgroupsOp>(user) ||
