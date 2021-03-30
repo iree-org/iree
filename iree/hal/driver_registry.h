@@ -105,13 +105,12 @@ iree_hal_driver_registry_default();
 // Creates and initializes an empty device driver registry
 //
 // Thread-safe.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_create(
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_allocate(
     iree_allocator_t allocator, iree_hal_driver_registry_t** out_registry);
 
 // Unregisters each factory and frees the associated registry resources.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_unregister_and_free(
-    iree_hal_driver_registry_t* registry, iree_allocator_t allocator);
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_driver_registry_free(iree_hal_driver_registry_t* registry);
 
 // Registers a driver factory to serve future queries/requests for drivers.
 // See iree_hal_driver_registry_t for more information.
