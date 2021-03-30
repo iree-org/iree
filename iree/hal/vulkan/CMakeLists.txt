@@ -74,7 +74,6 @@ iree_cc_library(
     absl::core_headers
     absl::flat_hash_map
     absl::inlined_vector
-    absl::memory
     absl::span
     absl::strings
     absl::synchronization

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "absl/memory/memory.h"
+#include <memory>
+
 #include "iree/hal/vulkan/util/intrusive_list.h"
 #include "iree/testing/gtest.h"
 
@@ -32,14 +33,14 @@ TEST(IntrusiveListUniquePtrTest, UniquePtr) {
   // Push/clear.
   IntrusiveList<std::unique_ptr<AllocatedType>> list;
   EXPECT_EQ(0, AllocatedType::alloc_count);
-  list.push_back(absl::make_unique<AllocatedType>());
+  list.push_back(std::make_unique<AllocatedType>());
   EXPECT_EQ(1, AllocatedType::alloc_count);
   EXPECT_NE(nullptr, list.front());
   list.clear();
   EXPECT_EQ(0, AllocatedType::alloc_count);
 
   // Push/pop.
-  list.push_back(absl::make_unique<AllocatedType>());
+  list.push_back(std::make_unique<AllocatedType>());
   EXPECT_EQ(1, AllocatedType::alloc_count);
   EXPECT_NE(nullptr, list.front());
   for (auto item : list) {
@@ -49,7 +50,7 @@ TEST(IntrusiveListUniquePtrTest, UniquePtr) {
   EXPECT_EQ(0, AllocatedType::alloc_count);
 
   // Push/take.
-  list.push_back(absl::make_unique<AllocatedType>());
+  list.push_back(std::make_unique<AllocatedType>());
   EXPECT_EQ(1, AllocatedType::alloc_count);
   EXPECT_NE(nullptr, list.front());
   auto item = list.take(list.front());
@@ -60,17 +61,17 @@ TEST(IntrusiveListUniquePtrTest, UniquePtr) {
   EXPECT_EQ(0, AllocatedType::alloc_count);
 
   // Push/replace.
-  list.push_back(absl::make_unique<AllocatedType>());
+  list.push_back(std::make_unique<AllocatedType>());
   EXPECT_EQ(1, AllocatedType::alloc_count);
-  list.replace(list.front(), absl::make_unique<AllocatedType>());
+  list.replace(list.front(), std::make_unique<AllocatedType>());
   EXPECT_EQ(1, AllocatedType::alloc_count);
   list.clear();
   EXPECT_EQ(0, AllocatedType::alloc_count);
 
   // Iteration.
-  list.push_back(absl::make_unique<AllocatedType>());
-  list.push_back(absl::make_unique<AllocatedType>());
-  list.push_back(absl::make_unique<AllocatedType>());
+  list.push_back(std::make_unique<AllocatedType>());
+  list.push_back(std::make_unique<AllocatedType>());
+  list.push_back(std::make_unique<AllocatedType>());
   EXPECT_EQ(3, AllocatedType::alloc_count);
   for (auto item : list) {
     AllocatedType* item_ptr = item;

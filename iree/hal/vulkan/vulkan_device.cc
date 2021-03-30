@@ -18,7 +18,6 @@
 #include <utility>
 
 #include "absl/container/inlined_vector.h"
-#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/status.h"

@@ -28,7 +28,6 @@ iree_cc_library(
     absl::core_headers
     absl::flat_hash_set
     absl::inlined_vector
-    absl::memory
     absl::span
     iree::base::status
     iree::base::tracing
