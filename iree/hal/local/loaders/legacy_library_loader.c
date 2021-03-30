@@ -75,6 +75,9 @@ typedef struct {
   // Loaded platform dynamic library.
   iree_dynamic_library_t* handle;
 
+  // Name used for the file field in tracy and debuggers.
+  iree_string_view_t identifier;
+
   // Queried metadata from the library.
   union {
     const iree_hal_executable_library_header_t** header;
@@ -155,6 +158,8 @@ static iree_status_t iree_hal_legacy_executable_query_library(
           "compiled to enable/understand: %u",
           (uint32_t)header->sanitizer);
   }
+
+  executable->identifier = iree_make_cstring_view(header->name);
 
   return iree_ok_status();
 }
@@ -257,8 +262,9 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
   if (iree_string_view_is_empty(entry_point_name)) {
     entry_point_name = iree_make_cstring_view("unknown_dylib_call");
   }
-  IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, entry_point_name.data,
-                                      entry_point_name.size);
+  IREE_TRACE_ZONE_BEGIN_EXTERNAL(
+      z0, executable->identifier.data, executable->identifier.size, ordinal,
+      entry_point_name.data, entry_point_name.size, NULL, 0);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   library->entry_points[ordinal](dispatch_state, workgroup_id);
