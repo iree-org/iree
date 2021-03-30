@@ -22,6 +22,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Block.h"
@@ -94,8 +95,9 @@ struct PatternRewriterWithScopedReplaceOp : public PatternRewriter {
 struct DispatchLinalgOnTensorsPass
     : public PassWrapper<DispatchLinalgOnTensorsPass, OperationPass<FuncOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, IREE::Flow::FlowDialect,
-                    AffineDialect, scf::SCFDialect, ShapeDialect>();
+    registry
+        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
+                memref::MemRefDialect, scf::SCFDialect, ShapeDialect>();
   }
   DispatchLinalgOnTensorsPass() = default;
   DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
@@ -330,14 +332,96 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
   return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
 }
 
+/// Reorders the operations in `ops` such that they could be inlined into the
+/// dispatch region in that order to satisfy dependencies.
+static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs() << "Ops to be inlined :\n";
+    for (auto op : ops) {
+      llvm::dbgs() << "\t";
+      op->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+  });
+
+  llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
+      insertAfterMap;
+  llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
+  // For each operation compute the list of operations in `ops` that use its
+  // results. Also compute the operations that form the leafs of the DAG of
+  // operations in `ops`.
+  for (auto op : ops) {
+    for (auto operand : op->getOperands()) {
+      auto definingOp = operand.getDefiningOp();
+      if (!definingOp) continue;
+      insertAfterMap[definingOp].push_back(op);
+      if (leafOps.count(definingOp)) leafOps.remove(op);
+    }
+  }
+
+  // The leaves are at the head of the ordered list.
+  SmallVector<Operation *> orderedOps(leafOps.begin(), leafOps.end());
+  orderedOps.reserve(ops.size());
+  llvm::SmallPtrSet<Operation *, 16> processed;
+  processed.insert(leafOps.begin(), leafOps.end());
+
+  // `readyOps` contains the list of operations that have been just added to the
+  // `orderedOps` list. With these marked ready, they might make further
+  // operations in `ops` ready as well.
+  // The complexity of the algorithm is driven by these
+  // - Each operations is added to `readyOps` list at most once, and is removed
+  //   after being processed
+  // - For every operation in `readyOps` every use of its results (within `ops`)
+  //   is looked at once.
+  // - For every use, the operands of the user are processed.
+  // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
+  // number of uses of each operation). Given that the size of `ops` is at max
+  // O(10), and not O(100), this is assumed to be reasonable.
+  // SmallVector<Operation *> readyOps = orderedOps;
+  ArrayRef<Operation *> readyOps(orderedOps);
+  size_t startPos = 0;
+  while (!readyOps.empty()) {
+    auto op = readyOps.front();
+    startPos++;
+    // Check all uses of `op` within `ops`. If all of the operations that define
+    // the operands of the user have been added to `orderedOps`, then the user
+    // is ready to be scheduled.
+    for (auto insertAfterOp : insertAfterMap[op]) {
+      if (processed.count(insertAfterOp)) continue;
+      if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
+            Operation *operandDefiningOp = operand.getDefiningOp();
+            return !operandDefiningOp || processed.count(operandDefiningOp);
+          })) {
+        // readyOps.push_back(insertAfterOp);
+        orderedOps.push_back(insertAfterOp);
+        processed.insert(insertAfterOp);
+      }
+    }
+    readyOps = ArrayRef<Operation *>(orderedOps).drop_front(startPos);
+  }
+
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs() << "Ops to be inlined (sorted) : \n";
+    for (auto op : orderedOps) {
+      llvm::dbgs() << "\t";
+      op->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+  });
+  assert(orderedOps.size() == ops.size() &&
+         "ordering of inlined operations failed");
+  return orderedOps;
+}
+
 /// Computes the values that will be eventually be used within the dispatch
 /// workgroup op but defined outside the op after all clonable operations are
 /// cloned into the region. Returns (by reference) the clonable operations too,
 /// in order in which they can be cloned within the region to satisfy use-def
 /// relationships between them.
 static void getUsedValuesDefinedAboveAfterCloningOps(
-    Region &region, llvm::SetVector<Value> &valuesDefinedAbove,
-    llvm::SmallVector<Operation *, 4> &clonedOps) {
+    IREE::Flow::DispatchWorkgroupsOp dispatchOp,
+    llvm::SetVector<Value> &valuesDefinedAbove,
+    llvm::SmallVector<Operation *> &clonedOps) {
   llvm::SetVector<Value> visited;
   SmallVector<Value, 4> worklist;
   worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
@@ -352,35 +436,25 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }
+    // Only clone if operation either has no operands, or the operation is in
+    // same basic block as the dispatch op. This could really be relaxed, but
+    // this is conservative for now.
+    if (definingOp->getNumOperands() != 0 &&
+        definingOp->getBlock() != dispatchOp->getBlock()) {
+      valuesDefinedAbove.insert(outsideValue);
+      continue;
+    }
     clonedOps.push_back(definingOp);
     worklist.append(definingOp->operand_begin(), definingOp->operand_end());
   }
-  // The cloned operations form a DAG. Return the cloned operations in reverse
-  // so the leaves come first, and can be cloned in-order into the dispatch
-  // region. Do the same for `valuesDefinedAbove` to keep return values
-  // consistent with order gotten from `mlir::getUsedValuesDefinedAbove` (more
-  // for a convention that correctness)
-  clonedOps = llvm::to_vector<4>(llvm::reverse(clonedOps));
-  llvm::SetVector<Value> reverseValuesDefinedAbove;
-  for (auto value : llvm::reverse(valuesDefinedAbove)) {
-    reverseValuesDefinedAbove.insert(value);
-  }
-  std::swap(reverseValuesDefinedAbove, valuesDefinedAbove);
-}
-
-/// Returns a valid insertion point for an operation based on the values used.
-static Operation *getInsertionPoint(Block &block, ArrayRef<Value> usedValues) {
-  if (usedValues.empty()) return &block.front();
-  Operation *insertAfter = &block.front();
-  for (auto value : usedValues) {
-    Operation *definingOp = value.getDefiningOp();
-    if (!definingOp) continue;
-    if (definingOp->getBlock() != &block) return nullptr;
-    if (insertAfter->isBeforeInBlock(definingOp)) {
-      insertAfter = definingOp;
-    }
-  }
-  return insertAfter->getNextNode();
+  // The cloned operations form a DAG. Return the cloned operations so the
+  // leaves come first, and can be cloned in-order into the dispatch region.
+  clonedOps = orderOperations(clonedOps);
+  // Reverse the values. This is not for correctness, but more for readability
+  // of the IR.
+  llvm::SetVector<Value> reversedValues;
+  reversedValues.insert(valuesDefinedAbove.rbegin(), valuesDefinedAbove.rend());
+  std::swap(reversedValues, valuesDefinedAbove);
 }
 
 /// Modifies `dispatchOp` to attach operand-result tie information when
@@ -453,6 +527,19 @@ static void tryToTieOperandsAndResults(
   }
 }
 
+static void replaceAllUsesWithinDispatchOp(
+    IREE::Flow::DispatchWorkgroupsOp dispatchOp, Value value,
+    Value replacement) {
+  SmallPtrSet<Operation *, 4> usesOutsideDispatch;
+  for (Operation *user : value.getUsers()) {
+    if (isa<IREE::Flow::DispatchWorkgroupsOp>(user) ||
+        !dispatchOp->isAncestor(user)) {
+      usesOutsideDispatch.insert(user);
+    }
+  }
+  value.replaceAllUsesExcept(replacement, usesOutsideDispatch);
+}
+
 // After outlining in dispatch region we can rewrite the dispatch ops with
 // proper captures.
 // A later RematerializeDispatchConstants should be called to avoid passing
@@ -466,14 +553,15 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   OpBuilder b = OpBuilder::atBlockBegin(&block);
 
   llvm::SetVector<Value> valuesDefinedAbove;
-  llvm::SmallVector<Operation *, 4> clonedOps;
+  llvm::SmallVector<Operation *> clonedOps;
   mlir::getUsedValuesDefinedAbove(region, valuesDefinedAbove);
   if (valuesDefinedAbove.empty()) return success();
 
-  getUsedValuesDefinedAboveAfterCloningOps(region, valuesDefinedAbove,
+  getUsedValuesDefinedAboveAfterCloningOps(dispatchOp, valuesDefinedAbove,
                                            clonedOps);
 
   BlockAndValueMapping map;
+  SmallVector<Value> toReplaceWithinRegion;
   // Replace valuesDefinedAbove by new BB args (including the op's operands).
   for (Value operand : valuesDefinedAbove) {
     if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
@@ -493,55 +581,29 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
       continue;
     }
     map.map(operand, repl);
+    toReplaceWithinRegion.push_back(operand);
   }
 
   // The only existing arguments are for the outputs. Just need to add a new
   // argument for the outputs and remap the value to use the new argument.
   for (auto ba : block.getArguments().take_front(numOldBBArgs)) {
     assert(ba.getType().isa<IREE::Flow::DispatchTensorType>());
-    map.map(ba, block.addArgument(ba.getType()));
+    ba.replaceAllUsesWith(block.addArgument(ba.getType()));
   }
-
-  auto getUsesOfValueOutsideOfDispatchOp = [&](Value v) {
-    SmallPtrSet<Operation *, 4> res;
-    for (Operation *user : v.getUsers())
-      if (isa<IREE::Flow::DispatchWorkgroupsOp>(user) ||
-          !dispatchOp->isAncestor(user))
-        res.insert(user);
-    return res;
-  };
-  // Replace all uses of mapped values within the dispatch op to the new value.
-  for (Value value : valuesDefinedAbove) {
-    auto uses = getUsesOfValueOutsideOfDispatchOp(value);
-    value.replaceAllUsesExcept(map.lookup(value), uses);
-  }
-
-  // Clone the marked operations.
-  for (Operation *op : clonedOps) {
-    SmallVector<Value, 2> clonedOpOperands = llvm::to_vector<2>(llvm::map_range(
-        op->getOperands(), [&map](Value v) { return map.lookup(v); }));
-    Operation *insertionPoint = getInsertionPoint(block, clonedOpOperands);
-    if (!insertionPoint) {
-      return op->emitOpError(
-          "failed to find insetion point within dispatch workgroup op for "
-          "cloned operation");
-    }
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPoint(insertionPoint);
-    b.clone(*op, map);
-    for (Value result : op->getResults()) {
-      auto uses = getUsesOfValueOutsideOfDispatchOp(result);
-      result.replaceAllUsesExcept(map.lookup(result), uses);
-    }
-  }
-
-  for (Value ba : block.getArguments().take_front(numOldBBArgs)) {
-    ba.replaceAllUsesWith(map.lookup(ba));
-  }
-
   // Drop old BB args.
   block.eraseArguments(
       llvm::to_vector<4>(llvm::seq<unsigned>(0, numOldBBArgs)));
+
+  // Clone the marked operations.
+  for (Operation *op : clonedOps) {
+    b.clone(*op, map);
+    toReplaceWithinRegion.append(op->result_begin(), op->result_end());
+  }
+
+  // Make the region isolated from above.
+  for (auto value : toReplaceWithinRegion) {
+    replaceAllUsesWithinDispatchOp(dispatchOp, value, map.lookup(value));
+  }
 
   // Gather the dynamic dimensions for all operands.
   SmallVector<Value, 4> operandDynamicDims;
