@@ -377,9 +377,12 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
   // number of uses of each operation). Given that the size of `ops` is at max
   // O(10), and not O(100), this is assumed to be reasonable.
-  SmallVector<Operation *> readyOps = orderedOps;
+  // SmallVector<Operation *> readyOps = orderedOps;
+  ArrayRef<Operation *> readyOps(orderedOps);
+  size_t startPos = 0;
   while (!readyOps.empty()) {
-    auto op = readyOps.pop_back_val();
+    auto op = readyOps.front();
+    startPos++;
     // Check all uses of `op` within `ops`. If all of the operations that define
     // the operands of the user have been added to `orderedOps`, then the user
     // is ready to be scheduled.
@@ -389,11 +392,12 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
             Operation *operandDefiningOp = operand.getDefiningOp();
             return !operandDefiningOp || processed.count(operandDefiningOp);
           })) {
-        readyOps.push_back(insertAfterOp);
+        // readyOps.push_back(insertAfterOp);
         orderedOps.push_back(insertAfterOp);
         processed.insert(insertAfterOp);
       }
     }
+    readyOps = ArrayRef<Operation *>(orderedOps).drop_front(startPos);
   }
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
