@@ -766,6 +766,7 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
   if (iree_status_is_ok(base_status) || iree_string_view_is_empty(message)) {
     return base_status;
   }
+
   // If there's no storage yet we can just reuse normal allocation. Both that
   // and this do not copy |message|.
   iree_status_storage_t* storage = iree_status_storage(base_status);
@@ -776,13 +777,15 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
     storage->message = message;
     return base_status;
   }
-  iree_status_payload_message_t* payload =
-      (iree_status_payload_message_t*)malloc(
-          sizeof(iree_status_payload_message_t));
+
+  iree_allocator_t allocator = iree_allocator_system();
+  iree_status_payload_message_t* payload = NULL;
+  iree_status_ignore(
+      iree_allocator_malloc(allocator, sizeof(*payload), (void**)&payload));
   if (IREE_UNLIKELY(!payload)) return base_status;
   memset(payload, 0, sizeof(*payload));
   payload->header.type = IREE_STATUS_PAYLOAD_TYPE_MESSAGE;
-  payload->header.allocator = iree_allocator_system();
+  payload->header.allocator = allocator;
   payload->header.formatter = iree_status_payload_message_formatter;
   payload->message = message;
   return iree_status_append_payload(base_status, storage,
@@ -830,13 +833,14 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
   // Allocate storage with the additional room to store the formatted message.
   // This avoids additional allocations for the common case of a message coming
   // only from the original status error site.
-  iree_status_payload_message_t* payload =
-      (iree_status_payload_message_t*)malloc(
-          sizeof(iree_status_payload_message_t) + message_size);
+  iree_allocator_t allocator = iree_allocator_system();
+  iree_status_payload_message_t* payload = NULL;
+  iree_status_ignore(iree_allocator_malloc(
+      allocator, sizeof(*payload) + message_size, (void**)&payload));
   if (IREE_UNLIKELY(!payload)) return base_status;
   memset(payload, 0, sizeof(*payload));
   payload->header.type = IREE_STATUS_PAYLOAD_TYPE_MESSAGE;
-  payload->header.allocator = iree_allocator_system();
+  payload->header.allocator = allocator;
   payload->header.formatter = iree_status_payload_message_formatter;
 
   // vsnprintf directly into message buffer.
