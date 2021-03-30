@@ -287,12 +287,12 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 // IREE-only.
 static void pullInProducersInSameGroup(
     PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
-    linalg::LinalgOp rootOp, ValueRange shapedOperands,
+    linalg::LinalgOp tiledOp, ValueRange tiledOpOperands,
     ArrayRef<Operation *> tiledLoops, int64_t groupNum) {
   // Scoped within DispatchWorkgroupOp.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
-  for (auto en : llvm::enumerate(shapedOperands)) {
+  for (auto en : llvm::enumerate(tiledOpOperands)) {
     if (auto producer = en.value().getDefiningOp<linalg::LinalgOp>()) {
       ArrayAttr opGroupAttr =
           producer.getOperation()->getAttrOfType<ArrayAttr>(kFusionGroupsAttr);
@@ -319,7 +319,7 @@ static void pullInProducersInSameGroup(
         OpResult opResult = en.value().cast<OpResult>();
         auto maybeFusionInfo = linalg::fuseProducerOfTensor(
             rewriter, clonedOpToFuse->getResult(opResult.getResultNumber()),
-            rootOp.getShapedOpOperand(en.index()));
+            tiledOp.getShapedOpOperand(en.index()));
         if (!maybeFusionInfo.hasValue()) {
           rewriter.replaceOp(clonedOpToFuse, producer->getResults());
         } else {
@@ -674,7 +674,7 @@ struct TileAndDistributeOnTensorsPattern
       rewriter.eraseOp(dispatchOp);
       return failure();
     }
-    // Keep track of the shapedOperands for fusion.
+    // Keep track of the tiledOpOperands for fusion.
     SmallVector<Value, 4> shapedOperands(clonedLinalgOp.getShapedOperands());
     rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
 
@@ -854,8 +854,11 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
   for (Block &block : funcOp) {
     auto linalgOps = block.getOps<linalg::LinalgOp>();
 
-    // Start with a root operation. Everything will be "fused with it".
+    // Tiling and fusion in linalg works by tiling the last operation in the
+    // fusion group and then pull in all producer ops int the same group into
+    // the tiled loop. So go in the reverse order here.
     for (linalg::LinalgOp linalgOp : llvm::reverse(linalgOps)) {
+      // Start with a root operation and fuse its producers.
       Operation *op = linalgOp.getOperation();
       if (!isRootOp(op)) continue;
       if (op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) continue;
