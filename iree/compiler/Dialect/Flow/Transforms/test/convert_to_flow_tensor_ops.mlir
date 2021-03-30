@@ -43,21 +43,24 @@ func @subtensor_convert(%arg0 : tensor<?x24x48xf32>, %arg1 : index) ->
 
 // -----
 
-func @rank_reducing_subtensor(%arg0: tensor<2x513xi32>, %arg1: index,
-                              %arg2: index) -> tensor<513xi32> {
-  %0 = subtensor %arg0[%arg1, %arg2] [1, 513] [1, 1] : tensor<2x513xi32> to tensor<513xi32>
-  return %0 : tensor<513xi32>
+func @tensor_reshape(%arg0 : tensor<?x4x?x5x?x6xf32>, %arg1 : tensor<20x?x40xf32>)
+    -> (tensor<?x5x?xf32>, tensor<5x4x?x4x2x4x5xf32>)
+{
+  %0 = linalg.tensor_reshape %arg0
+      [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+       affine_map<(d0, d1, d2, d3, d4, d5) -> (d3)>,
+       affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5)>]
+      : tensor<?x4x?x5x?x6xf32> into tensor<?x5x?xf32>
+  %1 = linalg.tensor_reshape %arg1
+      [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1)>,
+       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d2, d3)>,
+       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6)>]
+      : tensor<20x?x40xf32> into tensor<5x4x?x4x2x4x5xf32>
+  return %0, %1 : tensor<?x5x?xf32>, tensor<5x4x?x4x2x4x5xf32>
 }
-// CHECK-LABEL: func @rank_reducing_subtensor
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]*]]
-//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]*]]
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]*]]
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[C513:.+]] = constant 513 : index
-//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
-//       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]]
-//  CHECK-SAME:       [%[[ARG1]], %[[ARG2]] for %[[C1]], %[[C513]]]
-//  CHECK-SAME:       : tensor<2x513xi32>{%[[C2]], %[[C513]]}
-//  CHECK-SAME:       -> tensor<1x513xi32>{%[[C1]], %[[C513]]}
-//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[SLICE]] : tensor<1x513xi32> -> tensor<513xi32>
-//       CHECK:   return %[[RESHAPE]] : tensor<513xi32>
+// CHECK-LABEL: func @tensor_reshape
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x4x?x5x?x6xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<20x?x40xf32>
+//   CHECK-DAG:   %[[R0:.+]] = flow.tensor.reshape %[[ARG0]]
+//   CHECK-DAG:   %[[R1:.+]] = flow.tensor.reshape %[[ARG1]]
+//       CHECK:   return %[[R0]], %[[R1]]

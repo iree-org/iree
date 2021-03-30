@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
@@ -31,6 +32,34 @@ namespace IREE {
 namespace Flow {
 
 namespace {
+
+/// Converts linalg.tensor_reshape operations into flow.tensor.reshape
+/// operations.
+struct LinalgTensorReshapeToFlowTensorReshape
+    : OpRewritePattern<linalg::TensorReshapeOp> {
+  using OpRewritePattern<linalg::TensorReshapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::TensorReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = reshapeOp.getLoc();
+    SmallVector<SmallVector<Value>> outputShape;
+    if (failed(reshapeOp.reifyReturnTypeShapesPerResultDim(rewriter,
+                                                           outputShape))) {
+      return failure();
+    }
+    SmallVector<Value> outputDynamicShapes;
+    for (auto shape :
+         llvm::zip(reshapeOp.getResultType().getShape(), outputShape[0])) {
+      if (std::get<0>(shape) != ShapedType::kDynamicSize) continue;
+      outputDynamicShapes.push_back(std::get<1>(shape));
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        reshapeOp, reshapeOp.getResultType(), reshapeOp.src(),
+        outputDynamicShapes);
+    return success();
+  }
+};
+
 /// Convert subtensor operation to flow.tensor.slice if
 /// - all offsets apart from the first one are 0
 /// - all the sizes apart from the first match the sizes of the source
@@ -108,7 +137,8 @@ struct SubTensorToTensorSlice : OpRewritePattern<SubTensorOp> {
 struct ConvertToFlowTensorOpsPass
     : public PassWrapper<ConvertToFlowTensorOpsPass, OperationPass<FuncOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect, IREE::Flow::FlowDialect>();
+    registry.insert<IREE::Flow::FlowDialect, memref::MemRefDialect,
+                    mlir::StandardOpsDialect>();
   }
   ConvertToFlowTensorOpsPass() = default;
   ConvertToFlowTensorOpsPass(const ConvertToFlowTensorOpsPass &pass) {}
@@ -117,7 +147,9 @@ struct ConvertToFlowTensorOpsPass
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
     OwningRewritePatternList patterns(&getContext());
-    patterns.insert<SubTensorToTensorSlice>(context);
+    patterns
+        .insert<LinalgTensorReshapeToFlowTensorReshape, SubTensorToTensorSlice>(
+            context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
