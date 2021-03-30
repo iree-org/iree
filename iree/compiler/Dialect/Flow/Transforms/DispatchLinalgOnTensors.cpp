@@ -334,7 +334,7 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 
 /// Reorders the operations in `ops` such that they could be inlined into the
 /// dispatch region in that order to satisfy dependencies.
-static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
+static SmallVector<Operation *, 16> orderOperations(ArrayRef<Operation *> ops) {
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "Ops to be inlined :\n";
     for (auto op : ops) {
@@ -379,7 +379,6 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   // O(10), and not O(100), this is assumed to be reasonable.
   SmallVector<Operation *, 16> readyOps = llvm::to_vector<16>(leafOps);
   while (!readyOps.empty()) {
-    SmallVector<Operation *> nextReadyOps;
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "ReadyOps :\n";
       for (auto readyOp : readyOps) {
@@ -388,23 +387,18 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
         llvm::dbgs() << "\n";
       }
     });
-    for (auto readyOp : readyOps) {
-      // Check all uses of `readyOp` within `ops`. If all of the operations that
-      // define the operands of the user have been added to `orderedOps`, then
-      // the user is ready to be scheduled.
-      for (auto insertAfterOp : insertAfterMap[readyOp]) {
-        if (processed.count(insertAfterOp)) continue;
-        if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
-              Operation *operandDefiningOp = operand.getDefiningOp();
-              return !operandDefiningOp || processed.count(operandDefiningOp);
-            })) {
-          nextReadyOps.push_back(insertAfterOp);
-          orderedOps.push_back(insertAfterOp);
-          processed.insert(insertAfterOp);
-        }
+    auto op = readyOps.pop_back_val();
+    for (auto insertAfterOp : insertAfterMap[op]) {
+      if (processed.count(insertAfterOp)) continue;
+      if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
+            Operation *operandDefiningOp = operand.getDefiningOp();
+            return !operandDefiningOp || processed.count(operandDefiningOp);
+          })) {
+        readyOps.push_back(insertAfterOp);
+        orderedOps.push_back(insertAfterOp);
+        processed.insert(insertAfterOp);
       }
     }
-    std::swap(nextReadyOps, readyOps);
   }
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
@@ -416,7 +410,7 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
     }
   });
   assert(orderedOps.size() == ops.size());
-  return std::move(orderedOps);
+  return orderedOps;
 }
 
 /// Computes the values that will be eventually be used within the dispatch
