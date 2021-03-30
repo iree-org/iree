@@ -179,10 +179,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_checked(
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain_or_move(
     int is_move, iree_vm_ref_t* ref, iree_vm_ref_t* out_ref) {
-  if (ref != out_ref && ref->ptr != out_ref->ptr) {
+  if (ref != out_ref) {
     // Output ref contains a value that should be released first.
-    // Note that we check for it being the same as the new value so we don't
-    // do extra work unless we have to.
     iree_vm_ref_release(out_ref);
   }
 
