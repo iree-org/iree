@@ -17,7 +17,6 @@ iree_lit_test_suite(
     "convert_to_flow_tensor_ops.mlir"
     "deduplicate_executables.mlir"
     "dispatch_linalg_on_tensors.mlir"
-    "dispatch_linalg_on_tensors_dynamic.mlir"
     "expand_variable_dynamic_dims.mlir"
     "export_benchmark_funcs.mlir"
     "fold_compatible_dispatch_regions.mlir"
