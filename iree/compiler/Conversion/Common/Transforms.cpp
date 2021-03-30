@@ -554,12 +554,26 @@ static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
   return {};
 }
 
-LogicalResult AffineMinDistributedSCFCanonicalizationPattern::matchAndRewrite(
-    AffineMinOp minOp, PatternRewriter &rewriter) const {
-  Optional<int64_t> cst = foldAffineMin(minOp);
-  if (!cst) return failure();
-  rewriter.replaceOpWithNewOp<ConstantOp>(minOp, rewriter.getIndexAttr(*cst));
-  return failure();
+namespace {
+
+struct AffineMinDistributedSCFCanonicalizationPattern
+    : public mlir::OpRewritePattern<mlir::AffineMinOp> {
+  using OpRewritePattern<mlir::AffineMinOp>::OpRewritePattern;
+
+  mlir::LogicalResult matchAndRewrite(
+      mlir::AffineMinOp minOp, mlir::PatternRewriter &rewriter) const override {
+    Optional<int64_t> cst = foldAffineMin(minOp);
+    if (!cst) return failure();
+    rewriter.replaceOpWithNewOp<ConstantOp>(minOp, rewriter.getIndexAttr(*cst));
+    return failure();
+  }
+};
+
+}  // namespace
+
+void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns) {
+  patterns.add<AffineMinDistributedSCFCanonicalizationPattern>(
+      patterns.getContext());
 }
 
 /// Pass to be able to test AffineMinDistributedSCFCanonicalizationPattern
@@ -570,8 +584,7 @@ struct AffineMinDistributedSCFCanonicalizationPass
   void runOnFunction() override {
     FuncOp funcOp = getFunction();
     RewritePatternSet foldPattern(&getContext());
-    foldPattern.add<AffineMinDistributedSCFCanonicalizationPattern>(
-        &getContext());
+    populateAffineMinSCFCanonicalizationPattern(foldPattern);
     FrozenRewritePatternSet frozenPatterns(std::move(foldPattern));
 
     // Explicitly walk and apply the pattern locally to avoid more general
