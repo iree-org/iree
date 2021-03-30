@@ -855,8 +855,8 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
     auto linalgOps = block.getOps<linalg::LinalgOp>();
 
     // Tiling and fusion in linalg works by tiling the last operation in the
-    // fusion group and then pull in all producer ops int the same group into
-    // the tiled loop. So go in the reverse order here.
+    // fusion group and then pull producer ops into the tiled loops. So go in
+    // the reverse order here.
     for (linalg::LinalgOp linalgOp : llvm::reverse(linalgOps)) {
       // Start with a root operation and fuse its producers.
       Operation *op = linalgOp.getOperation();
