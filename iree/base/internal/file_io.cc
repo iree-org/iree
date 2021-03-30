@@ -39,7 +39,7 @@ iree_status_t FileExists(const char* path) {
 iree_status_t GetFileContents(const char* path, std::string* out_contents) {
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_contents = std::string();
-  FILE* file = fopen(path, "r");
+  FILE* file = fopen(path, "rb");
   if (file == NULL) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(iree_status_code_from_errno(errno),

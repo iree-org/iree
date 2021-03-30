@@ -42,6 +42,10 @@ Status ValidateFunctionAbi(const iree_vm_function_t& function) {
 
   iree_string_view_t sig_fv =
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("fv"));
+  if (sig_fv.size == 0) {
+    // Ignore functions without reflection information.
+    return OkStatus();
+  }
   if (absl::string_view{sig_fv.data, sig_fv.size} != "1") {
     auto function_name = iree_vm_function_name(&function);
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -49,6 +53,7 @@ Status ValidateFunctionAbi(const iree_vm_function_t& function) {
                             (int)function_name.size, function_name.data,
                             (int)sig_fv.size, sig_fv.data);
   }
+
   return OkStatus();
 }
 

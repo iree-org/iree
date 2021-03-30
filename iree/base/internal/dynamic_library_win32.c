@@ -30,8 +30,8 @@
 #define IREE_HAVE_DYNAMIC_LIBRARY_PDB_SUPPORT 1
 #pragma warning(disable : 4091)
 #include <dbghelp.h>
-extern "C" void IREEDbgHelpLock();
-extern "C" void IREEDbgHelpUnlock();
+void IREEDbgHelpLock();
+void IREEDbgHelpUnlock();
 #endif  // TRACY_ENABLE
 
 struct iree_dynamic_library_s {
@@ -135,8 +135,7 @@ static iree_status_t iree_dynamic_library_write_temp_file(
       /*lpFileName=*/*out_file_path, /*dwDesiredAccess=*/GENERIC_WRITE,
       /*dwShareMode=*/FILE_SHARE_DELETE, /*lpSecurityAttributes=*/NULL,
       /*dwCreationDisposition=*/CREATE_ALWAYS,
-      /*dwFlagsAndAttributes=*/FILE_ATTRIBUTE_TEMPORARY |
-          FILE_FLAG_DELETE_ON_CLOSE,
+      /*dwFlagsAndAttributes=*/FILE_ATTRIBUTE_TEMPORARY,
       /*hTemplateFile=*/NULL);
   if (file_handle == INVALID_HANDLE_VALUE) {
     status = iree_make_status(iree_status_code_from_win32_error(GetLastError()),
@@ -249,7 +248,7 @@ iree_status_t iree_dynamic_library_load_from_memory(
   // Extract the library to a temp file.
   char* temp_path = NULL;
   iree_status_t status = iree_dynamic_library_write_temp_file(
-      buffer, "mem_", "dll", allocator, &temp_path);
+      buffer, "mem", "dll", allocator, &temp_path);
 
   if (iree_status_is_ok(status)) {
     // Load using the normal load from file routine.
@@ -369,9 +368,8 @@ iree_status_t iree_dynamic_library_attach_symbols_from_file(
   // Load the PDB file and overlay it onto the already-loaded module at the
   // address range it got loaded into.
   if (state.module_base != 0) {
-    SymLoadModuleEx(GetCurrentProcess(), NULL, file_path,
-                    library->identifier.data, state.module_base,
-                    state.module_size, NULL, 0);
+    SymLoadModuleEx(GetCurrentProcess(), NULL, file_path, library->identifier,
+                    state.module_base, state.module_size, NULL, 0);
   }
 
   IREEDbgHelpUnlock();
