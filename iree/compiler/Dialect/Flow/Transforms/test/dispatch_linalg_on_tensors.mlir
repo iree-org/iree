@@ -1,13 +1,12 @@
 // RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -canonicalize -cse %s | IreeFileCheck %s
 
-// CHECK: #[[MULMAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
-
 func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %1 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
     outs(%arg2 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %1 : tensor<?x?xf32>
 }
+//      CHECK: #[[MULMAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //      CHECK: func @tile_matmul_alone
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
@@ -539,7 +538,7 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
   return %2 : tensor<1280xf32>
 }
 
-//  CHECK-DAG: #[[SIZE_MAP0:.+]] = affine_map<(d0) -> (1, -d0 + 1280)>
+//  CHECK-DAG: #[[SIZE_MAP0:.+]] = affine_map<(d0, d1) -> (d1, -d0 + 1280)>
 
 //      CHECK: func @tile_parallel_reduction
 // CHECK-SAME: (%[[INPUT:.+]]: tensor<7x7x1280xf32>)
@@ -550,8 +549,9 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
 // CHECK-NEXT:     (%[[ARG1:.+]]: !flow.dispatch.tensor<readonly:7x7x1280xf32>, %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:1280xf32>) {
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //  CHECK-DAG:   %[[C7:.+]] = constant 7 : index
+//      CHECK:   %[[WG_SIZE0:.+]] = flow.dispatch.workgroup.size[0] : index
 //      CHECK:   scf.for %[[IV:.+]] = %{{.+}} to %{{.+}} step %{{.+}}
-//      CHECK:     %[[SIZE0:.+]] = affine.min #[[SIZE_MAP0]](%[[IV]])
+//      CHECK:     %[[SIZE0:.+]] = affine.min #[[SIZE_MAP0]](%[[IV]], %[[WG_SIZE0]])
 //      CHECK:     %[[IN:.+]] = flow.dispatch.tensor.load %[[ARG1]]
 // CHECK-SAME:       sizes = [%[[C7]], %[[C7]], %[[SIZE0]]]
 //      CHECK:     %[[INIT:.+]] = linalg.init_tensor [%[[SIZE0]]] : tensor<?xf32>
