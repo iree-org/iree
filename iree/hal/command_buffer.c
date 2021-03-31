@@ -26,6 +26,7 @@ IREE_HAL_API_RETAIN_RELEASE(command_buffer);
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
@@ -33,7 +34,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_command_buffer)(
-          device, mode, command_categories, out_command_buffer);
+          device, mode, command_categories, queue_affinity, out_command_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

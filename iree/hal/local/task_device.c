@@ -197,17 +197,31 @@ static iree_hal_allocator_t* iree_hal_task_device_allocator(
   return device->device_allocator;
 }
 
+// Returns the queue index to submit work to based on the |queue_affinity|.
+//
+// If we wanted to have dedicated transfer queues we'd fork off based on
+// command_categories. For now all queues are general purpose.
+static iree_host_size_t iree_hal_task_device_select_queue(
+    iree_hal_task_device_t* device,
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity) {
+  // TODO(benvanik): evaluate if we want to obscure this mapping a bit so that
+  // affinity really means "equivalent affinities map to equivalent queues" and
+  // not a specific queue index.
+  return queue_affinity % device->queue_count;
+}
+
 static iree_status_t iree_hal_task_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  // TODO(benvanik): prevent the need for taking a scope here. We need it to
-  // construct the tasks as we record but unfortunately then that means we would
-  // need to know which queue we'd be submitting against ahead of time.
+  iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, command_categories, queue_affinity);
   return iree_hal_task_command_buffer_create(
-      base_device, &device->queues[0].scope, mode, command_categories,
-      &device->large_block_pool, out_command_buffer);
+      base_device, &device->queues[queue_index].scope, mode, command_categories,
+      queue_affinity, &device->large_block_pool, out_command_buffer);
 }
 
 static iree_status_t iree_hal_task_device_create_descriptor_set(
@@ -264,26 +278,14 @@ static iree_status_t iree_hal_task_device_create_semaphore(
                                         device->host_allocator, out_semaphore);
 }
 
-// Returns the queue index to submit work to based on the |queue_affinity|.
-//
-// If we wanted to have dedicated transfer queues we'd fork off based on
-// command_categories. For now all queues are general purpose.
-static iree_host_size_t iree_hal_device_select_queue(
-    iree_hal_task_device_t* device,
-    iree_hal_command_category_t command_categories, uint64_t queue_affinity) {
-  // TODO(benvanik): evaluate if we want to obscure this mapping a bit so that
-  // affinity really means "equivalent affinities map to equivalent queues" and
-  // not a specific queue index.
-  return queue_affinity % device->queue_count;
-}
-
 static iree_status_t iree_hal_task_device_queue_submit(
     iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories, uint64_t queue_affinity,
-    iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  iree_host_size_t queue_index =
-      iree_hal_device_select_queue(device, command_categories, queue_affinity);
+  iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, command_categories, queue_affinity);
   return iree_hal_task_queue_submit(&device->queues[queue_index], batch_count,
                                     batches);
 }

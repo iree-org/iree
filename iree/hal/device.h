@@ -171,7 +171,7 @@ iree_hal_device_allocator(iree_hal_device_t* device);
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkQueueSubmit.html
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-    uint64_t queue_affinity, iree_host_size_t batch_count,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
 
 // Blocks the caller until the semaphores reach or exceed the specified payload
@@ -242,6 +242,7 @@ typedef struct {
   iree_status_t(IREE_API_PTR* create_command_buffer)(
       iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
       iree_hal_command_category_t command_categories,
+      iree_hal_queue_affinity_t queue_affinity,
       iree_hal_command_buffer_t** out_command_buffer);
 
   iree_status_t(IREE_API_PTR* create_descriptor_set)(
@@ -276,7 +277,7 @@ typedef struct {
 
   iree_status_t(IREE_API_PTR* queue_submit)(
       iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-      uint64_t queue_affinity, iree_host_size_t batch_count,
+      iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
       const iree_hal_submission_batch_t* batches);
 
   iree_status_t(IREE_API_PTR* wait_semaphores_with_deadline)(
