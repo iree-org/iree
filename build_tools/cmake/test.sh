@@ -30,7 +30,8 @@ export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
-# SwiftShader doesn't support vk_khr_shader_float16_int8 extension.
+# The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
+# We test on SwiftShader, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
