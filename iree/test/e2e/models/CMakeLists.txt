@@ -53,6 +53,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-flow-inline-constants-max-byte-length=2048"
     "-iree-codegen-spirv-experimental-linalg-on-tensors"
     "-iree-spirv-enable-vectorization"
 )
@@ -69,6 +70,7 @@ iree_check_single_backend_test_suite(
     "dylib"
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-flow-inline-constants-max-byte-length=2048"
     "-iree-codegen-llvm-experimental-linalg-on-tensors"
 )
 
