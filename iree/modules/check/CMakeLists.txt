@@ -25,6 +25,7 @@ if(${IREE_HAL_DRIVER_VMLA})
       ::native_module
       absl::core_headers
       absl::strings
+      half::includes
       iree::base::api
       iree::base::logging
       iree::base::status
@@ -50,6 +51,7 @@ iree_cc_library(
   DEPS
     absl::inlined_vector
     absl::strings
+    half::includes
     iree::base::api
     iree::base::status
     iree::hal::api

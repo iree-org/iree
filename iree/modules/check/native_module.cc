@@ -28,6 +28,7 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/native_module_cc.h"
+#include "third_party/half/half.hpp"
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation
@@ -70,13 +71,30 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   return AbslSpan<uint8_t>(lhs_bytes) == AbslSpan<uint8_t>(rhs_bytes);
 }
 
+static constexpr float floatPrecisionThreshold = 0.0001f;
+
 template <typename T>
 bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   auto lhs_span = AbslSpan<T>(lhs_bytes);
   auto rhs_span = AbslSpan<T>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (fabs(lhs_span[i] - rhs_span[i]) > 0.0001) {
+    if (fabs(lhs_span[i] - rhs_span[i]) > floatPrecisionThreshold) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
+                         iree_byte_span_t rhs_bytes) {
+  auto lhs_span = AbslSpan<uint16_t>(lhs_bytes);
+  auto rhs_span = AbslSpan<uint16_t>(rhs_bytes);
+  assert(lhs_span.size() == rhs_span.size());
+  for (int i = 0; i < lhs_span.size(); ++i) {
+    if (fabs(half_float::detail::half2float<float>(lhs_span[i]) -
+             half_float::detail::half2float<float>(rhs_span[i])) >
+        floatPrecisionThreshold) {
       return false;
     }
   }
@@ -91,6 +109,8 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
       return AlmostEqByteSpan<float>(lhs_bytes, rhs_bytes);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       return AlmostEqByteSpan<double>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      return AlmostEqByteSpanF16(lhs_bytes, rhs_bytes);
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
@@ -104,7 +124,6 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_16:
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_32:
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_64:
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
     case IREE_HAL_ELEMENT_TYPE_NONE: {
       break;
     }
