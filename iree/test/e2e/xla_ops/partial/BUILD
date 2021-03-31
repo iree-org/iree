@@ -45,7 +45,7 @@ iree_check_single_backend_test_suite(
     driver = "vulkan",
     tags = [
         "notap",
-        "vulkan_f16",
+        "vulkan_uses_vk_khr_shader_float16_int8",
     ],
     target_backend = "vulkan-spirv",
 )

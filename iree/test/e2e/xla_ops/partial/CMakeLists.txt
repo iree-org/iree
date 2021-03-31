@@ -26,7 +26,7 @@ iree_check_single_backend_test_suite(
     "-iree-vulkan-target-triple=valhall-g77-unknown-android10"
   LABELS
     "notap"
-    "vulkan_f16"
+    "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

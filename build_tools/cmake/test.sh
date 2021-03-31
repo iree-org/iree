@@ -30,7 +30,7 @@ export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
-# Vulkan fp16 tests disabled by default as they don't run on swift shader.
+# SwiftShader doesn't support vk_khr_shader_float16_int8 extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
@@ -65,7 +65,7 @@ if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
 fi
 if [[ "${IREE_VULKAN_F16_DISABLE?}" == 1 ]]; then
-  label_exclude_args+=("^vulkan_f16$")
+  label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
 fi
 
 # Join on "|"
