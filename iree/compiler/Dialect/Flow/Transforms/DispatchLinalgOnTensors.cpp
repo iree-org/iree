@@ -144,6 +144,34 @@ static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
   return workload;
 }
 
+/// Returns the fusion groups for the given `op`.
+static SmallVector<int64_t, 1> getFunsionGroups(Operation *op) {
+  SmallVector<int64_t, 1> fusionGroups = {};
+  if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
+    fusionGroups = llvm::to_vector<1>(llvm::map_range(
+        fusionGroupsAttr,
+        [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+  }
+  return fusionGroups;
+}
+
+/// Appends the given `op` to the `newGroups` fusion groups.
+static void appendFusionGroups(Operation *op, ArrayRef<int64_t> newGroups) {
+  SmallVector<int64_t, 1> fusionGroups = getFunsionGroups(op);
+  fusionGroups.append(newGroups.begin(), newGroups.end());
+  op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
+}
+
+/// Returns true if the given `op` is in the `targetGroup` fusion group.
+static bool isInFusionGroup(Operation *op, unsigned targetGroup) {
+  if (ArrayAttr opGroupAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
+    return llvm::any_of(opGroupAttr, [&targetGroup](Attribute attr) {
+      return attr.cast<IntegerAttr>().getInt() == targetGroup;
+    });
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // Op property charecterizations
 //===----------------------------------------------------------------------===//
@@ -285,30 +313,29 @@ static void pullInProducersInSameGroup(
     PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
     linalg::LinalgOp tiledOp, ValueRange tiledOpOperands,
     ArrayRef<Operation *> tiledLoops, int64_t groupNum) {
+  LLVM_DEBUG(llvm::dbgs() << "pull in producers for tiled op: " << tiledOp
+                          << "\n");
   // Scoped within DispatchWorkgroupOp.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
   for (auto en : llvm::enumerate(tiledOpOperands)) {
     if (auto producer = en.value().getDefiningOp<linalg::LinalgOp>()) {
-      ArrayAttr opGroupAttr =
-          producer.getOperation()->getAttrOfType<ArrayAttr>(kFusionGroupsAttr);
-      if (!opGroupAttr ||
-          llvm::none_of(opGroupAttr, [&groupNum](Attribute attr) {
-            return attr.cast<IntegerAttr>().getInt() == groupNum;
-          })) {
-        continue;
-      }
+      if (!isInFusionGroup(producer, groupNum)) continue;
+      LLVM_DEBUG(llvm::dbgs() << "current producer: " << producer << "\n");
 
       Operation *clonedOpToFuse = rewriter.clone(*producer);
+      linalg::LinalgOp fusedProducer;
 
       static_cast<PatternRewriterWithScopedReplaceOp &>(rewriter)
           .replaceOpWithinScope(producer, clonedOpToFuse->getResults(),
                                 &dispatchOp.getRegion().front());
 
       if (tiledLoops.empty()) {
+        LLVM_DEBUG(llvm::dbgs() << "no loops; just copy over the op\n");
         // The root op wasn't tiled. We are done then; just to remove the
         // attribute.
         clonedOpToFuse->removeAttr(kFusionGroupsAttr);
+        fusedProducer = cast<linalg::LinalgOp>(clonedOpToFuse);
       } else {
         // TODO: this is incorrect on general pattern failures, try pattern
         // within pattern.
@@ -317,10 +344,36 @@ static void pullInProducersInSameGroup(
             rewriter, clonedOpToFuse->getResult(opResult.getResultNumber()),
             tiledOp.getShapedOpOperand(en.index()));
         if (!maybeFusionInfo.hasValue()) {
+          LLVM_DEBUG(llvm::dbgs() << "failed to fuse with tensor\n");
           rewriter.replaceOp(clonedOpToFuse, producer->getResults());
         } else {
+          LLVM_DEBUG(llvm::dbgs() << "succeeded to fuse with tensor\n");
           maybeFusionInfo->fusedProducer.getOperation()->removeAttr(
               kFusionGroupsAttr);
+          fusedProducer = maybeFusionInfo->fusedProducer;
+        }
+      }
+
+      // If the producer is successfully fused, go recursive over the current
+      // producer's operands and pull them in if they are marked to be fused
+      // into the current group.
+      if (fusedProducer) {
+        bool needsToPullInProducerOperands = false;
+        for (Value operand :
+             cast<linalg::LinalgOp>(clonedOpToFuse).getShapedOperands()) {
+          if (auto linalgOp = operand.getDefiningOp<linalg::LinalgOp>()) {
+            if (isInFusionGroup(linalgOp, groupNum)) {
+              needsToPullInProducerOperands = true;
+              break;
+            }
+          }
+        }
+
+        if (needsToPullInProducerOperands) {
+          SmallVector<Value, 4> producerOperands =
+              cast<linalg::LinalgOp>(clonedOpToFuse).getShapedOperands();
+          pullInProducersInSameGroup(rewriter, dispatchOp, fusedProducer,
+                                     producerOperands, tiledLoops, groupNum);
         }
       }
     }
@@ -879,24 +932,35 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 
 /// Checks if the `producer` can be fused into the dispatch region of the
 /// `consumer`.
-static bool isProducerFusableWithConsumer(linalg::LinalgOp producer,
-                                          linalg::LinalgOp consumer) {
-  // Fuse if the dependence from producer to consumer is to the `outs` operand
-  // of the consumer and the producer is a parallel operation
-  llvm::DenseSet<Value> producerResults(producer.getOperation()->result_begin(),
-                                        producer.getOperation()->result_end());
-  auto isProducerResultValue = [&producerResults](OpOperand &operand) -> bool {
-    return producerResults.count(operand.get());
-  };
-  auto isElementWiseParallelOp = [](linalg::LinalgOp op) -> bool {
+static bool isProducerFusable(linalg::LinalgOp producer,
+                              linalg::LinalgOp consumer,
+                              OpOperand &consumerOperand) {
+  auto isElementWiseParallelOp = [](linalg::LinalgOp op) {
     return llvm::all_of(op.iterator_types(), [](Attribute attr) {
-      return attr.cast<StringAttr>().getValue() ==
-             toString(IteratorType::Parallel);
+      return linalg::isParallelIteratorType(attr);
     });
   };
-  return llvm::none_of(consumer.getInputOpOperands(), isProducerResultValue) &&
-         llvm::any_of(consumer.getOutputOpOperands(), isProducerResultValue) &&
-         isElementWiseParallelOp(producer);
+
+  if (consumer.isInputTensor(&consumerOperand)) {
+    // Make sure that we have an identity indexing map for the operand for now.
+    //
+    // Theoretically with tensor abstraction, we can pull in whatever operand
+    // subrange for fusion. But if the consumer's access patterns for the input
+    // and output are not the same, we must materialize buffers for holding the
+    // temporary result, because we can have multiple levels of distribution.
+    // Identity map makes sure that we can actually avoid a new intermediate
+    // buffer and directly use the one for the consumer.
+    auto map = consumer.getIndexingMap(consumerOperand.getOperandNumber());
+    if (!map.isIdentity()) return false;
+
+    // If the producer's result is used by the consumer as an input, fuse if
+    // this producer has no other users.
+    return consumerOperand.get().hasOneUse();
+  } else {
+    // If the producer's result is used by the consumer as an output
+    // initializer, fuse if the producer is a parallel operation.
+    return isElementWiseParallelOp(producer);
+  }
 }
 
 /// For a given block partition the LinalgOps in the block into fusable
@@ -917,26 +981,24 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
       // Start with a root operation and fuse its producers.
       Operation *op = linalgOp.getOperation();
       if (!isRootOp(op)) continue;
-      if (op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) continue;
-      unsigned currGroupNum = numRootOps++;
-      op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(currGroupNum));
-      for (auto operand : linalgOp.getShapedOperands()) {
-        auto producer = operand.getDefiningOp<linalg::LinalgOp>();
+
+      // This might be a root op that is already fused into another root op.
+      // In that case, it has fusion groups attached on it.
+      SmallVector<int64_t, 1> fusionGroups = getFunsionGroups(op);
+      if (fusionGroups.empty()) {
+        // Otherwise, create a new group.
+        unsigned newGroup = numRootOps++;
+        fusionGroups.push_back(newGroup);
+        op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(newGroup));
+      }
+
+      for (OpOperand &operand : linalgOp.getShapedOpOperands()) {
+        auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
         if (!producer) continue;
         Operation *producerOp = producer.getOperation();
-        if (!isProducerFusableWithConsumer(producer, op)) continue;
+        if (!isProducerFusable(producer, op, operand)) continue;
 
-        SmallVector<int64_t, 2> fusionGroups = {};
-        if (ArrayAttr fusionGroupsAttr =
-                producerOp->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-          fusionGroups = llvm::to_vector<2>(
-              llvm::map_range(fusionGroupsAttr, [](Attribute attr) {
-                return attr.cast<IntegerAttr>().getInt();
-              }));
-        }
-        fusionGroups.push_back(currGroupNum);
-        producerOp->setAttr(kFusionGroupsAttr,
-                            builder.getI64ArrayAttr(fusionGroups));
+        appendFusionGroups(producerOp, fusionGroups);
       }
     }
   }

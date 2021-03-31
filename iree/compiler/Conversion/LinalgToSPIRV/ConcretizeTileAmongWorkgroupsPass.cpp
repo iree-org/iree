@@ -463,6 +463,12 @@ class ConcretizeTileAmongWorkgroupsPass
       llvm::dbgs() << "\n";
     });
 
+    // Make sure we don't have more than 3 dimensions.
+    if (workloadSize.size() > kWorkgroupDimCount)
+      workgroupSize.resize(kWorkgroupDimCount);
+    if (tileSize.size() > kWorkgroupDimCount)
+      tileSize.resize(kWorkgroupDimCount);
+
     // 4. Replace hal.interface.workgroup symbolic ops with constant values.
 
     {
