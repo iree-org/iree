@@ -65,7 +65,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
-    srcs = CHECK_FRAMEWORK_TESTS,
+    srcs = ["mobilenetv2_fake_weights.mlir"],
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-flow-inline-constants-max-byte-length=2048",
