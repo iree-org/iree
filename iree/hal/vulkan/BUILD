@@ -72,6 +72,8 @@ cc_library(
         "status_util.h",
         "timepoint_util.cc",
         "timepoint_util.h",
+        "tracing.cc",
+        "tracing.h",
         "vma_allocator.cc",
         "vma_allocator.h",
         "vma_buffer.cc",

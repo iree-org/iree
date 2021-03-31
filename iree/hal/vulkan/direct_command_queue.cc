@@ -26,10 +26,9 @@ namespace hal {
 namespace vulkan {
 
 DirectCommandQueue::DirectCommandQueue(
-    VkDeviceHandle* logical_device, std::string name,
+    VkDeviceHandle* logical_device,
     iree_hal_command_category_t supported_categories, VkQueue queue)
-    : CommandQueue(logical_device, std::move(name), supported_categories,
-                   queue) {}
+    : CommandQueue(logical_device, supported_categories, queue) {}
 
 DirectCommandQueue::~DirectCommandQueue() = default;
 
@@ -134,6 +133,7 @@ iree_status_t DirectCommandQueue::WaitIdle(iree_time_t deadline_ns) {
     iree_status_t status =
         VK_RESULT_TO_STATUS(syms()->vkQueueWaitIdle(queue_), "vkQueueWaitIdle");
     iree_slim_mutex_unlock(&queue_mutex_);
+    iree_hal_vulkan_tracing_context_collect(tracing_context(), VK_NULL_HANDLE);
     return status;
   }
 
@@ -190,6 +190,8 @@ iree_status_t DirectCommandQueue::WaitIdle(iree_time_t deadline_ns) {
   }
 
   syms()->vkDestroyFence(*logical_device_, fence, logical_device_->allocator());
+
+  iree_hal_vulkan_tracing_context_collect(tracing_context(), VK_NULL_HANDLE);
 
   return status;
 }
