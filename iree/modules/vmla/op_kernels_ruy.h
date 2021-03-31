@@ -18,7 +18,6 @@
 #include <memory>
 #include <type_traits>
 
-#include "absl/base/thread_annotations.h"
 #include "iree/base/status.h"
 #include "ruy/context.h"
 #include "ruy/mul_params.h"

@@ -30,12 +30,12 @@ iree_cc_library(
     "ref_cc.h"
   DEPS
     ::vm
-    absl::core_headers
     absl::inlined_vector
     absl::optional
     absl::span
     absl::strings
     iree::base::api
+    iree::base::core_headers
     iree::base::status
   PUBLIC
 )

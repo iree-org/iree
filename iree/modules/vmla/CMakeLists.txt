@@ -25,7 +25,6 @@ iree_cc_library(
     "op_kernels_ruy.h"
   DEPS
     absl::algorithm
-    absl::core_headers
     absl::flat_hash_set
     absl::inlined_vector
     absl::span

@@ -71,12 +71,10 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     Vulkan::Headers
-    absl::core_headers
     absl::flat_hash_map
     absl::inlined_vector
     absl::span
     absl::strings
-    absl::synchronization
     iree::base::api
     iree::base::core_headers
     iree::base::flatcc

@@ -54,7 +54,6 @@ iree_cc_test(
   DEPS
     ::native_module
     ::tensorlist_test_module_cc
-    absl::core_headers
     absl::inlined_vector
     absl::span
     absl::strings
