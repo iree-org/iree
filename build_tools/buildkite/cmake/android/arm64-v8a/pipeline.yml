@@ -61,7 +61,7 @@ steps:
       - "cd build-android/"
       # vulkan tests using khr_shader_float16_int8 are failing on pixel4.
       # Disabling it until we identify the root cause.
-      - "ctest --output-on-failure --label-exclude \"^vulkan_uses_vk_khr_shader_float16_int8$\""
+      - "ctest --output-on-failure --label-exclude \"^vulkan_uses_vk_khr_shader_float16_int8\\$\""
     agents:
       - "android-soc=snapdragon-855"
       - "queue=test-android"
