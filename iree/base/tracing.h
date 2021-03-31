@@ -448,14 +448,33 @@ enum {
 
 #else
 
+// TODO(benvanik): bump submodule when upstream patch lands:
+// https://github.com/wolfpld/tracy/pull/191
+#ifdef __cplusplus
+extern "C" {
+#endif
+TRACY_API void ___tracy_emit_memory_alloc_named(const void* ptr, size_t size,
+                                                int secure, const char* name);
+TRACY_API void ___tracy_emit_memory_free_named(const void* ptr, int secure,
+                                               const char* name);
+#ifdef __cplusplus
+}  // extern "C"
+#endif
+
 #define IREE_TRACE_ALLOC(ptr, size) ___tracy_emit_memory_alloc(ptr, size, 0)
 #define IREE_TRACE_FREE(ptr) ___tracy_emit_memory_free(ptr, 0)
+#define IREE_TRACE_ALLOC_NAMED(name, ptr, size) \
+  ___tracy_emit_memory_alloc_named(ptr, size, 0, name)
+#define IREE_TRACE_FREE_NAMED(name, ptr) \
+  ___tracy_emit_memory_free_named(ptr, 0, name)
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS
 
 #else
 #define IREE_TRACE_ALLOC(ptr, size)
 #define IREE_TRACE_FREE(ptr)
+#define IREE_TRACE_ALLOC_NAMED(name, ptr, size)
+#define IREE_TRACE_FREE_NAMED(name, ptr)
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 #if defined(__cplusplus) && \
