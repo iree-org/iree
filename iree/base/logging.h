@@ -57,7 +57,6 @@
 
 #include <cstdint>
 #include <limits>
-#include <map>
 #include <sstream>
 
 #include "iree/base/attributes.h"
@@ -73,16 +72,6 @@ const int INFO = 0;     // absl::LogSeverity::kInfo
 const int WARNING = 1;  // absl::LogSeverity::kWarning
 const int ERROR = 2;    // absl::LogSeverity::kError
 const int FATAL = 3;    // absl::LogSeverity::kFatal
-
-#ifdef __ANDROID__
-// Define equivalent android log levels to map to IREE.
-const std::map<int, int> IREE_TO_ANDROID_LEVEL{
-    std::make_pair(0, 4),  // Android info
-    std::make_pair(1, 5),  // Android waring
-    std::make_pair(2, 6),  // Android error
-    std::make_pair(3, 6),  // Android fatal (doesn't exist, so reusing error)
-};
-#endif
 
 namespace internal {
 

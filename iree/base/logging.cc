@@ -34,6 +34,16 @@ namespace internal {
 
 namespace {
 
+#ifdef __ANDROID__
+// Define equivalent android log levels to map to IREE.
+static const int kStatusToAndroidLevel[4] = {
+    4,  // Android info
+    5,  // Android waring
+    6,  // Android error
+    6   // Android fatal (doesn't exist, so reusing error)
+};
+#endif
+
 // Parse log level (int64_t) from environment variable (char*).
 // Returns true if the value was present and parsed successfully.
 bool LogLevelStrToInt(const char* iree_env_var_val, int64_t* out_level) {
@@ -96,7 +106,7 @@ void LogMessage::EmitLogMessage() {
           str().c_str());
 
 #if defined(__ANDROID__)
-  auto android_severity = IREE_TO_ANDROID_LEVEL.at(severity_);
+  auto android_severity = kStatusToAndroidLevel[severity_];
   auto android_message =
       absl::StrFormat("%s:%d] %s\n", file_name_, line_, str().c_str());
   __android_log_write(android_severity, "native", android_message.c_str());
