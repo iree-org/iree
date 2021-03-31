@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -32,6 +33,12 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
+
+static llvm::cl::opt<int> clInlineConstantByteLength(
+    "iree-flow-inline-constants-max-byte-length",
+    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
+                   "dispatch region"),
+    llvm::cl::init(256));
 
 namespace mlir {
 namespace iree_compiler {
@@ -831,7 +838,8 @@ static bool canDispatchRegionContainOp(Operation *op) {
       uint64_t estimatedByteLength =
           (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
           8;
-      return denseAttr.isSplat() || estimatedByteLength <= 256;  // or whatever
+      return denseAttr.isSplat() ||
+             estimatedByteLength <= clInlineConstantByteLength;
     } else if (constantType.isIntOrIndexOrFloat()) {
       return true;
     }
