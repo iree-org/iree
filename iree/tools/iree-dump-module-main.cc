@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "iree/base/internal/file_io.h"
+#include "iree/base/status.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
 
 // Today we just print to JSON. We could do something more useful (size
@@ -31,11 +32,7 @@ extern "C" int main(int argc, char** argv) {
     return 1;
   }
   std::string module_contents;
-  auto status = iree::file_io::GetFileContents(argv[1], &module_contents);
-  if (!status.ok()) {
-    std::cerr << status;
-    return 1;
-  }
+  IREE_CHECK_OK(iree::file_io::GetFileContents(argv[1], &module_contents));
 
   // Print direct to stdout.
   flatcc_json_printer_t printer;

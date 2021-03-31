@@ -24,6 +24,10 @@ namespace iree_compiler {
 /// Performs the final conversion to NNVM+LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 
+/// Perform tiling and distribution to threads.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createTileAndDistributeToThreads();
+
 /// Populates passes needed to lower a XLA HLO op to NVVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.

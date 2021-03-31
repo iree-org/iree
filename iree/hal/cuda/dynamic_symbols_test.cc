@@ -30,7 +30,8 @@ namespace {
 
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   iree_hal_cuda_dynamic_symbols_t symbols;
-  iree_status_t status = load_symbols(&symbols);
+  iree_status_t status = iree_hal_cuda_dynamic_symbols_initialize(
+      iree_allocator_system(), &symbols);
   if (!iree_status_is_ok(status)) {
     IREE_LOG(WARNING) << "Symbols cannot be loaded, skipping test.";
     GTEST_SKIP();
@@ -43,7 +44,8 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
     CUdevice device;
     CUDE_CHECK_ERRORS(symbols.cuDeviceGet(&device, /*ordinal=*/0));
   }
-  unload_symbols(&symbols);
+
+  iree_hal_cuda_dynamic_symbols_deinitialize(&symbols);
 }
 
 }  // namespace

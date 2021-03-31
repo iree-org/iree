@@ -65,16 +65,15 @@ iree_cc_library(
     dynamic_symbols
   HDRS
     "dynamic_symbols.h"
+  TEXTUAL_HDRS
+    "dynamic_symbol_tables.h"
   SRCS
     "cuda_headers.h"
-    "dynamic_symbols.cc"
-    "dynamic_symbols_tables.h"
+    "dynamic_symbols.c"
   DEPS
-    absl::span
     cuda_headers
     iree::base::core_headers
-    iree::base::dynamic_library
-    iree::base::status
+    iree::base::internal::dynamic_library
     iree::base::tracing
   PUBLIC
 )

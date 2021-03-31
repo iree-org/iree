@@ -55,7 +55,6 @@ iree_cc_test(
     "intrusive_list_unique_ptr_test.cc"
   DEPS
     ::intrusive_list
-    absl::memory
     iree::testing::gtest
     iree::testing::gtest_main
 )

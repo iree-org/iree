@@ -43,7 +43,6 @@ iree_pyext_module(
     iree::vm
     iree::vm::bytecode_module
     absl::inlined_vector
-    absl::memory
     absl::strings
     absl::optional
     absl::span

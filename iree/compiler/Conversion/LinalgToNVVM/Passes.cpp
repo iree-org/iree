@@ -32,27 +32,34 @@ static void addLinalgToNVVMPasses(OpPassManager &pm) {
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createLowerAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
+  pm.addNestedPass<ModuleOp>(createCSEPass());
+
+  // Distribute linalg onto threads within the workgroup.
+  pm.addPass(createTileAndDistributeToThreads());
+  // TODO: Linalg -> vector
+
+  pm.addNestedPass<ModuleOp>(createLowerAffinePass());
+  pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
+  pm.addNestedPass<ModuleOp>(createCSEPass());
 
   // TODO: This currently maps to a single thread. We should share Tile and
   // distribute with other GPU backends.
   // Linalg -> SCF
-  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
 
   // SCF -> STD
-  pm.addNestedPass<FuncOp>(createLowerToCFGPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createLowerToCFGPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
 
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
-  pm.addPass(createStripDebugInfoPass());
+  pm.addNestedPass<ModuleOp>(createStripDebugInfoPass());
   // convert to NVVM.
-  pm.addPass(createConvertToNVVMPass());
+  pm.addNestedPass<ModuleOp>(createConvertToNVVMPass());
 }
 
 void buildNVVMTransformPassPipeline(OpPassManager &pm) {
@@ -74,7 +81,7 @@ void buildNVVMTransformPassPipeline(OpPassManager &pm) {
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
-  addLinalgToNVVMPasses(nestedModulePM);
+  addLinalgToNVVMPasses(pm);
 }
 
 static PassPipelineRegistration<> linalgToNVVMPipeline(

@@ -15,10 +15,10 @@
 #ifndef IREE_MODULES_VMLA_OP_KERNELS_RUY_H_
 #define IREE_MODULES_VMLA_OP_KERNELS_RUY_H_
 
+#include <memory>
 #include <type_traits>
 
 #include "absl/base/thread_annotations.h"
-#include "absl/memory/memory.h"
 #include "iree/base/status.h"
 #include "ruy/context.h"
 #include "ruy/mul_params.h"
@@ -37,7 +37,7 @@ struct MatMul::RuntimeState {
 };
 
 inline std::unique_ptr<MatMul::RuntimeState> MatMul::CreateRuntimeState() {
-  return absl::make_unique<RuntimeState>();
+  return std::make_unique<RuntimeState>();
 }
 
 // Floating-point case.

@@ -61,7 +61,8 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
       identifier, &driver->identifier,
       (char*)driver + total_size - identifier.size);
   driver->default_device_index = options->default_device_index;
-  iree_status_t status = load_symbols(&driver->syms);
+  iree_status_t status =
+      iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
   if (iree_status_is_ok(status)) {
     *out_driver = (iree_hal_driver_t*)driver;
   } else {
@@ -75,7 +76,7 @@ static void iree_hal_cuda_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  unload_symbols(&driver->syms);
+  iree_hal_cuda_dynamic_symbols_deinitialize(&driver->syms);
   iree_allocator_free(host_allocator, driver);
 
   IREE_TRACE_ZONE_END(z0);

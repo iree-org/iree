@@ -182,7 +182,7 @@ Status ParseToVariantListFromFile(
     iree_hal_allocator_t* allocator, const std::string& filename,
     iree_vm_list_t** out_list) {
   std::string contents;
-  IREE_RETURN_IF_ERROR(file_io::GetFileContents(filename, &contents));
+  IREE_RETURN_IF_ERROR(file_io::GetFileContents(filename.c_str(), &contents));
   absl::InlinedVector<absl::string_view, 4> input_views(
       absl::StrSplit(contents, '\n', absl::SkipEmpty()));
   return ParseToVariantList(descs, allocator, input_views, out_list);

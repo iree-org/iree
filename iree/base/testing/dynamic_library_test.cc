@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/dynamic_library.h"
+#include "iree/base/internal/dynamic_library.h"
 
 #include <string>
 
 #include "iree/base/internal/file_io.h"
-#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/testing/dynamic_library_test_library_embed.h"
 #include "iree/testing/gtest.h"
@@ -32,6 +31,20 @@ static const char* kUnknownName = "library_that_does_not_exist.so";
 
 class DynamicLibraryTest : public ::testing::Test {
  public:
+  static std::string GetTempFilename(const char* suffix) {
+    static int unique_id = 0;
+    char* test_tmpdir = getenv("TEST_TMPDIR");
+    if (!test_tmpdir) {
+      test_tmpdir = getenv("TMPDIR");
+    }
+    if (!test_tmpdir) {
+      test_tmpdir = getenv("TEMP");
+    }
+    IREE_CHECK(test_tmpdir) << "TEST_TMPDIR/TMPDIR/TEMP not defined";
+    return test_tmpdir + std::string("/iree_test_") +
+           std::to_string(unique_id++) + suffix;
+  }
+
   static void SetUpTestCase() {
     // Making files available to tests, particularly across operating systems
     // and build tools (Bazel/CMake) is complicated. Rather than include a test
@@ -39,19 +52,18 @@ class DynamicLibraryTest : public ::testing::Test {
     // the file so it's embedded in a C++ module, then write that embedded file
     // to a platform/test-environment specific temp file for loading.
 
-    std::string base_name = "dynamic_library_test_library";
-    IREE_ASSERT_OK(file_io::GetTempFile(base_name, &library_temp_path_));
     // System APIs for loading dynamic libraries typically require an extension.
 #if defined(IREE_PLATFORM_WINDOWS)
-    library_temp_path_ += ".dll";
+    static constexpr const char* ext = ".dll";
 #else
-    library_temp_path_ += ".so";
+    static constexpr const char* ext = ".so";
 #endif
+    library_temp_path_ = GetTempFilename(ext);
 
     const auto* file_toc = dynamic_library_test_library_create();
-    absl::string_view file_data(reinterpret_cast<const char*>(file_toc->data),
-                                file_toc->size);
-    IREE_ASSERT_OK(file_io::SetFileContents(library_temp_path_, file_data));
+    IREE_ASSERT_OK(file_io::SetFileContents(
+        library_temp_path_.c_str(),
+        iree_make_const_byte_span(file_toc->data, file_toc->size)));
 
     IREE_LOG(INFO) << "Embedded test library written to temp path: "
                    << library_temp_path_;
@@ -63,38 +75,62 @@ class DynamicLibraryTest : public ::testing::Test {
 std::string DynamicLibraryTest::library_temp_path_;
 
 TEST_F(DynamicLibraryTest, LoadLibrarySuccess) {
-  std::unique_ptr<DynamicLibrary> library;
-  IREE_ASSERT_OK(DynamicLibrary::Load(library_temp_path_.c_str(), &library));
+  iree_dynamic_library_t* library = NULL;
+  IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
+      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      iree_allocator_system(), &library));
+  iree_dynamic_library_release(library);
 }
 
 TEST_F(DynamicLibraryTest, LoadLibraryFailure) {
-  std::unique_ptr<DynamicLibrary> library;
-  EXPECT_THAT(DynamicLibrary::Load(kUnknownName, &library),
-              StatusIs(iree::StatusCode::kUnavailable));
+  iree_dynamic_library_t* library = NULL;
+  EXPECT_THAT(iree_dynamic_library_load_from_file(
+                  kUnknownName, IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+                  iree_allocator_system(), &library),
+              StatusIs(iree::StatusCode::kNotFound));
 }
 
 TEST_F(DynamicLibraryTest, LoadLibraryTwice) {
-  std::unique_ptr<DynamicLibrary> library1;
-  IREE_ASSERT_OK(DynamicLibrary::Load(library_temp_path_.c_str(), &library1));
-  std::unique_ptr<DynamicLibrary> library2;
-  IREE_ASSERT_OK(DynamicLibrary::Load(library_temp_path_.c_str(), &library2));
+  iree_dynamic_library_t* library1 = NULL;
+  iree_dynamic_library_t* library2 = NULL;
+  IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
+      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      iree_allocator_system(), &library1));
+  IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
+      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      iree_allocator_system(), &library2));
+  iree_dynamic_library_release(library1);
+  iree_dynamic_library_release(library2);
 }
 
 TEST_F(DynamicLibraryTest, GetSymbolSuccess) {
-  std::unique_ptr<DynamicLibrary> library;
-  IREE_ASSERT_OK(DynamicLibrary::Load(library_temp_path_.c_str(), &library));
+  iree_dynamic_library_t* library = NULL;
+  IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
+      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      iree_allocator_system(), &library));
 
-  auto times_two_fn = library->GetSymbol<int (*)(int)>("times_two");
-  ASSERT_NE(nullptr, times_two_fn);
-  EXPECT_EQ(246, times_two_fn(123));
+  int (*fn_ptr)(int);
+  IREE_ASSERT_OK(iree_dynamic_library_lookup_symbol(library, "times_two",
+                                                    (void**)&fn_ptr));
+  ASSERT_NE(nullptr, fn_ptr);
+  EXPECT_EQ(246, fn_ptr(123));
+
+  iree_dynamic_library_release(library);
 }
 
 TEST_F(DynamicLibraryTest, GetSymbolFailure) {
-  std::unique_ptr<DynamicLibrary> library;
-  IREE_ASSERT_OK(DynamicLibrary::Load(library_temp_path_.c_str(), &library));
+  iree_dynamic_library_t* library = NULL;
+  IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
+      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      iree_allocator_system(), &library));
 
-  auto unknown_fn = library->GetSymbol<int (*)(int)>("unknown");
-  EXPECT_EQ(nullptr, unknown_fn);
+  int (*fn_ptr)(int);
+  EXPECT_THAT(
+      iree_dynamic_library_lookup_symbol(library, "unknown", (void**)&fn_ptr),
+      StatusIs(iree::StatusCode::kNotFound));
+  EXPECT_EQ(nullptr, fn_ptr);
+
+  iree_dynamic_library_release(library);
 }
 
 }  // namespace

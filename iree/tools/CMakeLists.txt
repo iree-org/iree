@@ -115,6 +115,7 @@ iree_cc_binary(
   DEPS
     flatcc::runtime
     iree::base::internal::file_io
+    iree::base::status
     iree::schemas::bytecode_module_def_c_fbs
 )
 
@@ -172,7 +173,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
-      iree::compiler::Dialect::Sequence::IR
       iree::compiler::Dialect::Shape::Conversion
       iree::compiler::Dialect::Shape::IR
       iree::compiler::Dialect::Shape::Transforms

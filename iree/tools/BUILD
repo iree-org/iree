@@ -73,6 +73,7 @@ cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.cc"],
     deps = [
+        "//iree/base:status",
         "//iree/base/internal:file_io",
         "//iree/schemas:bytecode_module_def_c_fbs",
     ],
@@ -93,7 +94,6 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/IREE/Transforms",
-        "//iree/compiler/Dialect/Sequence/IR",
         "//iree/compiler/Dialect/Shape/Conversion",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",

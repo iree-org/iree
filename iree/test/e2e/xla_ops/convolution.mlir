@@ -1,9 +1,9 @@
 func @conv2d_nopadding() attributes { iree.module.export } {
   %inputs = iree.unfoldable_constant dense<[[
-      [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0], [ 9.0, 10.0]],
-      [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0], [19.0, 20.0]],
-      [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0], [29.0, 30.0]],
-      [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0], [39.0, 40.0]]]]> : tensor<1x4x5x2xf32>
+      [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
+      [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
+      [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0]],
+      [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0]]]]> : tensor<1x4x4x2xf32>
   %weights = iree.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
@@ -22,7 +22,7 @@ func @conv2d_nopadding() attributes { iree.module.export } {
           output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x5x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
+        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
@@ -32,15 +32,15 @@ func @conv2d_nopadding() attributes { iree.module.export } {
 
 func @conv2d_nopadding_batch_feature() attributes { iree.module.export } {
   %inputs = iree.unfoldable_constant dense<[
-    [[[ 1.0], [ 3.0], [ 5.0], [ 7.0], [ 9.0]],
-     [[11.0], [13.0], [15.0], [17.0], [19.0]],
-     [[21.0], [23.0], [25.0], [27.0], [29.0]],
-     [[31.0], [33.0], [35.0], [37.0], [39.0]]],
-    [[[ 2.0], [ 4.0], [ 6.0], [ 8.0], [10.0]],
-     [[12.0], [14.0], [16.0], [18.0], [20.0]],
-     [[22.0], [24.0], [26.0], [28.0], [30.0]],
-     [[32.0], [34.0], [36.0], [38.0], [40.0]]]
-      ]> : tensor<2x4x5x1xf32>
+    [[[ 1.0], [ 3.0], [ 5.0], [ 7.0]],
+     [[11.0], [13.0], [15.0], [17.0]],
+     [[21.0], [23.0], [25.0], [27.0]],
+     [[31.0], [33.0], [35.0], [37.0]]],
+    [[[ 2.0], [ 4.0], [ 6.0], [ 8.0]],
+     [[12.0], [14.0], [16.0], [18.0]],
+     [[22.0], [24.0], [26.0], [28.0]],
+     [[32.0], [34.0], [36.0], [38.0]]]
+      ]> : tensor<2x4x4x1xf32>
   %weights = iree.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
@@ -59,7 +59,7 @@ func @conv2d_nopadding_batch_feature() attributes { iree.module.export } {
           output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x5x1xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
+        window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x4x1xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
@@ -72,9 +72,7 @@ func @conv2d_reorder_input_spatial() attributes { iree.module.export } {
       [[ 1.0,  2.0], [11.0, 12.0], [21.0, 22.0], [31.0, 32.0]],
       [[ 3.0,  4.0], [13.0, 14.0], [23.0, 24.0], [33.0, 34.0]],
       [[ 5.0,  6.0], [15.0, 16.0], [25.0, 26.0], [35.0, 36.0]],
-      [[ 7.0,  8.0], [17.0, 18.0], [27.0, 28.0], [37.0, 38.0]],
-      [[ 9.0, 10.0], [19.0, 20.0], [29.0, 30.0], [39.0, 40.0]]]]> : tensor<1x5x4x2xf32>
-
+      [[ 7.0,  8.0], [17.0, 18.0], [27.0, 28.0], [37.0, 38.0]]]]> : tensor<1x4x4x2xf32>
   %weights = iree.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
@@ -93,7 +91,7 @@ func @conv2d_reorder_input_spatial() attributes { iree.module.export } {
           output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x5x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
+        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
@@ -103,10 +101,10 @@ func @conv2d_reorder_input_spatial() attributes { iree.module.export } {
 
 func @conv2d_reorder_kernel() attributes { iree.module.export } {
   %inputs = iree.unfoldable_constant dense<[[
-      [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0], [ 9.0, 10.0]],
-      [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0], [19.0, 20.0]],
-      [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0], [29.0, 30.0]],
-      [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0], [39.0, 40.0]]]]> : tensor<1x4x5x2xf32>
+      [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
+      [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
+      [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0]],
+      [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0]]]]> : tensor<1x4x4x2xf32>
   %weights = iree.unfoldable_constant dense<
       [[[[ 1.0,  3.0], [ 2.0,  4.0]],
         [[ 5.0,  7.0], [ 6.0,  8.0]],
@@ -125,7 +123,7 @@ func @conv2d_reorder_kernel() attributes { iree.module.export } {
           output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x5x2xf32>, tensor<1x3x2x2xf32>) -> tensor<1x2x3x1xf32>
+        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<1x3x2x2xf32>) -> tensor<1x2x3x1xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
@@ -135,10 +133,10 @@ func @conv2d_reorder_kernel() attributes { iree.module.export } {
 
 func @conv2d_reorder_output() attributes { iree.module.export } {
   %inputs = iree.unfoldable_constant dense<[[
-      [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0], [ 9.0, 10.0]],
-      [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0], [19.0, 20.0]],
-      [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0], [29.0, 30.0]],
-      [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0], [39.0, 40.0]]]]> : tensor<1x4x5x2xf32>
+      [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
+      [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
+      [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0]],
+      [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0]]]]> : tensor<1x4x4x2xf32>
   %weights = iree.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
@@ -157,7 +155,7 @@ func @conv2d_reorder_output() attributes { iree.module.export } {
           output_spatial_dimensions = dense<[3, 1]> : tensor<2xi64>},
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x5x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x3x1x2xf32>
+        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x3x1x2xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0, 2090.0]],
       [[1466.0, 2246.0]],

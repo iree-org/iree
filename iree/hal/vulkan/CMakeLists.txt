@@ -74,7 +74,6 @@ iree_cc_library(
     absl::core_headers
     absl::flat_hash_map
     absl::inlined_vector
-    absl::memory
     absl::span
     absl::strings
     absl::synchronization
@@ -99,19 +98,16 @@ iree_cc_library(
   NAME
     dynamic_symbols
   HDRS
-    "dynamic_symbol_tables.h"
     "dynamic_symbols.h"
+  TEXTUAL_HDRS
+    "dynamic_symbol_tables.h"
   SRCS
     "dynamic_symbols.cc"
     "vulkan_headers.h"
   DEPS
     Vulkan::Headers
-    absl::core_headers
-    absl::memory
-    absl::span
-    absl::strings
     iree::base::core_headers
-    iree::base::dynamic_library
+    iree::base::internal::dynamic_library
     iree::base::status
     iree::base::tracing
     iree::hal::vulkan::util::ref_ptr

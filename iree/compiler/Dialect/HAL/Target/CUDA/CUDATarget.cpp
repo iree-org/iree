@@ -105,9 +105,16 @@ class CUDATargetBackend final : public TargetBackend {
       return targetOp.emitError() << "failed to translate the MLIR LLVM "
                                      "dialect to the native llvm::Module";
     }
+    std::vector<std::array<int32_t, 3>> workgroup_sizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
-
+      std::array<int32_t, 3> workgroup_size;
+      for (auto it : llvm::enumerate(func->getAttr("cuda_workgroup_size")
+                                         .cast<DenseIntElementsAttr>()
+                                         .getIntValues())) {
+        workgroup_size[it.index()] = it.value().getZExtValue();
+      }
+      workgroup_sizes.push_back(workgroup_size);
       llvm::Metadata *llvmMetadata[] = {
           llvm::ValueAsMetadata::get(llvmFunc),
           llvm::MDString::get(llvmModule->getContext(), "kernel"),
@@ -153,9 +160,11 @@ class CUDATargetBackend final : public TargetBackend {
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
     iree_CUDABlockSizeDef_vec_start(builder);
+    auto wg_size = workgroup_sizes.begin();
     for (auto shader : entryPointNames) {
-      // Hard-coded workgroup size.
-      iree_CUDABlockSizeDef_vec_push_create(builder, 1, 1, 1);
+      iree_CUDABlockSizeDef_vec_push_create(builder, (*wg_size)[0],
+                                            (*wg_size)[1], (*wg_size)[2]);
+      wg_size++;
     }
     auto blockSizesRef = iree_CUDABlockSizeDef_vec_end(builder);
 
@@ -172,15 +181,6 @@ class CUDATargetBackend final : public TargetBackend {
         builder.getBufferAttr(executableBuilder.getContext()));
 
     return success();
-  }
-
-  std::array<Value, 3> calculateDispatchWorkgroupCount(
-      Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
-      OpBuilder &builder) override {
-    // For now we are not tiling and just dispatch everything as 1,1,1.
-    auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
-    return {constantOne, constantOne, constantOne};
   }
 
  private:

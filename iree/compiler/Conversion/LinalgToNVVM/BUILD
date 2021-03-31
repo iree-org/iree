@@ -22,9 +22,12 @@ cc_library(
     name = "LinalgToNVVM",
     srcs = [
         "ConvertToNVVM.cpp",
+        "KernelConfig.cpp",
         "Passes.cpp",
+        "TileAndDistribute.cpp",
     ],
     hdrs = [
+        "KernelConfig.h",
         "Passes.h",
     ],
     deps = [
@@ -37,7 +40,9 @@ cc_library(
         "//iree/compiler/Dialect/Shape/Transforms",
         "@llvm-project//mlir:GPUToNVVMTransforms",
         "@llvm-project//mlir:GPUTransforms",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:NVVMDialect",
         "@llvm-project//mlir:Pass",

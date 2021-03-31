@@ -535,7 +535,7 @@ module {
 module {
   func @reduce_window_sum_nhwc() {
     %c0 = constant 0 : index
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x17x17x64xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
     %2 = linalg.init_tensor [3, 3] : tensor<3x3xf32>
     %3 = linalg.init_tensor [1, 8, 8, 64] : tensor<1x8x8x64xf32>
@@ -543,7 +543,7 @@ module {
     %5 = linalg.fill(%3, %4) : tensor<1x8x8x64xf32>, f32 -> tensor<1x8x8x64xf32>
     %6 = linalg.pooling_nhwc_sum {
         dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
-      ins(%0, %2 : tensor<1x18x18x64xf32>, tensor<3x3xf32>)
+      ins(%0, %2 : tensor<1x17x17x64xf32>, tensor<3x3xf32>)
       outs(%5 : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
     hal.interface.store.tensor %6, @legacy_io::@ret0, offset = %c0 : tensor<1x8x8x64xf32>
     return
@@ -555,7 +555,7 @@ module {
   }
 }
 // CHECK-LABEL: func @reduce_window_sum_nhwc
-// CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
+// CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x17x17x64xf32>
 // CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
 // CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
 // CHECK:         %[[WINDOW:.+]] = memref.alloc() : memref<3x3xf32>
@@ -564,5 +564,5 @@ module {
 // CHECK:         linalg.pooling_nhwc_sum
 // CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
 // CHECK-SAME:       strides = dense<2> : vector<2xi64>}
-// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x17x17x64xf32>, memref<3x3xf32>)
 // CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
