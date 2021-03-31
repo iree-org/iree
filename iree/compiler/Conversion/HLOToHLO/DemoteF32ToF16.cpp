@@ -110,7 +110,7 @@ class FloatTypeConverter : public TypeConverter {
 class GenericTypeConvert : public ConversionPattern {
  public:
   GenericTypeConvert(MLIRContext *context, TypeConverter &converter)
-      : ConversionPattern(0, converter, MatchAnyOpTypeTag()) {}
+      : ConversionPattern(converter, MatchAnyOpTypeTag(), 0, context) {}
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {

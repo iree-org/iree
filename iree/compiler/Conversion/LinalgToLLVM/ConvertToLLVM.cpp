@@ -700,7 +700,7 @@ void ConvertToLLVMPass::runOnOperation() {
   LLVMConversionTarget target(getContext());
   // IREE::HAL::InterfaceOp will be removed after successful conversion of the
   // rest of the IR.
-  target.addLegalOp<ModuleOp, ModuleTerminatorOp, IREE::HAL::InterfaceOp,
+  target.addLegalOp<ModuleOp, IREE::HAL::InterfaceOp,
                     IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
   target.addIllegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
                            IREE::HAL::HALDialect, math::MathDialect>();

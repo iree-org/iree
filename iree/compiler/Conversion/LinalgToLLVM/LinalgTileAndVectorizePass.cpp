@@ -44,9 +44,9 @@ namespace {
 // that is always templated on an op.
 struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
   using Base = linalg::LinalgBaseTilingPattern;
-  TileWorkgroups(linalg::LinalgTilingOptions options,
+  TileWorkgroups(MLIRContext *context, linalg::LinalgTilingOptions options,
                  linalg::LinalgTransformationFilter marker)
-      : LinalgBaseTilingPattern(options, marker) {}
+      : LinalgBaseTilingPattern(context, options, marker) {}
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op);
@@ -153,6 +153,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     // First level of tiling patterns. (workgroups memory)
     OwningRewritePatternList l1patterns(&getContext());
     l1patterns.insert<TileWorkgroups>(
+        context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
                Operation *operation) -> SmallVector<Value, 4> {
@@ -175,6 +176,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   {
     OwningRewritePatternList l2patterns(&getContext());
     l2patterns.insert<TileWorkgroups>(
+        context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
                Operation *operation) -> SmallVector<Value, 4> {

@@ -76,10 +76,8 @@ static void addLoweringPasses(mlir::PassManager &pm,
       mlir::spirv::createUpdateVersionCapabilityExtensionPass());
 
   pm.addPass(mlir::createAddVulkanLaunchWrapperPass(workgroupSize, args));
-  mlir::LowerToLLVMOptions llvmOptions = {
-      /*useBarePtrCallConv=*/false,
-      /*emitCWrappers=*/true,
-      /*indexBitwidth=*/mlir::kDeriveIndexBitwidthFromDataLayout};
+  mlir::LowerToLLVMOptions llvmOptions(pm.getContext());
+  llvmOptions.emitCWrappers = true;
   pm.addPass(createLowerToLLVMPass(llvmOptions));
   pm.addPass(mlir::createConvertVulkanLaunchFuncToVulkanCallsPass());
 }

@@ -137,10 +137,8 @@ static void addVulkanLoweringPass(mlir::PassManager& manager) {
   modulePM.addPass(mlir::spirv::createLowerABIAttributesPass());
   modulePM.addPass(mlir::spirv::createUpdateVersionCapabilityExtensionPass());
   manager.addPass(mlir::createConvertGpuLaunchFuncToVulkanLaunchFuncPass());
-  mlir::LowerToLLVMOptions llvmOptions = {
-      /*useBarePtrCallConv =*/false,
-      /*emitCWrappers = */ true,
-      /*indexBitwidth =*/mlir::kDeriveIndexBitwidthFromDataLayout};
+  mlir::LowerToLLVMOptions llvmOptions(manager.getContext());
+  llvmOptions.emitCWrappers = true;
   manager.addPass(createLowerToLLVMPass(llvmOptions));
   manager.addPass(mlir::createConvertVulkanLaunchFuncToVulkanCallsPass());
 }

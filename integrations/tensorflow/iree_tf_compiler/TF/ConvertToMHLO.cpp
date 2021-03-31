@@ -95,6 +95,11 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     target.addLegalOp<mlir::CallOp>();
     target.addLegalOp<mlir::tensor::CastOp>();
 
+    // TODO(suderman): Enable logicistic op for lowering once the op is
+    // supported in IREE. Also, remove the numerically unstable ConvertSigmoidOp
+    // pattern in the legalize-tf pass.
+    target.addIllegalOp<mhlo::LogisticOp>();
+
     DenseSet<Operation *> prevUnconvertedOps;
     DenseSet<Operation *> unconvertedOps;
 
