@@ -24,57 +24,22 @@ using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
 
-/// Fills `inputTypes` and `outputTypes` with the original input/output types
-/// for all tiles for `op`.
-/// Copied from iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.cpp
-/// This should be moved to a common location if still needed in the future.
-static void getInputOutputTypes(linalg::LinalgOp op,
-                                SmallVectorImpl<ShapedType> &inputTypes,
-                                SmallVectorImpl<ShapedType> &outputTypes) {
-  // NOTE: Special treatment to let the flow.dispatch.workgroups path to be able
-  // to query launch configurations. This should be cleaned up after the
-  // flow.dispatch.workgroups become the default path.
-  auto inputTypeAttr =
-      op->getAttrOfType<ArrayAttr>("iree.codegen.original_input_types");
-  auto outputTypeAttr =
-      op->getAttrOfType<ArrayAttr>("iree.codegen.original_output_types");
-  if (outputTypeAttr && inputTypeAttr) {
-    for (Type type : inputTypeAttr.getAsValueRange<TypeAttr>())
-      inputTypes.push_back(type.cast<ShapedType>());
-    for (Type type : outputTypeAttr.getAsValueRange<TypeAttr>())
-      outputTypes.push_back(type.cast<ShapedType>());
-  } else {
-    for (Type type : op.getInputBufferTypes())
-      inputTypes.push_back(type.cast<ShapedType>());
-    for (Type type : op.getOutputBufferTypes())
-      outputTypes.push_back(type.cast<ShapedType>());
-  }
-}
-
 static LaunchConfig getOpLaunchConfig(linalg::GenericOp op) {
   LaunchConfig config;
   size_t numLoops = getNumOuterParallelLoops(op);
   if (numLoops == 0) return config;
 
-  SmallVector<ShapedType, 4> inputTypes, outputTypes;
-  getInputOutputTypes(op, inputTypes, outputTypes);
-
   config.setWorkgroupSize({cudaWarpSize, 1, 1});
-  SmallVector<int64_t, 4> candidateTileSizes;
-  candidateTileSizes.append({4 * cudaWarpSize, 2 * cudaWarpSize, cudaWarpSize});
-  // Use the first tile size that can divide the shape. If the shape is not
-  // aligned on any of the tile sizes pick the smallest tile of one element per
-  // thread.
-  int64_t lowerTs = cudaWarpSize;
-  for (int64_t size : candidateTileSizes) {
-    if (outputTypes[0].getShape().back() % size != 0) continue;
-    lowerTs = size;
-    break;
-  }
+  // Pick a fixed tile size independent of the original shape.
+  // TODO(thomasraoux): Currently the original shape information is lost during
+  // tiling at the flow level. We need way to access it to be able to make a
+  // better choice of tile size.
+  int64_t lowerTs = 4 * cudaWarpSize;
   SmallVector<int64_t, 4> ts;
   ts.resize(numLoops, 1);
   ts.back() = lowerTs;
   config.setTileSizes(op, ts, 0);  // Workgroup level.
+  config.setTileSizes(op, {}, 1);  // Subgroup level.
   ts.back() = lowerTs / cudaWarpSize;
   config.setTileSizes(op, ts, 2);  // Thread level.
   return config;

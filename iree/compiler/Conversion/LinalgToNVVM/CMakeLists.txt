@@ -21,6 +21,7 @@ iree_cc_library(
     "KernelConfig.cpp"
     "Passes.cpp"
     "TileAndDistribute.cpp"
+    "VectorizationPass.cpp"
   DEPS
     MLIRGPU
     MLIRGPUToNVVMTransforms
@@ -32,7 +33,11 @@ iree_cc_library(
     MLIRSCFToStandard
     MLIRStandard
     MLIRStandardToLLVM
+    MLIRStandardToSPIRV
     MLIRTransforms
+    MLIRVector
+    MLIRVectorToLLVM
+    MLIRVectorToSCF
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToHLO
