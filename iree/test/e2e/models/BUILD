@@ -68,7 +68,6 @@ iree_check_single_backend_test_suite(
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
-        "-iree-flow-inline-constants-max-byte-length=2048",
         "-iree-codegen-spirv-experimental-linalg-on-tensors",
         "-iree-spirv-enable-vectorization",
     ],
@@ -81,7 +80,6 @@ iree_check_single_backend_test_suite(
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
-        "-iree-flow-inline-constants-max-byte-length=2048",
         "-iree-codegen-llvm-experimental-linalg-on-tensors",
     ],
     driver = "dylib",
