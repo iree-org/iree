@@ -28,6 +28,7 @@ typedef struct {
   iree_hal_cuda_context_wrapper_t* context;
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
+  iree_hal_queue_affinity_t queue_affinity;
   CUgraph graph;
   CUgraphExec exec;
   // Keep track of the last node added to the command buffer as we are currently
@@ -52,6 +53,7 @@ iree_status_t iree_hal_cuda_graph_command_buffer_allocate(
     iree_hal_cuda_context_wrapper_t* context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
@@ -72,6 +74,7 @@ iree_status_t iree_hal_cuda_graph_command_buffer_allocate(
     command_buffer->context = context;
     command_buffer->mode = mode;
     command_buffer->allowed_categories = command_categories;
+    command_buffer->queue_affinity = queue_affinity;
     command_buffer->graph = graph;
     command_buffer->exec = NULL;
     command_buffer->last_node = NULL;

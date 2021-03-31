@@ -498,7 +498,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create, rii, r) {
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
-      device, modes, command_categories, &command_buffer));
+      device, modes, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
   rets->r0 = iree_hal_command_buffer_move_ref(command_buffer);
   return iree_ok_status();
 }

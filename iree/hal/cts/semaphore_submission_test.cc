@@ -57,7 +57,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitAndSignal) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -94,7 +95,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithWait) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
@@ -142,7 +144,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithMultipleSemaphores) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));

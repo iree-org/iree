@@ -817,9 +817,25 @@ static iree_hal_allocator_t* iree_hal_vulkan_device_allocator(
   return device->device_allocator;
 }
 
+// Returns the queue to submit work to based on the |queue_affinity|.
+static CommandQueue* iree_hal_vulkan_device_select_queue(
+    iree_hal_vulkan_device_t* device,
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity) {
+  // TODO(benvanik): meaningful heuristics for affinity. We don't generate
+  // anything from the compiler that uses multiple queues and until we do it's
+  // best not to do anything too clever here.
+  if (command_categories == IREE_HAL_COMMAND_CATEGORY_TRANSFER) {
+    return device
+        ->transfer_queues[queue_affinity % device->transfer_queue_count];
+  }
+  return device->dispatch_queues[queue_affinity % device->dispatch_queue_count];
+}
+
 static iree_status_t iree_hal_vulkan_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
 
@@ -837,7 +853,7 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
 
   return iree_hal_vulkan_direct_command_buffer_allocate(
       device->logical_device, command_pool, mode, command_categories,
-      device->descriptor_pool_cache, out_command_buffer);
+      queue_affinity, device->descriptor_pool_cache, out_command_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_device_create_descriptor_set(
@@ -901,24 +917,11 @@ static iree_status_t iree_hal_vulkan_device_create_semaphore(
                                                  initial_value, out_semaphore);
 }
 
-// Returns the queue to submit work to based on the |queue_affinity|.
-static CommandQueue* iree_hal_vulkan_device_select_queue(
-    iree_hal_vulkan_device_t* device,
-    iree_hal_command_category_t command_categories, uint64_t queue_affinity) {
-  // TODO(benvanik): meaningful heuristics for affinity. We don't generate
-  // anything from the compiler that uses multiple queues and until we do it's
-  // best not to do anything too clever here.
-  if (command_categories == IREE_HAL_COMMAND_CATEGORY_TRANSFER) {
-    return device
-        ->transfer_queues[queue_affinity % device->transfer_queue_count];
-  }
-  return device->dispatch_queues[queue_affinity % device->dispatch_queue_count];
-}
-
 static iree_status_t iree_hal_vulkan_device_queue_submit(
     iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories, uint64_t queue_affinity,
-    iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   CommandQueue* queue = iree_hal_vulkan_device_select_queue(
       device, command_categories, queue_affinity);
