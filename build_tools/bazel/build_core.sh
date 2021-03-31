@@ -48,6 +48,8 @@ declare -a test_env_args=(
 declare -a default_build_tag_filters=("-nokokoro")
 declare -a default_test_tag_filters=("-nokokoro" "-driver=metal")
 
+# vulkan f16 tests cannot run with swiftshaders.
+default_test_tag_filters+=("-vulkan_f16")
 # CUDA CI testing disabled until we setup a target for it.
 default_test_tag_filters+=("-driver=cuda")
 
