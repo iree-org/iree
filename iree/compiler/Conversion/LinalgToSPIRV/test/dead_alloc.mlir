@@ -7,7 +7,7 @@ module {
       memref<8x4xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>, 3>
     %c0 = constant 0 : index
     %cst_0 = constant dense<0.000000e+00> : vector<1x4xf32>
-    vector.transfer_write %cst_0, %1[%c0, %c0] {masked = [false, false]} : 
+    vector.transfer_write %cst_0, %1[%c0, %c0] {in_bounds = [true, true]} :
       vector<1x4xf32>, memref<8x4xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>, 3>
     return
   }

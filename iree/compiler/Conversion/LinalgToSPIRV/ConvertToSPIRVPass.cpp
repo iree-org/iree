@@ -347,10 +347,10 @@ class TransferToCoopMatLoadStore final : public CoopMatOpLowering<OpTy> {
     // TODO(thomasraoux): use coloumn major operand when TransfertRead +
     // TransposeOp.
     if (!op.permutation_map().isMinorIdentity()) return failure();
-    if (op.masked() &&
-        llvm::any_of(op.masked()->template cast<ArrayAttr>(),
-                     [](mlir::Attribute maskedDim) {
-                       return maskedDim.cast<BoolAttr>().getValue();
+    if (op.in_bounds() &&
+        llvm::any_of(op.in_bounds()->template cast<ArrayAttr>(),
+                     [](mlir::Attribute dimInBounds) {
+                       return !dimInBounds.cast<BoolAttr>().getValue();
                      }))
       return failure();
     auto matType = spirv::CooperativeMatrixNVType::get(

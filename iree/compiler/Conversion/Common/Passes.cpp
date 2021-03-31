@@ -25,7 +25,6 @@ void addLinalgBufferizePasses(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createBufferAllocViewCleanUpPass());
-  passManager.addPass(createCopyRemovalPass());
   // passManager.addPass(createBufferHoistingPass());
   // TODO(nicolasvasilache): bug in buffer loop hoisting with
   // dynamic_linalg_matmul_on_tensors_fuse_0.mlir
