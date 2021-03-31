@@ -253,7 +253,8 @@ iree_vm_list_resize(iree_vm_list_t* list, iree_host_size_t new_size) {
     list->count = new_size;
   } else if (new_size > list->capacity) {
     // Extending beyond capacity.
-    IREE_RETURN_IF_ERROR(iree_vm_list_reserve(list, new_size));
+    IREE_RETURN_IF_ERROR(iree_vm_list_reserve(
+        list, iree_max(list->capacity * 2, iree_align(new_size, 64))));
   }
   list->count = new_size;
   return iree_ok_status();
