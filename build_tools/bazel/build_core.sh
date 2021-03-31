@@ -48,6 +48,9 @@ declare -a test_env_args=(
 declare -a default_build_tag_filters=("-nokokoro")
 declare -a default_test_tag_filters=("-nokokoro" "-driver=metal")
 
+# The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
+# We test on SwiftShader, which does not support this extension.
+default_test_tag_filters+=("-vulkan_uses_vk_khr_shader_float16_int8")
 # CUDA CI testing disabled until we setup a target for it.
 default_test_tag_filters+=("-driver=cuda")
 
