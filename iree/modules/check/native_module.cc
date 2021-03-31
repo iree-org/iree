@@ -71,13 +71,15 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   return AbslSpan<uint8_t>(lhs_bytes) == AbslSpan<uint8_t>(rhs_bytes);
 }
 
+static constexpr float floatPrecisionThreshold = 0.0001f;
+
 template <typename T>
 bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   auto lhs_span = AbslSpan<T>(lhs_bytes);
   auto rhs_span = AbslSpan<T>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (fabs(lhs_span[i] - rhs_span[i]) > 0.0001) {
+    if (fabs(lhs_span[i] - rhs_span[i]) > floatPrecisionThreshold) {
       return false;
     }
   }
@@ -91,7 +93,8 @@ bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
     if (fabs(half_float::detail::half2float<float>(lhs_span[i]) -
-             half_float::detail::half2float<float>(rhs_span[i])) > 0.0001) {
+             half_float::detail::half2float<float>(rhs_span[i])) >
+        floatPrecisionThreshold) {
       return false;
     }
   }
