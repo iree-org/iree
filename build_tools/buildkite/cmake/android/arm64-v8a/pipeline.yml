@@ -59,7 +59,9 @@ steps:
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
       - "cd build-android/"
-      - "ctest --output-on-failure"
+      # vulkan tests using khr_shader_float16_int8 are failing on pixel4.
+      # Disabling it until we identify the root cause.
+      - "ctest --output-on-failure --label-exclude \"^vulkan_uses_vk_khr_shader_float16_int8$\""
     agents:
       - "android-soc=snapdragon-855"
       - "queue=test-android"
