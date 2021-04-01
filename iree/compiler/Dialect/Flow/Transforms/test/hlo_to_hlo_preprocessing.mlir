@@ -79,6 +79,35 @@ func @reduce_window(%input: tensor<1x16x16x64xf32>) -> tensor<1x8x8x64xf32> {
 
 // -----
 
+// CHECK-LABEL: @reduce_window_variadic
+func @reduce_window_variadic(%input0: tensor<1x16x16x64xf32>, %input1: tensor<1x16x16x64xi32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>) {
+  // CHECK: %[[INITVAL0:.+]] = mhlo.constant dense<0xFF800000> : tensor<f32>
+  // CHECK: %[[INITVAL1:.+]] = mhlo.constant dense<3> : tensor<i32>
+  %initval0 = mhlo.constant dense<0xFF800000> : tensor<f32>
+  %initval1 = mhlo.constant dense<3> : tensor<i32>
+
+  //      CHECK: %[[PAD0:.+]] = "mhlo.pad"(%{{.+}}, %[[INITVAL0]])
+  // CHECK-SAME: edge_padding_high = dense<[0, 1, 1, 0]> : tensor<4xi64>
+  // CHECK-SAME: edge_padding_low = dense<[0, 1, 1, 0]> : tensor<4xi64>
+  //      CHECK: %[[PAD1:.+]] = "mhlo.pad"(%{{.+}}, %[[INITVAL1]])
+  // CHECK-SAME: edge_padding_high = dense<[0, 1, 1, 0]> : tensor<4xi64>
+  // CHECK-SAME: edge_padding_low = dense<[0, 1, 1, 0]> : tensor<4xi64>
+  //      CHECK: "mhlo.reduce_window"(%[[PAD0]], %[[PAD1]], %[[INITVAL0]], %[[INITVAL1]])
+  //  CHECK-NOT: padding
+  %0:2 = "mhlo.reduce_window"(%input0, %input1, %initval0, %initval1) ( {
+  ^bb0(%arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<f32>, %arg4: tensor<i32>):   // no predecessors
+    %3 = mhlo.maximum %arg1, %arg3 : tensor<f32>
+    %4 = mhlo.add %arg2, %arg4 : tensor<i32>
+    "mhlo.return"(%3, %4) : (tensor<f32>, tensor<i32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
+      window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>,
+      padding = dense<[[0, 0], [1, 1], [1, 1], [0, 0]]> : tensor<4x2xi64>
+  } : (tensor<1x16x16x64xf32>, tensor<1x16x16x64xi32>, tensor<f32>, tensor<i32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>)
+  return %0#0, %0#1 : tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>
+}
+
+// -----
+
 func @log_plus_one(%input: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: mhlo.add
   // CHECK: mhlo.log
