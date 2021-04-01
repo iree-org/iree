@@ -767,7 +767,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         func @dot_ex_dispatch_0() {
           %c0 = constant 0 : index
@@ -808,7 +808,7 @@ module  {
 {% raw %}
 ```
 hal.executable.target @llvm_aot, filter="dylib*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
   module  {
     func @dot_ex_dispatch_0() {
       %c0 = constant 0 : index
@@ -1116,7 +1116,7 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 hal.executable.target @llvm_aot, filter="dylib*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
     %c1 = constant 1 : index
     %c32 = constant 32 : index
@@ -3295,7 +3295,7 @@ module  {
 {% raw %}
 ```
 hal.executable.target @llvm_aot, filter="dylib*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
     %c1 = constant 1 : index
     %c32 = constant 32 : index
@@ -3665,7 +3665,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = constant 1 : index
         %c32 = constant 32 : index
@@ -4021,51 +4021,55 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %sz = hal.allocator.compute_size %allocator, shape = [%c32, %c64], element_type = %c50331680_i32
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
+    %sz = hal.allocator.compute_size<%allocator : !hal.allocator> shape([%c32, %c64]) type(%c50331680_i32) : index
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%sz}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
     %c2048 = constant 2048 : index
-    %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
+    %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
     %c0 = constant 0 : index
     %c32_0 = constant 32 : index
     %c1024 = constant 1024 : index
-    %allocator_1 = hal.buffer.allocator %arg0 : !hal.allocator
+    %allocator_1 = hal.buffer.allocator<%arg0 : !hal.buffer> : !hal.allocator
     %c50331680_i32_2 = constant 50331680 : i32
-    %sz_3 = hal.allocator.compute_size %allocator_1, shape = [%c32_0, %c1024], element_type = %c50331680_i32_2
+    %sz_3 = hal.allocator.compute_size<%allocator_1 : !hal.allocator> shape([%c32_0, %c1024]) type(%c50331680_i32_2) : index
     %c0_4 = constant 0 : index
     %c1024_5 = constant 1024 : index
     %c64_6 = constant 64 : index
-    %allocator_7 = hal.buffer.allocator %arg1 : !hal.allocator
+    %allocator_7 = hal.buffer.allocator<%arg1 : !hal.buffer> : !hal.allocator
     %c50331680_i32_8 = constant 50331680 : i32
-    %sz_9 = hal.allocator.compute_size %allocator_7, shape = [%c1024_5, %c64_6], element_type = %c50331680_i32_8
+    %sz_9 = hal.allocator.compute_size<%allocator_7 : !hal.allocator> shape([%c1024_5, %c64_6]) type(%c50331680_i32_8) : index
     %c1 = constant 1 : index
     %c32_10 = constant 32 : index
     %c64_11 = constant 64 : index
-    %allocator_12 = hal.buffer.allocator %buffer : !hal.allocator
+    %allocator_12 = hal.buffer.allocator<%buffer : !hal.buffer> : !hal.allocator
     %c50331680_i32_13 = constant 50331680 : i32
-    %sz_14 = hal.allocator.compute_size %allocator_12, shape = [%c32_10, %c64_11], element_type = %c50331680_i32_13
+    %sz_14 = hal.allocator.compute_size<%allocator_12 : !hal.allocator> shape([%c32_10, %c64_11]) type(%c50331680_i32_13) : index
     %c2 = constant 2 : index
     %c0_15 = constant 0 : index
-    hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0_15, bindings = [%c0_4 = (%arg0, %c0, %sz_3), %c1 = (%arg1, %c0, %sz_9), %c2 = (%buffer, %c0, %sz_14)]
-    hal.device.switch(%dev : !hal.device)
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0_15] bindings([
+      %c0_4 = (%arg0 : !hal.buffer)[%c0, %sz_3], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %sz_9], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %sz_14]
+    ])
+    hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_16 = constant 1 : index
       %c32_17 = constant 32 : index
       %c1_18 = constant 1 : index
       %c64_19 = constant 64 : index
       %c1_20 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_20, %c1_18, %c1_16]
+      hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0) workgroups([%c1_20, %c1_18, %c1_16])
       hal.return
     }
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   }
 }
@@ -4078,51 +4082,55 @@ module  {
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c50331680_i32 = constant 50331680 : i32
-  %sz = hal.allocator.compute_size %allocator, shape = [%c32, %c64], element_type = %c50331680_i32
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
+  %sz = hal.allocator.compute_size<%allocator : !hal.allocator> shape([%c32, %c64]) type(%c50331680_i32) : index
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%sz}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
   %c2048 = constant 2048 : index
-  %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
+  %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
   %c0 = constant 0 : index
   %c32_0 = constant 32 : index
   %c1024 = constant 1024 : index
-  %allocator_1 = hal.buffer.allocator %arg0 : !hal.allocator
+  %allocator_1 = hal.buffer.allocator<%arg0 : !hal.buffer> : !hal.allocator
   %c50331680_i32_2 = constant 50331680 : i32
-  %sz_3 = hal.allocator.compute_size %allocator_1, shape = [%c32_0, %c1024], element_type = %c50331680_i32_2
+  %sz_3 = hal.allocator.compute_size<%allocator_1 : !hal.allocator> shape([%c32_0, %c1024]) type(%c50331680_i32_2) : index
   %c0_4 = constant 0 : index
   %c1024_5 = constant 1024 : index
   %c64_6 = constant 64 : index
-  %allocator_7 = hal.buffer.allocator %arg1 : !hal.allocator
+  %allocator_7 = hal.buffer.allocator<%arg1 : !hal.buffer> : !hal.allocator
   %c50331680_i32_8 = constant 50331680 : i32
-  %sz_9 = hal.allocator.compute_size %allocator_7, shape = [%c1024_5, %c64_6], element_type = %c50331680_i32_8
+  %sz_9 = hal.allocator.compute_size<%allocator_7 : !hal.allocator> shape([%c1024_5, %c64_6]) type(%c50331680_i32_8) : index
   %c1 = constant 1 : index
   %c32_10 = constant 32 : index
   %c64_11 = constant 64 : index
-  %allocator_12 = hal.buffer.allocator %buffer : !hal.allocator
+  %allocator_12 = hal.buffer.allocator<%buffer : !hal.buffer> : !hal.allocator
   %c50331680_i32_13 = constant 50331680 : i32
-  %sz_14 = hal.allocator.compute_size %allocator_12, shape = [%c32_10, %c64_11], element_type = %c50331680_i32_13
+  %sz_14 = hal.allocator.compute_size<%allocator_12 : !hal.allocator> shape([%c32_10, %c64_11]) type(%c50331680_i32_13) : index
   %c2 = constant 2 : index
   %c0_15 = constant 0 : index
-  hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0_15, bindings = [%c0_4 = (%arg0, %c0, %sz_3), %c1 = (%arg1, %c0, %sz_9), %c2 = (%buffer, %c0, %sz_14)]
-  hal.device.switch(%dev : !hal.device)
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0_15] bindings([
+    %c0_4 = (%arg0 : !hal.buffer)[%c0, %sz_3], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %sz_9], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %sz_14]
+  ])
+  hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_16 = constant 1 : index
     %c32_17 = constant 32 : index
     %c1_18 = constant 1 : index
     %c64_19 = constant 64 : index
     %c1_20 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_20, %c1_18, %c1_16]
+    hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0) workgroups([%c1_20, %c1_18, %c1_16])
     hal.return
   }
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 }
 
@@ -4141,22 +4149,26 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
-  %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-  hal.device.switch(%dev : !hal.device)
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
+  %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
+  hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_0 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0) workgroups([%c1_0, %c1_0, %c1_0])
     hal.return
   }
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 }
 
@@ -4175,22 +4187,26 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
-  %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-  hal.device.switch(%dev : !hal.device)
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
+  %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
+  hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_0 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0) workgroups([%c1_0, %c1_0, %c1_0])
     hal.return
   }
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 }
 
@@ -4209,7 +4225,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = constant 1 : index
         %c32 = constant 32 : index
@@ -4564,7 +4580,7 @@ module  {
       }
     }
   }
-  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
@@ -4572,26 +4588,30 @@ module  {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
-    %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
-    hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-    hal.device.switch(%dev : !hal.device)
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
+    %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
+      %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+    ])
+    hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_0 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+      hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0) workgroups([%c1_0, %c1_0, %c1_0])
       hal.return
     }
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   }
   func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
-    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
     hal.check_success %0, "semaphore wait failed"
     %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
     %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
@@ -4599,17 +4619,17 @@ module  {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-    hal.semaphore.signal %arg4, value = %arg5
+    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+    hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
     return %view : !hal.buffer_view
   }
   func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %device = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
     %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
@@ -4630,7 +4650,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = constant 1 : index
         %c32 = constant 32 : index
@@ -4985,7 +5005,7 @@ module  {
       }
     }
   }
-  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
@@ -4993,26 +5013,30 @@ module  {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
-    %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
-    hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-    hal.device.switch(%dev : !hal.device)
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
+    %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
+      %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+    ])
+    hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_0 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+      hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0) workgroups([%c1_0, %c1_0, %c1_0])
       hal.return
     }
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   }
   func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
-    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
     hal.check_success %0, "semaphore wait failed"
     %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
     %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
@@ -5020,17 +5044,17 @@ module  {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-    hal.semaphore.signal %arg4, value = %arg5
+    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+    hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
     return %view : !hal.buffer_view
   }
   func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %device = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
     %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
@@ -5051,7 +5075,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = constant 1 : index
         hal.return %c1, %c1, %c1 : index, index, index
@@ -5402,7 +5426,7 @@ module  {
       }
     }
   }
-  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
@@ -5410,46 +5434,50 @@ module  {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
-    %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
-    hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-    hal.device.switch(%dev : !hal.device)
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
+    %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
+      %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+    ])
+    hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_0 = constant 1 : index
-      %0 = hal.command_buffer.device %arg2 : !hal.device
-      %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
-      hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+      %0 = hal.command_buffer.device<%arg2 : !hal.command_buffer> : !hal.device
+      %exe = hal.executable.lookup device(%0 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
+      hal.command_buffer.dispatch<%arg2 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c1_0, %c1_0, %c1_0])
       hal.return
     }
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   }
   func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
     hal.check_success %0, "semaphore wait failed"
     %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
     %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
     %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-    hal.semaphore.signal %arg4, value = %arg5
+    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+    hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
     return %view : !hal.buffer_view
   }
   func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %device = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
     %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
@@ -5462,7 +5490,7 @@ module  {
 
 {% raw %}
 ```
-func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
   %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
@@ -5470,24 +5498,28 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
-  %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-  hal.device.switch(%dev : !hal.device)
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
+  %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
+  hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_0 = constant 1 : index
-    %0 = hal.command_buffer.device %arg2 : !hal.device
-    %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    %0 = hal.command_buffer.device<%arg2 : !hal.command_buffer> : !hal.device
+    %exe = hal.executable.lookup device(%0 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
+    hal.command_buffer.dispatch<%arg2 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c1_0, %c1_0, %c1_0])
     hal.return
   }
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 }
 
@@ -5498,7 +5530,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 
 {% raw %}
 ```
-func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
   %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
@@ -5506,24 +5538,28 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
-  %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-  hal.device.switch(%dev : !hal.device)
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
+  %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
+  hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_0 = constant 1 : index
-    %0 = hal.command_buffer.device %arg2 : !hal.device
-    %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    %0 = hal.command_buffer.device<%arg2 : !hal.command_buffer> : !hal.device
+    %exe = hal.executable.lookup device(%0 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
+    hal.command_buffer.dispatch<%arg2 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c1_0, %c1_0, %c1_0])
     hal.return
   }
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 }
 
@@ -5538,13 +5574,13 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
   %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c50331680_i32 = constant 50331680 : i32
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
   hal.check_success %0, "semaphore wait failed"
   %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
   %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
   %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
+  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+  hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
   return %view : !hal.buffer_view
 }
 
@@ -5559,13 +5595,13 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
   %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c50331680_i32 = constant 50331680 : i32
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
   hal.check_success %0, "semaphore wait failed"
   %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
   %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
   %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
+  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+  hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
   return %view : !hal.buffer_view
 }
 
@@ -5579,10 +5615,10 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %device = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
   %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
   hal.check_success %1, "semaphore wait failed"
   return %0 : !hal.buffer_view
 }
@@ -5597,10 +5633,10 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %device = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
   %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
   hal.check_success %1, "semaphore wait failed"
   return %0 : !hal.buffer_view
 }
@@ -5615,24 +5651,24 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 module  {
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-    %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %device = hal.ex.shared_device : !hal.device
+    %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
   func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-    %dev = hal.ex.shared_device : !hal.device
-    %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+    %device = hal.ex.shared_device : !hal.device
+    %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
   func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-    %dev = hal.ex.shared_device : !hal.device
-    %0 = hal.device.switch(%dev : !hal.device) -> !hal.executable
-    #hal.device.match.id<"dylib*">(%arg0 = %dev : !hal.device) {
+    %device = hal.ex.shared_device : !hal.device
+    %0 = hal.device.switch<%device : !hal.device> -> !hal.executable
+    #hal.device.match.id<"dylib*">(%arg0 = %device : !hal.device) {
       %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-      %exe = hal.executable.create %arg0, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+      %exe = hal.executable.create device(%arg0 : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
       hal.return %exe : !hal.executable
     },
     #hal.match.always() {
@@ -5648,7 +5684,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = constant 1 : index
         hal.return %c1, %c1, %c1 : index, index, index
@@ -5999,7 +6035,7 @@ module  {
       }
     }
   }
-  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
@@ -6007,46 +6043,50 @@ module  {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-    hal.device.switch(%dev : !hal.device)
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+      %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+    ])
+    hal.device.switch<%device : !hal.device>
     #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_0 = constant 1 : index
-      %1 = hal.command_buffer.device %arg2 : !hal.device
+      %1 = hal.command_buffer.device<%arg2 : !hal.command_buffer> : !hal.device
       %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-      hal.command_buffer.dispatch %arg2, %2, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+      hal.command_buffer.dispatch<%arg2 : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c1_0, %c1_0, %c1_0])
       hal.return
     }
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   }
   func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
     hal.check_success %0, "semaphore wait failed"
     %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
     %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
     %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-    hal.semaphore.signal %arg4, value = %arg5
+    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+    hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
     return %view : !hal.buffer_view
   }
   func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %device = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
     %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
@@ -6060,8 +6100,8 @@ module  {
 {% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-  %dev = hal.ex.shared_device : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  %device = hal.ex.shared_device : !hal.device
+  %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
 }
 
@@ -6074,8 +6114,8 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  %dev = hal.ex.shared_device : !hal.device
-  %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+  %device = hal.ex.shared_device : !hal.device
+  %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
   return %executable_layout : !hal.executable_layout
 }
 
@@ -6087,12 +6127,12 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 {% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-  %dev = hal.ex.shared_device : !hal.device
-  %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+  %device = hal.ex.shared_device : !hal.device
+  %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
   br ^bb5(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %true = constant true
@@ -6113,7 +6153,7 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 
 {% raw %}
 ```
-func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
   %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
@@ -6121,27 +6161,31 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
   %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-  %1 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
+  %1 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %c1_0 = constant 1 : index
-  %2 = hal.command_buffer.device %cmd : !hal.device
+  %2 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
   %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%3 : !hal.executable)[0] workgroups([%c1_0, %c1_0, %c1_0])
   br ^bb3
 ^bb2:  // pred: ^bb0
   iree.unreachable
 ^bb3:  // pred: ^bb1
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 }
 
@@ -6156,13 +6200,13 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
   %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c50331680_i32 = constant 50331680 : i32
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
   hal.check_success %0, "semaphore wait failed"
   %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
   %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
   %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
+  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+  hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
   return %view : !hal.buffer_view
 }
 
@@ -6176,10 +6220,10 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %device = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
   %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
   hal.check_success %1, "semaphore wait failed"
   return %0 : !hal.buffer_view
 }
@@ -6194,25 +6238,25 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 module  {
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-    %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %device = hal.ex.shared_device : !hal.device
+    %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
   func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-    %dev = hal.ex.shared_device : !hal.device
-    %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+    %device = hal.ex.shared_device : !hal.device
+    %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
   func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-    %dev = hal.ex.shared_device : !hal.device
-    %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+    %device = hal.ex.shared_device : !hal.device
+    %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
     br ^bb5(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
     %true = constant true
@@ -6232,7 +6276,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = constant 1 : index
         hal.return %c1, %c1, %c1 : index, index, index
@@ -6583,7 +6627,7 @@ module  {
       }
     }
   }
-  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
@@ -6591,49 +6635,53 @@ module  {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
-    %1 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+      %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+    ])
+    %1 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %c1_0 = constant 1 : index
-    %2 = hal.command_buffer.device %cmd : !hal.device
+    %2 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
     %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%3 : !hal.executable)[0] workgroups([%c1_0, %c1_0, %c1_0])
     br ^bb3
   ^bb2:  // pred: ^bb0
     iree.unreachable
   ^bb3:  // pred: ^bb1
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   }
   func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
     hal.check_success %0, "semaphore wait failed"
     %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
     %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
     %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-    hal.semaphore.signal %arg4, value = %arg5
+    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+    hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
     return %view : !hal.buffer_view
   }
   func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %device = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
     %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
@@ -6649,31 +6697,31 @@ module  {
 module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func private @_device_match_id_0_initializer() -> i1 {
-    %dev = hal.ex.shared_device : !hal.device
-    %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+    %device = hal.ex.shared_device : !hal.device
+    %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
     return %0 : i1
   }
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-    %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %device = hal.ex.shared_device : !hal.device
+    %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
   func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-    %dev = hal.ex.shared_device : !hal.device
-    %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+    %device = hal.ex.shared_device : !hal.device
+    %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
   func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-    %dev = hal.ex.shared_device : !hal.device
+    %device = hal.ex.shared_device : !hal.device
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
     br ^bb5(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
     %true = constant true
@@ -6693,7 +6741,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = constant 1 : index
         hal.return %c1, %c1, %c1 : index, index, index
@@ -7044,7 +7092,7 @@ module  {
       }
     }
   }
-  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
@@ -7052,49 +7100,53 @@ module  {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+      %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+    ])
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %c1_0 = constant 1 : index
-    %2 = hal.command_buffer.device %cmd : !hal.device
+    %2 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
     %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%3 : !hal.executable)[0] workgroups([%c1_0, %c1_0, %c1_0])
     br ^bb3
   ^bb2:  // pred: ^bb0
     iree.unreachable
   ^bb3:  // pred: ^bb1
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   }
   func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
     hal.check_success %0, "semaphore wait failed"
     %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
     %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
     %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-    hal.semaphore.signal %arg4, value = %arg5
+    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+    hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
     return %view : !hal.buffer_view
   }
   func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %device = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
     %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
@@ -7108,8 +7160,8 @@ module  {
 {% raw %}
 ```
 func private @_device_match_id_0_initializer() -> i1 {
-  %dev = hal.ex.shared_device : !hal.device
-  %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+  %device = hal.ex.shared_device : !hal.device
+  %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
   return %0 : i1
 }
 
@@ -7121,8 +7173,8 @@ func private @_device_match_id_0_initializer() -> i1 {
 {% raw %}
 ```
 func private @_device_match_id_0_initializer() -> i1 {
-  %dev = hal.ex.shared_device : !hal.device
-  %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+  %device = hal.ex.shared_device : !hal.device
+  %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
   return %0 : i1
 }
 
@@ -7134,8 +7186,8 @@ func private @_device_match_id_0_initializer() -> i1 {
 {% raw %}
 ```
 func private @_device_match_id_0_initializer() -> i1 {
-  %dev = hal.ex.shared_device : !hal.device
-  %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+  %device = hal.ex.shared_device : !hal.device
+  %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
   return %0 : i1
 }
 
@@ -7147,8 +7199,8 @@ func private @_device_match_id_0_initializer() -> i1 {
 {% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-  %dev = hal.ex.shared_device : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  %device = hal.ex.shared_device : !hal.device
+  %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
 }
 
@@ -7160,8 +7212,8 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 {% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-  %dev = hal.ex.shared_device : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  %device = hal.ex.shared_device : !hal.device
+  %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
 }
 
@@ -7173,8 +7225,8 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 {% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-  %dev = hal.ex.shared_device : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  %device = hal.ex.shared_device : !hal.device
+  %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
 }
 
@@ -7187,8 +7239,8 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  %dev = hal.ex.shared_device : !hal.device
-  %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+  %device = hal.ex.shared_device : !hal.device
+  %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
   return %executable_layout : !hal.executable_layout
 }
 
@@ -7201,8 +7253,8 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  %dev = hal.ex.shared_device : !hal.device
-  %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+  %device = hal.ex.shared_device : !hal.device
+  %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
   return %executable_layout : !hal.executable_layout
 }
 
@@ -7215,8 +7267,8 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  %dev = hal.ex.shared_device : !hal.device
-  %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+  %device = hal.ex.shared_device : !hal.device
+  %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
   return %executable_layout : !hal.executable_layout
 }
 
@@ -7228,12 +7280,12 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 {% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-  %dev = hal.ex.shared_device : !hal.device
+  %device = hal.ex.shared_device : !hal.device
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
   br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %2 = iree.null : !hal.executable
@@ -7250,12 +7302,12 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 {% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-  %dev = hal.ex.shared_device : !hal.device
+  %device = hal.ex.shared_device : !hal.device
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
   br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %2 = iree.null : !hal.executable
@@ -7272,12 +7324,12 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 {% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-  %dev = hal.ex.shared_device : !hal.device
+  %device = hal.ex.shared_device : !hal.device
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
   br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %2 = iree.null : !hal.executable
@@ -7310,28 +7362,32 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
 
 {% raw %}
 ```
-func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
   %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
   %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 ^bb2:  // pred: ^bb0
   iree.unreachable
@@ -7344,28 +7400,32 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 
 {% raw %}
 ```
-func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
   %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
   %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 ^bb2:  // pred: ^bb0
   iree.unreachable
@@ -7378,28 +7438,32 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 
 {% raw %}
 ```
-func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
   %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
   %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 ^bb2:  // pred: ^bb0
   iree.unreachable
@@ -7416,13 +7480,13 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
   %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c50331680_i32 = constant 50331680 : i32
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
   hal.check_success %0, "semaphore wait failed"
   %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
   %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
   %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
+  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+  hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
   return %view : !hal.buffer_view
 }
 
@@ -7437,13 +7501,13 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
   %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c50331680_i32 = constant 50331680 : i32
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
   hal.check_success %0, "semaphore wait failed"
   %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
   %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
   %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
+  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+  hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
   return %view : !hal.buffer_view
 }
 
@@ -7458,13 +7522,13 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
   %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c50331680_i32 = constant 50331680 : i32
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
   hal.check_success %0, "semaphore wait failed"
   %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
   %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
   %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
+  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+  hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
   return %view : !hal.buffer_view
 }
 
@@ -7478,10 +7542,10 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %device = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
   %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
   hal.check_success %1, "semaphore wait failed"
   return %0 : !hal.buffer_view
 }
@@ -7496,10 +7560,10 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %device = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
   %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
   hal.check_success %1, "semaphore wait failed"
   return %0 : !hal.buffer_view
 }
@@ -7514,10 +7578,10 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %device = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
   %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
   hal.check_success %1, "semaphore wait failed"
   return %0 : !hal.buffer_view
 }
@@ -7532,31 +7596,31 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func private @_device_match_id_0_initializer() -> i1 {
-    %dev = hal.ex.shared_device : !hal.device
-    %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+    %device = hal.ex.shared_device : !hal.device
+    %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
     return %0 : i1
   }
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-    %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %device = hal.ex.shared_device : !hal.device
+    %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
   func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-    %dev = hal.ex.shared_device : !hal.device
-    %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+    %device = hal.ex.shared_device : !hal.device
+    %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
   func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-    %dev = hal.ex.shared_device : !hal.device
+    %device = hal.ex.shared_device : !hal.device
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
     br ^bb3(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
     %2 = iree.null : !hal.executable
@@ -7573,28 +7637,32 @@ module  {
     hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6882xi8>, format = 1145850178 : i32} {
     }
   }
-  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+      %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+    ])
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c1, %c1, %c1])
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   ^bb2:  // pred: ^bb0
     iree.unreachable
@@ -7603,22 +7671,22 @@ module  {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
     hal.check_success %0, "semaphore wait failed"
     %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
     %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
     %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-    hal.semaphore.signal %arg4, value = %arg5
+    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+    hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
     return %view : !hal.buffer_view
   }
   func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %device = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
     %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
@@ -7632,8 +7700,8 @@ module  {
 {% raw %}
 ```
 func private @_device_match_id_0_initializer() -> i1 {
-  %dev = hal.ex.shared_device : !hal.device
-  %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+  %device = hal.ex.shared_device : !hal.device
+  %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
   return %0 : i1
 }
 
@@ -7645,8 +7713,8 @@ func private @_device_match_id_0_initializer() -> i1 {
 {% raw %}
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-  %dev = hal.ex.shared_device : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  %device = hal.ex.shared_device : !hal.device
+  %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
 }
 
@@ -7659,8 +7727,8 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 ```
 func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  %dev = hal.ex.shared_device : !hal.device
-  %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+  %device = hal.ex.shared_device : !hal.device
+  %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
   return %executable_layout : !hal.executable_layout
 }
 
@@ -7672,12 +7740,12 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 {% raw %}
 ```
 func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-  %dev = hal.ex.shared_device : !hal.device
+  %device = hal.ex.shared_device : !hal.device
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
   br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %2 = iree.null : !hal.executable
@@ -7693,28 +7761,32 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 
 {% raw %}
 ```
-func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
   %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
   %c8192 = constant 8192 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-  hal.command_buffer.begin %cmd
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+  hal.command_buffer.begin<%cmd : !hal.command_buffer>
   %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+    %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+    %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+    %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+  ])
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-  hal.command_buffer.end %cmd
-  hal.ex.submit_and_wait %dev, %cmd
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+  hal.command_buffer.end<%cmd : !hal.command_buffer>
+  hal.ex.submit_and_wait %device, %cmd
   return %buffer : !hal.buffer
 ^bb2:  // pred: ^bb0
   iree.unreachable
@@ -7731,13 +7803,13 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
   %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c50331680_i32 = constant 50331680 : i32
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
   hal.check_success %0, "semaphore wait failed"
   %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
   %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
   %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
+  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+  hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
   return %view : !hal.buffer_view
 }
 
@@ -7751,10 +7823,10 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %dev = hal.ex.shared_device : !hal.device
-  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %device = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
   %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
   hal.check_success %1, "semaphore wait failed"
   return %0 : !hal.buffer_view
 }
@@ -7769,31 +7841,31 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func private @_device_match_id_0_initializer() -> i1 {
-    %dev = hal.ex.shared_device : !hal.device
-    %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+    %device = hal.ex.shared_device : !hal.device
+    %0 = hal.device.match.id<%device : !hal.device> pattern("dylib*") : i1
     return %0 : i1
   }
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
-    %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %device = hal.ex.shared_device : !hal.device
+    %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) usage(PushOnly) bindings([#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]) : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
   func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-    %dev = hal.ex.shared_device : !hal.device
-    %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+    %device = hal.ex.shared_device : !hal.device
+    %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
   func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
-    %dev = hal.ex.shared_device : !hal.device
+    %device = hal.ex.shared_device : !hal.device
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@llvm_aot) layouts([%1]) : !hal.executable
     br ^bb3(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
     %2 = iree.null : !hal.executable
@@ -7810,28 +7882,32 @@ module  {
     hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6882xi8>, format = 1145850178 : i32} {
     }
   }
-  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
     %c8192 = constant 8192 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %allocator = hal.device.allocator %dev : !hal.allocator
-    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
-    hal.command_buffer.begin %cmd
+    %device = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+    %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
+    %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+    hal.command_buffer.begin<%cmd : !hal.command_buffer>
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%0 : !hal.executable_layout)[%c0] bindings([
+      %c0 = (%arg0 : !hal.buffer)[%c0, %c131072], 
+      %c1 = (%arg1 : !hal.buffer)[%c0, %c262144], 
+      %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
+    ])
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
-    hal.command_buffer.end %cmd
-    hal.ex.submit_and_wait %dev, %cmd
+    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c1, %c1, %c1])
+    hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    hal.command_buffer.end<%cmd : !hal.command_buffer>
+    hal.ex.submit_and_wait %device, %cmd
     return %buffer : !hal.buffer
   ^bb2:  // pred: ^bb0
     iree.unreachable
@@ -7840,22 +7916,22 @@ module  {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
     %c50331680_i32 = constant 50331680 : i32
-    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
     hal.check_success %0, "semaphore wait failed"
     %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
     %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
     %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
-    hal.semaphore.signal %arg4, value = %arg5
+    %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer -> !hal.buffer_view
+    hal.semaphore.signal<%arg4 : !hal.semaphore> value(%arg5)
     return %view : !hal.buffer_view
   }
   func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %dev = hal.ex.shared_device : !hal.device
-    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %device = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
     %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
-    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    %1 = hal.semaphore.await<%semaphore : !hal.semaphore> until(%c1) : i32
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
@@ -7930,8 +8006,8 @@ module  {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
-      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      %c14 = vm.const.i32 14 : i32
+      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
       %c1_2 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %ref_3 = vm.call @hal.command_buffer.create(%ref, %c1_2, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
@@ -7955,7 +8031,6 @@ module  {
       %c2_6 = vm.const.i32 2 : i32
       vm.fail %c2_6, "unreachable location reached"
     }
-    vm.export @dot as("dot$raw")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c32 = vm.const.i32 32 : i32
       %c64 = vm.const.i32 64 : i32
@@ -8090,8 +8165,8 @@ vm.module @module {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %c50 = vm.const.i32 50 : i32
-    %c15 = vm.const.i32 15 : i32
-    %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+    %c14 = vm.const.i32 14 : i32
+    %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
     %c1_2 = vm.const.i32 1 : i32
     %c3 = vm.const.i32 3 : i32
     %ref_3 = vm.call @hal.command_buffer.create(%ref, %c1_2, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
@@ -8115,7 +8190,6 @@ vm.module @module {
     %c2_6 = vm.const.i32 2 : i32
     vm.fail %c2_6, "unreachable location reached"
   }
-  vm.export @dot as("dot$raw")
   vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
     %c32 = vm.const.i32 32 : i32
     %c64 = vm.const.i32 64 : i32
@@ -8249,8 +8323,8 @@ vm.module @module {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %c50 = vm.const.i32 50 : i32
-    %c15 = vm.const.i32 15 : i32
-    %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+    %c14 = vm.const.i32 14 : i32
+    %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
     %c1_2 = vm.const.i32 1 : i32
     %c3 = vm.const.i32 3 : i32
     %ref_3 = vm.call @hal.command_buffer.create(%ref, %c1_2, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
@@ -8274,7 +8348,6 @@ vm.module @module {
     %c2_6 = vm.const.i32 2 : i32
     vm.fail %c2_6, "unreachable location reached"
   }
-  vm.export @dot as("dot$raw")
   vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
     %c32 = vm.const.i32 32 : i32
     %c64 = vm.const.i32 64 : i32
@@ -8431,13 +8504,13 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.re
   %c1 = vm.const.i32 1 : i32
   %c2 = vm.const.i32 2 : i32
   %c50 = vm.const.i32 50 : i32
-  %c15 = vm.const.i32 15 : i32
+  %c14 = vm.const.i32 14 : i32
   %c3 = vm.const.i32 3 : i32
   %c20 = vm.const.i32 20 : i32
   %c5 = vm.const.i32 5 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-  %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+  %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
   %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
   vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
   %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
@@ -8637,13 +8710,13 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.re
   %c1 = vm.const.i32 1 : i32
   %c2 = vm.const.i32 2 : i32
   %c50 = vm.const.i32 50 : i32
-  %c15 = vm.const.i32 15 : i32
+  %c14 = vm.const.i32 14 : i32
   %c3 = vm.const.i32 3 : i32
   %c20 = vm.const.i32 20 : i32
   %c5 = vm.const.i32 5 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-  %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+  %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
   %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
   vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
   %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
@@ -8684,13 +8757,13 @@ module  {
       %c1 = vm.const.i32 1 : i32
       %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
+      %c14 = vm.const.i32 14 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
@@ -8707,7 +8780,6 @@ module  {
     ^bb2:  // pred: ^bb0
       vm.fail %c2, "unreachable location reached"
     }
-    vm.export @dot as("dot$raw")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c32 = vm.const.i32 32 : i32
       %c64 = vm.const.i32 64 : i32
@@ -8847,13 +8919,13 @@ module  {
       %c1 = vm.const.i32 1 : i32
       %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
+      %c14 = vm.const.i32 14 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
@@ -8870,7 +8942,6 @@ module  {
     ^bb2:  // pred: ^bb0
       vm.fail %c2, "unreachable location reached"
     }
-    vm.export @dot as("dot$raw")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c32 = vm.const.i32 32 : i32
       %c64 = vm.const.i32 64 : i32
@@ -9010,13 +9081,13 @@ module  {
       %c1 = vm.const.i32 1 : i32
       %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
+      %c14 = vm.const.i32 14 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
@@ -9033,7 +9104,6 @@ module  {
     ^bb2:  // pred: ^bb0
       vm.fail %c2, "unreachable location reached"
     }
-    vm.export @dot as("dot$raw")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c32 = vm.const.i32 32 : i32
       %c64 = vm.const.i32 64 : i32
@@ -9150,8 +9220,8 @@ vm.module @module {
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %c8192 = vm.const.i32 8192 : i32
     %c50 = vm.const.i32 50 : i32
-    %c15 = vm.const.i32 15 : i32
-    %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+    %c14 = vm.const.i32 14 : i32
+    %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
     %c1 = vm.const.i32 1 : i32
     %c3 = vm.const.i32 3 : i32
     %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
@@ -9176,7 +9246,6 @@ vm.module @module {
   ^bb2:  // pred: ^bb0
     vm.fail %c2, "unreachable location reached"
   }
-  vm.export @dot as("dot$raw")
   vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
     %0 = vm.call @hal.semaphore.await(%arg0, %arg1) : (!vm.ref<!hal.semaphore>, i32) -> i32
     vm.cond_br %0, ^bb2(%0 : i32), ^bb1
@@ -9293,8 +9362,8 @@ module  {
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %c8192 = vm.const.i32 8192 : i32
       %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
-      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      %c14 = vm.const.i32 14 : i32
+      %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
       %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
@@ -9319,7 +9388,6 @@ module  {
     ^bb2:  // pred: ^bb0
       vm.fail %c2, "unreachable location reached"
     }
-    vm.export @dot as("dot$raw")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %0 = vm.call @hal.semaphore.await(%arg0, %arg1) : (!vm.ref<!hal.semaphore>, i32) -> i32
       vm.cond_br %0, ^bb2(%0 : i32), ^bb1
