@@ -19,8 +19,7 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
-#include <atomic>
-#include <vector>
+#include <array>
 
 #include "iree/base/status.h"
 #include "iree/base/synchronization.h"
