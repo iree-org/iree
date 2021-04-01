@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/Shape/Transforms/Patterns.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
@@ -73,6 +74,9 @@ class PrePartitioningConversionPass
     setupDirectHLOToFlowLegality(context, conversionTarget);
     populateHLOToFlowPatterns(context, conversionPatterns);
     setupDirectStandardToFlowLegality(context, conversionTarget);
+
+    conversionTarget.addLegalOp<linalg::GenericOp, linalg::IndexedGenericOp>();
+    conversionTarget.markOpRecursivelyLegal<linalg::GenericOp, linalg::IndexedGenericOp>();
     populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
