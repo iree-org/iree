@@ -86,7 +86,8 @@ class LinalgTileAndDistributePass
       SmallVector<Operation *, 4> tiledLoops;
 
       if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) {
-        return signalPassFailure();
+        // If there are no linalg ops, nothing to do here.
+        continue;
       }
 
       linalg::Aliases aliases;
@@ -94,8 +95,8 @@ class LinalgTileAndDistributePass
       Optional<LaunchConfig> launchConfigOpt =
           initGPULaunchConfig(context, dependenceGraph, options, linalgOps);
       if (!launchConfigOpt) {
-        funcOp.emitError("unable to find launch configuration");
-        return signalPassFailure();
+        // Having no launch configuration also means nothing to do here.
+        continue;
       }
       LaunchConfig &launchConfig = *launchConfigOpt;
 
@@ -120,24 +121,6 @@ class LinalgTileAndDistributePass
           llvm::dbgs() << "}\n";
         }
       });
-      // Annotate the linalg op with the original types.
-      for (linalg::LinalgOp op : linalgOps) {
-        const char inputTypeAttrName[] = "iree.codegen.original_input_types";
-        const char outputTypeAttrName[] = "iree.codegen.original_output_types";
-
-        SmallVector<Type> inputTypes;
-        SmallVector<Type> outputTypes;
-        for (Type type : op.getInputBufferTypes()) inputTypes.push_back(type);
-        for (Type type : op.getOutputBufferTypes()) outputTypes.push_back(type);
-        if (!inputTypes.empty()) {
-          op->setAttr(inputTypeAttrName,
-                      Builder(op).getTypeArrayAttr(inputTypes));
-        }
-        if (!outputTypes.empty()) {
-          op->setAttr(outputTypeAttrName,
-                      Builder(op).getTypeArrayAttr(outputTypes));
-        }
-      }
       TileAndFuseOptions tileAndFuseOptions = {
           getWorkgroupDistributionOptions(), allocateWorkgroupMemory};
       if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,

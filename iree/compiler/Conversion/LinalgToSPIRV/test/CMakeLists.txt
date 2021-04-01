@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "batch_matmul_vectorization.mlir"
     "concretize_tile_among_workgroups.mlir"
+    "concretize_tile_among_workgroups_dynamic.mlir"
     "convert_to_gpu.mlir"
     "convert_to_spirv.mlir"
     "dead_alloc.mlir"
