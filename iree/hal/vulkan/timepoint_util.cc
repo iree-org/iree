@@ -68,6 +68,7 @@ iree_status_t TimePointFencePool::Create(VkDeviceHandle* logical_device,
                                          TimePointFencePool** out_pool) {
   IREE_TRACE_SCOPE0("TimePointFencePool::Create");
   ref_ptr<TimePointFencePool> pool(new TimePointFencePool(logical_device));
+  iree_slim_mutex_initialize(&(pool->mutex_));
   IREE_RETURN_IF_ERROR(pool->PreallocateFences());
   *out_pool = pool.release();
   return iree_ok_status();
@@ -76,7 +77,8 @@ iree_status_t TimePointFencePool::Create(VkDeviceHandle* logical_device,
 TimePointFencePool::~TimePointFencePool() {
   IREE_TRACE_SCOPE0("TimePointFencePool::dtor");
 
-  RaiiLocker locker(&mutex_);
+  iree_slim_mutex_lock(&mutex_);
+
   int free_count = 0;
   for (auto* fence : free_fences_) {
     syms()->vkDestroyFence(*logical_device_, fence->value(),
@@ -85,6 +87,9 @@ TimePointFencePool::~TimePointFencePool() {
   }
   IREE_DCHECK_EQ(free_count, kMaxInFlightFenceCount);
   free_fences_.clear();
+
+  iree_slim_mutex_unlock(&mutex_);
+  iree_slim_mutex_deinitialize(&mutex_);
 }
 
 Status TimePointFencePool::Acquire(ref_ptr<TimePointFence>* out_fence) {
@@ -166,6 +171,7 @@ iree_status_t TimePointSemaphorePool::Create(
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::Create");
   ref_ptr<TimePointSemaphorePool> pool(
       new TimePointSemaphorePool(logical_device));
+  iree_slim_mutex_initialize(&(pool->mutex_));
   IREE_RETURN_IF_ERROR(pool->PreallocateSemaphores());
   *out_pool = pool.release();
   return iree_ok_status();
@@ -174,7 +180,7 @@ iree_status_t TimePointSemaphorePool::Create(
 TimePointSemaphorePool::~TimePointSemaphorePool() {
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::dtor");
 
-  RaiiLocker locker(&mutex_);
+  iree_slim_mutex_lock(&mutex_);
 
   IREE_DCHECK_EQ(free_semaphores_.size(), kMaxInFlightSemaphoreCount);
   free_semaphores_.clear();
@@ -183,6 +189,9 @@ TimePointSemaphorePool::~TimePointSemaphorePool() {
     syms()->vkDestroySemaphore(*logical_device_, semaphore.semaphore,
                                logical_device_->allocator());
   }
+
+  iree_slim_mutex_unlock(&mutex_);
+  iree_slim_mutex_deinitialize(&mutex_);
 }
 
 Status TimePointSemaphorePool::Acquire(TimePointSemaphore** out_semaphore) {

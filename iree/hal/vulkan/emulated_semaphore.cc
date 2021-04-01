@@ -146,17 +146,22 @@ EmulatedTimelineSemaphore::EmulatedTimelineSemaphore(
       logical_device_(logical_device),
       semaphore_pool_(semaphore_pool),
       command_queue_count_(command_queue_count),
-      command_queues_(command_queues) {}
+      command_queues_(command_queues) {
+  iree_slim_mutex_initialize(&mutex_);
+}
 
 EmulatedTimelineSemaphore::~EmulatedTimelineSemaphore() {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::dtor");
   IREE_CHECK_OK(
       TryToAdvanceTimeline(UINT64_MAX, /*out_reached_upper_value=*/NULL));
-  RaiiLocker locker(&mutex_);
+
+  iree_slim_mutex_lock(&mutex_);
   IREE_CHECK(outstanding_semaphores_.empty())
       << "Destroying an emulated timeline semaphore without first waiting on "
          "outstanding signals";
   iree_status_free(status_);
+  iree_slim_mutex_unlock(&mutex_);
+  iree_slim_mutex_deinitialize(&mutex_);
 }
 
 iree_status_t EmulatedTimelineSemaphore::Query(uint64_t* out_value) {
