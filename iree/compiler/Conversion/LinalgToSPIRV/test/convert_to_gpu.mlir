@@ -10,7 +10,7 @@
 //   }
 //   hal.executable.target @vulkan, filter="vulkan*" {
 //     hal.executable.entry_point @parallel_4D attributes {
-//       interface = @legacy_io, ordinal = 0 : i32,
+//       interface = @legacy_io, ordinal = 0 : index,
 //       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
 //         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
 //     module attributes {
@@ -89,7 +89,7 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @parallel_4D_static attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -168,7 +168,7 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @scalar_add attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:f32>, !flow.dispatch.tensor<readonly:f32>,
         !flow.dispatch.tensor<writeonly:f32>) -> ()}
     module attributes {
@@ -222,7 +222,7 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @reduce_sum attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:40x50x75xf32>, !flow.dispatch.tensor<readonly:f32>,
         !flow.dispatch.tensor<writeonly:40xf32>) -> ()}
     module {
@@ -295,7 +295,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @matmul attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -367,7 +367,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
-    hal.executable.entry_point @conv_1d attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<3x8x1xf32>, tensor<3x1x1xf32>) -> tensor<3x6x1xf32>}
+    hal.executable.entry_point @conv_1d attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<3x8x1xf32>, tensor<3x1x1xf32>) -> tensor<3x6x1xf32>}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
       func @conv_1d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
         %cst = constant 0.000000e+00 : f32
@@ -426,7 +426,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @conv_no_padding attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -542,7 +542,7 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
-    hal.executable.entry_point @conv_3d attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<2x8x8x8x3xf32>, tensor<2x2x2x3x2xf32>) -> tensor<2x7x7x7x2xf32>}
+    hal.executable.entry_point @conv_3d attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<2x8x8x8x3xf32>, tensor<2x2x2x3x2xf32>) -> tensor<2x7x7x7x2xf32>}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
       func @conv_3d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
         %cst = constant 0.000000e+00 : f32
@@ -603,7 +603,7 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan, filter="vulkan*" {
-      hal.executable.entry_point @pooling_nhwc_max attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (!flow.dispatch.tensor<readonly:2x16x16x6xf32>, !flow.dispatch.tensor<readonly:1x3x4x2xf32>, !flow.dispatch.tensor<writeonly:2x14x13x5xf32>) -> ()} {
+      hal.executable.entry_point @pooling_nhwc_max attributes {interface = @legacy_io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:2x16x16x6xf32>, !flow.dispatch.tensor<readonly:1x3x4x2xf32>, !flow.dispatch.tensor<writeonly:2x14x13x5xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c4 = constant 4 : index
         %c1 = constant 1 : index

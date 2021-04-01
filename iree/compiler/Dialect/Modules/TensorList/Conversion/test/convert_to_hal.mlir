@@ -56,8 +56,7 @@ func @GetItem(%arg0: !tensorlist.list, %arg1: tensor<i32>) -> tensor<f32> {
 
 // CHECK: @Stack
 func @Stack(%arg0: !tensorlist.list, %arg1: tensor<i32>) -> tensor<1xf32> {
-  // CHECK-DAG: [[DEV:%.+]] = hal.ex.shared_device
-  // CHECK-DAG: [[ALL:%.+]] = hal.device.allocator [[DEV]]
+  // CHECK-DAG: [[ALL:%.+]] = hal.device.allocator
   // CHECK-DAG: [[VIEW:%.+]] = hal.buffer_view.create %arg1
   // CHECK-DAG: [[RES:%.+]] = "tensorlist.Stack"([[ALL]], %arg0, [[VIEW]])
   // CHECK-DAG: [[BUF:%.+]] = hal.buffer_view.buffer [[RES]]
@@ -71,8 +70,7 @@ func @Stack(%arg0: !tensorlist.list, %arg1: tensor<i32>) -> tensor<1xf32> {
 
 // CHECK: @Concat
 func @Concat(%arg0: !tensorlist.list) -> tensor<1xf32> {
-  // CHECK: [[DEV:%.+]] = hal.ex.shared_device : !hal.device
-  // CHECK: [[ALL:%.+]] = hal.device.allocator [[DEV]]
+  // CHECK: [[ALL:%.+]] = hal.device.allocator
   // CHECK: [[RES:%.+]] = "tensorlist.Concat"([[ALL]], %arg0)
   // CHECK: [[BUF:%.+]] = hal.buffer_view.buffer [[RES]]
   %0 = "tensorlist.Concat.Tensor"(%arg0) : (!tensorlist.list) -> tensor<1xf32>

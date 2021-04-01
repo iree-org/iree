@@ -4,9 +4,9 @@
 
 // CHECK-LABEL: @shared_device
 func @shared_device() -> !hal.device {
-  // CHECK: %dev = hal.ex.shared_device : !hal.device
-  %dev = hal.ex.shared_device : !hal.device
-  return %dev : !hal.device
+  // CHECK: %device = hal.ex.shared_device : !hal.device
+  %device = hal.ex.shared_device : !hal.device
+  return %device : !hal.device
 }
 
 // -----

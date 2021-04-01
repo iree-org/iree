@@ -36,11 +36,6 @@ void populateFlowVariableToHALPatterns(MLIRContext *context,
                                        OwningRewritePatternList &patterns,
                                        TypeConverter &converter);
 
-// Populates only the std.dim and std.rank conversion patterns.
-void populateHalBufferViewShapePatterns(MLIRContext *context,
-                                        OwningRewritePatternList &patterns,
-                                        TypeConverter &converter);
-
 void setupFlowToHALLegality(MLIRContext *context,
                             ConversionTarget &conversionTarget,
                             TypeConverter &typeConverter) {
@@ -54,7 +49,6 @@ void populateFlowToHALPatterns(MLIRContext *context,
   populateFlowStreamToHALPatterns(context, patterns, typeConverter);
   populateFlowTensorToHALPatterns(context, patterns, typeConverter);
   populateFlowVariableToHALPatterns(context, patterns, typeConverter);
-  populateHalBufferViewShapePatterns(context, patterns, typeConverter);
 }
 
 }  // namespace iree_compiler

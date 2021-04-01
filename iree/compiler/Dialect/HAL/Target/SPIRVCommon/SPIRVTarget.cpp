@@ -154,7 +154,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
         int32_t entryPointOrdinal = entryPoint.index();
         rewriter.create<IREE::HAL::CommandBufferDispatchOp>(
             loc, commandBuffer, executable,
-            rewriter.getI32IntegerAttr(entryPointOrdinal), workgroupCount[0],
+            rewriter.getIndexAttr(entryPointOrdinal), workgroupCount[0],
             workgroupCount[1], workgroupCount[2]);
         if (entryPoint.index() + 1 != entryPoints.size()) {
           recordFullExecutionBarrier(commandBuffer, loc, rewriter);

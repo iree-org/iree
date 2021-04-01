@@ -8,7 +8,7 @@ hal.executable @kernel_fusable_fill_conv1d_ops attributes {sym_visiblity = "priv
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_conv1d_ops attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x3x512xf32>, !flow.dispatch.tensor<readonly:3x512x1xf32>,
         !flow.dispatch.tensor<writeonly:?x1x512xf32>) -> ()}
     module {
@@ -36,7 +36,7 @@ hal.executable @kernel_fusable_fill_conv1d_ops attributes {sym_visiblity = "priv
           outs(%ts2 : memref<?x1x512xf32>)
         return
       }
-      hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+      hal.interface @legacy_io attributes {push_constants = 1 : index, sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -54,7 +54,7 @@ hal.executable @kernel_fusable_fill_conv2d_ops attributes {sym_visiblity = "priv
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_conv2d_ops attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
         !flow.dispatch.tensor<writeonly:?x1x1x512xf32>) -> ()}
     module {
@@ -82,7 +82,7 @@ hal.executable @kernel_fusable_fill_conv2d_ops attributes {sym_visiblity = "priv
           outs(%ts2 : memref<?x1x1x512xf32>)
         return
       }
-      hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+      hal.interface @legacy_io attributes {push_constants = 1 : index, sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -101,7 +101,7 @@ hal.executable @kernel_fusable_fill_conv3d_ops attributes {sym_visiblity = "priv
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_conv3d_ops attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x3x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x3x512x1xf32>,
         !flow.dispatch.tensor<writeonly:?x1x1x1x512xf32>) -> ()}
     module {
@@ -129,7 +129,7 @@ hal.executable @kernel_fusable_fill_conv3d_ops attributes {sym_visiblity = "priv
           outs(%ts2 : memref<?x1x1x1x512xf32>)
         return
       }
-      hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+      hal.interface @legacy_io attributes {push_constants = 1 : index, sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -148,7 +148,7 @@ hal.executable @kernel_fusable_fill_matmul_ops attributes {sym_visiblity = "priv
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_matmul_ops attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x512xf32>, !flow.dispatch.tensor<readonly:512x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module {
@@ -176,7 +176,7 @@ hal.executable @kernel_fusable_fill_matmul_ops attributes {sym_visiblity = "priv
                       outs(%ts3 : memref<?x?xf32>)
         return
       }
-      hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+      hal.interface @legacy_io attributes {push_constants = 1 : index, sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -195,7 +195,7 @@ hal.executable @kernel_fusable_pooling attributes {sym_visiblity = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_pooling attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?x?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?x?x?xf32>) -> ()}
     module {
@@ -235,7 +235,7 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
         !flow.dispatch.tensor<writeonly:?x1x1x512xf32>) -> ()}
     // CHECK: hal.executable.entry_point @kernel_dispatch_0
@@ -283,7 +283,7 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
         linalg.fill(%ts2, %cst) : memref<?x1x1x512xf32>, f32
         return
       }
-      hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+      hal.interface @legacy_io attributes {push_constants = 1 : index, sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -302,7 +302,7 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
         !flow.dispatch.tensor<writeonly:?x1x1x512xf32>) -> ()}
     // CHECK: hal.executable.entry_point @kernel_dispatch_0
@@ -363,7 +363,7 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
           outs(%ts2 : memref<?x1x1x512xf32>)
         return
       }
-      hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+      hal.interface @legacy_io attributes {push_constants = 1 : index, sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -384,7 +384,7 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:1x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
         !flow.dispatch.tensor<writeonly:1x1x1x512xf32>) -> ()}
     // CHECK-NOT: hal.entry_point_schedule
@@ -426,7 +426,7 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x3x512xf32>, !flow.dispatch.tensor<readonly:3x512x1xf32>,
         !flow.dispatch.tensor<writeonly:?x1x512xf32>) -> ()}
     module {
@@ -464,7 +464,7 @@ hal.executable @subview_interleaved attributes {sym_visiblity = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @subview_interleaved attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:18x12xf32>, !flow.dispatch.tensor<writeonly:18x12xf32>) -> ()}
     module {
       func @subview_interleaved() {
@@ -515,7 +515,7 @@ hal.executable @reshape_interleaved attributes {sym_visiblity = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @reshape_interleaved attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:2x4xf32>, !flow.dispatch.tensor<writeonly:1x2x4xf32>,
         !flow.dispatch.tensor<writeonly:2x4xf32>) -> ()}
     module {
@@ -575,7 +575,7 @@ hal.executable @predict_ex_dispatch_0 attributes {sym_visiblity = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @predict_ex_dispatch_0 attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:1x512x1xf32>, !flow.dispatch.tensor<readonly:4x8x16xf32>,
         !flow.dispatch.tensor<writeonly:4x8x16xf32>, !flow.dispatch.tensor<writeonly:4x8x16xf32>) -> ()}
     module {
@@ -595,7 +595,7 @@ hal.executable @predict_ex_dispatch_0 attributes {sym_visiblity = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+      hal.interface @legacy_io attributes {push_constants = 1 : index, sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -636,7 +636,7 @@ hal.executable @kernel_fusable_fill_matmul_generic_ops attributes {sym_visiblity
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_matmul_generic_ops attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x512xf32>, !flow.dispatch.tensor<readonly:512x?xf32>,
         !flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module {
@@ -681,7 +681,7 @@ hal.executable @kernel_fusable_fill_matmul_generic_ops attributes {sym_visiblity
         }
         return
       }
-      hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+      hal.interface @legacy_io attributes {push_constants = 1 : index, sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer", access="Read"

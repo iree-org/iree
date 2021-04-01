@@ -8,7 +8,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -67,7 +67,7 @@ hal.executable @matmul_fill_fused attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_fill_fused attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -129,7 +129,7 @@ hal.executable @matmul_add_fused attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_add_fused attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {

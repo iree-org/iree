@@ -38,8 +38,7 @@ class ConstantSubspanConversion
     auto lengthValue = rewriter.createOrFold<mlir::ConstantOp>(
         op.getLoc(), op.runtime_range().lengthAttr());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferSubspanOp>(
-        op, IREE::HAL::BufferType::get(rewriter.getContext()), bufferValue,
-        offsetValue, lengthValue);
+        op, bufferValue.getType(), bufferValue, offsetValue, lengthValue);
     return success();
   }
 };

@@ -20,12 +20,14 @@ iree_cc_library(
   TEXTUAL_HDRS
     "HALEnums.cpp.inc"
     "HALEnums.h.inc"
-    "HALOpInterface.cpp.inc"
-    "HALOpInterface.h.inc"
+    "HALOpInterfaces.cpp.inc"
+    "HALOpInterfaces.h.inc"
     "HALOps.cpp.inc"
     "HALOps.h.inc"
     "HALStructs.cpp.inc"
     "HALStructs.h.inc"
+    "HALTypeInterfaces.cpp.inc"
+    "HALTypeInterfaces.h.inc"
   SRCS
     "HALOpFolders.cpp"
     "HALOps.cpp"
@@ -67,6 +69,18 @@ iree_cc_library(
 
 iree_tablegen_library(
   NAME
+    HALInterfacesGen
+  TD_FILE
+    "HALInterfaces.td"
+  OUTS
+    -gen-op-interface-decls HALOpInterfaces.h.inc
+    -gen-op-interface-defs HALOpInterfaces.cpp.inc
+    -gen-type-interface-decls HALTypeInterfaces.h.inc
+    -gen-type-interface-defs HALTypeInterfaces.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
     HALOpsGen
   TD_FILE
     "HALOps.td"
@@ -95,8 +109,6 @@ iree_tablegen_library(
   OUTS
     -gen-enum-decls HALEnums.h.inc
     -gen-enum-defs HALEnums.cpp.inc
-    -gen-op-interface-decls HALOpInterface.h.inc
-    -gen-op-interface-defs HALOpInterface.cpp.inc
 )
 
 iree_tablegen_doc(

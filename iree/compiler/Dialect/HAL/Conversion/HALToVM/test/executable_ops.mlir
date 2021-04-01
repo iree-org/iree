@@ -30,12 +30,12 @@ func @executableCreate(
   // CHECK: %[[EX0:.+]] = vm.call.variadic @hal.executable.create(
   // CHECK-SAME: %[[DEV]], %c1230128453, %[[BIN0]], [%[[LAYOUT0]], %[[LAYOUT1]]]
   // CHECK-SAME: ) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
-  %0 = hal.executable.create %device, @exe::@binary1, layouts = [%layout0, %layout1] : !hal.executable
+  %0 = hal.executable.create device(%device : !hal.device) target(@exe::@binary1) layouts([%layout0, %layout1]) : !hal.executable
   // CHECK: %[[BIN1:.+]] = vm.const.ref.rodata @_exe_binary2_binary_spirv : !vm.ref<!iree.byte_buffer>
   // CHECK: %[[EX1:.+]] = vm.call.variadic @hal.executable.create(
   // CHECK-SAME: %[[DEV]], %c1397773893, %[[BIN1]], [%[[LAYOUT1]], %[[LAYOUT0]]]
   // CHECK-SAME: ) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
-  %1 = hal.executable.create %device, @exe::@binary2, layouts = [%layout1, %layout0] : !hal.executable
+  %1 = hal.executable.create device(%device : !hal.device) target(@exe::@binary2) layouts([%layout1, %layout0]) : !hal.executable
   // CHECK: vm.return %[[EX0]], %[[EX1]]
   return %0, %1 : !hal.executable, !hal.executable
 }

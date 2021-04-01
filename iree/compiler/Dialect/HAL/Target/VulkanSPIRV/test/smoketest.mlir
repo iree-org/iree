@@ -2,7 +2,7 @@
 
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
-      workload = 4 : index
+    workload = 4 : index
   }
   module {
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {

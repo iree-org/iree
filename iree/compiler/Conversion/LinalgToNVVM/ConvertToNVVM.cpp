@@ -112,7 +112,7 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
         op, op->getAttrOfType<SymbolRefAttr>("binding"));
     auto interfaceBindingOp = cast<IREE::HAL::InterfaceBindingOp>(symbol);
     Value llvmBufferBasePtr =
-        llvmFuncOp.getArgument(interfaceBindingOp.binding());
+        llvmFuncOp.getArgument(interfaceBindingOp.binding().getZExtValue());
     if (memrefType.hasStaticShape()) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);

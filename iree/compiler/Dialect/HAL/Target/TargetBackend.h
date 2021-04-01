@@ -203,28 +203,6 @@ class TargetBackend {
     // must follow. Note that backend-specific push constants must have been
     // allocated during `extractInterface`.
     int basePushConstantOffset = 0;
-
-    // Dispatch operands in a form accessible as hal.buffer/hal.buffer_view.
-    // Note that any introduced scheduling dependency (such as a write of an
-    // operand/result prior to the dispatch) must be handled appropriately, such
-    // as by inserting a `hal.command_buffer.barrier`.
-    //
-    // Operands are 1:1 the flow.dispatch operands, meaning that if there were
-    // operands that were not tensor/buffer types they will be None.
-    //
-    // NOTE: some operands/results may alias (as indicated by the interface).
-    ArrayRef<Optional<TensorRewriteAdaptor>> operands;
-
-    // Dispatch results with allocated buffers.
-    // Note that any introduced scheduling dependency (such as a write of an
-    // operand/result prior to the dispatch) must be handled appropriately, such
-    // as by inserting a `hal.command_buffer.barrier`.
-    //
-    // Results are 1:1 the flow.dispatch results, meaning that if there were
-    // results that were not tensor/buffer types they will be None.
-    //
-    // NOTE: some operands/results may alias (as indicated by the interface).
-    ArrayRef<Optional<TensorRewriteAdaptor>> results;
   };
 
   // Records a dispatch to a command buffer given the dispatch state.
@@ -267,7 +245,7 @@ class TargetBackend {
   //     hal.executable.target @target, filter="target-backend" {
   //       hal.executable.entry_point @main attributes {
   //         interface = @main_io,
-  //         ordinal = 0 : i32,
+  //         ordinal = 0 : index,
   //         signature = (tensor<4xf32>) -> tensor<4xf32>
   //       }
   //       module { ... }

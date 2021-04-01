@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "constant_ops.mlir"
     "structural_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
