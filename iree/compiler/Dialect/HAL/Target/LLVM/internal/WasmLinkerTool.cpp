@@ -67,6 +67,12 @@ class WasmLinkerTool : public LinkerTool {
       // -ffreestanding-like behavior.
       func.addFnAttr("no-builtins");
     }
+
+    // https://lld.llvm.org/WebAssembly.html#exports
+    for (auto func : exportedFuncs) {
+      func->addFnAttr("wasm-export-name", func->getName());
+    }
+
     return success();
   }
 
