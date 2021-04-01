@@ -17,9 +17,11 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -181,6 +183,14 @@ struct ConvertToNVVMPass
     // Apply in-dialect lowering first. In-dialect lowering will replace ops
     // which need to be lowered further, which is not supported by a single
     // conversion pass.
+    // Run Vector -> Vector transformations ahead of conversion to LLVM.
+    {
+      OwningRewritePatternList patterns(&getContext());
+      vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+      vector::populateVectorSlicesLoweringPatterns(patterns);
+      vector::populateVectorContractLoweringPatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
+    }
     {
       OwningRewritePatternList patterns(&getContext());
       populateGpuRewritePatterns(patterns);
@@ -201,6 +211,7 @@ struct ConvertToNVVMPass
                       IREE::HAL::InterfaceWorkgroupSizeOp, NVVM::BlockDimXOp,
                       NVVM::BlockDimYOp, NVVM::BlockDimZOp>>(m.getContext());
       populateStdToLLVMConversionPatterns(converter, llvmPatterns);
+      populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
       LLVMConversionTarget target(getContext());
       populateStdToLLVMFuncOpConversionPattern(converter, llvmPatterns);
