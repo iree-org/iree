@@ -58,6 +58,7 @@ iree_cc_library(
     MLIRStandardToLLVM
     MLIRStandardToSPIRV
     MLIRTensor
+    MLIRTosa
     MLIRTosaToStandard
     MLIRTransforms
     MLIRVector
