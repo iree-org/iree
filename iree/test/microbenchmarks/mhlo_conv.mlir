@@ -1,7 +1,9 @@
-// Convolution ops sampled from MobileVision V1 (mobilenet_v1_100_224)
+// Naming convention @conv_{input-spatial-dim}_{output-spatial-dim}_{filter-size}-{outputsizexinputsize}
+
+// The following ops sampled from MobileVision V1 (mobilenet_v1_100_224)
 // https://github.com/google/iree/blob/main/integrations/tensorflow/e2e/slim_vision_models/slim_vision_model_test.py#L34
 
-func @conv_244_3x3_3x32() -> tensor<1x112x112x32xf32> attributes { iree.module.export } {
+func @conv_244_112_3x3_3x32() -> tensor<1x112x112x32xf32> attributes { iree.module.export } {
     %input = iree.unfoldable_constant dense<1.0> : tensor<1x224x224x3xf32>
     %filter = iree.unfoldable_constant dense<1.0> : tensor<3x3x3x32xf32>
     %0 = "mhlo.convolution"(%input, %filter) {
@@ -25,7 +27,7 @@ func @conv_244_3x3_3x32() -> tensor<1x112x112x32xf32> attributes { iree.module.e
     return %0 : tensor<1x112x112x32xf32>
 }
 
-func @conv_112_1x1_32x64() -> tensor<1x112x112x64xf32> attributes { iree.module.export } {
+func @conv_112_112_1x1_32x64() -> tensor<1x112x112x64xf32> attributes { iree.module.export } {
     %input = iree.unfoldable_constant dense<1.0> : tensor<1x112x112x32xf32>
     %filter = iree.unfoldable_constant dense<1.0> : tensor<1x1x32x64xf32>
     %0 = "mhlo.convolution"(%input, %filter) {
@@ -49,7 +51,7 @@ func @conv_112_1x1_32x64() -> tensor<1x112x112x64xf32> attributes { iree.module.
     return %0 : tensor<1x112x112x64xf32>
 }
 
-func @conv_7_1x1_1024x1024() -> tensor<1x7x7x1024xf32> attributes { iree.module.export } {
+func @conv_7_7_1x1_1024x1024() -> tensor<1x7x7x1024xf32> attributes { iree.module.export } {
     %input = iree.unfoldable_constant dense<1.0> : tensor<1x7x7x1024xf32>
     %filter = iree.unfoldable_constant dense<1.0> : tensor<1x1x1024x1024xf32>
     %0 = "mhlo.convolution"(%input, %filter) {
