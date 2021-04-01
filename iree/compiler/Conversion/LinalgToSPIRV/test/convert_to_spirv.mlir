@@ -118,16 +118,16 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     %c0_i32 = constant 0 : i32
     %c0_i8 = constant 0 : i8
     // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV %{{.*}}, %{{.*}}, %{{.*}}
-    %4 = vector.transfer_read %arg2[%c0, %c0], %c0_i32 {masked = [false, false]} : memref<4096x4096xi32>, vector<16x16xi32>
+    %4 = vector.transfer_read %arg2[%c0, %c0], %c0_i32 {in_bounds = [true, true]} : memref<4096x4096xi32>, vector<16x16xi32>
     // CHECK: %[[ACC:.+]] = spv.Variable : !spv.ptr<!spv.coopmatrix<16x16xi32, Subgroup>, Function>
     // CHECK: spv.mlir.loop {
       // CHECK: spv.Branch ^[[BB:.+]](%{{.*}}, %[[C]] : i32, !spv.coopmatrix<16x16xi32, Subgroup>)
       // CHECK: ^[[BB]](%{{.*}}: i32, %[[C1:.+]]: !spv.coopmatrix<16x16xi32, Subgroup>)
     %5 = scf.for %arg3 = %c0 to %c4096 step %c32 iter_args(%arg4 = %4) -> (vector<16x16xi32>) {
       // CHECK: %[[A:.+]] = spv.CooperativeMatrixLoadNV %{{.*}}, %{{.*}}, %{{.*}}
-      %6 = vector.transfer_read %arg0[%c0, %arg3], %c0_i8 {masked = [false, false]} : memref<4096x4096xi8>, vector<16x32xi8>
+      %6 = vector.transfer_read %arg0[%c0, %arg3], %c0_i8 {in_bounds = [true, true]} : memref<4096x4096xi8>, vector<16x32xi8>
       // CHECK: %[[B:.+]] = spv.CooperativeMatrixLoadNV %{{.*}}, %{{.*}}, %{{.*}}
-      %7 = vector.transfer_read %arg1[%arg3, %c0], %c0_i8 {masked = [false, false]} : memref<4096x4096xi8>, vector<32x16xi8>
+      %7 = vector.transfer_read %arg1[%arg3, %c0], %c0_i8 {in_bounds = [true, true]} : memref<4096x4096xi8>, vector<32x16xi8>
       // CHECK: %[[R:.+]] = spv.CooperativeMatrixMulAddNV %[[A]], %[[B]], %[[C1]]
       %8 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} %6, %7, %arg4 : vector<16x32xi8>, vector<32x16xi8> into vector<16x16xi32>
       // CHECK: spv.Store "Function" %[[ACC]], %[[R]] : !spv.coopmatrix<16x16xi32, Subgroup>

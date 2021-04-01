@@ -329,12 +329,14 @@ static LogicalResult convertTensorReshapeOp(
       resultTensorType, {}, inputBufferType.getMemorySpaceAsInt());
   Value bufferReshape = b.create<linalg::ReshapeOp>(
       loc, reshapeResultType, reshapeSrc, op.reassociation());
-  auto allocationDynamicSizes = linalg::getReshapeOutputShapeFromInputShape(
-      b, loc, inputBuffer, resultTensorType.getShape(),
-      op.getReassociationMaps());
+  SmallVector<SmallVector<Value>> reshapeResultShape;
+  if (failed(op.reifyReturnTypeShapesPerResultDim(b, reshapeResultShape)) ||
+      reshapeResultShape.size() != 1) {
+    return op.emitError("failed to get shape of result");
+  }
   return createAliasingBufferOrAllocationForResult(
       b, loc, allocationFn, srcTensor, bufferReshape, resultTensor,
-      allocationDynamicSizes, bvm);
+      reshapeResultShape[0], bvm);
 }
 
 static SmallVector<int64_t, 4> extractFromI64ArrayAttr(ArrayAttr attr) {
@@ -460,7 +462,7 @@ static LogicalResult convertTransferOp(OpBuilder &b,
     b.create<vector::TransferWriteOp>(
         loc, writeOp.vector(), newInputBuffer, writeOp.indices(),
         writeOp.permutation_map(),
-        writeOp.masked() ? *writeOp.masked() : ArrayAttr());
+        writeOp.in_bounds() ? *writeOp.in_bounds() : ArrayAttr());
   }
   return success();
 }

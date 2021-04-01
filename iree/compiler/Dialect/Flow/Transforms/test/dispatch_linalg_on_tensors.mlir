@@ -193,8 +193,7 @@ func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tensor<?x
 //       CHECK:          flow.dispatch.tensor.store %[[RESULT]], %[[ARG5]]
 //       CHECK:          flow.return
 //       CHECK:     }
-//   CHECK-DAG:     %[[M_2:.+]] = memref.dim %[[RESULT1]], %[[C0]]
-//       CHECK:     flow.dispatch.workgroups[%[[N]], %[[M_2]], %[[C1]]]
+//       CHECK:     flow.dispatch.workgroups[%[[N]], %[[M]], %[[C1]]]
 //       CHECK:       %[[ZERO:.+]] = constant 0.0
 //       CHECK:       scf.for
 //       CHECK:         scf.for
@@ -539,6 +538,7 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
 }
 
 //  CHECK-DAG: #[[SIZE_MAP0:.+]] = affine_map<(d0, d1) -> (d1, -d0 + 1280)>
+//  CHECK-DAG: #[[SIZE_MAP1:.+]] = affine_map<(d0, d1) -> (-d0 + 1280, d1)>
 
 //      CHECK: func @tile_parallel_reduction
 // CHECK-SAME: (%[[INPUT:.+]]: tensor<7x7x1280xf32>)
@@ -554,7 +554,8 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
 //      CHECK:     %[[SIZE0:.+]] = affine.min #[[SIZE_MAP0]](%[[IV]], %[[WG_SIZE0]])
 //      CHECK:     %[[IN:.+]] = flow.dispatch.tensor.load %[[ARG1]]
 // CHECK-SAME:       sizes = [%[[C7]], %[[C7]], %[[SIZE0]]]
-//      CHECK:     %[[INIT:.+]] = linalg.init_tensor [%[[SIZE0]]] : tensor<?xf32>
+//      CHECK:     %[[SIZE1:.+]] = affine.min #[[SIZE_MAP1]](%[[IV]], %[[WG_SIZE0]])
+//      CHECK:     %[[INIT:.+]] = linalg.init_tensor [%[[SIZE1]]] : tensor<?xf32>
 // CHECK-NEXT:     %[[OUT:.+]] = linalg.fill(%[[INIT]]
 //      CHECK:     %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[IN]] : tensor<7x7x?xf32>) outs(%[[OUT]] : tensor<?xf32>)

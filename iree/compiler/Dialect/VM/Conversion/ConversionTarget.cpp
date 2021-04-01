@@ -26,8 +26,6 @@ VMConversionTarget::nestModuleForConversion(mlir::ModuleOp outerModuleOp) {
         ModuleOp::create(outerModuleOp.getLoc(), outerModuleOp.getName());
     innerModuleOp.getBodyRegion().takeBody(outerModuleOp.getBodyRegion());
     outerModuleOp.getBodyRegion().getBlocks().push_back(new Block());
-    OpBuilder builder = OpBuilder::atBlockEnd(outerModuleOp.getBody());
-    builder.create<mlir::ModuleTerminatorOp>(outerModuleOp.getLoc());
     outerModuleOp.push_back(innerModuleOp);
   }
   return std::make_pair(outerModuleOp, innerModuleOp);
@@ -42,10 +40,6 @@ VMConversionTarget::VMConversionTarget(MLIRContext *context)
   addDynamicallyLegalOp<mlir::ModuleOp>(+[](mlir::ModuleOp op) {
     return !op->getParentOp() || !isa<ModuleOp>(op->getParentOp());
   });
-  addDynamicallyLegalOp<mlir::ModuleTerminatorOp>(
-      +[](mlir::ModuleTerminatorOp op) {
-        return !isa<IREE::VM::ModuleOp>(op->getParentOp());
-      });
 }
 
 }  // namespace iree_compiler

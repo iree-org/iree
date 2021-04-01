@@ -278,25 +278,25 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //     %4 = flow.dispatch.tensor.load %0, offsets = [%c0, %c0], sizes = [%c1, %c3], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:2x3xf32> -> tensor<2x3xf32>
 //     %5 = flow.dispatch.tensor.load %1, offsets = [%c0, %c0], sizes = [%c3, %c1], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:3x4xf32> -> tensor<3x1xf32>
 //     %6 = flow.dispatch.tensor.load %2, offsets = [%c0, %c0], sizes = [%c1, %c1], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:2x4xf32> -> tensor<2x1xf32>
-//     %7 = vector.transfer_read %4[%c0, %c0], %cst {masked = [false, false]} : tensor<2x3xf32>, vector<1x1xf32>
-//     %8 = vector.transfer_read %4[%c0, %c1], %cst {masked = [false, false]} : tensor<2x3xf32>, vector<1x1xf32>
-//     %9 = vector.transfer_read %4[%c0, %c2], %cst {masked = [false, false]} : tensor<2x3xf32>, vector<1x1xf32>
-//     %10 = vector.transfer_read %4[%c1, %c0], %cst {masked = [false, false]} : tensor<2x3xf32>, vector<1x1xf32>
-//     %11 = vector.transfer_read %4[%c1, %c1], %cst {masked = [false, false]} : tensor<2x3xf32>, vector<1x1xf32>
-//     %12 = vector.transfer_read %4[%c1, %c2], %cst {masked = [false, false]} : tensor<2x3xf32>, vector<1x1xf32>
-//     %13 = vector.transfer_read %5[%c0, %c0], %cst {masked = [false, false]} : tensor<3x1xf32>, vector<1x1xf32>
-//     %14 = vector.transfer_read %5[%c1, %c0], %cst {masked = [false, false]} : tensor<3x1xf32>, vector<1x1xf32>
-//     %15 = vector.transfer_read %5[%c2, %c0], %cst {masked = [false, false]} : tensor<3x1xf32>, vector<1x1xf32>
-//     %16 = vector.transfer_read %6[%c0, %c0], %cst {masked = [false, false]} : tensor<2x1xf32>, vector<1x1xf32>
-//     %17 = vector.transfer_read %6[%c1, %c0], %cst {masked = [false, false]} : tensor<2x1xf32>, vector<1x1xf32>
+//     %7 = vector.transfer_read %4[%c0, %c0], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
+//     %8 = vector.transfer_read %4[%c0, %c1], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
+//     %9 = vector.transfer_read %4[%c0, %c2], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
+//     %10 = vector.transfer_read %4[%c1, %c0], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
+//     %11 = vector.transfer_read %4[%c1, %c1], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
+//     %12 = vector.transfer_read %4[%c1, %c2], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
+//     %13 = vector.transfer_read %5[%c0, %c0], %cst {in_bounds = [true, true]} : tensor<3x1xf32>, vector<1x1xf32>
+//     %14 = vector.transfer_read %5[%c1, %c0], %cst {in_bounds = [true, true]} : tensor<3x1xf32>, vector<1x1xf32>
+//     %15 = vector.transfer_read %5[%c2, %c0], %cst {in_bounds = [true, true]} : tensor<3x1xf32>, vector<1x1xf32>
+//     %16 = vector.transfer_read %6[%c0, %c0], %cst {in_bounds = [true, true]} : tensor<2x1xf32>, vector<1x1xf32>
+//     %17 = vector.transfer_read %6[%c1, %c0], %cst {in_bounds = [true, true]} : tensor<2x1xf32>, vector<1x1xf32>
 //     %18 = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %7, %13, %16 : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
 //     %19 = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %8, %14, %18 : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
 //     %20 = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %9, %15, %19 : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
 //     %21 = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %10, %13, %17 : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
 //     %22 = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %11, %14, %21 : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
 //     %23 = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %12, %15, %22 : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
-//     %24 = vector.transfer_write %20, %6[%c0, %c0] {masked = [false, false]} : vector<1x1xf32>, tensor<2x1xf32>
-//     %25 = vector.transfer_write %23, %24[%c1, %c0] {masked = [false, false]} : vector<1x1xf32>, tensor<2x1xf32>
+//     %24 = vector.transfer_write %20, %6[%c0, %c0] {in_bounds = [true, true]} : vector<1x1xf32>, tensor<2x1xf32>
+//     %25 = vector.transfer_write %23, %24[%c1, %c0] {in_bounds = [true, true]} : vector<1x1xf32>, tensor<2x1xf32>
 //     flow.dispatch.tensor.store %25, %3, offsets = [%c0, %c0], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<2x1xf32> -> !flow.dispatch.tensor<writeonly:2x4xf32>
 //     return
 //   }

@@ -120,7 +120,11 @@ static void mergeModuleInto(Operation *sourceModuleOp,
       }
       targetSymbolMap[symbolInterface.getName()] = op;
     }
-    op->moveBefore(&targetBlock.back());
+    if (!targetBlock.empty() &&
+        targetBlock.back().hasTrait<OpTrait::IsTerminator>())
+      op->moveBefore(&targetBlock.back());
+    else
+      op->moveBefore(&targetBlock, targetBlock.end());
   }
 
   // Now that we're done cloning its ops, delete the original target op.

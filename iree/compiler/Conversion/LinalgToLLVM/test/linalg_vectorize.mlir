@@ -24,8 +24,8 @@
 //       CHECK:   %[[D3:.*]] = vector.contract {{.*}} %[[V3]], %[[V6]], %[[VA]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
 //       CHECK:   %[[D4:.*]] = vector.contract {{.*}} %[[V4]], %[[V7]], %[[D3]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
 //       CHECK:   %[[D5:.*]] = vector.contract {{.*}} %[[V5]], %[[V8]], %[[D4]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
-//       CHECK:   %[[W0:.*]] = vector.transfer_write %[[D2]], %[[I2]][%[[C0]], %[[C0]]] {masked = [false, false]} : vector<1x1xf32>, tensor<2x1xf32>
-//       CHECK:   %[[W1:.*]] = vector.transfer_write %[[D5]], %[[W0]][%[[C1]], %[[C0]]] {masked = [false, false]} : vector<1x1xf32>, tensor<2x1xf32>
+//       CHECK:   %[[W0:.*]] = vector.transfer_write %[[D2]], %[[I2]][%[[C0]], %[[C0]]] {in_bounds = [true, true]} : vector<1x1xf32>, tensor<2x1xf32>
+//       CHECK:   %[[W1:.*]] = vector.transfer_write %[[D5]], %[[W0]][%[[C1]], %[[C0]]] {in_bounds = [true, true]} : vector<1x1xf32>, tensor<2x1xf32>
 //       CHECK:   flow.dispatch.tensor.store %[[W1]]
 
 func @tensor_dispatch_0() {

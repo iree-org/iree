@@ -89,8 +89,8 @@ struct FoldReshapeIntoInterfaceTensorLoad
 
 // Removes operations with Allocate MemoryEffects but no uses.
 struct RemoveDeadMemAllocs : RewritePattern {
-  RemoveDeadMemAllocs(PatternBenefit benefit = 1)
-      : RewritePattern(benefit, MatchAnyOpTypeTag()) {}
+  RemoveDeadMemAllocs(MLIRContext *context, PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
@@ -109,8 +109,8 @@ struct BufferAllocViewCleanUpPass
     : public PassWrapper<BufferAllocViewCleanUpPass, FunctionPass> {
   void runOnFunction() override {
     OwningRewritePatternList patterns(&getContext());
-    patterns.insert<FoldReshapeIntoInterfaceTensorLoad>(&getContext());
-    patterns.insert<RemoveDeadMemAllocs>();
+    patterns.insert<FoldReshapeIntoInterfaceTensorLoad, RemoveDeadMemAllocs>(
+        &getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

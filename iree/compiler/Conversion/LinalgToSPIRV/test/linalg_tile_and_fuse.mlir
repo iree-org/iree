@@ -258,7 +258,8 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP3]]()[%[[BIDX]]]
 //       CHECK:   %[[SV_ARG1:.+]] = memref.subview %[[ARG1]][0, %[[LBX]]]
 //       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]][%[[LBY]], %[[LBX]]]
-//       CHECK:   linalg.fill(%[[SV_RET0]], %{{.+}})
+//       CHECK:   %[[SV_RET0_1:.+]] = memref.subview %[[RET0]][%[[LBY]], %[[LBX]]]
+//       CHECK:   linalg.fill(%[[SV_RET0_1]], %{{.+}})
 //  CHECK-SAME:     "workgroup"
 //       CHECK:   linalg.matmul
 //  CHECK-SAME:     "workgroup"
@@ -328,7 +329,9 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
 //  CHECK-SAME:     [%[[BIDZ]], %[[LBY]], %[[LBX]], 0]
 //       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]]
 //  CHECK-SAME:     [%[[BIDZ]], %[[LBY]], %[[LBX]], 0]
-//       CHECK:   linalg.fill(%[[SV_RET0]], %{{.*}})
+//       CHECK:   %[[SV_RET0_1:.+]] = memref.subview %[[RET0]]
+//  CHECK-SAME:     [%[[BIDZ]], %[[LBY]], %[[LBX]], 0]
+//       CHECK:   linalg.fill(%[[SV_RET0_1]], %{{.*}})
 //  CHECK-SAME:     "workgroup"
 //       CHECK:   linalg.conv_2d_input_nhwc_filter_hwcf
 //  CHECK-SAME:     "workgroup"
@@ -397,10 +400,13 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
     }
   }
 }
+
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 8)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (8, s0 * -8 + 25)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 16)>
 //   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (16, s0 * -16 + 75)>
+//   CHECK-DAG: #[[MAP1_2:.+]] = affine_map<()[s0] -> (s0 * -8 + 25, 8)>
+//   CHECK-DAG: #[[MAP3_2:.+]] = affine_map<()[s0] -> (s0 * -16 + 75, 16)>
 //       CHECK: hal.executable.entry_point @three_op_fusion
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[C4:.+]] = constant 4
@@ -416,14 +422,16 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //   CHECK-NOT:   scf.parallel
 //   CHECK-NOT:   scf.for
-//       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//       CHECK:   %[[TILE_M:.+]] = affine.min #[[MAP1]]()[%[[BIDY]]]
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
-//       CHECK:   %[[TILE_N:.+]] = affine.min #[[MAP3]]()[%[[BIDX]]]
-//       CHECK:   %[[SV_ARG2:.+]] = memref.subview %[[ARG2]][%[[LBX]]] [%[[TILE_N]]]
-//       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]][%[[LBY]], %[[LBX]]
-//  CHECK-SAME:     [%[[TILE_M]], %[[TILE_N]]]
+//       CHECK:   %[[TILE_N_2:.+]] = affine.min #[[MAP3]]()[%[[BIDX]]]
+//       CHECK:   %[[SV_ARG2:.+]] = memref.subview %[[ARG2]][%[[LBX]]] [%[[TILE_N_2]]]
+//       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
+//       CHECK:   %[[TILE_M_2:.+]] = affine.min #[[MAP1]]()[%[[BIDY]]]
+//       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]][%[[LBY]], %[[LBX]]]
+//  CHECK-SAME:     [%[[TILE_M_2]], %[[TILE_N_2]]]
+//       CHECK:   %[[TILE_M:.+]] = affine.min #[[MAP1_2]]()[%[[BIDY]]]
 //       CHECK:   %[[SV_ARG0:.+]] = memref.subview %[[ARG0]][%[[LBY]], 0] [%[[TILE_M]], 50]
+//       CHECK:   %[[TILE_N:.+]] = affine.min #[[MAP3_2]]()[%[[BIDX]]]
 //       CHECK:   %[[SV_ARG1:.+]] = memref.subview %[[ARG1]][0, %[[LBX]]] [50, %[[TILE_N]]]
 //       CHECK:   %[[SV_ALLOC:.+]] = memref.subview %[[ALLOC]][0, 0] [%[[TILE_M]], %[[TILE_N]]]
 //       CHECK:   linalg.fill(%[[SV_ALLOC]], %{{.+}})
