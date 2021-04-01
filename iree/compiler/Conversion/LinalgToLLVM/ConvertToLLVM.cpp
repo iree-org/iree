@@ -676,7 +676,8 @@ void ConvertToLLVMPass::runOnOperation() {
 
   OwningRewritePatternList patterns(&getContext());
   // TOSA rescale will be lowered to Standard right before LLVM codegen. Future
-  // lowerings should using specific CPU operations to avoid requiring i64 values.
+  // lowerings should using specific CPU operations to avoid requiring i64
+  // values.
   tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
 
   populateAffineToStdConversionPatterns(patterns);
