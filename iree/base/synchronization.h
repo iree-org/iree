@@ -55,15 +55,6 @@
 #define IREE_PTR_GUARDED_BY(x)
 #endif  // __cplusplus
 
-// Documents the locks acquired in the body of the function. These locks
-// cannot be held when calling this function (as Abseil's `Mutex` locks are
-// non-reentrant).
-#if IREE_HAVE_ATTRIBUTE(locks_excluded)
-#define IREE_LOCKS_EXCLUDED(...) __attribute__((locks_excluded(__VA_ARGS__)))
-#else
-#define IREE_LOCKS_EXCLUDED(...)
-#endif
-
 // NOTE: we only support futex when not using tsan as we need to add annotations
 // for tsan to understand what we are doing.
 // https://github.com/llvm-mirror/compiler-rt/blob/master/include/sanitizer/tsan_interface.h

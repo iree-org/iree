@@ -153,7 +153,7 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
 
   const ref_ptr<DynamicSymbols>& syms() const;
 
-  Status PreallocateFences() IREE_LOCKS_EXCLUDED(mutex_);
+  Status PreallocateFences();
 
   VkDeviceHandle* logical_device_;
 
@@ -200,7 +200,7 @@ class TimePointSemaphorePool final : public RefObject<TimePointSemaphorePool> {
 
   const ref_ptr<DynamicSymbols>& syms() const;
 
-  Status PreallocateSemaphores() IREE_LOCKS_EXCLUDED(mutex_);
+  Status PreallocateSemaphores();
 
   VkDeviceHandle* logical_device_;
 

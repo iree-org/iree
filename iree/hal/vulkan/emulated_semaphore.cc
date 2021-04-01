@@ -91,14 +91,12 @@ class EmulatedTimelineSemaphore final {
   // Tries to advance the timeline to the given |to_upper_value| without
   // blocking and returns whether the |to_upper_value| is reached.
   iree_status_t TryToAdvanceTimeline(uint64_t to_upper_value,
-                                     bool* out_reached_upper_value)
-      IREE_LOCKS_EXCLUDED(mutex_);
+                                     bool* out_reached_upper_value);
   // Similar to the above, but also returns the fences that are known to have
   // already signaled via |signaled_fences|.
   iree_status_t TryToAdvanceTimeline(
       uint64_t to_upper_value, bool* out_reached_upper_value,
-      absl::InlinedVector<VkFence, 4>* out_signaled_fences)
-      IREE_LOCKS_EXCLUDED(mutex_);
+      absl::InlinedVector<VkFence, 4>* out_signaled_fences);
 
   std::atomic<uint64_t> signaled_value_;
 
