@@ -457,23 +457,38 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   if (!minOp.getSymbolOperands().empty() ||
       minOp.getAffineMap().getNumResults() != 2)
     return {};
-
-  scf::ForOp forOp;
   Value iv;
-  // Check if any of the dimensions are a ForOp induction variable.
+  Value ub;
+  Value lb;
+  Value step;
+  // Check if any of the dimensions is a ForOp or ParallelOp induction variable.
   for (auto dim : minOp.getDimOperands()) {
     auto ivArg = dim.dyn_cast<BlockArgument>();
     if (!ivArg) continue;
     Operation *containingOp = ivArg.getOwner()->getParentOp();
-    forOp = dyn_cast_or_null<scf::ForOp>(containingOp);
+    auto forOp = dyn_cast_or_null<scf::ForOp>(containingOp);
     if (forOp && forOp.getInductionVar() == dim) {
       iv = dim;
+      ub = forOp.upperBound();
+      lb = forOp.lowerBound();
+      step = forOp.step();
       break;
     }
+    auto parallelOp = dyn_cast_or_null<scf::ParallelOp>(containingOp);
+    if (!parallelOp) continue;
+    for (auto inductionVar : llvm::enumerate(parallelOp.getInductionVars())) {
+      if (inductionVar.value() == dim) {
+        iv = dim;
+        ub = parallelOp.upperBound()[inductionVar.index()];
+        lb = parallelOp.lowerBound()[inductionVar.index()];
+        step = parallelOp.step()[inductionVar.index()];
+        break;
+      }
+    }
+    if (iv) break;
   }
   if (!iv) return false;
   // Calculate the affine map representing `%ub - %iv`.
-  Value ub = forOp.upperBound();
   AffineExpr ivDim;
   AffineExpr ubDim;
   for (auto dim : llvm::enumerate(minOp.getDimOperands())) {
@@ -504,9 +519,8 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   // Now check that for every value of the induction variable `%ub - %iv` is
   // divisible by `dividend`. It is true if the lower bounder, the upper bound
   // and the step are all divisible by `dividend`.
-  std::array<Value, 3> forOperands = {forOp.lowerBound(), forOp.step(),
-                                      forOp.upperBound()};
-  return llvm::all_of(forOperands,
+  std::array<Value, 3> loopOperands = {lb, step, ub};
+  return llvm::all_of(loopOperands,
                       [dividend](Value v) { return isDivisible(v, dividend); });
 }
 

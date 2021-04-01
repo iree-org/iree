@@ -45,5 +45,23 @@ func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
     }
   }
 
+  // Same case but using scf.parallel.
+  //      CHECK: scf.for
+  //      CHECK:   %[[MIN:.*]] = affine.min
+  //      CHECK:   scf.parallel {{.*}} to (%[[MIN]])
+  // CHECK-NEXT:     %[[C4:.*]] = constant 4 : index
+  // CHECK-NEXT:     %[[C4I64:.*]] = index_cast %[[C4:.*]]
+  // CHECK-NEXT:     memref.store %[[C4I64]], %{{.*}}[] : memref<i64>
+  scf.for %arg0 = %0 to %c1020 step %1 {
+    %2 = affine.min affine_map<(d0) -> (32, -d0 + 1020)>(%arg0)
+    %3 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%id2]
+    %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%count2]
+    scf.parallel (%arg1) = (%3) to (%2) step (%4) {
+      %5 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%2, %arg1)
+      %6 = index_cast %5: index to i64
+      memref.store %6, %A[]: memref<i64>
+    }
+  }
+
   return
 }
