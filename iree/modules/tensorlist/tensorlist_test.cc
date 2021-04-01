@@ -14,7 +14,6 @@
 
 // Tests that our bytecode module can call through into our native module.
 
-#include "absl/base/macros.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"

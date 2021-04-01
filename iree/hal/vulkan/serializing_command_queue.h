@@ -22,9 +22,9 @@
 #include <memory>
 #include <string>
 
-#include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
 #include "iree/base/status.h"
+#include "iree/base/synchronization.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

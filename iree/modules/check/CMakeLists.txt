@@ -23,7 +23,6 @@ if(${IREE_HAL_DRIVER_VMLA})
       "check_test.cc"
     DEPS
       ::native_module
-      absl::core_headers
       absl::strings
       half::includes
       iree::base::api

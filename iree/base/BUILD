@@ -49,9 +49,6 @@ cc_library(
         "attributes.h",
         "target_platform.h",
     ],
-    deps = [
-        "@com_google_absl//absl/base:core_headers",
-    ],
 )
 
 cc_library(
