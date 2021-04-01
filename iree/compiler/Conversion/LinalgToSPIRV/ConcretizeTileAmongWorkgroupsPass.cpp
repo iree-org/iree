@@ -140,7 +140,7 @@ static std::tuple<SmallVector<Type>, SmallVector<Type>> getInputOutputTypes(
     }
     outputTypes.push_back(subviewOp.getViewSource().getType());
   }
-  return {std::move(inputTypes), std::move{outputTypes}};
+  return {std::move(inputTypes), std::move(outputTypes)};
 }
 
 /// Assuming the given `rootOp` is the tiled root Linalg op, returns the
