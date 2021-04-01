@@ -125,7 +125,8 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
       ::testing::MatchResultListener *listener) const override {
     if (GetCode(matchee) != code_) {
       *listener << "whose error code is "
-                << StatusCodeToString(GetCode(matchee));
+                << StatusCodeToString(GetCode(matchee)) << ": "
+                << GetMessage(matchee);
       return false;
     }
     if (message_.has_value() && GetMessage(matchee) != message_.value()) {

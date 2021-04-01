@@ -35,6 +35,7 @@ typedef struct {
   VkDeviceHandle* logical_device;
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
+  iree_hal_queue_affinity_t queue_affinity;
 
   VkCommandPoolHandle* command_pool;
   VkCommandBuffer handle;
@@ -66,6 +67,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree::hal::vulkan::VkCommandPoolHandle* command_pool,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
     iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(logical_device);
@@ -95,6 +97,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     command_buffer->logical_device = logical_device;
     command_buffer->mode = mode;
     command_buffer->allowed_categories = command_categories;
+    command_buffer->queue_affinity = queue_affinity;
     command_buffer->command_pool = command_pool;
     command_buffer->handle = handle;
     command_buffer->syms = logical_device->syms().get();

@@ -64,6 +64,22 @@ enum iree_hal_command_category_e {
 };
 typedef uint32_t iree_hal_command_category_t;
 
+// A bitmask indicating affinity for a submission to use a particular set of
+// queues.
+//
+// Upon submission the queue is selected based on the flags set in
+// |command_categories| and the |queue_affinity|. As the number of available
+// queues can vary the |queue_affinity| is used to hash into the available
+// queues for the required categories. For example if 2 queues support transfer
+// commands and the affinity is 5 the resulting queue could be index hash(5)=1.
+// The affinity can thus be treated as just a way to indicate whether two
+// submissions must be placed on to the same queue. Note that the exact hashing
+// function is implementation dependent.
+typedef uint64_t iree_hal_queue_affinity_t;
+
+// Specifies that any queue may be selected.
+#define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))
+
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
 // Maps to VkPipelineStageFlagBits.
@@ -193,9 +209,14 @@ typedef struct iree_hal_command_buffer_s iree_hal_command_buffer_t;
 
 // Creates a command buffer ready to begin recording, possibly reusing an
 // existing one from the |device| pool.
+//
+// |queue_affinity| specifies the device queues the command buffer may be
+// submitted to. The queue affinity provided to iree_hal_device_queue_submit
+// must match or be a subset of the |queue_affinity|.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Retains the given |command_buffer| for the caller.

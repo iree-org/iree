@@ -155,10 +155,12 @@ static iree_hal_allocator_t* iree_hal_cuda_device_allocator(
 static iree_status_t iree_hal_cuda_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_graph_command_buffer_allocate(
-      &device->context_wrapper, mode, command_categories, out_command_buffer);
+      &device->context_wrapper, mode, command_categories, queue_affinity,
+      out_command_buffer);
 }
 
 static iree_status_t iree_hal_cuda_device_create_descriptor_set(
@@ -218,8 +220,9 @@ static iree_status_t iree_hal_cuda_device_create_semaphore(
 
 static iree_status_t iree_hal_cuda_device_queue_submit(
     iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories, uint64_t queue_affinity,
-    iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   for (int i = 0; i < batch_count; i++) {
     for (int j = 0; j < batches[i].command_buffer_count; j++) {

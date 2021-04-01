@@ -450,12 +450,18 @@ enum {
 
 #define IREE_TRACE_ALLOC(ptr, size) ___tracy_emit_memory_alloc(ptr, size, 0)
 #define IREE_TRACE_FREE(ptr) ___tracy_emit_memory_free(ptr, 0)
+#define IREE_TRACE_ALLOC_NAMED(name, ptr, size) \
+  ___tracy_emit_memory_alloc_named(ptr, size, 0, name)
+#define IREE_TRACE_FREE_NAMED(name, ptr) \
+  ___tracy_emit_memory_free_named(ptr, 0, name)
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS
 
 #else
 #define IREE_TRACE_ALLOC(ptr, size)
 #define IREE_TRACE_FREE(ptr)
+#define IREE_TRACE_ALLOC_NAMED(name, ptr, size)
+#define IREE_TRACE_FREE_NAMED(name, ptr)
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 #if defined(__cplusplus) && \

@@ -42,7 +42,7 @@ iree_hal_device_allocator(iree_hal_device_t* device) {
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-    uint64_t queue_affinity, iree_host_size_t batch_count,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(!batch_count || batches);
