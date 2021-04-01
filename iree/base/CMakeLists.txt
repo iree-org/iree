@@ -105,6 +105,10 @@ iree_cc_library(
     absl::flags
     absl::str_format
   PUBLIC
+  if(ANDROID)
+  LINKOPTS
+    "-landroid"
+  endif()
 )
 
 iree_cc_library(
