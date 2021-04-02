@@ -254,6 +254,22 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
   }
   for (auto &op : streamOp.body().front()) {
     if (isNoOp(&op) || isIdentityOp(&op)) continue;
+
+    if (auto subspanOp = dyn_cast<IREE::HAL::ConstantSubspanOp>(op)) {
+      auto bufferValue = rewriter.createOrFold<IREE::HAL::VariableLoadOp>(
+          subspanOp.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
+          subspanOp.runtime_buffer().getLeafReference());
+      auto offsetValue = rewriter.createOrFold<mlir::ConstantOp>(
+          subspanOp.getLoc(), subspanOp.runtime_range().offsetAttr());
+      auto lengthValue = rewriter.createOrFold<mlir::ConstantOp>(
+          subspanOp.getLoc(), subspanOp.runtime_range().lengthAttr());
+      auto subspanValue = rewriter.createOrFold<IREE::HAL::BufferSubspanOp>(
+          subspanOp.getLoc(), bufferValue.getType(), bufferValue, offsetValue,
+          lengthValue);
+      bufferSet.rangeMap[subspanOp.result()] = BufferRange{subspanValue};
+      continue;
+    }
+
     auto tiedOp = dyn_cast<IREE::TiedOpInterface>(op);
     for (auto it : llvm::enumerate(op.getResults())) {
       auto result = it.value();
@@ -663,13 +679,14 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
       }
     } else if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(op)) {
       // No-op; handled by the buffer allocation.
-    } else if (isNoOp(&op) || isIdentityOp(&op)) {
-      // No work to perform. For identity ops, all buffers have been pushed
-      // to "real" ops.
     } else if (isa<ConstantOp>(op)) {
       // HACK: all this code is going away soon.
       auto newOp = rewriter.clone(op);
       op.replaceAllUsesWith(newOp);
+    } else if (isNoOp(&op) || isIdentityOp(&op) ||
+               isa<IREE::HAL::ConstantSubspanOp>(op)) {
+      // No work to perform. For identity ops, all buffers have been pushed
+      // to "real" ops.
     } else {
       return op.emitOpError() << "unexpected in stream";
     }
