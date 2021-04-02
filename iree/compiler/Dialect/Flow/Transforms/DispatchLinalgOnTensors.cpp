@@ -145,7 +145,7 @@ static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
 }
 
 /// Returns the fusion groups for the given `op`.
-static SmallVector<int64_t, 1> getFunsionGroups(Operation *op) {
+static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
   SmallVector<int64_t, 1> fusionGroups = {};
   if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
     fusionGroups = llvm::to_vector<1>(llvm::map_range(
@@ -157,7 +157,7 @@ static SmallVector<int64_t, 1> getFunsionGroups(Operation *op) {
 
 /// Appends the given `op` to the `newGroups` fusion groups.
 static void appendFusionGroups(Operation *op, ArrayRef<int64_t> newGroups) {
-  SmallVector<int64_t, 1> fusionGroups = getFunsionGroups(op);
+  SmallVector<int64_t, 1> fusionGroups = getFusionGroups(op);
   fusionGroups.append(newGroups.begin(), newGroups.end());
   op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
 }
@@ -935,12 +935,6 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 static bool isProducerFusable(linalg::LinalgOp producer,
                               linalg::LinalgOp consumer,
                               OpOperand &consumerOperand) {
-  auto isElementWiseParallelOp = [](linalg::LinalgOp op) {
-    return llvm::all_of(op.iterator_types(), [](Attribute attr) {
-      return linalg::isParallelIteratorType(attr);
-    });
-  };
-
   if (consumer.isInputTensor(&consumerOperand)) {
     // Make sure that we have an identity indexing map for the operand for now.
     //
@@ -958,7 +952,12 @@ static bool isProducerFusable(linalg::LinalgOp producer,
     return consumerOperand.get().hasOneUse();
   } else {
     // If the producer's result is used by the consumer as an output
-    // initializer, fuse if the producer is a parallel operation.
+    // initializer, fuse if the producer is an elementwise parallel operation.
+    auto isElementWiseParallelOp = [](linalg::LinalgOp op) {
+      return llvm::all_of(op.iterator_types(), [](Attribute attr) {
+        return linalg::isParallelIteratorType(attr);
+      });
+    };
     return isElementWiseParallelOp(producer);
   }
 }
@@ -984,7 +983,7 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
 
       // This might be a root op that is already fused into another root op.
       // In that case, it has fusion groups attached on it.
-      SmallVector<int64_t, 1> fusionGroups = getFunsionGroups(op);
+      SmallVector<int64_t, 1> fusionGroups = getFusionGroups(op);
       if (fusionGroups.empty()) {
         // Otherwise, create a new group.
         unsigned newGroup = numRootOps++;
