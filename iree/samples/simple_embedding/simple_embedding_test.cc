@@ -17,7 +17,8 @@
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
-#include "iree/hal/testing/driver_registry.h"
+#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -41,27 +42,27 @@ std::ostream& operator<<(std::ostream& os, const TestParams& params) {
   return os << absl::StrReplaceAll(params.driver_name, {{":", "_"}});
 }
 
-// Builds a list of tests to run based on the linked in driver modules.
-std::vector<TestParams> GetAvailableDriverTestParams() {
-  std::vector<TestParams> all_test_params;
-  auto driver_names = iree::hal::testing::EnumerateAvailableDrivers();
-  // TODO(#3843): this whole file stopped being useful a long time ago as a
-  // "simple" embedded test. This is a hack to work around its bustedness.
-  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "dylib");
-  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "llvm");
-  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "cuda");
-  for (const auto& driver_name : driver_names) {
-    TestParams test_params;
-    test_params.driver_name = driver_name;
-    all_test_params.push_back(std::move(test_params));
-  }
-  return all_test_params;
+std::vector<TestParams> GetDriverTestParams() {
+  // The test file was compiled for VMLA+Vulkan, so test on each driver.
+  std::vector<TestParams> test_params;
+
+  IREE_CHECK_OK(
+      iree_hal_vmla_driver_module_register(iree_hal_driver_registry_default()));
+  TestParams vmla_params;
+  vmla_params.driver_name = "vmla";
+  test_params.push_back(std::move(vmla_params));
+
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
+      iree_hal_driver_registry_default()));
+  TestParams vulkan_params;
+  vulkan_params.driver_name = "vulkan";
+  test_params.push_back(std::move(vulkan_params));
+
+  return test_params;
 }
 
 class SimpleEmbeddingTest : public ::testing::Test,
-                            public ::testing::WithParamInterface<TestParams> {
- protected:
-};
+                            public ::testing::WithParamInterface<TestParams> {};
 
 TEST_P(SimpleEmbeddingTest, RunOnce) {
   // TODO(benvanik): move to instance-based registration.
@@ -204,7 +205,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
 }
 
 INSTANTIATE_TEST_SUITE_P(AllDrivers, SimpleEmbeddingTest,
-                         ::testing::ValuesIn(GetAvailableDriverTestParams()),
+                         ::testing::ValuesIn(GetDriverTestParams()),
                          ::testing::PrintToStringParamName());
 
 }  // namespace
