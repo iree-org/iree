@@ -1063,10 +1063,10 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 func @dot_ex_dispatch_0() {
+  %c0 = constant 0 : index
+  %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c1024 = constant 1024 : index
-  %c32 = constant 32 : index
-  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
@@ -1094,10 +1094,10 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 func @dot_ex_dispatch_0() {
+  %c0 = constant 0 : index
+  %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c1024 = constant 1024 : index
-  %c32 = constant 32 : index
-  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
@@ -1123,10 +1123,10 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 func @dot_ex_dispatch_0() {
+  %c0 = constant 0 : index
+  %c32 = constant 32 : index
   %c64 = constant 64 : index
   %c1024 = constant 1024 : index
-  %c32 = constant 32 : index
-  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
@@ -1162,11 +1162,11 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 func @dot_ex_dispatch_0() {
+  %c0 = constant 0 : index
+  %c32 = constant 32 : index
+  %c1 = constant 1 : index
   %c64 = constant 64 : index
   %c1024 = constant 1024 : index
-  %c32 = constant 32 : index
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
@@ -1199,30 +1199,30 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 func @dot_ex_dispatch_0() {
-  %c1 = constant 1 : index
-  %c32 = constant 32 : index
   %c1024 = constant 1024 : index
-  %0 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
   %c64 = constant 64 : index
-  %1 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %2 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %3 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %4 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %0 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %c1 = constant 1 : index
+  %1 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %c32 = constant 32 : index
+  %2 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %3 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %4 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
   %c0 = constant 0 : index
   %5 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
   %6 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %7 = "shapex.to_extent_tensor"(%0) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
+  %7 = "shapex.to_extent_tensor"(%4) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
   %8 = "mhlo.dynamic_reshape"(%5, %7) : (tensor<32x1024xf32>, tensor<3xindex>) -> tensor<?x?x?xf32>
-  %9 = shapex.tie_shape %8, %0 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
+  %9 = shapex.tie_shape %8, %4 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
   %10 = "mhlo.transpose"(%6) {permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<1024x64xf32>) -> tensor<?x?xf32>
-  %11 = shapex.tie_shape %10, %4 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-  %12 = "shapex.to_extent_tensor"(%3) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
+  %11 = shapex.tie_shape %10, %0 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  %12 = "shapex.to_extent_tensor"(%1) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
   %13 = "mhlo.dynamic_reshape"(%11, %12) : (tensor<?x?xf32>, tensor<3xindex>) -> tensor<?x?x?xf32>
-  %14 = shapex.tie_shape %13, %3 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
+  %14 = shapex.tie_shape %13, %1 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
   %15 = vmla.batch.matmul.pseudo %9, %14 : (tensor<?x?x?xf32>, tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-  %16 = shapex.tie_shape %15, %2 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
+  %16 = shapex.tie_shape %15, %3 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
   %17 = "mhlo.transpose"(%16) {permutation = dense<[0, 2, 1]> : tensor<3xi64>} : (tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-  %18 = shapex.tie_shape %17, %1 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
+  %18 = shapex.tie_shape %17, %2 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
   %19 = "mhlo.reshape"(%18) : (tensor<?x?x?xf32>) -> tensor<32x64xf32>
   hal.interface.store.tensor %19, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
@@ -1236,30 +1236,30 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 func @dot_ex_dispatch_0() {
-  %c1 = constant 1 : index
-  %c32 = constant 32 : index
   %c1024 = constant 1024 : index
-  %0 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
   %c64 = constant 64 : index
-  %1 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %2 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %3 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %4 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %0 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %c1 = constant 1 : index
+  %1 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %c32 = constant 32 : index
+  %2 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %3 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %4 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
   %c0 = constant 0 : index
   %5 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
   %6 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %7 = "shapex.to_extent_tensor"(%0) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
+  %7 = "shapex.to_extent_tensor"(%4) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
   %8 = "mhlo.dynamic_reshape"(%5, %7) : (tensor<32x1024xf32>, tensor<3xindex>) -> tensor<?x?x?xf32>
-  %9 = shapex.tie_shape %8, %0 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
+  %9 = shapex.tie_shape %8, %4 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
   %10 = "mhlo.transpose"(%6) {permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<1024x64xf32>) -> tensor<?x?xf32>
-  %11 = shapex.tie_shape %10, %4 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-  %12 = "shapex.to_extent_tensor"(%3) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
+  %11 = shapex.tie_shape %10, %0 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  %12 = "shapex.to_extent_tensor"(%1) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
   %13 = "mhlo.dynamic_reshape"(%11, %12) : (tensor<?x?xf32>, tensor<3xindex>) -> tensor<?x?x?xf32>
-  %14 = shapex.tie_shape %13, %3 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
+  %14 = shapex.tie_shape %13, %1 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
   %15 = vmla.batch.matmul.pseudo %9, %14 : (tensor<?x?x?xf32>, tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-  %16 = shapex.tie_shape %15, %2 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
+  %16 = shapex.tie_shape %15, %3 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
   %17 = "mhlo.transpose"(%16) {permutation = dense<[0, 2, 1]> : tensor<3xi64>} : (tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-  %18 = shapex.tie_shape %17, %1 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
+  %18 = shapex.tie_shape %17, %2 : tensor<?x?x?xf32>, !shapex.ranked_shape<[?,?,?]>
   %19 = "mhlo.reshape"(%18) : (tensor<?x?x?xf32>) -> tensor<32x64xf32>
   hal.interface.store.tensor %19, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
@@ -1274,15 +1274,15 @@ func @dot_ex_dispatch_0() {
 ```
 module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) {
-    %c1 = constant 1 : index
-    %c32 = constant 32 : index
     %c1024 = constant 1024 : index
-    %0 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
     %c64 = constant 64 : index
-    %1 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %2 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %3 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %4 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+    %0 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+    %c1 = constant 1 : index
+    %1 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %c32 = constant 32 : index
+    %2 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %3 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %4 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
     %c0 = constant 0 : index
     %5 = vmla.interface.binding %arg0 {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
     %c4 = constant 4 : index
@@ -1300,31 +1300,31 @@ module  {
     %10 = muli %c4_2, %c1024_3 : index
     %11 = muli %10, %c64_4 : index
     %12 = vmla.buffer.view %9[%c0], byte_length = %11 : !vmla.buffer
-    %13 = "shapex.to_extent_tensor"(%0) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
-    %14 = shapex.tie_shape %8, %0 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    %13 = "shapex.to_extent_tensor"(%4) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
+    %14 = shapex.tie_shape %8, %4 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %rs1024_64_5 = shapex.const_ranked_shape : !shapex.ranked_shape<[1024,64]>
     %c4_6 = constant 4 : index
     %15 = muli %c4_6, %c64 : index
     %16 = muli %15, %c1024 : index
     %17 = vmla.buffer.alloc byte_length = %16 : !vmla.buffer
-    vmla.transpose %12(%rs1024_64_5 : !shapex.ranked_shape<[1024,64]>), out %17(%4 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
-    %18 = shapex.tie_shape %17, %4 : !vmla.buffer, !shapex.ranked_shape<[?,?]>
-    %19 = "shapex.to_extent_tensor"(%3) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
-    %20 = shapex.tie_shape %18, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.transpose %12(%rs1024_64_5 : !shapex.ranked_shape<[1024,64]>), out %17(%0 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
+    %18 = shapex.tie_shape %17, %0 : !vmla.buffer, !shapex.ranked_shape<[?,?]>
+    %19 = "shapex.to_extent_tensor"(%1) : (!shapex.ranked_shape<[?,?,?]>) -> tensor<3xindex>
+    %20 = shapex.tie_shape %18, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %c4_7 = constant 4 : index
     %21 = muli %c4_7, %c1 : index
     %22 = muli %21, %c64 : index
     %23 = muli %22, %c32 : index
     %24 = vmla.buffer.alloc byte_length = %23 : !vmla.buffer
-    vmla.batch.matmul %14(%0 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %20(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %24(%2 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
-    %25 = shapex.tie_shape %24, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.batch.matmul %14(%4 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %20(%1 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %24(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
+    %25 = shapex.tie_shape %24, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %c4_8 = constant 4 : index
     %26 = muli %c4_8, %c1 : index
     %27 = muli %26, %c32 : index
     %28 = muli %27, %c64 : index
     %29 = vmla.buffer.alloc byte_length = %28 : !vmla.buffer
-    vmla.transpose %25(%2 : !shapex.ranked_shape<[?,?,?]>), out %29(%1 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
-    %30 = shapex.tie_shape %29, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.transpose %25(%3 : !shapex.ranked_shape<[?,?,?]>), out %29(%2 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
+    %30 = shapex.tie_shape %29, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %31 = vmla.interface.binding %arg0 {binding = 2 : i32, set = 0 : i32} : !vmla.buffer
     %c0_9 = constant 0 : index
     %c4_10 = constant 4 : index
@@ -1346,15 +1346,15 @@ module  {
 {% raw %}
 ```
 func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) {
-  %c1 = constant 1 : index
-  %c32 = constant 32 : index
   %c1024 = constant 1024 : index
-  %0 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
   %c64 = constant 64 : index
-  %1 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %2 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %3 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %4 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %0 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %c1 = constant 1 : index
+  %1 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %c32 = constant 32 : index
+  %2 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %3 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %4 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
   %c0 = constant 0 : index
   %5 = vmla.interface.binding %arg0 {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
   %c4 = constant 4 : index
@@ -1365,25 +1365,25 @@ func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg
   %10 = muli %c4, %c1024 : index
   %11 = muli %10, %c64 : index
   %12 = vmla.buffer.view %9[%c0], byte_length = %11 : !vmla.buffer
-  %13 = shapex.tie_shape %8, %0 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+  %13 = shapex.tie_shape %8, %4 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
   %rs1024_64 = shapex.const_ranked_shape : !shapex.ranked_shape<[1024,64]>
   %14 = muli %c4, %c64 : index
   %15 = muli %14, %c1024 : index
   %16 = vmla.buffer.alloc byte_length = %15 : !vmla.buffer
-  vmla.transpose %12(%rs1024_64 : !shapex.ranked_shape<[1024,64]>), out %16(%4 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
-  %17 = shapex.tie_shape %16, %4 : !vmla.buffer, !shapex.ranked_shape<[?,?]>
-  %18 = shapex.tie_shape %17, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+  vmla.transpose %12(%rs1024_64 : !shapex.ranked_shape<[1024,64]>), out %16(%0 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
+  %17 = shapex.tie_shape %16, %0 : !vmla.buffer, !shapex.ranked_shape<[?,?]>
+  %18 = shapex.tie_shape %17, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
   %19 = muli %c4, %c1 : index
   %20 = muli %19, %c64 : index
   %21 = muli %20, %c32 : index
   %22 = vmla.buffer.alloc byte_length = %21 : !vmla.buffer
-  vmla.batch.matmul %13(%0 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %18(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %22(%2 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
-  %23 = shapex.tie_shape %22, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+  vmla.batch.matmul %13(%4 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %18(%1 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %22(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
+  %23 = shapex.tie_shape %22, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
   %24 = muli %19, %c32 : index
   %25 = muli %24, %c64 : index
   %26 = vmla.buffer.alloc byte_length = %25 : !vmla.buffer
-  vmla.transpose %23(%2 : !shapex.ranked_shape<[?,?,?]>), out %26(%1 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
-  %27 = shapex.tie_shape %26, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+  vmla.transpose %23(%3 : !shapex.ranked_shape<[?,?,?]>), out %26(%2 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
+  %27 = shapex.tie_shape %26, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
   %28 = vmla.interface.binding %arg0 {binding = 2 : i32, set = 0 : i32} : !vmla.buffer
   %29 = muli %6, %c64 : index
   vmla.buffer.copy %27[%c0], out %28[%c0], byte_length = %29
@@ -1398,34 +1398,34 @@ func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg
 {% raw %}
 ```
 func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) {
-  %c8192 = constant 8192 : index
-  %c262144 = constant 262144 : index
-  %c131072 = constant 131072 : index
-  %c1 = constant 1 : index
-  %c32 = constant 32 : index
   %c1024 = constant 1024 : index
   %c64 = constant 64 : index
+  %c1 = constant 1 : index
+  %c32 = constant 32 : index
   %c0 = constant 0 : index
+  %c131072 = constant 131072 : index
   %rs1024_64 = shapex.const_ranked_shape : !shapex.ranked_shape<[1024,64]>
-  %0 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %1 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %2 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %3 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-  %4 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %c262144 = constant 262144 : index
+  %c8192 = constant 8192 : index
+  %0 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %1 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %2 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %3 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+  %4 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
   %5 = vmla.interface.binding %arg0 {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
   %6 = vmla.buffer.view %5[%c0], byte_length = %c131072 : !vmla.buffer
   %7 = vmla.interface.binding %arg0 {binding = 1 : i32, set = 0 : i32} : !vmla.buffer
   %8 = vmla.buffer.view %7[%c0], byte_length = %c262144 : !vmla.buffer
-  %9 = shapex.tie_shape %6, %0 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+  %9 = shapex.tie_shape %6, %4 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
   %10 = vmla.buffer.alloc byte_length = %c262144 : !vmla.buffer
-  vmla.transpose %8(%rs1024_64 : !shapex.ranked_shape<[1024,64]>), out %10(%4 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
-  %11 = shapex.tie_shape %10, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+  vmla.transpose %8(%rs1024_64 : !shapex.ranked_shape<[1024,64]>), out %10(%0 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
+  %11 = shapex.tie_shape %10, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
   %12 = vmla.buffer.alloc byte_length = %c8192 : !vmla.buffer
-  vmla.batch.matmul %9(%0 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %11(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %12(%2 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
-  %13 = shapex.tie_shape %12, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+  vmla.batch.matmul %9(%4 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %11(%1 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %12(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
+  %13 = shapex.tie_shape %12, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
   %14 = vmla.buffer.alloc byte_length = %c8192 : !vmla.buffer
-  vmla.transpose %13(%2 : !shapex.ranked_shape<[?,?,?]>), out %14(%1 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
-  %15 = shapex.tie_shape %14, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+  vmla.transpose %13(%3 : !shapex.ranked_shape<[?,?,?]>), out %14(%2 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
+  %15 = shapex.tie_shape %14, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
   %16 = vmla.interface.binding %arg0 {binding = 2 : i32, set = 0 : i32} : !vmla.buffer
   vmla.buffer.copy %15[%c0], out %16[%c0], byte_length = %c8192
   return
@@ -1440,34 +1440,34 @@ func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg
 ```
 module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) attributes {iree.module.export} {
-    %c8192 = constant 8192 : index
-    %c262144 = constant 262144 : index
-    %c131072 = constant 131072 : index
-    %c1 = constant 1 : index
-    %c32 = constant 32 : index
     %c1024 = constant 1024 : index
     %c64 = constant 64 : index
+    %c1 = constant 1 : index
+    %c32 = constant 32 : index
     %c0 = constant 0 : index
+    %c131072 = constant 131072 : index
     %rs1024_64 = shapex.const_ranked_shape : !shapex.ranked_shape<[1024,64]>
-    %0 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %1 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %2 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %3 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %4 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+    %c262144 = constant 262144 : index
+    %c8192 = constant 8192 : index
+    %0 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+    %1 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %2 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %3 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %4 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
     %5 = vmla.interface.binding %arg0 {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
     %6 = vmla.buffer.view %5[%c0], byte_length = %c131072 : !vmla.buffer
     %7 = vmla.interface.binding %arg0 {binding = 1 : i32, set = 0 : i32} : !vmla.buffer
     %8 = vmla.buffer.view %7[%c0], byte_length = %c262144 : !vmla.buffer
-    %9 = shapex.tie_shape %6, %0 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    %9 = shapex.tie_shape %6, %4 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %10 = vmla.buffer.alloc byte_length = %c262144 : !vmla.buffer
-    vmla.transpose %8(%rs1024_64 : !shapex.ranked_shape<[1024,64]>), out %10(%4 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
-    %11 = shapex.tie_shape %10, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.transpose %8(%rs1024_64 : !shapex.ranked_shape<[1024,64]>), out %10(%0 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
+    %11 = shapex.tie_shape %10, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %12 = vmla.buffer.alloc byte_length = %c8192 : !vmla.buffer
-    vmla.batch.matmul %9(%0 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %11(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %12(%2 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
-    %13 = shapex.tie_shape %12, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.batch.matmul %9(%4 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %11(%1 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %12(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
+    %13 = shapex.tie_shape %12, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %14 = vmla.buffer.alloc byte_length = %c8192 : !vmla.buffer
-    vmla.transpose %13(%2 : !shapex.ranked_shape<[?,?,?]>), out %14(%1 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
-    %15 = shapex.tie_shape %14, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.transpose %13(%3 : !shapex.ranked_shape<[?,?,?]>), out %14(%2 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
+    %15 = shapex.tie_shape %14, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %16 = vmla.interface.binding %arg0 {binding = 2 : i32, set = 0 : i32} : !vmla.buffer
     vmla.buffer.copy %15[%c0], out %16[%c0], byte_length = %c8192
     return
@@ -1483,34 +1483,34 @@ module  {
 ```
 module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) attributes {iree.module.export} {
-    %c8192 = constant 8192 : index
-    %c262144 = constant 262144 : index
-    %c131072 = constant 131072 : index
-    %c1 = constant 1 : index
-    %c32 = constant 32 : index
     %c1024 = constant 1024 : index
     %c64 = constant 64 : index
+    %c1 = constant 1 : index
+    %c32 = constant 32 : index
     %c0 = constant 0 : index
+    %c131072 = constant 131072 : index
     %rs1024_64 = shapex.const_ranked_shape : !shapex.ranked_shape<[1024,64]>
-    %0 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %1 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %2 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %3 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
-    %4 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+    %c262144 = constant 262144 : index
+    %c8192 = constant 8192 : index
+    %0 = shapex.make_ranked_shape %c64, %c1024 : (index, index) -> !shapex.ranked_shape<[?,?]>
+    %1 = shapex.make_ranked_shape %c1, %c64, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %2 = shapex.make_ranked_shape %c1, %c32, %c64 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %3 = shapex.make_ranked_shape %c1, %c64, %c32 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
+    %4 = shapex.make_ranked_shape %c1, %c32, %c1024 : (index, index, index) -> !shapex.ranked_shape<[?,?,?]>
     %5 = vmla.interface.binding %arg0 {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
     %6 = vmla.buffer.view %5[%c0], byte_length = %c131072 : !vmla.buffer
     %7 = vmla.interface.binding %arg0 {binding = 1 : i32, set = 0 : i32} : !vmla.buffer
     %8 = vmla.buffer.view %7[%c0], byte_length = %c262144 : !vmla.buffer
-    %9 = shapex.tie_shape %6, %0 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    %9 = shapex.tie_shape %6, %4 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %10 = vmla.buffer.alloc byte_length = %c262144 : !vmla.buffer
-    vmla.transpose %8(%rs1024_64 : !shapex.ranked_shape<[1024,64]>), out %10(%4 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
-    %11 = shapex.tie_shape %10, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.transpose %8(%rs1024_64 : !shapex.ranked_shape<[1024,64]>), out %10(%0 : !shapex.ranked_shape<[?,?]>) {permutation = dense<[1, 0]> : tensor<2xi32>} : f32
+    %11 = shapex.tie_shape %10, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %12 = vmla.buffer.alloc byte_length = %c8192 : !vmla.buffer
-    vmla.batch.matmul %9(%0 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %11(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %12(%2 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
-    %13 = shapex.tie_shape %12, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.batch.matmul %9(%4 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, %11(%1 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>, out %12(%3 : !shapex.ranked_shape<[?,?,?]>) : tensor<?x?x?xf32>
+    %13 = shapex.tie_shape %12, %3 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %14 = vmla.buffer.alloc byte_length = %c8192 : !vmla.buffer
-    vmla.transpose %13(%2 : !shapex.ranked_shape<[?,?,?]>), out %14(%1 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
-    %15 = shapex.tie_shape %14, %1 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
+    vmla.transpose %13(%3 : !shapex.ranked_shape<[?,?,?]>), out %14(%2 : !shapex.ranked_shape<[?,?,?]>) {permutation = dense<[0, 2, 1]> : tensor<3xi32>} : f32
+    %15 = shapex.tie_shape %14, %2 : !vmla.buffer, !shapex.ranked_shape<[?,?,?]>
     %16 = vmla.interface.binding %arg0 {binding = 2 : i32, set = 0 : i32} : !vmla.buffer
     vmla.buffer.copy %15[%c0], out %16[%c0], byte_length = %c8192
     return
@@ -1526,15 +1526,197 @@ module  {
 ```
 module  {
   vm.module @module {
+    vm.import @vmla.interface.const(%interface : !vm.ref<!vmla.interface>, %offset : i32) -> i32 attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @vmla.buffer.const(%value : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @vmla.buffer.clone(%src : !vm.ref<!vmla.buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @vmla.buffer.byte_length(%value : !vm.ref<!vmla.buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+    vm.import @vmla.buffer.fill(%value : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.buffer.load.i32(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32) -> i32 attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @vmla.cmp.i8(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.cmp.i16(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.cmp.i32(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.cmp.f32(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.select.x8(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.select.x16(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.select.x32(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.finite.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.copy.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.copy.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.copy.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.transpose.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.transpose.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reverse.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dimensions : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reverse.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dimensions : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reverse.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dimensions : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pad.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %value : !vm.ref<!vmla.buffer>, %value_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %edge_padding_low : i32 ..., %edge_padding_high : i32 ..., %interior_padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pad.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %value : !vm.ref<!vmla.buffer>, %value_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %edge_padding_low : i32 ..., %edge_padding_high : i32 ..., %interior_padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pad.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %value : !vm.ref<!vmla.buffer>, %value_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %edge_padding_low : i32 ..., %edge_padding_high : i32 ..., %interior_padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.gather.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dim : i32, %batch_dims : i32) attributes {sym_visibility = "private"}
+    vm.import @vmla.gather.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dim : i32, %batch_dims : i32) attributes {sym_visibility = "private"}
+    vm.import @vmla.gather.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dim : i32, %batch_dims : i32) attributes {sym_visibility = "private"}
+    vm.import @vmla.scatter.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.scatter.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.scatter.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.broadcast.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.broadcast.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.broadcast.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.iota.i8(%dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.iota.i16(%dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.iota.i32(%dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.iota.f32(%dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.tile.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.tile.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.tile.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.not.x8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.not.x16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.not.x32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.and.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.and.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.and.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.and.broadcast.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.and.broadcast.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.and.broadcast.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.or.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.or.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.or.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.xor.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.xor.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.xor.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.xor.broadcast.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.xor.broadcast.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.xor.broadcast.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shl.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shl.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shl.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shr.u8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shr.u16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shr.u32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shr.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shr.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.shr.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.add.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.add.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.add.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.add.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sub.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sub.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sub.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sub.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.abs.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.abs.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.abs.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.abs.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.neg.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.neg.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.neg.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.neg.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.mul.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.mul.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.mul.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.mul.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.div.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.div.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.div.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.div.u8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.div.u16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.div.u32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.div.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rem.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rem.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rem.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rem.u8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rem.u16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rem.u32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rem.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.pow.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.exp.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.log.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rsqrt.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sqrt.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.cos.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sin.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.tanh.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.atan2.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.min.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.min.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.min.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.min.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.max.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.max.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.max.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.max.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.clamp.i8(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer>, %max : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.clamp.i16(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer>, %max : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.clamp.i32(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer>, %max : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.clamp.f32(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer>, %max : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.floor.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.ceil.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.round.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.fft.f32(%real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ..., %imag_src : !vm.ref<!vmla.buffer>, %imag_src_shape : i32 ..., %real_dst : !vm.ref<!vmla.buffer>, %imag_dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.ifft.f32(%real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ..., %imag_src : !vm.ref<!vmla.buffer>, %imag_src_shape : i32 ..., %real_dst : !vm.ref<!vmla.buffer>, %imag_dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.rfft.f32(%real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ..., %real_dst : !vm.ref<!vmla.buffer>, %imag_dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.irfft.f32(%real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ..., %imag_src : !vm.ref<!vmla.buffer>, %imag_src_shape : i32 ..., %real_dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i8.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i8.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i8.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i16.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i16.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i16.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i32.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i32.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.i32.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.f32.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.f32.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.conv.f32f32.f32(%input : !vm.ref<!vmla.buffer>, %input_shape : i32 ..., %filter : !vm.ref<!vmla.buffer>, %filter_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_strides : i32 ..., %padding : i32 ..., %lhs_dilation : i32 ..., %rhs_dilation : i32 ..., %feature_group_count : i32, %batch_group_count : i32) attributes {sym_visibility = "private"}
+    vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.batch.matmul.i32i32.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.batch.matmul.i8i8.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i8 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i8 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.batch.matmul.i16i16.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i16 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i16 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.sum.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.min.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.min.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.min.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.min.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.max.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.and.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.or.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.sum.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.min.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.min.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.min.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.min.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.max.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.pooling.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c8192 = vm.const.i32 8192 : i32
-      %c262144 = vm.const.i32 262144 : i32
-      %c131072 = vm.const.i32 131072 : i32
-      %c1 = vm.const.i32 1 : i32
-      %c32 = vm.const.i32 32 : i32
       %c1024 = vm.const.i32 1024 : i32
       %c64 = vm.const.i32 64 : i32
+      %c1 = vm.const.i32 1 : i32
+      %c32 = vm.const.i32 32 : i32
       %zero = vm.const.i32.zero : i32
+      %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
+      %c8192 = vm.const.i32 8192 : i32
       %zero_0 = vm.const.i32.zero : i32
       %zero_1 = vm.const.i32.zero : i32
       %ref = vm.call @vmla.interface.binding(%arg0, %zero_0, %zero_1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -1563,188 +1745,6 @@ module  {
       vm.return
     }
     vm.export @dot_ex_dispatch_0
-    vm.import @vmla.interface.const(%interface : !vm.ref<!vmla.interface>, %offset : i32) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @vmla.buffer.const(%value : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @vmla.buffer.clone(%src : !vm.ref<!vmla.buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @vmla.buffer.byte_length(%value : !vm.ref<!vmla.buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-    vm.import @vmla.buffer.fill(%value : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.buffer.load.i32(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @vmla.cmp.i8(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.cmp.i16(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.cmp.i32(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.cmp.f32(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.select.x8(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.select.x16(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.select.x32(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.finite.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.copy.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.copy.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.copy.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.transpose.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.transpose.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reverse.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dimensions : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reverse.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dimensions : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reverse.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dimensions : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pad.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %value : !vm.ref<!vmla.buffer>, %value_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %edge_padding_low : i32 ..., %edge_padding_high : i32 ..., %interior_padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pad.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %value : !vm.ref<!vmla.buffer>, %value_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %edge_padding_low : i32 ..., %edge_padding_high : i32 ..., %interior_padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pad.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %value : !vm.ref<!vmla.buffer>, %value_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %edge_padding_low : i32 ..., %edge_padding_high : i32 ..., %interior_padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.gather.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dim : i32, %batch_dims : i32) attributes {sym_visibility = "private"}
-    vm.import @vmla.gather.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dim : i32, %batch_dims : i32) attributes {sym_visibility = "private"}
-    vm.import @vmla.gather.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dim : i32, %batch_dims : i32) attributes {sym_visibility = "private"}
-    vm.import @vmla.scatter.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.scatter.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.scatter.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.broadcast.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.broadcast.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.broadcast.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.iota.i8(%dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.iota.i16(%dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.iota.i32(%dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.iota.f32(%dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.tile.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.tile.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.tile.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.not.x8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.not.x16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.not.x32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.and.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.and.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.and.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.and.broadcast.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.and.broadcast.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.and.broadcast.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.or.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.or.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.or.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.xor.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.xor.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.xor.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.xor.broadcast.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.xor.broadcast.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.xor.broadcast.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : i32, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shl.x8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shl.x16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shl.x32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shr.u8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shr.u16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shr.u32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shr.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shr.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.shr.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.add.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.add.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.add.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.add.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sub.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sub.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sub.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sub.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.abs.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.abs.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.abs.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.abs.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.neg.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.neg.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.neg.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.neg.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.mul.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.mul.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.mul.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.mul.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.div.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.div.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.div.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.div.u8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.div.u16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.div.u32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.div.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rem.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rem.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rem.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rem.u8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rem.u16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rem.u32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rem.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.pow.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.exp.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.log.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rsqrt.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sqrt.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.cos.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sin.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.tanh.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.atan2.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.min.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.min.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.min.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.min.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.max.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.max.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.max.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.max.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.clamp.i8(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer>, %max : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.clamp.i16(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer>, %max : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.clamp.i32(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer>, %max : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.clamp.f32(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer>, %max : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.floor.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.ceil.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.round.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sort.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sort.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sort.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.sort.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.fft.f32(%real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ..., %imag_src : !vm.ref<!vmla.buffer>, %imag_src_shape : i32 ..., %real_dst : !vm.ref<!vmla.buffer>, %imag_dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.ifft.f32(%real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ..., %imag_src : !vm.ref<!vmla.buffer>, %imag_src_shape : i32 ..., %real_dst : !vm.ref<!vmla.buffer>, %imag_dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.rfft.f32(%real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ..., %real_dst : !vm.ref<!vmla.buffer>, %imag_dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.irfft.f32(%real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ..., %imag_src : !vm.ref<!vmla.buffer>, %imag_src_shape : i32 ..., %real_dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i8.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i8.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i8.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i16.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i16.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i16.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i32.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i32.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.i32.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.f32.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.f32.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
-    vm.import @vmla.conv.f32f32.f32(%input : !vm.ref<!vmla.buffer>, %input_shape : i32 ..., %filter : !vm.ref<!vmla.buffer>, %filter_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_strides : i32 ..., %padding : i32 ..., %lhs_dilation : i32 ..., %rhs_dilation : i32 ..., %feature_group_count : i32, %batch_group_count : i32) attributes {sym_visibility = "private"}
-    vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.batch.matmul.i32i32.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.batch.matmul.i8i8.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i8 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i8 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.batch.matmul.i16i16.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i16 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i16 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.sum.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.min.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.min.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.min.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.min.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.max.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.and.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.reduce.or.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.sum.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.min.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.min.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.min.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.min.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.max.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-    vm.import @vmla.pooling.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   }
 }
 
@@ -1756,43 +1756,6 @@ module  {
 {% raw %}
 ```
 vm.module @module {
-  vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-    %c8192 = vm.const.i32 8192 : i32
-    %c262144 = vm.const.i32 262144 : i32
-    %c131072 = vm.const.i32 131072 : i32
-    %c1 = vm.const.i32 1 : i32
-    %c32 = vm.const.i32 32 : i32
-    %c1024 = vm.const.i32 1024 : i32
-    %c64 = vm.const.i32 64 : i32
-    %zero = vm.const.i32.zero : i32
-    %zero_0 = vm.const.i32.zero : i32
-    %zero_1 = vm.const.i32.zero : i32
-    %ref = vm.call @vmla.interface.binding(%arg0, %zero_0, %zero_1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-    %ref_2 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-    %zero_3 = vm.const.i32.zero : i32
-    %c1_4 = vm.const.i32 1 : i32
-    %ref_5 = vm.call @vmla.interface.binding(%arg0, %zero_3, %c1_4) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-    %ref_6 = vm.call @vmla.buffer.view(%ref_5, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-    %ref_7 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
-    %c1024_8 = vm.const.i32 1024 : i32
-    %c64_9 = vm.const.i32 64 : i32
-    %c1_10 = vm.const.i32 1 : i32
-    %zero_11 = vm.const.i32.zero : i32
-    vm.call.variadic @vmla.transpose.x32(%ref_6, [%c1024_8, %c64_9], [%c1_10, %zero_11], %ref_7, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-    %ref_12 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-    vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_2, [%c1, %c32, %c1024], %ref_7, [%c1, %c64, %c1024], %ref_12, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-    %ref_13 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-    %zero_14 = vm.const.i32.zero : i32
-    %c2 = vm.const.i32 2 : i32
-    %c1_15 = vm.const.i32 1 : i32
-    vm.call.variadic @vmla.transpose.x32(%ref_12, [%c1, %c64, %c32], [%zero_14, %c2, %c1_15], %ref_13, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-    %zero_16 = vm.const.i32.zero : i32
-    %c2_17 = vm.const.i32 2 : i32
-    %ref_18 = vm.call @vmla.interface.binding(%arg0, %zero_16, %c2_17) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-    vm.call @vmla.buffer.copy(%ref_13, %zero, %ref_18, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
-    vm.return
-  }
-  vm.export @dot_ex_dispatch_0
   vm.import @vmla.interface.const(%interface : !vm.ref<!vmla.interface>, %offset : i32) -> i32 attributes {nosideeffects, sym_visibility = "private"}
   vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @vmla.buffer.const(%value : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
@@ -1975,6 +1938,43 @@ vm.module @module {
   vm.import @vmla.pooling.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+  vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
+    %c1024 = vm.const.i32 1024 : i32
+    %c64 = vm.const.i32 64 : i32
+    %c1 = vm.const.i32 1 : i32
+    %c32 = vm.const.i32 32 : i32
+    %zero = vm.const.i32.zero : i32
+    %c131072 = vm.const.i32 131072 : i32
+    %c262144 = vm.const.i32 262144 : i32
+    %c8192 = vm.const.i32 8192 : i32
+    %zero_0 = vm.const.i32.zero : i32
+    %zero_1 = vm.const.i32.zero : i32
+    %ref = vm.call @vmla.interface.binding(%arg0, %zero_0, %zero_1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+    %ref_2 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+    %zero_3 = vm.const.i32.zero : i32
+    %c1_4 = vm.const.i32 1 : i32
+    %ref_5 = vm.call @vmla.interface.binding(%arg0, %zero_3, %c1_4) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+    %ref_6 = vm.call @vmla.buffer.view(%ref_5, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+    %ref_7 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
+    %c1024_8 = vm.const.i32 1024 : i32
+    %c64_9 = vm.const.i32 64 : i32
+    %c1_10 = vm.const.i32 1 : i32
+    %zero_11 = vm.const.i32.zero : i32
+    vm.call.variadic @vmla.transpose.x32(%ref_6, [%c1024_8, %c64_9], [%c1_10, %zero_11], %ref_7, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+    %ref_12 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+    vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_2, [%c1, %c32, %c1024], %ref_7, [%c1, %c64, %c1024], %ref_12, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+    %ref_13 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+    %zero_14 = vm.const.i32.zero : i32
+    %c2 = vm.const.i32 2 : i32
+    %c1_15 = vm.const.i32 1 : i32
+    vm.call.variadic @vmla.transpose.x32(%ref_12, [%c1, %c64, %c32], [%zero_14, %c2, %c1_15], %ref_13, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+    %zero_16 = vm.const.i32.zero : i32
+    %c2_17 = vm.const.i32 2 : i32
+    %ref_18 = vm.call @vmla.interface.binding(%arg0, %zero_16, %c2_17) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+    vm.call @vmla.buffer.copy(%ref_13, %zero, %ref_18, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+    vm.return
+  }
+  vm.export @dot_ex_dispatch_0
 }
 
 ```
@@ -1985,43 +1985,6 @@ vm.module @module {
 {% raw %}
 ```
 vm.module @module {
-  vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-    %c8192 = vm.const.i32 8192 : i32
-    %c262144 = vm.const.i32 262144 : i32
-    %c131072 = vm.const.i32 131072 : i32
-    %c1 = vm.const.i32 1 : i32
-    %c32 = vm.const.i32 32 : i32
-    %c1024 = vm.const.i32 1024 : i32
-    %c64 = vm.const.i32 64 : i32
-    %zero = vm.const.i32.zero : i32
-    %zero_0 = vm.const.i32.zero : i32
-    %zero_1 = vm.const.i32.zero : i32
-    %ref = vm.call @vmla.interface.binding(%arg0, %zero_0, %zero_1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-    %ref_2 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-    %zero_3 = vm.const.i32.zero : i32
-    %c1_4 = vm.const.i32 1 : i32
-    %ref_5 = vm.call @vmla.interface.binding(%arg0, %zero_3, %c1_4) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-    %ref_6 = vm.call @vmla.buffer.view(%ref_5, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-    %ref_7 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
-    %c1024_8 = vm.const.i32 1024 : i32
-    %c64_9 = vm.const.i32 64 : i32
-    %c1_10 = vm.const.i32 1 : i32
-    %zero_11 = vm.const.i32.zero : i32
-    vm.call.variadic @vmla.transpose.x32(%ref_6, [%c1024_8, %c64_9], [%c1_10, %zero_11], %ref_7, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-    %ref_12 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-    vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_2, [%c1, %c32, %c1024], %ref_7, [%c1, %c64, %c1024], %ref_12, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-    %ref_13 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-    %zero_14 = vm.const.i32.zero : i32
-    %c2 = vm.const.i32 2 : i32
-    %c1_15 = vm.const.i32 1 : i32
-    vm.call.variadic @vmla.transpose.x32(%ref_12, [%c1, %c64, %c32], [%zero_14, %c2, %c1_15], %ref_13, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-    %zero_16 = vm.const.i32.zero : i32
-    %c2_17 = vm.const.i32 2 : i32
-    %ref_18 = vm.call @vmla.interface.binding(%arg0, %zero_16, %c2_17) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-    vm.call @vmla.buffer.copy(%ref_13, %zero, %ref_18, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
-    vm.return
-  }
-  vm.export @dot_ex_dispatch_0
   vm.import @vmla.interface.const(%interface : !vm.ref<!vmla.interface>, %offset : i32) -> i32 attributes {nosideeffects, sym_visibility = "private"}
   vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @vmla.buffer.const(%value : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
@@ -2204,6 +2167,43 @@ vm.module @module {
   vm.import @vmla.pooling.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+  vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
+    %c1024 = vm.const.i32 1024 : i32
+    %c64 = vm.const.i32 64 : i32
+    %c1 = vm.const.i32 1 : i32
+    %c32 = vm.const.i32 32 : i32
+    %zero = vm.const.i32.zero : i32
+    %c131072 = vm.const.i32 131072 : i32
+    %c262144 = vm.const.i32 262144 : i32
+    %c8192 = vm.const.i32 8192 : i32
+    %zero_0 = vm.const.i32.zero : i32
+    %zero_1 = vm.const.i32.zero : i32
+    %ref = vm.call @vmla.interface.binding(%arg0, %zero_0, %zero_1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+    %ref_2 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+    %zero_3 = vm.const.i32.zero : i32
+    %c1_4 = vm.const.i32 1 : i32
+    %ref_5 = vm.call @vmla.interface.binding(%arg0, %zero_3, %c1_4) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+    %ref_6 = vm.call @vmla.buffer.view(%ref_5, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+    %ref_7 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
+    %c1024_8 = vm.const.i32 1024 : i32
+    %c64_9 = vm.const.i32 64 : i32
+    %c1_10 = vm.const.i32 1 : i32
+    %zero_11 = vm.const.i32.zero : i32
+    vm.call.variadic @vmla.transpose.x32(%ref_6, [%c1024_8, %c64_9], [%c1_10, %zero_11], %ref_7, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+    %ref_12 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+    vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_2, [%c1, %c32, %c1024], %ref_7, [%c1, %c64, %c1024], %ref_12, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+    %ref_13 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+    %zero_14 = vm.const.i32.zero : i32
+    %c2 = vm.const.i32 2 : i32
+    %c1_15 = vm.const.i32 1 : i32
+    vm.call.variadic @vmla.transpose.x32(%ref_12, [%c1, %c64, %c32], [%zero_14, %c2, %c1_15], %ref_13, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+    %zero_16 = vm.const.i32.zero : i32
+    %c2_17 = vm.const.i32 2 : i32
+    %ref_18 = vm.call @vmla.interface.binding(%arg0, %zero_16, %c2_17) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+    vm.call @vmla.buffer.copy(%ref_13, %zero, %ref_18, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+    vm.return
+  }
+  vm.export @dot_ex_dispatch_0
 }
 
 ```
@@ -2214,13 +2214,13 @@ vm.module @module {
 {% raw %}
 ```
 vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-  %c8192 = vm.const.i32 8192 : i32
-  %c262144 = vm.const.i32 262144 : i32
-  %c131072 = vm.const.i32 131072 : i32
-  %c1 = vm.const.i32 1 : i32
   %c32 = vm.const.i32 32 : i32
+  %c131072 = vm.const.i32 131072 : i32
+  %c262144 = vm.const.i32 262144 : i32
+  %c8192 = vm.const.i32 8192 : i32
   %c1024 = vm.const.i32 1024 : i32
   %c64 = vm.const.i32 64 : i32
+  %c1 = vm.const.i32 1 : i32
   %zero = vm.const.i32.zero : i32
   %c2 = vm.const.i32 2 : i32
   %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -2247,31 +2247,6 @@ vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i
 ```
 module  {
   vm.module @module {
-    vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c8192 = vm.const.i32 8192 : i32
-      %c262144 = vm.const.i32 262144 : i32
-      %c131072 = vm.const.i32 131072 : i32
-      %c1 = vm.const.i32 1 : i32
-      %c32 = vm.const.i32 32 : i32
-      %c1024 = vm.const.i32 1024 : i32
-      %c64 = vm.const.i32 64 : i32
-      %zero = vm.const.i32.zero : i32
-      %c2 = vm.const.i32 2 : i32
-      %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
-      vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-      vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-      vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
-      vm.return
-    }
-    vm.export @dot_ex_dispatch_0
     vm.import @vmla.interface.const(%interface : !vm.ref<!vmla.interface>, %offset : i32) -> i32 attributes {nosideeffects, sym_visibility = "private"}
     vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @vmla.buffer.const(%value : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
@@ -2454,6 +2429,31 @@ module  {
     vm.import @vmla.pooling.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
+    vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
+      %c32 = vm.const.i32 32 : i32
+      %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
+      %c8192 = vm.const.i32 8192 : i32
+      %c1024 = vm.const.i32 1024 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
+      %c2 = vm.const.i32 2 : i32
+      %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+      vm.return
+    }
+    vm.export @dot_ex_dispatch_0
   }
 }
 
@@ -2466,31 +2466,6 @@ module  {
 ```
 module  {
   vm.module @module {
-    vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c8192 = vm.const.i32 8192 : i32
-      %c262144 = vm.const.i32 262144 : i32
-      %c131072 = vm.const.i32 131072 : i32
-      %c1 = vm.const.i32 1 : i32
-      %c32 = vm.const.i32 32 : i32
-      %c1024 = vm.const.i32 1024 : i32
-      %c64 = vm.const.i32 64 : i32
-      %zero = vm.const.i32.zero : i32
-      %c2 = vm.const.i32 2 : i32
-      %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
-      vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-      vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-      vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
-      vm.return
-    }
-    vm.export @dot_ex_dispatch_0
     vm.import @vmla.interface.const(%interface : !vm.ref<!vmla.interface>, %offset : i32) -> i32 attributes {nosideeffects, sym_visibility = "private"}
     vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @vmla.buffer.const(%value : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
@@ -2673,26 +2648,14 @@ module  {
     vm.import @vmla.pooling.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
-  }
-}
-
-```
-{% endraw %}
-
-### IR Dump After SymbolDCE
-
-{% raw %}
-```
-module  {
-  vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c8192 = vm.const.i32 8192 : i32
-      %c262144 = vm.const.i32 262144 : i32
-      %c131072 = vm.const.i32 131072 : i32
-      %c1 = vm.const.i32 1 : i32
       %c32 = vm.const.i32 32 : i32
+      %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
+      %c8192 = vm.const.i32 8192 : i32
       %c1024 = vm.const.i32 1024 : i32
       %c64 = vm.const.i32 64 : i32
+      %c1 = vm.const.i32 1 : i32
       %zero = vm.const.i32.zero : i32
       %c2 = vm.const.i32 2 : i32
       %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -2710,12 +2673,49 @@ module  {
       vm.return
     }
     vm.export @dot_ex_dispatch_0
+  }
+}
+
+```
+{% endraw %}
+
+### IR Dump After SymbolDCE
+
+{% raw %}
+```
+module  {
+  vm.module @module {
     vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
     vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
+      %c32 = vm.const.i32 32 : i32
+      %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
+      %c8192 = vm.const.i32 8192 : i32
+      %c1024 = vm.const.i32 1024 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
+      %c2 = vm.const.i32 2 : i32
+      %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+      vm.return
+    }
+    vm.export @dot_ex_dispatch_0
   }
 }
 
@@ -2727,6 +2727,12 @@ module  {
 {% raw %}
 ```
 vm.module @module {
+  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
     %zero = vm.const.i32.zero : i32
     %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -2752,12 +2758,6 @@ vm.module @module {
     vm.return
   }
   vm.export @dot_ex_dispatch_0
-  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
 }
 
 ```
@@ -2771,6 +2771,12 @@ hal.executable.target @vmla, filter="vmla" {
   hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
   module  {
     vm.module @module {
+      vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+      vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+      vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+      vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+      vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+      vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
       vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
         %zero = vm.const.i32.zero : i32
         %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -2796,12 +2802,6 @@ hal.executable.target @vmla, filter="vmla" {
         vm.return
       }
       vm.export @dot_ex_dispatch_0
-      vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-      vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-      vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-      vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-      vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-      vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     }
   }
 }
@@ -2824,6 +2824,12 @@ module  {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         vm.module @module {
+          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
             %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -2849,12 +2855,6 @@ module  {
             vm.return
           }
           vm.export @dot_ex_dispatch_0
-          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
         }
       }
     }
@@ -2973,13 +2973,13 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c262144 = constant 262144 : index
-  %c131072 = constant 131072 : index
-  %c8192 = constant 8192 : index
   %c2048 = constant 2048 : index
-  %c0 = constant 0 : index
+  %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c1 = constant 1 : index
+  %c8192 = constant 8192 : index
   %c2 = constant 2 : index
+  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3011,13 +3011,13 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c262144 = constant 262144 : index
-  %c131072 = constant 131072 : index
-  %c8192 = constant 8192 : index
   %c2048 = constant 2048 : index
-  %c0 = constant 0 : index
+  %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c1 = constant 1 : index
+  %c8192 = constant 8192 : index
   %c2 = constant 2 : index
+  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3059,6 +3059,12 @@ module  {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         vm.module @module {
+          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
             %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -3084,24 +3090,18 @@ module  {
             vm.return
           }
           vm.export @dot_ex_dispatch_0
-          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
         }
       }
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-    %c262144 = constant 262144 : index
-    %c131072 = constant 131072 : index
-    %c8192 = constant 8192 : index
     %c2048 = constant 2048 : index
-    %c0 = constant 0 : index
+    %c131072 = constant 131072 : index
+    %c262144 = constant 262144 : index
     %c1 = constant 1 : index
+    %c8192 = constant 8192 : index
     %c2 = constant 2 : index
+    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3167,6 +3167,12 @@ module  {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         vm.module @module {
+          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
             %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -3192,24 +3198,18 @@ module  {
             vm.return
           }
           vm.export @dot_ex_dispatch_0
-          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
         }
       }
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-    %c262144 = constant 262144 : index
-    %c131072 = constant 131072 : index
-    %c8192 = constant 8192 : index
     %c2048 = constant 2048 : index
-    %c0 = constant 0 : index
+    %c131072 = constant 131072 : index
+    %c262144 = constant 262144 : index
     %c1 = constant 1 : index
+    %c8192 = constant 8192 : index
     %c2 = constant 2 : index
+    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3275,6 +3275,12 @@ module  {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         vm.module @module {
+          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
             %c131072 = vm.const.i32 131072 : i32
@@ -3300,24 +3306,18 @@ module  {
             vm.return
           }
           vm.export @dot_ex_dispatch_0
-          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
         }
       }
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-    %c262144 = constant 262144 : index
-    %c131072 = constant 131072 : index
-    %c8192 = constant 8192 : index
     %c2048 = constant 2048 : index
-    %c0 = constant 0 : index
+    %c131072 = constant 131072 : index
+    %c262144 = constant 262144 : index
     %c1 = constant 1 : index
+    %c8192 = constant 8192 : index
     %c2 = constant 2 : index
+    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3375,13 +3375,13 @@ module  {
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-  %c262144 = constant 262144 : index
-  %c131072 = constant 131072 : index
-  %c8192 = constant 8192 : index
   %c2048 = constant 2048 : index
-  %c0 = constant 0 : index
+  %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c1 = constant 1 : index
+  %c8192 = constant 8192 : index
   %c2 = constant 2 : index
+  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3415,13 +3415,13 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-  %c262144 = constant 262144 : index
-  %c131072 = constant 131072 : index
-  %c8192 = constant 8192 : index
   %c2048 = constant 2048 : index
-  %c0 = constant 0 : index
+  %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c1 = constant 1 : index
+  %c8192 = constant 8192 : index
   %c2 = constant 2 : index
+  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3571,6 +3571,12 @@ module  {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         vm.module @module {
+          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
             %c131072 = vm.const.i32 131072 : i32
@@ -3596,24 +3602,18 @@ module  {
             vm.return
           }
           vm.export @dot_ex_dispatch_0
-          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
         }
       }
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-    %c262144 = constant 262144 : index
-    %c131072 = constant 131072 : index
-    %c8192 = constant 8192 : index
     %c2048 = constant 2048 : index
-    %c0 = constant 0 : index
+    %c131072 = constant 131072 : index
+    %c262144 = constant 262144 : index
     %c1 = constant 1 : index
+    %c8192 = constant 8192 : index
     %c2 = constant 2 : index
+    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3725,13 +3725,13 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-  %c262144 = constant 262144 : index
-  %c131072 = constant 131072 : index
-  %c8192 = constant 8192 : index
   %c2048 = constant 2048 : index
-  %c0 = constant 0 : index
+  %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c1 = constant 1 : index
+  %c8192 = constant 8192 : index
   %c2 = constant 2 : index
+  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3850,6 +3850,12 @@ module  {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         vm.module @module {
+          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
             %c131072 = vm.const.i32 131072 : i32
@@ -3875,24 +3881,18 @@ module  {
             vm.return
           }
           vm.export @dot_ex_dispatch_0
-          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
         }
       }
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-    %c262144 = constant 262144 : index
-    %c131072 = constant 131072 : index
-    %c8192 = constant 8192 : index
     %c2048 = constant 2048 : index
-    %c0 = constant 0 : index
+    %c131072 = constant 131072 : index
+    %c262144 = constant 262144 : index
     %c1 = constant 1 : index
+    %c8192 = constant 8192 : index
     %c2 = constant 2 : index
+    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4002,6 +4002,12 @@ module  {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         vm.module @module {
+          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
             %c131072 = vm.const.i32 131072 : i32
@@ -4027,24 +4033,18 @@ module  {
             vm.return
           }
           vm.export @dot_ex_dispatch_0
-          vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-          vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-          vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-          vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
         }
       }
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-    %c262144 = constant 262144 : index
-    %c131072 = constant 131072 : index
-    %c8192 = constant 8192 : index
     %c2048 = constant 2048 : index
-    %c0 = constant 0 : index
+    %c131072 = constant 131072 : index
+    %c262144 = constant 262144 : index
     %c1 = constant 1 : index
+    %c8192 = constant 8192 : index
     %c2 = constant 2 : index
+    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4323,6 +4323,12 @@ vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i
 {% raw %}
 ```
 vm.module @module {
+  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
     %zero = vm.const.i32.zero : i32
     %c131072 = vm.const.i32 131072 : i32
@@ -4348,12 +4354,6 @@ vm.module @module {
     vm.return
   }
   vm.export @dot_ex_dispatch_0
-  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
 }
 
 ```
@@ -4364,6 +4364,12 @@ vm.module @module {
 {% raw %}
 ```
 vm.module @module {
+  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
     %zero = vm.const.i32.zero : i32
     %c131072 = vm.const.i32 131072 : i32
@@ -4389,12 +4395,6 @@ vm.module @module {
     vm.return
   }
   vm.export @dot_ex_dispatch_0
-  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
 }
 
 ```
@@ -4405,6 +4405,12 @@ vm.module @module {
 {% raw %}
 ```
 vm.module @module {
+  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
     %zero = vm.const.i32.zero : i32
     %c131072 = vm.const.i32 131072 : i32
@@ -4430,12 +4436,6 @@ vm.module @module {
     vm.return
   }
   vm.export @dot_ex_dispatch_0
-  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
 }
 
 ```
@@ -4446,6 +4446,12 @@ vm.module @module {
 {% raw %}
 ```
 vm.module @module {
+  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
     %zero = vm.const.i32.zero : i32
     %c131072 = vm.const.i32 131072 : i32
@@ -4471,12 +4477,6 @@ vm.module @module {
     vm.return
   }
   vm.export @dot_ex_dispatch_0
-  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
 }
 
 ```
@@ -4487,6 +4487,12 @@ vm.module @module {
 {% raw %}
 ```
 vm.module @module attributes {ordinal_counts = #vm.ordinal_counts<import_funcs = 6, export_funcs = 1, internal_funcs = 1, global_bytes = 0, global_refs = 0, rodatas = 0, rwdatas = 0>} {
+  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 0 : i32, sym_visibility = "private"}
+  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 1 : i32, sym_visibility = "private"}
+  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 2 : i32, sym_visibility = "private"}
+  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {ordinal = 3 : i32, sym_visibility = "private"}
+  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {ordinal = 4 : i32, sym_visibility = "private"}
+  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {ordinal = 5 : i32, sym_visibility = "private"}
   vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) attributes {ordinal = 0 : i32} {
     %zero = vm.const.i32.zero : i32
     %c131072 = vm.const.i32 131072 : i32
@@ -4512,12 +4518,6 @@ vm.module @module attributes {ordinal_counts = #vm.ordinal_counts<import_funcs =
     vm.return
   }
   vm.export @dot_ex_dispatch_0 attributes {ordinal = 0 : i32}
-  vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 0 : i32, sym_visibility = "private"}
-  vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 1 : i32, sym_visibility = "private"}
-  vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 2 : i32, sym_visibility = "private"}
-  vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {ordinal = 3 : i32, sym_visibility = "private"}
-  vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {ordinal = 4 : i32, sym_visibility = "private"}
-  vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {ordinal = 5 : i32, sym_visibility = "private"}
 }
 
 ```
@@ -4545,12 +4545,12 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-  %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
+  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %c2 = constant 2 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4583,12 +4583,12 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-  %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
+  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %c2 = constant 2 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4621,12 +4621,12 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-  %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
+  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %c2 = constant 2 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4820,12 +4820,12 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-    %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
+    %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
+    %c2 = constant 2 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %c2 = constant 2 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4944,12 +4944,12 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 {% raw %}
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-  %c262144 = constant 262144 : index
   %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
+  %c2 = constant 2 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %c2 = constant 2 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -5065,12 +5065,12 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
-    %c262144 = constant 262144 : index
     %c131072 = constant 131072 : index
+    %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
+    %c2 = constant 2 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %c2 = constant 2 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -5179,12 +5179,12 @@ module  {
       vm.return %0 : !vm.ref<!hal.executable>
     }
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-      %c262144 = vm.const.i32 262144 : i32
       %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
       %c8192 = vm.const.i32 8192 : i32
+      %c2 = vm.const.i32 2 : i32
       %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %c50 = vm.const.i32 50 : i32
@@ -5227,17 +5227,6 @@ module  {
       vm.return %ref_2 : !vm.ref<!hal.buffer_view>
     }
     vm.export @dot$async
-    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-      %zero = vm.const.i32.zero : i32
-      %c1 = vm.const.i32 1 : i32
-      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
-      %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
-      %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
-      vm.cond_fail %0, "semaphore wait failed"
-      vm.return %ref_1 : !vm.ref<!hal.buffer_view>
-    }
-    vm.export @dot$sync as("dot")
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
@@ -5276,6 +5265,17 @@ module  {
     vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.fail(%semaphore : !vm.ref<!hal.semaphore>, %status : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
+    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+      %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
+      %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_fail %0, "semaphore wait failed"
+      vm.return %ref_1 : !vm.ref<!hal.buffer_view>
+    }
+    vm.export @dot$sync as("dot")
   }
 }
 
@@ -5338,12 +5338,12 @@ vm.module @module {
     vm.return %0 : !vm.ref<!hal.executable>
   }
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-    %c262144 = vm.const.i32 262144 : i32
     %c131072 = vm.const.i32 131072 : i32
+    %c262144 = vm.const.i32 262144 : i32
     %c8192 = vm.const.i32 8192 : i32
+    %c2 = vm.const.i32 2 : i32
     %zero = vm.const.i32.zero : i32
     %c1 = vm.const.i32 1 : i32
-    %c2 = vm.const.i32 2 : i32
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %c50 = vm.const.i32 50 : i32
@@ -5386,17 +5386,6 @@ vm.module @module {
     vm.return %ref_2 : !vm.ref<!hal.buffer_view>
   }
   vm.export @dot$async
-  vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %zero = vm.const.i32.zero : i32
-    %c1 = vm.const.i32 1 : i32
-    %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-    %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
-    %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
-    %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
-    vm.cond_fail %0, "semaphore wait failed"
-    vm.return %ref_1 : !vm.ref<!hal.buffer_view>
-  }
-  vm.export @dot$sync as("dot")
   vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
   vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
@@ -5435,6 +5424,17 @@ vm.module @module {
   vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
   vm.import @hal.semaphore.fail(%semaphore : !vm.ref<!hal.semaphore>, %status : i32) attributes {sym_visibility = "private"}
   vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
+  vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %zero = vm.const.i32.zero : i32
+    %c1 = vm.const.i32 1 : i32
+    %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+    %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+    %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
+    %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+    vm.cond_fail %0, "semaphore wait failed"
+    vm.return %ref_1 : !vm.ref<!hal.buffer_view>
+  }
+  vm.export @dot$sync as("dot")
 }
 
 ```
@@ -5496,12 +5496,12 @@ vm.module @module {
     vm.return %0 : !vm.ref<!hal.executable>
   }
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-    %c262144 = vm.const.i32 262144 : i32
     %c131072 = vm.const.i32 131072 : i32
+    %c262144 = vm.const.i32 262144 : i32
     %c8192 = vm.const.i32 8192 : i32
+    %c2 = vm.const.i32 2 : i32
     %zero = vm.const.i32.zero : i32
     %c1 = vm.const.i32 1 : i32
-    %c2 = vm.const.i32 2 : i32
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %c50 = vm.const.i32 50 : i32
@@ -5544,17 +5544,6 @@ vm.module @module {
     vm.return %ref_2 : !vm.ref<!hal.buffer_view>
   }
   vm.export @dot$async
-  vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %zero = vm.const.i32.zero : i32
-    %c1 = vm.const.i32 1 : i32
-    %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-    %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
-    %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
-    %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
-    vm.cond_fail %0, "semaphore wait failed"
-    vm.return %ref_1 : !vm.ref<!hal.buffer_view>
-  }
-  vm.export @dot$sync as("dot")
   vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
   vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
@@ -5593,6 +5582,17 @@ vm.module @module {
   vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
   vm.import @hal.semaphore.fail(%semaphore : !vm.ref<!hal.semaphore>, %status : i32) attributes {sym_visibility = "private"}
   vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
+  vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %zero = vm.const.i32.zero : i32
+    %c1 = vm.const.i32 1 : i32
+    %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+    %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+    %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
+    %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+    vm.cond_fail %0, "semaphore wait failed"
+    vm.return %ref_1 : !vm.ref<!hal.buffer_view>
+  }
+  vm.export @dot$sync as("dot")
   vm.func @__init() {
     %0 = vm.call @_device_match_id_0_initializer() : () -> i32
     vm.global.store.i32 %0, @_device_match_id_0 : i32
@@ -5679,17 +5679,17 @@ vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!h
 {% raw %}
 ```
 vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-  %c262144 = vm.const.i32 262144 : i32
   %c131072 = vm.const.i32 131072 : i32
+  %c262144 = vm.const.i32 262144 : i32
   %c8192 = vm.const.i32 8192 : i32
-  %zero = vm.const.i32.zero : i32
-  %c1 = vm.const.i32 1 : i32
-  %c2 = vm.const.i32 2 : i32
   %c50 = vm.const.i32 50 : i32
   %c14 = vm.const.i32 14 : i32
+  %c1 = vm.const.i32 1 : i32
   %c3 = vm.const.i32 3 : i32
   %c20 = vm.const.i32 20 : i32
   %c5 = vm.const.i32 5 : i32
+  %zero = vm.const.i32.zero : i32
+  %c2 = vm.const.i32 2 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
   %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -5757,10 +5757,10 @@ vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_l
 {% raw %}
 ```
 vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
-  %c1 = vm.const.i32 1 : i32
   %zero = vm.const.i32.zero : i32
-  %c7 = vm.const.i32 7 : i32
+  %c1 = vm.const.i32 1 : i32
   %c2 = vm.const.i32 2 : i32
+  %c7 = vm.const.i32 7 : i32
   %c6 = vm.const.i32 6 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call.variadic @hal.descriptor_set_layout.create(%ref, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
@@ -5790,10 +5790,10 @@ vm.func private @_device_match_id_0_initializer() -> i32 {
 ```
 vm.func @__init() {
   %c1 = vm.const.i32 1 : i32
-  %zero = vm.const.i32.zero : i32
-  %c7 = vm.const.i32 7 : i32
   %c2 = vm.const.i32 2 : i32
+  %c7 = vm.const.i32 7 : i32
   %c6 = vm.const.i32 6 : i32
+  %zero = vm.const.i32.zero : i32
   %c1447906369 = vm.const.i32 1447906369 : i32
   %null = vm.const.ref.zero : !vm.ref<!hal.executable>
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -5885,17 +5885,17 @@ vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!h
 {% raw %}
 ```
 vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-  %c262144 = vm.const.i32 262144 : i32
   %c131072 = vm.const.i32 131072 : i32
+  %c262144 = vm.const.i32 262144 : i32
   %c8192 = vm.const.i32 8192 : i32
-  %zero = vm.const.i32.zero : i32
-  %c1 = vm.const.i32 1 : i32
-  %c2 = vm.const.i32 2 : i32
   %c50 = vm.const.i32 50 : i32
   %c14 = vm.const.i32 14 : i32
+  %c1 = vm.const.i32 1 : i32
   %c3 = vm.const.i32 3 : i32
   %c20 = vm.const.i32 20 : i32
   %c5 = vm.const.i32 5 : i32
+  %zero = vm.const.i32.zero : i32
+  %c2 = vm.const.i32 2 : i32
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
   %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -5932,17 +5932,17 @@ module  {
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
     vm.rodata @_dot_ex_dispatch_0_vmla_binary_vmla opaque<"_", "0xDEADBEEF"> : vector<1330xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-      %c262144 = vm.const.i32 262144 : i32
       %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
       %c8192 = vm.const.i32 8192 : i32
-      %zero = vm.const.i32.zero : i32
-      %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
       %c14 = vm.const.i32 14 : i32
+      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
+      %zero = vm.const.i32.zero : i32
+      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -5979,30 +5979,6 @@ module  {
       vm.fail %1, "semaphore wait failed"
     }
     vm.export @dot$async
-    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-      %zero = vm.const.i32.zero : i32
-      %c1 = vm.const.i32 1 : i32
-      %c32 = vm.const.i32 32 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c50331680 = vm.const.i32 50331680 : i32
-      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
-      %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
-      vm.cond_br %0, ^bb2(%0 : i32), ^bb1
-    ^bb1:  // pred: ^bb0
-      %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_3 = vm.call @dot(%ref_1, %ref_2) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
-      %ref_4 = vm.call.variadic @hal.buffer_view.create(%ref_3, %c50331680, [%c32, %c64]) : (!vm.ref<!hal.buffer>, i32, i32 ...) -> !vm.ref<!hal.buffer_view>
-      vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
-      %1 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
-      vm.cond_br %1, ^bb2(%1 : i32), ^bb3
-    ^bb2(%2: i32):  // 2 preds: ^bb0, ^bb1
-      vm.fail %2, "semaphore wait failed"
-    ^bb3:  // pred: ^bb1
-      vm.return %ref_4 : !vm.ref<!hal.buffer_view>
-    }
-    vm.export @dot$sync as("dot")
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
@@ -6041,12 +6017,36 @@ module  {
     vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.fail(%semaphore : !vm.ref<!hal.semaphore>, %status : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
+    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %c32 = vm.const.i32 32 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
+      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+      %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+    ^bb1:  // pred: ^bb0
+      %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_3 = vm.call @dot(%ref_1, %ref_2) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
+      %ref_4 = vm.call.variadic @hal.buffer_view.create(%ref_3, %c50331680, [%c32, %c64]) : (!vm.ref<!hal.buffer>, i32, i32 ...) -> !vm.ref<!hal.buffer_view>
+      vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
+      %1 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %1, ^bb2(%1 : i32), ^bb3
+    ^bb2(%2: i32):  // 2 preds: ^bb0, ^bb1
+      vm.fail %2, "semaphore wait failed"
+    ^bb3:  // pred: ^bb1
+      vm.return %ref_4 : !vm.ref<!hal.buffer_view>
+    }
+    vm.export @dot$sync as("dot")
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
-      %zero = vm.const.i32.zero : i32
-      %c7 = vm.const.i32 7 : i32
       %c2 = vm.const.i32 2 : i32
+      %c7 = vm.const.i32 7 : i32
       %c6 = vm.const.i32 6 : i32
+      %zero = vm.const.i32.zero : i32
       %c1447906369 = vm.const.i32 1447906369 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6094,17 +6094,17 @@ module  {
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
     vm.rodata @_dot_ex_dispatch_0_vmla_binary_vmla opaque<"_", "0xDEADBEEF"> : vector<1330xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-      %c262144 = vm.const.i32 262144 : i32
       %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
       %c8192 = vm.const.i32 8192 : i32
-      %zero = vm.const.i32.zero : i32
-      %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
       %c14 = vm.const.i32 14 : i32
+      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
+      %zero = vm.const.i32.zero : i32
+      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -6141,30 +6141,6 @@ module  {
       vm.fail %1, "semaphore wait failed"
     }
     vm.export @dot$async
-    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-      %zero = vm.const.i32.zero : i32
-      %c1 = vm.const.i32 1 : i32
-      %c32 = vm.const.i32 32 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c50331680 = vm.const.i32 50331680 : i32
-      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
-      %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
-      vm.cond_br %0, ^bb2(%0 : i32), ^bb1
-    ^bb1:  // pred: ^bb0
-      %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_3 = vm.call @dot(%ref_1, %ref_2) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
-      %ref_4 = vm.call.variadic @hal.buffer_view.create(%ref_3, %c50331680, [%c32, %c64]) : (!vm.ref<!hal.buffer>, i32, i32 ...) -> !vm.ref<!hal.buffer_view>
-      vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
-      %1 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
-      vm.cond_br %1, ^bb2(%1 : i32), ^bb3
-    ^bb2(%2: i32):  // 2 preds: ^bb0, ^bb1
-      vm.fail %2, "semaphore wait failed"
-    ^bb3:  // pred: ^bb1
-      vm.return %ref_4 : !vm.ref<!hal.buffer_view>
-    }
-    vm.export @dot$sync as("dot")
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
@@ -6203,12 +6179,36 @@ module  {
     vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.fail(%semaphore : !vm.ref<!hal.semaphore>, %status : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
+    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %c32 = vm.const.i32 32 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
+      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+      %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+    ^bb1:  // pred: ^bb0
+      %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_3 = vm.call @dot(%ref_1, %ref_2) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
+      %ref_4 = vm.call.variadic @hal.buffer_view.create(%ref_3, %c50331680, [%c32, %c64]) : (!vm.ref<!hal.buffer>, i32, i32 ...) -> !vm.ref<!hal.buffer_view>
+      vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
+      %1 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %1, ^bb2(%1 : i32), ^bb3
+    ^bb2(%2: i32):  // 2 preds: ^bb0, ^bb1
+      vm.fail %2, "semaphore wait failed"
+    ^bb3:  // pred: ^bb1
+      vm.return %ref_4 : !vm.ref<!hal.buffer_view>
+    }
+    vm.export @dot$sync as("dot")
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
-      %zero = vm.const.i32.zero : i32
-      %c7 = vm.const.i32 7 : i32
       %c2 = vm.const.i32 2 : i32
+      %c7 = vm.const.i32 7 : i32
       %c6 = vm.const.i32 6 : i32
+      %zero = vm.const.i32.zero : i32
       %c1447906369 = vm.const.i32 1447906369 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6256,17 +6256,17 @@ module  {
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
     vm.rodata @_dot_ex_dispatch_0_vmla_binary_vmla opaque<"_", "0xDEADBEEF"> : vector<1330xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
-      %c262144 = vm.const.i32 262144 : i32
       %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
       %c8192 = vm.const.i32 8192 : i32
-      %zero = vm.const.i32.zero : i32
-      %c1 = vm.const.i32 1 : i32
-      %c2 = vm.const.i32 2 : i32
       %c50 = vm.const.i32 50 : i32
       %c14 = vm.const.i32 14 : i32
+      %c1 = vm.const.i32 1 : i32
       %c3 = vm.const.i32 3 : i32
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
+      %zero = vm.const.i32.zero : i32
+      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c14, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -6303,6 +6303,25 @@ module  {
       vm.fail %1, "semaphore wait failed"
     }
     vm.export @dot$async
+    vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+    vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
+    vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.buffer_view.buffer(%buffer_view : !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.execution_barrier(%command_buffer : !vm.ref<!hal.command_buffer>, %source_stage_mask : i32, %target_stage_mask : i32, %flags : i32) attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.push_descriptor_set(%command_buffer : !vm.ref<!hal.command_buffer>, %executable_layout : !vm.ref<!hal.executable_layout>, %set : i32, %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...) attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.dispatch(%command_buffer : !vm.ref<!hal.command_buffer>, %executable : !vm.ref<!hal.executable>, %entry_point : i32, %workgroup_x : i32, %workgroup_y : i32, %workgroup_z : i32) attributes {sym_visibility = "private"}
+    vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %push_constants : i32, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
+    vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
       %zero = vm.const.i32.zero : i32
       %c1 = vm.const.i32 1 : i32
@@ -6327,31 +6346,12 @@ module  {
       vm.return %ref_4 : !vm.ref<!hal.buffer_view>
     }
     vm.export @dot$sync as("dot")
-    vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-    vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
-    vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.buffer_view.buffer(%buffer_view : !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.execution_barrier(%command_buffer : !vm.ref<!hal.command_buffer>, %source_stage_mask : i32, %target_stage_mask : i32, %flags : i32) attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.push_descriptor_set(%command_buffer : !vm.ref<!hal.command_buffer>, %executable_layout : !vm.ref<!hal.executable_layout>, %set : i32, %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...) attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.dispatch(%command_buffer : !vm.ref<!hal.command_buffer>, %executable : !vm.ref<!hal.executable>, %entry_point : i32, %workgroup_x : i32, %workgroup_y : i32, %workgroup_z : i32) attributes {sym_visibility = "private"}
-    vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %push_constants : i32, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
-    vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
-      %zero = vm.const.i32.zero : i32
-      %c7 = vm.const.i32 7 : i32
       %c2 = vm.const.i32 2 : i32
+      %c7 = vm.const.i32 7 : i32
       %c6 = vm.const.i32 6 : i32
+      %zero = vm.const.i32.zero : i32
       %c1447906369 = vm.const.i32 1447906369 : i32
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6409,8 +6409,8 @@ vm.module @module {
     %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
     vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-    %c262144 = vm.const.i32 262144 : i32
     %c131072 = vm.const.i32 131072 : i32
+    %c262144 = vm.const.i32 262144 : i32
     %zero = vm.const.i32.zero : i32
     %c2 = vm.const.i32 2 : i32
     vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_2, %_executable_layout_0, %zero, [(%zero, %arg0, %zero, %c131072), (%c1, %arg1, %zero, %c262144), (%c2, %ref_1, %zero, %c8192)]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...)
@@ -6445,6 +6445,25 @@ vm.module @module {
     vm.fail %1, "semaphore wait failed"
   }
   vm.export @dot$async
+  vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+  vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
+  vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.buffer_view.buffer(%buffer_view : !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
+  vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+  vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+  vm.import @hal.command_buffer.execution_barrier(%command_buffer : !vm.ref<!hal.command_buffer>, %source_stage_mask : i32, %target_stage_mask : i32, %flags : i32) attributes {sym_visibility = "private"}
+  vm.import @hal.command_buffer.push_descriptor_set(%command_buffer : !vm.ref<!hal.command_buffer>, %executable_layout : !vm.ref<!hal.executable_layout>, %set : i32, %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...) attributes {sym_visibility = "private"}
+  vm.import @hal.command_buffer.dispatch(%command_buffer : !vm.ref<!hal.command_buffer>, %executable : !vm.ref<!hal.executable>, %entry_point : i32, %workgroup_x : i32, %workgroup_y : i32, %workgroup_z : i32) attributes {sym_visibility = "private"}
+  vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %push_constants : i32, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
+  vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
   vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %zero = vm.const.i32.zero : i32
@@ -6469,25 +6488,6 @@ vm.module @module {
     vm.return %ref_4 : !vm.ref<!hal.buffer_view>
   }
   vm.export @dot$sync as("dot")
-  vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-  vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
-  vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.buffer_view.buffer(%buffer_view : !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
-  vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-  vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-  vm.import @hal.command_buffer.execution_barrier(%command_buffer : !vm.ref<!hal.command_buffer>, %source_stage_mask : i32, %target_stage_mask : i32, %flags : i32) attributes {sym_visibility = "private"}
-  vm.import @hal.command_buffer.push_descriptor_set(%command_buffer : !vm.ref<!hal.command_buffer>, %executable_layout : !vm.ref<!hal.executable_layout>, %set : i32, %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...) attributes {sym_visibility = "private"}
-  vm.import @hal.command_buffer.dispatch(%command_buffer : !vm.ref<!hal.command_buffer>, %executable : !vm.ref<!hal.executable>, %entry_point : i32, %workgroup_x : i32, %workgroup_y : i32, %workgroup_z : i32) attributes {sym_visibility = "private"}
-  vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %push_constants : i32, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
-  vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
   vm.func @__init() {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_vmla_EC74E8E47AC10E22 = vm.const.ref.rodata @_utf8_vmla_EC74E8E47AC10E22 : !vm.ref<!iree.byte_buffer>
@@ -6495,10 +6495,10 @@ vm.module @module {
     vm.global.store.i32 %0, @_device_match_id_0 : i32
     %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %c1 = vm.const.i32 1 : i32
-    %zero = vm.const.i32.zero : i32
-    %c7 = vm.const.i32 7 : i32
     %c2 = vm.const.i32 2 : i32
+    %c7 = vm.const.i32 7 : i32
     %c6 = vm.const.i32 6 : i32
+    %zero = vm.const.i32.zero : i32
     %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
     vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
     %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
@@ -6551,8 +6551,8 @@ module  {
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %c262144 = vm.const.i32 262144 : i32
       %c131072 = vm.const.i32 131072 : i32
+      %c262144 = vm.const.i32 262144 : i32
       %zero = vm.const.i32.zero : i32
       %c2 = vm.const.i32 2 : i32
       vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_2, %_executable_layout_0, %zero, [(%zero, %arg0, %zero, %c131072), (%c1, %arg1, %zero, %c262144), (%c2, %ref_1, %zero, %c8192)]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...)
@@ -6587,6 +6587,25 @@ module  {
       vm.fail %1, "semaphore wait failed"
     }
     vm.export @dot$async
+    vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+    vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
+    vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.buffer_view.buffer(%buffer_view : !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.execution_barrier(%command_buffer : !vm.ref<!hal.command_buffer>, %source_stage_mask : i32, %target_stage_mask : i32, %flags : i32) attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.push_descriptor_set(%command_buffer : !vm.ref<!hal.command_buffer>, %executable_layout : !vm.ref<!hal.executable_layout>, %set : i32, %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...) attributes {sym_visibility = "private"}
+    vm.import @hal.command_buffer.dispatch(%command_buffer : !vm.ref<!hal.command_buffer>, %executable : !vm.ref<!hal.executable>, %entry_point : i32, %workgroup_x : i32, %workgroup_y : i32, %workgroup_z : i32) attributes {sym_visibility = "private"}
+    vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %push_constants : i32, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
+    vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %zero = vm.const.i32.zero : i32
@@ -6611,25 +6630,6 @@ module  {
       vm.return %ref_4 : !vm.ref<!hal.buffer_view>
     }
     vm.export @dot$sync as("dot")
-    vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-    vm.import @hal.allocator.allocate(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %allocation_size : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
-    vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.buffer_view.buffer(%buffer_view : !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.execution_barrier(%command_buffer : !vm.ref<!hal.command_buffer>, %source_stage_mask : i32, %target_stage_mask : i32, %flags : i32) attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.push_descriptor_set(%command_buffer : !vm.ref<!hal.command_buffer>, %executable_layout : !vm.ref<!hal.executable_layout>, %set : i32, %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32> ...) attributes {sym_visibility = "private"}
-    vm.import @hal.command_buffer.dispatch(%command_buffer : !vm.ref<!hal.command_buffer>, %executable : !vm.ref<!hal.executable>, %entry_point : i32, %workgroup_x : i32, %workgroup_y : i32, %workgroup_z : i32) attributes {sym_visibility = "private"}
-    vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %push_constants : i32, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
-    vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_vmla_EC74E8E47AC10E22 = vm.const.ref.rodata @_utf8_vmla_EC74E8E47AC10E22 : !vm.ref<!iree.byte_buffer>
@@ -6637,10 +6637,10 @@ module  {
       vm.global.store.i32 %0, @_device_match_id_0 : i32
       %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %c1 = vm.const.i32 1 : i32
-      %zero = vm.const.i32.zero : i32
-      %c7 = vm.const.i32 7 : i32
       %c2 = vm.const.i32 2 : i32
+      %c7 = vm.const.i32 7 : i32
       %c6 = vm.const.i32 6 : i32
+      %zero = vm.const.i32.zero : i32
       %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
       vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
       %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
