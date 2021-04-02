@@ -33,40 +33,6 @@ func @buffer_length(%arg0: !hal.buffer) -> index {
 
 // -----
 
-// CHECK-LABEL: @buffer_fill
-func @buffer_fill(%arg0: !hal.buffer) {
-  // CHECK-DAG: %[[OFFSET:.+]] = constant 100
-  %offset = constant 100 : index
-  // CHECK-DAG: %[[LENGTH:.+]] = constant 200
-  %length = constant 200 : index
-  // CHECK-DAG: %[[PATTERN:.+]] = constant 42
-  %pattern = constant 42 : i32
-  // CHECK: hal.buffer.fill<%arg0 : !hal.buffer>[%[[OFFSET]], %[[LENGTH]]] pattern(%[[PATTERN]] : i32)
-  hal.buffer.fill<%arg0 : !hal.buffer>[%offset, %length] pattern(%pattern : i32)
-  return
-}
-
-// -----
-
-// CHECK-LABEL: @buffer_copy
-func @buffer_copy(%arg0: !hal.buffer, %arg1: !hal.buffer) {
-  // CHECK-DAG: %[[SRC_OFFSET:.+]] = constant 100
-  %src_offset = constant 100 : index
-  // CHECK-DAG: %[[DST_OFFSET:.+]] = constant 200
-  %dst_offset = constant 200 : index
-  // CHECK-DAG: %[[LENGTH:.+]] = constant 300
-  %length = constant 300 : index
-  // CHECK: hal.buffer.copy source(%arg0 : !hal.buffer)[%[[SRC_OFFSET]]]
-  // CHECK-SAME:            target(%arg1 : !hal.buffer)[%[[DST_OFFSET]]]
-  // CHECK-SAME:            length(%[[LENGTH]])
-  hal.buffer.copy source(%arg0 : !hal.buffer)[%src_offset]
-                  target(%arg1 : !hal.buffer)[%dst_offset]
-                  length(%length)
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @buffer_load
 func @buffer_load(%arg0: !hal.buffer) -> i32 {
   // CHECK-DAG: %[[SRC_OFFSET:.+]] = constant 100
