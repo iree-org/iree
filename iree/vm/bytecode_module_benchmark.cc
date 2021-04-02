@@ -207,7 +207,7 @@ static void BM_FullModuleInit(benchmark::State& state) {
 }
 BENCHMARK(BM_FullModuleInit);
 
-ABSL_ATTRIBUTE_NOINLINE static int empty_fn() {
+IREE_ATTRIBUTE_NOINLINE static int empty_fn() {
   int ret = 1;
   benchmark::DoNotOptimize(ret);
   return ret;
@@ -228,7 +228,7 @@ static void BM_EmptyFuncBytecode(benchmark::State& state) {
 }
 BENCHMARK(BM_EmptyFuncBytecode);
 
-ABSL_ATTRIBUTE_NOINLINE static int add_fn(int value) {
+IREE_ATTRIBUTE_NOINLINE static int add_fn(int value) {
   benchmark::DoNotOptimize(value += value);
   return value;
 }
