@@ -204,16 +204,6 @@ static LogicalResult convertAnyLinalgOp(
     return failure();
   }
 
-  // If this is a fill op that acts as a tensor initializer to other linalg ops,
-  // check whether the initialization is used. If not we can just drop the op.
-  if (auto fillOp = dyn_cast<linalg::FillOp>(op.getOperation())) {
-    bool needsFill = llvm::any_of(fillOp->getUses(), [](OpOperand &use) {
-      auto userOp = dyn_cast<linalg::LinalgOp>(use.getOwner());
-      return !userOp || userOp.payloadUsesValueFromOpOperand(&use);
-    });
-    if (!needsFill) return success();
-  }
-
   // Delegate to the linalg generic pattern.
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op.getOperation())) {
     return finalizeBufferAllocation(b, genericOp, newInputBuffers,
@@ -574,7 +564,7 @@ LogicalResult preProcessLinalgOps(OpBuilder &b, linalg::LinalgOp op,
     }
 
     // If the output tensor is not actually used (for initialization) by this
-    // op, we can reuse the result tensor's buffer for some operand.
+    // op, we can reuse the result tensor's buffer for some operands.
     if (!op.payloadUsesValueFromOutputOperandIndex(resultIndex)) {
       for (auto en : llvm::enumerate(op.getInputTensors())) {
         Value operand = en.value();

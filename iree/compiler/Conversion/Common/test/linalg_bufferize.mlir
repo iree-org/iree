@@ -882,20 +882,19 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>)
          -> tensor<1x112x112x32xf32>
-  %3 = linalg.fill(%0, %cst) : tensor<1x112x112x32xf32>, f32 -> tensor<1x112x112x32xf32>
-  %4 = linalg.generic {
+  %3 = linalg.generic {
          indexing_maps = [
            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
            affine_map<(d0, d1, d2, d3) -> (d3)>,
            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
          iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
          ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
-         outs(%3 : tensor<1x112x112x32xf32>) {
+         outs(%0 : tensor<1x112x112x32xf32>) {
          ^bb0(%a: f32, %b: f32, %c: f32):
             %sub = subf %a, %b : f32
             linalg.yield %sub : f32
          } -> tensor<1x112x112x32xf32>
-  flow.dispatch.tensor.store %4, %output_subspan : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+  flow.dispatch.tensor.store %3, %output_subspan : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
   return
 }
 
