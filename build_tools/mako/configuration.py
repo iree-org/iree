@@ -222,7 +222,7 @@ MODEL_BENCHMARKS = [
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="6338759231537152",
                                targets=get_pixel4_default_target_list(
-                                   skipped_target=['cpu2'],
+                                   skipped_target=['vlk2'],
                                    batch_config={
                                        'cpu': 16,
                                        'cpu2': 10
