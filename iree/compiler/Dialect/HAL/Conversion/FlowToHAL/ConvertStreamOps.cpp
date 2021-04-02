@@ -323,6 +323,104 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
       IREE::HAL::ExecutionBarrierFlagBitfield::None);
 }
 
+static void recordInterfaceBindings(Value device, Value commandBuffer,
+                                    IREE::Flow::DispatchOp &dispatchOp,
+                                    IREE::HAL::InterfaceOp &interfaceOp,
+                                    Value executableLayout,
+                                    ArrayAttr bindingsAttr,
+                                    BufferSet &bufferSet,
+                                    ConversionPatternRewriter &rewriter) {
+  // Accumulate a potentially sparse set of push constants.
+  // If we had canonicalizers for hal.command_buffer.push_constants then we
+  // would instead just emit each constant individually and let that collapse
+  // things later on.
+  int pushConstantBase = 0;  // always 0 today
+  SmallVector<Value> pushConstantValues;
+  pushConstantValues.resize(
+      interfaceOp.push_constants().getValueOr(APInt(64, 0)).getSExtValue());
+
+  // Accumulate a potentially sparse set of bindings.
+  int setOrdinal = 0;  // always 0 today
+  SmallVector<IREE::HAL::DescriptorSetBindingValue, 4> bindings;
+
+  auto zeroOffset =
+      rewriter.createOrFold<mlir::ConstantIndexOp>(dispatchOp.getLoc(), 0);
+  auto push_buffer_binding = [&](StringRef bindingName, Value tensorValue) {
+    auto bindingOp =
+        interfaceOp.lookupSymbol<IREE::HAL::InterfaceBindingOp>(bindingName);
+    assert(bindingOp);
+    assert(bindingOp.set().getSExtValue() == 0);
+
+    auto &bufferRange = bufferSet.rangeMap[tensorValue];
+    assert(bufferRange.buffer && "buffer not preallocated");
+    auto value = IREE::HAL::TensorRewriteAdaptor::getChecked(
+        dispatchOp.getLoc(), tensorValue, bufferRange.buffer, rewriter);
+    assert(value.hasValue() && "cannot create adaptor for tensor");
+    auto byteLength = value->getByteLength();
+    assert(byteLength);
+    bindings.push_back(
+        std::make_tuple(rewriter.createOrFold<mlir::ConstantOp>(
+                            dispatchOp.getLoc(), bindingOp.bindingAttr()),
+                        value->getBuffer(), zeroOffset, byteLength));
+  };
+
+  for (auto bindingAttr : bindingsAttr) {
+    if (auto constantStorageAttr =
+            bindingAttr.dyn_cast<IREE::HAL::ExConstantStorageAttr>()) {
+      auto bindingOp = interfaceOp.lookupSymbol<IREE::HAL::InterfaceBindingOp>(
+          constantStorageAttr.binding());
+      assert(bindingOp);
+      assert(bindingOp.set().getSExtValue() == setOrdinal);
+      auto storageBuffer = rewriter.createOrFold<IREE::HAL::VariableLoadOp>(
+          dispatchOp.getLoc(),
+          IREE::HAL::BufferType::get(rewriter.getContext()),
+          constantStorageAttr.storage());
+      bindings.push_back(std::make_tuple(
+          rewriter.createOrFold<mlir::ConstantOp>(dispatchOp.getLoc(),
+                                                  bindingOp.bindingAttr()),
+          storageBuffer,
+          rewriter.createOrFold<mlir::ConstantOp>(
+              dispatchOp.getLoc(), constantStorageAttr.offsetAttr()),
+          rewriter.createOrFold<mlir::ConstantOp>(
+              dispatchOp.getLoc(), constantStorageAttr.lengthAttr())));
+    } else if (auto pushConstantAttr =
+                   bindingAttr.dyn_cast<IREE::HAL::ExPushConstantAttr>()) {
+      auto inputValue =
+          dispatchOp.operands()[pushConstantAttr.operand().getSExtValue()];
+      auto pushConstantValue = rewriter.getRemappedValue(inputValue);
+      // Need an explicit index cast to i32 since the
+      // CommandBufferPushConstantsOp is intrinsically i32 based.
+      if (inputValue.getType().isa<IndexType>()) {
+        pushConstantValue = rewriter.create<mlir::IndexCastOp>(
+            dispatchOp.getLoc(), rewriter.getIntegerType(32),
+            pushConstantValue);
+      }
+      pushConstantValues[pushConstantAttr.ordinal().getSExtValue()] =
+          pushConstantValue;
+    } else if (auto operandBufferAttr =
+                   bindingAttr.dyn_cast<IREE::HAL::ExOperandBufferAttr>()) {
+      auto tensorValue =
+          dispatchOp.operands()[operandBufferAttr.operand().getSExtValue()];
+      push_buffer_binding(operandBufferAttr.binding(), tensorValue);
+    } else if (auto resultBufferAttr =
+                   bindingAttr.dyn_cast<IREE::HAL::ExResultBufferAttr>()) {
+      auto tensorValue =
+          dispatchOp.results()[resultBufferAttr.result().getSExtValue()];
+      push_buffer_binding(resultBufferAttr.binding(), tensorValue);
+    }
+  }
+
+  rewriter.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
+      dispatchOp.getLoc(), commandBuffer, executableLayout, setOrdinal,
+      bindings);
+
+  if (!pushConstantValues.empty()) {
+    rewriter.create<IREE::HAL::CommandBufferPushConstantsOp>(
+        dispatchOp.getLoc(), commandBuffer, executableLayout,
+        rewriter.getIndexAttr(pushConstantBase), pushConstantValues);
+  }
+}
+
 static void recordPushConstants(Value device, Value commandBuffer,
                                 IREE::Flow::DispatchOp &dispatchOp,
                                 IREE::HAL::InterfaceOp &interfaceOp,
@@ -429,39 +527,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
           dispatchOp, dispatchOp.executable()));
 
-  // Marshal tensor operands/results in to the state so that backends can
-  // read/write them as they need.
-  SmallVector<Optional<IREE::HAL::TensorRewriteAdaptor>, 4> operandAdaptors;
-  for (int i = 0; i < dispatchOp.getNumOperands(); ++i) {
-    auto value = dispatchOp.getOperand(i);
-    if (!value.getType().isa<TensorType>()) continue;
-    auto &bufferRange = bufferSet.rangeMap[value];
-    assert(bufferRange.buffer && "operand buffer not allocated");
-    auto adaptor = IREE::HAL::TensorRewriteAdaptor::getChecked(
-        dispatchOp.getLoc(), value, bufferRange.buffer, rewriter);
-    if (!adaptor.hasValue()) {
-      return dispatchOp.emitOpError()
-             << "cannot create adaptor for tensor operand";
-    }
-    operandAdaptors.emplace_back(adaptor.getValue());
-  }
-
-  SmallVector<Optional<IREE::HAL::TensorRewriteAdaptor>, 4> resultAdaptors;
-  for (int i = 0; i < dispatchOp.getNumResults(); ++i) {
-    auto value = dispatchOp.getResult(i);
-    if (!value.getType().isa<TensorType>()) continue;
-    auto &bufferRange = bufferSet.rangeMap[value];
-    assert(bufferRange.buffer && "result buffer not preallocated");
-    auto adaptor = IREE::HAL::TensorRewriteAdaptor::getChecked(
-        dispatchOp.getLoc(), value, bufferRange.buffer, rewriter);
-    if (!adaptor.hasValue()) {
-      return dispatchOp.emitOpError()
-             << "cannot create adaptor for tensor result";
-      ;
-    }
-    resultAdaptors.emplace_back(adaptor.getValue());
-  }
-
   IREE::HAL::TargetBackend::DispatchState dispatchState;
   dispatchState.dispatchOp = dispatchOp;
   dispatchState.executableOp = executableOp;
@@ -497,16 +562,20 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
               interfaceOp.push_constantsAttr(),
               interfaceOp.getExecutableSetLayoutsAttr());
 
-      // Setup push constants for any dynamic values we need to pass across at
-      // runtime.
-      recordPushConstants(device, commandBuffer, dispatchOp, interfaceOp,
-                          executableLayout, rewriter);
-
-      // Setup bindings, right now pushed immediately but soon to be replaced
-      // with descriptor sets (or something better, anyway).
-      if (failed(recordPushBindings(device, commandBuffer, dispatchOp,
-                                    executableLayout, bufferSet, rewriter))) {
-        return failure();
+      // HACK: switch off for new-style bindings population if the metadata is
+      // available.
+      if (auto bindingsAttr =
+              dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings")) {
+        recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
+                                executableLayout, bindingsAttr, bufferSet,
+                                rewriter);
+      } else {
+        recordPushConstants(device, commandBuffer, dispatchOp, interfaceOp,
+                            executableLayout, rewriter);
+        if (failed(recordPushBindings(device, commandBuffer, dispatchOp,
+                                      executableLayout, bufferSet, rewriter))) {
+          return failure();
+        }
       }
 
       dispatchState.entryPointOp = entryPointOp;

@@ -437,7 +437,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
 
 static PassRegistration<MaterializeInterfacesPass> pass(
     "iree-hal-materialize-interfaces",
-    "Materializes hal.executable ops from flow.executable ops", [] {
+    "Materializes hal.executable ops from flow.executable ops (DEPRECATED)",
+    [] {
       auto options = getTargetOptionsFromFlags();
       return std::make_unique<MaterializeInterfacesPass>(options);
     });
