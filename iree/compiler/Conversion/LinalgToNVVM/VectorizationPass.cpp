@@ -52,6 +52,14 @@ static Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
     SmallVector<int64_t, 4> nativeSize(rank, 1);
     nativeSize.back() = 4;
     return nativeSize;
+  } else if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
+    unsigned lastParalleldim = 0;
+    for (auto it : llvm::enumerate(contract.iterator_types())) {
+      if (isParallelIterator(it.value())) lastParalleldim = it.index();
+    }
+    SmallVector<int64_t, 4> nativeSize(contract.iterator_types().size(), 1);
+    nativeSize[lastParalleldim] = 4;
+    return nativeSize;
   }
   return llvm::None;
 }

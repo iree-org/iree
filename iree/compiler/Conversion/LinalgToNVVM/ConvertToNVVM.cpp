@@ -188,7 +188,10 @@ struct ConvertToNVVMPass
       OwningRewritePatternList patterns(&getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorSlicesLoweringPatterns(patterns);
-      vector::populateVectorContractLoweringPatterns(patterns);
+      vector::populateVectorContractLoweringPatterns(
+          patterns,
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct));
       (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
     }
     {

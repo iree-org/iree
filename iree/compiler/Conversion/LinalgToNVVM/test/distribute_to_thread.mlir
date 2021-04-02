@@ -35,5 +35,5 @@ hal.executable.target @cuda, filter="cuda" {
 // CHECK-LABEL: func @add_dispatch_0()
 //  CHECK-SAME: cuda_workgroup_size = dense<[32, 1, 1]>
 //      CHECK:    "gpu.thread_id"() {dimension = "x"}
-//      CHECK:    scf.for
+//      CHECK:    scf.parallel
 //      CHECK:      linalg.generic
