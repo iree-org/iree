@@ -167,6 +167,16 @@ void ConvertTFToTFTensorListPass::runOnOperation() {
         typeConversionWorklist.push_back(v);
         break;
       }
+      // Depending on phase ordering, we may still have identity ops that
+      // operate on these types. Just elide them if encountered.
+      if (auto identityOp = dyn_cast<TF::IdentityOp>(owner)) {
+        identityOp.output().replaceAllUsesWith(identityOp.input());
+        identityOp.erase();
+        // The RAUW could have added more uses of `v`, so put it back on the
+        // worklist and process it again.
+        typeConversionWorklist.push_back(v);
+        break;
+      }
       owner->emitError() << "unable to convert tensorlist op: "
                          << owner->getName();
       return signalPassFailure();
