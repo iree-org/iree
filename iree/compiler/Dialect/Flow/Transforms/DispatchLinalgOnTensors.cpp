@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -46,6 +47,12 @@ static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     "iree-flow-dispatch-linalg-on-tensors-tile-sizes",
     llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
     llvm::cl::CommaSeparated);
+
+static llvm::cl::opt<bool> clDisableOperandFusion(
+    "iree-flow-dispatch-formation-disable-operand-fusion",
+    llvm::cl::desc(
+        "Disable fusing operand producers during dispatch region formation"),
+    llvm::cl::init(false));
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
@@ -289,7 +296,8 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
   return {dispatchOp, clonedOp};
 }
 
-// Only fuses the first producer for the purpose of connecting the pieces.
+// Fuses producers marked in the same group recursively.
+//
 // The impl does not worry about the dispatchOp, operands and arguments are set
 // in a post-pattern `legalizeDispatchWorkgroupOperands` function.
 // To simplify the implementation of the dispatch region formation, we just
@@ -298,9 +306,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 // used for their DimOp. This is a canonicalization that is more involved than
 // necessary across the boundary of regions without captures.
 //
-// TODO(nicolasvasilache): Enhance fusion.
-//
-// TODO(nicolasvasilache: This implementation jumps an abstraction gap as it
+// TODO(nicolasvasilache): This implementation jumps an abstraction gap as it
 // knows that `clonedLinalgOp` has been tiled into `tiledLinalgOp`. In the case
 // where a `rootOp`, i.e. the untiled original operation used to create the
 // dispatch region, can be fused with its producer, this allows calling into a
@@ -309,6 +315,10 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 // the loop nest + operations in order to get the producer of an `out` tensor.
 // In the future, this analysis should be implemented in core but for now it is
 // IREE-only.
+//
+// TODO(antiagainst): Right now this function requires taking all shaped
+// operands of the tiled op to inspect them. This should probably be changed to
+// just take one operand we know that need to be fused.
 static void pullInProducersInSameGroup(
     PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
     linalg::LinalgOp tiledOp, ValueRange tiledOpOperands,
@@ -358,23 +368,10 @@ static void pullInProducersInSameGroup(
       // producer's operands and pull them in if they are marked to be fused
       // into the current group.
       if (fusedProducer) {
-        bool needsToPullInProducerOperands = false;
-        for (Value operand :
-             cast<linalg::LinalgOp>(clonedOpToFuse).getShapedOperands()) {
-          if (auto linalgOp = operand.getDefiningOp<linalg::LinalgOp>()) {
-            if (isInFusionGroup(linalgOp, groupNum)) {
-              needsToPullInProducerOperands = true;
-              break;
-            }
-          }
-        }
-
-        if (needsToPullInProducerOperands) {
-          SmallVector<Value, 4> producerOperands =
-              cast<linalg::LinalgOp>(clonedOpToFuse).getShapedOperands();
-          pullInProducersInSameGroup(rewriter, dispatchOp, fusedProducer,
-                                     producerOperands, tiledLoops, groupNum);
-        }
+        SmallVector<Value, 4> producerOperands =
+            cast<linalg::LinalgOp>(clonedOpToFuse).getShapedOperands();
+        pullInProducersInSameGroup(rewriter, dispatchOp, fusedProducer,
+                                   producerOperands, tiledLoops, groupNum);
       }
     }
   }
@@ -936,6 +933,8 @@ static bool isProducerFusable(linalg::LinalgOp producer,
                               linalg::LinalgOp consumer,
                               OpOperand &consumerOperand) {
   if (consumer.isInputTensor(&consumerOperand)) {
+    if (clDisableOperandFusion) return false;
+
     // Make sure that we have an identity indexing map for the operand for now.
     //
     // Theoretically with tensor abstraction, we can pull in whatever operand
