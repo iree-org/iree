@@ -52,7 +52,7 @@ using SemaphoreValue = std::pair<iree_hal_semaphore_t*, uint64_t>;
 // the GPU.
 class SerializingCommandQueue final : public CommandQueue {
  public:
-  SerializingCommandQueue(VkDeviceHandle* logical_device, std::string name,
+  SerializingCommandQueue(VkDeviceHandle* logical_device,
                           iree_hal_command_category_t supported_categories,
                           VkQueue queue, TimePointFencePool* fence_pool);
   ~SerializingCommandQueue() override;

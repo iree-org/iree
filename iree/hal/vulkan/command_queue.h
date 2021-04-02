@@ -22,6 +22,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/tracing.h"
 #include "iree/hal/vulkan/util/arena.h"
 
 namespace iree {
@@ -42,6 +43,15 @@ class CommandQueue {
     return logical_device_->syms();
   }
 
+  VkQueue handle() const { return queue_; }
+
+  iree_hal_vulkan_tracing_context_t* tracing_context() {
+    return tracing_context_;
+  }
+  void set_tracing_context(iree_hal_vulkan_tracing_context_t* tracing_context) {
+    tracing_context_ = tracing_context;
+  }
+
   bool can_dispatch() const {
     return iree_all_bits_set(supported_categories_,
                              IREE_HAL_COMMAND_CATEGORY_DISPATCH);
@@ -52,18 +62,18 @@ class CommandQueue {
   virtual iree_status_t WaitIdle(iree_time_t deadline_ns) = 0;
 
  protected:
-  CommandQueue(VkDeviceHandle* logical_device, std::string name,
+  CommandQueue(VkDeviceHandle* logical_device,
                iree_hal_command_category_t supported_categories, VkQueue queue)
       : logical_device_(logical_device),
-        name_(std::move(name)),
         supported_categories_(supported_categories),
         queue_(queue) {
     iree_slim_mutex_initialize(&queue_mutex_);
   }
 
   VkDeviceHandle* logical_device_;
-  const std::string name_;
   const iree_hal_command_category_t supported_categories_;
+
+  iree_hal_vulkan_tracing_context_t* tracing_context_ = nullptr;
 
   // VkQueue needs to be externally synchronized.
   iree_slim_mutex_t queue_mutex_;

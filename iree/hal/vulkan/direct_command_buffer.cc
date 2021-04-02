@@ -36,6 +36,7 @@ typedef struct {
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
   iree_hal_queue_affinity_t queue_affinity;
+  iree_hal_vulkan_tracing_context_t* tracing_context;
 
   VkCommandPoolHandle* command_pool;
   VkCommandBuffer handle;
@@ -68,6 +69,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_vulkan_tracing_context_t* tracing_context,
     iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(logical_device);
@@ -98,6 +100,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     command_buffer->mode = mode;
     command_buffer->allowed_categories = command_categories;
     command_buffer->queue_affinity = queue_affinity;
+    command_buffer->tracing_context = tracing_context;
     command_buffer->command_pool = command_pool;
     command_buffer->handle = handle;
     command_buffer->syms = logical_device->syms().get();
@@ -564,6 +567,15 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
 
+  iree_hal_vulkan_source_location_t source_location;
+  iree_hal_vulkan_native_executable_entry_point_source_location(
+      executable, entry_point, &source_location);
+  IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->handle,
+      source_location.file_name.data, source_location.file_name.size,
+      source_location.line, source_location.func_name.data,
+      source_location.func_name.size, NULL, 0);
+
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.
   VkPipeline pipeline_handle = VK_NULL_HANDLE;
@@ -576,6 +588,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
   command_buffer->syms->vkCmdDispatch(command_buffer->handle, workgroup_x,
                                       workgroup_y, workgroup_z);
 
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
+
   return iree_ok_status();
 }
 
@@ -586,6 +601,15 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
     iree_device_size_t workgroups_offset) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  iree_hal_vulkan_source_location_t source_location;
+  iree_hal_vulkan_native_executable_entry_point_source_location(
+      executable, entry_point, &source_location);
+  IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->handle,
+      source_location.file_name.data, source_location.file_name.size,
+      source_location.line, source_location.func_name.data,
+      source_location.func_name.size, NULL, 0);
 
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.
@@ -601,6 +625,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   workgroups_offset += iree_hal_buffer_byte_offset(workgroups_buffer);
   command_buffer->syms->vkCmdDispatchIndirect(
       command_buffer->handle, workgroups_device_buffer, workgroups_offset);
+
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
 
   return iree_ok_status();
 }

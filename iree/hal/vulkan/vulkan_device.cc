@@ -39,6 +39,7 @@
 #include "iree/hal/vulkan/nop_executable_cache.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/tracing.h"
 #include "iree/hal/vulkan/vma_allocator.h"
 
 using namespace iree::hal::vulkan;
@@ -134,6 +135,26 @@ iree_hal_vulkan_query_extensibility_set(
     ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_OPTIONAL,
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  if (iree_all_bits_set(requested_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
+    // VK_EXT_host_query_reset:
+    // optionally allows for vkResetQueryPool to be used to reset query pools
+    // from the host without needing to do an expensive vkCmdResetQueryPool
+    // submission.
+    ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+            VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME);
+
+    // VK_EXT_calibrated_timestamps:
+    // optionally provides more accurate timestamps that correspond to the
+    // system time. If this is not present then tracy will attempt calibration
+    // itself and have some per-run variance in the skew (up to many
+    // milliseconds).
+    ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+            VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+  }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   *out_string_count = string_count;
   return status;
@@ -338,6 +359,9 @@ typedef struct {
   iree_host_size_t transfer_queue_count;
   CommandQueue** transfer_queues;
 
+  // |queue_count| tracing contexts, if tracing is enabled.
+  iree_hal_vulkan_tracing_context_t** queue_tracing_contexts;
+
   DescriptorPoolCache* descriptor_pool_cache;
 
   VkCommandPoolHandle* dispatch_command_pool;
@@ -395,35 +419,32 @@ static CommandQueue* iree_hal_vulkan_device_create_queue(
   VkQueue queue = VK_NULL_HANDLE;
   logical_device->syms()->vkGetDeviceQueue(*logical_device, queue_family_index,
                                            queue_index, &queue);
-  std::string queue_name;
-  if (!iree_all_bits_set(command_category,
-                         IREE_HAL_COMMAND_CATEGORY_DISPATCH)) {
-    queue_name = "q(t):";
-  } else {
-    queue_name = "q(d):";
-  }
-  queue_name += std::to_string(queue_index);
 
   // When emulating timeline semaphores we use a special queue that allows us to
   // sequence the semaphores correctly.
   if (fence_pool != NULL) {
-    return new SerializingCommandQueue(logical_device, std::move(queue_name),
-                                       command_category, queue, fence_pool);
+    return new SerializingCommandQueue(logical_device, command_category, queue,
+                                       fence_pool);
   }
 
-  return new DirectCommandQueue(logical_device, std::move(queue_name),
-                                command_category, queue);
+  return new DirectCommandQueue(logical_device, command_category, queue);
 }
 
 // Creates command queues for the given sets of queues and populates the
 // device queue lists.
-static void iree_hal_vulkan_device_initialize_command_queues(
-    iree_hal_vulkan_device_t* device, iree_string_view_t queue_prefix,
+static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
+    iree_hal_vulkan_device_t* device,
+    iree_hal_vulkan_features_t enabled_features,
+    iree_string_view_t queue_prefix,
     const iree_hal_vulkan_queue_set_t* compute_queue_set,
     const iree_hal_vulkan_queue_set_t* transfer_queue_set) {
   device->queue_count = 0;
   device->dispatch_queue_count = 0;
   device->transfer_queue_count = 0;
+
+  // The first available queue supporting dispatch commands that will be used by
+  // the tracing subsystem for query and cleanup tasks.
+  VkQueue maintenance_dispatch_queue = VK_NULL_HANDLE;
 
   uint64_t compute_queue_count =
       iree_math_count_ones_u64(compute_queue_set->queue_indices);
@@ -431,29 +452,77 @@ static void iree_hal_vulkan_device_initialize_command_queues(
       iree_math_count_ones_u64(transfer_queue_set->queue_indices);
   for (iree_host_size_t i = 0; i < compute_queue_count; ++i) {
     if (!(compute_queue_set->queue_indices & (1ull << i))) continue;
+
+    char queue_name_buffer[32];
+    int queue_name_length =
+        snprintf(queue_name_buffer, IREE_ARRAYSIZE(queue_name_buffer),
+                 "Vulkan[%c:%d]", 'D', (int)device->dispatch_queue_count);
+    iree_string_view_t queue_name =
+        iree_make_string_view(queue_name_buffer, queue_name_length);
+
     CommandQueue* queue = iree_hal_vulkan_device_create_queue(
         device->logical_device, IREE_HAL_COMMAND_CATEGORY_ANY,
         compute_queue_set->queue_family_index, i, device->fence_pool);
-    device->queues[device->queue_count++] = queue;
+
+    iree_host_size_t queue_index = device->queue_count++;
+    device->queues[queue_index] = queue;
     device->dispatch_queues[device->dispatch_queue_count++] = queue;
+
     if (!transfer_queue_count) {
       // If we don't have any dedicated transfer queues then use all dispatch
       // queues as transfer queues.
       device->transfer_queues[device->transfer_queue_count++] = queue;
     }
+
+    if (maintenance_dispatch_queue == VK_NULL_HANDLE) {
+      maintenance_dispatch_queue = queue->handle();
+    }
+
+    if (iree_all_bits_set(enabled_features,
+                          IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_tracing_context_allocate(
+          device->physical_device, device->logical_device, queue->handle(),
+          queue_name, maintenance_dispatch_queue, device->dispatch_command_pool,
+          device->host_allocator,
+          &device->queue_tracing_contexts[queue_index]));
+      queue->set_tracing_context(device->queue_tracing_contexts[queue_index]);
+    }
   }
   for (iree_host_size_t i = 0; i < transfer_queue_count; ++i) {
     if (!(transfer_queue_set->queue_indices & (1ull << i))) continue;
+
+    char queue_name_buffer[32];
+    int queue_name_length =
+        snprintf(queue_name_buffer, IREE_ARRAYSIZE(queue_name_buffer),
+                 "Vulkan[%c:%d]", 'T', (int)device->transfer_queue_count);
+    iree_string_view_t queue_name =
+        iree_make_string_view(queue_name_buffer, queue_name_length);
+
     CommandQueue* queue = iree_hal_vulkan_device_create_queue(
         device->logical_device, IREE_HAL_COMMAND_CATEGORY_TRANSFER,
         transfer_queue_set->queue_family_index, i, device->fence_pool);
-    device->queues[device->queue_count++] = queue;
+
+    iree_host_size_t queue_index = device->queue_count++;
+    device->queues[queue_index] = queue;
     device->transfer_queues[device->transfer_queue_count++] = queue;
+
+    if (iree_all_bits_set(enabled_features,
+                          IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_tracing_context_allocate(
+          device->physical_device, device->logical_device, queue->handle(),
+          queue_name, maintenance_dispatch_queue, device->dispatch_command_pool,
+          device->host_allocator,
+          &device->queue_tracing_contexts[queue_index]));
+      queue->set_tracing_context(device->queue_tracing_contexts[queue_index]);
+    }
   }
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
+    iree_hal_vulkan_features_t enabled_features,
     const iree_hal_vulkan_device_options_t* options, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
     const iree_hal_vulkan_device_extensions_t* device_extensions,
@@ -474,7 +543,8 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
       sizeof(*device) + identifier.size +
       total_queue_count * sizeof(device->queues[0]) +
       total_queue_count * sizeof(device->dispatch_queues[0]) +
-      total_queue_count * sizeof(device->transfer_queues[0]);
+      total_queue_count * sizeof(device->transfer_queues[0]) +
+      total_queue_count * sizeof(device->queue_tracing_contexts[0]);
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&device));
   memset(device, 0, total_size);
@@ -502,6 +572,9 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   buffer_ptr += total_queue_count * sizeof(device->dispatch_queues[0]);
   device->transfer_queues = (CommandQueue**)buffer_ptr;
   buffer_ptr += total_queue_count * sizeof(device->transfer_queues[0]);
+  device->queue_tracing_contexts =
+      (iree_hal_vulkan_tracing_context_t**)buffer_ptr;
+  buffer_ptr += total_queue_count * sizeof(device->queue_tracing_contexts[0]);
 
   device->descriptor_pool_cache =
       new DescriptorPoolCache(device->logical_device);
@@ -550,8 +623,9 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   // initialization; this happens last as the queues require the pools allocated
   // above.
   if (iree_status_is_ok(status)) {
-    iree_hal_vulkan_device_initialize_command_queues(
-        device, identifier, compute_queue_set, transfer_queue_set);
+    status = iree_hal_vulkan_device_initialize_command_queues(
+        device, enabled_features, identifier, compute_queue_set,
+        transfer_queue_set);
   }
 
   if (iree_status_is_ok(status)) {
@@ -570,6 +644,7 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
   // Drop all command queues. These may wait until idle in their destructor.
   for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
     delete device->queues[i];
+    iree_hal_vulkan_tracing_context_free(device->queue_tracing_contexts[i]);
   }
 
   // Drop command pools now that we know there are no more outstanding command
@@ -715,6 +790,16 @@ iree_status_t iree_hal_vulkan_device_create(
     semaphore_features.timelineSemaphore = VK_TRUE;
   }
 
+  VkPhysicalDeviceHostQueryResetFeaturesEXT host_query_reset_features;
+  if (enabled_device_extensions.host_query_reset) {
+    memset(&host_query_reset_features, 0, sizeof(host_query_reset_features));
+    host_query_reset_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES_EXT;
+    host_query_reset_features.pNext = features2.pNext;
+    features2.pNext = &host_query_reset_features;
+    host_query_reset_features.hostQueryReset = VK_TRUE;
+  }
+
   auto logical_device = new VkDeviceHandle(
       instance_syms, enabled_device_extensions,
       /*owns_device=*/true, host_allocator, /*allocator=*/NULL);
@@ -741,9 +826,9 @@ iree_status_t iree_hal_vulkan_device_create(
   // Allocate and initialize the device.
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_device_create_internal(
-        driver, identifier, options, instance, physical_device, logical_device,
-        &enabled_device_extensions, &compute_queue_set, &transfer_queue_set,
-        host_allocator, out_device);
+        driver, identifier, enabled_features, options, instance,
+        physical_device, logical_device, &enabled_device_extensions,
+        &compute_queue_set, &transfer_queue_set, host_allocator, out_device);
   }
 
   logical_device->ReleaseReference();
@@ -783,6 +868,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_wrap_device(
   iree_hal_vulkan_device_extensions_t enabled_device_extensions =
       iree_hal_vulkan_infer_enabled_device_extensions(device_syms.get());
 
+  iree_hal_vulkan_features_t enabled_features = 0;
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
   // Wrap the provided VkDevice with a VkDeviceHandle for use within the HAL.
   auto logical_device_handle = new VkDeviceHandle(
       device_syms.get(), enabled_device_extensions,
@@ -791,9 +881,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_wrap_device(
 
   // Allocate and initialize the device.
   iree_status_t status = iree_hal_vulkan_device_create_internal(
-      /*driver=*/NULL, identifier, options, instance, physical_device,
-      logical_device_handle, &enabled_device_extensions, compute_queue_set,
-      transfer_queue_set, host_allocator, out_device);
+      /*driver=*/NULL, identifier, enabled_features, options, instance,
+      physical_device, logical_device_handle, &enabled_device_extensions,
+      compute_queue_set, transfer_queue_set, host_allocator, out_device);
 
   logical_device_handle->ReleaseReference();
   return status;
@@ -851,9 +941,18 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
     command_pool = device->dispatch_command_pool;
   }
 
+  // The tracing context is tied to a particular queue so we must select here
+  // even though ideally we'd do it during submission. This is informational
+  // only and if the user does provide a different queue affinity during
+  // submission it just means the commands will be attributed to the wrong
+  // queue.
+  CommandQueue* queue = iree_hal_vulkan_device_select_queue(
+      device, command_categories, queue_affinity);
+
   return iree_hal_vulkan_direct_command_buffer_allocate(
       device->logical_device, command_pool, mode, command_categories,
-      queue_affinity, device->descriptor_pool_cache, out_command_buffer);
+      queue_affinity, queue->tracing_context(), device->descriptor_pool_cache,
+      out_command_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_device_create_descriptor_set(
@@ -956,13 +1055,6 @@ static iree_status_t iree_hal_vulkan_device_wait_semaphores_with_timeout(
 static iree_status_t iree_hal_vulkan_device_wait_idle_with_deadline(
     iree_hal_device_t* base_device, iree_time_t deadline_ns) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
-    // Fast path for using vkDeviceWaitIdle, which is usually cheaper (as it
-    // requires fewer calls into the driver).
-    return VK_RESULT_TO_STATUS(device->logical_device->syms()->vkDeviceWaitIdle(
-                                   *device->logical_device),
-                               "vkDeviceWaitIdle");
-  }
   for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
     IREE_RETURN_IF_ERROR(device->queues[i]->WaitIdle(deadline_ns));
   }

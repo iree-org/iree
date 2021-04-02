@@ -161,11 +161,10 @@ void PrepareSubmitInfo(absl::Span<const VkSemaphore> wait_semaphore_handles,
 }  // namespace
 
 SerializingCommandQueue::SerializingCommandQueue(
-    VkDeviceHandle* logical_device, std::string name,
+    VkDeviceHandle* logical_device,
     iree_hal_command_category_t supported_categories, VkQueue queue,
     TimePointFencePool* fence_pool)
-    : CommandQueue(logical_device, std::move(name), supported_categories,
-                   queue),
+    : CommandQueue(logical_device, supported_categories, queue),
       fence_pool_(fence_pool) {}
 
 SerializingCommandQueue::~SerializingCommandQueue() = default;
@@ -314,6 +313,8 @@ iree_status_t SerializingCommandQueue::WaitIdle(iree_time_t deadline_ns) {
     }
 
     iree_slim_mutex_unlock(&queue_mutex_);
+
+    iree_hal_vulkan_tracing_context_collect(tracing_context(), VK_NULL_HANDLE);
     return status;
   }
 
