@@ -153,7 +153,7 @@ struct InsertImmutabilityPreservingStreamClones
       if (!tiedOperandIndex.hasValue()) continue;
       auto tiedOperand = tiedOp->getOperand(tiedOperandIndex.getValue());
       if (hasUsersInStreamAfterUpdate(tiedOperand, tiedOp)) {
-        rewriter.setInsertionPointAfterValue(tiedOperand);
+        rewriter.setInsertionPoint(tiedOp);
         auto clonedOperand = rewriter.createOrFold<TensorCloneOp>(
             tiedOperand.getLoc(), tiedOperand);
         SmallPtrSet<Operation *, 1> excludedOps;
