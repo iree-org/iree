@@ -85,7 +85,8 @@ LogicalResult convertOperation(Operation *oldOp,
                                FlowTypeConverter &typeConverter,
                                BlockAndValueMapping &mapping,
                                OpBuilder &builder) {
-  if (llvm::isa<mlir::linalg::LinalgOp>(oldOp)) {
+  if (llvm::isa<mlir::linalg::LinalgOp>(oldOp) ||
+      llvm::isa<mlir::linalg::YieldOp>(oldOp)) {
     // Currently assumes linalg ops have legal types.
     // TODO: rewrite to generic and back.
     builder.clone(*oldOp, mapping);
