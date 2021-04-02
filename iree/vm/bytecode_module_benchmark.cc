@@ -13,9 +13,10 @@
 // limitations under the License.
 
 #include <array>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"

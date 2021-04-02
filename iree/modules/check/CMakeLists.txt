@@ -48,7 +48,6 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
-    absl::inlined_vector
     absl::strings
     half::includes
     iree::base::api

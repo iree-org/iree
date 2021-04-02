@@ -53,7 +53,6 @@ iree_cc_library(
     "string_util.cc"
     "string_util.h"
   DEPS
-    absl::inlined_vector
     absl::span
     absl::strings
     half::includes
@@ -73,7 +72,7 @@ iree_cc_test(
     "string_util_test.cc"
   DEPS
     ::api
-    absl::inlined_vector
+    absl::span
     absl::strings
     iree::base::core_headers
     iree::base::status

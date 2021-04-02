@@ -93,7 +93,6 @@ iree_cc_library(
   SRCS
     "signature_parser.cc"
   DEPS
-    absl::inlined_vector
     absl::optional
     absl::span
     absl::strings

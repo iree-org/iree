@@ -19,7 +19,6 @@
 #include <memory>
 #include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/status.h"
@@ -81,7 +80,7 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "expected rank > 0 buffer view");
     }
-    absl::InlinedVector<int32_t, 6> shape(rank);
+    std::vector<int32_t> shape(rank);
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_shape(tensor.get(), rank, shape.data(), nullptr));
 
@@ -96,8 +95,8 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
     // The python pseudocode for this is:
     // for i in range(t.shape[0]):
     //   list[i] = t[i,...]
-    absl::InlinedVector<int32_t, 6> start_indices(shape.size());
-    absl::InlinedVector<int32_t, 6> lengths = shape;
+    std::vector<int32_t> start_indices(shape.size());
+    std::vector<int32_t> lengths = shape;
     lengths[0] = 1;
     for (int i = 0, e = list_elements; i < e; i++) {
       start_indices[0] = i;
@@ -135,7 +134,7 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
       auto item = GetItem(i).get();
       if (!item) continue;
       size_t element_rank = iree_hal_buffer_view_shape_rank(item);
-      absl::InlinedVector<int32_t, 6> element_shape(element_rank);
+      std::vector<int32_t> element_shape(element_rank);
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(
           item, element_rank, element_shape.data(), nullptr));
       if (absl::MakeSpan(shape) != absl::MakeSpan(element_shape) ||
@@ -167,7 +166,7 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
 
     IREE_RETURN_IF_ERROR(CopyTensorBytes(result_buffer.get()));
 
-    absl::InlinedVector<int32_t, 4> result_shape;
+    std::vector<int32_t> result_shape;
     result_shape.push_back(Size());
     for (int32_t dim : shape) {
       result_shape.push_back(dim);
@@ -194,7 +193,7 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
 
     size_t rank = iree_hal_buffer_view_shape_rank(GetItem(0).get());
     iree_hal_element_type_t type = dtype_;
-    absl::InlinedVector<int32_t, 6> shape(rank);
+    std::vector<int32_t> shape(rank);
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(GetItem(0).get(), rank,
                                                     shape.data(), nullptr));
     const size_t num_rows = num_tensors * shape[0];
@@ -208,7 +207,7 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
                                 i);
       }
 
-      absl::InlinedVector<int32_t, 6> element_shape(element_rank);
+      std::vector<int32_t> element_shape(element_rank);
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(
           GetItem(i).get(), element_rank, element_shape.data(), nullptr));
 
@@ -240,7 +239,7 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
 
     IREE_RETURN_IF_ERROR(CopyTensorBytes(result_buffer.get()));
 
-    absl::InlinedVector<int32_t, 4> result_shape;
+    std::vector<int32_t> result_shape;
     result_shape.push_back(num_rows);
     for (int32_t dim : absl::MakeSpan(shape).subspan(1)) {
       result_shape.push_back(dim);

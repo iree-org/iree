@@ -19,8 +19,8 @@
 #include <cstdio>
 #include <cstring>
 #include <sstream>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
 #include "iree/base/status.h"
@@ -216,12 +216,12 @@ class CheckModuleState final {
     auto* lhs = lhs_ref.get();
     auto* rhs = rhs_ref.get();
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
-    absl::InlinedVector<int32_t, 6> lhs_shape(lhs_rank);
+    std::vector<int32_t> lhs_shape(lhs_rank);
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr));
 
     size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
-    absl::InlinedVector<int32_t, 6> rhs_shape(rhs_rank);
+    std::vector<int32_t> rhs_shape(rhs_rank);
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr));
 
@@ -285,12 +285,12 @@ class CheckModuleState final {
     auto* lhs = lhs_ref.get();
     auto* rhs = rhs_ref.get();
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
-    absl::InlinedVector<int32_t, 6> lhs_shape(lhs_rank);
+    std::vector<int32_t> lhs_shape(lhs_rank);
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr));
 
     size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
-    absl::InlinedVector<int32_t, 6> rhs_shape(rhs_rank);
+    std::vector<int32_t> rhs_shape(rhs_rank);
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr));
 

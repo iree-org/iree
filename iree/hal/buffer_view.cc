@@ -17,8 +17,8 @@
 #include <cctype>
 #include <cinttypes>
 #include <cstdio>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -75,7 +75,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
   }
 
   // AxBxC...
-  absl::InlinedVector<iree_hal_dim_t, 6> shape(6);
+  std::vector<iree_hal_dim_t> shape(6);
   iree_host_size_t shape_rank = 0;
   iree_status_t shape_result =
       iree_hal_parse_shape({shape_str.data(), shape_str.length()}, shape.size(),
