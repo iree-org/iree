@@ -80,9 +80,11 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "expected rank > 0 buffer view");
     }
-    std::vector<int32_t> shape(rank);
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_shape(tensor.get(), rank, shape.data(), nullptr));
+    std::vector<iree_hal_dim_t> shape(rank);
+    if (rank > 0) {
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(tensor.get(), rank,
+                                                      shape.data(), nullptr));
+    }
 
     auto element_type = iree_hal_buffer_view_element_type(tensor.get());
 
@@ -134,9 +136,11 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
       auto item = GetItem(i).get();
       if (!item) continue;
       size_t element_rank = iree_hal_buffer_view_shape_rank(item);
-      std::vector<int32_t> element_shape(element_rank);
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(
-          item, element_rank, element_shape.data(), nullptr));
+      std::vector<iree_hal_dim_t> element_shape(element_rank);
+      if (element_rank > 0) {
+        IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(
+            item, element_rank, element_shape.data(), nullptr));
+      }
       if (absl::MakeSpan(shape) != absl::MakeSpan(element_shape) ||
           iree_hal_buffer_view_element_type(item) != type) {
         return iree_make_status(
@@ -193,9 +197,11 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
 
     size_t rank = iree_hal_buffer_view_shape_rank(GetItem(0).get());
     iree_hal_element_type_t type = dtype_;
-    std::vector<int32_t> shape(rank);
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(GetItem(0).get(), rank,
-                                                    shape.data(), nullptr));
+    std::vector<iree_hal_dim_t> shape(rank);
+    if (rank > 0) {
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(GetItem(0).get(), rank,
+                                                      shape.data(), nullptr));
+    }
     const size_t num_rows = num_tensors * shape[0];
     for (size_t i = 0; i < num_tensors; i++) {
       auto item = GetItem(i).get();
@@ -207,7 +213,7 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
                                 i);
       }
 
-      std::vector<int32_t> element_shape(element_rank);
+      std::vector<iree_hal_dim_t> element_shape(element_rank);
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(
           GetItem(i).get(), element_rank, element_shape.data(), nullptr));
 
@@ -296,7 +302,7 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
   }
 
   std::vector<vm::ref<iree_hal_buffer_view_t>> list_;
-  std::vector<int32_t> shape_;
+  std::vector<iree_hal_dim_t> shape_;
   iree_hal_element_type_t dtype_;
 };
 }  // namespace
@@ -387,7 +393,7 @@ class TensorListModuleState final {
       vm::ref<iree_hal_buffer_view_t> element_shape,
       vm::ref<iree_hal_buffer_view_t> num_elements_buf,
       iree_hal_element_type_t element_type) {
-    IREE_ASSIGN_OR_RETURN(std::vector<int32_t> shape,
+    IREE_ASSIGN_OR_RETURN(std::vector<iree_hal_dim_t> shape,
                           ReadInt32VectorFromBufferView(element_shape.get()));
     TensorList* tensorlist = new TensorList(shape, element_type);
     IREE_ASSIGN_OR_RETURN(int32_t num_elements, ReadInt32FromScalarBufferView(

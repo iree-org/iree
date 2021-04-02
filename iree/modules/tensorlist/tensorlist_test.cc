@@ -131,8 +131,10 @@ class TensorListModulesTest : public ::testing::Test {
 
     std::vector<int32_t> returned_shape(
         iree_hal_buffer_view_shape_rank(returned_buffer_view));
-    iree_hal_buffer_view_shape(returned_buffer_view, returned_shape.size(),
-                               returned_shape.data(), nullptr);
+    if (returned_shape.size() > 0) {
+      iree_hal_buffer_view_shape(returned_buffer_view, returned_shape.size(),
+                                 returned_shape.data(), nullptr);
+    }
 
     EXPECT_EQ(returned_shape, expected_shape);
 
