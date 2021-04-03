@@ -740,6 +740,9 @@ static LogicalResult getPoolingOpLaunchConfig(
                                     config);                            \
   }
 
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxI8Op)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxI16Op)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxI32Op)
 DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxFOp)
 DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMinFOp)
 DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCSumFOp)
