@@ -127,7 +127,7 @@ struct Rfft {
     int element_count = real_src_buffer.size() / 2 + 1;
 
     std::vector<T> complex_output;
-    complex_output.reserve(element_count * 4);
+    complex_output.resize(element_count * 4);
 
     pffft_transform_ordered(fft_state, &real_src_buffer[0], &complex_output[0],
                             NULL, PFFFT_FORWARD);

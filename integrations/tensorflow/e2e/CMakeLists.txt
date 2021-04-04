@@ -53,7 +53,6 @@ iree_e2e_cartesian_product_test_suite(
     "einsum_dynamic_test.py,iree_llvmaot,"
     "einsum_static_test.py,iree_llvmaot,"
     "einsum_vector_test.py,iree_llvmaot,"
-    "fft_test.py,iree_llvmaot,"
     "fill_test.py,iree_llvmaot,"
     "linspace_test.py,iree_llvmaot,"
     "mandelbrot_test.py,iree_llvmaot,"
