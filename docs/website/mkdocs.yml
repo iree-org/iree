@@ -1,0 +1,111 @@
+site_name: IREE
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/ghost
+  favicon: assets/images/favicon.png
+  logo: assets/images/favicon.png
+  custom_dir: overrides
+
+  features:
+    - navigation.instant  # Faster loading
+
+    # TODO(scotttodd): join mkdocs-material insiders for this
+    - navigation.tracking  # Update URL in address bar with the active anchor
+
+    # TODO(scotttodd): decide if we want this
+    #     these move sections from the left nav to tabs below the header
+    # - navigation.tabs
+    # - navigation.tabs.sticky  # insiders only
+
+    # TODO(scotttodd): remove this if the number of pages grows too much
+    - navigation.sections  # Group sections without collapsible buttons
+
+    - navigation.top  # Back to top button
+
+    # Insiders only: navigation indices
+    #     1) supply index.md page under each section
+    #     2) list each index.md page in the `nav:` section below
+    # - navigation.indexes
+
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+
+repo_url: https://github.com/google/iree
+repo_name: google/iree
+edit_uri: ""  # Omit edit button (linking to GitHub) from each document
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/google/iree
+      name: IREE on GitHub
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/26P4xW4
+      name: IREE Discord Server
+    - icon: fontawesome/solid/users
+      link: https://groups.google.com/forum/#!forum/iree-discuss
+      name: IREE Discuss Google Group
+  generator: false  # TODO(scotttodd): join mkdocs-material insiders for this
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+copyright: Copyright &copy; 2021 Google LLC
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - footnotes
+  - meta
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.tabbed
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - toc:
+      permalink: true  # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
+
+# Navigation with explicit ordering and nesting.
+# https://www.mkdocs.org/user-guide/configuration/#nav
+nav:
+  - Home: 'index.md'
+  - 'ML frameworks':
+      - TensorFlow: 'ml-frameworks/tensorflow.md'
+      - TensorFlow Lite: 'ml-frameworks/tensorflow-lite.md'
+      - JAX: 'ml-frameworks/jax.md'
+  - 'Deployment configurations':
+      - CPU - Dylib: 'deployment-configurations/cpu-dylib.md'
+      - GPU - Vulkan: 'deployment-configurations/gpu-vulkan.md'
+  - 'Building from source':
+      # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
+      - 'building-from-source/getting-started.md'
+      - Optional features: 'building-from-source/optional-features.md'
+      - Android cross-compilation: 'building-from-source/android.md'
+  - 'Bindings':
+      - C API: 'bindings/c-api.md'
+      - Python: 'bindings/python.md'
+      - TensorFlow Lite: 'bindings/tensorflow-lite.md'
+  - 'Community':
+      - Projects: 'community/projects.md'
