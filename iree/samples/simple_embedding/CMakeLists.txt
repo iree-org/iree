@@ -8,6 +8,11 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
+if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_VMLA} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 iree_bytecode_module(
