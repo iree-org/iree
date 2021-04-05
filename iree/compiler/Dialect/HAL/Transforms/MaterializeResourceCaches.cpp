@@ -125,8 +125,7 @@ class MaterializeResourceCachesPass
                                       IntegerAttr pushConstantsAttr) {
     // Push constants are optional but we always provide the value.
     if (!pushConstantsAttr) {
-      pushConstantsAttr =
-          IntegerAttr::get(IntegerType::get(loc.getContext(), 32), 0);
+      pushConstantsAttr = IntegerAttr::get(IndexType::get(loc.getContext()), 0);
     }
 
     // We key the layout cache on all attributes that compose an executable

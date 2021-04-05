@@ -16,8 +16,8 @@
 
 #include <sstream>
 #include <string>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/logging.h"

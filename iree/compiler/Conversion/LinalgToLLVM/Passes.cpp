@@ -32,6 +32,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager,
                            LLVMCodegenOptions options) {
   // Distribute linalg op among a 3d grid of parallel threads. Tile each
   // workgroup thread memory then vectorize the linalg op.
+
   if (options.usingLinalgOnTensors) {
     passManager.addPass(createMaterializeCPULaunchConfigurationPass());
   } else {
@@ -39,6 +40,8 @@ void addLinalgToLLVMPasses(OpPassManager &passManager,
   }
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
+
   if (options.useConvImg2Col) {
     // linalg::ConvInputNHWCFilterHWCFOp -> (Img2Col packing + matmul).
     // After convolution is tiled and distributed among workgroups its converted
@@ -80,7 +83,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager,
 
   // HLO -> Linalg on buffers.
   if (options.usingLinalgOnTensors) {
-    nestedModulePM.addPass(createLinalgVectorizePass());
+    nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
     // Use stack allocation on CPU side.
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,

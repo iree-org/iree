@@ -40,7 +40,6 @@ iree_e2e_cartesian_product_test_suite(
     "einsum_dynamic_test.py,iree_vmla,"
     "einsum_static_test.py,iree_vmla,"
     "einsum_vector_test.py,iree_vmla,"
-    "fft_test.py,iree_vmla,"
     "mandelbrot_test.py,iree_vmla,"
     "ring_buffer_test.py,iree_vmla,"
     "strings_test.py,iree_vmla,"

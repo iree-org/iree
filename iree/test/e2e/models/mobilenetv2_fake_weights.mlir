@@ -263,7 +263,8 @@ module  {
   flow.variable @"__iree_flow___sm_node1078__m.layer-152.moving_variance" dense<0.00384615385> : tensor<1280xf32> attributes {noinline, sym_visibility = "private"}
   flow.variable @"__iree_flow___sm_node1091__m.layer-155.kernel" dense<0.00383141753> : tensor<1280x1000xf32> attributes {noinline, sym_visibility = "private"}
   flow.variable @"__iree_flow___sm_node1092__m.layer-155.bias" dense<0.00381679391> : tensor<1000xf32> attributes {noinline, sym_visibility = "private"}
-  func @call(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
+  func @predict() attributes { iree.module.export } {
+    %arg0 = iree.unfoldable_constant dense<1.5> : tensor<1x224x224x3xf32>
     %0 = flow.variable.address @"__iree_flow___sm_node163__m.layer-1.kernel" : !iree.ptr<tensor<3x3x3x32xf32>>
     %1 = flow.variable.address @"__iree_flow___sm_node169__m.layer-2.gamma" : !iree.ptr<tensor<32xf32>>
     %2 = flow.variable.address @"__iree_flow___sm_node170__m.layer-2.beta" : !iree.ptr<tensor<32xf32>>
@@ -986,7 +987,8 @@ module  {
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x1000xf32>, tensor<f32>) -> tensor<1xf32>
     %708 = "mhlo.broadcast_in_dim"(%707) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1xf32>) -> tensor<1x1000xf32>
     %709 = mhlo.divide %706, %708 : tensor<1x1000xf32>
-    return %709 : tensor<1x1000xf32>
+    check.expect_almost_eq_const(%709, dense<0.001> : tensor<1x1000xf32>) : tensor<1x1000xf32>
+    return
   }
 }
 

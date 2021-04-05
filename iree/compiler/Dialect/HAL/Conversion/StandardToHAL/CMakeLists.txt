@@ -16,12 +16,16 @@ iree_cc_library(
   HDRS
     "ConvertStandardToHAL.h"
   SRCS
+    "ConvertConstantOps.cpp"
+    "ConvertShapeOps.cpp"
     "ConvertStandardToHAL.cpp"
     "ConvertStructuralOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRMemRef
     MLIRPass
+    MLIRShape
     MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
@@ -29,6 +33,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )
 

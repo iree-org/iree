@@ -283,7 +283,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
           builder.clone(*oldEntryPointOp.getOperation()));
       clonedEntryPointOp.sym_nameAttr(builder.getStringAttr(newFnName));
       clonedEntryPointOp.ordinalAttr(
-          builder.getI32IntegerAttr(static_cast<int32_t>(entryPoints.size())));
+          builder.getIndexAttr(static_cast<int32_t>(entryPoints.size())));
       entryPoints.push_back(builder.getSymbolRefAttr(clonedEntryPointOp));
     }
 

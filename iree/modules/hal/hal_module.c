@@ -324,21 +324,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan, rii, r) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_fill, riii, v) {
-  // DEPRECATED: will be removed in future versions. Use command buffers.
-  iree_hal_buffer_t* target_buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &target_buffer));
-  iree_vm_size_t target_offset = (iree_vm_size_t)args->i1;
-  iree_vm_size_t length = (iree_vm_size_t)args->i2;
-  uint32_t pattern = (uint32_t)args->i3;
-
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_fill(target_buffer, target_offset,
-                                            length, &pattern, sizeof(pattern)),
-                       "fill range failed (target_offset=%d, length=%d)",
-                       target_offset, length);
-  return iree_ok_status();
-}
-
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_load, rii, i) {
   iree_hal_buffer_t* source_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &source_buffer));
@@ -498,7 +483,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create, rii, r) {
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
-      device, modes, command_categories, &command_buffer));
+      device, modes, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
   rets->r0 = iree_hal_command_buffer_move_ref(command_buffer);
   return iree_ok_status();
 }

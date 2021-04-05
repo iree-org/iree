@@ -30,8 +30,6 @@
 #include "iree/vm/ref_cc.h"
 
 // Other dependencies (helpers, etc.)
-#include "absl/base/macros.h"
-#include "absl/types/span.h"
 #include "iree/base/internal/main.h"
 #include "iree/base/logging.h"
 

@@ -55,17 +55,6 @@ vm.import @buffer.subspan(
   %length : i32
 ) -> !vm.ref<!hal.buffer>
 
-// DEPRECATED: this will be removed in future versions and replaced with
-// transfer queue operations by the compiler.
-//
-// Fills the target buffer with the given repeating value.
-vm.import @buffer.fill(
-  %target_buffer : !vm.ref<!hal.buffer>,
-  %target_offset : i32,
-  %length : i32,
-  %pattern : i32
-)
-
 // Loads a value from a buffer by mapping it.
 vm.import @buffer.load(
   %source_buffer : !vm.ref<!hal.buffer>,

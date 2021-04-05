@@ -28,7 +28,6 @@ iree_lit_test_suite(
     test-simple-jit
     test-simple-jit-vulkan
     test-simple-mlir
-    test-vec-to-gpu
     test-vector-transfers-jit
     iree::tools::IreeFileCheck
 )
@@ -112,38 +111,6 @@ iree_cc_binary(
     MLIRSPIRV
     experimental::ModelBuilder
     experimental::ModelBuilder::ModelRunner
-    vulkan-runtime-wrappers
-)
-
-iree_cc_binary(
-  NAME
-    test-vec-to-gpu
-  OUT
-    test-vec-to-gpu
-  SRCS
-    "TestVectorToGPU.cpp"
-  DEPS
-    LLVMSupport
-    MLIRExecutionEngine
-    MLIRGPU
-    MLIRGPUToVulkanTransforms
-    MLIRIR
-    MLIRLinalg
-    MLIRLinalgToLLVM
-    MLIRLinalgTransforms
-    MLIRParser
-    MLIRPass
-    MLIRSPIRV
-    MLIRStandardToLLVM
-    MLIRStandardToSPIRV
-    MLIRTransformUtils
-    MLIRVector
-    experimental::ModelBuilder
-    experimental::ModelBuilder::ModelRunner
-    experimental::ModelBuilder::VulkanLaunchWrapper
-    iree::compiler::Conversion::CodegenUtils
-    iree::compiler::Conversion::LinalgToSPIRV
-    iree::tools::init_mlir_passes_and_dialects
     vulkan-runtime-wrappers
 )
 

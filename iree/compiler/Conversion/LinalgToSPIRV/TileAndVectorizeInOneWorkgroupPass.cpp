@@ -412,7 +412,8 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
     SmallVector<Operation *, 4> tiledLoops;
 
     if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) {
-      return signalPassFailure();
+      // Nothing to do here.
+      continue;
     }
 
     linalg::Aliases aliases;
@@ -420,8 +421,8 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
     Optional<LaunchConfig> launchConfigOpt =
         initGPULaunchConfig(context, dependenceGraph, options, linalgOps);
     if (!launchConfigOpt) {
-      funcOp.emitError("unable to find launch configuration");
-      return signalPassFailure();
+      // No configuration to tile and vectorize. Nothing to do here.
+      continue;
     }
     LaunchConfig &launchConfig = *launchConfigOpt;
 

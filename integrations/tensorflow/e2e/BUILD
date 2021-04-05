@@ -109,7 +109,6 @@ VMLA_FAILING = [
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",
-    "fft_test.py",  # TODO(natashaknk): Get diffs within tolerance
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",

@@ -41,9 +41,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "@com_google_absl//absl/algorithm",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/types:span",
         "@com_google_ruy//ruy",
         "@com_google_ruy//ruy:context",
@@ -59,7 +57,6 @@ cc_test(
         "//iree/base:core_headers",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 

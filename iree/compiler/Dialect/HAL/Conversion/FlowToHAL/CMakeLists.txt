@@ -17,7 +17,6 @@ iree_cc_library(
     "ConvertFlowToHAL.h"
   SRCS
     "ConvertFlowToHAL.cpp"
-    "ConvertShapeQueryOps.cpp"
     "ConvertStreamOps.cpp"
     "ConvertTensorOps.cpp"
     "ConvertVariableOps.cpp"

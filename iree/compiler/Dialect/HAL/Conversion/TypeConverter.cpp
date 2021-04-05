@@ -14,7 +14,9 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 
 namespace mlir {
@@ -23,6 +25,7 @@ namespace iree_compiler {
 HALTypeConverter::HALTypeConverter(
     ArrayRef<const HALConversionDialectInterface *> conversionInterfaces)
     : conversionInterfaces(conversionInterfaces.vec()) {
+  // Custom conversion interfaces for external dialects.
   addConversion([this](Type type, SmallVectorImpl<Type> &results) {
     for (auto *conversionInterface : this->conversionInterfaces) {
       if (succeeded(conversionInterface->convertType(type, results))) {
@@ -32,18 +35,22 @@ HALTypeConverter::HALTypeConverter(
     results.push_back(type);
     return success();
   });
+
+  // Tensors become buffers by default.
+  // TODO(benvanik): make them buffer views instead? then they carry shape but
+  // are memory type erased which is not good.
   addConversion([](TensorType type) -> Optional<Type> {
     // HAL only should be concerned with numeric values.
-    if (HALTypeConverter::shouldConvertToHalBuffer(type)) {
+    if (HALTypeConverter::shouldConvertToBuffer(type)) {
       // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
       return IREE::HAL::BufferType::get(type.getContext());
     }
-
     return llvm::None;
   });
+
+  // Recursively handle pointer target types (we want to convert
+  // ptr<tensor<...>> to ptr<!hal.buffer<...>>, for example).
   addConversion([this](IREE::PtrType type) -> Type {
-    // Recursively handle pointer target types (we want to convert ptr<index> to
-    // ptr<i32>, for example).
     auto targetType = convertType(type.getTargetType());
     if (!targetType) {
       return Type();

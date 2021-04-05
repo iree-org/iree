@@ -38,6 +38,16 @@ func @concat(%arg0: tensor<?xf32>, %element_shape: tensor<0xi32>, %lead: tensor<
   return %t#0, %t#1 : tensor<?xf32>, tensor<0xi64>
 }
 
+// CHECK-LABEL: func @identity
+func @identity(%arg0: tensor<?xf32>, %element_shape: tensor<0xi32>, %lead: tensor<i64>) -> (tensor<?xf32>, tensor<0xi64>) {
+  // CHECK-NOT: tf.Identity
+  // CHECK: return
+
+  %list0 = "tf.TensorListFromTensor"(%arg0, %element_shape) : (tensor<?xf32>, tensor<0xi32>) -> tensor<!tf.variant<tensor<f32>>>
+  %ident = "tf.Identity"(%list0) : (tensor<!tf.variant<tensor<f32>>>) -> tensor<!tf.variant<tensor<f32>>>
+  %t:2 = "tf.TensorListConcatV2"(%ident, %element_shape, %lead) : (tensor<!tf.variant<tensor<f32>>>, tensor<0xi32>, tensor<i64>) -> (tensor<?xf32>, tensor<0xi64>)
+  return %t#0, %t#1 : tensor<?xf32>, tensor<0xi64>
+}
 
 // CHECK-LABEL: func @control_flow_simple
 func @control_flow_simple(%arg0: tensor<f32>, %num_elements: tensor<i32>, %element_shape: tensor<0xi32>, %index: tensor<i32>, %item: tensor<f32>) {

@@ -27,6 +27,7 @@ cc_library(
         "LowerGlobalTensors.cpp",
         "Passes.cpp",
         "PropagateResourceCasts.cpp",
+        "StripAsserts.cpp",
         "StripMetadata.cpp",
         "VerifyFullyConverted.cpp",
     ],

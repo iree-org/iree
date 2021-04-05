@@ -9,7 +9,7 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @matmul_128x128x128 attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:128x128xf32>, !flow.dispatch.tensor<readonly:128x128xf32>,
         !flow.dispatch.tensor<writeonly:128x128xf32>) -> ()}
     module {
@@ -90,7 +90,7 @@ hal.executable @dynamic_matmul_i8_i8_i32 attributes {sym_visibility = "private"}
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @matmul_i8_i8_i32_128x128x128 attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:128x128xi8>, !flow.dispatch.tensor<readonly:128x128xi8>,
         !flow.dispatch.tensor<writeonly:128x128xi32>) -> ()}
     module {

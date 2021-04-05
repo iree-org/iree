@@ -14,8 +14,8 @@
 
 // Tests that our bytecode module can call through into our native module.
 
-#include "absl/base/macros.h"
-#include "absl/container/inlined_vector.h"
+#include <vector>
+
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
@@ -129,10 +129,12 @@ class TensorListModulesTest : public ::testing::Test {
         reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
             outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
 
-    absl::InlinedVector<int32_t, 5> returned_shape(
+    std::vector<int32_t> returned_shape(
         iree_hal_buffer_view_shape_rank(returned_buffer_view));
-    iree_hal_buffer_view_shape(returned_buffer_view, returned_shape.size(),
-                               returned_shape.data(), nullptr);
+    if (returned_shape.size() > 0) {
+      iree_hal_buffer_view_shape(returned_buffer_view, returned_shape.size(),
+                                 returned_shape.data(), nullptr);
+    }
 
     EXPECT_EQ(returned_shape, expected_shape);
 
@@ -203,33 +205,33 @@ TEST_F(TensorListModulesTest, IdentityThroughSetItemGetItem2D) {
 TEST_F(TensorListModulesTest, IdentityThroughConcat) {
   // Allocate the buffer we'll be passing through.
   std::vector<float> input = {42.0f, 43.0f, 44.0f, 45.0f};
-  absl::InlinedVector<int32_t, 4> input_shape = {4, 1};
-  absl::InlinedVector<int32_t, 4> expected_shape = {4};
+  std::vector<int32_t> input_shape = {4, 1};
+  std::vector<int32_t> expected_shape = {4};
   Invoke("identity_through_concat", input, input_shape, input, expected_shape);
 }
 
 TEST_F(TensorListModulesTest, ConcatAppendsEmpty) {
   // Allocate the buffer we'll be passing through.
   std::vector<float> input = {42.0f};
-  absl::InlinedVector<int32_t, 4> input_shape = {1};
+  std::vector<int32_t> input_shape = {1};
   std::vector<float> expected = {42.0f, 0.0f};
-  absl::InlinedVector<int32_t, 4> expected_shape = {2};
+  std::vector<int32_t> expected_shape = {2};
   Invoke("concat_appends_empty", input, input_shape, expected, expected_shape);
 }
 
 TEST_F(TensorListModulesTest, IdentityThroughStack) {
   // Allocate the buffer we'll be passing through.
   std::vector<float> input = {42.0f, 43.0f};
-  absl::InlinedVector<int32_t, 4> input_shape = {2, 1};
+  std::vector<int32_t> input_shape = {2, 1};
   Invoke("identity_through_stack", input, input_shape, input, input_shape);
 }
 
 TEST_F(TensorListModulesTest, StackAppendsEmpty) {
   // Allocate the buffer we'll be passing through.
   std::vector<float> input = {42.0f};
-  absl::InlinedVector<int32_t, 4> input_shape = {};
+  std::vector<int32_t> input_shape = {};
   std::vector<float> expected = {42.0f, 0.0f};
-  absl::InlinedVector<int32_t, 4> expected_shape = {2};
+  std::vector<int32_t> expected_shape = {2};
   Invoke("stack_appends_empty", input, input_shape, expected, expected_shape);
 }
 

@@ -91,7 +91,8 @@ struct InterfaceLoadTensorOpConversion
     IREE::HAL::InterfaceLoadTensorOp::Adaptor newOperands(operands);
     auto bufferOp = rewriter.create<IREE::VMLA::InterfaceBindingOp>(
         loadOp.getLoc(), IREE::VMLA::BufferType::get(loadOp.getContext()),
-        interfaceArg, bindingOp.set(), bindingOp.binding());
+        interfaceArg, bindingOp.set().getZExtValue(),
+        bindingOp.binding().getZExtValue());
     auto byteLengthValue = VMLAConversionTarget::getBufferLength(
         loadOp.getLoc(), loadOp.result(), typeConverter, rewriter);
     if (!byteLengthValue) return failure();
@@ -123,7 +124,8 @@ struct InterfaceStoreTensorOpConversion
     IREE::HAL::InterfaceStoreTensorOp::Adaptor newOperands(operands);
     auto bufferOp = rewriter.create<IREE::VMLA::InterfaceBindingOp>(
         storeOp.getLoc(), IREE::VMLA::BufferType::get(storeOp.getContext()),
-        interfaceArg, bindingOp.set(), bindingOp.binding());
+        interfaceArg, bindingOp.set().getZExtValue(),
+        bindingOp.binding().getZExtValue());
 
     auto zeroValue =
         rewriter.createOrFold<mlir::ConstantIndexOp>(storeOp.getLoc(), 0);

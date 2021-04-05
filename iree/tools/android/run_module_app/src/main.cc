@@ -131,7 +131,7 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   std::vector<RawSignatureParser::Description> input_descs;
   IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
 
-  absl::InlinedVector<absl::string_view, 4> input_views(
+  std::vector<absl::string_view> input_views(
       absl::StrSplit(invocation.inputs, '\n', absl::SkipEmpty()));
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(ParseToVariantList(

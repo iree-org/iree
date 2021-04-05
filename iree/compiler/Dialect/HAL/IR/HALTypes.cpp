@@ -15,6 +15,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -57,6 +59,243 @@ static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
   attr = AttrType::get(parser.getBuilder().getContext(), symbolized.getValue());
   return success();
 }
+
+template <typename AttrType>
+static LogicalResult parseOptionalEnumAttr(DialectAsmParser &parser,
+                                           StringRef attrName, AttrType &attr) {
+  if (succeeded(parser.parseOptionalQuestion())) {
+    // Special case `?` to indicate any/none/undefined/etc.
+    attr = AttrType::get(parser.getBuilder().getContext(), 0);
+    return success();
+  }
+  return parseEnumAttr<AttrType>(parser, attrName, attr);
+}
+
+static LogicalResult parseMemoryType(DialectAsmParser &parser,
+                                     Attribute &attr) {
+  if (succeeded(parser.parseOptionalQuestion())) {
+    attr = parser.getBuilder().getI32IntegerAttr(0);
+    return success();
+  }
+
+  StringRef fullString;
+  if (succeeded(parser.parseOptionalString(&fullString))) {
+    auto symbolized = symbolizeEnum<MemoryTypeBitfield>(fullString);
+    if (!symbolized.hasValue()) {
+      return parser.emitError(parser.getCurrentLocation())
+             << "failed to parse memory type enum value";
+    }
+    attr = parser.getBuilder().getI32IntegerAttr(
+        static_cast<int32_t>(symbolized.getValue()));
+    return success();
+  }
+
+  StringRef shortString;
+  if (failed(parser.parseKeyword(&shortString))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "failed to find memory type short string";
+  }
+  MemoryTypeBitfield memoryType = MemoryTypeBitfield::None;
+  for (char c : shortString) {
+    switch (c) {
+      case 'T':
+        memoryType = memoryType | MemoryTypeBitfield::Transient;
+        break;
+      case 'h':
+        memoryType = memoryType | MemoryTypeBitfield::HostVisible;
+        break;
+      case 'H':
+        memoryType = memoryType | MemoryTypeBitfield::HostLocal;
+        break;
+      case 'c':
+        memoryType = memoryType | MemoryTypeBitfield::HostCoherent;
+        break;
+      case 'C':
+        memoryType = memoryType | MemoryTypeBitfield::HostCached;
+        break;
+      case 'd':
+        memoryType = memoryType | MemoryTypeBitfield::DeviceVisible;
+        break;
+      case 'D':
+        memoryType = memoryType | MemoryTypeBitfield::DeviceLocal;
+        break;
+      default:
+        return parser.emitError(parser.getCurrentLocation())
+               << "unknown memory type short-form char: " << c;
+    }
+  }
+  attr =
+      parser.getBuilder().getI32IntegerAttr(static_cast<int32_t>(memoryType));
+  return success();
+}
+
+static void printMemoryType(DialectAsmPrinter &printer,
+                            MemoryTypeBitfield memoryType) {
+  if (memoryType == MemoryTypeBitfield::None) {
+    printer << '?';
+    return;
+  }
+  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::Transient)) {
+    printer << 't';
+  }
+  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostLocal)) {
+    printer << 'H';
+  } else if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostVisible)) {
+    printer << 'h';
+  }
+  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostCoherent)) {
+    printer << 'c';
+  }
+  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostCached)) {
+    printer << 'C';
+  }
+  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::DeviceLocal)) {
+    printer << 'D';
+  } else if (allEnumBitsSet(memoryType, MemoryTypeBitfield::DeviceVisible)) {
+    printer << 'd';
+  }
+}
+
+static LogicalResult parseMemoryAccess(DialectAsmParser &parser,
+                                       Attribute &attr) {
+  if (succeeded(parser.parseOptionalQuestion())) {
+    attr = parser.getBuilder().getI32IntegerAttr(0);
+    return success();
+  }
+
+  StringRef fullString;
+  if (succeeded(parser.parseOptionalString(&fullString))) {
+    auto symbolized = symbolizeEnum<MemoryAccessBitfield>(fullString);
+    if (!symbolized.hasValue()) {
+      return parser.emitError(parser.getCurrentLocation())
+             << "failed to parse memory access enum value";
+    }
+    attr = parser.getBuilder().getI32IntegerAttr(
+        static_cast<int32_t>(symbolized.getValue()));
+    return success();
+  }
+
+  StringRef shortString;
+  if (failed(parser.parseKeyword(&shortString))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "failed to find memory access short string";
+  }
+  MemoryAccessBitfield memoryAccess = MemoryAccessBitfield::None;
+  for (char c : shortString) {
+    switch (c) {
+      case 'R':
+        memoryAccess = memoryAccess | MemoryAccessBitfield::Read;
+        break;
+      case 'W':
+        memoryAccess = memoryAccess | MemoryAccessBitfield::Write;
+        break;
+      case 'D':
+        memoryAccess = memoryAccess | MemoryAccessBitfield::Discard;
+        break;
+      case 'A':
+        memoryAccess = memoryAccess | MemoryAccessBitfield::MayAlias;
+        break;
+      default:
+        return parser.emitError(parser.getCurrentLocation())
+               << "unknown memory access short-form char: " << c;
+    }
+  }
+  attr =
+      parser.getBuilder().getI32IntegerAttr(static_cast<int32_t>(memoryAccess));
+  return success();
+}
+
+static void printMemoryAccess(DialectAsmPrinter &printer,
+                              MemoryAccessBitfield memoryAccess) {
+  if (memoryAccess == MemoryAccessBitfield::None) {
+    printer << '?';
+    return;
+  }
+  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Read)) {
+    printer << 'R';
+  }
+  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Discard)) {
+    printer << 'D';
+  }
+  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Write)) {
+    printer << 'W';
+  }
+  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::MayAlias)) {
+    printer << 'A';
+  }
+}
+
+static LogicalResult parseBufferUsage(DialectAsmParser &parser,
+                                      Attribute &attr) {
+  if (succeeded(parser.parseOptionalQuestion())) {
+    attr = parser.getBuilder().getI32IntegerAttr(0);
+    return success();
+  }
+
+  StringRef fullString;
+  if (succeeded(parser.parseOptionalString(&fullString))) {
+    auto symbolized = symbolizeEnum<BufferUsageBitfield>(fullString);
+    if (!symbolized.hasValue()) {
+      return parser.emitError(parser.getCurrentLocation())
+             << "failed to parse buffer usage enum value";
+    }
+    attr = parser.getBuilder().getI32IntegerAttr(
+        static_cast<int32_t>(symbolized.getValue()));
+    return success();
+  }
+
+  StringRef shortString;
+  if (failed(parser.parseKeyword(&shortString))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "failed to find buffer usage short string";
+  }
+  BufferUsageBitfield usage = BufferUsageBitfield::None;
+  for (char c : shortString) {
+    switch (c) {
+      case 'C':
+        usage = usage | BufferUsageBitfield::Constant;
+        break;
+      case 'T':
+        usage = usage | BufferUsageBitfield::Transfer;
+        break;
+      case 'M':
+        usage = usage | BufferUsageBitfield::Mapping;
+        break;
+      case 'D':
+        usage = usage | BufferUsageBitfield::Dispatch;
+        break;
+      default:
+        return parser.emitError(parser.getCurrentLocation())
+               << "unknown buffer usage short-form char: " << c;
+    }
+  }
+  attr = parser.getBuilder().getI32IntegerAttr(static_cast<int32_t>(usage));
+  return success();
+}
+
+static void printBufferUsage(DialectAsmPrinter &printer,
+                             BufferUsageBitfield usage) {
+  if (usage == BufferUsageBitfield::None) {
+    printer << '?';
+    return;
+  }
+  if (allEnumBitsSet(usage, BufferUsageBitfield::Constant)) {
+    printer << 'C';
+  }
+  if (allEnumBitsSet(usage, BufferUsageBitfield::Transfer)) {
+    printer << 'T';
+  }
+  if (allEnumBitsSet(usage, BufferUsageBitfield::Mapping)) {
+    printer << 'M';
+  }
+  if (allEnumBitsSet(usage, BufferUsageBitfield::Dispatch)) {
+    printer << 'D';
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Element types
+//===----------------------------------------------------------------------===//
 
 // Keep these in sync with iree/hal/api.h
 namespace {
@@ -124,6 +363,53 @@ Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
       builder.createOrFold<SubIOp>(
           loc, builder.createOrFold<AddIOp>(loc, bitCount, c8), c1),
       c8);
+}
+
+//===----------------------------------------------------------------------===//
+// Size-aware type utils
+//===----------------------------------------------------------------------===//
+
+// Returns the SSA value containing the size of the given |value|.
+static Value lookupValueSize(Value value) {
+  assert(value.getType().isa<SizeAwareTypeInterface>());
+
+  auto definingOp = value.getDefiningOp();
+  if (!definingOp) {
+    return {};  // Not yet implemented.
+  }
+
+  // Skip do-not-optimize ops.
+  if (auto dnoOp = dyn_cast<IREE::DoNotOptimizeOp>(definingOp)) {
+    return lookupValueSize(dnoOp.getOperand(0));
+  }
+
+  // Query size from the size-aware op that defined the value, as it knows how
+  // to get/build the right value.
+  unsigned resultIndex = -1;
+  for (unsigned i = 0; i < definingOp->getNumResults(); ++i) {
+    if (definingOp->getResult(i) == value) {
+      resultIndex = i;
+      break;
+    }
+  }
+  assert(resultIndex != -1 && "result not in results");
+  auto sizeAwareOp = dyn_cast<SizeAwareOpInterface>(definingOp);
+  if (!sizeAwareOp) return {};
+  return sizeAwareOp.getResultSize(resultIndex);
+}
+
+//===----------------------------------------------------------------------===//
+// Object types
+//===----------------------------------------------------------------------===//
+
+Value BufferType::inferSizeFromValue(Location loc, Value value,
+                                     OpBuilder &builder) const {
+  return builder.createOrFold<BufferLengthOp>(loc, builder.getIndexType(),
+                                              value);
+}
+Value BufferViewType::inferSizeFromValue(Location loc, Value value,
+                                         OpBuilder &builder) const {
+  return builder.createOrFold<BufferViewByteLengthOp>(loc, value);
 }
 
 //===----------------------------------------------------------------------===//
@@ -310,8 +596,7 @@ Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
   if (failed(p.parseLess()) ||
       failed(p.parseAttribute(bindingAttr, b.getIntegerType(32))) ||
       failed(p.parseComma()) || failed(parseEnumAttr(p, "type", typeAttr)) ||
-      failed(p.parseComma()) ||
-      failed(parseEnumAttr(p, "access", accessAttr)) ||
+      failed(p.parseComma()) || failed(parseMemoryAccess(p, accessAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
@@ -323,7 +608,7 @@ void DescriptorSetLayoutBindingAttr::print(DialectAsmPrinter &p) const {
   os << getKindName() << "<";
   os << binding() << ", ";
   os << "\"" << stringifyDescriptorType(type()) << "\", ";
-  os << "\"" << stringifyMemoryAccessBitfield(access()) << "\"";
+  printMemoryAccess(p, access());
   os << ">";
 }
 
@@ -420,7 +705,8 @@ void DeviceMatchMemoryModelAttr::print(DialectAsmPrinter &p) const {
   os << "\">";
 }
 
-#include "iree/compiler/Dialect/HAL/IR/HALOpInterface.cpp.inc"
+#include "iree/compiler/Dialect/HAL/IR/HALOpInterfaces.cpp.inc"
+#include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
   addAttributes<BufferConstraintsAttr, ByteRangeAttr,

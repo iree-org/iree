@@ -64,6 +64,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerExportedFunctionsPass();
 // Push resource casts forward to better propagate resource related shapes.
 std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCastsPass();
 
+// Strips tf.Assert ops.
+std::unique_ptr<OperationPass<FuncOp>> createStripAssertsPass();
+
 // Strips all TF-related attributes; none are needed by IREE.
 std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass();
 std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass();
@@ -86,6 +89,7 @@ inline void registerAllPasses() {
   createLowerGlobalTensorsPass();
   createLowerExportedFunctionsPass();
   createPropagateResourceCastsPass();
+  createStripAssertsPass();
   createStripModuleMetadataPass();
   createStripFunctionMetadataPass();
   createVerifyFullyConvertedPass();

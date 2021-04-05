@@ -56,6 +56,3 @@
 [submodule "third_party/mlir-hlo"]
 	path = third_party/mlir-hlo
 	url = https://github.com/tensorflow/mlir-hlo.git
-[submodule "third_party/wasm-micro-runtime"]
-	path = third_party/wasm-micro-runtime
-	url = https://github.com/bytecodealliance/wasm-micro-runtime.git

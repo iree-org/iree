@@ -67,6 +67,14 @@ class WasmLinkerTool : public LinkerTool {
       // -ffreestanding-like behavior.
       func.addFnAttr("no-builtins");
     }
+
+    // https://lld.llvm.org/WebAssembly.html#exports
+    // Note: once we can set --shared this shouldn't be needed, since we set
+    // default visibility on exported functions.
+    for (auto func : exportedFuncs) {
+      func->addFnAttr("wasm-export-name", func->getName());
+    }
+
     return success();
   }
 
@@ -96,6 +104,10 @@ class WasmLinkerTool : public LinkerTool {
 
         // Treat warnings as errors.
         "--fatal-warnings",
+
+        // Generated a shared object, not an executable.
+        // Note: disabled since creating shared libraries is not yet supported.
+        // "--shared",
 
         "-o " + artifacts.libraryFile.path,
     };

@@ -37,12 +37,11 @@ namespace {
 // |wait_semaphores| and |signal_semaphores| will be filled with the binary
 // `VkSemaphores` on success.
 iree_status_t TryToPrepareSemaphores(
-    const absl::InlinedVector<SemaphoreValue, 4>& batch_wait_semaphores,
-    const absl::InlinedVector<SemaphoreValue, 4>& batch_signal_semaphores,
+    const std::vector<SemaphoreValue>& batch_wait_semaphores,
+    const std::vector<SemaphoreValue>& batch_signal_semaphores,
     const ref_ptr<TimePointFence>& batch_fence,
-    absl::InlinedVector<VkSemaphore, 4>* wait_semaphores,
-    absl::InlinedVector<VkSemaphore, 4>* signal_semaphores,
-    bool* out_ready_to_submit) {
+    std::vector<VkSemaphore>* wait_semaphores,
+    std::vector<VkSemaphore>* signal_semaphores, bool* out_ready_to_submit) {
   IREE_TRACE_SCOPE0("TryToPrepareSemaphores");
   *out_ready_to_submit = false;
 
@@ -127,7 +126,7 @@ void PrepareSubmitInfo(absl::Span<const VkSemaphore> wait_semaphore_handles,
   // args are mutated in-place after this function is called so we can't
   // reference them here. If we were going to preserve this code post-Vulkan 1.2
   // then we'd really want to rework all of this to properly use the arena from
-  // the start instead of all this InlinedVector tomfoolery.
+  // the start instead of all this span tomfoolery.
   auto wait_semaphores =
       arena->AllocateSpan<VkSemaphore>(wait_semaphore_handles.size());
   for (size_t i = 0, e = wait_semaphore_handles.size(); i < e; ++i) {
@@ -161,11 +160,10 @@ void PrepareSubmitInfo(absl::Span<const VkSemaphore> wait_semaphore_handles,
 }  // namespace
 
 SerializingCommandQueue::SerializingCommandQueue(
-    VkDeviceHandle* logical_device, std::string name,
+    VkDeviceHandle* logical_device,
     iree_hal_command_category_t supported_categories, VkQueue queue,
     TimePointFencePool* fence_pool)
-    : CommandQueue(logical_device, std::move(name), supported_categories,
-                   queue),
+    : CommandQueue(logical_device, supported_categories, queue),
       fence_pool_(fence_pool) {}
 
 SerializingCommandQueue::~SerializingCommandQueue() = default;
@@ -238,14 +236,14 @@ iree_status_t SerializingCommandQueue::TryProcessDeferredSubmissions(
   if (out_work_submitted) *out_work_submitted = false;
 
   Arena arena(4 * 1024);
-  absl::InlinedVector<VkSubmitInfo, 4> submit_infos;
-  absl::InlinedVector<VkFence, 4> submit_fences;
+  std::vector<VkSubmitInfo> submit_infos;
+  std::vector<VkFence> submit_fences;
   while (!deferred_submissions_.empty()) {
     FencedSubmission* submission = deferred_submissions_.front();
     ref_ptr<TimePointFence>& fence = submission->fence;
 
-    absl::InlinedVector<VkSemaphore, 4> wait_semaphores;
-    absl::InlinedVector<VkSemaphore, 4> signal_semaphores;
+    std::vector<VkSemaphore> wait_semaphores;
+    std::vector<VkSemaphore> signal_semaphores;
     bool ready_to_submit = false;
     IREE_RETURN_IF_ERROR(TryToPrepareSemaphores(
         submission->wait_semaphores, submission->signal_semaphores, fence,
@@ -314,6 +312,8 @@ iree_status_t SerializingCommandQueue::WaitIdle(iree_time_t deadline_ns) {
     }
 
     iree_slim_mutex_unlock(&queue_mutex_);
+
+    iree_hal_vulkan_tracing_context_collect(tracing_context(), VK_NULL_HANDLE);
     return status;
   }
 
@@ -324,7 +324,7 @@ iree_status_t SerializingCommandQueue::WaitIdle(iree_time_t deadline_ns) {
   do {
     status = ProcessDeferredSubmissions();
     bool has_deferred_submissions = !deferred_submissions_.empty();
-    absl::InlinedVector<VkFence, 8> fence_handles(pending_fences_.size());
+    std::vector<VkFence> fence_handles(pending_fences_.size());
     for (size_t i = 0; i < pending_fences_.size(); ++i) {
       fence_handles[i] = pending_fences_[i]->value();
     }
@@ -388,7 +388,7 @@ void SerializingCommandQueue::AbortQueueSubmission() {
   // yet so we don't need to reset.
   deferred_submissions_.clear();
 
-  absl::InlinedVector<VkFence, 8> fence_handles(pending_fences_.size());
+  std::vector<VkFence> fence_handles(pending_fences_.size());
   for (size_t i = 0; i < pending_fences_.size(); ++i) {
     fence_handles[i] = pending_fences_[i]->value();
   }

@@ -32,8 +32,8 @@ func @SetItem(%list: !tensorlist.list, %index: !hal.buffer_view, %item: !hal.buf
 
 // CHECK-LABEL: @Stack
 func @Stack(%list: !tensorlist.list, %num_elements: !hal.buffer_view) -> !hal.buffer_view {
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   // CHECK: vm.call @tensorlist.stack
   %0 = "tensorlist.Stack"(%allocator, %list, %num_elements) : (!hal.allocator, !tensorlist.list, !hal.buffer_view) -> !hal.buffer_view
   return %0 : !hal.buffer_view
@@ -43,8 +43,8 @@ func @Stack(%list: !tensorlist.list, %num_elements: !hal.buffer_view) -> !hal.bu
 
 // CHECK-LABEL: @Concat
 func @Concat(%list: !tensorlist.list) -> !hal.buffer_view {
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   // CHECK: vm.call @tensorlist.concat
   %0 = "tensorlist.Concat"(%allocator, %list) : (!hal.allocator, !tensorlist.list) -> !hal.buffer_view
   return %0 : !hal.buffer_view

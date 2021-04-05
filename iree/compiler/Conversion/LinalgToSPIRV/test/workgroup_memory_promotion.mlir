@@ -9,7 +9,7 @@ hal.executable @matmul_tile attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_tile attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
         !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
@@ -67,7 +67,7 @@ hal.executable @conv_no_padding_tile attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding_tile attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x15x14x6xf32>,
         !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {

@@ -8,7 +8,7 @@ hal.executable @exe {
   hal.executable.target @target, filter="target" {
     hal.executable.entry_point @entry attributes {
       interface = @interface,
-      ordinal = 0 : i32,
+      ordinal = 0 : index,
       signature = (tensor<4xf32>) -> tensor<4xf32>,
       workgroup_size = [32 : index, 4 : index, 8 : index]
     }

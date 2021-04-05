@@ -61,6 +61,8 @@ iree_cc_library(
     "status_util.h"
     "timepoint_util.cc"
     "timepoint_util.h"
+    "tracing.cc"
+    "tracing.h"
     "vma_allocator.cc"
     "vma_allocator.h"
     "vma_buffer.cc"
@@ -71,12 +73,9 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     Vulkan::Headers
-    absl::core_headers
     absl::flat_hash_map
-    absl::inlined_vector
     absl::span
     absl::strings
-    absl::synchronization
     iree::base::api
     iree::base::core_headers
     iree::base::flatcc

@@ -72,6 +72,8 @@ iree_status_t iree_hal_vulkan_vma_buffer_wrap(
     //     VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT flag.
     vmaSetAllocationUserData(buffer->vma, buffer->allocation, buffer);
 
+    IREE_TRACE_ALLOC_NAMED("VMA", (void*)buffer->handle, byte_length);
+
     *out_buffer = &buffer->base;
   } else {
     vmaDestroyBuffer(vma, handle, allocation);
@@ -87,6 +89,8 @@ static void iree_hal_vulkan_vma_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_TRACE_FREE_NAMED("VMA", (void*)buffer->handle);
 
   vmaDestroyBuffer(buffer->vma, buffer->handle, buffer->allocation);
   iree_allocator_free(host_allocator, buffer);

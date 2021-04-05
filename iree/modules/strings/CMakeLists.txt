@@ -21,7 +21,6 @@ iree_cc_library(
     "api.cc"
     "strings_module.cc"
   DEPS
-    absl::inlined_vector
     absl::span
     absl::strings
     benchmark
@@ -46,7 +45,7 @@ iree_cc_test(
   DEPS
     ::strings_module
     ::strings_module_test_module_cc
-    absl::inlined_vector
+    absl::span
     absl::strings
     benchmark
     iree::base::api

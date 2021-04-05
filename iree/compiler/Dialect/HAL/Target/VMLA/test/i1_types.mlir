@@ -17,7 +17,7 @@ func @i1_op_usage(%arg0: tensor<4xi1>) -> tensor<4xi1> {
 // CHECK: hal.executable.target @vmla
 // CHECK: hal.executable.entry_point @i1_op_usage_ex_dispatch_0 attributes {
 // CHECK-SAME:   interface = @legacy_io
-// CHECK-SAME:   ordinal = 0 : i32
+// CHECK-SAME:   ordinal = 0 : index
 // CHECK-SAME:   signature = (tensor<4xi1>, tensor<4xi1>) -> tensor<4xi1>
 flow.executable @i1_op_usage_ex_dispatch_0 attributes {sym_visibility = "private"} {
   flow.dispatch.entry @i1_op_usage_ex_dispatch_0

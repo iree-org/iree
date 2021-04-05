@@ -23,8 +23,8 @@ if(${IREE_HAL_DRIVER_VMLA})
       "check_test.cc"
     DEPS
       ::native_module
-      absl::core_headers
       absl::strings
+      half::includes
       iree::base::api
       iree::base::logging
       iree::base::status
@@ -48,8 +48,8 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
-    absl::inlined_vector
     absl::strings
+    half::includes
     iree::base::api
     iree::base::status
     iree::hal::api

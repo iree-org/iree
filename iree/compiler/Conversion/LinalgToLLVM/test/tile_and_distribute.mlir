@@ -9,7 +9,7 @@
 //   }
 //   hal.executable.target @llvm_aot, filter="dylib*" {
 //     hal.executable.entry_point @dynamic_matmul attributes {
-//       interface = @legacy_io, ordinal = 0 : i32,
+//       interface = @legacy_io, ordinal = 0 : index,
 //       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
 //         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
 //     module {
@@ -57,7 +57,7 @@ hal.executable @static_matmul attributes {sym_visibility = "private"} {
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @static_matmul attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:16x4xf32>, !flow.dispatch.tensor<readonly:4x8xf32>,
         !flow.dispatch.tensor<writeonly:16x8xf32>) -> ()}
     module {

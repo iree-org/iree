@@ -25,7 +25,6 @@ cc_library(
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:cc",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@com_google_benchmark//:benchmark",
@@ -57,8 +56,8 @@ cc_test(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
         "@com_google_benchmark//:benchmark",
     ],
 )
