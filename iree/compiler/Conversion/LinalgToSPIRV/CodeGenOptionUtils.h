@@ -44,9 +44,6 @@ struct SPIRVCodegenOptions {
 // Returns SPIR-V CodeGen options from command-line options.
 SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions();
 
-void printOptionsToDebug(const SPIRVCodegenOptions &options,
-                         llvm::raw_ostream &os);
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

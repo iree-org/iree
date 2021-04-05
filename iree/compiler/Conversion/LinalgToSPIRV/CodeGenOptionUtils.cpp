@@ -64,19 +64,5 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
   return options;
 }
 
-void printOptionsToDebug(const SPIRVCodegenOptions &options,
-                         llvm::raw_ostream &os) {
-  os << "SPIRV options :\n";
-  os << "\t workgroupSize : ";
-  llvm::interleaveComma(options.workgroupSize, os);
-  os << "\n";
-  os << "\t tileSizes : ";
-  llvm::interleaveComma(options.tileSizes, os);
-  os << "\n";
-  os << "\t useWorkgroupMemory: " << options.useWorkgroupMemory << "\n";
-  os << "\t vectorizeMemref: " << options.vectorizeMemref << "\n";
-  os << "\t usingLinalgOnTensors: " << options.usingLinalgOnTensors << "\n";
-}
-
 }  // namespace iree_compiler
 }  // namespace mlir

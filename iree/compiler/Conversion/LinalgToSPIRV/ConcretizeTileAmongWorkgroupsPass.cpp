@@ -506,8 +506,6 @@ static PassRegistration<ConcretizeTileAmongWorkgroupsPass> pass(
     "tiling and distribution scheme",
     [] {
       SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
-      // llvm::dbgs() << "In pass registration ";
-      // printOptionsToDebug(options, llvm::dbgs());
       return std::make_unique<ConcretizeTileAmongWorkgroupsPass>(options);
     });
 
