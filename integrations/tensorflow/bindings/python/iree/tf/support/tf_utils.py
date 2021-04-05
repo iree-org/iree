@@ -17,7 +17,7 @@
 import os
 import random
 import re
-from typing import Any, Callable, Sequence, Set, Tuple, Union
+from typing import Any, Callable, Mapping, Sequence, Set, Tuple, Union
 
 from absl import logging
 import iree.runtime
@@ -72,7 +72,7 @@ def apply_function(values, function):
     return [apply_function(v, function) for v in values]
   elif isinstance(values, tuple):
     return tuple(apply_function(v, function) for v in values)
-  elif isinstance(values, dict):
+  elif isinstance(values, Mapping):
     return {k: apply_function(v, function) for k, v in values.items()}
   else:
     return function(values)

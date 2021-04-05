@@ -400,16 +400,21 @@ class ExtractReduceWindowOpPaddingAttributes
     if (op.base_dilations() || op.window_dilations()) return failure();
     if (isAllZero(op.paddingAttr())) return failure();
 
-    auto inputType = op.operand().getType().cast<ShapedType>();
-    int rank = inputType.getRank();
+    // All inputs must be of the same static shape, since
+    // mhlo.pad doesn't support dynamic shape.
+    for (Type inputType : op.inputs().getType()) {
+      if (!inputType.cast<ShapedType>().hasStaticShape()) return failure();
+    }
+    ArrayRef<int64_t> inputShape =
+        op.inputs()[0].getType().cast<ShapedType>().getShape();
+
+    int rank = inputShape.size();
     SmallVector<int64_t, 4> paddingLow, paddingHigh, interiorPadding, shape;
     for (unsigned i = 0; i < rank; ++i) {
-      // mhlo.pad doesn't support dynamic shape.
-      if (inputType.isDynamicDim(i)) return failure();
       interiorPadding.push_back(0);
       paddingLow.push_back(op.paddingAttr().getValue<int64_t>({i, 0}));
       paddingHigh.push_back(op.paddingAttr().getValue<int64_t>({i, 1}));
-      int size = inputType.getShape()[i];
+      int size = inputShape[i];
       shape.push_back(size + paddingLow.back() + paddingHigh.back());
     }
 
@@ -419,20 +424,27 @@ class ExtractReduceWindowOpPaddingAttributes
           elements);
     };
 
+    SmallVector<Value> padOps;
+    padOps.reserve(op.inputs().size());
     auto loc = op.getLoc();
-    auto padResultType =
-        RankedTensorType::get(shape, inputType.getElementType());
-    auto padOp = rewriter.create<mhlo::PadOp>(
-        loc, padResultType, op.operand(), op.init_value(),
-        toDenseAttr(paddingLow), toDenseAttr(paddingHigh),
-        toDenseAttr(interiorPadding));
+    for (auto it : llvm::zip(op.inputs(), op.init_values())) {
+      Value input = std::get<0>(it);
+      Value initValue = std::get<1>(it);
+      auto inputType = input.getType().cast<ShapedType>();
+      auto padResultType =
+          RankedTensorType::get(shape, inputType.getElementType());
+      auto padOp = rewriter.create<mhlo::PadOp>(
+          loc, padResultType, input, initValue, toDenseAttr(paddingLow),
+          toDenseAttr(paddingHigh), toDenseAttr(interiorPadding));
+      padOps.push_back(padOp);
+    }
     auto newOp = rewriter.create<mhlo::ReduceWindowOp>(
-        loc, op.getResult().getType(), padOp, op.init_value(),
+        loc, op.getResultTypes(), padOps, op.init_values(),
         op.window_dimensions(), op.window_stridesAttr(),
         op.base_dilationsAttr(), op.window_dilationsAttr(),
         /*padding=*/nullptr);
     rewriter.inlineRegionBefore(op.body(), newOp.body(), newOp.body().begin());
-    rewriter.replaceOp(op, newOp.getResult());
+    rewriter.replaceOp(op, newOp.getResults());
     return success();
   }
 };

@@ -24,9 +24,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_absl//absl/flags:parse": ["absl::flags_parse"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
-    "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [
-        "MLIRAllDialects"
-    ],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToStandard"],
     "@llvm-project//mlir:DialectUtils": [""],

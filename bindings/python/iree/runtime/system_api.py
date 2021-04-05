@@ -154,7 +154,7 @@ def normalize_value(
     # Exclude None from falling through to blanket np.asarray conversion.
     return value
 
-  if isinstance(value, (list, tuple)):
+  if isinstance(value, (list, tuple, dict)):
     return value
 
   array = np.asarray(value)

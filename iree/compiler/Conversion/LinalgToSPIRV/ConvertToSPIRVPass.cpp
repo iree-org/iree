@@ -584,7 +584,7 @@ void ConvertToSPIRVPass::runOnOperation() {
           typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
-      spirv::SPIRVConversionTarget::get(targetAttr);
+      SPIRVConversionTarget::get(targetAttr);
   // Disallow all other ops.
   target->markUnknownOpDynamicallyLegal([](Operation *) { return false; });
   SmallVector<FuncOp, 1> functions;
