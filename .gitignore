@@ -53,3 +53,6 @@ gradlew
 gradlew.bat
 gradle/
 local.properties
+
+# Generated documentation files
+mkdocs/site/

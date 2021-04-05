@@ -1,0 +1,68 @@
+site_name: IREE
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant
+    - navigation.tracking  # TODO(scotttodd): join mkdocs-material insiders for this
+
+    # TODO(scotttodd): decide if we want this
+    # - navigation.tabs
+    # - navigation.tabs.sticky  # insiders only
+
+    - navigation.sections
+    - navigation.top
+
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+
+repo_url: https://github.com/google/iree
+repo_name: google/iree
+edit_uri: ""  # Omit edit button (linking to GitHub) from each document
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/google/iree
+      name: IREE on GitHub
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/26P4xW4
+      name: IREE Discord Server
+  generator: false  # TODO(scotttodd): join mkdocs-material insiders for this
+
+copyright: Copyright &copy; 2021 Google LLC  # TODO(scotttodd): remove?
+
+markdown_extensions:
+  - admonition
+  - meta
+  - pymdownx.details
+  - pymdownx.tabbed
+  - pymdownx.superfences
+  - toc:
+      permalink: true  # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
+
+# Navigation with explicit ordering and nesting.
+# https://www.mkdocs.org/user-guide/configuration/#nav
+nav:
+    - Home: 'index.md'
+    - 'Building from source':
+      - 'building-from-source/getting-started.md'
+      - 'building-from-source/android.md'
+    - 'Community':
+      - Projects: 'community/projects.md'
