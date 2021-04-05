@@ -14,7 +14,8 @@
 
 #include "iree/hal/vulkan/direct_command_buffer.h"
 
-#include "absl/container/inlined_vector.h"
+#include <vector>
+
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/descriptor_set_arena.h"
@@ -270,8 +271,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_execution_barrier(
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
 
-  absl::InlinedVector<VkMemoryBarrier, 8> memory_barrier_infos(
-      memory_barrier_count);
+  std::vector<VkMemoryBarrier> memory_barrier_infos(memory_barrier_count);
   for (int i = 0; i < memory_barrier_count; ++i) {
     const auto& memory_barrier = memory_barriers[i];
     auto& info = memory_barrier_infos[i];
@@ -283,8 +283,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_execution_barrier(
         iree_hal_vulkan_convert_access_mask(memory_barrier.target_scope);
   }
 
-  absl::InlinedVector<VkBufferMemoryBarrier, 8> buffer_barrier_infos(
-      buffer_barrier_count);
+  std::vector<VkBufferMemoryBarrier> buffer_barrier_infos(buffer_barrier_count);
   for (int i = 0; i < buffer_barrier_count; ++i) {
     const auto& buffer_barrier = buffer_barriers[i];
     auto& info = buffer_barrier_infos[i];
@@ -352,13 +351,12 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_wait_events(
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
 
-  absl::InlinedVector<VkEvent, 4> event_handles(event_count);
+  std::vector<VkEvent> event_handles(event_count);
   for (int i = 0; i < event_count; ++i) {
     event_handles[i] = iree_hal_vulkan_native_event_handle(events[i]);
   }
 
-  absl::InlinedVector<VkMemoryBarrier, 8> memory_barrier_infos(
-      memory_barrier_count);
+  std::vector<VkMemoryBarrier> memory_barrier_infos(memory_barrier_count);
   for (int i = 0; i < memory_barrier_count; ++i) {
     const auto& memory_barrier = memory_barriers[i];
     auto& info = memory_barrier_infos[i];
@@ -370,8 +368,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_wait_events(
         iree_hal_vulkan_convert_access_mask(memory_barrier.target_scope);
   }
 
-  absl::InlinedVector<VkBufferMemoryBarrier, 8> buffer_barrier_infos(
-      buffer_barrier_count);
+  std::vector<VkBufferMemoryBarrier> buffer_barrier_infos(buffer_barrier_count);
   for (int i = 0; i < buffer_barrier_count; ++i) {
     const auto& buffer_barrier = buffer_barriers[i];
     auto& info = buffer_barrier_infos[i];
@@ -542,7 +539,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_bind_descriptor_set(
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
 
   // Vulkan takes uint32_t as the size here, unlike everywhere else.
-  absl::InlinedVector<uint32_t, 4> dynamic_offsets_i32(dynamic_offset_count);
+  std::vector<uint32_t> dynamic_offsets_i32(dynamic_offset_count);
   for (int i = 0; i < dynamic_offset_count; ++i) {
     dynamic_offsets_i32[i] = static_cast<uint32_t>(dynamic_offsets[i]);
   }

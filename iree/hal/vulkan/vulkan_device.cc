@@ -16,8 +16,8 @@
 
 #include <functional>
 #include <utility>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/status.h"
@@ -730,9 +730,9 @@ iree_status_t iree_hal_vulkan_device_create(
   // are of the same queue family as the dispatch queues: Vulkan requires that
   // all queues created from the same family are done in the same
   // VkDeviceQueueCreateInfo struct.
-  absl::InlinedVector<VkDeviceQueueCreateInfo, 2> queue_create_info;
-  absl::InlinedVector<float, 4> dispatch_queue_priorities;
-  absl::InlinedVector<float, 4> transfer_queue_priorities;
+  std::vector<VkDeviceQueueCreateInfo> queue_create_info;
+  std::vector<float> dispatch_queue_priorities;
+  std::vector<float> transfer_queue_priorities;
   queue_create_info.push_back({});
   auto& dispatch_queue_info = queue_create_info.back();
   dispatch_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;

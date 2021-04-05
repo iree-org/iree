@@ -17,7 +17,8 @@
 #include <inttypes.h>
 #include <stdint.h>
 
-#include "absl/container/inlined_vector.h"
+#include <vector>
+
 #include "iree/base/status.h"
 #include "iree/base/synchronization.h"
 #include "iree/base/tracing.h"
@@ -94,9 +95,9 @@ class EmulatedTimelineSemaphore final {
                                      bool* out_reached_upper_value);
   // Similar to the above, but also returns the fences that are known to have
   // already signaled via |signaled_fences|.
-  iree_status_t TryToAdvanceTimeline(
-      uint64_t to_upper_value, bool* out_reached_upper_value,
-      absl::InlinedVector<VkFence, 4>* out_signaled_fences);
+  iree_status_t TryToAdvanceTimeline(uint64_t to_upper_value,
+                                     bool* out_reached_upper_value,
+                                     std::vector<VkFence>* out_signaled_fences);
 
   std::atomic<uint64_t> signaled_value_;
 
@@ -344,7 +345,7 @@ iree_status_t EmulatedTimelineSemaphore::GetSignalSemaphore(
 
 iree_status_t EmulatedTimelineSemaphore::TryToAdvanceTimeline(
     uint64_t to_upper_value, bool* out_reached_upper_value) {
-  absl::InlinedVector<VkFence, 4> signaled_fences;
+  std::vector<VkFence> signaled_fences;
   iree_status_t status = TryToAdvanceTimeline(
       to_upper_value, out_reached_upper_value, &signaled_fences);
   // Inform the queue that some fences are known to have signaled. This should
@@ -361,7 +362,7 @@ iree_status_t EmulatedTimelineSemaphore::TryToAdvanceTimeline(
 
 iree_status_t EmulatedTimelineSemaphore::TryToAdvanceTimeline(
     uint64_t to_upper_value, bool* out_reached_upper_value,
-    absl::InlinedVector<VkFence, 4>* out_signaled_fences) {
+    std::vector<VkFence>* out_signaled_fences) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::TryToAdvanceTimeline");
   IREE_DVLOG(3) << "EmulatedTimelineSemaphore::TryToAdvanceTimeline";
   if (out_reached_upper_value) *out_reached_upper_value = false;

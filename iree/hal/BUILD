@@ -78,7 +78,6 @@ cc_library(
         "//iree/base:threading",
         "//iree/base:tracing",
         "//iree/base/internal",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@half//:includes",
@@ -94,7 +93,7 @@ cc_test(
         "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )

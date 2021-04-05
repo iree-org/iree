@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "absl/container/inlined_vector.h"
+#include <vector>
+
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
@@ -29,7 +31,7 @@ using ::testing::ElementsAre;
 using ::testing::Eq;
 
 // TODO(benvanik): move these utils to C++ bindings.
-using Shape = absl::InlinedVector<iree_hal_dim_t, 6>;
+using Shape = std::vector<iree_hal_dim_t>;
 
 // Parses a serialized set of shape dimensions using the canonical shape format
 // (the same as produced by FormatShape).

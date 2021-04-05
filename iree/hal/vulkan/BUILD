@@ -105,7 +105,6 @@ cc_library(
         "//iree/hal/vulkan/util:ref_ptr",
         "//iree/schemas:spirv_executable_def_c_fbs",
         "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@iree_vulkan_headers//:vulkan_headers",

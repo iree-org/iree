@@ -30,7 +30,6 @@ iree_cc_library(
     "ref_cc.h"
   DEPS
     ::vm
-    absl::inlined_vector
     absl::optional
     absl::span
     absl::strings
@@ -185,6 +184,7 @@ iree_cc_test(
   DEPS
     ::bytecode_module
     ::vm
+    absl::span
     absl::strings
     iree::base::logging
     iree::base::status
@@ -202,7 +202,7 @@ iree_cc_binary(
     ::bytecode_module
     ::bytecode_module_benchmark_module_cc
     ::vm
-    absl::inlined_vector
+    absl::span
     absl::strings
     benchmark
     iree::base::api

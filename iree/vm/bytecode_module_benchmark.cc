@@ -13,9 +13,10 @@
 // limitations under the License.
 
 #include <array>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
@@ -207,7 +208,7 @@ static void BM_FullModuleInit(benchmark::State& state) {
 }
 BENCHMARK(BM_FullModuleInit);
 
-ABSL_ATTRIBUTE_NOINLINE static int empty_fn() {
+IREE_ATTRIBUTE_NOINLINE static int empty_fn() {
   int ret = 1;
   benchmark::DoNotOptimize(ret);
   return ret;
@@ -228,7 +229,7 @@ static void BM_EmptyFuncBytecode(benchmark::State& state) {
 }
 BENCHMARK(BM_EmptyFuncBytecode);
 
-ABSL_ATTRIBUTE_NOINLINE static int add_fn(int value) {
+IREE_ATTRIBUTE_NOINLINE static int add_fn(int value) {
   benchmark::DoNotOptimize(value += value);
   return value;
 }

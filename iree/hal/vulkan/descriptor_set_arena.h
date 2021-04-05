@@ -66,7 +66,7 @@ class DescriptorSetArena final {
   std::array<DescriptorPool, 4> descriptor_pool_buckets_;
 
   // All pools that have been used during allocation.
-  absl::InlinedVector<DescriptorPool, 8> used_descriptor_pools_;
+  std::vector<DescriptorPool> used_descriptor_pools_;
 };
 
 }  // namespace vulkan

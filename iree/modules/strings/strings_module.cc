@@ -17,8 +17,8 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
@@ -123,9 +123,11 @@ class StringsModuleState final {
   StatusOr<vm::ref<strings_string_tensor_t>> ToStringTensor(
       vm::ref<iree_hal_buffer_view_t> hal_buffer_view) {
     const size_t rank = iree_hal_buffer_view_shape_rank(hal_buffer_view.get());
-    absl::InlinedVector<int32_t, 6> shape(rank);
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(hal_buffer_view.get(), rank,
-                                                    shape.data(), nullptr));
+    std::vector<iree_hal_dim_t> shape(rank);
+    if (rank > 0) {
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(
+          hal_buffer_view.get(), rank, shape.data(), nullptr));
+    }
 
     size_t num_elements = 1;
     for (auto val : shape) {
@@ -224,9 +226,11 @@ class StringsModuleState final {
     }
 
     const size_t rank = iree_hal_buffer_view_shape_rank(ids.get());
-    absl::InlinedVector<int32_t, 6> shape(rank);
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_shape(ids.get(), rank, shape.data(), nullptr));
+    std::vector<iree_hal_dim_t> shape(rank);
+    if (rank > 0) {
+      IREE_RETURN_IF_ERROR(
+          iree_hal_buffer_view_shape(ids.get(), rank, shape.data(), nullptr));
+    }
 
     size_t num_elements = 1;
     for (auto val : shape) {
