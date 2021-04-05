@@ -20,6 +20,15 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_VMLA} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  return()
+endif()
+""",
+)
+
 iree_bytecode_module(
     name = "simple_embedding_test_bytecode_module",
     src = "simple_embedding_test.mlir",
