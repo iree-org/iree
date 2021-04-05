@@ -961,6 +961,7 @@ inline void ReduceDimension(absl::Span<const T> src_buffer,
     // TODO(scotttodd): Clean this up somehow, share across recursion levels?
     size_t dst_size = src_shape.size() - reduce_dims.size();
     std::vector<int> dst_indices;
+    dst_indices.reserve(src_indices.size());
     for (size_t i = 0; i < src_indices.size(); ++i) {
       if (std::find(std::begin(reduce_dims), std::end(reduce_dims), i) ==
           std::end(reduce_dims)) {
