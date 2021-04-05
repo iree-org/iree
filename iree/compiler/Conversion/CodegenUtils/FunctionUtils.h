@@ -42,7 +42,7 @@ unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
 /// Gets the source type of ops that implement ViewOpInterface recursively. Can
-/// be used to get the types of the untiled operands from a tiled operation.
+/// be used to get the untiled operands from a tiled operation.
 Value getViewSource(Value view);
 
 }  // namespace iree_compiler
