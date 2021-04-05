@@ -562,51 +562,6 @@ def HAL_BufferLengthOp : HAL_PureOp<"buffer.length", [
   }];
 }
 
-def HAL_BufferFillOp : HAL_Op<"buffer.fill"> {
-  let summary = [{buffer fill operation}];
-  let description = [{
-    Fills the target buffer with the given repeating value.
-  }];
-
-  let arguments = (ins
-    HAL_BufferType:$target_buffer,
-    HAL_DeviceSize:$target_offset,
-    HAL_DeviceSize:$length,
-    I32:$pattern
-  );
-
-  let assemblyFormat = [{
-    `<` $target_buffer `:` type($target_buffer) `>`
-    `` `[` $target_offset `,` $length `]`
-    `pattern` `(` $pattern `:` type($pattern) `)`
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_BufferCopyOp : HAL_Op<"buffer.copy"> {
-  let summary = [{buffer-to-buffer copy operation}];
-  let description = [{
-    Copies data from the provided source_buffer into the buffer.
-  }];
-
-  let arguments = (ins
-    HAL_BufferType:$source_buffer,
-    HAL_DeviceSize:$source_offset,
-    HAL_BufferType:$target_buffer,
-    HAL_DeviceSize:$target_offset,
-    HAL_DeviceSize:$length
-  );
-
-  let assemblyFormat = [{
-    `source` `(` $source_buffer `:` type($source_buffer) `)`
-    `` `[` $source_offset `]`
-    `target` `(` $target_buffer `:` type($target_buffer) `)`
-    `` `[` $target_offset `]`
-    `length` `(` $length `)`
-    attr-dict-with-keyword
-  }];
-}
-
 def HAL_BufferLoadOp : HAL_PureOp<"buffer.load"> {
   let summary = [{buffer element load operation}];
   let description = [{

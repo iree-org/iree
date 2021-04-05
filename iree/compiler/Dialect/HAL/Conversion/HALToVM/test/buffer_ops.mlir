@@ -11,18 +11,6 @@ func @buffer_subspan(%arg0 : !hal.buffer) -> !hal.buffer {
 
 // -----
 
-// CHECK-LABEL: @buffer_fill
-func @buffer_fill(%arg0 : !hal.buffer) {
-  %c42 = constant 42 : index
-  %c43 = constant 43 : index
-  %c123 = constant 123 : i32
-  // CHECK: vm.call @hal.buffer.fill(%arg0, %c42, %c43, %c123) : (!vm.ref<!hal.buffer>, i32, i32, i32) -> ()
-  hal.buffer.fill<%arg0 : !hal.buffer>[%c42, %c43] pattern(%c123 : i32)
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @buffer_load
 func @buffer_load(%arg0 : !hal.buffer) -> (i8, i16, i32) {
   %c42 = constant 42 : index
