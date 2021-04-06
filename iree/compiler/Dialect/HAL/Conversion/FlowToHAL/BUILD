@@ -22,7 +22,6 @@ cc_library(
     name = "FlowToHAL",
     srcs = [
         "ConvertFlowToHAL.cpp",
-        "ConvertShapeQueryOps.cpp",
         "ConvertStreamOps.cpp",
         "ConvertTensorOps.cpp",
         "ConvertVariableOps.cpp",

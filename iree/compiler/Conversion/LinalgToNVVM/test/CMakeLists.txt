@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "convert_to_nvvm.mlir"
     "distribute_to_thread.mlir"
     "pipeline_test.mlir"
+    "vectorization.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

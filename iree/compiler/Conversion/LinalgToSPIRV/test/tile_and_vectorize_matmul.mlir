@@ -8,7 +8,7 @@ hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} 
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @matmul_static_shape_f16 attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:1x225x225x16xf32>, !flow.dispatch.tensor<readonly:3x3x16x32xf32>, !flow.dispatch.tensor<writeonly:1x112x112x32xf32>) -> ()}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @matmul_static_shape_f16() {

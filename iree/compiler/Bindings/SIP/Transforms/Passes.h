@@ -48,7 +48,10 @@ std::unique_ptr<OperationPass<FuncOp>> createMaterializeReflectionAttrsPass();
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
-inline void registerPasses() { createMaterializeReflectionAttrsPass(); }
+inline void registerPasses() {
+  registerTransformPassPipeline();
+  createMaterializeReflectionAttrsPass();
+}
 
 }  // namespace SIP
 }  // namespace IREE

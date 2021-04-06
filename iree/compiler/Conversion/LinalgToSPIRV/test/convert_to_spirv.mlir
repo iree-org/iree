@@ -14,7 +14,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     return
   }
 
-  hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = "private"} {
+  hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
@@ -35,7 +35,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     return
   }
 
-  hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = "private"} {
+  hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }
@@ -68,7 +68,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     return
   }
 
-  hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = "private"} {
+  hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }
@@ -273,7 +273,7 @@ module attributes {
     return
   }
 
-  hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = "private"} {
+  hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }

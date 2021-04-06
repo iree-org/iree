@@ -78,7 +78,8 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
       int bindingOrdinal = nextBindingOrdinal++;
       auto bindingName = "arg" + std::to_string(inputType.index());
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName, /*set=*/0, /*binding=*/bindingOrdinal,
+          interfaceLoc, bindingName, /*set=*/APInt(64, 0),
+          /*binding=*/APInt(64, bindingOrdinal),
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::Read);
     } else if (auto tensorType =
@@ -106,7 +107,8 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
       std::string bindingName =
           std::string(prefix) + std::to_string(bindingOrdinal);
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName, /*set=*/0, /*binding=*/bindingOrdinal,
+          interfaceLoc, bindingName, /*set=*/APInt(64, 0),
+          /*binding=*/APInt(64, bindingOrdinal),
           IREE::HAL::DescriptorType::StorageBuffer, memoryAccess);
     } else if (auto indexType = inputType.value().dyn_cast<IndexType>()) {
       ++pushConstantCount;
@@ -132,7 +134,8 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
     auto bindingName = "ret" + std::to_string(outputType.index());
     if (outputType.value().isa<TensorType>()) {
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName, /*set=*/0, /*binding=*/bindingOrdinal,
+          interfaceLoc, bindingName, /*set=*/APInt(64, 0),
+          /*binding=*/APInt(64, bindingOrdinal),
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::DiscardWrite);
     } else {
@@ -145,7 +148,7 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
 
   if (pushConstantCount > 0) {
     interfaceOp->setAttr("push_constants",
-                         interfaceBuilder.getI32IntegerAttr(pushConstantCount));
+                         interfaceBuilder.getIndexAttr(pushConstantCount));
   }
 
   return interfaceOp;
@@ -398,7 +401,7 @@ static LogicalResult declareEntryPointOps(
         builder.create<IREE::HAL::ExecutableEntryPointOp>(
             dispatchEntryOp.getLoc(),
             builder.getStringAttr(dispatchEntryOp.function_ref()),
-            builder.getI32IntegerAttr(nextOrdinal++),
+            builder.getIndexAttr(nextOrdinal++),
             builder.getSymbolRefAttr(interfaceOp),
             TypeAttr::get(sourceFuncOp.getType()), ArrayAttr{});
       }

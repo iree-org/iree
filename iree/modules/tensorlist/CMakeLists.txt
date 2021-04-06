@@ -18,7 +18,6 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
-    absl::inlined_vector
     absl::span
     iree::base::api
     iree::base::status
@@ -54,8 +53,6 @@ iree_cc_test(
   DEPS
     ::native_module
     ::tensorlist_test_module_cc
-    absl::core_headers
-    absl::inlined_vector
     absl::span
     absl::strings
     iree::base::api

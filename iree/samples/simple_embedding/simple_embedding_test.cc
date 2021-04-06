@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "absl/base/macros.h"
 #include "absl/strings/str_replace.h"
-#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
-#include "iree/hal/testing/driver_registry.h"
+#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -43,27 +42,27 @@ std::ostream& operator<<(std::ostream& os, const TestParams& params) {
   return os << absl::StrReplaceAll(params.driver_name, {{":", "_"}});
 }
 
-// Builds a list of tests to run based on the linked in driver modules.
-std::vector<TestParams> GetAvailableDriverTestParams() {
-  std::vector<TestParams> all_test_params;
-  auto driver_names = iree::hal::testing::EnumerateAvailableDrivers();
-  // TODO(#3843): this whole file stopped being useful a long time ago as a
-  // "simple" embedded test. This is a hack to work around its bustedness.
-  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "dylib");
-  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "llvm");
-  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "cuda");
-  for (const auto& driver_name : driver_names) {
-    TestParams test_params;
-    test_params.driver_name = driver_name;
-    all_test_params.push_back(std::move(test_params));
-  }
-  return all_test_params;
+std::vector<TestParams> GetDriverTestParams() {
+  // The test file was compiled for VMLA+Vulkan, so test on each driver.
+  std::vector<TestParams> test_params;
+
+  IREE_CHECK_OK(
+      iree_hal_vmla_driver_module_register(iree_hal_driver_registry_default()));
+  TestParams vmla_params;
+  vmla_params.driver_name = "vmla";
+  test_params.push_back(std::move(vmla_params));
+
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
+      iree_hal_driver_registry_default()));
+  TestParams vulkan_params;
+  vulkan_params.driver_name = "vulkan";
+  test_params.push_back(std::move(vulkan_params));
+
+  return test_params;
 }
 
 class SimpleEmbeddingTest : public ::testing::Test,
-                            public ::testing::WithParamInterface<TestParams> {
- protected:
-};
+                            public ::testing::WithParamInterface<TestParams> {};
 
 TEST_P(SimpleEmbeddingTest, RunOnce) {
   // TODO(benvanik): move to instance-based registration.
@@ -109,9 +108,9 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   iree_vm_module_release(bytecode_module);
 
   // Lookup the entry point function.
-  // Note that we use the "raw" variant which operates on pure type/shape
+  // Note that we use the synchronous variant which operates on pure type/shape
   // erased buffers.
-  const char kMainFunctionName[] = "module.simple_mul$raw";
+  const char kMainFunctionName[] = "module.simple_mul";
   iree_vm_function_t main_function;
   IREE_ASSERT_OK(iree_vm_context_resolve_function(
       context, iree_make_cstring_view(kMainFunctionName), &main_function))
@@ -142,15 +141,30 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   IREE_ASSERT_OK(iree_hal_buffer_fill(arg1_buffer, 0, IREE_WHOLE_BUFFER,
                                       &kFloat2, sizeof(float)));
 
+  // Wrap buffers in shaped buffer views.
+  iree_hal_dim_t shape[1] = {kElementCount};
+  iree_hal_buffer_view_t* arg0_buffer_view = nullptr;
+  iree_hal_buffer_view_t* arg1_buffer_view = nullptr;
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      arg0_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape, IREE_ARRAYSIZE(shape),
+      &arg0_buffer_view));
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      arg1_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape, IREE_ARRAYSIZE(shape),
+      &arg1_buffer_view));
+  iree_hal_buffer_release(arg0_buffer);
+  iree_hal_buffer_release(arg1_buffer);
+
   // Setup call inputs with our buffers.
   // TODO(benvanik): make a macro/magic.
   vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
                                      iree_allocator_system(), &inputs));
-  auto arg0_buffer_ref = iree_hal_buffer_move_ref(arg0_buffer);
-  auto arg1_buffer_ref = iree_hal_buffer_move_ref(arg1_buffer);
-  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &arg0_buffer_ref));
-  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &arg1_buffer_ref));
+  auto arg0_buffer_view_ref = iree_hal_buffer_view_move_ref(arg0_buffer_view);
+  auto arg1_buffer_view_ref = iree_hal_buffer_view_move_ref(arg1_buffer_view);
+  IREE_ASSERT_OK(
+      iree_vm_list_push_ref_move(inputs.get(), &arg0_buffer_view_ref));
+  IREE_ASSERT_OK(
+      iree_vm_list_push_ref_move(inputs.get(), &arg1_buffer_view_ref));
 
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
@@ -165,17 +179,17 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
 
   // Get the result buffers from the invocation.
   IREE_LOG(INFO) << "Retrieving results...";
-  auto* ret_buffer =
-      reinterpret_cast<iree_hal_buffer_t*>(iree_vm_list_get_ref_deref(
-          outputs.get(), 0, iree_hal_buffer_get_descriptor()));
-  ASSERT_NE(nullptr, ret_buffer);
+  auto* ret_buffer_view =
+      reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
+          outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
+  ASSERT_NE(nullptr, ret_buffer_view);
 
   // Read back the results and ensure we got the right values.
   IREE_LOG(INFO) << "Reading back results...";
   iree_hal_buffer_mapping_t mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(ret_buffer,
-                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                           IREE_WHOLE_BUFFER, &mapped_memory));
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(
+      iree_hal_buffer_view_buffer(ret_buffer_view), IREE_HAL_MEMORY_ACCESS_READ,
+      0, IREE_WHOLE_BUFFER, &mapped_memory));
   ASSERT_THAT(absl::Span<const float>(
                   reinterpret_cast<const float*>(mapped_memory.contents.data),
                   mapped_memory.contents.data_length / sizeof(float)),
@@ -191,7 +205,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
 }
 
 INSTANTIATE_TEST_SUITE_P(AllDrivers, SimpleEmbeddingTest,
-                         ::testing::ValuesIn(GetAvailableDriverTestParams()),
+                         ::testing::ValuesIn(GetDriverTestParams()),
                          ::testing::PrintToStringParamName());
 
 }  // namespace

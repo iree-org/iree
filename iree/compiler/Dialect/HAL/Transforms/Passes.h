@@ -52,7 +52,7 @@ void registerHALTransformPassPipeline();
 // Conversion
 //===----------------------------------------------------------------------===//
 
-// Convert input flow/std/etc dialects to the IREE HAL dialect.
+// Converts input flow/std/etc dialects to the IREE HAL dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
 
 //===----------------------------------------------------------------------===//

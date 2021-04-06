@@ -2,7 +2,7 @@
 
 hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.target @cuda, filter="cuda" {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (!flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<writeonly:1024xf32>) -> ()}
+  hal.executable.entry_point @add_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<writeonly:1024xf32>) -> ()}
   module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
@@ -35,5 +35,5 @@ hal.executable.target @cuda, filter="cuda" {
 // CHECK-LABEL: func @add_dispatch_0()
 //  CHECK-SAME: cuda_workgroup_size = dense<[32, 1, 1]>
 //      CHECK:    "gpu.thread_id"() {dimension = "x"}
-//      CHECK:    scf.for
+//      CHECK:    scf.parallel
 //      CHECK:      linalg.generic

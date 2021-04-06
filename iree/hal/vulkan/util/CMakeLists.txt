@@ -18,7 +18,6 @@ iree_cc_library(
   SRCS
     "arena.cc"
   DEPS
-    absl::core_headers
     absl::span
     iree::base::core_headers
     iree::base::logging
@@ -65,7 +64,7 @@ iree_cc_library(
   HDRS
     "ref_ptr.h"
   DEPS
-    absl::core_headers
+    iree::base::core_headers
     iree::base::internal
     iree::base::logging
   PUBLIC

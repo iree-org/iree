@@ -196,7 +196,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
         auto newEntryPointOp =
             linkedTargetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
-                builder.getI32IntegerAttr(nextEntryPointOrdinal++),
+                builder.getIndexAttr(nextEntryPointOrdinal++),
                 builder.getSymbolRefAttr(linkedInterfaceOp.getName()),
                 entryPointOp.signatureAttr(), ArrayAttr{});
 
@@ -347,11 +347,15 @@ LogicalResult TargetBackend::recordDispatch(
   }
 
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
+  auto entryPointSymRef = builder.getSymbolRefAttr(
+      dispatchState.executableOp.getName(),
+      {builder.getSymbolRefAttr(dispatchState.entryPointOp->getParentOp()),
+       builder.getSymbolRefAttr(dispatchState.entryPointOp)});
   auto remappedWorkgroupCount = calculateDispatchWorkgroupCount(
       loc, dispatchState.executableOp, dispatchState.entryPointOp,
       originalWorkgroupCount, builder);
   builder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-      loc, commandBuffer, dispatchState.entryPointOp, remappedWorkgroupCount[0],
+      loc, commandBuffer, entryPointSymRef, remappedWorkgroupCount[0],
       remappedWorkgroupCount[1], remappedWorkgroupCount[2]);
 
   builder.create<IREE::HAL::ReturnOp>(loc);

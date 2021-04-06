@@ -18,8 +18,8 @@
 #include <memory>
 #include <tuple>
 #include <utility>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
@@ -486,7 +486,7 @@ struct ParamUnpack<std::tuple<Ts...>> {
 template <typename U>
 struct ParamUnpack<absl::Span<U>, enable_if_not_primitive<U>> {
   using element_type = typename impl::remove_cvref<U>::type;
-  using storage_type = absl::InlinedVector<element_type, 16>;
+  using storage_type = std::vector<element_type>;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     iree_host_size_t count = *reinterpret_cast<const int32_t*>(ptr);
     ptr += sizeof(int32_t);

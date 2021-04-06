@@ -24,7 +24,10 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
-        ["structural_ops.mlir"],
+        [
+            "constant_ops.mlir",
+            "structural_ops.mlir",
+        ],
         include = ["*.mlir"],
     ),
     data = [

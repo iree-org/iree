@@ -42,6 +42,7 @@ typedef struct {
   iree_task_scope_t* scope;
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
+  iree_hal_queue_affinity_t queue_affinity;
 
   // Arena used for all allocations; references the shared device block pool.
   iree_arena_allocator_t arena;
@@ -108,6 +109,7 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_hal_device_t* device, iree_task_scope_t* scope,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_arena_block_pool_t* block_pool,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device);
@@ -140,6 +142,7 @@ iree_status_t iree_hal_task_command_buffer_create(
     command_buffer->scope = scope;
     command_buffer->mode = mode;
     command_buffer->allowed_categories = command_categories;
+    command_buffer->queue_affinity = queue_affinity;
     iree_arena_initialize(block_pool, &command_buffer->arena);
     iree_task_list_initialize(&command_buffer->root_tasks);
     iree_task_list_initialize(&command_buffer->leaf_tasks);

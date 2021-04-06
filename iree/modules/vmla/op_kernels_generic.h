@@ -20,9 +20,9 @@
 #include <iostream>
 #include <iterator>
 #include <numeric>
+#include <vector>
 
 #include "absl/container/flat_hash_set.h"
-#include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
 
@@ -92,9 +92,9 @@ Status CompareGE::Execute(absl::Span<const T> lhs_buffer,
 }
 
 namespace impl {
-inline absl::InlinedVector<size_t, 6> ComputeCopyStrides(ShapeSpan shape,
-                                                         size_t element_size) {
-  absl::InlinedVector<size_t, 6> strides(shape.size());
+inline std::vector<size_t> ComputeCopyStrides(ShapeSpan shape,
+                                              size_t element_size) {
+  std::vector<size_t> strides(shape.size());
   strides.back() = element_size;
   for (int i = static_cast<int>(shape.size()) - 2; i >= 0; --i) {
     strides[i] = strides[i + 1] * shape[i + 1];
@@ -276,9 +276,9 @@ Status Transpose::Execute(absl::Span<const T> src_buffer,
                           absl::Span<const int32_t> perm) {
   int rank = src_shape.size();
 
-  absl::InlinedVector<int, 8> src_strides(rank);
-  absl::InlinedVector<int, 8> dst_strides(rank);
-  absl::InlinedVector<int32_t, 8> dst_shape(rank);
+  std::vector<int> src_strides(rank);
+  std::vector<int> dst_strides(rank);
+  std::vector<int32_t> dst_shape(rank);
   size_t src_stride = 1;
   size_t dst_stride = 1;
   for (int dim_i = rank - 1; dim_i >= 0; --dim_i) {
@@ -348,7 +348,7 @@ Status Pad::Execute(absl::Span<const T> src_buffer,
   }
   auto padding_value = padding_value_buffer.front();
 
-  absl::InlinedVector<int, 8> dst_indices(src_shape.size(), 0);
+  std::vector<int> dst_indices(src_shape.size(), 0);
 
   const T* src_ptr = src_buffer.begin();
   T* dst_ptr = dst_buffer.begin();
@@ -536,7 +536,7 @@ Status Reverse::Execute(absl::Span<const T> src_buffer,
                         absl::Span<const int32_t> dimensions) {
   // This implementation is not fast either.
   int rank = src_shape.size();
-  absl::InlinedVector<int, 8> strides(rank);
+  std::vector<int> strides(rank);
   size_t stride = 1;
   for (int dim_i = rank - 1; dim_i >= 0; --dim_i) {
     strides[dim_i] = stride;
@@ -601,8 +601,8 @@ Status Tile::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
                      ShapeSpan src_shape, ShapeSpan dst_shape) {
   // This implementation is .... not fast.
   int rank = dst_shape.size();
-  absl::InlinedVector<int, 8> src_strides(rank);
-  absl::InlinedVector<int, 8> dst_strides(rank);
+  std::vector<int> src_strides(rank);
+  std::vector<int> dst_strides(rank);
   size_t src_stride = 1;
   size_t dst_stride = 1;
   for (int dim_i = rank - 1; dim_i >= 0; --dim_i) {
@@ -960,7 +960,8 @@ inline void ReduceDimension(absl::Span<const T> src_buffer,
     //
     // TODO(scotttodd): Clean this up somehow, share across recursion levels?
     size_t dst_size = src_shape.size() - reduce_dims.size();
-    absl::InlinedVector<int, 8> dst_indices;
+    std::vector<int> dst_indices;
+    dst_indices.reserve(src_indices.size());
     for (size_t i = 0; i < src_indices.size(); ++i) {
       if (std::find(std::begin(reduce_dims), std::end(reduce_dims), i) ==
           std::end(reduce_dims)) {
@@ -1012,7 +1013,7 @@ Status GenericReduce(absl::Span<const T> src_buffer,
 
   // Precompute destination strides.
   int dst_rank = dst_shape.size();
-  absl::InlinedVector<int, 8> dst_strides;
+  std::vector<int> dst_strides;
   size_t dst_stride = 1;
   for (int dim_i = dst_rank - 1; dim_i >= 0; --dim_i) {
     dst_strides.push_back(dst_stride);
@@ -1024,7 +1025,7 @@ Status GenericReduce(absl::Span<const T> src_buffer,
   //   * the innermost dimension (last in the shape)
   //   * flat_src_i of 0 (corresponds to [0, 0, ..., 0] above)
   //   * source stride 1
-  absl::InlinedVector<int, 8> src_indices(src_shape.size(), 0);
+  std::vector<int> src_indices(src_shape.size(), 0);
   ReduceDimension<T, KernelImpl>(src_buffer, dst_buffer, src_shape, {dimension},
                                  absl::MakeSpan(dst_strides),
                                  src_shape.size() - 1,
@@ -1088,7 +1089,7 @@ void ComputePoolingWindow(absl::Span<const T> src_buffer,
                           ShapeSpan src_shape, T init_value,
                           ShapeSpan window_dimensions, T* dst_value) {
   size_t rank = src_shape.size();
-  absl::InlinedVector<int, 8> window_indices(rank, 0);
+  std::vector<int> window_indices(rank, 0);
   auto getSrcValue = [&]() -> T {
     size_t flat_idx = 0;
     for (size_t i = 0; i < rank; ++i) {
@@ -1113,8 +1114,8 @@ Status GenericPooling(absl::Span<const T> src_buffer,
                       ShapeSpan window_dimensions, ShapeSpan strides,
                       ShapeSpan pad_low) {
   size_t rank = src_shape.size();
-  absl::InlinedVector<int, 8> src_indices(rank, 0);
-  absl::InlinedVector<int, 8> dst_indices(rank, 0);
+  std::vector<int> src_indices(rank, 0);
+  std::vector<int> dst_indices(rank, 0);
   for (size_t i = 0, e = GetElementCount(dst_shape); i < e; ++i) {
     for (size_t j = 0; j < rank; ++j) {
       src_indices[j] = dst_indices[j] * strides[j] - pad_low[j];

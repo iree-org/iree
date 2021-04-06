@@ -14,7 +14,8 @@
 
 #include "iree/modules/vmla/op_kernels.h"
 
-#include "absl/container/inlined_vector.h"
+#include <vector>
+
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -27,7 +28,7 @@ namespace {
 
 constexpr float kEpsilon = 0.0001f;
 
-using Shape = absl::InlinedVector<int32_t, 6>;
+using Shape = std::vector<int32_t>;
 
 // reinterpret_cast for Spans, preserving byte size.
 template <typename T, typename U>

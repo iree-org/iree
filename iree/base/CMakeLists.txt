@@ -35,8 +35,6 @@ iree_cc_library(
     "attributes.h"
     "math.h"
     "target_platform.h"
-  DEPS
-    absl::core_headers
   PUBLIC
 )
 
@@ -95,7 +93,6 @@ iree_cc_library(
   SRCS
     "signature_parser.cc"
   DEPS
-    absl::inlined_vector
     absl::optional
     absl::span
     absl::strings

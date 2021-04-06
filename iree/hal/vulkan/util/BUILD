@@ -25,7 +25,6 @@ cc_library(
     deps = [
         "//iree/base:core_headers",
         "//iree/base:logging",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -68,9 +67,9 @@ cc_library(
     name = "ref_ptr",
     hdrs = ["ref_ptr.h"],
     deps = [
+        "//iree/base:core_headers",
         "//iree/base:logging",
         "//iree/base/internal",
-        "@com_google_absl//absl/base:core_headers",
     ],
 )
 

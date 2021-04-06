@@ -13,7 +13,7 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @elementwise_static_shape attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?xf32>,
         !flow.dispatch.tensor<readonly:?xf32>,
         !flow.dispatch.tensor<writeonly:?xf32>) -> ()}
@@ -61,7 +61,7 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
 // Negative test as we currently don't support vectorization when there is a
 // transpose.
 // CHECK-LABEL: func @elementwise_transpose
-//   CHECK-NOT:   vector.transfer_read 
+//   CHECK-NOT:   vector.transfer_read
 //       CHECK:   linalg.generic
 hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
@@ -71,7 +71,7 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @elementwise_transpose attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<readonly:?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}

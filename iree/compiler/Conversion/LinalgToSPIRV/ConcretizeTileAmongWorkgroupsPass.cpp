@@ -40,6 +40,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
@@ -73,28 +74,16 @@
 namespace mlir {
 namespace iree_compiler {
 
-namespace {
+static constexpr unsigned kMaxWorkgroupDimCount = 3;
 
-constexpr unsigned kWorkgroupDimCount = 3;
-
-int64_t ceilDiv(int64_t a, int64_t b) { return (a + b - 1) / b; }
-
-static size_t getNumOuterParallelDims(linalg::LinalgOp op) {
-  ArrayRef<Attribute> iterators = op.iterator_types().getValue();
-  auto parallels = iterators.take_while(
-      [](Attribute attr) { return linalg::isParallelIteratorType(attr); });
-  return parallels.size();
-}
+static int64_t ceilDiv(int64_t a, int64_t b) { return (a + b - 1) / b; }
 
 /// Returns the root Linalg op that dictates tiling and distribution policy.
-linalg::LinalgOp getRootLinalgOp(FuncOp funcOp) {
+static linalg::LinalgOp getRootLinalgOp(FuncOp funcOp,
+                                        const SPIRVCodegenOptions &options) {
   SmallVector<linalg::LinalgOp, 4> linalgOps;
   SmallVector<Operation *, 4> tiledLoops;
   if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) return {};
-
-  SPIRVCodegenOptions options;
-  options.enableVectorization = true;
-  options.usingLinalgOnTensors = true;
 
   linalg::Aliases aliases;
   linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
@@ -125,26 +114,29 @@ linalg::LinalgOp getRootLinalgOp(FuncOp funcOp) {
 // TODO(antiagainst): This is quite fragile. We need a better way to pass the
 // information down from the upper layer, which readily has it. Probably via
 // linalg.tile op.
-LogicalResult getInputOutputTypesForAllTiles(
-    linalg::LinalgOp rootOp, SmallVectorImpl<Type> &inputTypes,
-    SmallVectorImpl<Type> &outputTypes) {
+static std::tuple<SmallVector<Type>, SmallVector<Type>> getInputOutputTypes(
+    linalg::LinalgOp rootOp) {
+  SmallVector<Type> inputTypes, outputTypes;
   for (Value inputBuffer : rootOp.getInputBuffers()) {
     if (auto subviewOp = inputBuffer.getDefiningOp<memref::SubViewOp>()) {
       inputTypes.push_back(subviewOp.getViewSource().getType());
     } else if (auto allocOp = inputBuffer.getDefiningOp<memref::AllocOp>()) {
       inputTypes.push_back(allocOp.getType());
     } else {
-      return failure();
+      inputTypes.clear();
+      break;
     }
   }
 
   for (Value outputBuffer : rootOp.getOutputBuffers()) {
     auto subviewOp = outputBuffer.getDefiningOp<memref::SubViewOp>();
-    if (!subviewOp) return failure();
+    if (!subviewOp) {
+      outputTypes.clear();
+      break;
+    }
     outputTypes.push_back(subviewOp.getViewSource().getType());
   }
-
-  return success();
+  return std::make_tuple(std::move(inputTypes), std::move(outputTypes));
 }
 
 /// Assuming the given `rootOp` is the tiled root Linalg op, returns the
@@ -153,10 +145,10 @@ LogicalResult getInputOutputTypesForAllTiles(
 ///
 /// TODO(antiagainst): This pass can be shared between CPU and GPU. But the
 /// following query scopes it to GPU for now.
-llvm::Optional<
-    std::pair<llvm::SmallVector<int64_t, 4>, llvm::SmallVector<int64_t, 4>>>
-getTileSizeAndWorkgroupSize(Operation *rootOp, ArrayRef<Type> inputTypes,
-                            ArrayRef<Type> outputTypes) {
+static LogicalResult getTileSizeAndWorkgroupSize(
+    Operation *rootOp, ArrayRef<Type> inputTypes, ArrayRef<Type> outputTypes,
+    SmallVector<int64_t, 4> &tileSize, SmallVector<int64_t, 4> &workgroupSize,
+    const SPIRVCodegenOptions &options) {
   // Build necesary structures to query the tile sizes for distributing to
   // workgroups.
   linalg::Aliases aliases;
@@ -164,10 +156,6 @@ getTileSizeAndWorkgroupSize(Operation *rootOp, ArrayRef<Type> inputTypes,
   auto ops = rootOp->getBlock()->getOps<linalg::LinalgOp>();
   linalgOps.assign(ops.begin(), ops.end());
   linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
-
-  SPIRVCodegenOptions options;
-  options.enableVectorization = true;
-  options.usingLinalgOnTensors = true;
 
   // NOTE: Launch configuration expects the original input/output type to decide
   // the configuration. But we have already tiled the Linalg ops here. Use an
@@ -186,85 +174,44 @@ getTileSizeAndWorkgroupSize(Operation *rootOp, ArrayRef<Type> inputTypes,
   Optional<LaunchConfig> launchConfig = initGPULaunchConfig(
       rootOp->getContext(), dependenceGraph, options, linalgOps);
   if (!launchConfig) {
-    rootOp->emitError("unable to find launch configuration");
-    return llvm::None;
+    return rootOp->emitError("unable to find launch configuration");
   }
 
-  ArrayRef<int64_t> tileSize = launchConfig->getTileSizes(rootOp, 0);
-  ArrayRef<int64_t> workgroupSize = launchConfig->getWorkgroupSize();
+  tileSize = llvm::to_vector<4>(launchConfig->getTileSizes(rootOp, 0));
+  workgroupSize = llvm::to_vector<4>(launchConfig->getWorkgroupSize());
 
   // Clean up internal markers that are set during launch configuration
   // preparation.
   launchConfig->finalize(rootOp->getParentOfType<FuncOp>());
 
-  return std::make_pair(llvm::to_vector<4>(tileSize),
-                        llvm::to_vector<4>(workgroupSize));
+  return success();
 }
 
-/// Replaces hal.interface.workgroup.size op with the constant value chosen
-/// from tiling scheme.
-class ConcretizeWorkgroupSizeOp final
-    : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
- public:
-  ConcretizeWorkgroupSizeOp(MLIRContext *context,
-                            SmallVector<int64_t, 4> workloadSize,
-                            SmallVector<int64_t, 4> tileSize,
-                            PatternBenefit benefit = 1)
-      : OpRewritePattern(context, benefit),
-        workloadSize(std::move(workloadSize)),
-        tileSize(std::move(tileSize)) {}
-
-  LogicalResult matchAndRewrite(IREE::HAL::InterfaceWorkgroupSizeOp op,
-                                PatternRewriter &rewriter) const override {
-    unsigned dimIndex = op.dimension().getZExtValue();
-
-    if (dimIndex < kWorkgroupDimCount && tileSize[dimIndex] != 0) {
-      rewriter.replaceOpWithNewOp<ConstantOp>(
-          op, rewriter.getIndexAttr(tileSize[dimIndex]));
-      return success();
-    }
-
-    return failure();
-  }
-
- private:
-  SmallVector<int64_t, 4> workloadSize;
-  SmallVector<int64_t, 4> tileSize;
-};
-
+namespace {
 /// Replaces hal.interface.workgroup.count op with the constant value chosen
 /// from tiling scheme.
 class ConcretizeWorkgroupCountOp final
     : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupCountOp> {
  public:
   ConcretizeWorkgroupCountOp(MLIRContext *context,
-                             SmallVector<int64_t, 4> workloadSize,
-                             SmallVector<int64_t, 4> tileSize,
+                             ArrayRef<int64_t> numWorkgroups,
                              PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
-        workloadSize(std::move(workloadSize)),
-        tileSize(std::move(tileSize)) {}
+        numWorkgroups(numWorkgroups.begin(), numWorkgroups.end()) {}
 
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceWorkgroupCountOp op,
                                 PatternRewriter &rewriter) const override {
     unsigned dimIndex = op.dimension().getZExtValue();
 
-    if (dimIndex >= kWorkgroupDimCount) return failure();
-
-    int64_t dimSize = workloadSize[dimIndex];
-    int64_t dimTile = tileSize[dimIndex];
-
-    if (dimSize == ShapedType::kDynamicSize || dimTile == 0) return failure();
-
-    int64_t count = ceilDiv(dimSize, dimTile);
-    rewriter.replaceOpWithNewOp<ConstantOp>(op, rewriter.getIndexAttr(count));
+    if (dimIndex >= numWorkgroups.size()) return failure();
+    rewriter.replaceOpWithNewOp<ConstantOp>(
+        op, rewriter.getIndexAttr(numWorkgroups[dimIndex]));
 
     return success();
   }
 
  private:
-  SmallVector<int64_t, 4> workloadSize;
-  SmallVector<int64_t, 4> tileSize;
+  SmallVector<int64_t, 4> numWorkgroups;
 };
 
 // Canonicalizes away a trip-one scf.for loop by inlining its body and removing
@@ -282,12 +229,11 @@ class ConcretizeWorkgroupCountOp final
 // Such scf.for loops can be inlined if %lb is smaller than upper bound.
 class RemoveTripOneLoop final : public OpRewritePattern<scf::ForOp> {
  public:
-  RemoveTripOneLoop(MLIRContext *context, SmallVector<int64_t, 4> workloadSize,
-                    SmallVector<int64_t, 4> tileSize,
-                    PatternBenefit benefit = 1)
+  RemoveTripOneLoop(MLIRContext *context, ArrayRef<int64_t> workloadSize,
+                    ArrayRef<int64_t> tileSize, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
-        workloadSize(std::move(workloadSize)),
-        tileSize(std::move(tileSize)) {}
+        workloadSize(workloadSize.begin(), workloadSize.end()),
+        tileSize(tileSize.begin(), tileSize.end()) {}
 
   LogicalResult matchAndRewrite(scf::ForOp op,
                                 PatternRewriter &rewriter) const override {
@@ -358,6 +304,72 @@ class RemoveTripOneLoop final : public OpRewritePattern<scf::ForOp> {
   SmallVector<int64_t, 4> tileSize;
 };
 
+static void removeOneTripTiledLoops(MLIRContext *context, FuncOp funcOp,
+                                    linalg::LinalgOp rootLinalgOp,
+                                    ArrayRef<int64_t> halWorkgroupSize) {
+  if (rootLinalgOp.getNumOutputs() != 1) return;
+  unsigned numParallelDims = getNumOuterParallelLoops(rootLinalgOp);
+  unsigned numTiledDims =
+      std::min<size_t>(numParallelDims, kMaxWorkgroupDimCount);
+
+  Value untiledOutputOperand = getViewSource(rootLinalgOp.getOutput(0));
+  ArrayRef<int64_t> outputShape =
+      untiledOutputOperand.getType().cast<ShapedType>().getShape();
+  if (outputShape.size() < numParallelDims) return;
+
+  // TODO(ravishankarm, antiagainst): Its pure co-incidence that the
+  // workload is derivable from the output shape. There is no requirement
+  // for this but is the case for all operations we are interested in.
+  auto workloadSize = llvm::to_vector<4>(llvm::reverse(
+      outputShape.take_front(numParallelDims).take_back(numTiledDims)));
+  if (llvm::any_of(workloadSize, [](int64_t dim) {
+        return dim == ShapedType::kDynamicSize;
+      })) {
+    return;
+  }
+  LLVM_DEBUG({
+    llvm::dbgs() << "Queried workload size: ";
+    llvm::interleaveComma(workloadSize, llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
+  SmallVector<int64_t, 3> numWorkgroups;
+  assert(halWorkgroupSize.size() == workloadSize.size());
+  for (auto pair : llvm::zip(workloadSize, halWorkgroupSize)) {
+    auto workload = std::get<0>(pair);
+    auto size = std::get<1>(pair);
+    numWorkgroups.push_back(ceilDiv(workload, size));
+  }
+  numWorkgroups.resize(kMaxWorkgroupDimCount, 1);
+  WorkgroupCountRegionBuilder regionBuilder = [&](OpBuilder &b, Location loc,
+                                                  std::array<Value, 3>) {
+    std::array<Value, 3> returnValues;
+    for (unsigned i = 0; i < kMaxWorkgroupDimCount; ++i) {
+      returnValues[i] = b.create<ConstantIndexOp>(loc, numWorkgroups[i]);
+    }
+    return returnValues;
+  };
+
+  OpBuilder builder(context);
+  if (failed(defineWorkgroupCountRegion(builder, funcOp, regionBuilder))) {
+    return;
+  }
+
+  {
+    OwningRewritePatternList workgroupCountPatterns(context);
+    workgroupCountPatterns.insert<ConcretizeWorkgroupCountOp>(context,
+                                                              numWorkgroups);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(workgroupCountPatterns));
+  }
+  {
+    OwningRewritePatternList removeTripOneLoopPatterns(context);
+    removeTripOneLoopPatterns.insert<RemoveTripOneLoop>(context, workloadSize,
+                                                        halWorkgroupSize);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(removeTripOneLoopPatterns));
+  }
+}
+
 /// Concretizes hal.interface.workgroup.* ops with constants from the chosen
 /// tiling sheme when possible and perform loop canonicalization afterwards.
 class ConcretizeTileAmongWorkgroupsPass
@@ -375,10 +387,9 @@ class ConcretizeTileAmongWorkgroupsPass
   void runOnOperation() override {
     IREE::HAL::ExecutableTargetOp targetOp = getOperation();
     ModuleOp module = targetOp.getInnerModule();
-
     for (FuncOp funcOp : module.getOps<FuncOp>()) {
       if (!funcOp.isPublic()) continue;
-      if (failed(runOnFunction(funcOp))) return signalPassFailure();
+      (void)runOnFunction(funcOp);
     }
   }
 
@@ -386,158 +397,84 @@ class ConcretizeTileAmongWorkgroupsPass
   LogicalResult runOnFunction(FuncOp funcOp) {
     MLIRContext &context = getContext();
 
-    // 1. Get the root op first. We need it to figure out the original problem
-    // size, which then affects the tiling and distribution policy.
+    // 1. Get the linalg operations within the function. The callee here
+    // successed only for functions with single basic block.
+    SmallVector<linalg::LinalgOp> linalgOps;
+    SmallVector<Operation *> tiledLoops;
+    if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) {
+      return failure();
+    }
+    // If there are no Linalg ops. Nothing to do. Return.
+    if (linalgOps.empty()) return success();
 
-    linalg::LinalgOp rootOp = getRootLinalgOp(funcOp);
-    if (!rootOp) {
-      LLVM_DEBUG(llvm::dbgs() << "unable to find root Linalg op\n");
-      // It can happen for ops that are not abstractly tiled during dispatch
-      // region formation. So don't trigger pass failure.
+    // 2. Get the launch configuration to use for the function.
+    linalg::Aliases aliases;
+    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
+    Optional<LaunchConfig> launchConfig = initGPULaunchConfig(
+        funcOp.getContext(), dependenceGraph, options, linalgOps);
+    if (!launchConfig) {
+      // Having no config implies that there is nothing to do here. Return
       return success();
     }
-    LLVM_DEBUG(llvm::dbgs() << "Root op: " << rootOp << "\n");
 
-    size_t numTilableDims = getNumOuterParallelDims(rootOp);
+    // 3. The root operation determines the tile size to use. This has already
+    // been computed by the launch configuration.
+    // TODO(ravishankarm): The configuration actually makes sure that all tile
+    // sizes for the parallel loops are consistent, but get the root operation
+    // for now.
+    Operation *rootOp =
+        launchConfig->getRootOperation(llvm::to_vector<4>(llvm::map_range(
+            linalgOps, [](linalg::LinalgOp op) { return op.getOperation(); })));
 
-    // 2. Figure out the original problem size.
-
-    SmallVector<Type, 4> inputTypes, outputTypes;
-    SmallVector<int64_t, 4> workloadSize;
-    if (succeeded(
-            getInputOutputTypesForAllTiles(rootOp, inputTypes, outputTypes))) {
-      if (outputTypes.size() != 1) {
-        return rootOp.emitError("only support ops with one result right now");
-      }
-
-      // Flow/HAL processor id/size/count ops' indices follow the reverse order
-      // of the shape dimensions.
-      workloadSize = llvm::to_vector<4>(llvm::reverse(
-          outputTypes.front().cast<ShapedType>().getShape().take_front(
-              numTilableDims)));
-    } else {
-      // This can happen for dynamic shapes.
-      LLVM_DEBUG(llvm::dbgs()
-                 << "unable to find input/output type for all tiles");
-
-      inputTypes.clear();
-      outputTypes.clear();
-
-      workloadSize.assign(numTilableDims, ShapedType::kDynamicSize);
+    unsigned numParallelDims = getNumOuterParallelLoops(rootOp);
+    unsigned numTiledDims =
+        std::min<size_t>(numParallelDims, kMaxWorkgroupDimCount);
+    ArrayRef<int64_t> tileSizes = launchConfig->getTileSizes(rootOp, 0);
+    if (tileSizes.size() < numParallelDims) {
+      return rootOp->emitError(
+                 "invalid tile size configuration, expected at least as many "
+                 "as the number of tiled loops : ")
+             << numParallelDims;
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "Queried workload size: ";
-      llvm::interleaveComma(workloadSize, llvm::dbgs());
-      llvm::dbgs() << "\n";
-    });
-
-    // 3. Query the scheme for tiling among workgroups.
-
-    SmallVector<int64_t, 4> tileSize;
-    SmallVector<int64_t, 4> workgroupSize;
-
-    // Try to use configuration from the command-line first for testing.
-    tileSize.assign(options.tileSizes.begin(), options.tileSizes.end());
-    tileSize.resize(numTilableDims, 0);
-    workgroupSize.assign(options.workgroupSize.begin(),
-                         options.workgroupSize.end());
-    if (tileSize.empty() || workgroupSize.empty()) {
-      auto sizes = getTileSizeAndWorkgroupSize(rootOp, inputTypes, outputTypes);
-      if (sizes) {
-        // The tile sizes are specified against the original dimension order of
-        // the workload shape. But Flow/HAL processor id/size/count ops' are
-        // created using the reverse order.
-        tileSize = sizes->first;
-        tileSize.resize(numTilableDims);
-        tileSize = llvm::to_vector<4>(llvm::reverse(tileSize));
-        workgroupSize = sizes->second;
-      } else {
-        return funcOp.emitError("failed to query tile size and workgroup size");
-      }
+    // TODO(ravishankarm): The flow tiling only tiles the inner parallel loops
+    // by default. Using the same approach here. This spooky distant shake hand
+    // needs to be resolved. Potentially can be made cleaner with use of
+    // `linalg.tile` operation.
+    tileSizes = tileSizes.take_front(numParallelDims).take_back(numTiledDims);
+    if (llvm::any_of(tileSizes, [](int64_t ts) { return ts == 0; })) {
+      return rootOp->emitError(
+          "unhandled tile size setting of 0 for a loop that was tiled");
     }
+
+    // 4. The hal.workgroup.size is a representation of the tile size. Note that
+    // this is not the actual workgroup size used eventually. That is computed
+    // by the launch configuration and is set below.
+    auto halWorkgroupSize = llvm::to_vector<4>(llvm::reverse(tileSizes));
 
     LLVM_DEBUG({
       llvm::dbgs() << "Queried tile size: ";
-      llvm::interleaveComma(tileSize, llvm::dbgs());
+      llvm::interleaveComma(tileSizes, llvm::dbgs());
+      llvm::dbgs() << ", HAL workgroup size: ";
+      llvm::interleaveComma(halWorkgroupSize, llvm::dbgs());
       llvm::dbgs() << "\n";
     });
-
-    // 4. Replace hal.interface.workgroup symbolic ops with constant values.
-
-    {
-      OwningRewritePatternList patterns(&getContext());
-      patterns.insert<ConcretizeWorkgroupSizeOp, ConcretizeWorkgroupCountOp>(
-          &context, workloadSize, tileSize);
-
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    // 4. Materialize the constant values for the hal.workgroup.size along
+    // different dimensions.
+    if (failed(materializeStaticLaunchInformation(funcOp, halWorkgroupSize))) {
+      return funcOp.emitOpError(
+          "failed to materialize static launch information");
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs()
-          << "--- After concretizing hal.interface.workgroup ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
-    // 5. Set the entry point region for computing the number of workgroups
-    // to dispatch. The region has symbolic arguments representing the workload.
-    // So two modes here (see comments at the begining of this file).
-
-    {
-      SmallVector<int64_t, 3> numWorkgroups;
-      for (auto pair : llvm::zip(workloadSize, tileSize)) {
-        auto workload = std::get<0>(pair);
-        auto tile = std::get<1>(pair);
-        if (workload == ShapedType::kDynamicSize || tile == 0) {
-          numWorkgroups.push_back(ShapedType::kDynamicSize);
-        } else {
-          numWorkgroups.push_back(ceilDiv(workload, tile));
-        }
-      }
-
-      numWorkgroups.resize(kWorkgroupDimCount, 1);
-
-      // If all dimensions are known constant, then we can set the number of
-      // workgroups directly. Otherwise, we need to generate the IR for
-      // computing it using symbolic values.
-      if (llvm::none_of(numWorkgroups, [](int64_t dim) {
-            return dim == ShapedType::kDynamicSize;
-          })) {
-        OpBuilder builder(&context);
-        WorkgroupCountRegionBuilder regionBuilder =
-            [&](OpBuilder &builder, Location loc, std::array<Value, 3>) {
-              std::array<Value, 3> returnValues;
-              for (unsigned i = 0; i < kWorkgroupDimCount; ++i) {
-                returnValues[i] =
-                    builder.create<ConstantIndexOp>(loc, numWorkgroups[i]);
-              }
-              return returnValues;
-            };
-        if (failed(
-                defineWorkgroupCountRegion(builder, funcOp, regionBuilder))) {
-          return funcOp.emitError(
-              "failed to set entry point region for number of workgroups");
-        }
-      } else {
-        if (failed(materializeStaticLaunchInformation(funcOp, tileSize))) {
-          return funcOp.emitOpError(
-              "failed to materialize static launch information");
-        }
-      }
-    }
-
-    if (failed(updateWorkGroupSize(funcOp, workgroupSize))) {
+    // 5. Update the actual workgroup size to use based on launch configuraiton.
+    if (failed(updateWorkGroupSize(funcOp, launchConfig->getWorkgroupSize()))) {
       return funcOp.emitOpError("failed to set workgroup size on function");
     }
-
-    // 6. Canonicalization and clean up.
+    launchConfig->finalize(funcOp);
 
     if (inlineTripOneLoops) {
-      OwningRewritePatternList patterns(&getContext());
-      patterns.insert<RemoveTripOneLoop>(&context, workloadSize, tileSize);
-
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+      removeOneTripTiledLoops(&context, funcOp, cast<linalg::LinalgOp>(rootOp),
+                              halWorkgroupSize);
     }
 
     return success();

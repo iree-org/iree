@@ -61,14 +61,16 @@ void MaterializeCPULaunchConfigurationPass::runOnOperation() {
     SmallVector<linalg::LinalgOp, 4> linalgOps;
     SmallVector<Operation *, 4> tiledLoops;
     if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) {
-      return signalPassFailure();
+      // Nothing to do here. Continue.
+      continue;
     }
     linalg::Aliases aliases;
     linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
     Optional<LaunchConfig> launchConfigOpt =
         initCPULaunchConfig(context, dependenceGraph, linalgOps);
     if (!launchConfigOpt) {
-      return;
+      // Nothing to do here. Continue.
+      continue;
     }
     LaunchConfig &launchConfig = *launchConfigOpt;
 

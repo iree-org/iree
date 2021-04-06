@@ -29,15 +29,16 @@
 namespace mlir {
 namespace iree_compiler {
 
+static constexpr int32_t kNumGPUDims = 3;
+
 static SmallVector<linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
     OpBuilder &builder, Location loc, unsigned numDims) {
-  static constexpr int32_t kNumGPUDims = 3;
+  assert(numDims <= kNumGPUDims);
   SmallVector<linalg::ProcInfo, 2> procInfo(numDims);
   std::array<StringRef, kNumGPUDims> dimAttr{"x", "y", "z"};
   Type indexType = builder.getIndexType();
   for (unsigned i = 0; i < numDims; ++i) {
-    StringAttr attr =
-        builder.getStringAttr(dimAttr[std::min<unsigned>(i, kNumGPUDims)]);
+    StringAttr attr = builder.getStringAttr(dimAttr[i]);
     procInfo[numDims - 1 - i] = {
         builder.create<gpu::ThreadIdOp>(loc, indexType, attr),
         builder.create<gpu::BlockDimOp>(loc, indexType, attr)};
@@ -47,16 +48,20 @@ static SmallVector<linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
 
 /// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns) {
+    MLIRContext *context, OwningRewritePatternList &patterns,
+    ArrayRef<int64_t> tileSizes) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
-      [](OpBuilder &builder, Operation *operation) {
-        ArrayRef<int64_t> tileSizes = {4};
+      [tileSizes](OpBuilder &builder, Operation *operation) {
         if (tileSizes.empty()) return SmallVector<Value, 4>();
         SmallVector<Value, 4> tileSizesVal;
         tileSizesVal.reserve(tileSizes.size());
-        for (auto val : tileSizes) {
+        for (auto val : llvm::enumerate(tileSizes)) {
+          // Only tile the last 3 dimensions. Use tile size of 0 for any higher
+          // dimension as we only support distributing on 3 dimensions.
+          int64_t t =
+              (tileSizes.size() - val.index()) <= kNumGPUDims ? val.value() : 0;
           tileSizesVal.push_back(
-              builder.create<ConstantIndexOp>(operation->getLoc(), val));
+              builder.create<ConstantIndexOp>(operation->getLoc(), t));
         }
         return tileSizesVal;
       };
@@ -72,7 +77,7 @@ static void populateTilingToInvocationPatterns(
 
   auto tilingOptions =
       linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::Loops)
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
@@ -174,12 +179,22 @@ struct TileAndDistributeToThreads
       }
 
       {
+        SmallVector<int64_t, 4> threadTileSize =
+            llvm::to_vector<4>(config->getTileSizes(rootOp, 2));
         // Apply last level of tiling and distribute to threads.
         OwningRewritePatternList threadLevelTilingPatterns(context);
-        populateTilingToInvocationPatterns(context, threadLevelTilingPatterns);
+        populateTilingToInvocationPatterns(context, threadLevelTilingPatterns,
+                                           threadTileSize);
         (void)applyPatternsAndFoldGreedily(
             funcOp, std::move(threadLevelTilingPatterns));
         applyCanonicalizationPatternsForTiling(context, funcOp);
+      }
+      {
+        OwningRewritePatternList patterns(context);
+        // Apply canonicalization patterns.
+        linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+        populateAffineMinSCFCanonicalizationPattern(patterns);
+        (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
       }
     }
   }

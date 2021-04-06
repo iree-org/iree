@@ -83,6 +83,10 @@ typedef struct {
   bool push_descriptors : 1;
   // VK_KHR_timeline_semaphore is enabled.
   bool timeline_semaphore : 1;
+  // VK_EXT_host_query_reset is enabled.
+  bool host_query_reset : 1;
+  // VK_EXT_calibrated_timestamps is enabled.
+  bool calibrated_timestamps : 1;
 } iree_hal_vulkan_device_extensions_t;
 
 // Returns a bitfield with all of the provided extension names.

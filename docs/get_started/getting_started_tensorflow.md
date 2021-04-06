@@ -39,6 +39,7 @@ For example to run TensorFlow-based tests, you can build `iree-import-tf`
 TODO(4979): Rename iree-tf-import to iree-import-tf
 
 ```shell
+python3 configure_bazel.py
 cd integrations/tensorflow
 bazel build \
   //iree_tf_compiler:iree-tf-import \

@@ -41,7 +41,8 @@ TEST_P(CommandBufferTest, Create) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
 
   EXPECT_TRUE((iree_hal_command_buffer_allowed_categories(command_buffer) &
                IREE_HAL_COMMAND_CATEGORY_DISPATCH) ==
@@ -54,7 +55,8 @@ TEST_P(CommandBufferTest, BeginEnd) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -66,7 +68,8 @@ TEST_P(CommandBufferTest, SubmitEmpty) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -81,7 +84,8 @@ TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_TRANSFER, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
 
   iree_hal_buffer_t* device_buffer;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
@@ -141,7 +145,8 @@ TEST_P(CommandBufferTest, CopyWholeBuffer) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_TRANSFER, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
 
   // Create and fill a host buffer.
   iree_hal_buffer_t* host_buffer;
@@ -192,7 +197,8 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_TRANSFER, &command_buffer));
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      &command_buffer));
 
   iree_hal_buffer_t* device_buffer;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(

@@ -1,6 +1,4 @@
-// Tests printing and parsing of executable/structural ops.
-
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @ex
 hal.executable @ex {
@@ -8,12 +6,12 @@ hal.executable @ex {
   hal.executable.target @backend, filter="backend" {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
-    // CHECK-SAME:     ordinal = 0 : i32
+    // CHECK-SAME:     ordinal = 0 : index
     // CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
-      ordinal = 0 : i32,
+      ordinal = 0 : index,
       signature = (tensor<4xf32>) -> tensor<4xf32>,
       workgroup_size = [4 : index, 1 : index, 1 : index]
     }
@@ -42,12 +40,12 @@ hal.executable @ex_with_workgroup_count_region {
   hal.executable.target @backend, filter="backend" {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
-    // CHECK-SAME:     ordinal = 0 : i32
+    // CHECK-SAME:     ordinal = 0 : index
     // CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
-      ordinal = 0 : i32,
+      ordinal = 0 : index,
       signature = (tensor<4xf32>) -> tensor<4xf32>,
       workgroup_size = [4 : index, 1 : index, 1 : index]
     } {
@@ -87,12 +85,7 @@ hal.executable @ex_with_source {
       // CHECK-NEXT: func @dispatch0
       func @dispatch0(%arg0: memref<4xf32>, %arg1: memref<4xf32>) attributes {
           iree.executable.export,
-          iree.ordinal = 0 : i32} {
-        %0 = "iree_ll_interp.alloc_heap"() : () -> memref<4xf32>
-        "iree_ll_interp.add_f"(%arg0, %arg0, %0) : (memref<4xf32>, memref<4xf32>, memref<4xf32>) -> ()
-        %1 = "iree_ll_interp.constant"() {value = dense<0> : tensor<1xi64>} : () -> memref<1xi64>
-        %2 = "iree_ll_interp.constant"() {value = dense<4> : tensor<1xi64>} : () -> memref<1xi64>
-        "iree_ll_interp.dynamic_copy"(%0, %1, %arg1, %1, %2) : (memref<4xf32>, memref<1xi64>, memref<4xf32>, memref<1xi64>, memref<1xi64>) -> ()
+          iree.ordinal = 0 : index} {
         return
       }
     }
@@ -105,17 +98,34 @@ hal.executable @ex_with_source {
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME: %[[LAYOUT0:.+]]: !hal.executable_layout,
 // CHECK-SAME: %[[LAYOUT1:.+]]: !hal.executable_layout
-func @executable_create(%device : !hal.device, %layout0 : !hal.executable_layout, %layout1 : !hal.executable_layout) {
-  // CHECK: = hal.executable.create %[[DEVICE]], @exe::@binary1, layouts = [%[[LAYOUT0]], %[[LAYOUT1]]] : !hal.executable
-  %0 = hal.executable.create %device, @exe::@binary1, layouts = [%layout0, %layout1] : !hal.executable
+func @executable_create(%device: !hal.device,
+                        %layout0: !hal.executable_layout,
+                        %layout1: !hal.executable_layout) {
+  //      CHECK: = hal.executable.create
+  // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
+  // CHECK-SAME:     target(@exe::@binary1)
+  // CHECK-SAME:    layouts([%[[LAYOUT0]], %[[LAYOUT1]]]) : !hal.executable
+  %0 = hal.executable.create device(%device : !hal.device)
+                             target(@exe::@binary1)
+                            layouts([%layout0, %layout1]) : !hal.executable
   return
 }
 
 // -----
 
 // CHECK-LABEL: @executable_layout_create
-func @executable_layout_create(%arg0 : !hal.device, %arg1 : !hal.descriptor_set_layout) {
-  // CHECK: hal.executable_layout.create %arg0, push_constants = 1, set_layouts = [%arg1] : !hal.executable_layout
-  %executable_layout = hal.executable_layout.create %arg0, push_constants = 1, set_layouts = [%arg1] : !hal.executable_layout
+// CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME: %[[LAYOUT0:.+]]: !hal.descriptor_set_layout,
+// CHECK-SAME: %[[LAYOUT1:.+]]: !hal.descriptor_set_layout
+func @executable_layout_create(%device: !hal.device,
+                               %layout0: !hal.descriptor_set_layout,
+                               %layout1: !hal.descriptor_set_layout) {
+  // CHECK: hal.executable_layout.create
+  // CHECK-SAME:          device(%[[DEVICE]] : !hal.device)
+  // CHECK-SAME:  push_constants(1)
+  // CHECK-SAME:         layouts([%[[LAYOUT0]], %[[LAYOUT1]]]) : !hal.executable_layout
+  %0 = hal.executable_layout.create device(%device : !hal.device)
+                            push_constants(1)
+                                   layouts([%layout0, %layout1]) : !hal.executable_layout
   return
 }

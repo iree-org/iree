@@ -688,11 +688,11 @@ struct TileAndDistributeOnTensorsPattern
     SmallVector<Value, 4> count = llvm::to_vector<4>(
         llvm::map_range(linalgOp.createLoopRanges(rewriter, loc),
                         [](Range r) { return r.size; }));
-    size_t numParrallelLoops = getNumOuterParallelLoops(op);
-    if (numParrallelLoops > kNumMaxParallelDims) {
+    size_t numParallelLoops = getNumOuterParallelLoops(op);
+    if (numParallelLoops > kNumMaxParallelDims) {
       count.erase(
           count.begin(),
-          std::next(count.begin(), numParrallelLoops - kNumMaxParallelDims));
+          std::next(count.begin(), numParallelLoops - kNumMaxParallelDims));
     }
     count.resize(getNumTilableLoops(op));
     auto workload = convertToWorkload(rewriter, loc, count);

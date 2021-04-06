@@ -206,6 +206,12 @@ iree_hal_vulkan_populate_enabled_device_extensions(
     } else if (strcmp(extension_name,
                       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
       extensions.timeline_semaphore = true;
+    } else if (strcmp(extension_name, VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME) ==
+               0) {
+      extensions.host_query_reset = true;
+    } else if (strcmp(extension_name,
+                      VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) == 0) {
+      extensions.calibrated_timestamps = true;
     }
   }
   return extensions;
@@ -221,6 +227,12 @@ iree_hal_vulkan_infer_enabled_device_extensions(
   }
   if (device_syms->vkSignalSemaphore || device_syms->vkSignalSemaphoreKHR) {
     extensions.timeline_semaphore = true;
+  }
+  if (device_syms->vkResetQueryPoolEXT) {
+    extensions.host_query_reset = true;
+  }
+  if (device_syms->vkGetCalibratedTimestampsEXT) {
+    extensions.calibrated_timestamps = true;
   }
   return extensions;
 }

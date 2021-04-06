@@ -57,52 +57,134 @@ static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<SizeAwareType>
+//===----------------------------------------------------------------------===//
+// type{%size}
+
+static ParseResult parseSizeAwareType(OpAsmParser &parser, Type &type,
+                                      OpAsmParser::OperandType &size) {
+  if (failed(parser.parseType(type)) || failed(parser.parseLBrace()) ||
+      failed(parser.parseOperand(size)) || failed(parser.parseRBrace())) {
+    return failure();
+  }
+  return success();
+}
+
+static void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type,
+                               Value size) {
+  p.printType(type);
+  p << "{";
+  p.printOperand(size);
+  p << "}";
+}
+
+//===----------------------------------------------------------------------===//
+// custom<SizeAwareTypeList>
+//===----------------------------------------------------------------------===//
+// (type{%size0}, type, type{%size1})
+
+static ParseResult parseSizeAwareTypeList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types,
+    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
+  do {
+    Type type;
+    if (failed(parser.parseType(type))) return failure();
+    if (type.isa<SizeAwareTypeInterface>()) {
+      OpAsmParser::OperandType size;
+      if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
+          failed(parser.parseRBrace())) {
+        return failure();
+      }
+      sizes.push_back(size);
+    }
+    types.push_back(type);
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op,
+                                   TypeRange types, OperandRange sizes) {
+  int sizeIndex = 0;
+  llvm::interleaveComma(types, p, [&](Type type) {
+    p.printType(type);
+    if (type.isa<SizeAwareTypeInterface>()) {
+      p << "{";
+      p.printOperand(sizes[sizeIndex++]);
+      p << "}";
+    }
+  });
+}
+
+//===----------------------------------------------------------------------===//
+// custom<DescriptorSetBindings>($binding_ordinals,
+//                               $binding_buffers,
+//                               type($binding_buffers),
+//                               $binding_offsets,
+//                               $binding_lengths)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseDescriptorSetBindings(
+    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &ordinals,
+    SmallVectorImpl<OpAsmParser::OperandType> &buffers,
+    SmallVectorImpl<Type> &bufferTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &bufferOffsets,
+    SmallVectorImpl<OpAsmParser::OperandType> &bufferLengths) {
+  do {
+    OpAsmParser::OperandType ordinal;
+    OpAsmParser::OperandType buffer;
+    Type bufferType;
+    OpAsmParser::OperandType bufferOffset;
+    OpAsmParser::OperandType bufferLength;
+    if (failed(parser.parseOperand(ordinal)) || failed(parser.parseEqual()) ||
+        failed(parser.parseLParen()) || failed(parser.parseOperand(buffer)) ||
+        failed(parser.parseColonType(bufferType)) ||
+        failed(parser.parseRParen()) || failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(bufferOffset)) ||
+        failed(parser.parseComma()) ||
+        failed(parser.parseOperand(bufferLength)) ||
+        failed(parser.parseRSquare())) {
+      return failure();
+    }
+    ordinals.push_back(ordinal);
+    buffers.push_back(buffer);
+    bufferTypes.push_back(bufferType);
+    bufferOffsets.push_back(bufferOffset);
+    bufferLengths.push_back(bufferLength);
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
+                                       ValueRange ordinals, ValueRange buffers,
+                                       TypeRange bufferTypes,
+                                       ValueRange bufferOffsets,
+                                       ValueRange bufferLengths) {
+  llvm::interleaveComma(
+      llvm::zip(ordinals, buffers, bufferTypes, bufferOffsets, bufferLengths),
+      p, [&](std::tuple<Value, Value, Type, Value, Value> it) {
+        p.printNewline();
+        p << "  ";
+        p.printOperand(std::get<0>(it));
+        p << " = (";
+        p.printOperand(std::get<1>(it));
+        p << " : ";
+        p.printType(std::get<2>(it));
+        p << ")[";
+        p.printOperand(std::get<3>(it));
+        p << ", ";
+        p.printOperand(std::get<4>(it));
+        p << "]";
+      });
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.ex.shared_device
 //===----------------------------------------------------------------------===//
 
 void ExSharedDeviceOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "dev");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.make_memory_barrier
-//===----------------------------------------------------------------------===//
-
-void MakeMemoryBarrierOp::build(OpBuilder &builder, OperationState &state,
-                                IREE::HAL::AccessScopeBitfield sourceScope,
-                                IREE::HAL::AccessScopeBitfield targetScope) {
-  state.addAttribute("source_scope", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(sourceScope)));
-  state.addAttribute("target_scope", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(targetScope)));
-  state.addTypes({MemoryBarrierType::get(builder.getContext())});
-}
-
-void MakeMemoryBarrierOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "memory_barrier");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.make_buffer_barrier
-//===----------------------------------------------------------------------===//
-
-void MakeBufferBarrierOp::build(OpBuilder &builder, OperationState &state,
-                                IREE::HAL::AccessScopeBitfield sourceScope,
-                                IREE::HAL::AccessScopeBitfield targetScope,
-                                Value buffer, Value offset, Value length) {
-  state.addAttribute("source_scope", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(sourceScope)));
-  state.addAttribute("target_scope", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(targetScope)));
-  state.addOperands({buffer, offset, length});
-  state.addTypes({BufferBarrierType::get(builder.getContext())});
-}
-
-void MakeBufferBarrierOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "buffer_barrier");
+  setNameFn(result(), "device");
 }
 
 //===----------------------------------------------------------------------===//
@@ -440,43 +522,20 @@ void AllocatorComputeRangeOp::getAsmResultNames(
 // hal.allocator.allocate
 //===----------------------------------------------------------------------===//
 
-void AllocatorAllocateOp::build(OpBuilder &builder, OperationState &state,
-                                Value allocator,
-                                IREE::HAL::MemoryTypeBitfield memoryTypes,
-                                IREE::HAL::BufferUsageBitfield bufferUsage,
-                                Value allocationSize) {
-  state.addOperands({allocator, allocationSize});
-  state.addAttribute("memory_types", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(memoryTypes)));
-  state.addAttribute("buffer_usage", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(bufferUsage)));
-  state.addTypes({BufferType::get(builder.getContext())});
-}
-
 void AllocatorAllocateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "buffer");
 }
 
+Value AllocatorAllocateOp::getOperandSize(unsigned idx) { return {}; }
+
+Value AllocatorAllocateOp::getResultSize(unsigned idx) { return result_size(); }
+
 //===----------------------------------------------------------------------===//
-// hal.allocator.allocate.const
+// hal.allocator.constant
 //===----------------------------------------------------------------------===//
 
-void AllocatorAllocateConstOp::build(OpBuilder &builder, OperationState &state,
-                                     Value allocator,
-                                     IREE::HAL::MemoryTypeBitfield memoryTypes,
-                                     IREE::HAL::BufferUsageBitfield bufferUsage,
-                                     ElementsAttr value) {
-  state.addOperands({allocator});
-  state.addAttribute("memory_types", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(memoryTypes)));
-  state.addAttribute("buffer_usage", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(bufferUsage)));
-  state.addAttribute("value", value);
-  state.addTypes({BufferType::get(builder.getContext())});
-}
-
-void AllocatorAllocateConstOp::getAsmResultNames(
+void AllocatorConstantOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "cbuffer");
 }
@@ -485,33 +544,21 @@ void AllocatorAllocateConstOp::getAsmResultNames(
 // hal.allocator.map
 //===----------------------------------------------------------------------===//
 
-void AllocatorMapOp::build(OpBuilder &builder, OperationState &state,
-                           Value allocator,
-                           IREE::HAL::MemoryTypeBitfield memoryTypes,
-                           IREE::HAL::BufferUsageBitfield bufferUsage,
-                           Value source, Value offset, Value length) {
-  state.addOperands({allocator, source, offset, length});
-  state.addAttribute("memory_types", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(memoryTypes)));
-  state.addAttribute("buffer_usage", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(bufferUsage)));
-  state.addTypes({BufferType::get(builder.getContext())});
-}
-
 void AllocatorMapOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "mapped");
 }
 
+Value AllocatorMapOp::getOperandSize(unsigned idx) { return {}; }
+
+Value AllocatorMapOp::getResultSize(unsigned idx) { return length(); }
+
+//===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
 //===----------------------------------------------------------------------===//
 // hal.buffer.allocator
 //===----------------------------------------------------------------------===//
-
-void BufferAllocatorOp::build(OpBuilder &builder, OperationState &state,
-                              Value buffer) {
-  state.addOperands({buffer});
-  state.addTypes({AllocatorType::get(builder.getContext())});
-}
 
 void BufferAllocatorOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -527,27 +574,17 @@ void BufferSubspanOp::getAsmResultNames(
   setNameFn(result(), "buffer");
 }
 
+Value BufferSubspanOp::getOperandSize(unsigned idx) { return length(); }
+
+Value BufferSubspanOp::getResultSize(unsigned idx) { return length(); }
+
 //===----------------------------------------------------------------------===//
-// hal.buffer_view.const
+// hal.buffer.byte_length
 //===----------------------------------------------------------------------===//
 
-void BufferViewConstOp::build(OpBuilder &builder, OperationState &state,
-                              Value allocator,
-                              IREE::HAL::MemoryTypeBitfield memoryTypes,
-                              IREE::HAL::BufferUsageBitfield bufferUsage,
-                              ElementsAttr value) {
-  state.addOperands({allocator});
-  state.addAttribute("memory_types", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(memoryTypes)));
-  state.addAttribute("buffer_usage", builder.getI32IntegerAttr(
-                                         static_cast<int32_t>(bufferUsage)));
-  state.addAttribute("value", value);
-  state.addTypes({BufferViewType::get(builder.getContext())});
-}
-
-void BufferViewConstOp::getAsmResultNames(
+void BufferLengthOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "view");
+  setNameFn(result(), "len");
 }
 
 //===----------------------------------------------------------------------===//
@@ -587,12 +624,6 @@ void BufferViewSubviewOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // hal.buffer_view.buffer
 //===----------------------------------------------------------------------===//
-
-void BufferViewBufferOp::build(OpBuilder &builder, OperationState &state,
-                               Value bufferView) {
-  state.addOperands({bufferView});
-  state.addTypes({BufferType::get(builder.getContext())});
-}
 
 void BufferViewBufferOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -652,19 +683,6 @@ void BufferViewComputeRangeOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // hal.command_buffer.create
 //===----------------------------------------------------------------------===//
-
-void CommandBufferCreateOp::build(
-    OpBuilder &builder, OperationState &state, Value device,
-    IREE::HAL::CommandBufferModeBitfield modes,
-    IREE::HAL::CommandCategoryBitfield commandCategories) {
-  state.addOperands({device});
-  state.addAttribute("modes",
-                     builder.getI32IntegerAttr(static_cast<int32_t>(modes)));
-  state.addAttribute(
-      "command_categories",
-      builder.getI32IntegerAttr(static_cast<int32_t>(commandCategories)));
-  state.addTypes({CommandBufferType::get(builder.getContext())});
-}
 
 void CommandBufferCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -749,157 +767,6 @@ void CommandBufferPushDescriptorSetOp::build(
   state.addOperands(bindingBuffers);
   state.addOperands(bindingOffsets);
   state.addOperands(bindingLengths);
-}
-
-static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
-                                              OperationState *result) {
-  auto indexType = parser.getBuilder().getIndexType();
-  SmallVector<Value, 4> bindingOrdinals;
-  SmallVector<Value, 4> bindingBuffers;
-  SmallVector<Value, 4> bindingOffsets;
-  SmallVector<Value, 4> bindingLengths;
-  do {
-    NamedAttrList attrList;
-    OpAsmParser::OperandType ordinal;
-    OpAsmParser::OperandType buffer;
-    OpAsmParser::OperandType bufferOffset;
-    OpAsmParser::OperandType bufferLength;
-    if (failed(parser.parseOperand(ordinal)) ||
-        failed(parser.resolveOperand(ordinal, indexType, bindingOrdinals)) ||
-        failed(parser.parseEqual()) || failed(parser.parseLParen()) ||
-        failed(parser.parseOperand(buffer)) ||
-        failed(parser.resolveOperand(
-            buffer, BufferType::get(result->getContext()), bindingBuffers)) ||
-        failed(parser.parseComma()) ||
-        failed(parser.parseOperand(bufferOffset)) ||
-        failed(
-            parser.resolveOperand(bufferOffset, indexType, bindingOffsets)) ||
-        failed(parser.parseComma()) ||
-        failed(parser.parseOperand(bufferLength)) ||
-        failed(
-            parser.resolveOperand(bufferLength, indexType, bindingLengths)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  } while (succeeded(parser.parseOptionalComma()));
-  result->addOperands(bindingOrdinals);
-  result->addOperands(bindingBuffers);
-  result->addOperands(bindingOffsets);
-  result->addOperands(bindingLengths);
-  return success();
-}
-
-static ParseResult parseCommandBufferPushDescriptorSetOp(
-    OpAsmParser &parser, OperationState *result) {
-  OpAsmParser::OperandType commandBuffer;
-  OpAsmParser::OperandType executableLayout;
-  OpAsmParser::OperandType set;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseOperand(executableLayout)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("set")) ||
-      failed(parser.parseEqual()) || failed(parser.parseOperand(set)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.resolveOperands(
-          ArrayRef<OpAsmParser::OperandType>{
-              commandBuffer,
-              executableLayout,
-              set,
-          },
-          ArrayRef<Type>{
-              CommandBufferType::get(result->getContext()),
-              ExecutableLayoutType::get(result->getContext()),
-              IndexType::get(result->getContext()),
-          },
-          operandsLoc, result->operands)) ||
-      failed(parser.parseKeyword("bindings")) || failed(parser.parseEqual()) ||
-      failed(parser.parseLSquare()) ||
-      failed(parseDescriptorSetBindings(parser, result)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-template <typename T>
-static void printDescriptorSetBindings(OpAsmPrinter &p, T op) {
-  for (int i = 0; i < op.binding_ordinals().size(); ++i) {
-    p.printOperand(op.binding_ordinals()[i]);
-    p << " = (";
-    p.printOperand(op.binding_buffers()[i]);
-    p << ", ";
-    p.printOperand(op.binding_offsets()[i]);
-    p << ", ";
-    p.printOperand(op.binding_lengths()[i]);
-    p << ")";
-    if (i < op.binding_ordinals().size() - 1) p << ", ";
-  }
-}
-
-static void printCommandBufferPushDescriptorSetOp(
-    OpAsmPrinter &p, CommandBufferPushDescriptorSetOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.command_buffer());
-  p << ", ";
-  p.printOperand(op.executable_layout());
-  p << ", set = ";
-  p.printOperand(op.set());
-  p << ", bindings = [";
-  printDescriptorSetBindings(p, op);
-  p << "]";
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
-                              "set",
-                              "bindings",
-                          });
-}
-
-//===----------------------------------------------------------------------===//
-// hal.command_buffer.bind_descriptor_set
-//===----------------------------------------------------------------------===//
-
-void CommandBufferBindDescriptorSetOp::build(OpBuilder &builder,
-                                             OperationState &state,
-                                             Value commandBuffer,
-                                             Value executableLayout,
-                                             int64_t set, Value descriptorSet,
-                                             ValueRange dynamicOffsets) {
-  build(builder, state, commandBuffer, executableLayout,
-        builder.createOrFold<ConstantIndexOp>(state.location, set),
-        descriptorSet, dynamicOffsets);
-}
-
-void CommandBufferBindDescriptorSetOp::build(OpBuilder &builder,
-                                             OperationState &state,
-                                             Value commandBuffer,
-                                             Value executableLayout, Value set,
-                                             Value descriptorSet,
-                                             ValueRange dynamicOffsets) {
-  state.addOperands({commandBuffer, executableLayout, set, descriptorSet});
-  state.addOperands(dynamicOffsets);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.command_buffer.dispatch.symbol
-//===----------------------------------------------------------------------===//
-
-void CommandBufferDispatchSymbolOp::build(
-    OpBuilder &builder, OperationState &state, Value commandBuffer,
-    IREE::HAL::ExecutableEntryPointOp entryPoint, Value workgroupX,
-    Value workgroupY, Value workgroupZ) {
-  state.addOperands({commandBuffer, workgroupX, workgroupY, workgroupZ});
-  // Construct Executable::Target::EntryPoint nested reference.
-  StringRef executableOpSymName =
-      entryPoint->getParentOp()
-          ->getParentOp()
-          ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
-          .getValue();
-  state.addAttribute("entry_point",
-                     builder.getSymbolRefAttr(
-                         executableOpSymName,
-                         {builder.getSymbolRefAttr(entryPoint->getParentOp()),
-                          builder.getSymbolRefAttr(entryPoint)}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -995,47 +862,6 @@ void DescriptorSetCreateOp::build(
   state.addOperands(bindingLengths);
 }
 
-static ParseResult parseDescriptorSetCreateOp(OpAsmParser &parser,
-                                              OperationState *result) {
-  OpAsmParser::OperandType device;
-  OpAsmParser::OperandType setLayout;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseOperand(device)) || failed(parser.parseComma()) ||
-      failed(parser.parseOperand(setLayout)) || failed(parser.parseComma()) ||
-      failed(parser.resolveOperands(
-          ArrayRef<OpAsmParser::OperandType>{
-              device,
-              setLayout,
-          },
-          ArrayRef<Type>{
-              DeviceType::get(result->getContext()),
-              DescriptorSetLayoutType::get(result->getContext()),
-          },
-          operandsLoc, result->operands)) ||
-      failed(parser.parseKeyword("bindings")) || failed(parser.parseEqual()) ||
-      failed(parser.parseLSquare()) ||
-      failed(parseDescriptorSetBindings(parser, result)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printDescriptorSetCreateOp(OpAsmPrinter &p,
-                                       DescriptorSetCreateOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p << ", ";
-  p.printOperand(op.set_layout());
-  p << ", bindings = [";
-  printDescriptorSetBindings(p, op);
-  p << "]";
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
-                              "bindings",
-                          });
-}
-
 void DescriptorSetCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "descriptor_set");
@@ -1091,10 +917,10 @@ static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
                                        OperationState *result) {
   OpAsmParser::OperandType device;
   Type deviceType;
-  if (failed(parser.parseLParen()) || failed(parser.parseOperand(device)) ||
+  if (failed(parser.parseLess()) || failed(parser.parseOperand(device)) ||
       failed(parser.parseColonType(deviceType)) ||
       failed(parser.resolveOperand(device, deviceType, result->operands)) ||
-      failed(parser.parseRParen()) ||
+      failed(parser.parseGreater()) ||
       failed(parser.parseOptionalArrowTypeList(result->types))) {
     return failure();
   }
@@ -1150,11 +976,11 @@ static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
 }
 
 static void printDeviceSwitchOp(OpAsmPrinter &p, DeviceSwitchOp op) {
-  p << op.getOperationName() << "(";
+  p << op.getOperationName() << "<";
   p.printOperand(op.device());
   p << " : ";
   p.printType(op.device().getType());
-  p << ")";
+  p << ">";
   p.printOptionalArrowTypeList(op.getResultTypes());
   p << "\n";
   p.getStream().indent(4);
@@ -1542,8 +1368,8 @@ ArrayAttr InterfaceOp::getExecutableSetLayoutsAttr() {
   Builder builder(getContext());
   SmallVector<SmallVector<Attribute, 4>, 4> setAttrs;
   for (auto bindingOp : getBlock().getOps<InterfaceBindingOp>()) {
-    int set = bindingOp.set();
-    int binding = bindingOp.binding();
+    unsigned set = bindingOp.set().getZExtValue();
+    unsigned binding = bindingOp.binding().getZExtValue();
     if (set >= setAttrs.size()) setAttrs.resize(set + 1);
     auto &bindingAttrs = setAttrs[set];
     if (binding >= bindingAttrs.size()) bindingAttrs.resize(binding + 1);
@@ -1582,13 +1408,12 @@ static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
                                     result->attributes)) ||
       failed(parser.parseComma()) || failed(parser.parseKeyword("set")) ||
       failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(setAttr,
-                                   parser.getBuilder().getIntegerType(32),
+      failed(parser.parseAttribute(setAttr, parser.getBuilder().getIndexType(),
                                    "set", result->attributes)) ||
       failed(parser.parseComma()) || failed(parser.parseKeyword("binding")) ||
       failed(parser.parseEqual()) ||
       failed(parser.parseAttribute(bindingAttr,
-                                   parser.getBuilder().getIntegerType(32),
+                                   parser.getBuilder().getIndexType(),
                                    "binding", result->attributes)) ||
       failed(parser.parseComma()) || failed(parser.parseKeyword("type")) ||
       failed(parser.parseEqual()) ||

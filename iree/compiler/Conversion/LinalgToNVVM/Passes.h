@@ -24,6 +24,9 @@ namespace iree_compiler {
 /// Performs the final conversion to NNVM+LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 
+/// Convert Linalg ops to Vector.
+std::unique_ptr<OperationPass<FuncOp>> createVectorizationPass();
+
 /// Perform tiling and distribution to threads.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createTileAndDistributeToThreads();

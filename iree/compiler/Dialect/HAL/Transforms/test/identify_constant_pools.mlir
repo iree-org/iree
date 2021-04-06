@@ -2,11 +2,11 @@
 
 //      CHECK: hal.constant_pool @_const_pool attributes
 // CHECK-SAME:     buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 256, max_buffer_range = 134217728, min_buffer_range_alignment = 16>
-// CHECK-NEXT:   hal.constant_pool.value @cst0 {{.+}} = dense<1.000000e+00> : tensor<1xf32>
+// CHECK-NEXT:   hal.constant_pool.value @cst0 = dense<1.000000e+00> : tensor<1xf32>
 flow.variable @cst0 dense<1.000000e+00> : tensor<1xf32>
-// CHECK-NEXT:   hal.constant_pool.value @cst1 {{.+}} = dense<[2.100000e+00, 3.200000e+00, 4.300000e+00, 5.400000e+00]> : tensor<4xf32>
+// CHECK-NEXT:   hal.constant_pool.value @cst1 = dense<[2.100000e+00, 3.200000e+00, 4.300000e+00, 5.400000e+00]> : tensor<4xf32>
 flow.variable @cst1 dense<[2.1, 3.2, 4.3, 5.4]> : tensor<4xf32>
-// CHECK-NEXT:   hal.constant_pool.value @cst2 {{.+}} = dense<[6, 7, 8]> : tensor<3xi8>
+// CHECK-NEXT:   hal.constant_pool.value @cst2 = dense<[6, 7, 8]> : tensor<3xi8>
 flow.variable @cst2 dense<[6, 7, 8]> : tensor<3xi8>
 
 // CHECK-LABEL: func @immutable_variables
@@ -23,7 +23,7 @@ func @immutable_variables() -> (tensor<1xf32>, tensor<4xf32>, tensor<3xi8>) {
 // -----
 
 //      CHECK: hal.constant_pool @_const_pool_init
-// CHECK-NEXT:   hal.constant_pool.value @variable_0 {{.+}} = dense<3.000000e+00> : tensor<128xf32>
+// CHECK-NEXT:   hal.constant_pool.value @variable_0 = dense<3.000000e+00> : tensor<128xf32>
 
 // CHECK: flow.variable @variable_0 mutable init(@variable_0_initializer)
 flow.variable @variable_0 mutable dense<3.0> : tensor<128xf32>

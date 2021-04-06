@@ -9,7 +9,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x16x16x6xf32>,
         !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
@@ -76,7 +76,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
         !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
@@ -143,7 +143,7 @@ hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @pooling_nhwc_max attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:2x16x16x6xf32>, !flow.dispatch.tensor<readonly:1x3x4x2xf32>,
         !flow.dispatch.tensor<writeonly:2x14x13x5xf32>) -> ()}
     module attributes {
@@ -207,7 +207,7 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_fusion attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
         !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
@@ -277,7 +277,7 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding_fusion attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x15x14x6xf32>,
         !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
@@ -349,7 +349,7 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @three_op_fusion attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
+      interface = @legacy_io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
         !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
