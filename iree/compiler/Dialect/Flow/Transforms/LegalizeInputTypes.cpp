@@ -85,9 +85,9 @@ LogicalResult convertOperation(Operation *oldOp,
                                FlowTypeConverter &typeConverter,
                                BlockAndValueMapping &mapping,
                                OpBuilder &builder) {
-  if (llvm::isa<mlir::linalg::LinalgOp>(oldOp)) {
-    // Currently assumes linalg ops have legal types.
-    // TODO: rewrite to generic and back.
+  if (isa<linalg::LinalgDialect>(oldOp->getDialect())) {
+    // Currently we assume all Linalg ops only contain valid types.
+    // TODO: Support converting Linalg types when unsupported.
     builder.clone(*oldOp, mapping);
     return success();
   }
