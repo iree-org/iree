@@ -205,6 +205,11 @@ extern "C" int main(int argc, char** argv) {
     return 0;
   }
 
+  if (ret != 0) {
+    std::cout << "Test failed\n";
+    std::cout << status;
+  }
+
   return ret;
 }
 
