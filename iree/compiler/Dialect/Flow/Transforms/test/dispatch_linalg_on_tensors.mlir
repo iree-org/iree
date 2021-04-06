@@ -505,12 +505,7 @@ func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32
 //      CHECK: func @subtensor_insert
 // CHECK-SAME: (%[[INPUT:.+]]: tensor<1x224x224x3xf32>)
 //
-//      CHECK:   %[[FILL:.+]] = flow.dispatch.workgroups[{{.+}}]() : () -> tensor<1x225x225x3xf32> =
-// CHECK-NEXT:       (%[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x225x225x3xf32>) {
-//      CHECK:     linalg.init_tensor
-// CHECK-NEXT:     %[[TENSOR:.+]] = linalg.fill
-// CHECK-NEXT:     flow.dispatch.tensor.store %[[TENSOR]], %[[OUTPUT]], {{.*}}
-// CHECK-NEXT:     flow.return
+//      CHECK:   %[[FILL:.+]] = constant dense<0.000000e+00> : tensor<1x225x225x3xf32>
 //
 //      CHECK:   %[[PAD:.+]] = flow.dispatch.workgroups[{{.+}}](%[[INPUT]], %[[FILL]]) : (tensor<1x224x224x3xf32>, tensor<1x225x225x3xf32>) -> %[[FILL]] =
 // CHECK-NEXT:       (%[[SRC:.+]]: !flow.dispatch.tensor<readonly:1x224x224x3xf32>, %[[DST:.+]]: !flow.dispatch.tensor<readwrite:1x225x225x3xf32>) {

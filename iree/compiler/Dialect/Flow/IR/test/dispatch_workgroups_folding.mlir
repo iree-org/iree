@@ -148,3 +148,22 @@ func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
   }
   return %0 : tensor<4x8xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @convertPureFillDispatchIntoTensorSplat
+func @convertPureFillDispatchIntoTensorSplat(%arg0: !flow.dispatch.tensor<writeonly:1x225x225x3xf32>) -> tensor<1x225x225x3xf32> {
+  %c3 = constant 3 : index
+  %c225 = constant 225 : index
+  // CHECK: %[[CST:.+]] = constant dense<0.000000e+00> : tensor<1x225x225x3xf32>
+  %0 = flow.dispatch.workgroups[%c3, %c225, %c225]() : () -> tensor<1x225x225x3xf32> =
+      (%arg0: !flow.dispatch.tensor<writeonly:1x225x225x3xf32>) {
+    %cst = constant 0.0 : f32
+    %init = linalg.init_tensor [1, 225, 225, 3] : tensor<1x225x225x3xf32>
+    %fill = linalg.fill(%init, %cst) : tensor<1x225x225x3xf32>, f32 -> tensor<1x225x225x3xf32>
+    flow.dispatch.tensor.store %fill, %arg0, offsets=[], sizes=[], strides=[] : tensor<1x225x225x3xf32> -> !flow.dispatch.tensor<writeonly:1x225x225x3xf32>
+    flow.return
+  }
+  // CHECK: return %[[CST]]
+  return %0: tensor<1x225x225x3xf32>
+}

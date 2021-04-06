@@ -25,6 +25,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -354,9 +355,48 @@ void DispatchRegionOp::getCanonicalizationPatterns(
   results.insert<ClosureOptimizationPattern<DispatchRegionOp>>(context);
 }
 
+/// Turns a flow.dispatch.workgroups op that just performs buffer fill into
+/// a flow.tensor.splat op.
+struct ConvertPureFillDispatchIntoTensorSplat final
+    : public OpRewritePattern<DispatchWorkgroupsOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchWorkgroupsOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    // Make sure we just have one block.
+    Block &entryBlock = dispatchOp.getClosureBodyRegion().front();
+    if (!isa<Flow::ReturnOp>(entryBlock.getTerminator())) return failure();
+
+    // Make sure we just have one block argument.
+    if (entryBlock.getNumArguments() != 1) return failure();
+    BlockArgument entryArg = entryBlock.getArgument(0);
+
+    // Make sure we are only storing to the tensor of the block argument,
+    // at the full range.
+    if (!entryArg.hasOneUse()) return failure();
+    auto storeOp = dyn_cast<DispatchTensorStoreOp>(*entryArg.user_begin());
+    if (!storeOp || !storeOp.offsets().empty() || !storeOp.sizes().empty() ||
+        !storeOp.strides().empty())
+      return failure();
+
+    // The source should be a linalg.fill op that filling a constant value.
+    auto fillOp = storeOp.value().getDefiningOp<linalg::FillOp>();
+    if (!fillOp || !matchPattern(fillOp.value(), m_Constant()))
+      return failure();
+
+    Operation *cstOp = rewriter.clone(*fillOp.value().getDefiningOp());
+    rewriter.replaceOpWithNewOp<TensorSplatOp>(
+        dispatchOp, storeOp.value().getType(), cstOp->getResult(0),
+        dispatchOp.operand_dims());
+
+    return success();
+  }
+};
+
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>>(context);
+  results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>,
+                 ConvertPureFillDispatchIntoTensorSplat>(context);
 }
 
 //===----------------------------------------------------------------------===//
