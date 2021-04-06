@@ -42,5 +42,12 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
   return nullptr;
 }
 
+Value getViewSource(Value view) {
+  while (auto viewOp = view.getDefiningOp<ViewLikeOpInterface>()) {
+    view = viewOp.getViewSource();
+  }
+  return view;
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

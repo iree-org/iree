@@ -25,9 +25,7 @@ iree_cc_library(
     "op_kernels_ruy.h"
   DEPS
     absl::algorithm
-    absl::core_headers
     absl::flat_hash_set
-    absl::inlined_vector
     absl::span
     iree::base::status
     iree::base::tracing
@@ -43,7 +41,6 @@ iree_cc_test(
     "op_kernels_test.cc"
   DEPS
     ::op_kernels
-    absl::inlined_vector
     iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main

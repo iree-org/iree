@@ -49,9 +49,5 @@ func private @pool_splats_initializer() -> !hal.buffer {
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator>
       type("HostVisible|DeviceVisible|DeviceLocal")
       usage("Constant|Transfer|Mapping|Dispatch") : !hal.buffer{%c64}
-  // CHECK: vm.call @hal.buffer.fill([[BUFFER]], %zero, %c4, %c1065353216)
-  hal.buffer.fill<%buffer : !hal.buffer>[%c0, %c4] pattern(%c1065353216_i32 : i32)
-  // CHECK: vm.call @hal.buffer.fill([[BUFFER]], %c32, %c32, %c1234567890)
-  hal.buffer.fill<%buffer : !hal.buffer>[%c32, %c32] pattern(%c1234567890_i32 : i32)
   return %buffer : !hal.buffer
 }

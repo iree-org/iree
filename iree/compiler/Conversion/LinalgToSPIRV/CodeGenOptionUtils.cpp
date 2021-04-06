@@ -56,7 +56,8 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
   options.workgroupSize.assign(clWorkgroupSizes.begin(),
                                clWorkgroupSizes.end());
   options.tileSizes.assign(clTileSizes.begin(), clTileSizes.end());
-  options.enableVectorization = clEnableVectorization;
+  options.enableVectorization =
+      clEnableLinalgOnTensorsSPIRV || clEnableVectorization;
   options.useWorkgroupMemory = clUseWorkgroupMemory;
   options.vectorizeMemref = clVectorizeMemref;
   options.usingLinalgOnTensors = clEnableLinalgOnTensorsSPIRV;

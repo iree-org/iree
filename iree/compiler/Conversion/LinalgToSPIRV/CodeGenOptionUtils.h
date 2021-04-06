@@ -26,6 +26,7 @@
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_CODEGENOPTIONUTILS_H_
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
 namespace iree_compiler {

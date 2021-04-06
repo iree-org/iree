@@ -51,6 +51,7 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
   // Try to get the IR in good condition.
   //----------------------------------------------------------------------------
+  pm.addPass(createStripAssertsPass());
   pm.addPass(createInlinerPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(TFDevice::CreateDecomposeResourceOpsPass());

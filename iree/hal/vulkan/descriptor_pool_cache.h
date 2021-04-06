@@ -15,7 +15,8 @@
 #ifndef IREE_HAL_VULKAN_DESCRIPTOR_POOL_CACHE_H_
 #define IREE_HAL_VULKAN_DESCRIPTOR_POOL_CACHE_H_
 
-#include "absl/container/inlined_vector.h"
+#include <vector>
+
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 
@@ -43,7 +44,7 @@ class DescriptorSetGroup final {
  public:
   DescriptorSetGroup() = default;
   DescriptorSetGroup(DescriptorPoolCache* descriptor_pool_cache,
-                     absl::InlinedVector<DescriptorPool, 8> descriptor_pools)
+                     std::vector<DescriptorPool> descriptor_pools)
       : descriptor_pool_cache_(descriptor_pool_cache),
         descriptor_pools_(std::move(descriptor_pools)) {}
   DescriptorSetGroup(const DescriptorSetGroup&) = delete;
@@ -62,7 +63,7 @@ class DescriptorSetGroup final {
 
  private:
   DescriptorPoolCache* descriptor_pool_cache_;
-  absl::InlinedVector<DescriptorPool, 8> descriptor_pools_;
+  std::vector<DescriptorPool> descriptor_pools_;
 };
 
 // A "cache" (or really, pool) of descriptor pools. These pools are allocated

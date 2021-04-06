@@ -37,10 +37,20 @@ extern "C" {
 enum iree_hal_vulkan_feature_e {
   // Use VK_LAYER_KHRONOS_standard_validation to validate Vulkan API usage.
   // Has a significant performance penalty and is *not* a security mechanism.
-  IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS = 1 << 0,
+  IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS = 1u << 0,
 
   // Use VK_EXT_debug_utils, record markers, and log errors.
-  IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS = 1 << 1,
+  IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS = 1u << 1,
+
+  // Enables tracing of command buffers when IREE tracing is enabled.
+  // May take advantage of additional extensions for more accurate timing or
+  // hardware-specific performance counters.
+  //
+  // NOTE: tracing has a non-trivial overhead and will skew the timing of
+  // submissions and introduce false barriers between dispatches. Use this to
+  // identify slow dispatches and refine from there; be wary of whole-program
+  // tracing with this enabled.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING = 1u << 2,
 };
 typedef uint64_t iree_hal_vulkan_features_t;
 

@@ -49,9 +49,6 @@ cc_library(
         "attributes.h",
         "target_platform.h",
     ],
-    deps = [
-        "@com_google_absl//absl/base:core_headers",
-    ],
 )
 
 cc_library(
@@ -100,7 +97,6 @@ cc_library(
     srcs = ["signature_parser.cc"],
     hdrs = ["signature_parser.h"],
     deps = [
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",

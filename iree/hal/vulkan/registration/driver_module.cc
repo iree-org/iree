@@ -35,6 +35,9 @@ ABSL_FLAG(int, vulkan_default_index, 0, "Index of the default Vulkan device.");
 ABSL_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
           "Uses timeline semaphore emulation even if native support exists.");
 
+ABSL_FLAG(bool, vulkan_tracing, true,
+          "Enables Vulkan tracing (if IREE tracing is enabled).");
+
 static iree_status_t iree_hal_vulkan_create_driver_with_flags(
     iree_string_view_t identifier, iree_allocator_t allocator,
     iree_hal_driver_t** out_driver) {
@@ -62,6 +65,9 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   if (absl::GetFlag(FLAGS_vulkan_debug_utils)) {
     driver_options.requested_features |=
         IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS;
+  }
+  if (absl::GetFlag(FLAGS_vulkan_tracing)) {
+    driver_options.requested_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
   }
 
   driver_options.default_device_index =

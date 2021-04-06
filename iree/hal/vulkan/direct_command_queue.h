@@ -25,7 +25,7 @@ namespace vulkan {
 // Command queue implementation directly maps to VkQueue.
 class DirectCommandQueue final : public CommandQueue {
  public:
-  DirectCommandQueue(VkDeviceHandle* logical_device, std::string name,
+  DirectCommandQueue(VkDeviceHandle* logical_device,
                      iree_hal_command_category_t supported_categories,
                      VkQueue queue);
   ~DirectCommandQueue() override;

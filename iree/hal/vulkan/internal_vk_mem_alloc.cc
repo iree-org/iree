@@ -12,24 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This file configures VMA to use common Google/Abseil types in an effort to
-// better integrate with applications compiled using other Google code. By using
-// the same types that dependers are likely using we can often reduce binary
-// size and ease debugging (such as by using absl::Mutex to get better tsan
-// warnings).
-
 // Only compile if an external implementation has not been otherwise linked.
 #if !defined(VULKAN_MEMORY_ALLOCATOR_EXTERNAL_IMPL)
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/synchronization/mutex.h"
 #include "iree/base/logging.h"
-
-// Uncomment to try using std::vector instead of the VMA version.
-// #define VMA_USE_STL_VECTOR 1
-
-// TODO(benvanik): figure out why std::list cannot be used.
-// #define VMA_USE_STL_LIST 1
+#include "iree/base/synchronization.h"
 
 // Use absl::flat_hash_map instead of std::unordered_map.
 #define VmaPair std::pair
@@ -48,25 +36,38 @@
 #define VMA_DEBUG_LOG(...)
 #endif  // !NDEBUG
 
-// Use absl::Mutex for VMA_MUTEX.
-#define VMA_MUTEX absl::Mutex
-class ABSL_SCOPED_LOCKABLE AbslVmaRWMutex {
+// Use iree_slim_mutex_t for VMA_MUTEX.
+class IreeVmaMutex {
  public:
-  void LockRead() ABSL_SHARED_LOCK_FUNCTION() { mutex_.ReaderLock(); }
-  void UnlockRead() ABSL_UNLOCK_FUNCTION() { mutex_.ReaderUnlock(); }
-  bool TryLockRead() ABSL_SHARED_TRYLOCK_FUNCTION(true) {
-    return mutex_.ReaderTryLock();
-  }
-  void LockWrite() ABSL_EXCLUSIVE_LOCK_FUNCTION() { mutex_.WriterLock(); }
-  void UnlockWrite() ABSL_UNLOCK_FUNCTION() { mutex_.WriterUnlock(); }
-  bool TryLockWrite() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) {
-    return mutex_.WriterTryLock();
-  }
+  IreeVmaMutex() { iree_slim_mutex_initialize(&mutex_); }
+  ~IreeVmaMutex() { iree_slim_mutex_deinitialize(&mutex_); }
+
+  void Lock() { iree_slim_mutex_lock(&mutex_); }
+  void Unlock() { iree_slim_mutex_unlock(&mutex_); }
+  bool TryLock() { return iree_slim_mutex_try_lock(&mutex_); }
 
  private:
-  absl::Mutex mutex_;
+  iree_slim_mutex_t mutex_;
 };
-#define VMA_RW_MUTEX AbslVmaRWMutex
+#define VMA_MUTEX IreeVmaMutex
+
+// Use iree_slim_mutex_t for VMA_RW_MUTEX.
+class IreeVmaRWMutex {
+ public:
+  IreeVmaRWMutex() { iree_slim_mutex_initialize(&mutex_); }
+  ~IreeVmaRWMutex() { iree_slim_mutex_deinitialize(&mutex_); }
+
+  void LockRead() { iree_slim_mutex_lock(&mutex_); }
+  void UnlockRead() { iree_slim_mutex_unlock(&mutex_); }
+  bool TryLockRead() { return iree_slim_mutex_try_lock(&mutex_); }
+  void LockWrite() { iree_slim_mutex_lock(&mutex_); }
+  void UnlockWrite() { iree_slim_mutex_unlock(&mutex_); }
+  bool TryLockWrite() { return iree_slim_mutex_try_lock(&mutex_); }
+
+ private:
+  iree_slim_mutex_t mutex_;
+};
+#define VMA_RW_MUTEX IreeVmaRWMutex
 
 #define VMA_IMPLEMENTATION
 #include "iree/hal/vulkan/internal_vk_mem_alloc.h"

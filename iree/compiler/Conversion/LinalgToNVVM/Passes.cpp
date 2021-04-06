@@ -19,6 +19,7 @@
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRVPass.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -37,7 +38,13 @@ static void addLinalgToNVVMPasses(OpPassManager &pm) {
 
   // Distribute linalg onto threads within the workgroup.
   pm.addPass(createTileAndDistributeToThreads());
-  // TODO: Linalg -> vector
+  pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
+  pm.addNestedPass<ModuleOp>(createCSEPass());
+
+  // Linalg -> vector
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorizationPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
 
   pm.addNestedPass<ModuleOp>(createLowerAffinePass());
   pm.addNestedPass<ModuleOp>(createCanonicalizerPass());

@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "lower_global_tensors_complex.mlir",
             "lower_global_tensors_invalid.mlir",
             "propagate_resource_casts.mlir",
+            "strip_asserts.mlir",
             "strip_metadata.mlir",
             "verify_fully_converted.mlir",
         ],

@@ -26,6 +26,11 @@
 
 using namespace iree::hal::vulkan;
 
+typedef struct {
+  VkPipeline pipeline;
+  iree_string_view_t name;
+} iree_hal_vulkan_entry_point_t;
+
 static iree_status_t iree_hal_vulkan_create_shader_module(
     VkDeviceHandle* logical_device, iree_const_byte_span_t code,
     VkShaderModule* out_shader_module) {
@@ -55,7 +60,8 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     iree_SpirVExecutableDef_table_t executable_def,
     VkShaderModule shader_module, iree_host_size_t executable_layout_count,
     iree_hal_executable_layout_t* const* executable_layouts,
-    iree_host_size_t pipeline_count, VkPipeline* out_pipelines) {
+    iree_host_size_t pipeline_count,
+    iree_hal_vulkan_entry_point_t* out_entry_points) {
   VkComputePipelineCreateInfo* create_infos = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       logical_device->host_allocator(),
@@ -96,11 +102,18 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     stage_create_info->pSpecializationInfo = NULL;
   }
 
+  VkPipeline* pipelines =
+      (VkPipeline*)iree_alloca(pipeline_count * sizeof(VkPipeline));
   iree_status_t status = VK_RESULT_TO_STATUS(
       logical_device->syms()->vkCreateComputePipelines(
           *logical_device, pipeline_cache, (uint32_t)pipeline_count,
-          create_infos, logical_device->allocator(), out_pipelines),
+          create_infos, logical_device->allocator(), pipelines),
       "vkCreateComputePipelines");
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
+      out_entry_points[i].pipeline = pipelines[i];
+    }
+  }
 
   iree_allocator_free(logical_device->host_allocator(), create_infos);
   return status;
@@ -179,8 +192,8 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
 typedef struct {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
-  iree_host_size_t pipeline_count;
-  VkPipeline pipelines[];
+  iree_host_size_t entry_point_count;
+  iree_hal_vulkan_entry_point_t entry_points[];
 } iree_hal_vulkan_native_executable_t;
 
 extern const iree_hal_executable_vtable_t
@@ -226,30 +239,42 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   // Create pipelines for each entry point.
   flatbuffers_string_vec_t entry_points_vec =
       iree_SpirVExecutableDef_entry_points_get(executable_def);
-  iree_host_size_t pipeline_count =
+  iree_host_size_t entry_point_count =
       flatbuffers_string_vec_len(entry_points_vec);
 
   iree_hal_vulkan_native_executable_t* executable = NULL;
   iree_host_size_t total_size =
-      sizeof(*executable) + pipeline_count * sizeof(*executable->pipelines);
+      sizeof(*executable) +
+      entry_point_count * sizeof(*executable->entry_points);
   iree_status_t status = iree_allocator_malloc(logical_device->host_allocator(),
                                                total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_vulkan_native_executable_vtable,
                                  &executable->resource);
     executable->logical_device = logical_device;
-    executable->pipeline_count = pipeline_count;
-    memset(executable->pipelines, 0,
-           pipeline_count * sizeof(*executable->pipelines));
+    executable->entry_point_count = entry_point_count;
+    memset(executable->entry_points, 0,
+           entry_point_count * sizeof(*executable->entry_points));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_create_pipelines(
         logical_device, pipeline_cache, executable_spec->caching_mode,
         executable_def, shader_module, executable_spec->executable_layout_count,
-        executable_spec->executable_layouts, executable->pipeline_count,
-        executable->pipelines);
+        executable_spec->executable_layouts, executable->entry_point_count,
+        executable->entry_points);
   }
   iree_hal_vulkan_destroy_shader_module(logical_device, shader_module);
+
+  if (iree_status_is_ok(status)) {
+    flatbuffers_string_vec_t entry_points_vec =
+        iree_SpirVExecutableDef_entry_points_get(executable_def);
+    for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
+      flatbuffers_string_t name =
+          flatbuffers_string_vec_at(entry_points_vec, i);
+      executable->entry_points[i].name =
+          iree_make_string_view(name, flatbuffers_string_len(name));
+    }
+  }
 
   if (iree_status_is_ok(status)) {
     *out_executable = (iree_hal_executable_t*)executable;
@@ -269,13 +294,29 @@ static void iree_hal_vulkan_native_executable_destroy(
       executable->logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  for (iree_host_size_t i = 0; i < executable->pipeline_count; ++i) {
+  for (iree_host_size_t i = 0; i < executable->entry_point_count; ++i) {
     iree_hal_vulkan_destroy_pipeline(executable->logical_device,
-                                     executable->pipelines[i]);
+                                     executable->entry_points[i].pipeline);
   }
   iree_allocator_free(host_allocator, executable);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_hal_vulkan_native_executable_entry_point_source_location(
+    iree_hal_executable_t* base_executable, iree_host_size_t entry_ordinal,
+    iree_hal_vulkan_source_location_t* out_source_location) {
+  iree_hal_vulkan_native_executable_t* executable =
+      iree_hal_vulkan_native_executable_cast(base_executable);
+  memset(out_source_location, 0, sizeof(*out_source_location));
+  if (entry_ordinal >= executable->entry_point_count) {
+    return;
+  }
+  out_source_location->func_name = executable->entry_points[entry_ordinal].name;
+
+  // TODO(benvanik): plumb through file name/line for the MLIR function.
+  out_source_location->file_name = out_source_location->func_name;
+  out_source_location->line = 0;
 }
 
 iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(
@@ -283,11 +324,11 @@ iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(
     VkPipeline* out_pipeline_handle) {
   iree_hal_vulkan_native_executable_t* executable =
       iree_hal_vulkan_native_executable_cast(base_executable);
-  if (entry_ordinal >= executable->pipeline_count) {
+  if (entry_ordinal >= executable->entry_point_count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "invalid entry point ordinal %zu", entry_ordinal);
   }
-  *out_pipeline_handle = executable->pipelines[entry_ordinal];
+  *out_pipeline_handle = executable->entry_points[entry_ordinal].pipeline;
   return iree_ok_status();
 }
 

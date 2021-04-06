@@ -21,10 +21,10 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
-#include "absl/base/thread_annotations.h"
-#include "absl/container/inlined_vector.h"
 #include "iree/base/status.h"
+#include "iree/base/synchronization.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
@@ -52,7 +52,7 @@ using SemaphoreValue = std::pair<iree_hal_semaphore_t*, uint64_t>;
 // the GPU.
 class SerializingCommandQueue final : public CommandQueue {
  public:
-  SerializingCommandQueue(VkDeviceHandle* logical_device, std::string name,
+  SerializingCommandQueue(VkDeviceHandle* logical_device,
                           iree_hal_command_category_t supported_categories,
                           VkQueue queue, TimePointFencePool* fence_pool);
   ~SerializingCommandQueue() override;
@@ -78,9 +78,9 @@ class SerializingCommandQueue final : public CommandQueue {
  private:
   // A submission batch together with the fence to singal its status.
   struct FencedSubmission : public IntrusiveLinkBase<void> {
-    absl::InlinedVector<SemaphoreValue, 4> wait_semaphores;
-    absl::InlinedVector<VkCommandBuffer, 4> command_buffers;
-    absl::InlinedVector<SemaphoreValue, 4> signal_semaphores;
+    std::vector<SemaphoreValue> wait_semaphores;
+    std::vector<VkCommandBuffer> command_buffers;
+    std::vector<SemaphoreValue> signal_semaphores;
     ref_ptr<TimePointFence> fence;
   };
 
@@ -94,8 +94,7 @@ class SerializingCommandQueue final : public CommandQueue {
   TimePointFencePool* fence_pool_;
 
   // A list of fences that are submitted to GPU.
-  absl::InlinedVector<ref_ptr<TimePointFence>, 4> pending_fences_
-      IREE_GUARDED_BY(mutex_);
+  std::vector<ref_ptr<TimePointFence>> pending_fences_ IREE_GUARDED_BY(mutex_);
   // A list of deferred submissions that haven't been submitted to GPU.
   IntrusiveList<std::unique_ptr<FencedSubmission>> deferred_submissions_
       IREE_GUARDED_BY(mutex_);

@@ -36,7 +36,6 @@ EXPORT_FN("allocator.allocate", iree_hal_module_allocator_allocate, riii, r)
 EXPORT_FN("allocator.wrap.byte_buffer", iree_hal_module_allocator_wrap_byte_buffer, riirii, r)
 
 EXPORT_FN("buffer.allocator", iree_hal_module_buffer_allocator, r, r)
-EXPORT_FN("buffer.fill", iree_hal_module_buffer_fill, riii, v)
 EXPORT_FN("buffer.load", iree_hal_module_buffer_load, rii, i)
 EXPORT_FN("buffer.store", iree_hal_module_buffer_store, irii, v)
 EXPORT_FN("buffer.subspan", iree_hal_module_buffer_subspan, rii, r)

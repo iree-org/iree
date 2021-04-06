@@ -240,26 +240,14 @@ struct BuiltinPoolingOpConversion
   LogicalResult matchAndRewrite(
       mhlo::ReduceWindowOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (srcOp.body().getBlocks().size() > 1) {
-      // Control flow within the computation is not supported; bail to fallback.
-      return failure();
-    } else if (srcOp.body().front().getOperations().size() > 2) {
+    // ReduceWindow body is always a single block region.For simple pattern
+    // matching, the reduce-window region needs to have 1 operation for each
+    // output + 1 operation for the return (exactly).
+    Block &body = srcOp.body().front();
+    if (!llvm::hasNItems(body, srcOp.getNumResults() + 1)) {
       // Require splitting first.
       return failure();
     }
-
-    auto operand = operands[0];
-    auto operandShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
-    auto initValue = operands[1];
-    auto initValueShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.init_value(), typeConverter, rewriter);
-    auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
-    auto dstShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
-    auto elementType =
-        srcOp.operand().getType().cast<ShapedType>().getElementType();
 
     SmallVector<int32_t, 4> windowDimensions;
     for (const auto &value : srcOp.window_dimensions().getIntValues())
@@ -274,35 +262,62 @@ struct BuiltinPoolingOpConversion
         padding[i] = srcOp.paddingAttr().getValue<int64_t>({i, 0});
     }
 
-    auto &computeOp = *srcOp.body().front().begin();
-    if (isa<mlir::AddIOp>(computeOp) || isa<mlir::AddFOp>(computeOp) ||
-        isa<mhlo::AddOp>(computeOp)) {
-      rewriter.create<IREE::VMLA::PoolingSumOp>(
-          srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
-          dstShape, TypeAttr::get(elementType),
-          rewriter.getI32VectorAttr(windowDimensions),
-          rewriter.getI32VectorAttr(windowStrides),
-          rewriter.getI32VectorAttr(padding));
-    } else if (isa<mhlo::MinOp>(computeOp)) {
-      rewriter.create<IREE::VMLA::PoolingMinOp>(
-          srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
-          dstShape, TypeAttr::get(elementType),
-          rewriter.getI32VectorAttr(windowDimensions),
-          rewriter.getI32VectorAttr(windowStrides),
-          rewriter.getI32VectorAttr(padding));
-    } else if (isa<mhlo::MaxOp>(computeOp)) {
-      rewriter.create<IREE::VMLA::PoolingMaxOp>(
-          srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
-          dstShape, TypeAttr::get(elementType),
-          rewriter.getI32VectorAttr(windowDimensions),
-          rewriter.getI32VectorAttr(windowStrides),
-          rewriter.getI32VectorAttr(padding));
-    } else {
-      computeOp.emitRemark() << "unsupported builtin reduction operation";
-      return failure();
+    int numInputs = srcOp.inputs().size();
+    ArrayRef<Value> inputs = operands.take_front(numInputs);
+    ArrayRef<Value> initValues = operands.drop_front(numInputs);
+
+    SmallVector<Value> newValues;
+    for (unsigned i = 0; i < numInputs; ++i) {
+      auto inputShape = VMLAConversionTarget::getTensorShape(
+          srcOp.getLoc(), srcOp.inputs()[i], typeConverter, rewriter);
+      auto initValueShape = VMLAConversionTarget::getTensorShape(
+          srcOp.getLoc(), srcOp.init_values()[i], typeConverter, rewriter);
+      auto dst = VMLAConversionTarget::allocateOutputBuffer(
+          srcOp.getLoc(), srcOp.getResult(i), typeConverter, rewriter);
+      auto dstShape = VMLAConversionTarget::getTensorShape(
+          srcOp.getLoc(), srcOp.getResult(i), typeConverter, rewriter);
+      auto elementType =
+          srcOp.inputs()[i].getType().cast<ShapedType>().getElementType();
+
+      Operation *computeOp = srcOp.getReductionOp(i);
+      if (!computeOp) {
+        srcOp.emitRemark() << "unsupported builtin reduction operation";
+        return failure();
+      }
+
+      Value input = inputs[i];
+      Value initValue = initValues[i];
+
+      if (isa<mlir::AddIOp>(computeOp) || isa<mlir::AddFOp>(computeOp) ||
+          isa<mhlo::AddOp>(computeOp)) {
+        rewriter.create<IREE::VMLA::PoolingSumOp>(
+            srcOp.getLoc(), input, inputShape, initValue, initValueShape, dst,
+            dstShape, TypeAttr::get(elementType),
+            rewriter.getI32VectorAttr(windowDimensions),
+            rewriter.getI32VectorAttr(windowStrides),
+            rewriter.getI32VectorAttr(padding));
+      } else if (isa<mhlo::MinOp>(computeOp)) {
+        rewriter.create<IREE::VMLA::PoolingMinOp>(
+            srcOp.getLoc(), input, inputShape, initValue, initValueShape, dst,
+            dstShape, TypeAttr::get(elementType),
+            rewriter.getI32VectorAttr(windowDimensions),
+            rewriter.getI32VectorAttr(windowStrides),
+            rewriter.getI32VectorAttr(padding));
+      } else if (isa<mhlo::MaxOp>(computeOp)) {
+        rewriter.create<IREE::VMLA::PoolingMaxOp>(
+            srcOp.getLoc(), input, inputShape, initValue, initValueShape, dst,
+            dstShape, TypeAttr::get(elementType),
+            rewriter.getI32VectorAttr(windowDimensions),
+            rewriter.getI32VectorAttr(windowStrides),
+            rewriter.getI32VectorAttr(padding));
+      } else {
+        computeOp->emitRemark() << "unsupported builtin reduction operation";
+        return failure();
+      }
+      newValues.push_back(dst);
     }
 
-    rewriter.replaceOp(srcOp, {dst});
+    rewriter.replaceOp(srcOp, newValues);
     return success();
   }
 

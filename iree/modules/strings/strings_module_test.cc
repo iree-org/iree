@@ -15,9 +15,10 @@
 #include "iree/modules/strings/strings_module.h"
 
 #include <cstdint>
+#include <vector>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
@@ -344,7 +345,7 @@ TEST_F(StringsModuleTest, Prototype) {
 TEST_F(StringsModuleTest, StringTensorToString_Scalar) {
   // Expected output.
   std::string expected_output = "str";
-  absl::InlinedVector<iree_string_view_t, 1> string_views = {
+  std::vector<iree_string_view_t> string_views = {
       iree_make_cstring_view("str")};
   TestStringTensorToString(string_views, {}, expected_output);
 }
@@ -352,7 +353,7 @@ TEST_F(StringsModuleTest, StringTensorToString_Scalar) {
 TEST_F(StringsModuleTest, StringTensorToString_Vector) {
   // Expected output.
   std::string expected_output = "[str1, str2]";
-  absl::InlinedVector<iree_string_view_t, 1> string_views = {
+  std::vector<iree_string_view_t> string_views = {
       iree_make_cstring_view("str1"),
       iree_make_cstring_view("str2"),
   };
@@ -362,219 +363,217 @@ TEST_F(StringsModuleTest, StringTensorToString_Vector) {
 TEST_F(StringsModuleTest, StringTensorToString_Tensor) {
   // Expected output.
   std::string expected_output = "[[[str1, str2]],\n[[str3, str4]]]";
-  absl::InlinedVector<iree_string_view_t, 4> string_views = {
+  std::vector<iree_string_view_t> string_views = {
       iree_make_cstring_view("str1"), iree_make_cstring_view("str2"),
       iree_make_cstring_view("str3"), iree_make_cstring_view("str4")};
-  absl::InlinedVector<int32_t, 4> shape = {2, 1, 2};
+  std::vector<int32_t> shape = {2, 1, 2};
   TestStringTensorToString(string_views, shape, expected_output);
 }
 
 TEST_F(StringsModuleTest, ToString_Scalar) {
-  absl::InlinedVector<iree_string_view_t, 1> expected{
-      iree_make_cstring_view("14.000000")};
-  absl::InlinedVector<float, 1> contents{14.0f};
+  std::vector<iree_string_view_t> expected{iree_make_cstring_view("14.000000")};
+  std::vector<float> contents{14.0f};
   TestToStringTensor<float, IREE_HAL_ELEMENT_TYPE_FLOAT_32>(contents, {},
                                                             expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Vector) {
-  absl::InlinedVector<iree_string_view_t, 2> expected{
-      iree_make_cstring_view("42.000000"), iree_make_cstring_view("43.000000")};
+  std::vector<iree_string_view_t> expected{iree_make_cstring_view("42.000000"),
+                                           iree_make_cstring_view("43.000000")};
 
-  absl::InlinedVector<float, 2> contents{42.0f, 43.0f};
-  absl::InlinedVector<int32_t, 4> shape{2};
+  std::vector<float> contents{42.0f, 43.0f};
+  std::vector<int32_t> shape{2};
   TestToStringTensor<float, IREE_HAL_ELEMENT_TYPE_FLOAT_32>(contents, shape,
                                                             expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("1.000000"), iree_make_cstring_view("2.000000"),
       iree_make_cstring_view("3.000000"), iree_make_cstring_view("4.000000")};
 
-  absl::InlinedVector<float, 4> contents{1.0f, 2.0f, 3.0f, 4.0f};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<float> contents{1.0f, 2.0f, 3.0f, 4.0f};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<float, IREE_HAL_ELEMENT_TYPE_FLOAT_32>(contents, shape,
                                                             expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor_Signed_Int8) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("-1"), iree_make_cstring_view("2"),
       iree_make_cstring_view("3"), iree_make_cstring_view("127")};
 
-  absl::InlinedVector<int8_t, 4> contents{-1, 2, 3, 127};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<int8_t> contents{-1, 2, 3, 127};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<int8_t, IREE_HAL_ELEMENT_TYPE_SINT_8>(contents, shape,
                                                            expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor_Unsigned_Int8) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("1"), iree_make_cstring_view("2"),
       iree_make_cstring_view("3"), iree_make_cstring_view("255")};
 
-  absl::InlinedVector<uint8_t, 4> contents{1, 2, 3, 255};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<uint8_t> contents{1, 2, 3, 255};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<uint8_t, IREE_HAL_ELEMENT_TYPE_UINT_8>(contents, shape,
                                                             expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor_Signed_Int16) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("-1"), iree_make_cstring_view("2"),
       iree_make_cstring_view("3"), iree_make_cstring_view("32700")};
 
-  absl::InlinedVector<int16_t, 4> contents{-1, 2, 3, 32700};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<int16_t> contents{-1, 2, 3, 32700};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<int16_t, IREE_HAL_ELEMENT_TYPE_SINT_16>(contents, shape,
                                                              expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor_Unsigned_Int16) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("1"), iree_make_cstring_view("2"),
       iree_make_cstring_view("3"), iree_make_cstring_view("65000")};
 
-  absl::InlinedVector<uint16_t, 4> contents{1, 2, 3, 65000};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<uint16_t> contents{1, 2, 3, 65000};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<uint16_t, IREE_HAL_ELEMENT_TYPE_UINT_16>(contents, shape,
                                                               expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor_Signed_Int32) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("-1"), iree_make_cstring_view("2"),
       iree_make_cstring_view("3"), iree_make_cstring_view("2140000000")};
 
-  absl::InlinedVector<int32_t, 4> contents{-1, 2, 3, 2140000000};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<int32_t> contents{-1, 2, 3, 2140000000};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<int32_t, IREE_HAL_ELEMENT_TYPE_SINT_32>(contents, shape,
                                                              expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor_Unsigned_Int32) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("1"), iree_make_cstring_view("2"),
       iree_make_cstring_view("3"), iree_make_cstring_view("4290000000")};
 
-  absl::InlinedVector<uint32_t, 4> contents{1, 2, 3, 4290000000};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<uint32_t> contents{1, 2, 3, 4290000000};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<uint32_t, IREE_HAL_ELEMENT_TYPE_UINT_32>(contents, shape,
                                                               expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor_Signed_Int64) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("-1"), iree_make_cstring_view("2"),
       iree_make_cstring_view("3"), iree_make_cstring_view("4300000000")};
 
-  absl::InlinedVector<int64_t, 4> contents{-1, 2, 3, 4300000000};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<int64_t> contents{-1, 2, 3, 4300000000};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<int64_t, IREE_HAL_ELEMENT_TYPE_SINT_64>(contents, shape,
                                                              expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor_Unsigned_Int64) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("1"), iree_make_cstring_view("2"),
       iree_make_cstring_view("3"), iree_make_cstring_view("4300000000")};
 
-  absl::InlinedVector<uint64_t, 4> contents{1, 2, 3, 4300000000};
-  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  std::vector<uint64_t> contents{1, 2, 3, 4300000000};
+  std::vector<int32_t> shape{1, 2, 1, 1, 2};
   TestToStringTensor<uint64_t, IREE_HAL_ELEMENT_TYPE_UINT_64>(contents, shape,
                                                               expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Vector_Float_64) {
-  absl::InlinedVector<iree_string_view_t, 2> expected{
-      iree_make_cstring_view("42.000000"), iree_make_cstring_view("43.000000")};
+  std::vector<iree_string_view_t> expected{iree_make_cstring_view("42.000000"),
+                                           iree_make_cstring_view("43.000000")};
 
-  absl::InlinedVector<double, 2> contents{42.0f, 43.0f};
-  absl::InlinedVector<int32_t, 4> shape{2};
+  std::vector<double> contents{42.0f, 43.0f};
+  std::vector<int32_t> shape{2};
   TestToStringTensor<double, IREE_HAL_ELEMENT_TYPE_FLOAT_64>(contents, shape,
                                                              expected);
 }
 
 TEST_F(StringsModuleTest, GatherSingleElement) {
-  absl::InlinedVector<iree_string_view_t, 1> expected{
-      iree_make_cstring_view("World")};
+  std::vector<iree_string_view_t> expected{iree_make_cstring_view("World")};
 
-  absl::InlinedVector<iree_string_view_t, 3> dict{
-      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
-      iree_make_cstring_view("!")};
-  absl::InlinedVector<int32_t, 1> dict_shape{3};
+  std::vector<iree_string_view_t> dict{iree_make_cstring_view("Hello"),
+                                       iree_make_cstring_view("World"),
+                                       iree_make_cstring_view("!")};
+  std::vector<int32_t> dict_shape{3};
 
-  absl::InlinedVector<int32_t, 1> ids{1};
-  absl::InlinedVector<int32_t, 1> ids_shape{1};
+  std::vector<int32_t> ids{1};
+  std::vector<int32_t> ids_shape{1};
 
   TestGather(dict, dict_shape, ids, ids_shape, expected);
 }
 
 TEST_F(StringsModuleTest, GatherMultipleElements) {
-  absl::InlinedVector<iree_string_view_t, 2> expected{
-      iree_make_cstring_view("World"), iree_make_cstring_view("Hello")};
+  std::vector<iree_string_view_t> expected{iree_make_cstring_view("World"),
+                                           iree_make_cstring_view("Hello")};
 
-  absl::InlinedVector<iree_string_view_t, 3> dict{
-      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
-      iree_make_cstring_view("!")};
-  absl::InlinedVector<int32_t, 1> dict_shape{3};
+  std::vector<iree_string_view_t> dict{iree_make_cstring_view("Hello"),
+                                       iree_make_cstring_view("World"),
+                                       iree_make_cstring_view("!")};
+  std::vector<int32_t> dict_shape{3};
 
-  absl::InlinedVector<int32_t, 2> ids{1, 0};
-  absl::InlinedVector<int32_t, 1> ids_shape{2};
+  std::vector<int32_t> ids{1, 0};
+  std::vector<int32_t> ids_shape{2};
 
   TestGather(dict, dict_shape, ids, ids_shape, expected);
 }
 
 TEST_F(StringsModuleTest, GatherHigherRank) {
-  absl::InlinedVector<iree_string_view_t, 6> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("!"),     iree_make_cstring_view("!"),
       iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
       iree_make_cstring_view("!"),     iree_make_cstring_view("!")};
 
-  absl::InlinedVector<iree_string_view_t, 3> dict{
-      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
-      iree_make_cstring_view("!")};
-  absl::InlinedVector<int32_t, 1> dict_shape{3};
+  std::vector<iree_string_view_t> dict{iree_make_cstring_view("Hello"),
+                                       iree_make_cstring_view("World"),
+                                       iree_make_cstring_view("!")};
+  std::vector<int32_t> dict_shape{3};
 
-  absl::InlinedVector<int32_t, 6> ids{2, 2, 0, 1, 2, 2};
-  absl::InlinedVector<int32_t, 4> ids_shape{2, 3, 1, 1};
+  std::vector<int32_t> ids{2, 2, 0, 1, 2, 2};
+  std::vector<int32_t> ids_shape{2, 3, 1, 1};
 
   TestGather(dict, dict_shape, ids, ids_shape, expected);
 }
 
 TEST_F(StringsModuleTest, Concat) {
-  absl::InlinedVector<iree_string_view_t, 2> expected{
-      iree_make_cstring_view("abc"), iree_make_cstring_view("def")};
+  std::vector<iree_string_view_t> expected{iree_make_cstring_view("abc"),
+                                           iree_make_cstring_view("def")};
 
-  absl::InlinedVector<iree_string_view_t, 6> contents{
+  std::vector<iree_string_view_t> contents{
       iree_make_cstring_view("a"), iree_make_cstring_view("b"),
       iree_make_cstring_view("c"), iree_make_cstring_view("d"),
       iree_make_cstring_view("e"), iree_make_cstring_view("f")};
-  absl::InlinedVector<int32_t, 2> shape{2, 3};
+  std::vector<int32_t> shape{2, 3};
 
   TestConcat(contents, shape, expected);
 }
 
 TEST_F(StringsModuleTest, ConcatMultiDim) {
-  absl::InlinedVector<iree_string_view_t, 4> expected{
+  std::vector<iree_string_view_t> expected{
       iree_make_cstring_view("abc"), iree_make_cstring_view("def"),
       iree_make_cstring_view("ghi"), iree_make_cstring_view("jkl")};
 
-  absl::InlinedVector<iree_string_view_t, 6> contents{
+  std::vector<iree_string_view_t> contents{
       iree_make_cstring_view("a"), iree_make_cstring_view("b"),
       iree_make_cstring_view("c"), iree_make_cstring_view("d"),
       iree_make_cstring_view("e"), iree_make_cstring_view("f"),
       iree_make_cstring_view("g"), iree_make_cstring_view("h"),
       iree_make_cstring_view("i"), iree_make_cstring_view("j"),
       iree_make_cstring_view("k"), iree_make_cstring_view("l")};
-  absl::InlinedVector<int32_t, 3> shape{2, 2, 3};
+  std::vector<int32_t> shape{2, 2, 3};
 
   TestConcat(contents, shape, expected);
 }
 
 TEST_F(StringsModuleTest, IdsToStrings) {
-  absl::InlinedVector<iree_string_view_t, 12> intermediate_expected{
+  std::vector<iree_string_view_t> intermediate_expected{
       iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
       iree_make_cstring_view("World"), iree_make_cstring_view("World"),
       iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
@@ -582,17 +581,17 @@ TEST_F(StringsModuleTest, IdsToStrings) {
       iree_make_cstring_view("!"),     iree_make_cstring_view("!"),
       iree_make_cstring_view("World"), iree_make_cstring_view("!")};
 
-  absl::InlinedVector<iree_string_view_t, 3> dict{
-      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
-      iree_make_cstring_view("!")};
-  absl::InlinedVector<int32_t, 1> dict_shape{3};
+  std::vector<iree_string_view_t> dict{iree_make_cstring_view("Hello"),
+                                       iree_make_cstring_view("World"),
+                                       iree_make_cstring_view("!")};
+  std::vector<int32_t> dict_shape{3};
 
-  absl::InlinedVector<int32_t, 12> ids{0, 1, 1, 1, 0, 1, 0, 1, 2, 2, 1, 2};
-  absl::InlinedVector<int32_t, 4> ids_shape{1, 1, 4, 3};
+  std::vector<int32_t> ids{0, 1, 1, 1, 0, 1, 0, 1, 2, 2, 1, 2};
+  std::vector<int32_t> ids_shape{1, 1, 4, 3};
 
   TestGather(dict, dict_shape, ids, ids_shape, intermediate_expected);
 
-  absl::InlinedVector<iree_string_view_t, 4> final_expected{
+  std::vector<iree_string_view_t> final_expected{
       iree_make_cstring_view("HelloWorldWorld"),
       iree_make_cstring_view("WorldHelloWorld"),
       iree_make_cstring_view("HelloWorld!"), iree_make_cstring_view("!World!")};

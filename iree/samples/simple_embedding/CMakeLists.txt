@@ -8,6 +8,11 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
+if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_VMLA} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 iree_bytecode_module(
@@ -31,13 +36,13 @@ iree_cc_test(
     "simple_embedding_test.cc"
   DEPS
     ::simple_embedding_test_bytecode_module_cc
-    absl::core_headers
     absl::span
     absl::strings
     iree::base::api
     iree::base::logging
     iree::hal::api
-    iree::hal::testing::driver_registry
+    iree::hal::vmla::registration
+    iree::hal::vulkan::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main
