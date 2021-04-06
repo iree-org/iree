@@ -182,6 +182,16 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
     auto outerValue = opArg.value();
     auto *sourceOp = outerValue.getDefiningOp();
     if (!sourceOp) continue;  // can't clone block arguments into closures
+
+    BlockArgument blockArg = entryBlock.getArgument(opArg.index());
+    if (auto type = blockArg.getType().dyn_cast<DispatchTensorType>()) {
+      // We cannot just simply inline and replace all users if this is an
+      // argument that can be written; for example, the region might perform
+      // work after loading a initial constant from the argument and then
+      // write back.
+      if (type.getAccess() != TensorAccess::ReadOnly) continue;
+    }
+
     if (closureOp.canClosureContainOp(sourceOp) &&
         shouldInlineIntoClosure(outerValue)) {
       // Clone the op (with regions).
@@ -197,8 +207,7 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
       auto newValue = clonedOp->getResult(resultIndex);
 
       // Replace all of the uses inside of the closure.
-      auto innerValue = entryBlock.getArgument(opArg.index());
-      innerValue.replaceAllUsesWith(newValue);
+      blockArg.replaceAllUsesWith(newValue);
     }
   }
 }
