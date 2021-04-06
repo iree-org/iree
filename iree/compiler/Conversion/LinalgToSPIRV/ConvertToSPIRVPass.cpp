@@ -545,9 +545,14 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateGPUToSPIRVPatterns(typeConverter, patterns);
   // Pull in SCF patterns to convert control flow ops.
   populateSCFToSPIRVPatterns(typeConverter, scfToSPIRVContext, patterns);
-  // TOSA rescale will be lowered to Standard right before SPIRV codegen. Future
-  // lowerings should using specific SPIRV operations to avoid requiring i64
-  // values.
+
+  // Use the default 64-bit lowering for TOSA's ApplyScale operator:
+  //   This lowering widens integer types to 64-bit an performs the non-fused
+  //   operations, specifically multiply, add, and shift. Bit-widening
+  //   is used to guarantee higher-order bits are not truncated during the
+  //   multiply or add.
+  //
+  // TODO(antiagainst): Use a lowering that uses specific SPIRV intrinsics.
   tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
 
   // Pull in standard patterns to convert arithmetic ops and others.

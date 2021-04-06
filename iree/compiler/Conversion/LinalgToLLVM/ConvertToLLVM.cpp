@@ -676,23 +676,13 @@ void ConvertToLLVMPass::runOnOperation() {
 
   OwningRewritePatternList patterns(&getContext());
 
-  // TOSA's apply scale operator performs a bit-precise scale-shift-round
-  // operation that can be summarized to:
-  //  out = (in * multiplier + round) >> shift;
+  // Use the default 64-bit lowering for TOSA's ApplyScale operator:
+  //   This lowering widens integer types to 64-bit an performs the non-fused
+  //   operations, specifically multiply, add, and shift. Bit-widening
+  //   is used to guarantee higher-order bits are not truncated during the
+  //   multiply or add.
   //
-  // This can be performed using i64 types as:
-  //
-  // %in64 = sexti %in : i64
-  // %multiplier64 = sexti %multiplier : i64
-  // %round64 = sexti %round : i64
-  // %shift64 = sexti %shift : i64
-  //
-  // %0 = muli %in64, %multiplier64
-  // %1 = addi %0, %round64
-  // %2 = signed_shift_right  %1, %shift64
-  // %out = trunci %2
-  //
-  // Note that the round value is computed by the shift value.
+  // TODO(silvasean): Use a lowering that uses specific ARM/X86 intrinsics.
   tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
 
   populateAffineToStdConversionPatterns(patterns);
