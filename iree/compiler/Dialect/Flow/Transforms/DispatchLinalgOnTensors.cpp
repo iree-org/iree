@@ -990,11 +990,26 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
         op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(newGroup));
       }
 
-      for (OpOperand &operand : linalgOp.getShapedOpOperands()) {
-        auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
+      for (OpOperand *operand : linalgOp.getInputTensorsOpOperands()) {
+        auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
         if (!producer) continue;
         Operation *producerOp = producer.getOperation();
-        if (!isProducerFusable(producer, op, operand)) continue;
+        if (!isProducerFusable(producer, op, *operand)) continue;
+
+        appendFusionGroups(producerOp, fusionGroups);
+
+        // For input operands, only allow fusing the first one for now. This
+        // avoids pulling in two many operations in the same region. Multiple
+        // inputs also means it's less likely to elide all the intermediate
+        // buffers.
+        break;
+      }
+
+      for (OpOperand *operand : linalgOp.getOutputTensorsOpOperands()) {
+        auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
+        if (!producer) continue;
+        Operation *producerOp = producer.getOperation();
+        if (!isProducerFusable(producer, op, *operand)) continue;
 
         appendFusionGroups(producerOp, fusionGroups);
       }
