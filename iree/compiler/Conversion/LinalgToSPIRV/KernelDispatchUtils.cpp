@@ -729,9 +729,9 @@ static LogicalResult getPoolingOpLaunchConfig(
                                     config);                            \
   }
 
-DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxOp)
-DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMinOp)
-DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCSumOp)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxFOp)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMinFOp)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCSumFOp)
 
 #undef DEFINE_POOLINGOP_CONFIG
 
@@ -781,9 +781,9 @@ Optional<LaunchConfig> initGPULaunchConfig(
     DISPATCH(linalg::ConvInputNHWCFilterHWCFOp)
     DISPATCH(linalg::ConvInputNDHWCFilterDHWCFOp)
     DISPATCH(linalg::MatmulOp)
-    DISPATCH(linalg::PoolingNHWCMaxOp)
-    DISPATCH(linalg::PoolingNHWCMinOp)
-    DISPATCH(linalg::PoolingNHWCSumOp)
+    DISPATCH(linalg::PoolingNHWCMaxFOp)
+    DISPATCH(linalg::PoolingNHWCMinFOp)
+    DISPATCH(linalg::PoolingNHWCSumFOp)
   }
 
   // Any generic/indexed_generic operations found are made the root if no other

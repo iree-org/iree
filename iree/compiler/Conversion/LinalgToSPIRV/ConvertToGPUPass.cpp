@@ -840,9 +840,9 @@ void ConvertToGPUPass::runOnOperation() {
       MapLinalgOpToLocalInvocationId<linalg::IndexedGenericOp>,
       MapLinalgOpToLocalInvocationId<linalg::MatmulOp>,
       MapLinalgOpToLocalInvocationId<linalg::BatchMatmulOp>,
-      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCMaxOp>,
-      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCMinOp>,
-      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCSumOp>,
+      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCMaxFOp>,
+      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCMinFOp>,
+      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCSumFOp>,
       RemoveLinalgRange, SerializeParallelLoopPattern>(
       context, options.usingLinalgOnTensors);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
