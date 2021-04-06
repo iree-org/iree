@@ -115,3 +115,17 @@ func @tensor(%A: tensor<2x3xf32>, %B: tensor<3x4xf32>, %C: tensor<2x4xf32>)  -> 
                     outs(%C: tensor<2x4xf32>) -> tensor<2x4xf32>
   return %E : tensor<2x4xf32>
 }
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+
+func @linalg(%A: tensor<2xf32>)  -> tensor<2xf32> {
+  %init = linalg.init_tensor [2] : tensor<2xf32>
+  %generic = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%A : tensor<2xf32>) outs(%init : tensor<2xf32>) {
+  ^bb0(%arg1: f32, %arg2: f32):
+    linalg.yield %arg1 : f32
+  } -> tensor<2xf32>
+
+  return %init : tensor<2xf32>
+}
