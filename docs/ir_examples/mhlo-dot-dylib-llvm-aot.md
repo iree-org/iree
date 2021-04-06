@@ -8204,7 +8204,6 @@ module  {
     vm.import @hal.allocator.wrap.byte_buffer(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %source : !vm.ref<!iree.byte_buffer>, %offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
     vm.import @hal.buffer.allocator(%buffer : !vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator> attributes {sym_visibility = "private"}
     vm.import @hal.buffer.subspan(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
-    vm.import @hal.buffer.fill(%target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32, %pattern : i32) attributes {sym_visibility = "private"}
     vm.import @hal.buffer.load(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> i32 attributes {sym_visibility = "private"}
     vm.import @hal.buffer.store(%value : i32, %target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32) attributes {sym_visibility = "private"}
     vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
@@ -8363,7 +8362,6 @@ vm.module @module {
   vm.import @hal.allocator.wrap.byte_buffer(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %source : !vm.ref<!iree.byte_buffer>, %offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
   vm.import @hal.buffer.allocator(%buffer : !vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator> attributes {sym_visibility = "private"}
   vm.import @hal.buffer.subspan(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
-  vm.import @hal.buffer.fill(%target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32, %pattern : i32) attributes {sym_visibility = "private"}
   vm.import @hal.buffer.load(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> i32 attributes {sym_visibility = "private"}
   vm.import @hal.buffer.store(%value : i32, %target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32) attributes {sym_visibility = "private"}
   vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
@@ -8521,7 +8519,6 @@ vm.module @module {
   vm.import @hal.allocator.wrap.byte_buffer(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %source : !vm.ref<!iree.byte_buffer>, %offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
   vm.import @hal.buffer.allocator(%buffer : !vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator> attributes {sym_visibility = "private"}
   vm.import @hal.buffer.subspan(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
-  vm.import @hal.buffer.fill(%target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32, %pattern : i32) attributes {sym_visibility = "private"}
   vm.import @hal.buffer.load(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> i32 attributes {sym_visibility = "private"}
   vm.import @hal.buffer.store(%value : i32, %target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32) attributes {sym_visibility = "private"}
   vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
@@ -8956,7 +8953,6 @@ module  {
     vm.import @hal.allocator.wrap.byte_buffer(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %source : !vm.ref<!iree.byte_buffer>, %offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
     vm.import @hal.buffer.allocator(%buffer : !vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator> attributes {sym_visibility = "private"}
     vm.import @hal.buffer.subspan(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
-    vm.import @hal.buffer.fill(%target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32, %pattern : i32) attributes {sym_visibility = "private"}
     vm.import @hal.buffer.load(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> i32 attributes {sym_visibility = "private"}
     vm.import @hal.buffer.store(%value : i32, %target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32) attributes {sym_visibility = "private"}
     vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}
@@ -9118,7 +9114,6 @@ module  {
     vm.import @hal.allocator.wrap.byte_buffer(%allocator : !vm.ref<!hal.allocator>, %memory_types : i32, %buffer_usage : i32, %source : !vm.ref<!iree.byte_buffer>, %offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
     vm.import @hal.buffer.allocator(%buffer : !vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator> attributes {sym_visibility = "private"}
     vm.import @hal.buffer.subspan(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> !vm.ref<!hal.buffer> attributes {sym_visibility = "private"}
-    vm.import @hal.buffer.fill(%target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32, %pattern : i32) attributes {sym_visibility = "private"}
     vm.import @hal.buffer.load(%source_buffer : !vm.ref<!hal.buffer>, %source_offset : i32, %length : i32) -> i32 attributes {sym_visibility = "private"}
     vm.import @hal.buffer.store(%value : i32, %target_buffer : !vm.ref<!hal.buffer>, %target_offset : i32, %length : i32) attributes {sym_visibility = "private"}
     vm.import @hal.buffer_view.create(%buffer : !vm.ref<!hal.buffer>, %element_type : i32, %shape : i32 ...) -> !vm.ref<!hal.buffer_view> attributes {nosideeffects, sym_visibility = "private"}

@@ -360,59 +360,6 @@ Returns the allocator this buffer was allocated from.
 | :----: | ----------- |
 `result` | allocator
 
-### `hal.buffer.copy` (::mlir::iree_compiler::IREE::HAL::BufferCopyOp)
-
-buffer-to-buffer copy operation
-
-
-Syntax:
-
-```
-operation ::= `hal.buffer.copy` `source` `(` $source_buffer `:` type($source_buffer) `)`
-              `` `[` $source_offset `]`
-              `target` `(` $target_buffer `:` type($target_buffer) `)`
-              `` `[` $target_offset `]`
-              `length` `(` $length `)`
-              attr-dict-with-keyword
-```
-
-Copies data from the provided source_buffer into the buffer.
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`source_buffer` | buffer
-`source_offset` | index
-`target_buffer` | buffer
-`target_offset` | index
-`length` | index
-
-### `hal.buffer.fill` (::mlir::iree_compiler::IREE::HAL::BufferFillOp)
-
-buffer fill operation
-
-
-Syntax:
-
-```
-operation ::= `hal.buffer.fill` `<` $target_buffer `:` type($target_buffer) `>`
-              `` `[` $target_offset `,` $length `]`
-              `pattern` `(` $pattern `:` type($pattern) `)`
-              attr-dict-with-keyword
-```
-
-Fills the target buffer with the given repeating value.
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`target_buffer` | buffer
-`target_offset` | index
-`length` | index
-`pattern` | 32-bit signless integer
-
 ### `hal.buffer.length` (::mlir::iree_compiler::IREE::HAL::BufferLengthOp)
 
 buffer byte length accessor
