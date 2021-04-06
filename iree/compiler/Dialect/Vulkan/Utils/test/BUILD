@@ -33,7 +33,10 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
-        ["target_env_conversion.mlir"],
+        [
+            "target_env_conversion_linalg_on_tensors.mlir",
+            "target_env_conversion.mlir",
+        ],
         include = ["*.mlir"],
     ),
     data = [

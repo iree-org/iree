@@ -19,6 +19,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "target_env_conversion.mlir"
+    "target_env_conversion_linalg_on_tensors.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
