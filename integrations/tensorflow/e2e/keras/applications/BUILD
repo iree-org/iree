@@ -107,6 +107,13 @@ KERAS_APPLICATIONS_MODELS = [
 iree_e2e_cartesian_product_test_suite(
     name = "large_cifar10_tests",
     size = "large",
+    failing_configurations = [
+        {
+            # TODO(#5268): Failing on Vulkan due to OOM.
+            "model": "ResNet50",
+            "target_backends": "iree_vulkan",
+        },
+    ],
     matrix = {
         "src": "applications_test.py",
         "reference_backend": "tf",
