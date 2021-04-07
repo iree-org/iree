@@ -731,6 +731,9 @@ iree_status_t iree_hal_vulkan_device_create(
   // all queues created from the same family are done in the same
   // VkDeviceQueueCreateInfo struct.
   std::vector<VkDeviceQueueCreateInfo> queue_create_info;
+  // Reserve space for create infos. Note: must be the maximum used, or else
+  // references used below will be invalidated as the vector grows.
+  queue_create_info.reserve(2);
   std::vector<float> dispatch_queue_priorities;
   std::vector<float> transfer_queue_priorities;
   queue_create_info.push_back({});
