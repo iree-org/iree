@@ -135,11 +135,11 @@ flow.executable @static_tiled_dispatch {
       // CHECK-NEXT: %[[RET:.+]] = hal.interface.binding.subspan @legacy_io::@wo1[%c0] : !flow.dispatch.tensor<writeonly:4x8xf32>
 
       // CHECK-NEXT: %[[ARG_TILE:.+]] = flow.dispatch.tensor.load %[[ARG]]
-      %arg_tile = flow.dispatch.tensor.load %arg : !flow.dispatch.tensor<readonly:8x4xf32> -> tensor<8x4xf32>
+      %arg_tile = flow.dispatch.tensor.load %arg, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:8x4xf32> -> tensor<8x4xf32>
       // CHECK-NEXT: %[[RET_TILE:.+]] = "test.sink"(%[[ARG_TILE]])
       %ret_tile = "test.sink"(%arg_tile) : (tensor<8x4xf32>) -> tensor<4x8xf32>
       // CHECK-NEXT: flow.dispatch.tensor.store %[[RET_TILE]], %[[RET]]
-      flow.dispatch.tensor.store %ret_tile, %ret : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:4x8xf32>
+      flow.dispatch.tensor.store %ret_tile, %ret, offsets=[], sizes=[], strides=[] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:4x8xf32>
       return
     }
   }
@@ -190,11 +190,11 @@ flow.executable @dynamic_tiled_dispatch {
       // CHECK-NEXT: %[[RET_SHAPED:.+]] = flow.dispatch.tie_shape %[[RET]], %[[RET_SHAPE]]
       %ret_shaped = flow.dispatch.tie_shape %ret, %ret_shape : (!flow.dispatch.tensor<writeonly:?x?x1024xf32>, !shapex.ranked_shape<[?,?,1024]>) -> !flow.dispatch.tensor<writeonly:?x?x1024xf32>
       // CHECK-NEXT: %[[ARG_TILE:.+]] = flow.dispatch.tensor.load %[[ARG_SHAPED]]
-      %arg_tile = flow.dispatch.tensor.load %arg_shaped : !flow.dispatch.tensor<readonly:7x?x24x?xf32> -> tensor<7x?x24x?xf32>
+      %arg_tile = flow.dispatch.tensor.load %arg_shaped, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:7x?x24x?xf32> -> tensor<7x?x24x?xf32>
       // CHECK-NEXT: %[[RET_TILE:.+]] = "test.tile_math"(%[[ARG_TILE]])
       %ret_tile = "test.tile_math"(%arg_tile) : (tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32>
       // CHECK-NEXT: flow.dispatch.tensor.store %[[RET_TILE]], %[[RET_SHAPED]]
-      flow.dispatch.tensor.store %ret_tile, %ret_shaped : tensor<?x?x1024xf32> -> !flow.dispatch.tensor<writeonly:?x?x1024xf32>
+      flow.dispatch.tensor.store %ret_tile, %ret_shaped, offsets=[], sizes=[], strides=[] : tensor<?x?x1024xf32> -> !flow.dispatch.tensor<writeonly:?x?x1024xf32>
       return
     }
   }

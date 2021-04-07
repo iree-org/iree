@@ -423,9 +423,9 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
         loadOp.strides().empty()) {
       return failure();
     }
-    rewriter.replaceOpWithNewOp<SubTensorOp>(loadOp, loadOp.source(),
-                                             loadOp.offsets(), loadOp.sizes(),
-                                             loadOp.strides());
+    rewriter.replaceOpWithNewOp<SubTensorOp>(
+        loadOp, loadOp.source(), loadOp.getMixedOffsets(),
+        loadOp.getMixedSizes(), loadOp.getMixedStrides());
     return success();
   }
 };
@@ -442,8 +442,9 @@ void DispatchTensorLoadOp::getCanonicalizationPatterns(
 // verification. Fold such uses of the offsets, size and strides are emtpy.
 // i.e, flow.dispatch.input.load %v -> %v
 OpFoldResult DispatchTensorLoadOp::fold(ArrayRef<Attribute> operands) {
-  if (source().getType().isa<RankedTensorType>() && offsets().empty() &&
-      sizes().empty() && strides().empty()) {
+  if (source().getType() && source().getType().isa<RankedTensorType>() &&
+      getMixedOffsets().empty() && getMixedSizes().empty() &&
+      getMixedStrides().empty()) {
     return source();
   }
   return {};
