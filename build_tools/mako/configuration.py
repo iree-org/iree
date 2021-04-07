@@ -176,7 +176,9 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
               "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
               "--iree-flow-dispatch-linalg-on-tensors",
               "--iree-codegen-spirv-experimental-linalg-on-tensors",
-              "-iree-flow-inline-constants-max-byte-length=2048"
+              # TODO(GH-5330): Revisit the number or delete the flag.
+              "-iree-flow-inline-constants-max-byte-length=16",
+              "-iree-spirv-enable-vectorization"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
