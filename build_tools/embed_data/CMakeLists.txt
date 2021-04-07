@@ -21,7 +21,6 @@ if(NOT CMAKE_CROSSCOMPILING)
     absl::flags
     absl::flags_parse
     absl::strings
-    absl::time
   )
   install(TARGETS generate_cc_embed_data
           COMPONENT generate_cc_embed_data
