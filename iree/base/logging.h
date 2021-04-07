@@ -68,10 +68,10 @@ namespace iree {
 // ------------------------------------------------------------------------- //
 
 // Severity levels for IREE_LOG().
-const int INFO = 0;     // absl::LogSeverity::kInfo
-const int WARNING = 1;  // absl::LogSeverity::kWarning
-const int ERROR = 2;    // absl::LogSeverity::kError
-const int FATAL = 3;    // absl::LogSeverity::kFatal
+const int INFO = 0;
+const int WARNING = 1;
+const int ERROR = 2;
+const int FATAL = 3;
 
 namespace internal {
 
