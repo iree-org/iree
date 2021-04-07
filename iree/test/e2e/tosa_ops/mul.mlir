@@ -18,7 +18,7 @@ func @tensor_int_shifted() attributes { iree.module.export } {
   %0 = iree.unfoldable_constant dense<[1, 0, 3, 4]> : tensor<4xi32>
   %1 = iree.unfoldable_constant dense<[5, 6, -3, 8]> : tensor<4xi32>
   %result = "tosa.mul"(%0, %1) {shift = 1 : i32} : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
-  check.expect_eq_const(%result, dense<[2, 0, -5, 16]> : tensor<4xi32>) : tensor<4xi32>
+  check.expect_eq_const(%result, dense<[3, 0, -4, 16]> : tensor<4xi32>) : tensor<4xi32>
   return
 }
 
