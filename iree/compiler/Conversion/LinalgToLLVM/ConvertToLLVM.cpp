@@ -682,7 +682,7 @@ void ConvertToLLVMPass::runOnOperation() {
   //   is used to guarantee higher-order bits are not truncated during the
   //   multiply or add.
   //
-  // TODO(silvasean): Use a lowering that uses specific ARM/X86 intrinsics.
+  // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
   tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
 
   populateAffineToStdConversionPatterns(patterns);
