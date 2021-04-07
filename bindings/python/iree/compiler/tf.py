@@ -90,7 +90,6 @@ class ImportOptions(CompilerOptions):
                import_extra_args: Sequence[str] = (),
                save_temp_tf_input: Optional[str] = None,
                save_temp_iree_input: Optional[str] = None,
-               output_generic_mlir: bool = False,
                **kwargs):
     """Initialize options from keywords.
 
