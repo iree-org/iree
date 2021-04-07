@@ -16,7 +16,7 @@
 
 #include <mutex>
 
-#include "iree/base/flags.h"
+#include "iree/base/internal/flags.h"
 #include "iree/hal/vmla/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/strings_module.h"
