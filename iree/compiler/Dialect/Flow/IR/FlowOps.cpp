@@ -874,13 +874,6 @@ DispatchRegionOp::cloneReplacementExcludingOperandsAndResults(
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
 
-/*void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
-                                 RankedTensorType resultType, Value source) {
-  build(builder, state, resultType, source, ArrayRef<Value>(),
-        ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
-        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
-}*/
-
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  RankedTensorType returnType, Value source,
                                  ArrayRef<NamedAttribute> attributes) {

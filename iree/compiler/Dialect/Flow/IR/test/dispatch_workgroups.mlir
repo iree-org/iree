@@ -61,8 +61,8 @@ func @complexWorkgroupsUsage(
 
     // Load tensors (optional offsets/sizes/strides):
 
-    // CHECK: %[[ARG0_VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]] : !flow.dispatch.tensor<readonly:?x4xf32> -> tensor<?x4xf32>
-    %arg0_value = flow.dispatch.tensor.load %arg0_capture : !flow.dispatch.tensor<readonly:?x4xf32> -> tensor<?x4xf32>
+    // CHECK: %[[ARG0_VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readonly:?x4xf32> -> tensor<?x4xf32>
+    %arg0_value = flow.dispatch.tensor.load %arg0_capture, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?x4xf32> -> tensor<?x4xf32>
     // CHECK-NEXT: %[[ARG0_SHAPE_INDIRECT:.+]] = shapex.get_ranked_shape %[[ARG0_VALUE]] : tensor<?x4xf32> -> !shapex.ranked_shape<[?,4]>
     %arg0_shape_indirect = shapex.get_ranked_shape %arg0_value : tensor<?x4xf32> -> !shapex.ranked_shape<[?,4]>
 
@@ -73,8 +73,8 @@ func @complexWorkgroupsUsage(
 
     // Store tensors (optional offsets/sizes/strides):
 
-    // CHECK: flow.dispatch.tensor.store %[[RET0_VALUE]], %[[INNER_RET0]] : tensor<4x?xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>
-    flow.dispatch.tensor.store %ret0_value, %ret0 : tensor<4x?xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>
+    // CHECK: flow.dispatch.tensor.store %[[RET0_VALUE]], %[[INNER_RET0]], {{.*}} : tensor<4x?xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>
+    flow.dispatch.tensor.store %ret0_value, %ret0, offsets=[], sizes=[], strides=[] : tensor<4x?xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>
 
     // CHECK-NEXT: flow.return
     flow.return
@@ -104,10 +104,10 @@ func @inplaceDispatch(
   // CHECK-NEXT: (%[[INNER_ARG0:.+]]: !flow.dispatch.tensor<readwrite:?x4xf32>
   // CHECK-SAME:  %[[INNER_ARG1:.+]]: index) {
   (%arg0_capture: !flow.dispatch.tensor<readwrite:?x4xf32>, %arg1_capture: index) {
-    // CHECK: %[[VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]] : !flow.dispatch.tensor<readwrite:?x4xf32> -> tensor<?x4xf32>
-    %t = flow.dispatch.tensor.load %arg0_capture : !flow.dispatch.tensor<readwrite:?x4xf32> -> tensor<?x4xf32>
-    // CHECK: flow.dispatch.tensor.store %[[VALUE]], %[[INNER_ARG0]] : tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>
-    flow.dispatch.tensor.store %t, %arg0_capture : tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>
+    // CHECK: %[[VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readwrite:?x4xf32> -> tensor<?x4xf32>
+    %t = flow.dispatch.tensor.load %arg0_capture, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readwrite:?x4xf32> -> tensor<?x4xf32>
+    // CHECK: flow.dispatch.tensor.store %[[VALUE]], %[[INNER_ARG0]], {{.*}}: tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>
+    flow.dispatch.tensor.store %t, %arg0_capture, offsets=[], sizes=[], strides=[] : tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>
     // CHECK-NEXT: flow.return
     flow.return
   }
