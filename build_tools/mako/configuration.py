@@ -176,7 +176,7 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
               "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
               "--iree-flow-dispatch-linalg-on-tensors",
               "--iree-codegen-spirv-experimental-linalg-on-tensors",
-              # TODO(GH-5330): Replace 16 with 2048 or delete the flag.
+              # TODO(GH-5330): Revisit the number or delete the flag.
               "-iree-flow-inline-constants-max-byte-length=16",
               "-iree-spirv-enable-vectorization"
           ])
