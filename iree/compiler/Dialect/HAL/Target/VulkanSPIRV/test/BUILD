@@ -24,7 +24,10 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
-        ["smoketest.mlir"],
+        [
+            "smoketest.mlir",
+            "smoketest_linalg_on_tensors.mlir",
+        ],
         include = ["*.mlir"],
     ),
     data = [
