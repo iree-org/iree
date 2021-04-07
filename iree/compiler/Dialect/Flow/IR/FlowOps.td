@@ -550,6 +550,13 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     attr-dict `:` type($source) `->` type($result)
   }];
 
+  let builders = [
+    // Builder for tensor.load with empty offset, sizes and strides operands.
+    // This is used to load an entire tensor.
+    OpBuilder<(ins "RankedTensorType":$resultType, "Value":$source,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+  ];
+
   let extraClassDeclaration = [{
     /// Return the expected rank of each of the`static_offsets`, `static_sizes`
     /// and `static_strides` attributes.

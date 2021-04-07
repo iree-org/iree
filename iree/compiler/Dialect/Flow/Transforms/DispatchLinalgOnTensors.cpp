@@ -626,13 +626,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
     Value repl = bbArg;
     if (bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
       repl = b.create<IREE::Flow::DispatchTensorLoadOp>(
-          loc, operand.getType(), bbArg, ArrayRef<Value>({}),
-          ArrayRef<Value>({}), ArrayRef<Value>({}), b.getI64ArrayAttr({}),
-          b.getI64ArrayAttr({}), b.getI64ArrayAttr({}));
-
-    } else if (bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
-      // TODO(nicolasvasilache): do something useful.
-      continue;
+          loc, operand.getType().cast<RankedTensorType>(), bbArg);
     }
     map.map(operand, repl);
     toReplaceWithinRegion.push_back(operand);
