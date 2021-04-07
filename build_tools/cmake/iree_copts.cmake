@@ -307,10 +307,10 @@ else()
 endif()
 
 if(ANDROID)
-  # logging.h on Android needs llog to link in Android logging. 
+  # logging.h on Android needs llog to link in Android logging.
   iree_select_compiler_opts(_IREE_LOGGING_LINKOPTS
     CLANG_OR_GCC
-    "-llog"
+      "-llog"
   )
 endif()
 
