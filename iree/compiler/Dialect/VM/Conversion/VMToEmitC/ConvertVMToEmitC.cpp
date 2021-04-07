@@ -209,6 +209,18 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
   StringRef funcName;
 };
 
+class ListAllocOpConversion
+    : public OpConversionPattern<IREE::VM::ListAllocOp> {
+  using OpConversionPattern<IREE::VM::ListAllocOp>::OpConversionPattern;
+
+ private:
+  LogicalResult matchAndRewrite(
+      IREE::VM::ListAllocOp allocOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
 }  // namespace
 
 void populateVMToCPatterns(MLIRContext *context,
@@ -225,6 +237,9 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI32ZeroOp>>(context);
   patterns.insert<ConstRefZeroOpConversion>(context);
+
+  // Lists
+  patterns.insert<ListAllocOpConversion>(context);
 
   // Conditional assignment ops
   patterns.insert<CallOpConversion<IREE::VM::SelectI32Op>>(context,
