@@ -401,7 +401,6 @@ class ExtractReduceWindowOpPaddingAttributes
                                 PatternRewriter &rewriter) const override {
     if (!op.padding()) return failure();
 
-
     if ((op.base_dilations() && !isSplatValue(*op.base_dilations(), 1)) ||
         (op.window_dilations() && !isSplatValue(*op.window_dilations(), 1))) {
       return failure();
