@@ -1075,6 +1075,25 @@ func @dot_ex_dispatch_0() {
 ```
 {% endraw %}
 
+### IR Dump After Canonicalizer
+
+{% raw %}
+```
+func @dot_ex_dispatch_0() {
+  %c0 = constant 0 : index
+  %cst = constant 0.000000e+00 : f32
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
+  %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+  return
+}
+
+```
+{% endraw %}
+
 ### IR Dump After CSE
 
 {% raw %}
