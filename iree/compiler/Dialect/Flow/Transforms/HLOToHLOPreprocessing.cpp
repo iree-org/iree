@@ -47,9 +47,13 @@ static llvm::cl::opt<bool> orderConvFeatures(
     llvm::cl::desc("Guarantees input/output features ordered for conv kernel"),
     llvm::cl::init(true));
 
+/// Returns true if the given `attr` is a splat of the given `value`.
+static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
+  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
+}
+
 static bool isAllZero(DenseIntElementsAttr attr) {
-  if (!attr.isSplat()) return false;
-  return attr.getSplatValue<IntegerAttr>().getInt() == 0;
+  return isSplatValue(attr, 0);
 }
 
 static bool isIota(ArrayRef<int64_t> array) {
@@ -397,7 +401,10 @@ class ExtractReduceWindowOpPaddingAttributes
                                 PatternRewriter &rewriter) const override {
     if (!op.padding()) return failure();
 
-    if (op.base_dilations() || op.window_dilations()) return failure();
+    if ((op.base_dilations() && !isSplatValue(*op.base_dilations(), 1)) ||
+        (op.window_dilations() && !isSplatValue(*op.window_dilations(), 1))) {
+      return failure();
+    }
     if (isAllZero(op.paddingAttr())) return failure();
 
     // All inputs must be of the same static shape, since
