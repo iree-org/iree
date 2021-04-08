@@ -61,8 +61,18 @@ markdown_extensions:
 # https://www.mkdocs.org/user-guide/configuration/#nav
 nav:
     - Home: 'index.md'
+    - 'Frontends':
+      - TensorFlow: 'frontends/tensorflow.md'
+      - TensorFlow Lite: 'frontends/tensorflow-lite.md'
+      - JAX: 'frontends/jax.md'
+    - 'Backends':
+      - CPU LLVM: 'backends/cpu-llvm.md'
+      - GPU Vulkan: 'backends/gpu-vulkan.md'
     - 'Building from source':
       - 'building-from-source/getting-started.md'
       - 'building-from-source/android.md'
+    - 'Bindings':
+      - C API: 'bindings/c-api.md'
+      - TensorFlow Lite: 'bindings/tensorflow-lite.md'
     - 'Community':
       - Projects: 'community/projects.md'
