@@ -52,7 +52,7 @@ static llvm::cl::opt<bool> clDisableOperandFusion(
     "iree-flow-dispatch-formation-disable-operand-fusion",
     llvm::cl::desc(
         "Disable fusing operand producers during dispatch region formation"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
