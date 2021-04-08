@@ -445,6 +445,12 @@ enum {
                                        IREE_TRACING_MAX_CALLSTACK_DEPTH, 0)
 #define IREE_TRACE_FREE(ptr) \
   ___tracy_emit_memory_free_callstack(ptr, IREE_TRACING_MAX_CALLSTACK_DEPTH, 0)
+#define IREE_TRACE_ALLOC_NAMED(name, ptr, size) \
+  ___tracy_emit_memory_alloc_callstack_named(   \
+      ptr, size, IREE_TRACING_MAX_CALLSTACK_DEPTH, 0, name)
+#define IREE_TRACE_FREE_NAMED(name, ptr)     \
+  ___tracy_emit_memory_free_callstack_named( \
+      ptr, IREE_TRACING_MAX_CALLSTACK_DEPTH, 0, name)
 
 #else
 

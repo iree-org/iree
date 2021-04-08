@@ -18,14 +18,7 @@
 #include "iree/base/logging.h"
 #include "iree/base/synchronization.h"
 
-// Use std::unordered_map.
-#define VmaPair std::pair
-#define VMA_MAP_TYPE(KeyT, ValueT)                                       \
-  std::unordered_map<KeyT, ValueT, std::hash<KeyT>, std::equal_to<KeyT>, \
-                     VmaStlAllocator<std::pair<KeyT, ValueT> > >
-
-// Use IREE_CHECK for assertions.
-#define VMA_ASSERT IREE_CHECK
+#define VMA_ASSERT IREE_DCHECK
 #define VMA_HEAVY_ASSERT IREE_DCHECK
 
 // Use IREE_LOG for logging.
