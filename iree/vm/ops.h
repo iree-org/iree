@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/vm/value.h"
 
 //===------------------------------------------------------------------===//
 // Globals
@@ -32,6 +33,14 @@ static inline void vm_global_store_i32(uint8_t* base, uint32_t byte_offset,
                                        int32_t value) {
   int32_t* global_ptr = (int32_t*)(base + byte_offset);
   *global_ptr = value;
+}
+
+//===------------------------------------------------------------------===//
+// List ops
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_list_value_extract_i32(iree_vm_value_t* value) {
+  return value->i32;
 }
 
 //===------------------------------------------------------------------===//
@@ -137,6 +146,14 @@ static inline iree_status_t vm_fail_or_ok(int32_t status_code,
                                 message);
   }
   return iree_ok_status();
+}
+
+//===------------------------------------------------------------------===//
+// ExtI64: List ops
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_list_value_extract_i64(iree_vm_value_t* value) {
+  return value->i64;
 }
 
 //===------------------------------------------------------------------===//
