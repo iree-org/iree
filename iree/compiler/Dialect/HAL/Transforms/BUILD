@@ -29,6 +29,7 @@ cc_library(
         "LinkExecutables.cpp",
         "MaterializeConstantPoolBuffers.cpp",
         "MaterializeInterfaces.cpp",
+        "MaterializeInterfaces2.cpp",
         "MaterializeResourceCaches.cpp",
         "MemoizeDeviceQueries.cpp",
         "PackConstantPoolStorage.cpp",

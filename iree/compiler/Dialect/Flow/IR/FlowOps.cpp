@@ -1553,6 +1553,18 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   if (auto constantOp = dyn_cast<ConstantOp>(op)) {
     return constantOp.getType().isIntOrIndexOrFloat();
   }
+  if (auto loadOp = dyn_cast<VariableLoadOp>(op)) {
+    // Only allow loads of immutable variables to move into the stream.
+    // As they are immutable it's always safe to do so as no synchronization at
+    // the stream entry/exit boundary is required.
+    //
+    // Loads of mutable variables may sometimes be safe to move in as well
+    // however that is best done when we have better cross-stream
+    // synchronization support and can make those guarantees structurally.
+    auto variableOp =
+        SymbolTable::lookupNearestSymbolFrom<VariableOp>(op, loadOp.variable());
+    return variableOp.is_mutable() == false;
+  }
   return false;
 }
 
