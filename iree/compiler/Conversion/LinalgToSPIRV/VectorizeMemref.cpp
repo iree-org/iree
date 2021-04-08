@@ -215,7 +215,8 @@ class ProcessTransferRead final
     }
 
     Location loc = read.getLoc();
-    vector::TransferReadOp::Adaptor adaptor(operands);
+    vector::TransferReadOp::Adaptor adaptor(operands,
+                                            read->getAttrDictionary());
 
     auto scalarMemrefType = read.source().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
@@ -271,7 +272,8 @@ class ProcessTransferWrite final
     }
 
     Location loc = write.getLoc();
-    vector::TransferWriteOp::Adaptor adaptor(operands);
+    vector::TransferWriteOp::Adaptor adaptor(operands,
+                                             write->getAttrDictionary());
 
     auto scalarMemrefType = write.source().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
