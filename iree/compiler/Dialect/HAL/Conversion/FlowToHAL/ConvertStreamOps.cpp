@@ -250,7 +250,6 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
           allocateTransientBuffer(result, bufferSet.allocator, rewriter);
       auto bufferRange = BufferRange{buffer};
       bufferSet.rangeMap[result] = bufferRange;
-      propagateTiedBuffer(bufferSet, result, bufferRange);
     }
   }
 }
