@@ -978,7 +978,7 @@ func @bufferize_cst_output_tensor() {
   %cst5 = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
   %input = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:5xf32>
   %output = hal.interface.binding.subspan @legacy_io::@wo1[%c0] : !flow.dispatch.tensor<writeonly:i32>
-  %1 = flow.dispatch.tensor.load %input : !flow.dispatch.tensor<readonly:5xf32> -> tensor<5xf32>
+  %1 = flow.dispatch.tensor.load %input, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:5xf32> -> tensor<5xf32>
   %2 = linalg.generic {
          indexing_maps = [affine_map<(d0) -> (-d0 + 4)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
          iterator_types = ["reduction"]}
@@ -992,7 +992,7 @@ func @bufferize_cst_output_tensor() {
     %12 = select %11, %10, %arg2 : i32
     linalg.yield %12 : i32
   } -> tensor<i32>
-  flow.dispatch.tensor.store %2, %output : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
+  flow.dispatch.tensor.store %2, %output, offsets=[], sizes=[], strides=[] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
   return
 }
 
