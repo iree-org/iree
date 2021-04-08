@@ -58,14 +58,6 @@ struct BufferSet {
   DenseMap<Value, BufferRange> rangeMap;
 };
 
-// If the op does no work and has no operands/results that impact buffer
-// assignment, the it is a no-op.
-static bool isNoOp(Operation *op) { return isa<Shape::MakeRankedShapeOp>(op); }
-
-// If the op's result is an identity of its first operand, it is an
-// identity.
-static bool isIdentityOp(Operation *op) { return isa<Shape::TieShapeOp>(op); }
-
 // HACK: until we are doing buffer allocation we need to pin tied buffers all
 // the way up the stream from the outputs.
 static void propagateTiedBuffer(BufferSet &bufferSet, Value streamValue,
@@ -200,61 +192,8 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
   LLVM_DEBUG(llvm::dbgs() << ": HAL allocateTransientBuffers: "
                           << *streamOp.getOperation() << "\n");
 
-  auto propagateIdentityBuffers = [&]() {
-    bool madeChange = false;
-    // Pull outputs that terminate on identities to operands.
-    for (auto &op : llvm::reverse(streamOp.body().front())) {
-      if (isIdentityOp(&op)) {
-        auto operand = op.getOperand(0);
-        auto result = op.getResult(0);
-        if (!operand.getType().isa<ShapedType>()) continue;
-        if (!result.getType().isa<ShapedType>()) continue;
-        if (bufferSet.rangeMap[result].buffer &&
-            !bufferSet.rangeMap[operand].buffer) {
-          LLVM_DEBUG(llvm::dbgs() << "  + PROPAGATE IDENTITY RESULT->OPERAND: "
-                                  << op << "\n");
-          madeChange = true;
-          bufferSet.rangeMap[operand].buffer =
-              bufferSet.rangeMap[result].buffer;
-        }
-      }
-    }
-
-    // Push inputs that originate on identities to results.
-    for (auto &op : streamOp.body().front()) {
-      if (isIdentityOp(&op)) {
-        auto operand = op.getOperand(0);
-        auto result = op.getResult(0);
-        if (!operand.getType().isa<ShapedType>()) continue;
-        if (!result.getType().isa<ShapedType>()) continue;
-        if (bufferSet.rangeMap[operand].buffer &&
-            !bufferSet.rangeMap[result].buffer) {
-          LLVM_DEBUG(llvm::dbgs() << "  + PROPAGATE IDENTITY OPERAND->RESULT: "
-                                  << op << "\n");
-          madeChange = true;
-          bufferSet.rangeMap[result].buffer =
-              bufferSet.rangeMap[operand].buffer;
-        }
-      }
-    }
-    return madeChange;
-  };
-
   // Allocate any needed transient buffers.
-  // The idea here is that every non-identity-op result needs to be assigned a
-  // buffer; however, input and output buffers are already assigned to outer
-  // operands and results (which may be on identity ops). To handle this,
-  // we first propagate all buffers across identity ops, then allocate any
-  // transient buffers on non-identity ops that are still needed. Finally,
-  // propagate across identity ops again (to account for identity ops on
-  // the interior).
-  // Because there may be runs of identity ops, propagation loops until no
-  // changes are made.
-  while (propagateIdentityBuffers()) {
-  }
   for (auto &op : streamOp.body().front()) {
-    if (isNoOp(&op) || isIdentityOp(&op)) continue;
-
     if (auto subspanOp = dyn_cast<IREE::HAL::ConstantSubspanOp>(op)) {
       auto bufferValue = rewriter.createOrFold<IREE::HAL::VariableLoadOp>(
           subspanOp.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
@@ -306,8 +245,6 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
       bufferSet.rangeMap[result] = bufferRange;
       propagateTiedBuffer(bufferSet, result, bufferRange);
     }
-  }
-  while (propagateIdentityBuffers()) {
   }
 }
 
@@ -752,10 +689,8 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
       // HACK: all this code is going away soon.
       auto newOp = rewriter.clone(op);
       op.replaceAllUsesWith(newOp);
-    } else if (isNoOp(&op) || isIdentityOp(&op) ||
-               isa<IREE::HAL::ConstantSubspanOp>(op)) {
-      // No work to perform. For identity ops, all buffers have been pushed
-      // to "real" ops.
+    } else if (isa<IREE::HAL::ConstantSubspanOp>(op)) {
+      // No work to perform.
     } else {
       return op.emitOpError() << "unexpected in stream";
     }
