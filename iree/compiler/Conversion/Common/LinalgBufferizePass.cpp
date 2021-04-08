@@ -190,6 +190,9 @@ static LogicalResult finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
 static LogicalResult convertAnyLinalgOp(
     OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn, linalg::LinalgOp op,
     BlockAndValueMapping &bvm) {
+  // Skip linalg ops inserted by this pass.
+  if (op.hasBufferSemantics()) return success();
+
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Location loc = op.getLoc();
@@ -230,7 +233,11 @@ static LogicalResult convertConstantOp(OpBuilder &b, ConstantOp constantOp,
   Value memref =
       b.create<memref::BufferCastOp>(constantOp.getLoc(), memrefType, result);
   if (Value resultBuffer = bvm.lookupOrNull(result)) {
-    // Since this is already remapped to a buffer, copy the data.
+    // Since this is already remapped to a buffer, copy the data. Note that
+    // constant ops are typicaly placed at the beginning of the block; we need
+    // to make sure to insert the new copy op after the result buffer, which can
+    // be after the constant op.
+    b.setInsertionPointAfterValue(resultBuffer);
     b.create<linalg::CopyOp>(constantOp.getLoc(), memref, resultBuffer);
   } else {
     bvm.map(result, memref);
@@ -623,8 +630,8 @@ class LinalgBufferizePass
  public:
   LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, linalg::LinalgDialect, scf::SCFDialect,
-                    StandardOpsDialect>();
+    registry.insert<IREEDialect, linalg::LinalgDialect, memref::MemRefDialect,
+                    scf::SCFDialect, StandardOpsDialect>();
   }
   void runOnFunction() override;
 

@@ -658,7 +658,7 @@ func @rhs_non_splat_constant() {
       %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 5)>(%arg1)[%workgroup_size_x]
       %11 = subtensor %cst[0, %arg1] [3, %10] [1, 1] : tensor<3x5xf32> to tensor<3x?xf32>
       %12 = linalg.init_tensor [%8, %10] : tensor<?x?xf32>
-      %13 = linalg.fill(%12, %cst_0) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+      %13 = linalg.fill(%12, %cst_0) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
       %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%9, %11 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
       flow.dispatch.tensor.store %14, %1, offsets = [%arg0, %arg1], sizes = [%8, %10], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:5x5xf32>
     }
@@ -968,3 +968,48 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
 // CHECK-NEXT: linalg.generic
 // CHECK-SAME:   ins(%[[ALLOC]], %{{.+}} : memref<1x112x112x32xf32>, memref<32xf32>)
 // CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
+
+// -----
+
+func @bufferize_cst_output_tensor() {
+  %c0 = constant 0 : index
+  %cst1 = constant dense<-2147483648> : tensor<i32>
+  %zero = constant 0.000000e+00 : f32
+  %cst5 = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  %input = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:5xf32>
+  %output = hal.interface.binding.subspan @legacy_io::@wo1[%c0] : !flow.dispatch.tensor<writeonly:i32>
+  %1 = flow.dispatch.tensor.load %input, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:5xf32> -> tensor<5xf32>
+  %2 = linalg.generic {
+         indexing_maps = [affine_map<(d0) -> (-d0 + 4)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
+         iterator_types = ["reduction"]}
+         ins(%1, %cst5 : tensor<5xf32>, tensor<5xi32>)
+         outs(%cst1 : tensor<i32>) {
+  ^bb0(%arg0: f32, %arg1: i32, %arg2: i32):
+    %8 = cmpf oeq, %arg0, %zero : f32
+    %9 = zexti %8 : i1 to i32
+    %10 = muli %9, %arg1 : i32
+    %11 = cmpi sgt, %10, %arg2 : i32
+    %12 = select %11, %10, %arg2 : i32
+    linalg.yield %12 : i32
+  } -> tensor<i32>
+  flow.dispatch.tensor.store %2, %output, offsets=[], sizes=[], strides=[] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
+  return
+}
+
+hal.interface @interface_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @wo1, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+
+// CHECK-LABEL: func @bufferize_cst_output_tensor()
+
+//       CHECK: %[[CST1:.+]] = constant dense<-2147483648> : tensor<i32>
+//       CHECK: %[[CST5:.+]] = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+//       CHECK: %[[CAST1:.+]] = memref.buffer_cast %[[CST1]] : memref<i32>
+//       CHECK: %[[CAST5:.+]] = memref.buffer_cast %[[CST5]] : memref<5xi32>
+//       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : memref<5xf32>
+//       CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @legacy_io::@wo1[%c0] : memref<i32>
+//       CHECK: linalg.copy(%[[CAST1]], %[[OUTPUT]])
+//       CHECK: linalg.generic
+//  CHECK-SAME:   ins(%[[INPUT]], %[[CAST5]] : memref<5xf32>, memref<5xi32>)
+//  CHECK-SAME:   outs(%[[OUTPUT]] : memref<i32>)
