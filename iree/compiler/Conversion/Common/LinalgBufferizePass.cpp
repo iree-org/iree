@@ -83,10 +83,12 @@ static void transferShapeOpsToMemref(OpBuilder &b, Value tensor, Value memref,
 /// Creates a subview operation given the `src`, `offsets`, `sizes` and
 /// `strides`. Handles the corner case where the `offsets`, `sizes` and
 /// `strides` are empty in which case just forward the `src` value.
+/// TODO(ataei): Instead create memref.subview %v [][][] folder.
 static Value createSubviewOp(OpBuilder &b, Location loc, Value src,
-                             ValueRange offsets, ValueRange sizes,
-                             ValueRange strides) {
-  if (offsets.empty()) return src;
+                             ArrayRef<OpFoldResult> offsets,
+                             ArrayRef<OpFoldResult> sizes,
+                             ArrayRef<OpFoldResult> strides) {
+  if (offsets.empty() && sizes.empty() && strides.empty()) return src;
   return b.create<memref::SubViewOp>(loc, src, offsets, sizes, strides);
 }
 
@@ -407,9 +409,8 @@ static LogicalResult convertSubTensorInsertOp(
   Value source = op.source();
   Value outputBuffer = bvm.lookup(op.result());
   Value sourceBuffer = bvm.lookup(source);
-  auto subViewOp =
-      b.create<memref::SubViewOp>(loc, outputBuffer, op.getMixedOffsets(),
-                                  op.getMixedSizes(), op.getMixedStrides());
+  auto subViewOp = createSubviewOp(b, loc, outputBuffer, op.getMixedOffsets(),
+                                   op.getMixedSizes(), op.getMixedStrides());
   b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
   return success();
 }
@@ -485,8 +486,9 @@ LogicalResult convertInterfaceLoadTensorOp(
   b.setInsertionPoint(loadOp);
   Location loc = loadOp.getLoc();
   Value memref = bvm.lookup(loadOp.source());
-  Value res = createSubviewOp(b, loc, memref, loadOp.offsets(), loadOp.sizes(),
-                              loadOp.strides());
+  Value res = createSubviewOp(b, loc, memref, loadOp.getMixedOffsets(),
+                              loadOp.getMixedSizes(), loadOp.getMixedStrides());
+
   bvm.map(loadOp.result(), res);
   transferShapeOpsToMemref(b, loadOp.result(), res, bvm);
   return success();
@@ -539,7 +541,8 @@ LogicalResult preProcessInterfaceStoreTensorOp(
   b.setInsertionPoint(insertionPoint);
   Value subview =
       createSubviewOp(b, storeOp.getLoc(), bvm.lookup(storeOp.target()),
-                      storeOp.offsets(), storeOp.sizes(), storeOp.strides());
+                      storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+                      storeOp.getMixedStrides());
   bvm.map(storeOp.value(), subview);
   return success();
 }
@@ -606,8 +609,9 @@ LogicalResult convertInterfaceStoreTensorOp(
   }
 
   Value subview =
-      createSubviewOp(b, storeOp.getLoc(), storeTo, storeOp.offsets(),
-                      storeOp.sizes(), storeOp.strides());
+      createSubviewOp(b, storeOp.getLoc(), storeTo, storeOp.getMixedOffsets(),
+                      storeOp.getMixedSizes(), storeOp.getMixedStrides());
+
   b.create<linalg::CopyOp>(storeOp->getLoc(), storeFrom, subview);
   storeOp->erase();
   return success();

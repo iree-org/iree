@@ -3,6 +3,7 @@
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
+
 //
 //      https://www.apache.org/licenses/LICENSE-2.0
 //
@@ -23,6 +24,7 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 
 class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
     FLOW_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
@@ -517,7 +519,8 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape"> {
 }
 
 def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
-    SameVariadicOperandSize,
+    AttrSizedOperandSegments,
+    OffsetSizeAndStrideOpInterface,
   ]> {
   let summary = [{loads a tensor from a dispatch input placeholder}];
   let description = [{
@@ -530,7 +533,10 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     FLOW_ReadableDispatchTensor:$source,
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
-    Variadic<Index>:$strides
+    Variadic<Index>:$strides,
+    I64ArrayAttr:$static_offsets,
+    I64ArrayAttr:$static_sizes,
+    I64ArrayAttr:$static_strides
   );
   let results = (outs
     AnyRankedTensor:$result
@@ -538,10 +544,30 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
 
   let assemblyFormat = [{
     $source
-    ( `,` `offsets` `=` `[` $offsets^ `]` )?
-    ( `,` `sizes` `=` `[` $sizes^ `]` )?
-    ( `,` `strides` `=` `[` $strides^ `]` )?
-    `:` type($source) `->` type($result) attr-dict-with-keyword
+    `,` `offsets` `=` custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
+    `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
+    `,` `strides` `=` custom<OperandsOrIntegersOffsetsOrStridesList>($strides, $static_strides)
+    attr-dict `:` type($source) `->` type($result)
+  }];
+
+  let builders = [
+    // Builder for tensor.load with empty offset, sizes and strides operands.
+    // This is used to load an entire tensor.
+    OpBuilder<(ins "RankedTensorType":$resultType, "Value":$source,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+  ];
+
+  let extraClassDeclaration = [{
+    /// Return the expected rank of each of the`static_offsets`, `static_sizes`
+    /// and `static_strides` attributes.
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
+      unsigned resultRank = getResult().getType().cast<ShapedType>().getRank();
+      return {resultRank, resultRank, resultRank};
+    }
+
+    /// Return the number of leading operands before the `offsets`, `sizes` and
+    /// and `strides` operands.
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 1; }
   }];
 
   let hasCanonicalizer = 1;
@@ -549,7 +575,8 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
 }
 
 def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
-    SameVariadicOperandSize,
+    AttrSizedOperandSegments,
+    OffsetSizeAndStrideOpInterface,
   ]> {
   let summary = [{stores a tensor into a dispatch output placeholder}];
   let description = [{
@@ -563,16 +590,32 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     FLOW_WritableDispatchTensor:$target,
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
-    Variadic<Index>:$strides
+    Variadic<Index>:$strides,
+    I64ArrayAttr:$static_offsets,
+    I64ArrayAttr:$static_sizes,
+    I64ArrayAttr:$static_strides
   );
   let results = (outs);
 
   let assemblyFormat = [{
     $value `,` $target
-    ( `,` `offsets` `=` `[` $offsets^ `]` )?
-    ( `,` `sizes` `=` `[` $sizes^ `]` )?
-    ( `,` `strides` `=` `[` $strides^ `]` )?
-    `:` type($value) `->` type($target) attr-dict-with-keyword
+    `,` `offsets` `=` custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
+    `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
+    `,` `strides` `=` custom<OperandsOrIntegersOffsetsOrStridesList>($strides, $static_strides)
+    attr-dict `:` type($value) `->` type($target)
+  }];
+
+  let extraClassDeclaration = [{
+    /// Return the expected rank of each of the`static_offsets`, `static_sizes`
+    /// and `static_strides` attributes.
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
+      unsigned resultRank = target().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      return {resultRank, resultRank, resultRank};
+    }
+
+    /// Return the number of leading operands before the `offsets`, `sizes` and
+    /// and `strides` operands.
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 2; }
   }];
 }
 

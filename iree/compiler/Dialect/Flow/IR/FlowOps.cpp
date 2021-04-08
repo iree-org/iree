@@ -871,6 +871,18 @@ DispatchRegionOp::cloneReplacementExcludingOperandsAndResults(
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tensor.load
+//===----------------------------------------------------------------------===//
+
+void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
+                                 RankedTensorType returnType, Value source,
+                                 ArrayRef<NamedAttribute> attributes) {
+  build(builder, state, returnType, source, ArrayRef<Value>(),
+        ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
+        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.workgroups
 //===----------------------------------------------------------------------===//
 

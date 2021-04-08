@@ -237,16 +237,11 @@ static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
   }
   if (!loadOp) return failure();
 
-  SmallVector<Range, 4> ranges = getOrCreateRanges(op, b, op.getLoc());
-  SmallVector<Value, 4> offsets, sizes, strides;
-  for (auto &r : ranges) {
-    offsets.push_back(r.offset);
-    sizes.push_back(r.size);
-    strides.push_back(r.stride);
-  }
   Value loaded = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      op.getLoc(), op.getResult().getType(), loadOp.source(), offsets, sizes,
-      strides);
+      op.getLoc(), op.getResult().getType(), loadOp.source(), op.offsets(),
+      op.sizes(), op.strides(), op.static_offsets(), op.static_sizes(),
+      op.static_strides());
+
   op.getResult().replaceAllUsesWith(loaded);
   op.erase();
   return success();
@@ -271,15 +266,10 @@ static LogicalResult rewriteSubTensorInsertInPlace(OpBuilder &b,
   // Kills the SSA use-def chain.
   op.replaceAllUsesWith(dest);
 
-  SmallVector<Range, 4> ranges = getOrCreateRanges(op, b, op.getLoc());
-  SmallVector<Value, 4> offsets, sizes, strides;
-  for (auto &r : ranges) {
-    offsets.push_back(r.offset);
-    sizes.push_back(r.size);
-    strides.push_back(r.stride);
-  }
-  b.create<IREE::Flow::DispatchTensorStoreOp>(op.getLoc(), op.source(), target,
-                                              offsets, sizes, strides);
+  b.create<IREE::Flow::DispatchTensorStoreOp>(
+      op.getLoc(), op.source(), target, op.offsets(), op.sizes(), op.strides(),
+      op.static_offsets(), op.static_sizes(), op.static_strides());
+
   return success();
 }
 

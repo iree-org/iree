@@ -287,7 +287,8 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
                                  clonedOp->getNumResults()))) {
       rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
           loc, std::get<0>(it), std::get<1>(it), llvm::None, llvm::None,
-          llvm::None);
+          llvm::None, rewriter.getArrayAttr({}), rewriter.getArrayAttr({}),
+          rewriter.getArrayAttr({}));
     }
     rewriter.create<IREE::Flow::ReturnOp>(loc);
   }
@@ -624,11 +625,8 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
     Value bbArg = block.getArguments().back();
     Value repl = bbArg;
     if (bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
-      repl = b.create<IREE::Flow::DispatchTensorLoadOp>(loc, operand.getType(),
-                                                        bbArg);
-    } else if (bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
-      // TODO(nicolasvasilache): do something useful.
-      continue;
+      repl = b.create<IREE::Flow::DispatchTensorLoadOp>(
+          loc, operand.getType().cast<RankedTensorType>(), bbArg);
     }
     map.map(operand, repl);
     toReplaceWithinRegion.push_back(operand);

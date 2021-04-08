@@ -470,7 +470,7 @@ func @dot_general_lowering() {
   %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x1x2xf32>
   %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : !flow.dispatch.tensor<readonly:2x3xf32>
   %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:1x3xf32>
-  %3 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:1x1x2xf32> -> tensor<1x1x2xf32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x1x2xf32> -> tensor<1x1x2xf32>
   %4 = linalg.tensor_reshape %3 [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d2)>] : tensor<1x1x2xf32> into tensor<1x2xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
@@ -522,9 +522,9 @@ func @slice_whole_stride_dispatch_0() {
   %c0 = constant 0 : index
   %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
   %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>
-  %2 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
   %3 = subtensor %2[1, 0] [1, 4] [1, 1] : tensor<?x?xi32> to tensor<1x4xi32>
-  flow.dispatch.tensor.store %3, %1 : tensor<1x4xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
+  flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<1x4xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
 hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -545,12 +545,12 @@ func @subtensor_insert() {
   %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
   %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
   %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>
-  %3 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
-  %4 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+  %4 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
   %5 = memref.dim %3, %c0 : tensor<?x?xi32>
   %6 = memref.dim %3, %c1 : tensor<?x?xi32>
   %7 = subtensor_insert %3 into %4[3, 4] [%5, %6] [1, 1] : tensor<?x?xi32> into tensor<?x?xi32>
-  flow.dispatch.tensor.store %7, %2 : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
+  flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
 hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -577,10 +577,10 @@ func @tensor_extract() {
   %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:i32>
   %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x9xi32>
   %2 = linalg.init_tensor [3, 9] : tensor<3x9xi32>
-  %3 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = []  : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
   %4 = tensor.extract %3[] : tensor<i32>
   %5 = linalg.fill(%2, %4) : tensor<3x9xi32>, i32 -> tensor<3x9xi32>
-  flow.dispatch.tensor.store %5, %1 : tensor<3x9xi32> -> !flow.dispatch.tensor<writeonly:3x9xi32>
+  flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<3x9xi32> -> !flow.dispatch.tensor<writeonly:3x9xi32>
   return
 }
 hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -599,8 +599,8 @@ func @load_to_store() {
   %c0 = constant 0 : index
   %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:3x4xi32>
-  %3 = flow.dispatch.tensor.load %2 : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
-  flow.dispatch.tensor.store %3, %1 : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
+  %3 = flow.dispatch.tensor.load %2, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
+  flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
 
@@ -620,7 +620,7 @@ func @constant() {
   %c0 = constant 0 : index
   %cst = constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
   %0 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:2x2x3xi32>
-  flow.dispatch.tensor.store %cst, %0 : tensor<2x2x3xi32> -> !flow.dispatch.tensor<writeonly:2x2x3xi32>
+  flow.dispatch.tensor.store %cst, %0, offsets = [], sizes = [], strides = [] : tensor<2x2x3xi32> -> !flow.dispatch.tensor<writeonly:2x2x3xi32>
   return
 }
 // CHECK-LABEL: func @constant()
@@ -639,7 +639,7 @@ func @rhs_non_splat_constant() {
   %c1 = constant 1 : index
   %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x5x3x1xf32>
   %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:5x5xf32>
-  %2 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:1x5x3x1xf32> -> tensor<1x5x3x1xf32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x5x3x1xf32> -> tensor<1x5x3x1xf32>
   %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d2, d3)>] : tensor<1x5x3x1xf32> into tensor<5x3xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
@@ -693,8 +693,8 @@ func @gather() {
   %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
   %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?xi32>
   %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
-  %4 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
-  %5 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
+  %4 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = []: !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %5 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
   %d0 = memref.dim %5, %c0 : tensor<?xi32>
   %d1 = memref.dim %4, %c1 : tensor<?x?xf32>
   %3 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
@@ -704,7 +704,7 @@ func @gather() {
     %9 = tensor.extract %4[%8, %arg1] : tensor<?x?xf32>
     linalg.yield %9 : f32
   } -> tensor<?x?xf32>
-  flow.dispatch.tensor.store %7, %2 : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+  flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
   return
 }
 hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -730,9 +730,9 @@ func @pooling_nhwc_sum() {
   %1 = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : !flow.dispatch.tensor<readonly:1x4x6x1xf32>
   %2 = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
   %3 = linalg.init_tensor [2, 3] : tensor<2x3xf32>
-  %4 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:f32> -> tensor<f32>
+  %4 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:f32> -> tensor<f32>
   %5 = tensor.extract %4[] : tensor<f32>
-  %6 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:1x4x6x1xf32> -> tensor<1x4x6x1xf32>
+  %6 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x4x6x1xf32> -> tensor<1x4x6x1xf32>
   %7 = linalg.init_tensor [1, 2, 2, 1] : tensor<1x2x2x1xf32>
   %8 = linalg.fill(%7, %5) : tensor<1x2x2x1xf32>, f32 -> tensor<1x2x2x1xf32>
   %9 = linalg.pooling_nhwc_sum {
@@ -740,7 +740,7 @@ func @pooling_nhwc_sum() {
     strides = dense<[2, 3]> : vector<2xi64>
   } ins(%6, %3 : tensor<1x4x6x1xf32>, tensor<2x3xf32>)
    outs(%8 : tensor<1x2x2x1xf32>) -> tensor<1x2x2x1xf32>
-  flow.dispatch.tensor.store %9, %2 : tensor<1x2x2x1xf32> -> !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
+  flow.dispatch.tensor.store %9, %2, offsets = [], sizes = [], strides = [] : tensor<1x2x2x1xf32> -> !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
   return
 }
 hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -768,9 +768,9 @@ func @read_only_subtensor() {
   %c1 = constant 1 : index
   %0 = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
   %1 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
-  %2 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %2 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %3 = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
-  %4 = flow.dispatch.tensor.load %3 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %4 = flow.dispatch.tensor.load %3, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -836,7 +836,7 @@ func @reshape_read_only() {
   %c0 = constant 0 : index
   %0 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
   %1 = hal.interface.binding.subspan @legacy_io::@wo0[%c0] : !flow.dispatch.tensor<writeonly:?xf32>
-  %2 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1) -> (d0, d1)>]
       : tensor<?x?xf32> into tensor<?xf32>
   %4 = memref.dim %3, %c0 : tensor<?xf32>
@@ -849,7 +849,7 @@ func @reshape_read_only() {
          %7 = addf %arg0, %arg0 : f32
          linalg.yield %7 : f32
       } -> tensor<?xf32>
-  flow.dispatch.tensor.store %6, %1 : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>
+  flow.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = []: tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>
   return
 }
 // CHECK-LABEL: func @reshape_read_only
@@ -870,9 +870,9 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
   %offset_subspan = hal.interface.binding.subspan @interface_io::@ro2[%c0] : !flow.dispatch.tensor<readonly:32xf32>
   %output_subspan = hal.interface.binding.subspan @interface_io::@wo3[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
 
-  %input = flow.dispatch.tensor.load %input_subspan : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
-  %filter = flow.dispatch.tensor.load %filter_subspan : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
-  %offset = flow.dispatch.tensor.load %offset_subspan : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
+  %input = flow.dispatch.tensor.load %input_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
+  %filter = flow.dispatch.tensor.load %filter_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
+  %offset = flow.dispatch.tensor.load %offset_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
 
   %cst = constant 0.0 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
@@ -894,7 +894,7 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
             %sub = subf %a, %b : f32
             linalg.yield %sub : f32
          } -> tensor<1x112x112x32xf32>
-  flow.dispatch.tensor.store %3, %output_subspan : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+  flow.dispatch.tensor.store %3, %output_subspan, offsets = [], sizes = [], strides = [] : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
   return
 }
 
@@ -926,9 +926,9 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
   %offset_subspan = hal.interface.binding.subspan @interface_io::@ro2[%c0] : !flow.dispatch.tensor<readonly:32xf32>
   %output_subspan = hal.interface.binding.subspan @interface_io::@wo3[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
 
-  %input = flow.dispatch.tensor.load %input_subspan : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
-  %filter = flow.dispatch.tensor.load %filter_subspan : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
-  %offset = flow.dispatch.tensor.load %offset_subspan : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
+  %input = flow.dispatch.tensor.load %input_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
+  %filter = flow.dispatch.tensor.load %filter_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
+  %offset = flow.dispatch.tensor.load %offset_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
 
   %cst0 = constant 0.0 : f32
   %cst1 = constant 1.0 : f32
@@ -953,7 +953,7 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
             %add = addf %sub, %c : f32
             linalg.yield %add : f32
          } -> tensor<1x112x112x32xf32>
-  flow.dispatch.tensor.store %4, %output_subspan : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+  flow.dispatch.tensor.store %4, %output_subspan, offsets = [], sizes = [], strides = []: tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
   return
 }
 
