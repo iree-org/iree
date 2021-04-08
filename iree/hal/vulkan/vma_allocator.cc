@@ -159,12 +159,6 @@ static iree_status_t iree_hal_vulkan_vma_allocator_make_compatible(
     iree_hal_memory_type_t* memory_type,
     iree_hal_memory_access_t* allowed_access,
     iree_hal_buffer_usage_t* allowed_usage) {
-  // TODO(benvanik): remove this entirely!
-  // Host currently uses mapping to copy buffers, which is done a lot.
-  // We could probably remove this mutation by preventing copies in those cases
-  // or issuing small copy command buffers.
-  *allowed_usage |=
-      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_BUFFER_USAGE_MAPPING;
   return iree_ok_status();
 }
 
