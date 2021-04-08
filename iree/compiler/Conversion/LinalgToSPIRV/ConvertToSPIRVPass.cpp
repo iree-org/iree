@@ -53,82 +53,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 //===----------------------------------------------------------------------===//
-// Resource and push constant variable utilities
+// Resource utilities
 //===----------------------------------------------------------------------===//
-// TODO(antiagainst): move these utilities to MLIR core.
-
-/// Returns the pointer type for the push constant storage containing
-/// `elementCount` 32-bit integer values.
-spirv::PointerType getPushConstantStorageType(unsigned elementCount,
-                                              Builder &builder) {
-  auto arrayType = spirv::ArrayType::get(
-      SPIRVTypeConverter::getIndexType(builder.getContext()), elementCount,
-      /*stride=*/4);
-  auto structType = spirv::StructType::get({arrayType}, /*offsetInfo=*/0);
-  return spirv::PointerType::get(structType, spirv::StorageClass::PushConstant);
-}
-
-/// Returns the push constant varible containing `elementCount` 32-bit integer
-/// values in `body`. Returns null op if such an op does not exit.
-spirv::GlobalVariableOp getPushConstantVariable(Block &body,
-                                                unsigned elementCount) {
-  for (auto varOp : body.getOps<spirv::GlobalVariableOp>()) {
-    auto ptrType = varOp.type().cast<spirv::PointerType>();
-    // Note that Vulkan requires "There must be no more than one push constant
-    // block statically used per shader entry point." So we should always reuse
-    // the existing one.
-    if (ptrType.getStorageClass() == spirv::StorageClass::PushConstant) {
-      auto numElements = ptrType.getPointeeType()
-                             .cast<spirv::StructType>()
-                             .getElementType(0)
-                             .cast<spirv::ArrayType>()
-                             .getNumElements();
-      if (numElements == elementCount) return varOp;
-    }
-  }
-  return nullptr;
-}
-
-/// Gets or inserts a global variable for push constant storage containing
-/// `elementCount` 32-bit integer values in `block`.
-spirv::GlobalVariableOp getOrInsertPushConstantVariable(Location loc,
-                                                        Block &block,
-                                                        unsigned elementCount,
-                                                        OpBuilder &b) {
-  if (auto varOp = getPushConstantVariable(block, elementCount)) return varOp;
-
-  auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
-  auto type = getPushConstantStorageType(elementCount, builder);
-  StringRef name = "__push_constant_var__";
-  return builder.create<spirv::GlobalVariableOp>(loc, type, name,
-                                                 /*initializer=*/nullptr);
-}
-
-/// Gets the value at the given `offset` of the push constant storage. A global
-/// variable will be created for the push constant storage if not existing. Load
-/// ops will be created via the given `builder` to load values from the push
-/// constant.
-Value getPushConstantValue(Operation *op, unsigned elementCount,
-                           unsigned offset, OpBuilder &builder) {
-  Location loc = op->getLoc();
-  Operation *parent = SymbolTable::getNearestSymbolTable(op->getParentOp());
-  if (!parent) {
-    op->emitError("expected operation to be within a module-like op");
-    return nullptr;
-  }
-
-  spirv::GlobalVariableOp varOp = getOrInsertPushConstantVariable(
-      loc, parent->getRegion(0).front(), elementCount, builder);
-
-  auto i32Type = SPIRVTypeConverter::getIndexType(builder.getContext());
-  Value zeroOp = spirv::ConstantOp::getZero(i32Type, loc, builder);
-  Value offsetOp = builder.create<spirv::ConstantOp>(
-      loc, i32Type, builder.getI32IntegerAttr(offset));
-  auto addrOp = builder.create<spirv::AddressOfOp>(loc, varOp);
-  auto acOp = builder.create<spirv::AccessChainOp>(
-      loc, addrOp, llvm::makeArrayRef({zeroOp, offsetOp}));
-  return builder.create<spirv::LoadOp>(loc, acOp);
-}
 
 /// Inserts a resource evariable of the given `type` into `block` and bind
 /// it to `set` and `binding`. `id` uniquely identifies the inserted variable.
@@ -494,7 +420,8 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
 
   // The following function generates SPIR-V ops with i32 types. So it does type
   // "conversion" (index -> i32) implicitly.
-  auto value = getPushConstantValue(loadOp, elementCount, offset, rewriter);
+  auto value =
+      spirv::getPushConstantValue(loadOp, elementCount, offset, rewriter);
 
   rewriter.replaceOp(loadOp, value);
   return success();
