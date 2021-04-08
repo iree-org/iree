@@ -67,6 +67,10 @@ ALL_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = ALL_SRCS,
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+        "-iree-codegen-spirv-experimental-linalg-on-tensors",
+    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -74,6 +78,10 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = ALL_SRCS,
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+        "-iree-codegen-llvm-experimental-linalg-on-tensors",
+    ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )

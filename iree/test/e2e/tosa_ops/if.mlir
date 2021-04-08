@@ -1,8 +1,9 @@
 func @if_true_test() attributes { iree.module.export } {
-  %0 = iree.unfoldable_constant dense<true> : tensor<i1>
+  %0 = iree.unfoldable_constant dense<1> : tensor<i8>
+  %cond = std.trunci %0 : tensor<i8> to tensor<i1>
   %1 = iree.unfoldable_constant dense<10> : tensor<i32>
   %path = iree.unfoldable_constant 1 : i32
-  %2 = "tosa.cond_if"(%0, %1) ( {
+  %2 = "tosa.cond_if"(%cond, %1) ( {
   ^bb0(%arg0 : tensor<i32>):
     check.expect_true(%path) : i32
     %3 = iree.unfoldable_constant dense<10> : tensor<i32>
@@ -18,10 +19,11 @@ func @if_true_test() attributes { iree.module.export } {
 }
 
 func @if_false_test() attributes { iree.module.export } {
-  %0 = iree.unfoldable_constant dense<false> : tensor<i1>
+  %0 = iree.unfoldable_constant dense<0> : tensor<i8>
+  %cond = std.trunci %0 : tensor<i8> to tensor<i1>
   %1 = iree.unfoldable_constant dense<10> : tensor<i32>
   %path = iree.unfoldable_constant 0 : i32
-  %2 = "tosa.cond_if"(%0, %1) ( {
+  %2 = "tosa.cond_if"(%cond, %1) ( {
   ^bb0(%arg0 : tensor<i32>):
     check.expect_true(%path) : i32
     "tosa.yield"(%arg0) : (tensor<i32>) -> ()
@@ -35,4 +37,3 @@ func @if_false_test() attributes { iree.module.export } {
   check.expect_eq_const(%2, dense<20> : tensor<i32>) : tensor<i32>
   return
 }
-
