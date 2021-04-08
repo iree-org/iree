@@ -194,15 +194,23 @@ Syntax:
 
 ```
 operation ::= `flow.dispatch.tensor.load` $source
-              ( `,` `offsets` `=` `[` $offsets^ `]` )?
-              ( `,` `sizes` `=` `[` $sizes^ `]` )?
-              ( `,` `strides` `=` `[` $strides^ `]` )?
-              `:` type($source) `->` type($result) attr-dict-with-keyword
+              `,` `offsets` `=` custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
+              `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
+              `,` `strides` `=` custom<OperandsOrIntegersOffsetsOrStridesList>($strides, $static_strides)
+              attr-dict `:` type($source) `->` type($result)
 ```
 
 Loads an input tensor or subtensor from an input placeholder. As each
 workgroup executes concurrently all workgroups will receive identical loaded
 results of regions that may overlap.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`static_offsets` | ::mlir::ArrayAttr | 64-bit integer array attribute
+`static_sizes` | ::mlir::ArrayAttr | 64-bit integer array attribute
+`static_strides` | ::mlir::ArrayAttr | 64-bit integer array attribute
 
 #### Operands:
 
@@ -228,15 +236,23 @@ Syntax:
 
 ```
 operation ::= `flow.dispatch.tensor.store` $value `,` $target
-              ( `,` `offsets` `=` `[` $offsets^ `]` )?
-              ( `,` `sizes` `=` `[` $sizes^ `]` )?
-              ( `,` `strides` `=` `[` $strides^ `]` )?
-              `:` type($value) `->` type($target) attr-dict-with-keyword
+              `,` `offsets` `=` custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
+              `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
+              `,` `strides` `=` custom<OperandsOrIntegersOffsetsOrStridesList>($strides, $static_strides)
+              attr-dict `:` type($value) `->` type($target)
 ```
 
 Stores a tensor or subtensor into an output tensor placeholder. As each
 workgroup executes concurrently behavior is undefined if more than one
 workgroup stores into overlapping regions of the full output tensor.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`static_offsets` | ::mlir::ArrayAttr | 64-bit integer array attribute
+`static_sizes` | ::mlir::ArrayAttr | 64-bit integer array attribute
+`static_strides` | ::mlir::ArrayAttr | 64-bit integer array attribute
 
 #### Operands:
 
