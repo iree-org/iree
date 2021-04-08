@@ -41,7 +41,6 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "@com_google_absl//absl/algorithm",
-        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/types:span",
         "@com_google_ruy//ruy",
         "@com_google_ruy//ruy:context",

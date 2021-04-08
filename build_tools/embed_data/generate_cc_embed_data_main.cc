@@ -21,7 +21,6 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/strip.h"
-#include "absl/time/time.h"
 
 ABSL_FLAG(std::string, identifier, "resources",
           "name of the resources function");
