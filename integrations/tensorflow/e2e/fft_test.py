@@ -100,6 +100,5 @@ def main(argv):
     tf.enable_v2_behavior()
   tf.test.main()
 
-
 if __name__ == '__main__':
   app.run(main)

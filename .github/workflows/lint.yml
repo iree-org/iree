@@ -56,7 +56,8 @@ jobs:
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
       - name: Install yapf
-        run: python3 -m pip install yapf
+        run: |
+          python3 -m pip install yapf==0.30.0
       - name: Run format_diff.py with yapf
         run: |
           git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i
