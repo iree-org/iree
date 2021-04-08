@@ -34,11 +34,13 @@ class RiscvLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getToolPath() const override {
-    // First check for setting the linker explicitly. For RISC-V targets, it has to be specified.
+    // First check for setting the linker explicitly. For RISC-V targets, it has
+    // to be specified.
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
 
-    llvm::errs() << "IREE_LLVMAOT_LINKER_PATH environment variable must be set to RISC-V linker.\n";
+    llvm::errs() << "IREE_LLVMAOT_LINKER_PATH environment variable must be set"
+                 << " to RISC-V linker.\n";
     return "";
   }
 
