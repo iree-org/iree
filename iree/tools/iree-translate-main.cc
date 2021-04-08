@@ -113,6 +113,7 @@ int main(int argc, char **argv) {
   auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
                            llvm::raw_ostream &os) {
     mlir::MLIRContext context;
+    context.allowUnregisteredDialects();
     context.appendDialectRegistry(registry);
     llvm::SourceMgr sourceMgr;
     sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());

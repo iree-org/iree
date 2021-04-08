@@ -21,6 +21,12 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -338,6 +338,7 @@ class TransferToCoopMatLoadStore final : public CoopMatOpLowering<OpTy> {
   LogicalResult matchAndRewrite(
       OpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    if (op.mask()) return failure();
     if (!cooperativeMatrixAnalysis.usesCooperativeMatrixType(op))
       return failure();
     auto loc = op.getLoc();
@@ -508,7 +509,8 @@ LogicalResult ScalarizeVectorTransferRead::matchAndRewrite(
     return failure();
 
   Location loc = readOp.getLoc();
-  vector::TransferReadOp::Adaptor adaptor(operands);
+  vector::TransferReadOp::Adaptor adaptor(operands,
+                                          readOp->getAttrDictionary());
 
   SmallVector<Value, 4> scalars;
   SmallVector<Value, 4> indices(adaptor.indices().begin(),
