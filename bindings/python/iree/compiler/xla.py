@@ -113,13 +113,21 @@ def build_import_command_line(input_path: str,
       input_path,
       f"--xla-format={options.import_format.value}",
   ]
+
   if options.import_only and options.output_file:
     # Import stage directly outputs.
-    if options.output_file:
-      cl.append(f"-o={options.output_file}")
+    cl.append(f"-o={options.output_file}")
+
+  # MLIR flags.
+  if options.output_mlir_debuginfo:
+    cl.append("--mlir-print-debuginfo")
+  if options.output_generic_mlir:
+    cl.append("--mlir-print-op-generic")
+
   # Save temps flags.
   if options.save_temp_iree_input:
     cl.append(f"--save-temp-iree-input={options.save_temp_iree_input}")
+
   # Extra args.
   cl.extend(options.import_extra_args)
   return cl

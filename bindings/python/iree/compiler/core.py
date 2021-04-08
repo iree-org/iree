@@ -77,6 +77,10 @@ class CompilerOptions:
       Example: ["--print-ir-after-all"]
     optimize: Whether to apply some default high level optimizations (default
       True).
+    output_mlir_debuginfo: Include debuginfo (including paths) in any saved or
+      returned MLIR.
+    output_generic_mlir: Use the generic (and more portable) MLIR formatting for
+      any saved or returned MLIR instead of the per-dialect custom assembly.
     strip_debug_ops: Whether to strip high level operations used to aid
       debugging.
     strip_source_map: Whether to strip source map information (used to generate
@@ -98,6 +102,8 @@ class CompilerOptions:
                                     str] = OutputFormat.FLATBUFFER_BINARY,
                extra_args: Sequence[str] = (),
                optimize: bool = True,
+               output_mlir_debuginfo: bool = True,
+               output_generic_mlir: bool = False,
                strip_debug_ops: bool = False,
                strip_source_map: bool = False,
                strip_symbols: bool = False,
@@ -109,6 +115,8 @@ class CompilerOptions:
     self.output_format = OutputFormat.parse(output_format)
     self.extra_args = extra_args
     self.optimize = optimize
+    self.output_mlir_debuginfo = output_mlir_debuginfo
+    self.output_generic_mlir = output_generic_mlir
     self.strip_debug_ops = strip_debug_ops
     self.strip_source_map = strip_source_map
     self.strip_symbols = strip_symbols
@@ -145,6 +153,12 @@ def build_compile_command_line(input_file: str,
 
   # Translation to perform.
   cl.append("--iree-mlir-to-vm-bytecode-module")
+
+  # MLIR flags.
+  if options.output_mlir_debuginfo:
+    cl.append("--mlir-print-debuginfo")
+  if options.output_generic_mlir:
+    cl.append("--mlir-print-op-generic")
 
   # Other options to set if specified.
   if options.strip_debug_ops:
