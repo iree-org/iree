@@ -16,13 +16,14 @@
 #define IREE_MODULES_VMLA_OP_KERNELS_GENERIC_H_
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <iterator>
 #include <numeric>
+#include <unordered_set>
 #include <vector>
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
 
@@ -542,14 +543,14 @@ Status Reverse::Execute(absl::Span<const T> src_buffer,
     strides[dim_i] = stride;
     stride *= src_shape[dim_i];
   }
-  absl::flat_hash_set<int32_t> dims_set(dimensions.begin(), dimensions.end());
+  std::unordered_set<int32_t> dims_set(dimensions.begin(), dimensions.end());
   for (size_t dst_i = 0; dst_i < dst_buffer.size(); ++dst_i) {
     size_t src_i = 0;
     size_t t = dst_i;
     for (int dim_i = 0; dim_i < rank; ++dim_i) {
       size_t ratio = t / strides[dim_i];
       t -= ratio * strides[dim_i];
-      bool do_reverse = dims_set.contains(dim_i);
+      bool do_reverse = dims_set.count(dim_i) > 0;
       src_i += (do_reverse ? (src_shape[dim_i] - 1 - ratio) : ratio) *
                strides[dim_i];
     }
