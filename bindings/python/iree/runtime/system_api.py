@@ -36,7 +36,7 @@ __all__ = [
 import os
 import sys
 
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
 from . import binding as _binding
 
@@ -139,9 +139,7 @@ def _bool_to_int8(
     return array
 
   # IREE models booleans as i8s.
-  # TODO: This cast should be moved into the function abi. If it's possible to
-  # tell that the result should have boolean type from the IR, then the return
-  # type should also be recast to np.bool at that level.
+  # TODO(#5359): This cast should be moved into the function abi.
   if array.dtype == np.bool:
     array = array.astype(np.int8)
   return array
@@ -158,6 +156,7 @@ def normalize_value(
     return value
 
   array = np.asarray(value)
+  # TODO(#5359): Move into the function abi.
   if isinstance(value, (bool, int, float)):
     # Manually convert ints and floats to 32 bits.
     if array.dtype == np.float64:
@@ -166,6 +165,17 @@ def normalize_value(
       array = array.astype(np.int32)
 
   return array
+
+
+def _convert_lists_to_tuples(pytree):
+  if isinstance(pytree, Sequence):
+    return tuple(_convert_lists_to_tuples(leaf) for leaf in pytree)
+  elif isinstance(pytree, Mapping):
+    for key in pytree:
+      pytree[key] = _convert_lists_to_tuples(pytree[key])
+    return pytree
+  else:
+    return pytree
 
 
 class BoundFunction:
@@ -195,6 +205,17 @@ class BoundFunction:
     self._context._vm_context.invoke(self._vm_function, inputs, results)
     self._serialized_outputs = tuple(self._abi.serialize_vm_list(results))
     unpacked_results = self._abi.unpack_results(results)
+
+    # TODO(#5359): Add support for list and tuple return types.
+    # The SIP signature used by the runtime bindings cannot differentiate
+    # between Lists and Tuples, as it only has a single 'sequence' type.
+    # The function abi uses py::list when unpacking the results according to the
+    # SIP signature. The most common instance of a returned Sequence in Python
+    # however is multiple return values, and that is represented by a tuple.
+    # We manually change the return types of all Sequences to Tuple in order to
+    # match the semantics of this case.
+    unpacked_results = _convert_lists_to_tuples(unpacked_results)
+
     return unpacked_results
 
   def __repr__(self):

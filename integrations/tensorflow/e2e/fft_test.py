@@ -29,18 +29,18 @@ class FftModule(tf.Module):
   def fft(self, real_array, imag_array):
     complex_in = tf.complex(real_array, imag_array)
     complex_out = tf.signal.fft(complex_in)
-    return [tf.math.real(complex_out), tf.math.imag(complex_out)]
+    return tf.math.real(complex_out), tf.math.imag(complex_out)
 
   @tf.function(input_signature=complex_input_signature)
   def ifft(self, real_array, imag_array):
     complex_in = tf.complex(real_array, imag_array)
     complex_out = tf.signal.ifft(complex_in)
-    return [tf.math.real(complex_out), tf.math.imag(complex_out)]
+    return tf.math.real(complex_out), tf.math.imag(complex_out)
 
   @tf.function(input_signature=[tf.TensorSpec([32], tf.float32)])
   def rfft(self, real_array):
     complex_out = tf.signal.rfft(real_array)
-    return [tf.math.real(complex_out), tf.math.imag(complex_out)]
+    return tf.math.real(complex_out), tf.math.imag(complex_out)
 
   # TODO(natashaknk): Enable IRFFT tests when Linalg on tensors changes land.
   # @tf.function(input_signature=complex_input_signature)

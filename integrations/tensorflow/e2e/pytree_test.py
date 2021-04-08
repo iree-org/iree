@@ -17,36 +17,31 @@ from iree.tf.support import tf_test_utils
 import tensorflow as tf
 
 
-# Empty lists and dicts are currently unsupported. IREE also currently does not
-# preserve tuples but converts them into lists.
+# Empty lists and dicts are currently unsupported. IREE also currently cannot
+# represent multiple sequence types, so we turn all sequences into tuples.
 class PyTreeModule(tf_test_utils.TestModule):
 
   @tf_test_utils.tf_function_unit_test(input_signature=[])
-  def output_list_len_1(self):
-    return [0]
+  def output_tuple_len_1(self):
+    return (0,)
 
   @tf_test_utils.tf_function_unit_test(input_signature=[])
-  def output_list_len_2(self):
-    return [0, 1]
+  def output_tuple_len_2(self):
+    return 0, 1
 
   @tf_test_utils.tf_function_unit_test(input_signature=[])
-  def output_list_len_3(self):
-    return [0, 1, 2]
+  def output_tuple_len_3(self):
+    return 0, 1, 2
 
   @tf_test_utils.tf_function_unit_test(input_signature=[])
   def output_nested_pytree(self):
-    return {"key_a": [0, 1, 2], "key_b": [0, 1, {"key_c": [0, 1]}]}
+    return {"key_a": (0, 1, 2), "key_b": (0, 1, {"key_c": (0, 1)})}
 
   @tf_test_utils.tf_function_unit_test(input_signature=[{
-      "key_a": [tf.TensorSpec([]),
-                tf.TensorSpec([]),
-                tf.TensorSpec([])],
-      "key_b": [
-          tf.TensorSpec([]),
-          tf.TensorSpec([]), {
-              "key_c": [tf.TensorSpec([]), tf.TensorSpec([])]
-          }
-      ]
+      "key_a": (tf.TensorSpec([]), tf.TensorSpec([]), tf.TensorSpec([])),
+      "key_b": (tf.TensorSpec([]), tf.TensorSpec([]), {
+          "key_c": (tf.TensorSpec([]), tf.TensorSpec([]))
+      })
   }])
   def input_nested_pytree(self, input_pytree):
     return input_pytree
