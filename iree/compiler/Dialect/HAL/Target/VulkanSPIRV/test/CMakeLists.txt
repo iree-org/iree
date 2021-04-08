@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "smoketest.mlir"
+    "smoketest_linalg_on_tensors.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

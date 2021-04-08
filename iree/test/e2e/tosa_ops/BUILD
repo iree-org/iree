@@ -48,6 +48,7 @@ ALL_SRCS = enforce_glob(
         "maximum.mlir",
         "minimum.mlir",
         "negate.mlir",
+        "pad.mlir",
         "reluN.mlir",
         "reshape.mlir",
         "rsqrt.mlir",

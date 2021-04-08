@@ -72,6 +72,8 @@ func @reduce_window(%input: tensor<1x16x16x64xf32>) -> tensor<1x8x8x64xf32> {
     "mhlo.return"(%3) : (tensor<f32>) -> ()
   }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
       window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>,
+      window_dilations = dense<1> : tensor<4xi64>,
+      base_dilations = dense<1> : tensor<4xi64>,
       padding = dense<[[0, 0], [1, 1], [1, 1], [0, 0]]> : tensor<4x2xi64>
   } : (tensor<1x16x16x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
   return %0 : tensor<1x8x8x64xf32>

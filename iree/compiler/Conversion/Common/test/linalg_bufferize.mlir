@@ -859,3 +859,112 @@ func @reshape_read_only() {
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<?xf32>)
 //  CHECK-SAME:     outs(%[[OUTPUT]] : memref<?xf32>)
+
+// -----
+
+func @use_buffer_for_operand_when_output_tensor_not_used() {
+  %c0 = constant 0 : index
+
+  %input_subspan = hal.interface.binding.subspan @interface_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:1x225x225x16xf32>
+  %filter_subspan = hal.interface.binding.subspan @interface_io::@ro1[%c0] : !flow.dispatch.tensor<readonly:3x3x16x32xf32>
+  %offset_subspan = hal.interface.binding.subspan @interface_io::@ro2[%c0] : !flow.dispatch.tensor<readonly:32xf32>
+  %output_subspan = hal.interface.binding.subspan @interface_io::@wo3[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+
+  %input = flow.dispatch.tensor.load %input_subspan : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
+  %filter = flow.dispatch.tensor.load %filter_subspan : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
+  %offset = flow.dispatch.tensor.load %offset_subspan : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
+
+  %cst = constant 0.0 : f32
+  %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<1x112x112x32xf32>, f32 -> tensor<1x112x112x32xf32>
+  %2 = linalg.conv_2d_input_nhwc_filter_hwcf
+         {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
+         ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
+         outs(%1 : tensor<1x112x112x32xf32>)
+         -> tensor<1x112x112x32xf32>
+  %3 = linalg.generic {
+         indexing_maps = [
+           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+           affine_map<(d0, d1, d2, d3) -> (d3)>,
+           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+         iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+         ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
+         outs(%0 : tensor<1x112x112x32xf32>) {
+         ^bb0(%a: f32, %b: f32, %c: f32):
+            %sub = subf %a, %b : f32
+            linalg.yield %sub : f32
+         } -> tensor<1x112x112x32xf32>
+  flow.dispatch.tensor.store %3, %output_subspan : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+  return
+}
+
+hal.interface @interface_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
+  hal.interface.binding @ro2, set=0, binding=2, type="StorageBuffer", access="Read"
+  hal.interface.binding @wo3, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+}
+
+// CHECK: func @use_buffer_for_operand_when_output_tensor_not_used()
+
+//  CHECK-NOT: memref.alloc
+//      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @interface_io::@wo3
+//      CHECK: linalg.fill(%[[OUTPUT]], %{{.+}})
+// CHECK-NEXT: linalg.conv_2d_input_nhwc_filter_hwcf
+// CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
+// CHECK-NEXT: linalg.generic
+// CHECK-SAME:   ins(%[[OUTPUT]], %{{.+}} : memref<1x112x112x32xf32>, memref<32xf32>)
+// CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
+
+// -----
+
+func @dont_use_buffer_for_operand_when_output_tensor_used() {
+  %c0 = constant 0 : index
+
+  %input_subspan = hal.interface.binding.subspan @interface_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:1x225x225x16xf32>
+  %filter_subspan = hal.interface.binding.subspan @interface_io::@ro1[%c0] : !flow.dispatch.tensor<readonly:3x3x16x32xf32>
+  %offset_subspan = hal.interface.binding.subspan @interface_io::@ro2[%c0] : !flow.dispatch.tensor<readonly:32xf32>
+  %output_subspan = hal.interface.binding.subspan @interface_io::@wo3[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+
+  %input = flow.dispatch.tensor.load %input_subspan : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
+  %filter = flow.dispatch.tensor.load %filter_subspan : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
+  %offset = flow.dispatch.tensor.load %offset_subspan : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
+
+  %cst0 = constant 0.0 : f32
+  %cst1 = constant 1.0 : f32
+  %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
+  %1 = linalg.fill(%0, %cst0) : tensor<1x112x112x32xf32>, f32 -> tensor<1x112x112x32xf32>
+  %2 = linalg.conv_2d_input_nhwc_filter_hwcf
+         {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
+         ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
+         outs(%1 : tensor<1x112x112x32xf32>)
+         -> tensor<1x112x112x32xf32>
+  %3 = linalg.fill(%0, %cst1) : tensor<1x112x112x32xf32>, f32 -> tensor<1x112x112x32xf32>
+  %4 = linalg.generic {
+         indexing_maps = [
+           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+           affine_map<(d0, d1, d2, d3) -> (d3)>,
+           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+         iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+         ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
+         outs(%3 : tensor<1x112x112x32xf32>) {
+         ^bb0(%a: f32, %b: f32, %c: f32):
+            %sub = subf %a, %b : f32
+            %add = addf %sub, %c : f32
+            linalg.yield %add : f32
+         } -> tensor<1x112x112x32xf32>
+  flow.dispatch.tensor.store %4, %output_subspan : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+  return
+}
+
+// CHECK-LABEL: func @dont_use_buffer_for_operand_when_output_tensor_used()
+
+//      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @interface_io::@wo3
+//      CHECK: %[[ALLOC:.+]] = memref.alloc
+// CHECK-NEXT: linalg.fill(%[[ALLOC]], %{{.+}})
+// CHECK-NEXT: linalg.conv_2d_input_nhwc_filter_hwcf
+// CHECK-SAME:   outs(%[[ALLOC]] : memref<1x112x112x32xf32>)
+// CHECK-NEXT: linalg.fill(%[[OUTPUT]], %{{.+}})
+// CHECK-NEXT: linalg.generic
+// CHECK-SAME:   ins(%[[ALLOC]], %{{.+}} : memref<1x112x112x32xf32>, memref<32xf32>)
+// CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)

@@ -26,6 +26,8 @@ iree_e2e_cartesian_product_test_suite(
     "cifar10"
     "MobileNet;MobileNetV2;ResNet50;VGG16;VGG19"
     "tf;tflite;iree_vmla;iree_llvmaot;iree_vulkan"
+  FAILING_CONFIGURATIONS
+    ",,,ResNet50,iree_vulkan"
   LABELS
     "manual"
 )

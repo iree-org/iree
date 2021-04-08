@@ -180,7 +180,9 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
               "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
               "--iree-flow-dispatch-linalg-on-tensors",
               "--iree-codegen-spirv-experimental-linalg-on-tensors",
-              "-iree-flow-inline-constants-max-byte-length=2048"
+              # TODO(GH-5330): Revisit the number or delete the flag.
+              "-iree-flow-inline-constants-max-byte-length=16",
+              "-iree-spirv-enable-vectorization"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -240,6 +242,18 @@ MODEL_BENCHMARKS = [
                     "cpu2": 10,
                     "vlk2": 64
                 })),
+        ]),
+    ModelBenchmarkInfo(
+        name="mobilebert-f16",
+        model_artifacts_name="mobilebert-f16.tar.gz",
+        model_path="mobilebert-f16/mobilebert-f16.mlir",
+        flagfile_path="mobilebert-f16/flagfile",
+        phones=[
+            PhoneBenchmarkInfo(
+                name="S20",
+                benchmark_key="4636549841944576",
+                targets=get_s20_default_target_list(
+                    skipped_target=['cpu', 'vmla', 'cpu2', 'vlk2'])),
         ])
 ]
 

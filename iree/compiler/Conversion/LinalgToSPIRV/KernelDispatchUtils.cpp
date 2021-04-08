@@ -756,21 +756,17 @@ Optional<LaunchConfig> initGPULaunchConfig(
 
   Optional<linalg::LinalgOp> rootOperation = {};
   LaunchConfigInfo config;
-#define DISPATCH(opName)                                                     \
-  if (auto op = dyn_cast<opName>(linalgOp.getOperation())) {                 \
-    if (rootOperation) {                                                     \
-      op.emitError("unhandled multiple root operations in dispatch region"); \
-      return llvm::None;                                                     \
-    }                                                                        \
-    rootOperation = linalgOp;                                                \
-    if (launchConfig.hasTileSizes(linalgOp.getOperation())) continue;        \
-    TileSizesListType tileSizesInfo;                                         \
-    if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo,      \
-                                 config))) {                                 \
-      return llvm::None;                                                     \
-    }                                                                        \
-    launchConfig.setTileSizes(op, tileSizesInfo);                            \
-    continue;                                                                \
+#define DISPATCH(opName)                                                \
+  if (auto op = dyn_cast<opName>(linalgOp.getOperation())) {            \
+    rootOperation = linalgOp;                                           \
+    if (launchConfig.hasTileSizes(linalgOp.getOperation())) break;      \
+    TileSizesListType tileSizesInfo;                                    \
+    if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo, \
+                                 config))) {                            \
+      return llvm::None;                                                \
+    }                                                                   \
+    launchConfig.setTileSizes(op, tileSizesInfo);                       \
+    break;                                                              \
   }
 
   for (linalg::LinalgOp linalgOp : linalgOps) {

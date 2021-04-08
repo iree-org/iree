@@ -73,7 +73,6 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     Vulkan::Headers
-    absl::flat_hash_map
     absl::span
     absl::strings
     iree::base::api

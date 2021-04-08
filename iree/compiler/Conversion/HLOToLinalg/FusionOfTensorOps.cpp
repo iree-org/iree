@@ -85,7 +85,10 @@ struct FusionOfTensorOpsPass
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        frozenInterfacePatterns);
 
-    linalg::populateElementwiseOpsFusionPatterns(fusionPatterns);
+    linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
+                                                 linalg::LinalgElementwiseFusionOptions()
+                                                 .setAllowFoldingUnitDimReshapes(true));
+    
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));
 

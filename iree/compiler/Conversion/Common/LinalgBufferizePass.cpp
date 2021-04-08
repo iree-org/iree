@@ -109,17 +109,19 @@ static LogicalResult allocateBuffersForResults(
   for (auto en : llvm::enumerate(op->getResultTypes())) {
     size_t resultIndex = en.index();
     Value outTensor = op.getOutput(resultIndex);
+    Value resultTensor = op->getResult(en.index());
 
     // If output tensor was produced by a LinalgOp, just reuse the buffer.
     // TODO(nicolasvasilache): this may be too brutal and we may prefer to leave
     // this decision to a copy + alloc removal pass.
     if (outTensor.getDefiningOp<linalg::LinalgOp>()) {
-      resultBuffers.push_back(bvm.lookup(outTensor));
+      Value outBuffer = bvm.lookup(outTensor);
+      bvm.map(resultTensor, outBuffer);
+      resultBuffers.push_back(outBuffer);
       continue;
     }
 
     // If resultTensor already has a buffer, just use that.
-    Value resultTensor = op->getResult(en.index());
     Value alloc = bvm.lookupOrNull(resultTensor);
     if (!alloc) {
       Type resultType = en.value();
@@ -197,7 +199,9 @@ static LogicalResult convertAnyLinalgOp(
   SmallVector<Value, 2> newOutputBuffers;
   if (failed(allocateBuffersForResults(b, loc, allocationFn, op,
                                        newOutputBuffers, bvm))) {
-    assert(false);
+    LLVM_DEBUG(llvm::dbgs()
+               << "failed to allocate output buffers for op: " << op << "\n");
+    return failure();
   }
 
   // Delegate to the linalg generic pattern.
@@ -540,21 +544,42 @@ LogicalResult preProcessInterfaceStoreTensorOp(
   return success();
 }
 
-/// Pre process linalg operations (on tensors) so that if the result of the
-/// linalg operation is mapped to a buffer, the out is mapped to the same buffer
-/// to make this an inplace update.
+/// Pre process linalg operations (on tensors) to propagate buffer assignment
+/// from results to operands wherever possible.
 LogicalResult preProcessLinalgOps(OpBuilder &b, linalg::LinalgOp op,
                                   BlockAndValueMapping &bvm) {
   if (!op.hasTensorSemantics()) return success();
+
   for (auto en :
        llvm::zip(op.getOperation()->getResults(), op.getOutputTensors())) {
     Value resultTensor = std::get<0>(en);
     Value outTensor = std::get<1>(en);
+    unsigned resultIndex = resultTensor.cast<OpResult>().getResultNumber();
     Value resultBuffer = bvm.lookupOrNull(resultTensor);
+
+    // If the result is mapped to a buffer, the corresponding output tensor can
+    // be mapped to the same buffer to make this an inplace update.
     if (resultBuffer && outTensor.hasOneUse()) {
       bvm.map(outTensor, resultBuffer);
     }
+
+    // If the output tensor is not actually used (for initialization) by this
+    // op, we can reuse the result tensor's buffer for some operands.
+    if (!op.payloadUsesValueFromOutputOperandIndex(resultIndex)) {
+      for (auto en : llvm::enumerate(op.getInputTensors())) {
+        Value operand = en.value();
+        auto producerOp = operand.getDefiningOp<linalg::LinalgOp>();
+        if (producerOp && operand.hasOneUse() &&
+            operand.getType() == resultTensor.getType() &&
+            op.getInputIndexingMap(en.index()) ==
+                op.getOutputIndexingMap(resultIndex)) {
+          bvm.map(operand, resultBuffer);
+          break;
+        }
+      }
+    }
   }
+
   return success();
 }
 
