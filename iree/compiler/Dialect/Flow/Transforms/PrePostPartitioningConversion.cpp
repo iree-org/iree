@@ -76,7 +76,8 @@ class PrePartitioningConversionPass
     setupDirectStandardToFlowLegality(context, conversionTarget);
 
     conversionTarget.addLegalOp<linalg::GenericOp, linalg::IndexedGenericOp>();
-    conversionTarget.markOpRecursivelyLegal<linalg::GenericOp, linalg::IndexedGenericOp>();
+    conversionTarget
+        .markOpRecursivelyLegal<linalg::GenericOp, linalg::IndexedGenericOp>();
     populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
