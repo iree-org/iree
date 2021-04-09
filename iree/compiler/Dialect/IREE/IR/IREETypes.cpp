@@ -173,7 +173,6 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
 }
 
 LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
-  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
   auto storageAttr =
       tiedOp->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
   if (!storageAttr || storageAttr.getValue().empty()) {
@@ -182,20 +181,6 @@ LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
   auto tiedOperandIndices = storageAttr.getValue();
   if (tiedOperandIndices.size() != tiedOp->getNumResults()) {
     return tiedOp.emitError("op results/tied operand indices mismatch");
-  }
-  for (unsigned resultIndex = 0; resultIndex < tiedOp->getNumResults();
-       ++resultIndex) {
-    int64_t tiedOperandIndex =
-        tiedOperandIndices[resultIndex].cast<IntegerAttr>().getInt();
-    if (tiedOperandIndex < 0) continue;
-    auto operandType =
-        tiedOp->getOperand(tiedOperandsOffset + tiedOperandIndex).getType();
-    auto resultType = tiedOp->getResult(resultIndex).getType();
-    if (operandType != resultType) {
-      return tiedOp.emitError(
-                 "tied operand and result type mismatch; operand has ")
-             << operandType << " and result has " << resultType;
-    }
   }
   return success();
 }

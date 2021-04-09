@@ -705,13 +705,110 @@ void DeviceMatchMemoryModelAttr::print(DialectAsmPrinter &p) const {
   os << "\">";
 }
 
+// static
+Attribute ExConstantStorageAttr::parse(DialectAsmParser &p) {
+  StringAttr bindingAttr;
+  StringAttr storageAttr;
+  IntegerAttr offsetAttr;
+  IntegerAttr lengthAttr;
+  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
+      failed(p.parseComma()) || failed(p.parseAttribute(storageAttr)) ||
+      failed(p.parseComma()) || failed(p.parseAttribute(offsetAttr)) ||
+      failed(p.parseComma()) || failed(p.parseAttribute(lengthAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(bindingAttr, storageAttr, offsetAttr, lengthAttr);
+}
+
+void ExConstantStorageAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  p.printAttribute(bindingAttr());
+  os << ", ";
+  p.printAttribute(storageAttr());
+  os << ", ";
+  p.printAttribute(offsetAttr());
+  os << ", ";
+  p.printAttribute(lengthAttr());
+  os << ">";
+}
+
+// static
+Attribute ExPushConstantAttr::parse(DialectAsmParser &p) {
+  IntegerAttr ordinalAttr;
+  IntegerAttr operandAttr;
+  if (failed(p.parseLess()) || failed(p.parseAttribute(ordinalAttr)) ||
+      failed(p.parseComma()) || failed(p.parseAttribute(operandAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(ordinalAttr, operandAttr);
+}
+
+void ExPushConstantAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  p.printAttribute(ordinalAttr());
+  os << ", ";
+  p.printAttribute(operandAttr());
+  os << ">";
+}
+
+// static
+Attribute ExOperandBufferAttr::parse(DialectAsmParser &p) {
+  StringAttr bindingAttr;
+  IntegerAttr operandAttr;
+  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
+      failed(p.parseComma()) || failed(p.parseAttribute(operandAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(bindingAttr, operandAttr);
+}
+
+void ExOperandBufferAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  p.printAttribute(bindingAttr());
+  os << ", ";
+  p.printAttribute(operandAttr());
+  os << ">";
+}
+
+// static
+Attribute ExResultBufferAttr::parse(DialectAsmParser &p) {
+  StringAttr bindingAttr;
+  IntegerAttr resultAttr;
+  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
+      failed(p.parseComma()) || failed(p.parseAttribute(resultAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(bindingAttr, resultAttr);
+}
+
+void ExResultBufferAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  p.printAttribute(bindingAttr());
+  os << ", ";
+  p.printAttribute(resultAttr());
+  os << ">";
+}
+
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterfaces.cpp.inc"
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
   addAttributes<BufferConstraintsAttr, ByteRangeAttr,
-                DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
-                MatchAllAttr, DeviceMatchIDAttr, DeviceMatchMemoryModelAttr>();
+                DescriptorSetLayoutBindingAttr,
+                //
+                ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
+                ExResultBufferAttr,
+                //
+                MatchAlwaysAttr, MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
+                DeviceMatchMemoryModelAttr>();
 }
 void HALDialect::registerTypes() {
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,

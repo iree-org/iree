@@ -64,7 +64,7 @@ func @convertDimOfDispatchInputLoadToDispatchShape(%arg0: !flow.dispatch.tensor<
   // CHECK-NEXT: %[[RANKED_SHAPE:.*]] = flow.dispatch.shape %[[ARG]]
   // CHECK-NEXT: %[[DIM:.*]] = shapex.ranked_dim %[[RANKED_SHAPE]][0]
   // CHECK-NEXT: "test.sink"(%[[DIM]]) : (index) -> ()
-  %tensor = flow.dispatch.tensor.load %arg0 : !flow.dispatch.tensor<readonly:?xf32> -> tensor<?xf32>
+  %tensor = flow.dispatch.tensor.load %arg0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?xf32> -> tensor<?xf32>
   %c0 = constant 0 : index
   %dim = memref.dim %tensor, %c0 : tensor<?xf32>
   "test.sink"(%dim) : (index) -> ()
@@ -141,9 +141,9 @@ func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
     %arg1_capture: !flow.dispatch.tensor<readwrite:4x8xf32>
   ) {
     "test.sink"(%arg0_capture) : (!flow.dispatch.tensor<readonly:1x4xf32>) -> ()
-    %load = flow.dispatch.tensor.load %arg1_capture : !flow.dispatch.tensor<readwrite:4x8xf32> -> tensor<4x8xf32>
+    %load = flow.dispatch.tensor.load %arg1_capture, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readwrite:4x8xf32> -> tensor<4x8xf32>
     %0 = "test.do_work"(%load) : (tensor<4x8xf32>) -> (tensor<4x8xf32>)
-    flow.dispatch.tensor.store %0, %arg1_capture : tensor<4x8xf32> -> !flow.dispatch.tensor<readwrite:4x8xf32>
+    flow.dispatch.tensor.store %0, %arg1_capture, offsets=[], sizes=[], strides=[] : tensor<4x8xf32> -> !flow.dispatch.tensor<readwrite:4x8xf32>
     flow.return
   }
   return %0 : tensor<4x8xf32>

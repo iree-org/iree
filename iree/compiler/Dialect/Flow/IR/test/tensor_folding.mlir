@@ -2,8 +2,17 @@
 
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
 
-// CHECK-LABEL: @reshapeNoOp
-func @reshapeNoOp(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+// CHECK-LABEL: @reshapeNoOpScalar
+func @reshapeNoOpScalar(%arg0: tensor<f32>) -> tensor<f32> {
+  // CHECK-NEXT: return %arg0 : tensor<f32>
+  %0 = flow.tensor.reshape %arg0 : tensor<f32> -> tensor<f32>
+  return %0 : tensor<f32>
+}
+
+// -----
+
+// CHECK-LABEL: @reshapeNoOpStatic
+func @reshapeNoOpStatic(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK-NEXT: return %arg0 : tensor<4x4xf32>
   %0 = flow.tensor.reshape %arg0 : tensor<4x4xf32> -> tensor<4x4xf32>
   return %0 : tensor<4x4xf32>
@@ -11,11 +20,42 @@ func @reshapeNoOp(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 // -----
 
-// CHECK-LABEL: @reshapeNoOpScalar
-func @reshapeNoOpScalar(%arg0 : tensor<f32>) -> tensor<f32> {
-  // CHECK-NEXT: return %arg0 : tensor<f32>
-  %0 = flow.tensor.reshape %arg0 : tensor<f32> -> tensor<f32>
-  return %0 : tensor<f32>
+// CHECK-LABEL: @reshapeStaticDifferent
+func @reshapeStaticDifferent(%arg0: tensor<1x4xf32>) -> tensor<4x1xf32> {
+  // CHECK-NEXT: flow.tensor.reshape %arg0
+  %0 = flow.tensor.reshape %arg0 : tensor<1x4xf32> -> tensor<4x1xf32>
+  return %0 : tensor<4x1xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @reshapeNoOpDynamic
+func @reshapeNoOpDynamic(%arg0: tensor<4x?xf32>, %dim: index) -> tensor<4x?xf32> {
+  // CHECK-NEXT: return %arg0 : tensor<4x?xf32>
+  %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim} -> tensor<4x?xf32>{%dim}
+  return %0 : tensor<4x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @reshapeDynamicDifferent
+func @reshapeDynamicDifferent(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index) -> tensor<4x?xf32> {
+  // CHECK-NEXT: flow.tensor.reshape %arg0
+  %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<4x?xf32>{%dim1}
+  return %0 : tensor<4x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @flattenReshapeChain
+// CHECK-SAME: %[[ARG:.+]]: tensor<4x?xf32>,
+// CHECK-SAME: %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index
+func @flattenReshapeChain(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index, %dim2: index) -> tensor<4x?xf32> {
+  // CHECK-NEXT: %[[RET:.+]] = flow.tensor.reshape %[[ARG]] : tensor<4x?xf32>{%[[DIM0]]} -> tensor<4x?xf32>{%[[DIM2]]}
+  %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<4x?xf32>{%dim1}
+  %1 = flow.tensor.reshape %0 : tensor<4x?xf32>{%dim1} -> tensor<4x?xf32>{%dim2}
+  // CHECK-NEXT: return %[[RET]]
+  return %1 : tensor<4x?xf32>
 }
 
 // -----

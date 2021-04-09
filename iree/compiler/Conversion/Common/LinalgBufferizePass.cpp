@@ -83,10 +83,12 @@ static void transferShapeOpsToMemref(OpBuilder &b, Value tensor, Value memref,
 /// Creates a subview operation given the `src`, `offsets`, `sizes` and
 /// `strides`. Handles the corner case where the `offsets`, `sizes` and
 /// `strides` are empty in which case just forward the `src` value.
+/// TODO(ataei): Instead create memref.subview %v [][][] folder.
 static Value createSubviewOp(OpBuilder &b, Location loc, Value src,
-                             ValueRange offsets, ValueRange sizes,
-                             ValueRange strides) {
-  if (offsets.empty()) return src;
+                             ArrayRef<OpFoldResult> offsets,
+                             ArrayRef<OpFoldResult> sizes,
+                             ArrayRef<OpFoldResult> strides) {
+  if (offsets.empty() && sizes.empty() && strides.empty()) return src;
   return b.create<memref::SubViewOp>(loc, src, offsets, sizes, strides);
 }
 
@@ -188,6 +190,9 @@ static LogicalResult finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
 static LogicalResult convertAnyLinalgOp(
     OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn, linalg::LinalgOp op,
     BlockAndValueMapping &bvm) {
+  // Skip linalg ops inserted by this pass.
+  if (op.hasBufferSemantics()) return success();
+
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Location loc = op.getLoc();
@@ -228,7 +233,11 @@ static LogicalResult convertConstantOp(OpBuilder &b, ConstantOp constantOp,
   Value memref =
       b.create<memref::BufferCastOp>(constantOp.getLoc(), memrefType, result);
   if (Value resultBuffer = bvm.lookupOrNull(result)) {
-    // Since this is already remapped to a buffer, copy the data.
+    // Since this is already remapped to a buffer, copy the data. Note that
+    // constant ops are typicaly placed at the beginning of the block; we need
+    // to make sure to insert the new copy op after the result buffer, which can
+    // be after the constant op.
+    b.setInsertionPointAfterValue(resultBuffer);
     b.create<linalg::CopyOp>(constantOp.getLoc(), memref, resultBuffer);
   } else {
     bvm.map(result, memref);
@@ -407,9 +416,8 @@ static LogicalResult convertSubTensorInsertOp(
   Value source = op.source();
   Value outputBuffer = bvm.lookup(op.result());
   Value sourceBuffer = bvm.lookup(source);
-  auto subViewOp =
-      b.create<memref::SubViewOp>(loc, outputBuffer, op.getMixedOffsets(),
-                                  op.getMixedSizes(), op.getMixedStrides());
+  auto subViewOp = createSubviewOp(b, loc, outputBuffer, op.getMixedOffsets(),
+                                   op.getMixedSizes(), op.getMixedStrides());
   b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
   return success();
 }
@@ -485,8 +493,9 @@ LogicalResult convertInterfaceLoadTensorOp(
   b.setInsertionPoint(loadOp);
   Location loc = loadOp.getLoc();
   Value memref = bvm.lookup(loadOp.source());
-  Value res = createSubviewOp(b, loc, memref, loadOp.offsets(), loadOp.sizes(),
-                              loadOp.strides());
+  Value res = createSubviewOp(b, loc, memref, loadOp.getMixedOffsets(),
+                              loadOp.getMixedSizes(), loadOp.getMixedStrides());
+
   bvm.map(loadOp.result(), res);
   transferShapeOpsToMemref(b, loadOp.result(), res, bvm);
   return success();
@@ -539,7 +548,8 @@ LogicalResult preProcessInterfaceStoreTensorOp(
   b.setInsertionPoint(insertionPoint);
   Value subview =
       createSubviewOp(b, storeOp.getLoc(), bvm.lookup(storeOp.target()),
-                      storeOp.offsets(), storeOp.sizes(), storeOp.strides());
+                      storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+                      storeOp.getMixedStrides());
   bvm.map(storeOp.value(), subview);
   return success();
 }
@@ -606,10 +616,23 @@ LogicalResult convertInterfaceStoreTensorOp(
   }
 
   Value subview =
-      createSubviewOp(b, storeOp.getLoc(), storeTo, storeOp.offsets(),
-                      storeOp.sizes(), storeOp.strides());
+      createSubviewOp(b, storeOp.getLoc(), storeTo, storeOp.getMixedOffsets(),
+                      storeOp.getMixedSizes(), storeOp.getMixedStrides());
+
   b.create<linalg::CopyOp>(storeOp->getLoc(), storeFrom, subview);
   storeOp->erase();
+  return success();
+}
+
+// Forwards buffer assigned to cast inputs to its outputs.
+LogicalResult convertTensorCastOp(OpBuilder &b,
+                                  WorkgroupMemoryAllocationFn allocationFn,
+                                  tensor::CastOp castOp,
+                                  BlockAndValueMapping &bvm) {
+  Value inputBuffer = bvm.lookup(castOp.source());
+  // Note: tensor.cast isn't suppose to do any data-movements, so we should
+  // never need to allocate and copy data to the result tensor.
+  bvm.map(castOp.dest(), inputBuffer);
   return success();
 }
 
@@ -619,8 +642,8 @@ class LinalgBufferizePass
  public:
   LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, linalg::LinalgDialect, scf::SCFDialect,
-                    StandardOpsDialect>();
+    registry.insert<IREEDialect, linalg::LinalgDialect, memref::MemRefDialect,
+                    scf::SCFDialect, StandardOpsDialect>();
   }
   void runOnFunction() override;
 
@@ -683,6 +706,17 @@ void LinalgBufferizePass::runOnFunction() {
     return signalPassFailure();
   }
 
+  // Walk backward and forward buffers assigned to tensor.cast results to their
+  // inputs.
+  SmallVector<tensor::CastOp> castOps;
+  funcOp.walk([&castOps](tensor::CastOp castOp) { castOps.push_back(castOp); });
+  for (tensor::CastOp castOp : llvm::reverse(castOps)) {
+    auto outBuffer = bvm.lookup(castOp.dest());
+    if (outBuffer) {
+      bvm.map(castOp.source(), outBuffer);
+    }
+  }
+
   /// Walk the linalg operations backwards (if they are all in the same basic
   /// block) to propagate buffer usage backwards to reduce the need for
   /// allocation. This works for simple cases where all the linalg operations
@@ -713,6 +747,9 @@ void LinalgBufferizePass::runOnFunction() {
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return convertInterfaceStoreTensorOp(b, storeOp, bvm);
             })
+        .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
+          return convertTensorCastOp(b, allocationFn, castOp, bvm);
+        })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return convertAnyLinalgOp(b, allocationFn, linalgOp, bvm);
         })

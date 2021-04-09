@@ -134,14 +134,6 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 void TileAndVectorizeWorkgroups::runOnFunction() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
-
-  // Apply prior vectorization canonicalization passes.
-  {
-    OwningRewritePatternList canonicalization(&getContext());
-    populateAffineMinSCFCanonicalizationPattern(canonicalization);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalization));
-  }
-
   // Promotes workgroups subviews to a full-tile allocated on the stack.
   if (clEnablePromoteWorkgroupToFullTiles) {
     OwningRewritePatternList promotionPatterns(&getContext());

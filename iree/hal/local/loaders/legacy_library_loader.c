@@ -143,14 +143,18 @@ static iree_status_t iree_hal_legacy_executable_query_library(
       // however checks outside will (often) still trigger when guard pages are
       // dirtied/etc.
       break;
-#if !defined(IREE_SANITIZER_ADDRESS)
+#if defined(IREE_SANITIZER_ADDRESS)
+    case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_ADDRESS:
+      // ASAN is compiled into the host and we can load this library.
+      break;
+#else
     case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_ADDRESS:
       return iree_make_status(
           IREE_STATUS_UNAVAILABLE,
           "executable library is compiled with ASAN support but the host "
           "runtime is not compiled with it enabled; add -fsanitize=address to "
           "the runtime compilation options");
-#endif  // !IREE_SANITIZER_ADDRESS
+#endif  // IREE_SANITIZER_ADDRESS
     default:
       return iree_make_status(
           IREE_STATUS_UNAVAILABLE,

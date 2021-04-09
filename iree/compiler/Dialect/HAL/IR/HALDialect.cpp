@@ -127,6 +127,15 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   } else if (attrKind == DeviceMatchMemoryModelAttr::getKindName()) {
     return DeviceMatchMemoryModelAttr::parse(parser);
   }
+  if (attrKind == ExConstantStorageAttr::getKindName()) {
+    return ExConstantStorageAttr::parse(parser);
+  } else if (attrKind == ExPushConstantAttr::getKindName()) {
+    return ExPushConstantAttr::parse(parser);
+  } else if (attrKind == ExOperandBufferAttr::getKindName()) {
+    return ExOperandBufferAttr::parse(parser);
+  } else if (attrKind == ExResultBufferAttr::getKindName()) {
+    return ExResultBufferAttr::parse(parser);
+  }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << attrKind;
   return {};
@@ -135,8 +144,13 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
       .Case<BufferConstraintsAttr, ByteRangeAttr,
-            DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
-            MatchAllAttr, DeviceMatchIDAttr, DeviceMatchMemoryModelAttr>(
+            DescriptorSetLayoutBindingAttr,
+            //
+            ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
+            ExResultBufferAttr,
+            //
+            MatchAlwaysAttr, MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
+            DeviceMatchMemoryModelAttr>(
           [&](auto typedAttr) { typedAttr.print(p); })
       .Default(
           [](Attribute) { llvm_unreachable("unhandled HAL attribute kind"); });
