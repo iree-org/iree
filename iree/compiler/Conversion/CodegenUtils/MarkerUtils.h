@@ -34,6 +34,10 @@ namespace iree_compiler {
 StringRef getWorkgroupMarker();
 
 /// Marker to denote that a linalg operation has been partitioned to
+/// workgroups and tiled along reduction dimennsions.
+StringRef getWorkgroupKTiledMarker();
+
+/// Marker to denote that a linalg operation has been partitioned to
 /// workgroups and operands promoted to scratchspace memory.
 StringRef getWorkgroupMemoryMarker();
 
