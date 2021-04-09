@@ -24,23 +24,29 @@ static llvm::cl::opt<bool> clEnableLLVMLinalgOnTensors(
     llvm::cl::desc("Enable the linalg on tensors experimental LLVM path"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> convImg2ColConversion(
+static llvm::cl::opt<bool> clConvImg2ColConversion(
     "iree-codegen-linalg-to-llvm-conv-img2col-conversion",
     llvm::cl::desc("Enable rewriting linalg.conv_2d_input_nhwc_filter_hwcf "
                    "linalg.generic that does img2col buffer packing + "
                    "linag.matmul"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> unfusedFMA(
+static llvm::cl::opt<bool> clUnfusedFMA(
     "iree-codegen-linalg-to-llvm-use-unfused-fma",
+    llvm::cl::desc("Enable rewriting llvm.fma to its unfused version."),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clEnableLinalgOnTensorsToVectors(
+    "iree-codegen-linalg-to-llvm-linalg-on-tensors-to-vectors",
     llvm::cl::desc("Enable rewriting llvm.fma to its unfused version."),
     llvm::cl::init(false));
 
 LLVMCodegenOptions getLLVMCodegenOptionsFromClOptions() {
   LLVMCodegenOptions options;
   options.usingLinalgOnTensors = clEnableLLVMLinalgOnTensors;
-  options.useConvImg2Col = convImg2ColConversion;
-  options.unfuseFMAOps = unfusedFMA;
+  options.useConvImg2Col = clConvImg2ColConversion;
+  options.unfuseFMAOps = clUnfusedFMA;
+  options.useLinalgOnTensorsToVectors = clEnableLinalgOnTensorsToVectors;
   return options;
 }
 

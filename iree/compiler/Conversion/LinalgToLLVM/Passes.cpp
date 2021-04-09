@@ -72,7 +72,11 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(createMaterializeCPULaunchConfigurationPass());
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
     nestedModulePM.addPass(createInlinerPass());
-    nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
+    // TODO(ataei): We want to enable when tensor -> vector pass is fully
+    // supported which requires first moving vector-tiling before this step.
+    if (options.useLinalgOnTensorsToVectors) {
+      nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
+    }
     // Use stack allocation on CPU side.
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,

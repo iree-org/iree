@@ -27,6 +27,7 @@ struct LLVMCodegenOptions {
   // Target specific options.
   bool unfuseFMAOps = false;
   bool useVectorToAarch64 = false;
+  bool useLinalgOnTensorsToVectors = false;
 };
 
 // Returns LLVM CodeGen options from command-line options.
