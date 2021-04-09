@@ -826,8 +826,8 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     bool isTransfer() { return true; }
   }];
 
-  // TODO(benvanik): canonicalize away if resulting ops don't care.
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
