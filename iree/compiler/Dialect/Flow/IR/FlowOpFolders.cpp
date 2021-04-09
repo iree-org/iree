@@ -551,14 +551,74 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
   return valueIndex;
 }
 
+static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
+                               ShapedType rhsType, ValueRange rhsDynamicDims) {
+  if (lhsType.hasStaticShape() && lhsType == rhsType) {
+    // Static shape equivalence means we can fast-path the check.
+    return true;
+  }
+  unsigned dynamicDimIndex = 0;
+  for (unsigned i = 0; i < lhsType.getRank(); ++i) {
+    if (lhsType.isDynamicDim(i) != rhsType.isDynamicDim(i)) {
+      // Static/dynamic dimension mismatch - definitely differ.
+      return false;
+    } else if (lhsType.isDynamicDim(i)) {
+      unsigned j = dynamicDimIndex++;
+      if (lhsDynamicDims[j] != rhsDynamicDims[j]) {
+        // Dynamic dimensions with different SSA values - probably differ.
+        return false;
+      }
+    } else {
+      if (lhsType.getDimSize(i) != rhsType.getDimSize(i)) {
+        // Static dimensions differ.
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
   auto sourceType = source().getType().cast<ShapedType>();
   auto resultType = result().getType().cast<ShapedType>();
-  if (sourceType.hasStaticShape() && sourceType == resultType) {
-    // No-op.
+  if (compareShapesEqual(sourceType, source_dims(), resultType,
+                         result_dims())) {
+    // Shapes match and this is a no-op so just fold to the source.
     return source();
   }
+
   return {};
+}
+
+namespace {
+
+// Flatten a chain of reshapes (reshape feeding into reshape) such that a
+// reshape only ever pulls from a non-reshape source. This prevents big useless
+// chains and makes it easier to track the original storage for the tensor.
+struct FlattenTensorReshapeChain : public OpRewritePattern<TensorReshapeOp> {
+  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceOp =
+        dyn_cast_or_null<TensorReshapeOp>(reshapeOp.source().getDefiningOp());
+    if (!sourceOp) return failure();
+
+    // We want the same result value/shape but to source from the ancestor. We
+    // need to pull any dynamic dims from that as we don't care about the
+    // intermediate reshapes.
+    rewriter.replaceOpWithNewOp<TensorReshapeOp>(
+        reshapeOp, reshapeOp.result().getType(), sourceOp.source(),
+        sourceOp.source_dims(), reshapeOp.result_dims());
+    return success();
+  }
+};
+
+}  // namespace
+
+void TensorReshapeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FlattenTensorReshapeChain>(context);
 }
 
 OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute> operands) {
