@@ -74,8 +74,6 @@ static void populateTilingToInvocationPatterns(
     const LaunchConfig &launchConfig) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [launchConfig](OpBuilder &builder, Operation *operation) {
-        auto attr = operation->getAttrOfType<StringAttr>(
-            linalg::LinalgTransforms::kLinalgTransformMarker);
         SmallVector<Value, 4> tileSizesVal;
         ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(operation, 2);
         if (tileSizes.empty()) return SmallVector<Value, 4>();
@@ -133,8 +131,6 @@ static void populateTilingCopyToWorkgroupMemPatterns(
         const int64_t copyTileSize = 4;
         // We tile to 4 as we want each thread to load 4 element in a cyclic
         // distribution.
-        auto attr = operation->getAttrOfType<StringAttr>(
-            linalg::LinalgTransforms::kLinalgTransformMarker);
         SmallVector<Value, 4> tileSizesVal;
         unsigned rank =
             cast<linalg::CopyOp>(operation).getOutputBufferTypes()[0].getRank();
