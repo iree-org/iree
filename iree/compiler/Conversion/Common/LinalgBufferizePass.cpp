@@ -624,6 +624,18 @@ LogicalResult convertInterfaceStoreTensorOp(
   return success();
 }
 
+// Forwards buffer assigned to cast inputs to its outputs.
+LogicalResult convertTensorCastOp(OpBuilder &b,
+                                  WorkgroupMemoryAllocationFn allocationFn,
+                                  tensor::CastOp castOp,
+                                  BlockAndValueMapping &bvm) {
+  Value inputBuffer = bvm.lookup(castOp.source());
+  // Note: tensor.cast isn't suppose to do any data-movements, so we should
+  // never need to allocate and copy data to the result tensor.
+  bvm.map(castOp.dest(), inputBuffer);
+  return success();
+}
+
 namespace {
 class LinalgBufferizePass
     : public PassWrapper<LinalgBufferizePass, FunctionPass> {
@@ -694,6 +706,17 @@ void LinalgBufferizePass::runOnFunction() {
     return signalPassFailure();
   }
 
+  // Walk backward and forward buffers assigned to tensor.cast results to their
+  // inputs.
+  SmallVector<tensor::CastOp> castOps;
+  funcOp.walk([&castOps](tensor::CastOp castOp) { castOps.push_back(castOp); });
+  for (tensor::CastOp castOp : llvm::reverse(castOps)) {
+    auto outBuffer = bvm.lookup(castOp.dest());
+    if (outBuffer) {
+      bvm.map(castOp.source(), outBuffer);
+    }
+  }
+
   /// Walk the linalg operations backwards (if they are all in the same basic
   /// block) to propagate buffer usage backwards to reduce the need for
   /// allocation. This works for simple cases where all the linalg operations
@@ -724,6 +747,9 @@ void LinalgBufferizePass::runOnFunction() {
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return convertInterfaceStoreTensorOp(b, storeOp, bvm);
             })
+        .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
+          return convertTensorCastOp(b, allocationFn, castOp, bvm);
+        })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return convertAnyLinalgOp(b, allocationFn, linalgOp, bvm);
         })

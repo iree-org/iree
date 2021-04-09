@@ -1013,3 +1013,53 @@ hal.interface @interface_io attributes {sym_visibility = "private"} {
 //       CHECK: linalg.generic
 //  CHECK-SAME:   ins(%[[INPUT]], %[[CAST5]] : memref<5xf32>, memref<5xi32>)
 //  CHECK-SAME:   outs(%[[OUTPUT]] : memref<i32>)
+
+
+// -----
+
+func @cast_follwed_by_store() {
+  %c0 = constant 0 : index
+  %cst = constant 0.000000e+00 : f32
+  %c4 = constant 4 : index
+  %c64 = constant 64 : index
+  %c1 = constant 1 : index
+  %c32 = constant 32 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x1024x64xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4x32x64xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %workgroup_id_z = hal.interface.workgroup.id[2] : index
+  %workgroup_count_z = hal.interface.workgroup.count[2] : index
+  scf.for %arg0 = %workgroup_id_z to %c4 step %workgroup_count_z {
+    %3 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
+    %4 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_y]
+    scf.for %arg1 = %3 to %c32 step %4 {
+      %5 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
+      %6 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
+      scf.for %arg2 = %5 to %c64 step %6 {
+        %7 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [%c1, %c32, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x32x1024xf32> -> tensor<?x?x1024xf32>
+        %8 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [%c1, 1024, %c32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x1024x64xf32> -> tensor<?x1024x?xf32>
+        %9 = linalg.init_tensor [1, 32, 32] : tensor<1x32x32xf32>
+        %10 = linalg.fill(%9, %cst) {__internal_linalg_transform__ = "workgroup"} : tensor<1x32x32xf32>, f32 -> tensor<1x32x32xf32>
+        %11 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%7, %8 : tensor<?x?x1024xf32>, tensor<?x1024x?xf32>) outs(%10 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
+        %12 = tensor.cast %11 : tensor<1x32x32xf32> to tensor<?x?x?xf32>
+        flow.dispatch.tensor.store %12, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%c1, %c32, %c32], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x32x64xf32>
+      }
+    }
+  }
+  return
+}
+
+// CHECK-LABEL: func @cast_follwed_by_store()
+//    CHECK: %[[ZERO:.+]] = constant 0.000000e+00 : f32
+//    CHECK: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<4x32x1024xf32>
+//    CHECK: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4x1024x64xf32>
+//    CHECK: %[[RESULT:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<4x32x64xf32>
+//    CHECK: %[[RESULTV:.+]] = memref.subview %[[RESULT]]
+//    CHECK: %[[LHSV:.+]] = memref.subview %[[LHS]]
+//    CHECK: %[[RHSV:.+]] = memref.subview %[[RHS]]
+//    CHECK: linalg.fill(%[[RESULTV]], %[[ZERO]])
+//    CHECK: linalg.batch_matmul {{.*}} ins(%[[LHSV]], %[[RHSV]] : {{.*}}) outs(%[[RESULTV]]
