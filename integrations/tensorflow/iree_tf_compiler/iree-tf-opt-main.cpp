@@ -33,6 +33,7 @@ int main(int argc, char **argv) {
 
   mlir::RegisterAllTensorFlowDialects(registry);
   mlir::iree_integrations::TF::registerAllDialects(registry);
+  mlir::iree_integrations::TF::registerAllPasses();
 
   if (failed(MlirOptMain(argc, argv, "IREE-TF modular optimizer driver\n",
                          registry,
