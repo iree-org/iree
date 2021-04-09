@@ -19,7 +19,7 @@ package org.tensorflow.lite;
 /** Static utility methods loading the TensorFlowLite runtime. */
 public final class TensorFlowLite {
   private static final Throwable LOAD_LIBRARY_EXCEPTION;
-  private static volatile boolean isInit = false;
+  private static volatile boolean isInitialized = false;
 
   static {
     Throwable loadLibraryException = null;
@@ -45,7 +45,7 @@ public final class TensorFlowLite {
    * @throws UnsatisfiedLinkError with the appropriate error message.
    */
   public static void init() {
-    if (isInit) {
+    if (isInitialized) {
       return;
     }
 
@@ -53,7 +53,7 @@ public final class TensorFlowLite {
       // Try to invoke a native method (the method itself doesn't really matter) to ensure that
       // native libs are available.
       nativeRuntimeVersion();
-      isInit = true;
+      isInitialized = true;
     } catch (UnsatisfiedLinkError e) {
       // Prefer logging the original library loading exception if native methods are unavailable.
       Throwable exceptionToLog = LOAD_LIBRARY_EXCEPTION != null ? LOAD_LIBRARY_EXCEPTION : e;

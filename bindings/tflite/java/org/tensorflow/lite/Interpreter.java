@@ -26,14 +26,14 @@ import org.checkerframework.checker.nullness.qual.NonNull;
  * Main driver class for the IREE Java compatibility shim. Provides model
  * creation and inference for IREE compatible TFLite models.
  *
- * <p>This shim aims to mimic the functionality of the Tensorflow Lite's
- * Interpeter.java class, however, there are a few notable features IREE dosn't
+ * <p>This shim aims to mimic the functionality of Tensorflow Lite's
+ * Interpeter.java class, however, there are a few notable features IREE doesn't
  * support:
  *
  * <ul>
  *  <li> Delegates and the NNAPI
  *  <li> Advanced interpreter options
- *  <li> Interrupting or canceling inference before its complete
+ *  <li> Interrupting or canceling inference before it's complete
  *  <li> Tensor method signatures
  *  <li> Dynamic shapes
  *  <li> String input/output isn't supported
@@ -46,49 +46,49 @@ import org.checkerframework.checker.nullness.qual.NonNull;
  * <p>Example using the Interpreter with a model with a single input/output Tensor:
  *
  * <pre>{@code
- * ByteBuffer modelByteBuffer = ... load model here ....
- * try (Interpreter interpreter = new Interpreter(modelByteBuffer)) {
- *   interpreter.allocateTensors();
+ *  // Load model/initialize interpreter:
+ *  ByteBuffer modelByteBuffer = ... load model here ....
+ *  Interpreter interpreter = new Interpreter(modelByteBuffer);
+ *  interpreter.allocateTensors();
  *
- *   float[] input = {1, 3};
- *   float[] output = new float[2];
+ *  // Prepare inputs:
+ *  float[] input = {1, 3};
+ *  float[] output = new float[2];
  *
- *   int bytesInFloat = 4;
- *   FloatBuffer inputBuffer = ByteBuffer.allocateDirect(bytesInFloat * input.length)
- *      .order(ByteOrder.nativeOrder())
- *      .asFloatBuffer()
- *   FloatBuffer outputBuffer = ByteBuffer.allocateDirect(bytesInFloat * output.length)
- *      .order(ByteOrder.nativeOrder())
- *      .asFloatBuffer()
+ *  int bytesInFloat = 4;
+ *  FloatBuffer inputBuffer = ByteBuffer.allocateDirect(bytesInFloat * input.length)
+ *    .order(ByteOrder.nativeOrder())
+ *    .asFloatBuffer();
+ *  FloatBuffer outputBuffer = ByteBuffer.allocateDirect(bytesInFloat * output.length)
+ *    .order(ByteOrder.nativeOrder())
+ *    .asFloatBuffer();
  *
- *   inputBuffer.put(input);
- *   interpreter.run(inputBuffer, outputBuffer);
- *   outputBuffer.get(output);
+ *  // Run inference:
+ *  inputBuffer.put(input);
+ *  interpreter.run(inputBuffer, outputBuffer);
+ *  outputBuffer.get(output);
+ *  ... process output ...
  *
- *   ... process output ...
- *
- *   interpreter.close();
- * }
+ *  // Cleanup:
+ *  interpreter.close();
  * }</pre>
  *
  * <p>If a model takes multiple inputs, use
  *   {@link #runForMultipleInputsOutputs(Buffer[], Map)}:
  *
  * <pre>{@code
- * Buffer[] inputs = {input0, input1, ...};
- * Map<Integer, Buffer> indexToOutput = new HashMap<>();
- * FloatBuffer ithOutput = ... allocate (native) and populate buffer ...
- * indexToOutput.put(i, ithOutput);
+ *  // Load model/initialize interpreter same as above.
  *
- * ByteBuffer modelByteBuffer = ... load model here ....
- * try (Interpreter interpreter = new Interpreter(modelByteBuffer)) {
- *   interpreter.allocateTensors();
- *   interpreter.runForMultipleInputsOutputs(inputs, indexToOutput);
+ *  // Prepare inputs:
+ *  Buffer[] inputs = {input0, input1, ...};
+ *  Map<Integer, Buffer> indexToOutput = new HashMap<>();
+ *  FloatBuffer ithOutput = ... allocate (native) and populate buffer ...
+ *  indexToOutput.put(i, ithOutput);
  *
- *   .. process output ...
+ *  // Run inference:
+ *  interpreter.runForMultipleInputsOutputs(inputs, indexToOutput);
  *
- *   interpreter.close();
- * }
+ *  // Cleanup same as above.
  * }</pre>
  *
  * <p>Orders of inputs and outputs are determined when converting TensorFlow
@@ -126,6 +126,8 @@ public final class Interpreter implements AutoCloseable {
     }
   }
 
+  private final int inputTensorCount;
+  private final int outputTensorCount;
   private final Tensor[] inputTensors;
   private final Tensor[] outputTensors;
   private final long nativeAddress;
@@ -141,7 +143,7 @@ public final class Interpreter implements AutoCloseable {
    * @param options: options for the interpreter, or null (to use defaults).
    * @throws IllegalArgumentException if the model cannot be initialized in the Interpreter.
    */
-  public Interpreter(@NonNull ByteBuffer modelByteBuffer, Options options) throws Exception {
+  public Interpreter(@NonNull ByteBuffer modelByteBuffer, Options options) throws IllegalArgumentException {
     TensorFlowLite.init();
     if (options == null) {
       options = new Options();
@@ -153,8 +155,10 @@ public final class Interpreter implements AutoCloseable {
       throw new IllegalArgumentException("Could not create Interpreter");
     }
 
-    inputTensors = new Tensor[getInputTensorCount()];
-    outputTensors = new Tensor[getOutputTensorCount()];
+    inputTensorCount = nativeInputTensorCount();
+    outputTensorCount = nativeOutputTensorCount();
+    inputTensors = new Tensor[inputTensorCount];
+    outputTensors = new Tensor[outputTensorCount];
   }
 
   /**
@@ -179,7 +183,6 @@ public final class Interpreter implements AutoCloseable {
    *
    * <pre>{@code
    * FloatBuffer inputBuffer = ... create float buffer of capacity 1 ...
-   *
    * }</pre>
    *
    * <p>Single dimensional arrays/tensor input should be wrapped directly in a buffer with matching
@@ -265,33 +268,6 @@ public final class Interpreter implements AutoCloseable {
   }
 
   /**
-   * [Placeholder] for running model inference based on SignatureDef provided through @code
-   * methodName. This method is unsupported.
-   *
-   * @param inputs A Map of inputs from input name in the signatureDef to an input object.
-   * @param outputs a map mapping from output name in SignatureDef to output data.
-   * @param methodName The exported method name identifying the SignatureDef.
-   * @throws UnsupportedOperationException since IREE doesn't support tensor signatures.
-   */
-  public void runSignature(
-      @NonNull Map<String, Object> inputs,
-      @NonNull Map<String, Object> outputs,
-      String methodName) {
-    throw new UnsupportedOperationException("IREE does not support tensor signatures.");
-  }
-
-  /* Same as {@link Interpreter#runSignature(Object, Object, String)} but doesn't require
-   * passing a methodName, assuming the model has one SignatureDef. If the model has more than
-   * one SignatureDef it will throw an exception.
-   *
-   * * <p>WARNING: This is an experimental API and subject to change.
-   * */
-  public void runSignature(
-      @NonNull Map<String, Object> inputs, @NonNull Map<String, Object> outputs) {
-    throw new UnsupportedOperationException("IREE does not support tensor signatures.");
-  }
-
-  /**
    * Explicitly updates allocations for all tensors, if necessary.
    *
    * <p>This will propagate shapes and memory allocations for all dependent tensors using the input
@@ -321,10 +297,13 @@ public final class Interpreter implements AutoCloseable {
   }
 
   /**
-   * Resizes idx-th input of the native model to the given dims.
+   * Resizes the specified input of the native model to the given dims.
    *
-   * @throws IllegalArgumentException if {@code idx} is negative or is not smaller than the number
-   *     of model inputs; or if error occurs when resizing the idx-th input.
+   * @param inputIndex index of input to resize
+   * @param dims array specifying new shape
+   *
+   * @throws IllegalArgumentException if {@code inputIndex} is negative or is not smaller than the number
+   *     of model inputs; or if error occurs when resizing the specified input.
    */
   public void resizeInput(int inputIndex, @NonNull int[] dims) {
     if (nativeResizeInputTensor(inputIndex, dims) != 0) {
@@ -335,7 +314,7 @@ public final class Interpreter implements AutoCloseable {
 
   /** Gets the number of input tensors. */
   public int getInputTensorCount() {
-    return nativeInputTensorCount();
+    return inputTensorCount;
   }
 
   /**
@@ -363,16 +342,15 @@ public final class Interpreter implements AutoCloseable {
     if (index < 0 || index >= inputTensors.length) {
       throw new IllegalArgumentException(String.format("Invalid input Tensor index: %d", index));
     }
-    Tensor inputTensor = inputTensors[index];
-    if (inputTensor == null) {
-      inputTensor = inputTensors[index] = Tensor.inputFromIndex(nativeAddress, index);
+    if (inputTensors[index] == null) {
+      inputTensors[index] = Tensor.inputFromIndex(nativeAddress, index);
     }
-    return inputTensor;
+    return inputTensors[index];
   }
 
   /** Gets the number of output Tensors. */
   public int getOutputTensorCount() {
-    return nativeOutputTensorCount();
+    return outputTensorCount;
   }
 
   /** Gets index of an output given the op name of the output or -1 if not found. */
@@ -402,11 +380,10 @@ public final class Interpreter implements AutoCloseable {
     if (index < 0 || index >= outputTensors.length) {
       throw new IllegalArgumentException(String.format("Invalid output Tensor index: %d", index));
     }
-    Tensor outputTensor = outputTensors[index];
-    if (outputTensor == null) {
-      outputTensor = outputTensors[index] = Tensor.outputFromIndex(nativeAddress, index);
+    if (outputTensors[index] == null) {
+      outputTensors[index] = Tensor.outputFromIndex(nativeAddress, index);
     }
-    return outputTensor;
+    return outputTensors[index];
   }
 
   /** Returns native inference timing, or -1 if inference isn't complete yet. */

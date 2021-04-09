@@ -25,4 +25,6 @@ iree_cc_library(
   DEPS
     iree::base::api
     bindings::tflite::shim
+  LINKOPTS
+    "-landroid"
 )

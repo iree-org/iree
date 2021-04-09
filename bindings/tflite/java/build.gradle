@@ -6,6 +6,7 @@ repositories {
 buildscript {
     repositories {
         google()
+        // TODO: jcenter will soon go away. Find a replacement: https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/
         jcenter()
     }
 
@@ -30,7 +31,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments "-DIREE_BUILD_BINDINGS_TFLITE=ON",
-                        "-IREE_BUILD_BINDINGS_TFLITE_JAVA=ON",
+                        "-DIREE_BUILD_BINDINGS_TFLITE_JAVA=ON",
                         "-DIREE_HAL_DRIVERS_TO_BUILD=VMLA",
 
                         // Disable all but the runtime components needed for the

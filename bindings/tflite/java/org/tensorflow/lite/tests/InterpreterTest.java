@@ -16,7 +16,6 @@
 
 package org.tensorflow.lite;
 
-// import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
@@ -38,7 +37,7 @@ import org.tensorflow.lite.Interpreter.Options;
 public final class InterpreterTest {
   private static final String TAG = InterpreterTest.class.getCanonicalName();
 
-  private static final float EPSILON = 0.0000001f;
+  private static final float EPSILON = 0.0001f;
 
   private static final int BYTES_IN_FLOAT = 4;
 
