@@ -43,8 +43,10 @@ FlowTypeConverter::FlowTypeConverter() {
   // 64-bit types natively.
   // TODO(benvanik): make whether to narrow integers an option.
   addConversion([](IntegerType integerType) -> Optional<Type> {
-    if (integerType.isSignlessInteger() && integerType.getWidth() > 32) {
+    if (integerType.getWidth() > 32) {
       // Don't support 64-bit types in general. Rewrite to i32 (if desired).
+      // note: std.constant op requires integer result types to be signless, so
+      // we narrow ui64 to i32 as well.
       return IntegerType::get(integerType.getContext(), 32);
     }
     return llvm::None;
