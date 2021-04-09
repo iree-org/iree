@@ -222,7 +222,7 @@ class ListAllocOpConversion
     // The generated c code looks roughly like this.
     // iree_vm_type_def_t element_type = iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
     // iree_vm_type_def_t* element_type_ptr = &element_type;
-    // iree_vm_list_t* list = nullptr;
+    // iree_vm_list_t* list = NULL;
     // iree_vm_list_t** list_ptr = &list;
     // iree_vm_list_create(&element_type, {initial_capacity}, state->allocator, &list);
     // clang-format on
@@ -262,7 +262,7 @@ class ListAllocOpConversion
     auto listOp = rewriter.replaceOpWithNewOp<emitc::ConstOp>(
         /*op=*/allocOp,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
-        /*value=*/StringAttr::get(ctx, "nullptr"));
+        /*value=*/StringAttr::get(ctx, "NULL"));
 
     auto listPtrOp = rewriter.create<emitc::GetAddressOfOp>(
         /*location=*/loc,
