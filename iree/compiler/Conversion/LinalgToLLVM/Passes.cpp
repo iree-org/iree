@@ -72,8 +72,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(createMaterializeCPULaunchConfigurationPass());
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
     nestedModulePM.addPass(createInlinerPass());
-    // TODO(ataei): Currently tensor -> vector is failing (GH-5370).
-    // nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
+    nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
     // Use stack allocation on CPU side.
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
