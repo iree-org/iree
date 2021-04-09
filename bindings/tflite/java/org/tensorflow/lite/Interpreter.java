@@ -92,7 +92,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
  * }</pre>
  *
  * <p>Orders of inputs and outputs are determined when converting TensorFlow
- * model to TensorFlowLite model with Toco, as are the default shapes of the
+ * model to TensorFlow Lite model with TOCO, as are the default shapes of the
  * inputs.
  *
  * <p><b>WARNING:</b>Instances of {@link Interpreter} are <b>not</b> thread-safe.
