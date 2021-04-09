@@ -786,6 +786,11 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     FLOW_StreamableOp,
     AllElementTypesMatch<["source", "result"]>,
     AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+        "getTiedResult",
+        "getTiedResultOperandIndex",
+        "getTiedResultOperandIndices",
+    ]>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{reshapes a tensor}];

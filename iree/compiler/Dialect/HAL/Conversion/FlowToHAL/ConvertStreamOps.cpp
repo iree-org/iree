@@ -68,7 +68,11 @@ static void propagateTiedBuffer(BufferSet &bufferSet, Value streamValue,
     auto tiedValue = definingOp.getTiedResultOperand(baseValue);
     if (!tiedValue) break;
     baseValue = tiedValue;
-    bufferSet.rangeMap[baseValue] = bufferRange;
+    if (bufferSet.rangeMap[baseValue].buffer != bufferRange.buffer) {
+      LLVM_DEBUG(llvm::dbgs() << "    -- PROPAGATING TIED STREAM VALUE "
+                              << streamValue << " TO " << baseValue << "\n");
+      bufferSet.rangeMap[baseValue] = bufferRange;
+    }
   }
 }
 
@@ -137,6 +141,9 @@ static void allocateOutputBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
       auto operand = entryBlock.getArgument(tiedOperandIndex.getValue());
       bufferRange = bufferSet.rangeMap[operand];
     } else {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    -- ALLOCATE BUFFER FOR STREAM ESCAPE RESULT("
+                 << result.index() << ")\n");
       auto buffer = allocateOutputBuffer(streamValue, externalValue,
                                          bufferSet.allocator, rewriter);
       bufferRange = BufferRange{buffer};
@@ -189,7 +196,7 @@ static Value allocateTransientBuffer(Value streamValue, Value allocator,
 static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
                                      BufferSet &bufferSet,
                                      ConversionPatternRewriter &rewriter) {
-  LLVM_DEBUG(llvm::dbgs() << ": HAL allocateTransientBuffers: "
+  LLVM_DEBUG(llvm::dbgs() << "HAL allocateTransientBuffers: "
                           << *streamOp.getOperation() << "\n");
 
   // Allocate any needed transient buffers.
@@ -689,7 +696,8 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
       // HACK: all this code is going away soon.
       auto newOp = rewriter.clone(op);
       op.replaceAllUsesWith(newOp);
-    } else if (isa<IREE::HAL::ConstantSubspanOp>(op)) {
+    } else if (isa<IREE::HAL::ConstantSubspanOp>(op) ||
+               isa<IREE::Flow::TensorReshapeOp>(op)) {
       // No work to perform.
     } else {
       return op.emitOpError() << "unexpected in stream";

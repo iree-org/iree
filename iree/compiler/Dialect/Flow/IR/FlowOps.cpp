@@ -1312,7 +1312,7 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.*
+// flow.tensor.reshape
 //===----------------------------------------------------------------------===//
 
 Value TensorReshapeOp::buildOperandRankedShape(unsigned idx,
@@ -1326,6 +1326,23 @@ Value TensorReshapeOp::buildResultRankedShape(unsigned idx,
   return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
                                          builder);
 }
+
+Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
+  return IREE::TiedOpInterface::findTiedBaseValue(source());
+}
+
+::llvm::Optional<unsigned> TensorReshapeOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // source
+}
+
+SmallVector<int64_t, 4> TensorReshapeOp::getTiedResultOperandIndices() {
+  return {0};  // source
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.*
+//===----------------------------------------------------------------------===//
 
 Value TensorLoadOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
   return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
@@ -1423,7 +1440,7 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
 
 ::llvm::Optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
-  return 0;  // target
+  return {0};  // target
 }
 
 SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
