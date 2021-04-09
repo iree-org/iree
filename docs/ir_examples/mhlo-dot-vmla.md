@@ -755,6 +755,34 @@ module  {
 ```
 {% endraw %}
 
+### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeInterfaces2Pass
+
+{% raw %}
+```
+module  {
+  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+    module  {
+      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+        return %0 : tensor<32x64xf32>
+      }
+    }
+  }
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %c2048 = constant 2048 : index
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      flow.return %1 : tensor<32x64xf32>
+    }
+    return %0 : tensor<32x64xf32>
+  }
+}
+
+```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeInterfacesPass
 
 {% raw %}

@@ -1030,6 +1030,45 @@ module  {
 ```
 {% endraw %}
 
+### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeInterfaces2Pass
+
+{% raw %}
+```
+module  {
+  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>}
+    module  {
+      func @dot_ex_dispatch_0(%arg0: index, %arg1: index, %arg2: tensor<?x?xf32>, %arg3: index, %arg4: index, %arg5: tensor<?x?xf32>, %arg6: index, %arg7: index) -> tensor<?x?xf32> {
+        %0 = shapex.make_ranked_shape %arg3, %arg4 : (index, index) -> !shapex.ranked_shape<[?,?]>
+        %1 = shapex.make_ranked_shape %arg6, %arg7 : (index, index) -> !shapex.ranked_shape<[?,?]>
+        %2 = shapex.tie_shape %arg5, %1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+        %3 = shapex.tie_shape %arg2, %0 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+        %4 = "mhlo.dot"(%2, %3) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+        return %4 : tensor<?x?xf32>
+      }
+    }
+  }
+  func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: tensor<?x?xf32>, %arg3: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+    %0 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
+    %1 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
+    %2 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
+    %3 = shapex.ranked_dim %arg3[0] : !shapex.ranked_shape<[?,?]> -> index
+    %4 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
+    %5 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
+    %6 = muli %4, %5 : index
+    %7 = shapex.make_ranked_shape %4, %5 : (index, index) -> !shapex.ranked_shape<[?,?]>
+    %8 = flow.ex.stream.fragment(%6, %4, %5, %arg2, %3, %2, %arg0, %1, %0) : (index, index, index, tensor<?x?xf32>{%3, %2}, index, index, tensor<?x?xf32>{%1, %0}, index, index) -> tensor<?x?xf32>{%4, %5} =
+        (%arg4: index, %arg5: index, %arg6: index, %arg7: tensor<?x?xf32>, %arg8: index, %arg9: index, %arg10: tensor<?x?xf32>, %arg11: index, %arg12: index) -> tensor<?x?xf32> {
+      %9 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg4](%arg5, %arg6, %arg7, %arg8, %arg9, %arg10, %arg11, %arg12) : (index, index, tensor<?x?xf32>{%arg8, %arg9}, index, index, tensor<?x?xf32>{%arg11, %arg12}, index, index) -> tensor<?x?xf32>{%arg5, %arg6}
+      flow.return %9 : tensor<?x?xf32>
+    }
+    return %8, %7 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  }
+}
+
+```
+{% endraw %}
+
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeInterfacesPass
 
 {% raw %}
