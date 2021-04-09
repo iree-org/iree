@@ -47,15 +47,16 @@ static LaunchConfig getOpLaunchConfig(linalg::GenericOp op) {
 
 static LaunchConfig getOpLaunchConfig(linalg::MatmulOp op) {
   LaunchConfig config;
-  std::array<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
+  const int64_t numWarp = 2;
+  std::array<int64_t, 3> workgroupSize = {numWarp * cudaWarpSize, 1, 1};
   config.setWorkgroupSize(workgroupSize);
   // Currently just a basic tile size to enable tiling and vectorization.
   // TODO: pick a more efficient tile size and tile at subgroup level.
-  SmallVector<int64_t, 4> ts = {2, 128, 4};
+  SmallVector<int64_t, 4> ts = {2, 256, 4};
   config.setTileSizes(op, ts, 0);  // Workgroup level.
   config.setTileSizes(op, {}, 1);  // Subgroup level.
   SmallVector<int64_t, 4> invocationLevelTs = {ts[0] / workgroupSize[1],
-                                               ts[1] / workgroupSize[0], ts[2]};
+                                               ts[1] / workgroupSize[0]};
   config.setTileSizes(op, invocationLevelTs, 2);  // Thread level.
   return config;
 }
