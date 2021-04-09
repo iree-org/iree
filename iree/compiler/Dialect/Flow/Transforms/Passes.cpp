@@ -107,7 +107,8 @@ void registerInputTransformPassPipeline() {
       });
 }
 
-void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    bool dispatchLinalgOnTensors) {
   //----------------------------------------------------------------------------
   // Entry dialect cleanup
   //----------------------------------------------------------------------------
@@ -204,7 +205,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       IREE::Flow::createPrePartitioningConversionPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
-  if (clEnableLinalgOnTensorsDispatch) {
+  if (dispatchLinalgOnTensors) {
     // TODO(benvanik): move up to input; requires pre-partitioning conversion
     // to be reworked first.
     passManager.addNestedPass<FuncOp>(
@@ -308,7 +309,7 @@ void registerFlowTransformPassPipeline() {
       "iree-flow-transformation-pipeline",
       "Runs the full IREE flow dialect transformation pipeline",
       [](OpPassManager &passManager) {
-        buildFlowTransformPassPipeline(passManager);
+        buildFlowTransformPassPipeline(passManager, false);
       });
 }
 

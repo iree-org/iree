@@ -56,7 +56,7 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
   static llvm::cl::opt<bool> clEnableLinalgOnTensorsSPIRV(
       "iree-codegen-spirv-experimental-linalg-on-tensors",
       llvm::cl::desc("Enable the linalg on tensors on SPIR-V path"),
-      llvm::cl::init(false));
+      llvm::cl::init(true));
 
   SPIRVCodegenOptions options;
   options.workgroupSize.assign(clWorkgroupSizes.begin(),
