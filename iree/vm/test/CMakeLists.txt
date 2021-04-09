@@ -31,6 +31,7 @@ iree_cc_embed_data(
     "list_ops.vmfb"
     "shift_ops.vmfb"
     "shift_ops_i64.vmfb"
+    "structural_ops.vmfb"
   CC_FILE_OUTPUT
     "all_bytecode_modules.cc"
   H_FILE_OUTPUT
@@ -174,6 +175,18 @@ iree_bytecode_module(
     shift_ops_i64
   SRC
     "shift_ops_i64.mlir"
+  CC_NAMESPACE
+    "iree::vm::test"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    structural_ops
+  SRC
+    "structural_ops.mlir"
   CC_NAMESPACE
     "iree::vm::test"
   FLAGS

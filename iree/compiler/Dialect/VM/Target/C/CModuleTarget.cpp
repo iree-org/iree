@@ -34,7 +34,9 @@ static std::string buildFunctionName(IREE::VM::ModuleOp &moduleOp,
   std::string functionName =
       std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
 
-  return implSuffix ? functionName + "_impl" : functionName;
+  if (implSuffix) functionName += "_impl";
+
+  return functionName;
 }
 
 static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
@@ -669,7 +671,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     return failure();
   }
 
-  // translate functions
+    // translate functions
   for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
     if (failed(translateFunctionToC(moduleOp, funcOp, emitter))) {
       return failure();

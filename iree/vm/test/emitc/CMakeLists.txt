@@ -42,6 +42,7 @@ iree_cc_test(
     ::global_ops
     ::shift_ops
     ::shift_ops_i64
+    ::structural_ops
 )
 
 iree_c_module(
@@ -150,6 +151,15 @@ iree_c_module(
     "../shift_ops_i64.mlir"
   H_FILE_OUTPUT
     "shift_ops_i64.h"
+)
+
+iree_c_module(
+  NAME
+    structural_ops
+  SRC
+    "../structural_ops.mlir"
+  H_FILE_OUTPUT
+    "structural_ops.h"
 )
 
 endif()

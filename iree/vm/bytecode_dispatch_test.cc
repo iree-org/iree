@@ -39,7 +39,9 @@ struct TestParams {
 std::ostream& operator<<(std::ostream& os, const TestParams& params) {
   return os << absl::StrReplaceAll(params.module_file.name,
                                    {{":", "_"}, {".", "_"}})
-            << "_" << params.function_name;
+            << "_"
+            << absl::StrReplaceAll(params.function_name,
+                                   {{":", "_"}, {".", "_"}, {"$", "_"}});
 }
 
 std::vector<TestParams> GetModuleTestParams() {

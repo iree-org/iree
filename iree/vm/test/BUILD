@@ -47,6 +47,7 @@ cc_embed_data(
         ":list_ops.vmfb",
         ":shift_ops.vmfb",
         ":shift_ops_i64.vmfb",
+        ":structural_ops.vmfb",
     ],
     cc_file_output = "all_bytecode_modules.cc",
     cpp_namespace = "iree::vm::test",
@@ -133,6 +134,13 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "shift_ops_i64",
     src = "shift_ops_i64.mlir",
+    cc_namespace = "iree::vm::test",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
+    name = "structural_ops",
+    src = "structural_ops.mlir",
     cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )

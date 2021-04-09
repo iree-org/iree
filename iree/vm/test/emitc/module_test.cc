@@ -30,6 +30,7 @@
 #include "iree/vm/test/emitc/global_ops.h"
 #include "iree/vm/test/emitc/shift_ops.h"
 #include "iree/vm/test/emitc/shift_ops_i64.h"
+#include "iree/vm/test/emitc/structural_ops.h"
 
 namespace {
 
@@ -48,7 +49,8 @@ struct ModuleDescription {
 };
 
 std::ostream& operator<<(std::ostream& os, const TestParams& params) {
-  return os << absl::StrReplaceAll(params.local_name, {{":", "_"}, {".", "_"}});
+  return os << absl::StrReplaceAll(params.local_name,
+                                   {{":", "_"}, {".", "_"}, {"$", "_"}});
 }
 
 std::vector<TestParams> GetModuleTestParams() {
@@ -67,7 +69,8 @@ std::vector<TestParams> GetModuleTestParams() {
       {conversion_ops_i64_descriptor_, conversion_ops_i64_create},
       {global_ops_descriptor_, global_ops_create},
       {shift_ops_descriptor_, shift_ops_create},
-      {shift_ops_i64_descriptor_, shift_ops_i64_create}};
+      {shift_ops_i64_descriptor_, shift_ops_i64_create},
+      {structural_ops_descriptor_, structural_ops_create}};
 
   for (size_t i = 0; i < modules.size(); i++) {
     iree_vm_native_module_descriptor_t descriptor = modules[i].descriptor;
