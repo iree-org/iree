@@ -48,10 +48,10 @@ static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
     llvm::cl::CommaSeparated);
 
-static llvm::cl::opt<bool> clDisableOperandFusion(
-    "iree-flow-dispatch-formation-disable-operand-fusion",
+static llvm::cl::opt<bool> clEnableOperandFusion(
+    "iree-flow-dispatch-formation-enable-operand-fusion",
     llvm::cl::desc(
-        "Disable fusing operand producers during dispatch region formation"),
+        "Enable fusing operand producers during dispatch region formation"),
     llvm::cl::init(false));
 
 static const char kRootOpAttr[] = "__root_op__";
@@ -931,7 +931,7 @@ static bool isProducerFusable(linalg::LinalgOp producer,
                               linalg::LinalgOp consumer,
                               OpOperand &consumerOperand) {
   if (consumer.isInputTensor(&consumerOperand)) {
-    if (clDisableOperandFusion) return false;
+    if (!clEnableOperandFusion) return false;
 
     // Make sure that we have an identity indexing map for the operand for now.
     //
