@@ -60,6 +60,82 @@ func @multipleDispatches(%input: tensor<128xf32>) -> tensor<128xf32> {
 
 // -----
 
+// CHECK-LABEL: @tensorReshapePassThrough
+//  CHECK-SAME: (%[[SRC_BUF:.+]]:{{.+}})
+func @tensorReshapePassThrough(%arg0 : tensor<5x24x48xf32>) -> tensor<30x2x96xf32> {
+  // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create
+  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
+  %0 = flow.ex.stream.fragment(%arg0)
+      : (tensor<5x24x48xf32>) -> (tensor<30x2x96xf32>) =
+      (%source: tensor<5x24x48xf32>) -> (tensor<30x2x96xf32>) {
+    // Yeah, it's pretty silly we create a command buffer here. TBD :)
+    %t = flow.tensor.reshape %source : tensor<5x24x48xf32> -> tensor<30x2x96xf32>
+    flow.return %t : tensor<30x2x96xf32>
+  }
+  // CHECK: return %[[RET_BUF]]
+  return %0 : tensor<30x2x96xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorReshapeWithSingleUse
+//  CHECK-SAME: (%[[SRC_BUF:.+]]:{{.+}})
+func @tensorReshapeWithSingleUse(%arg0 : tensor<5x24x48xf32>) -> tensor<30x2x96xf32> {
+  // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create
+  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
+  %0 = flow.ex.stream.fragment(%arg0)
+      : (tensor<5x24x48xf32>) -> (tensor<30x2x96xf32>) =
+      (%source: tensor<5x24x48xf32>) -> (tensor<30x2x96xf32>) {
+    // CHECK-NEXT: hal.command_buffer.copy_buffer
+    // CHECK-SAME:     source(%[[SRC_BUF]] : !hal.buffer)[%c0]
+    // CHECK-SAME:     target(%[[RET_BUF]] : !hal.buffer)[%c0]
+    // CHECK-SAME:     length(%c23040)
+    // CHECK-NEXT: hal.command_buffer.execution_barrier
+    %0 = flow.tensor.reshape %source : tensor<5x24x48xf32> -> tensor<30x2x96xf32>
+    %1 = flow.tensor.clone %0 : tensor<30x2x96xf32>
+    flow.return %1 : tensor<30x2x96xf32>
+  }
+  // CHECK: return %[[RET_BUF]]
+  return %0 : tensor<30x2x96xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorReshapeWithMultipleUses
+//  CHECK-SAME: (%[[SRC_BUF:.+]]:{{.+}})
+func @tensorReshapeWithMultipleUses(%arg0 : tensor<5x24x48xf32>)
+    -> (tensor<60x2x48xf32>, tensor<30x2x96xf32>) {
+  // CHECK: %[[RET_BUF1:.+]] = hal.allocator.allocate
+  // CHECK: %[[RET_BUF2:.+]] = hal.allocator.allocate
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create
+  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
+  %0, %1 = flow.ex.stream.fragment(%arg0)
+      : (tensor<5x24x48xf32>) -> (tensor<60x2x48xf32>, tensor<30x2x96xf32>) =
+      (%arg1 : tensor<5x24x48xf32>) -> (tensor<60x2x48xf32>, tensor<30x2x96xf32>) {
+    // CHECK-NEXT: hal.command_buffer.copy_buffer
+    // CHECK-SAME:     source(%[[SRC_BUF]] : !hal.buffer)[%c0]
+    // CHECK-SAME:     target(%[[RET_BUF2]] : !hal.buffer)[%c0]
+    // CHECK-SAME:     length(%c23040)
+    // CHECK-NEXT: hal.command_buffer.execution_barrier
+    %1 = flow.tensor.clone %arg1 : tensor<5x24x48xf32>
+    %2 = flow.tensor.reshape %arg1 : tensor<5x24x48xf32> -> tensor<60x2x48xf32>
+    // CHECK-NEXT: hal.command_buffer.copy_buffer
+    // CHECK-SAME:     source(%[[SRC_BUF]] : !hal.buffer)[%c0]
+    // CHECK-SAME:     target(%[[RET_BUF1]] : !hal.buffer)[%c0]
+    // CHECK-SAME:     length(%c23040)
+    // CHECK-NEXT: hal.command_buffer.execution_barrier
+    %3 = flow.tensor.clone %2 : tensor<60x2x48xf32>
+    %4 = flow.tensor.reshape %1 : tensor<5x24x48xf32> -> tensor<30x2x96xf32>
+    flow.return %3, %4 : tensor<60x2x48xf32>, tensor<30x2x96xf32>
+  }
+  // CHECK: return %[[RET_BUF1]], %[[RET_BUF2]]
+  return %0, %1 : tensor<60x2x48xf32>, tensor<30x2x96xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorSlice
 // CHECK-SAME: (%[[SBUF:.+]]:{{.+}})
 func @tensorSlice(%arg0 : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {

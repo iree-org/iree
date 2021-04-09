@@ -104,7 +104,7 @@ def IREE_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         auto resultIndex = result.cast<mlir::OpResult>().getResultNumber();
-        auto operandIndex = IREE::detail::getTiedResultOperandIndex($_op, resultIndex);
+        auto operandIndex = $_op.getTiedResultOperandIndex(resultIndex);
         return operandIndex.hasValue() ?
             $_op.getOperand(operandIndex.getValue()) :
             nullptr;
