@@ -583,6 +583,93 @@ void CommandBufferDeviceOp::getCanonicalizationPatterns(
 
 namespace {
 
+/// Folds hal.buffer.subspans into buffer fill offsets.
+struct FoldCommandBufferFillBufferSubspans
+    : public OpRewritePattern<CommandBufferFillBufferOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CommandBufferFillBufferOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newTargetBuffer = op.target_buffer();
+    auto newTargetOffset = op.target_offset();
+    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+            op.target_buffer().getDefiningOp())) {
+      newTargetBuffer = subspanOp.source_buffer();
+      newTargetOffset = rewriter.createOrFold<mlir::AddIOp>(
+          subspanOp.getLoc(), subspanOp.source_offset(), op.target_offset());
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      op.target_bufferMutable().assign(newTargetBuffer);
+      op.target_offsetMutable().assign(newTargetOffset);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void CommandBufferFillBufferOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldCommandBufferFillBufferSubspans>(context);
+}
+
+namespace {
+
+/// Folds hal.buffer.subspans into buffer copy offsets.
+struct FoldCommandBufferCopyBufferSubspans
+    : public OpRewritePattern<CommandBufferCopyBufferOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CommandBufferCopyBufferOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newSourceBuffer = op.source_buffer();
+    auto newSourceOffset = op.source_offset();
+    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+            op.source_buffer().getDefiningOp())) {
+      newSourceBuffer = subspanOp.source_buffer();
+      newSourceOffset = rewriter.createOrFold<mlir::AddIOp>(
+          subspanOp.getLoc(), subspanOp.source_offset(), op.source_offset());
+      needsUpdate = true;
+    }
+    auto newTargetBuffer = op.target_buffer();
+    auto newTargetOffset = op.target_offset();
+    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+            op.target_buffer().getDefiningOp())) {
+      newTargetBuffer = subspanOp.source_buffer();
+      newTargetOffset = rewriter.createOrFold<mlir::AddIOp>(
+          subspanOp.getLoc(), subspanOp.source_offset(), op.target_offset());
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      op.source_bufferMutable().assign(newSourceBuffer);
+      op.source_offsetMutable().assign(newSourceOffset);
+      op.target_bufferMutable().assign(newTargetBuffer);
+      op.target_offsetMutable().assign(newTargetOffset);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void CommandBufferCopyBufferOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldCommandBufferCopyBufferSubspans>(context);
+}
+
+namespace {
+
 /// Folds hal.buffer.subspans into push descriptor bindings.
 /// The binding range is always equal to or a subset of the subspan.
 struct FoldCommandBufferPushDescriptorSetBufferSubspan

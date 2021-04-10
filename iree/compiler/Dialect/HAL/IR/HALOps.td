@@ -1021,6 +1021,8 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     `pattern` `(` $pattern `:` type($pattern) `)`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 // TODO(benvanik): update buffer op.
@@ -1049,6 +1051,8 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
     `length` `(` $length `)`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_CommandBufferPushConstantsOp :
