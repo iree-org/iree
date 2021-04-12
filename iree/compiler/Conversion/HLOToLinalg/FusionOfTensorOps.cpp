@@ -85,10 +85,25 @@ struct FusionOfTensorOpsPass
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        frozenInterfacePatterns);
 
-    linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
-                                                 linalg::LinalgElementwiseFusionOptions()
-                                                 .setAllowFoldingUnitDimReshapes(true));
-    
+    // Only fuse operations where all uses of the producer are generic or
+    // indexed generic operations. If an operation is used in a named op, it
+    // will be computed anyway, so the consumers can just use that value.
+    linalg::ControlElementwiseOpsFusionFn controlFn =
+        [](const OpResult &producer, const OpOperand & /*consumer*/) {
+          llvm::SmallDenseSet<Operation *, 4> numUsers;
+          for (Operation *user : producer.getUsers()) {
+            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(user))
+              continue;
+            numUsers.insert(user);
+          }
+          return numUsers.empty();
+        };
+
+    linalg::populateElementwiseOpsFusionPatterns(
+        fusionPatterns, linalg::LinalgElementwiseFusionOptions()
+                            .setAllowFoldingUnitDimReshapes(true)
+                            .setControlElementwiseOpsFusionFn(controlFn));
+
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));
 
