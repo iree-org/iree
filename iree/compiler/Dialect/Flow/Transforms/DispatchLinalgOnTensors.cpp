@@ -111,8 +111,8 @@ struct DispatchLinalgOnTensorsPass
   void runOnOperation() override;
 
  private:
-  Statistic numDispatches{this, "number of dipsatches",
-        "Number of Flow dispatches created"};
+  Statistic numDispatches{this, "number of dispatches",
+                          "Number of Flow dispatches created"};
 };
 }  // namespace
 
