@@ -179,6 +179,60 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<PackSliceRanges>($lifetime_intervals,
+//                         $dynamic_slice_sizes,
+//                         type($packed_offsets))
+//===----------------------------------------------------------------------===//
+
+static ParseResult parsePackSliceRanges(
+    OpAsmParser &parser, ArrayAttr &lifetimeIntervals,
+    SmallVectorImpl<OpAsmParser::OperandType> &dynamicSliceSizes,
+    SmallVectorImpl<Type> &packedOffsetTypes) {
+  auto indexType = parser.getBuilder().getIndexType();
+  SmallVector<Attribute> lifetimeRangeValues;
+  do {
+    if (failed(parser.parseOptionalLSquare())) break;
+    IntegerAttr lifetimeStart;
+    IntegerAttr lifetimeEnd;
+    OpAsmParser::OperandType dynamicSliceSize;
+    if (failed(parser.parseAttribute(lifetimeStart, indexType)) ||
+        failed(parser.parseComma()) ||
+        failed(parser.parseAttribute(lifetimeEnd, indexType)) ||
+        failed(parser.parseRSquare()) || failed(parser.parseEqual()) ||
+        failed(parser.parseOperand(dynamicSliceSize))) {
+      return failure();
+    }
+    lifetimeRangeValues.push_back(lifetimeStart);
+    lifetimeRangeValues.push_back(lifetimeEnd);
+    dynamicSliceSizes.push_back(dynamicSliceSize);
+    packedOffsetTypes.push_back(indexType);
+  } while (succeeded(parser.parseOptionalComma()));
+  lifetimeIntervals = parser.getBuilder().getArrayAttr(lifetimeRangeValues);
+  return success();
+}
+
+static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
+                                 ArrayAttr lifetimeIntervals,
+                                 ValueRange dynamicSliceSizes,
+                                 TypeRange packedOffsetTypes) {
+  if (packedOffsetTypes.empty()) return;
+  for (unsigned i = 0; i < packedOffsetTypes.size(); ++i) {
+    auto lifetimeStart = lifetimeIntervals[i * 2];
+    auto lifetimeEnd = lifetimeIntervals[i * 2 + 1];
+    auto sliceSize = dynamicSliceSizes[i];
+    p.printNewline();
+    p << "  [";
+    p.printAttributeWithoutType(lifetimeStart);
+    p << ", ";
+    p.printAttributeWithoutType(lifetimeEnd);
+    p << "] = ";
+    p.printOperand(sliceSize);
+    if (i < packedOffsetTypes.size() - 1) p << ",";
+  }
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.ex.shared_device
 //===----------------------------------------------------------------------===//
 
@@ -554,7 +608,45 @@ Value AllocatorMapOp::getOperandSize(unsigned idx) { return {}; }
 Value AllocatorMapOp::getResultSize(unsigned idx) { return length(); }
 
 //===----------------------------------------------------------------------===//
+// hal.allocator.pack
 //===----------------------------------------------------------------------===//
+
+void AllocatorPackOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): figure out if we can get the names to coalesce when there
+  // are multiple results. Ideally we'd have `%total_length, %offsets:123` but
+  // unfortunately all get splatted out and create 10k+ char lines that are a
+  // pain to read.
+  // setNameFn(total_length(), "total_length");
+  // for (auto packedOffset : llvm::enumerate(packed_offsets())) {
+  // setNameFn(packedOffset.value(),
+  //           "offset" + std::to_string(packedOffset.index()));
+  // }
+}
+
+static LogicalResult verifyAllocatorPackOp(AllocatorPackOp op) {
+  size_t sliceCount = op.packed_offsets().size();
+  if (op.lifetime_intervals().size() != sliceCount * 2) {
+    return op.emitOpError() << "requires a [start, end] range for each slice";
+  }
+  if (op.dynamic_slice_sizes().size() != sliceCount) {
+    return op.emitOpError() << "requires a size for each slice";
+  }
+  return success();
+}
+
+SmallVector<AllocatorPackOp::Slice> AllocatorPackOp::getSlices() {
+  auto intervalPairs = lifetime_intervals().getValue();
+  auto sizes = dynamic_slice_sizes();
+  auto offsets = packed_offsets();
+  SmallVector<AllocatorPackOp::Slice> slices(offsets.size());
+  for (size_t i = 0; i < offsets.size(); ++i) {
+    int64_t start = intervalPairs[i * 2 + 0].cast<IntegerAttr>().getInt();
+    int64_t end = intervalPairs[i * 2 + 1].cast<IntegerAttr>().getInt();
+    slices[i] = {start, end, sizes[i], offsets[i]};
+  }
+  return slices;
+}
 
 //===----------------------------------------------------------------------===//
 // hal.buffer.allocator

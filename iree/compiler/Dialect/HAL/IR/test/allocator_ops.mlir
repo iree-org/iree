@@ -109,18 +109,52 @@ func @allocator_constant_buffer(%allocator: !hal.allocator) {
 // -----
 
 // CHECK-LABEL: @allocator_map_byte_buffer
-func @allocator_map_byte_buffer(%arg0: !hal.allocator, %arg1: !iree.byte_buffer) {
+//  CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
+func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !iree.byte_buffer) {
   // CHECK-DAG: %[[OFFSET:.+]] = constant 100
   %offset = constant 100 : index
   // CHECK-DAG: %[[LENGTH:.+]] = constant 200
   %length = constant 200 : index
-  //      CHECK: = hal.allocator.map<%arg0 : !hal.allocator>
+  //      CHECK: = hal.allocator.map<%[[ALLOCATOR]] : !hal.allocator>
   // CHECK-SAME:   source(%arg1 : !iree.byte_buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-SAME:   type("DeviceVisible|DeviceLocal")
   // CHECK-SAME:   usage(Transfer)
   // CHECK-SAME:   : !hal.buffer
-  %ref = hal.allocator.map<%arg0 : !hal.allocator>
+  %ref = hal.allocator.map<%allocator : !hal.allocator>
                     source(%arg1 : !iree.byte_buffer)[%offset, %length]
                     type(DeviceLocal) usage(Transfer) : !hal.buffer
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @allocator_pack
+//  CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
+func @allocator_pack(%allocator: !hal.allocator) {
+  // CHECK-DAG: %[[BASE_OFFSET:.+]] = constant 999
+  %base_offset = constant 999 : index
+  // CHECK-DAG: %[[SIZE_0:.+]] = constant 100
+  %size_0 = constant 100 : index
+  // CHECK-DAG: %[[SIZE_1:.+]] = constant 101
+  %size_1 = constant 101 : index
+  // CHECK-DAG: %[[SIZE_2:.+]] = constant 102
+  %size_2 = constant 102 : index
+  // CHECK-NEXT: %{{.+}}:4 =
+  %total_length, %offset_0, %offset_1, %offset_2 =
+      // CHECK-SAME: hal.allocator.pack<%[[ALLOCATOR]] : !hal.allocator>
+      hal.allocator.pack<%allocator : !hal.allocator>
+          // CHECK-SAME: offset(%[[BASE_OFFSET]])
+          offset(%base_offset)
+          // CHECK-SAME: slices({
+          slices({
+            // CHECK-NEXT: [0, 4] = %[[SIZE_0]],
+            [0, 4] = %size_0,
+            // CHECK-NEXT: [1, 2] = %[[SIZE_1]],
+            [1, 2] = %size_1,
+            // CHECK-NEXT: [3, 4] = %[[SIZE_2]]
+            // NOTE: tolerant to trailing comma
+            [3, 4] = %size_2,
+          // CHECK-NEXT: }) : index
+          }) : index
   return
 }
