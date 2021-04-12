@@ -554,7 +554,11 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     // Builder for tensor.load with empty offset, sizes and strides operands.
     // This is used to load an entire tensor.
     OpBuilder<(ins "RankedTensorType":$resultType, "Value":$source,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    // Builder for tensor.load with mixed static/dynamic opperands.
+    OpBuilder<(ins "Value":$source, "ArrayRef<OpFoldResult>":$offsets,
+      "ArrayRef<OpFoldResult>":$sizes, "ArrayRef<OpFoldResult>":$strides,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 
   let extraClassDeclaration = [{

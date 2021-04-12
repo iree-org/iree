@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "dispatch_ops.mlir"
     "dispatch_region_folding.mlir"
     "dispatch_regions.mlir"
+    "dispatch_tensor_folding.mlir"
     "dispatch_workgroups.mlir"
     "dispatch_workgroups_folding.mlir"
     "executable_ops.mlir"
