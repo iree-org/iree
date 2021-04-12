@@ -109,6 +109,10 @@ struct DispatchLinalgOnTensorsPass
   DispatchLinalgOnTensorsPass() = default;
   DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
   void runOnOperation() override;
+
+ private:
+  Statistic numDispatches{this, "number of dipsatches",
+        "Number of Flow dispatches created"};
 };
 }  // namespace
 
@@ -292,8 +296,8 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
     }
     rewriter.create<IREE::Flow::ReturnOp>(loc);
   }
-  LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell " << *dispatchOp
-                          << "\n");
+  DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs() << "Created dispatchOp shell "
+                                           << *dispatchOp << "\n");
   return {dispatchOp, clonedOp};
 }
 
@@ -324,15 +328,16 @@ static void pullInProducersInSameGroup(
     PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
     linalg::LinalgOp tiledOp, ValueRange tiledOpOperands,
     ArrayRef<Operation *> tiledLoops, int64_t groupNum) {
-  LLVM_DEBUG(llvm::dbgs() << "pull in producers for tiled op: " << tiledOp
-                          << "\n");
+  DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs() << "pull in producers for tiled op: "
+                                           << tiledOp << "\n");
   // Scoped within DispatchWorkgroupOp.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
   for (auto en : llvm::enumerate(tiledOpOperands)) {
     if (auto producer = en.value().getDefiningOp<linalg::LinalgOp>()) {
       if (!isInFusionGroup(producer, groupNum)) continue;
-      LLVM_DEBUG(llvm::dbgs() << "current producer: " << producer << "\n");
+      DEBUG_WITH_TYPE(DEBUG_TYPE,
+                      llvm::dbgs() << "current producer: " << producer << "\n");
 
       Operation *clonedOpToFuse = rewriter.clone(*producer);
       linalg::LinalgOp fusedProducer;
@@ -342,7 +347,8 @@ static void pullInProducersInSameGroup(
                                 &dispatchOp.getRegion().front());
 
       if (tiledLoops.empty()) {
-        LLVM_DEBUG(llvm::dbgs() << "no loops; just copy over the op\n");
+        DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs()
+                                        << "no loops; just copy over the op\n");
         // The root op wasn't tiled. We are done then; just to remove the
         // attribute.
         clonedOpToFuse->removeAttr(kFusionGroupsAttr);
@@ -355,10 +361,12 @@ static void pullInProducersInSameGroup(
             rewriter, clonedOpToFuse->getResult(opResult.getResultNumber()),
             tiledOp.getShapedOpOperand(en.index()));
         if (!maybeFusionInfo.hasValue()) {
-          LLVM_DEBUG(llvm::dbgs() << "failed to fuse with tensor\n");
+          DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs()
+                                          << "failed to fuse with tensor\n");
           rewriter.replaceOp(clonedOpToFuse, producer->getResults());
         } else {
-          LLVM_DEBUG(llvm::dbgs() << "succeeded to fuse with tensor\n");
+          DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs()
+                                          << "succeeded to fuse with tensor\n");
           maybeFusionInfo->fusedProducer.getOperation()->removeAttr(
               kFusionGroupsAttr);
           fusedProducer = maybeFusionInfo->fusedProducer;
@@ -1025,7 +1033,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   decideFusableLinalgOps(funcOp);
 
-  LLVM_DEBUG({
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
@@ -1125,6 +1133,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   // proper captures.
   if (funcOp
           .walk([&](IREE::Flow::DispatchWorkgroupsOp op) -> WalkResult {
+            numDispatches++;
             return legalizeDispatchWorkgroupOperands(op);
           })
           .wasInterrupted()) {
