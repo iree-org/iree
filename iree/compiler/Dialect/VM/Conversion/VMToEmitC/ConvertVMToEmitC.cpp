@@ -210,6 +210,67 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
   StringRef funcName;
 };
 
+// Convert vm list operations to two emitc calls. The wrapping ref pointer is
+// first dereferenced and the result is used as the argument of the specified
+// function name.
+template <typename SrcOpTy>
+class ListOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+ public:
+  ListOpConversion(MLIRContext *context, StringRef funcName,
+                   size_t listArgumentIndex)
+      : OpConversionPattern<SrcOpTy>(context),
+        funcName(funcName),
+        listArgumentIndex(listArgumentIndex) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto ctx = op.getContext();
+    auto loc = op.getLoc();
+
+    if (listArgumentIndex >= operands.size()) {
+      return op.emitError() << " index for list argument out of range";
+    }
+
+    auto listDerefOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{operands[listArgumentIndex]});
+
+    // Replace the one list argument (which is wrapped in a ref) with the
+    // unwrapped list.
+    SmallVector<Value, 4> updatedOperands;
+    for (auto &operand : llvm::enumerate(operands)) {
+      if (operand.index() == listArgumentIndex) {
+        updatedOperands.push_back(listDerefOp.getResult(0));
+      } else {
+        updatedOperands.push_back(operand.value());
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(
+        /*op=*/op,
+        /*type=*/op.getOperation()->getResultTypes(),
+        /*callee=*/rewriter.getStringAttr(funcName),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>(updatedOperands));
+
+    return success();
+  }
+
+  StringRef funcName;
+
+  // The index of the list argument. This gets replaced in the conversion.
+  size_t listArgumentIndex;
+};
+
 class ListAllocOpConversion
     : public OpConversionPattern<IREE::VM::ListAllocOp> {
   using OpConversionPattern<IREE::VM::ListAllocOp>::OpConversionPattern;
@@ -222,9 +283,11 @@ class ListAllocOpConversion
     // The generated c code looks roughly like this.
     // iree_vm_type_def_t element_type = iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
     // iree_vm_type_def_t* element_type_ptr = &element_type;
+    // iree_vm_ref_t list_ref;
     // iree_vm_list_t* list = NULL;
     // iree_vm_list_t** list_ptr = &list;
     // iree_vm_list_create(&element_type, {initial_capacity}, state->allocator, &list);
+    // iree_vm_ref_wrap_assign(list, iree_vm_list_type_id(), &list_ref));
     // clang-format on
 
     auto ctx = allocOp.getContext();
@@ -259,8 +322,8 @@ class ListAllocOpConversion
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t*"),
         /*operand=*/elementTypeOp.getResult(0));
 
-    auto listOp = rewriter.replaceOpWithNewOp<emitc::ConstOp>(
-        /*op=*/allocOp,
+    auto listOp = rewriter.create<emitc::ConstOp>(
+        /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
         /*value=*/StringAttr::get(ctx, "NULL"));
 
@@ -281,6 +344,34 @@ class ListAllocOpConversion
         /*operands=*/
         ArrayRef<Value>{elementTypePtrOp.getResult(), operands[0],
                         listPtrOp.getResult()});
+
+    auto refOp = rewriter.replaceOpWithNewOp<emitc::ConstOp>(
+        /*op=*/allocOp,
+        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+        /*value=*/StringAttr::get(ctx, ""));
+
+    auto refPtrOp = rewriter.create<emitc::GetAddressOfOp>(
+        /*location=*/loc,
+        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        /*operand=*/refOp.getResult());
+
+    auto refTypeOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_type_id"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{});
+
+    rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/TypeRange{},
+        /*callee=*/rewriter.getStringAttr("iree_vm_ref_wrap_assign"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/
+        ArrayRef<Value>{listOp.getResult(), refTypeOp.getResult(0),
+                        refPtrOp.getResult()});
 
     return success();
   }
@@ -328,6 +419,14 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t*"),
         /*operand=*/valueOp.getResult());
 
+    auto listDerefOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{getOp.list()});
+
     auto getValueOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/TypeRange{},
@@ -338,7 +437,8 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
                              rewriter.getIndexAttr(2)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{getOp.list(), getOp.index(), valuePtrOp.getResult()});
+        ArrayRef<Value>{listDerefOp.getResult(0), getOp.index(),
+                        valuePtrOp.getResult()});
 
     rewriter.replaceOpWithNewOp<emitc::CallOp>(
         /*op=*/getOp,
@@ -388,6 +488,14 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t*"),
         /*operand=*/valueOp.getResult(0));
 
+    auto listDerefOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{setOp.list()});
+
     rewriter.replaceOpWithNewOp<emitc::CallOp>(
         /*op=*/setOp,
         /*type=*/TypeRange{},
@@ -396,7 +504,8 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{setOp.list(), setOp.index(), valuePtrOp.getResult()});
+        ArrayRef<Value>{listDerefOp.getResult(0), setOp.index(),
+                        valuePtrOp.getResult()});
 
     return success();
   }
@@ -422,12 +531,12 @@ void populateVMToCPatterns(MLIRContext *context,
   // TODO(simon-camp): We leak memory in the generated code, as we never release
   // the lists.
   patterns.insert<ListAllocOpConversion>(context);
-  patterns.insert<CallOpConversion<IREE::VM::ListReserveOp>>(
-      context, "iree_vm_list_reserve");
-  patterns.insert<CallOpConversion<IREE::VM::ListResizeOp>>(
-      context, "iree_vm_list_resize");
-  patterns.insert<CallOpConversion<IREE::VM::ListSizeOp>>(context,
-                                                          "iree_vm_list_size");
+  patterns.insert<ListOpConversion<IREE::VM::ListReserveOp>>(
+      context, "iree_vm_list_reserve", /*listArgumentIndex=*/0);
+  patterns.insert<ListOpConversion<IREE::VM::ListResizeOp>>(
+      context, "iree_vm_list_resize", /*listArgumentIndex=*/0);
+  patterns.insert<ListOpConversion<IREE::VM::ListSizeOp>>(
+      context, "iree_vm_list_size", /*listArgumentIndex=*/0);
   patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(context);
   patterns.insert<ListSetOpConversion<IREE::VM::ListSetI32Op>>(context);
 
