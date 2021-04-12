@@ -63,7 +63,6 @@ func @multipleDispatches(%input: tensor<128xf32>) -> tensor<128xf32> {
 // CHECK-LABEL: @tensorReshapePassThrough
 //  CHECK-SAME: (%[[SRC_BUF:.+]]:{{.+}})
 func @tensorReshapePassThrough(%arg0 : tensor<5x24x48xf32>) -> tensor<30x2x96xf32> {
-  // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %0 = flow.ex.stream.fragment(%arg0)
@@ -73,7 +72,7 @@ func @tensorReshapePassThrough(%arg0 : tensor<5x24x48xf32>) -> tensor<30x2x96xf3
     %t = flow.tensor.reshape %source : tensor<5x24x48xf32> -> tensor<30x2x96xf32>
     flow.return %t : tensor<30x2x96xf32>
   }
-  // CHECK: return %[[RET_BUF]]
+  // CHECK: return %[[SRC_BUF]]
   return %0 : tensor<30x2x96xf32>
 }
 
@@ -132,6 +131,51 @@ func @tensorReshapeWithMultipleUses(%arg0 : tensor<5x24x48xf32>)
   }
   // CHECK: return %[[RET_BUF1]], %[[RET_BUF2]]
   return %0, %1 : tensor<60x2x48xf32>, tensor<30x2x96xf32>
+}
+
+// -----
+
+hal.executable @ex0 {
+  hal.interface @interface {
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Discard|Write"
+  }
+  hal.executable.target @vmla, filter="vmla" {
+    hal.executable.entry_point @entry0 attributes {
+      interface = @interface,
+      ordinal = 0 : index,
+      signature = (tensor<4x4x1x2xf32>) -> tensor<4x4x1x2xf32>
+    }
+    module {}
+  }
+}
+
+// CHECK-LABEL: @tensorReshapeToDispatch
+// CHECK-SAME: (%[[SRC_BUF:.+]]: !hal.buffer)
+func @tensorReshapeToDispatch(%arg0 : tensor<4x4x2xf32>) -> tensor<4x4x1x2xf32> {
+  // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate{{.+}} : !hal.buffer{%c128}
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create
+  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
+  %0 = flow.ex.stream.fragment(%arg0) : (tensor<4x4x2xf32>) -> (tensor<4x4x1x2xf32>) =
+      (%source: tensor<4x4x2xf32>) -> (tensor<4x4x1x2xf32>) {
+    %c1 = constant 1 : index
+    %r = flow.tensor.reshape %source : tensor<4x4x2xf32> -> tensor<4x4x1x2xf32>
+    // CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]]
+    // CHECK:   %c0 = (%[[SRC_BUF]] : !hal.buffer)[%c0, %c128],
+    // CHECK:   %c1 = (%[[RET_BUF]] : !hal.buffer)[%c0, %c128]
+    // CHECK: ])
+    // CHECK: hal.command_buffer.dispatch.symbol
+    %t = flow.dispatch @ex0::@entry0[%c1, %c1, %c1](%r) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"s0b0", 0 : index>,
+        #hal.ex.result_buffer<"s0b1", 0 : index>
+      ]
+    } : (tensor<4x4x1x2xf32>) -> tensor<4x4x1x2xf32>
+    // CHECK: hal.command_buffer.end<%[[CMD]]
+    flow.return %t : tensor<4x4x1x2xf32>
+  }
+  // CHECK: return %[[RET_BUF]]
+  return %0 : tensor<4x4x1x2xf32>
 }
 
 // -----
@@ -251,9 +295,9 @@ hal.executable @ex attributes {sym_visibility = "private"} {
   }
 }
 
-// CHECK-LABEL: func @static_tiled_dispatch
+// CHECK-LABEL: func @staticTiledDispatch
 // CHECK-SAME: %[[INPUT:.+]]: !hal.buffer
-func @static_tiled_dispatch(%input: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
+func @staticTiledDispatch(%input: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
   %c1024 = constant 1024 : index
   %c512 = constant 512 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
@@ -291,9 +335,9 @@ hal.executable @ex attributes {sym_visibility = "private"} {
   }
 }
 
-// CHECK-LABEL: func @dynamic_tiled_dispatch
+// CHECK-LABEL: func @dynamicTiledDispatch
 // CHECK-SAME: %[[INPUT:.+]]: !hal.buffer
-func @dynamic_tiled_dispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: index) -> tensor<?x?x1024xf32> {
+func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: index) -> tensor<?x?x1024xf32> {
   %c1024 = constant 1024 : index
   %c512 = constant 512 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
@@ -307,8 +351,8 @@ func @dynamic_tiled_dispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: i
     //      CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]]
     // CHECK-SAME:   layout(%executable_layout : !hal.executable_layout)[%c0]
     // CHECK-SAME:   bindings([
-    // CHECK-NEXT:     %c0 = (%[[INPUT]] : !hal.buffer)[%c0, %9],
-    // CHECK-NEXT:     %c1 = (%{{.+}} : !hal.buffer)[%c0, %12]
+    // CHECK-NEXT:     %c0 = (%[[INPUT]] : !hal.buffer)[%c0, %2],
+    // CHECK-NEXT:     %c1 = (%{{.+}} : !hal.buffer)[%c0, %5]
 
     // CHECK: #hal.device.match.id<"dylib*">(
     // CHECK-SAME: %[[CMD_INNER:.+]] = %cmd : !hal.command_buffer,
@@ -370,9 +414,9 @@ hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
   }
 }
 
-// CHECK-LABEL: func @dispatch_tied_buffer
+// CHECK-LABEL: func @dispatchTiedBuffer
 // CHECK-SAME: (%[[FILL:.+]]: !hal.buffer, %[[INPUT:.+]]: !hal.buffer)
-func @dispatch_tied_buffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<3x9xi32> {
+func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<3x9xi32> {
   //      CHECK: %[[OUTPUT:.+]] = hal.allocator.allocate
   // CHECK-SAME:   type("HostVisible|DeviceVisible|DeviceLocal")
   // CHECK-SAME:   usage("Transfer|Mapping|Dispatch")
