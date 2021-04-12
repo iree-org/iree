@@ -39,6 +39,11 @@ namespace Flow {
 class PrePartitioningConversionPass
     : public PassWrapper<PrePartitioningConversionPass, FunctionPass> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect, FlowDialect, mhlo::MhloDialect,
+                    StandardOpsDialect, tensor::TensorDialect>();
+  }
+
   void runOnFunction() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(*context);
