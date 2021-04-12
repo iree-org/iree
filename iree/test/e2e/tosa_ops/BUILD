@@ -55,6 +55,7 @@ ALL_SRCS = enforce_glob(
         "rsqrt.mlir",
         "select.mlir",
         "sub.mlir",
+        "table.mlir",
         "tanh.mlir",
         "transpose.mlir",
         "while.mlir",
