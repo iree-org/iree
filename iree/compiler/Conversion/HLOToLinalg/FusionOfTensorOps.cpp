@@ -92,7 +92,8 @@ struct FusionOfTensorOpsPass
         [](const OpResult &producer, const OpOperand & /*consumer*/) {
           llvm::SmallDenseSet<Operation *, 4> numUsers;
           for (Operation *user : producer.getUsers()) {
-            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(user)) continue;
+            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(user))
+              continue;
             numUsers.insert(user);
           }
           return numUsers.empty();
