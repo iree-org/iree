@@ -1,4 +1,4 @@
-# TensorFlow Lite Frontend
+# TensorFlow Lite frontend
 
 <!-- TODO(??): overview (mention TOSA?) -->
 

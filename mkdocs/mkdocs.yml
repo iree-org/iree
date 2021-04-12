@@ -14,6 +14,11 @@ theme:
     - navigation.sections
     - navigation.top
 
+    # Insiders only: navigation indices
+    #     supply index.md page under each section
+    #     list each index.md page in the `nav:` section below
+    # - navigation.indexes
+
   palette:
     # Light mode
     - media: "(prefers-color-scheme: light)"
@@ -54,6 +59,7 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.tabbed
   - pymdownx.superfences
+  - tables
   - toc:
       permalink: true  # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
 
@@ -66,12 +72,15 @@ nav:
       - TensorFlow Lite: 'frontends/tensorflow-lite.md'
       - JAX: 'frontends/jax.md'
     - 'Backends':
-      - CPU LLVM: 'backends/cpu-llvm.md'
-      - GPU Vulkan: 'backends/gpu-vulkan.md'
+      - CPU - LLVM: 'backends/cpu-llvm.md'
+      - GPU - Vulkan: 'backends/gpu-vulkan.md'
     - 'Building from source':
+      # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
       - 'building-from-source/getting-started.md'
-      - 'building-from-source/android.md'
+      - Python bindings: 'building-from-source/python.md'
+      - Android cross-compilation: 'building-from-source/android.md'
     - 'Bindings':
+      - Python: 'bindings/python.md'
       - C API: 'bindings/c-api.md'
       - TensorFlow Lite: 'bindings/tensorflow-lite.md'
     - 'Community':

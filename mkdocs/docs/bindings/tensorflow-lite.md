@@ -1,4 +1,4 @@
-# TensorFlow Lite Bindings
+# TensorFlow Lite bindings
 
 <!-- TODO(??): overview, advantages/disadvantages to using TFLite bindings -->
 

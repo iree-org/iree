@@ -1,4 +1,4 @@
-# C API Bindings
+# C API bindings
 
 <!-- TODO(??): overview, advantages/disadvantages to using raw C APIs -->
 

@@ -1,4 +1,4 @@
-# JAX Frontend
+# JAX frontend
 
 <!-- TODO(??): overview (mention XLA? numpy?) -->
 

@@ -1,4 +1,4 @@
-# Building for Android
+# Android cross-compilation
 
 Running on a platform like Android involves cross-compiling from a _host_
 platform (e.g. Linux) to a _target_ platform (a specific Android version and

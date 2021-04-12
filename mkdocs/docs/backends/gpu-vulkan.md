@@ -1,4 +1,4 @@
-# Vulkan GPU Backend
+# Vulkan GPU backend
 
 <!-- TODO(??): overview, when to use CPU vs GPU -->
 
