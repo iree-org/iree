@@ -1,22 +1,22 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))" -iree-codegen-spirv-experimental-linalg-on-tensors -cse -canonicalize -split-input-file %s | IreeFileCheck %s
 
 hal.executable @add attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @add attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module  attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
       func @add() {
         %c0 = constant 0 : index
-        %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<?x?xf32>
-        %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<?xf32>
-        %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<?x?xf32>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?xf32>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>
         linalg.generic {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                            affine_map<(d0, d1) -> (d1)>,
@@ -29,7 +29,7 @@ hal.executable @add attributes {sym_visibility = "private"} {
           }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -51,9 +51,9 @@ hal.executable @add attributes {sym_visibility = "private"} {
 //  CHECK-SAME:   spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
-//   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
-//   CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
+//   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
+//   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @io::@arg1
+//   CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @io::@ret0
 //   CHECK-DAG:   %[[M:.+]] = memref.dim %[[LHS]], %[[C0]]
 //   CHECK-DAG:   %[[N:.+]] = memref.dim %[[LHS]], %[[C1]]
 //       CHECK:   %[[UB:.+]] = muli %[[N]], %[[M]]

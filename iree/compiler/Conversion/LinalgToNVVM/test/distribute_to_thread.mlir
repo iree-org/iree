@@ -2,14 +2,14 @@
 
 hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.target @cuda, filter="cuda" {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<writeonly:1024xf32>) -> ()}
+  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<writeonly:1024xf32>) -> ()}
   module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
       %c1024 = constant 1024 : index
-      %0 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : memref<1024xf32>
-      %1 = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : memref<1024xf32>
-      %2 = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : memref<1024xf32>
+      %0 = hal.interface.binding.subspan @io::@ro0[%c0] : memref<1024xf32>
+      %1 = hal.interface.binding.subspan @io::@ro1[%c0] : memref<1024xf32>
+      %2 = hal.interface.binding.subspan @io::@wo2[%c0] : memref<1024xf32>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_count_x = hal.interface.workgroup.count[0] : index

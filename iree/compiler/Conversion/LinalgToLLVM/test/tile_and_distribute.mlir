@@ -2,14 +2,14 @@
 
 // // TODO(GH-4901): Enable the dynamic shape tests when linalg on tensors becomes default.
 // hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
-//   hal.interface @legacy_io {
+//   hal.interface @io {
 //     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
 //     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 //   }
 //   hal.executable.target @llvm_aot, filter="dylib*" {
 //     hal.executable.entry_point @dynamic_matmul attributes {
-//       interface = @legacy_io, ordinal = 0 : index,
+//       interface = @io, ordinal = 0 : index,
 //       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
 //         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
 //     module {
@@ -50,14 +50,14 @@
 // -----
 
 hal.executable @static_matmul attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @static_matmul attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:16x4xf32>, !flow.dispatch.tensor<readonly:4x8xf32>,
         !flow.dispatch.tensor<writeonly:16x8xf32>) -> ()}
     module {

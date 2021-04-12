@@ -3,14 +3,14 @@
 // TODO(GH-4901): Enable this test when linalg on tensors becomes default.
 // #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // hal.executable @parallel_4D attributes {sym_visibility = "private"} {
-//   hal.interface @legacy_io {
+//   hal.interface @io {
 //     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
 //     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 //   }
 //   hal.executable.target @vulkan, filter="vulkan*" {
 //     hal.executable.entry_point @parallel_4D attributes {
-//       interface = @legacy_io, ordinal = 0 : index,
+//       interface = @io, ordinal = 0 : index,
 //       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
 //         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
 //     module attributes {
@@ -21,11 +21,11 @@
 //          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
 //       func @parallel_4D() {
 //         %arg0 = iree.placeholder for "interace buffer"
-//           {binding = @legacy_io::@arg0, operand_result_index = 4 : i32} : memref<?x?x?x?xf32>
+//           {binding = @io::@arg0, operand_result_index = 4 : i32} : memref<?x?x?x?xf32>
 //         %arg1 = iree.placeholder for "interace buffer"
-//           {binding = @legacy_io::@arg1, operand_result_index = 9 : i32} : memref<?x?x?x?xf32>
+//           {binding = @io::@arg1, operand_result_index = 9 : i32} : memref<?x?x?x?xf32>
 //         %arg2 = iree.placeholder for "interace buffer"
-//           {binding = @legacy_io::@ret0, operand_result_index = 10 : i32} : memref<?x?x?x?xf32>
+//           {binding = @io::@ret0, operand_result_index = 10 : i32} : memref<?x?x?x?xf32>
 //         linalg.generic {
 //            indexing_maps = [#map0, #map0, #map0],
 //            iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
@@ -40,7 +40,7 @@
 //       func private @parallel_4D__num_workgroups__
 //         (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
 //          !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
-//       hal.interface @legacy_io attributes {sym_visibility = "private"} {
+//       hal.interface @io attributes {sym_visibility = "private"} {
 //         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
 //         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -82,14 +82,14 @@
 
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @parallel_4D_static attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -100,11 +100,11 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @parallel_4D_static() {
         %arg0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x5x6xf32>
+          {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<3x4x5x6xf32>
         %arg1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<3x4x5x6xf32>
+          {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<3x4x5x6xf32>
         %arg2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<3x4x5x6xf32>
+          {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<3x4x5x6xf32>
         linalg.generic {
            indexing_maps = [#map0, #map0, #map0],
            iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
@@ -116,7 +116,7 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -161,14 +161,14 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
 }
 
 hal.executable @scalar_add attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @scalar_add attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:f32>, !flow.dispatch.tensor<readonly:f32>,
         !flow.dispatch.tensor<writeonly:f32>) -> ()}
     module attributes {
@@ -179,11 +179,11 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @scalar_add() attributes {hal.num_workgroups_fn = @scalar_add__num_workgroups__} {
         %arg0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<f32>
+          {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<f32>
         %arg1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<f32>
+          {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<f32>
         %arg2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<f32>
+          {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<f32>
         linalg.generic #trait
           ins(%arg0, %arg1 : memref<f32>, memref<f32>)
          outs(%arg2 : memref<f32>) {
@@ -193,7 +193,7 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
          }
          return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -215,24 +215,24 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @reduce_sum attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @reduce_sum attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:40x50x75xf32>, !flow.dispatch.tensor<readonly:f32>,
         !flow.dispatch.tensor<writeonly:40xf32>) -> ()}
     module {
       func @reduce_sum() {
         %arg0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<40x50x75xf32>
+          {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<40x50x75xf32>
         %arg1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<f32>
+          {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<f32>
         %arg2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<40xf32>
+          {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<40xf32>
         linalg.indexed_generic {
           indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                            affine_map<(d0, d1, d2) -> ()>,
@@ -252,7 +252,7 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -288,14 +288,14 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 hal.executable @matmul attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @matmul attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -304,9 +304,9 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
                         {max_compute_workgroup_invocations = 128 : i32,
                          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @matmul() {
-        %arg0 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0} : memref<?x?xf32>
-        %arg1 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1} : memref<?x?xf32>
-        %arg2 = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0} : memref<?x?xf32>
+        %arg0 = iree.placeholder for "interace buffer" {binding = @io::@arg0} : memref<?x?xf32>
+        %arg1 = iree.placeholder for "interace buffer" {binding = @io::@arg1} : memref<?x?xf32>
+        %arg2 = iree.placeholder for "interace buffer" {binding = @io::@ret0} : memref<?x?xf32>
         %c4 = constant 4 : index
         %c0 = constant 0 : index
         %c1 = constant 1 : index
@@ -336,7 +336,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -361,19 +361,19 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 
 
 hal.executable @conv_1d attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
-    hal.executable.entry_point @conv_1d attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<3x8x1xf32>, tensor<3x1x1xf32>) -> tensor<3x6x1xf32>}
+    hal.executable.entry_point @conv_1d attributes {interface = @io, ordinal = 0 : index, signature = (tensor<3x8x1xf32>, tensor<3x1x1xf32>) -> tensor<3x6x1xf32>}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
       func @conv_1d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
         %cst = constant 0.000000e+00 : f32
-        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<3x6x1xf32>
-        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<3x8x1xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x1x1xf32>
+        %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<3x6x1xf32>
+        %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<3x8x1xf32>
+        %2 = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<3x1x1xf32>
         %3 = "gpu.block_id"() {dimension = "x"} : () -> index
         %4 = "gpu.block_id"() {dimension = "y"} : () -> index
         %5 = "gpu.block_id"() {dimension = "z"} : () -> index
@@ -392,7 +392,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
         linalg.conv_1d_input_nwc_filter_wcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -419,14 +419,14 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
 
 
 hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @conv_no_padding attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -435,9 +435,9 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
                         {max_compute_workgroup_invocations = 128 : i32,
                          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @conv_no_padding() {
-        %arg0 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0} : memref<?x?x?x?xf32>
-        %arg1 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1} : memref<?x?x?x?xf32>
-        %arg2 = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0} : memref<?x?x?x?xf32>
+        %arg0 = iree.placeholder for "interace buffer" {binding = @io::@arg0} : memref<?x?x?x?xf32>
+        %arg1 = iree.placeholder for "interace buffer" {binding = @io::@arg1} : memref<?x?x?x?xf32>
+        %arg2 = iree.placeholder for "interace buffer" {binding = @io::@ret0} : memref<?x?x?x?xf32>
         %c2 = constant 2 : index
         %c0 = constant 0 : index
         %c3 = constant 3 : index
@@ -483,7 +483,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -494,9 +494,9 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //       CHECK: func @conv_no_padding
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0}
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1}
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0}
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @io::@arg0}
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @io::@arg1}
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @io::@ret0}
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[C2:.+]] = constant 2
@@ -536,19 +536,19 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @conv_3d attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
-    hal.executable.entry_point @conv_3d attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<2x8x8x8x3xf32>, tensor<2x2x2x3x2xf32>) -> tensor<2x7x7x7x2xf32>}
+    hal.executable.entry_point @conv_3d attributes {interface = @io, ordinal = 0 : index, signature = (tensor<2x8x8x8x3xf32>, tensor<2x2x2x3x2xf32>) -> tensor<2x7x7x7x2xf32>}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
       func @conv_3d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
         %cst = constant 0.000000e+00 : f32
-        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x7x7x7x2xf32>
-        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x8x8x8x3xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<2x2x2x3x2xf32>
+        %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<2x7x7x7x2xf32>
+        %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<2x8x8x8x3xf32>
+        %2 = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<2x2x2x3x2xf32>
         %3 = "gpu.block_id"() {dimension = "x"} : () -> index
         %4 = "gpu.block_id"() {dimension = "y"} : () -> index
         %5 = "gpu.block_id"() {dimension = "z"} : () -> index
@@ -566,7 +566,7 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
         linalg.conv_3d_input_ndhwc_filter_dhwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -597,13 +597,13 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
 #map7 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1092 + s0 + d1 * 78 + d2 * 6 + d3)>
 module  {
   hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
+    hal.interface @io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan, filter="vulkan*" {
-      hal.executable.entry_point @pooling_nhwc_max attributes {interface = @legacy_io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:2x16x16x6xf32>, !flow.dispatch.tensor<readonly:1x3x4x2xf32>, !flow.dispatch.tensor<writeonly:2x14x13x5xf32>) -> ()} {
+      hal.executable.entry_point @pooling_nhwc_max attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:2x16x16x6xf32>, !flow.dispatch.tensor<readonly:1x3x4x2xf32>, !flow.dispatch.tensor<writeonly:2x14x13x5xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c4 = constant 4 : index
         %c1 = constant 1 : index
@@ -611,9 +611,9 @@ module  {
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}  {
         func @pooling_nhwc_max() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
-          %0 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<2x16x16x6xf32>
-          %1 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<3x4xf32>
-          %2 = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x14x13x6xf32>
+          %0 = iree.placeholder for "interace buffer" {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<2x16x16x6xf32>
+          %1 = iree.placeholder for "interace buffer" {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<3x4xf32>
+          %2 = iree.placeholder for "interace buffer" {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<2x14x13x6xf32>
           %3 = "gpu.block_id"() {dimension = "x"} : () -> index
           %4 = "gpu.block_id"() {dimension = "y"} : () -> index
           %5 = affine.apply #map0()[%4]
@@ -627,7 +627,7 @@ module  {
           linalg.pooling_nhwc_max {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>) outs(%12 : memref<2x?x?x6xf32, #map7>)
           return
         }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
+        hal.interface @io attributes {sym_visibility = "private"} {
           hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
           hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
           hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -640,9 +640,9 @@ module  {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //       CHECK: func @pooling_nhwc_max
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32}
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32}
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @io::@arg0, operand_result_index = 0 : i32}
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @io::@arg1, operand_result_index = 1 : i32}
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @io::@ret0, operand_result_index = 2 : i32}
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //       CHECK:   %[[IV1:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]

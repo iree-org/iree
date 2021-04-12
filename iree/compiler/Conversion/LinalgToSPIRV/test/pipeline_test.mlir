@@ -1,14 +1,14 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-to-spirv-pipeline))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
 
 hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -30,11 +30,11 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
       func @matmul_static_shape()
         attributes {vkspv.num_workgroups_fn = @matmul_static_shape__num_workgroups__} {
         %arg0 = iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@arg0, operand_result_num = 0 : i32} : memref<4096x4096xf32>
+          {binding = @io::@arg0, operand_result_num = 0 : i32} : memref<4096x4096xf32>
         %arg1 = iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@arg1, operand_result_num = 1 : i32} : memref<4096x4096xf32>
+          {binding = @io::@arg1, operand_result_num = 1 : i32} : memref<4096x4096xf32>
         %ret0 = iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@ret0, operand_result_num = 2 : i32} : memref<4096x4096xf32>
+          {binding = @io::@ret0, operand_result_num = 2 : i32} : memref<4096x4096xf32>
         linalg.matmul ins(%arg0, %arg1 : memref<4096x4096xf32>, memref<4096x4096xf32>)
                      outs(%ret0 : memref<4096x4096xf32>)
         return
@@ -42,7 +42,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
       func private @matmul_static_shape__num_workgroups__
         (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
          !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
@@ -60,14 +60,14 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @matmul_fill_fused attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_fill_fused attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -89,11 +89,11 @@ hal.executable @matmul_fill_fused attributes {sym_visibility = "private"} {
       func @matmul_fill_fused()
         attributes {vkspv.num_workgroups_fn = @matmul_fill_fused__num_workgroups__} {
         %arg0 = iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@arg0, operand_result_num = 0 : i32} : memref<4096x4096xf32>
+          {binding = @io::@arg0, operand_result_num = 0 : i32} : memref<4096x4096xf32>
         %arg1 = iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@arg1, operand_result_num = 1 : i32} : memref<4096x4096xf32>
+          {binding = @io::@arg1, operand_result_num = 1 : i32} : memref<4096x4096xf32>
         %ret0 = iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@ret0, operand_result_num = 2 : i32} : memref<4096x4096xf32>
+          {binding = @io::@ret0, operand_result_num = 2 : i32} : memref<4096x4096xf32>
         %cst = constant 0.000000e+00 : f32
         linalg.fill(%ret0, %cst) : memref<4096x4096xf32>, f32
         linalg.matmul ins(%arg0, %arg1 : memref<4096x4096xf32>, memref<4096x4096xf32>)
@@ -103,7 +103,7 @@ hal.executable @matmul_fill_fused attributes {sym_visibility = "private"} {
       func private @matmul_fill_fused__num_workgroups__
         (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
          !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
@@ -122,14 +122,14 @@ hal.executable @matmul_fill_fused attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @matmul_add_fused attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_add_fused attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
@@ -150,10 +150,10 @@ hal.executable @matmul_add_fused attributes {sym_visibility = "private"} {
            subgroup_size = 16 : i32}>} {
       func @matmul_add_fused() attributes {hal.num_workgroups_fn = @matmul_add_fused__num_workgroups__} {
         %cst = constant 0.000000e+00 : f32
-        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 3 : i32} : memref<1024x256xf32>
-        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<1024x512xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<512x256xf32>
-        %3 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg2, operand_result_index = 2 : i32} : memref<1024x256xf32>
+        %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0, operand_result_index = 3 : i32} : memref<1024x256xf32>
+        %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<1024x512xf32>
+        %2 = iree.placeholder for "interface buffer" {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<512x256xf32>
+        %3 = iree.placeholder for "interface buffer" {binding = @io::@arg2, operand_result_index = 2 : i32} : memref<1024x256xf32>
         %4 = memref.alloc() : memref<1024x256xf32>
         linalg.fill(%4, %cst) : memref<1024x256xf32>, f32
         linalg.matmul ins(%1, %2 : memref<1024x512xf32>, memref<512x256xf32>)
@@ -172,7 +172,7 @@ hal.executable @matmul_add_fused attributes {sym_visibility = "private"} {
       func private @matmul_add_fused__num_workgroups__
         (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
          !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
