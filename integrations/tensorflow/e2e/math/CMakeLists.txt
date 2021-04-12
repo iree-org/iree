@@ -67,6 +67,9 @@ iree_e2e_cartesian_product_test_suite(
     ",,polygamma,,,tflite"
     ",,polyval,,,tflite"
     ",,reduce_euclidean_norm,,,tflite"
+    ",,reduce_mean,,,tflite"
+    ",,reduce_std,,,tflite"
+    ",,reduce_variance,,,tflite"
     ",,segment_max,,,tflite"
     ",,segment_mean,,,tflite"
     ",,segment_min,,,tflite"
@@ -145,9 +148,13 @@ iree_e2e_cartesian_product_test_suite(
     ",,igamma,,,iree_llvmaot"
     ",,igammac,,,iree_llvmaot"
     ",,in_top_k,,,iree_llvmaot"
+    ",,is_non_decreasing,,,iree_llvmaot"
+    ",,is_strictly_increasing,,,iree_llvmaot"
     ",,invert_permutation,,,iree_llvmaot"
     ",,ndtri,,,iree_llvmaot"
     ",,nextafter,,,iree_llvmaot"
+    ",,reduce_all,,,iree_llvmaot"
+    ",,reduce_any,,,iree_llvmaot"
     ",,reduce_euclidean_norm,,,iree_llvmaot"
     ",,reduce_prod,,,iree_llvmaot"
     ",,segment_max,,,iree_llvmaot"
@@ -214,6 +221,9 @@ iree_e2e_cartesian_product_test_suite(
     ",,unsorted_segment_sqrt_n,,,iree_vulkan"
     ",,unsorted_segment_sum,,,iree_vulkan"
     ",,zeta,,,iree_vulkan"
+    ",,digamma,,,iree_vulkan"
+    ",,is_finite,,,iree_vulkan"
+    ",,mod,,,iree_vulkan"
 )
 
 iree_e2e_cartesian_product_test_suite(

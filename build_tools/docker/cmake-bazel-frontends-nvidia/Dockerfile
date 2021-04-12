@@ -23,7 +23,7 @@
 #      does not support Ubuntu 18.04.
 # This allows to share configuration with base CMake, but it also means we need
 # to MATCH the driver version between the host machine and the docker image.
-FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:3656d9c3a08770f8371ad3a6f777b979c954656dae1cdbdfadfccdd7ab713f87 AS final
+FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:02c21884ec62a548992fc62031c41375d5cb7ebc33cb4ecbb8ac0ec2c83a2aa1 AS final
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y \

@@ -218,6 +218,9 @@ TFLITE_FAILING = [
     "polygamma",
     "polyval",
     "reduce_euclidean_norm",
+    "reduce_mean",
+    "reduce_std",
+    "reduce_variance",
     "segment_max",
     "segment_mean",
     "segment_min",
@@ -304,9 +307,13 @@ LLVM_FAILING = [
     "igamma",
     "igammac",
     "in_top_k",
+    "is_non_decreasing",
+    "is_strictly_increasing",
     "invert_permutation",
     "ndtri",
     "nextafter",
+    "reduce_all",
+    "reduce_any",
     "reduce_euclidean_norm",
     "reduce_prod",
     "segment_max",
@@ -379,6 +386,14 @@ VULKAN_FAILING = [
     "zeta",
 ]
 
+# TODO(#5400): Failing only on Nvidia GPU.
+# keep sorted
+TURING_VULKAN_FAILING = [
+    "digamma",
+    "is_finite",
+    "mod",
+]
+
 iree_e2e_cartesian_product_test_suite(
     name = "math_tests",
     failing_configurations = [
@@ -399,7 +414,7 @@ iree_e2e_cartesian_product_test_suite(
         },
         {
             # Failing on vulkan.
-            "functions": VULKAN_FAILING,
+            "functions": VULKAN_FAILING + TURING_VULKAN_FAILING,
             "target_backends": "iree_vulkan",
         },
     ],
