@@ -104,9 +104,9 @@ Status ContextWrapper::InvokeFunction(const FunctionWrapper& function_wrapper,
     // Wrap the input buffers in buffer views.
     iree_hal_buffer_view_t* input_buffer_view = nullptr;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        input_buffer, /*shape=*/&input_element_count,
-        /*shape_rank=*/1, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-        &input_buffer_view));
+        input_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+        /*shape=*/&input_element_count,
+        /*shape_rank=*/1, &input_buffer_view));
     iree_hal_buffer_release(input_buffer);
 
     // Marshal the input buffer views through the input VM variant list.
@@ -134,7 +134,7 @@ Status ContextWrapper::InvokeFunction(const FunctionWrapper& function_wrapper,
   auto* output_buffer = iree_hal_buffer_view_buffer(output_buffer_view);
   // TODO(jennik): this is unsafe - we don't know the size of output ptr here!
   IREE_RETURN_IF_ERROR(iree_hal_buffer_read_data(
-        output_buffer, 0, output, iree_hal_buffer_byte_length(output_buffer)));
+      output_buffer, 0, output, iree_hal_buffer_byte_length(output_buffer)));
   return OkStatus();
 }
 
@@ -150,8 +150,8 @@ ContextWrapper::~ContextWrapper() {
 // TODO(jennik): Also create default string and tensorlist modules.
 Status ContextWrapper::CreateDefaultModules() {
   IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
-      iree_hal_driver_registry_default(),
-      iree_make_cstring_view("vmla"), iree_allocator_system(), &driver_));
+      iree_hal_driver_registry_default(), iree_make_cstring_view("vmla"),
+      iree_allocator_system(), &driver_));
   IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
       driver_, iree_allocator_system(), &device_));
   IREE_RETURN_IF_ERROR(

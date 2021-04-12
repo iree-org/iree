@@ -101,13 +101,12 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
     batch_config = []
   targets = [
       TargetInfo(name="vmla", mako_tag="vmla"),
-      TargetInfo(
-          name="dylib-llvm-aot",
-          mako_tag="cpu",
-          compilation_flags=[
-              "--iree-llvm-target-triple=aarch64-none-linux-android29"
-          ],
-          runtime_flags=["--dylib_worker_count=1"]),
+      TargetInfo(name="dylib-llvm-aot",
+                 mako_tag="cpu",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+                 ],
+                 runtime_flags=["--dylib_worker_count=1"]),
       TargetInfo(
           name="vulkan-spirv",
           mako_tag="vlk",
@@ -115,16 +114,16 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
               "--iree-spirv-enable-vectorization",
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
           ]),
-      TargetInfo(
-          name="dylib-llvm-aot",
-          mako_tag="cpu2",
-          compilation_flags=[
-              "--iree-llvm-target-triple=aarch64-none-linux-android29",
-              "--iree-flow-dispatch-linalg-on-tensors",
-              "--iree-codegen-llvm-experimental-linalg-on-tensors",
-              "-iree-flow-inline-constants-max-byte-length=2048"
-          ],
-          runtime_flags=["--dylib_worker_count=1"]),
+      TargetInfo(name="dylib-llvm-aot",
+                 mako_tag="cpu2",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-dispatch-linalg-on-tensors",
+                     "--iree-codegen-llvm-experimental-linalg-on-tensors",
+                     "-iree-flow-inline-constants-max-byte-length=2048",
+                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                 ],
+                 runtime_flags=["--dylib_worker_count=1"]),
       TargetInfo(
           name="vulkan-spirv",
           mako_tag="vlk2",
@@ -132,7 +131,8 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10",
               "--iree-flow-dispatch-linalg-on-tensors",
               "--iree-codegen-spirv-experimental-linalg-on-tensors",
-              "-iree-flow-inline-constants-max-byte-length=2048"
+              "-iree-flow-inline-constants-max-byte-length=2048",
+              "-iree-flow-dispatch-formation-enable-operand-fusion"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -149,13 +149,12 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
     batch_config = []
   targets = [
       TargetInfo(name="vmla", mako_tag="vmla"),
-      TargetInfo(
-          name="dylib-llvm-aot",
-          mako_tag="cpu",
-          compilation_flags=[
-              "--iree-llvm-target-triple=aarch64-none-linux-android29"
-          ],
-          runtime_flags=["--dylib_worker_count=1"]),
+      TargetInfo(name="dylib-llvm-aot",
+                 mako_tag="cpu",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+                 ],
+                 runtime_flags=["--dylib_worker_count=1"]),
       TargetInfo(
           name="vulkan-spirv",
           mako_tag="vlk",
@@ -163,16 +162,16 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
               "--iree-spirv-enable-vectorization",
               "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
           ]),
-      TargetInfo(
-          name="dylib-llvm-aot",
-          mako_tag="cpu2",
-          compilation_flags=[
-              "--iree-llvm-target-triple=aarch64-none-linux-android29",
-              "--iree-flow-dispatch-linalg-on-tensors",
-              "--iree-codegen-llvm-experimental-linalg-on-tensors",
-              "-iree-flow-inline-constants-max-byte-length=2048"
-          ],
-          runtime_flags=["--dylib_worker_count=1"]),
+      TargetInfo(name="dylib-llvm-aot",
+                 mako_tag="cpu2",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-dispatch-linalg-on-tensors",
+                     "--iree-codegen-llvm-experimental-linalg-on-tensors",
+                     "-iree-flow-inline-constants-max-byte-length=2048",
+                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                 ],
+                 runtime_flags=["--dylib_worker_count=1"]),
       TargetInfo(
           name="vulkan-spirv",
           mako_tag="vlk2",
@@ -182,7 +181,8 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
               "--iree-codegen-spirv-experimental-linalg-on-tensors",
               # TODO(GH-5330): Revisit the number or delete the flag.
               "-iree-flow-inline-constants-max-byte-length=16",
-              "-iree-spirv-enable-vectorization"
+              "-iree-spirv-enable-vectorization",
+              "-iree-flow-dispatch-formation-enable-operand-fusion"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -199,24 +199,25 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
 MODEL_BENCHMARKS = [
     ModelBenchmarkInfo(
         name="mobile-bert",
-        model_artifacts_name="iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz",
+        model_artifacts_name=
+        "iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz",
         model_path="tmp/iree/modules/MobileBertSquad/iree_input.mlir",
-        flagfile_path="tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile",
+        flagfile_path=
+        "tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile",
         phones=[
-            PhoneBenchmarkInfo(
-                name="Pixel4",
-                benchmark_key="5538704950034432",
-                targets=get_pixel4_default_target_list(
-                    skipped_target=["cpu2", "vlk2"], batch_config={"cpu": 8})),
-            PhoneBenchmarkInfo(
-                name="S20",
-                benchmark_key="4699630718681088",
-                targets=get_s20_default_target_list(
-                    skipped_target=["cpu2", "vlk2"],
-                    batch_config={
-                        "cpu": 8,
-                        "vlk": 16
-                    })),
+            PhoneBenchmarkInfo(name="Pixel4",
+                               benchmark_key="5538704950034432",
+                               targets=get_pixel4_default_target_list(
+                                   skipped_target=["cpu2", "vlk2"],
+                                   batch_config={"cpu": 8})),
+            PhoneBenchmarkInfo(name="S20",
+                               benchmark_key="4699630718681088",
+                               targets=get_s20_default_target_list(
+                                   skipped_target=["cpu2", "vlk2"],
+                                   batch_config={
+                                       "cpu": 8,
+                                       "vlk": 16
+                                   })),
         ]),
     ModelBenchmarkInfo(
         name="mobilenet-v2",
@@ -224,15 +225,14 @@ MODEL_BENCHMARKS = [
         model_path="mobilenet-v2/iree_input.mlir",
         flagfile_path="mobilenet-v2/flagfile",
         phones=[
-            PhoneBenchmarkInfo(
-                name="Pixel4",
-                benchmark_key="6338759231537152",
-                targets=get_pixel4_default_target_list(
-                    skipped_target=["vlk2"],
-                    batch_config={
-                        "cpu": 16,
-                        "cpu2": 10
-                    })),
+            PhoneBenchmarkInfo(name="Pixel4",
+                               benchmark_key="6338759231537152",
+                               targets=get_pixel4_default_target_list(
+                                   skipped_target=["vlk2"],
+                                   batch_config={
+                                       "cpu": 16,
+                                       "cpu2": 10
+                                   })),
             PhoneBenchmarkInfo(
                 name="S20",
                 benchmark_key="5618403088793600",

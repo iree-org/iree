@@ -65,9 +65,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
-    # TODO(#5268) Add bert_encoder to this list once the issue is
-    # fixed.
-    srcs = ["mobilenetv2_fake_weights.mlir"],
+    srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-flow-inline-constants-max-byte-length=2048",

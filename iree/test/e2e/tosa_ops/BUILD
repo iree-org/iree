@@ -47,6 +47,7 @@ ALL_SRCS = enforce_glob(
         "logical_right_shift.mlir",
         "maximum.mlir",
         "minimum.mlir",
+        "mul.mlir",
         "negate.mlir",
         "pad.mlir",
         "reluN.mlir",
@@ -54,13 +55,13 @@ ALL_SRCS = enforce_glob(
         "rsqrt.mlir",
         "select.mlir",
         "sub.mlir",
+        "table.mlir",
         "tanh.mlir",
         "transpose.mlir",
         "while.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        "mul.mlir",  # TODO(suderman): Re-enable once apply_scale lowering lands.
     ],
 )
 

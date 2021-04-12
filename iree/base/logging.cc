@@ -16,6 +16,10 @@
 
 #include <string>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #include "absl/flags/flag.h"
 #include "absl/strings/str_format.h"
 #include "iree/base/tracing.h"
@@ -90,6 +94,21 @@ void LogMessage::EmitLogMessage() {
   // TODO(scotttodd): Include current system time
   fprintf(stderr, "%c %s:%d] %s\n", "IWEF"[severity_], file_name_, line_,
           str().c_str());
+
+#if defined(__ANDROID__)
+  // Define equivalent android log levels to map to IREE.
+  constexpr int kStatusToAndroidLevel[4] = {
+      4,  // Android info
+      5,  // Android waring
+      6,  // Android error
+      6   // Android fatal (doesn't exist, so reusing error)
+  };
+
+  int android_severity = kStatusToAndroidLevel[severity_];
+  std::string android_message =
+      absl::StrFormat("%s:%d] %s\n", file_name_, line_, str().c_str());
+  __android_log_write(android_severity, "native", android_message.c_str());
+#endif  // !defined(__ANDROID__)
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_LOG_MESSAGES
   constexpr int kLevelColors[4] = {

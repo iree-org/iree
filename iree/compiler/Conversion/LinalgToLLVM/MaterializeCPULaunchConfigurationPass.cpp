@@ -126,6 +126,14 @@ void MaterializeCPULaunchConfigurationPass::runOnOperation() {
     }
 
     launchConfig.finalize(funcOp);
+
+    // Apply post distribution canonicalization passes.
+    {
+      OwningRewritePatternList canonicalization(&getContext());
+      AffineMinOp::getCanonicalizationPatterns(canonicalization, context);
+      populateAffineMinSCFCanonicalizationPattern(canonicalization);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalization));
+    }
   }
 }
 

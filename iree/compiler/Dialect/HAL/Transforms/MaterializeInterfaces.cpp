@@ -82,34 +82,6 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
           /*binding=*/APInt(64, bindingOrdinal),
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::Read);
-    } else if (auto tensorType =
-                   inputType.value()
-                       .dyn_cast<IREE::Flow::DispatchTensorType>()) {
-      StringRef prefix;
-      IREE::HAL::MemoryAccessBitfield memoryAccess =
-          IREE::HAL::MemoryAccessBitfield::None;
-      switch (tensorType.getAccess()) {
-        case IREE::Flow::TensorAccess::ReadOnly:
-          prefix = "ro";
-          memoryAccess = IREE::HAL::MemoryAccessBitfield::Read;
-          break;
-        case IREE::Flow::TensorAccess::ReadWrite:
-          prefix = "rw";
-          memoryAccess = IREE::HAL::MemoryAccessBitfield::Read |
-                         IREE::HAL::MemoryAccessBitfield::Write;
-          break;
-        case IREE::Flow::TensorAccess::WriteOnly:
-          prefix = "wo";
-          memoryAccess = IREE::HAL::MemoryAccessBitfield::DiscardWrite;
-          break;
-      }
-      int bindingOrdinal = nextBindingOrdinal++;
-      std::string bindingName =
-          std::string(prefix) + std::to_string(bindingOrdinal);
-      interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName, /*set=*/APInt(64, 0),
-          /*binding=*/APInt(64, bindingOrdinal),
-          IREE::HAL::DescriptorType::StorageBuffer, memoryAccess);
     } else if (auto indexType = inputType.value().dyn_cast<IndexType>()) {
       ++pushConstantCount;
     } else if (auto integerType = inputType.value().dyn_cast<IntegerType>()) {
@@ -302,66 +274,6 @@ static Optional<FuncOp> createDispatchEntryThunk(
   return thunkFuncOp;
 }
 
-// Converts a tile dispatch entry function in the Flow dialect to an
-// argumentless function referencing the hal.interface symbols directly.
-// The contents of the function are unchanged beyond the argument marshaling
-// inserted meaning that flow ops will remain for the target backends to
-// convert as needed.
-static void convertTiledEntryFuncToSymbols(
-    IREE::Flow::DispatchEntryOp entryOp, FuncOp sourceFuncOp,
-    IREE::HAL::InterfaceOp interfaceOp,
-    IREE::HAL::ExecutableTargetOp targetOp) {
-  // Clone the source FuncOp into the target then manipulate it into a
-  // dispatch entry thunk.
-  auto clonedFuncOp = sourceFuncOp.clone();
-  targetOp.getInnerModule().push_back(clonedFuncOp);
-
-  // Strip all arguments as functions take all I/O through the interface API.
-  clonedFuncOp.setType(FunctionType::get(clonedFuncOp.getContext(), {}, {}));
-
-  auto *entryBlock = &clonedFuncOp.front();
-  OpBuilder entryBuilder = OpBuilder::atBlockBegin(entryBlock);
-
-  // For now we only support 1:1 tensor types, so bindings are in order.
-  // In the future we will want to provide N:M mappings (as well as the
-  // information to compute offsets).
-  auto bindingOps = llvm::to_vector<4>(
-      interfaceOp.getBlock().getOps<IREE::HAL::InterfaceBindingOp>());
-
-  // We also don't offset things today but will as soon as the ringbuffer lands.
-  auto zeroOffset =
-      entryBuilder.createOrFold<mlir::ConstantIndexOp>(entryOp.getLoc(), 0);
-
-  // As we only have inputs and this is just an indirection we insert everything
-  // at the top of the entry block and let replaceAllUses handle the rest.
-  int bindingOrdinal = 0;
-  int pushConstantOffset = 0;
-  for (BlockArgument arg : entryBlock->getArguments()) {
-    if (auto tensorType =
-            arg.getType().dyn_cast<IREE::Flow::DispatchTensorType>()) {
-      auto bindingOp = bindingOps[bindingOrdinal++];
-      auto bindingSymRefAttr = entryBuilder.getSymbolRefAttr(
-          interfaceOp.sym_name(), {entryBuilder.getSymbolRefAttr(bindingOp)});
-      auto subspanOp =
-          entryBuilder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-              entryOp.getLoc(), arg.getType(), bindingSymRefAttr,
-              /*byte_offset=*/zeroOffset,
-              /*byte_length=*/Value{});
-      arg.replaceAllUsesWith(subspanOp);
-    } else {
-      auto loadOp = entryBuilder.create<IREE::HAL::InterfaceLoadConstantOp>(
-          entryOp.getLoc(), arg.getType(), APInt(64, pushConstantOffset++));
-      arg.replaceAllUsesWith(loadOp);
-    }
-  }
-
-  // Remove all of the arguments now that we've turned them into symbol
-  // accesses and replaced their uses.
-  while (entryBlock->getNumArguments() > 0) {
-    entryBlock->eraseArgument(0);
-  }
-}
-
 // Adds the entry point ops with assigned ordinals for each entry function.
 // The entry points will all use the provided |interfaceOp|.
 static LogicalResult declareEntryPointOps(
@@ -381,22 +293,13 @@ static LogicalResult declareEntryPointOps(
             sourceExecutableOp.getInnerModule().lookupSymbol<FuncOp>(
                 dispatchEntryOp.function_ref());
 
-        // If this is a new-style tiled dispatch entry then we don't need a
-        // thunk function and directly map from flow->hal. If it's a
-        // legacy-style dispatch entry then we need to create a thunk function
-        // to handle marshaling IO.
-        if (dispatchEntryOp.workgroup_rank().hasValue()) {
-          convertTiledEntryFuncToSymbols(dispatchEntryOp, sourceFuncOp,
-                                         interfaceOp, targetOp);
-        } else {
-          auto thunkFuncOp =
-              createDispatchEntryThunk(sourceFuncOp, interfaceOp, targetOp);
-          if (!thunkFuncOp.hasValue()) {
-            return failure();
-          }
-          dispatchEntryOp->setAttr(
-              "function_ref", builder.getSymbolRefAttr(thunkFuncOp.getValue()));
+        auto thunkFuncOp =
+            createDispatchEntryThunk(sourceFuncOp, interfaceOp, targetOp);
+        if (!thunkFuncOp.hasValue()) {
+          return failure();
         }
+        dispatchEntryOp->setAttr(
+            "function_ref", builder.getSymbolRefAttr(thunkFuncOp.getValue()));
 
         builder.create<IREE::HAL::ExecutableEntryPointOp>(
             dispatchEntryOp.getLoc(),
@@ -464,24 +367,6 @@ static LogicalResult declareTargetOps(TargetOptions targetOptions,
   return success();
 }
 
-namespace {
-
-template <typename SrcOp, typename DstOp>
-class ConverterDispatchWorkgroupInfoPattern final
-    : public OpRewritePattern<SrcOp> {
- public:
-  using OpRewritePattern<SrcOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(SrcOp op,
-                                PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<DstOp>(op, op.getResult().getType(),
-                                       op.dimensionAttr());
-    return success();
-  }
-};
-
-}  // namespace
-
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
@@ -504,6 +389,14 @@ class MaterializeInterfacesPass
     auto sourceOps =
         llvm::to_vector<32>(getOperation().getOps<IREE::Flow::ExecutableOp>());
     for (auto sourceOp : sourceOps) {
+      // Don't touch tiled executables as the new pass takes care of that.
+      auto entryOps = sourceOp.getOps<IREE::Flow::DispatchEntryOp>();
+      if (entryOps.empty()) continue;
+      auto anyEntryOp = *entryOps.begin();
+      if (anyEntryOp.workgroup_rank().hasValue()) {
+        continue;
+      }
+
       // Create the op that will contain the translated executables.
       OpBuilder builder = OpBuilder::atBlockEnd(getOperation().getBody());
       builder.setInsertionPointAfter(sourceOp);
@@ -529,23 +422,6 @@ class MaterializeInterfacesPass
         return signalPassFailure();
       }
 
-      // Convert interface-related flow.dispatch.* ops to their hal.* versions.
-      OwningRewritePatternList patterns(&getContext());
-      patterns.insert<ConverterDispatchWorkgroupInfoPattern<
-                          IREE::Flow::DispatchWorkgroupIDOp,
-                          IREE::HAL::InterfaceWorkgroupIDOp>,
-                      ConverterDispatchWorkgroupInfoPattern<
-                          IREE::Flow::DispatchWorkgroupCountOp,
-                          IREE::HAL::InterfaceWorkgroupCountOp>,
-                      ConverterDispatchWorkgroupInfoPattern<
-                          IREE::Flow::DispatchWorkgroupSizeOp,
-                          IREE::HAL::InterfaceWorkgroupSizeOp>>(
-          executableOp.getContext());
-      if (failed(applyPatternsAndFoldGreedily(executableOp,
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
-
       sourceOp.erase();
     }
   }
@@ -561,7 +437,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
 
 static PassRegistration<MaterializeInterfacesPass> pass(
     "iree-hal-materialize-interfaces",
-    "Materializes hal.executable ops from flow.executable ops", [] {
+    "Materializes hal.executable ops from flow.executable ops (DEPRECATED)",
+    [] {
       auto options = getTargetOptionsFromFlags();
       return std::make_unique<MaterializeInterfacesPass>(options);
     });

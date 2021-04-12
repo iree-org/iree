@@ -23,8 +23,8 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
-   OR NOT ${IREE_HAL_DRIVER_VMLA} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
   return()
 endif()
 """,
@@ -36,7 +36,7 @@ iree_bytecode_module(
     cc_namespace = "iree::samples",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=vmla",
+        "-iree-hal-target-backends=dylib-llvm-aot",
         "-iree-hal-target-backends=vulkan-spirv",
     ],
 )
@@ -49,7 +49,7 @@ cc_test(
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/hal:api",
-        "//iree/hal/vmla/registration",
+        "//iree/hal/dylib/registration",
         "//iree/hal/vulkan/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",

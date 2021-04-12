@@ -32,7 +32,8 @@ namespace iree_compiler {
 //====---------------------------------------------------------------------===//
 
 static void populateVectorizationPatterns(OwningRewritePatternList &patterns) {
-  linalg::insertVectorizationPatterns<linalg::FillOp, linalg::GenericOp,
+  linalg::insertVectorizationPatterns<linalg::FillOp, linalg::CopyOp,
+                                      linalg::GenericOp,
                                       linalg::ContractionOpInterface>(
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(

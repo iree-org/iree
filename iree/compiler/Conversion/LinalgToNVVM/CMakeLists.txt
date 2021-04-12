@@ -23,6 +23,7 @@ iree_cc_library(
     "TileAndDistribute.cpp"
     "VectorizationPass.cpp"
   DEPS
+    MLIRAffine
     MLIRGPU
     MLIRGPUToNVVMTransforms
     MLIRIR

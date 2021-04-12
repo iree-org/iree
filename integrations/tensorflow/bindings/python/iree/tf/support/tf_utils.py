@@ -166,8 +166,7 @@ def _complex_wrapper(function):
     for real, imag in zip(args[::2], args[1::2]):
       inputs.append(tf.complex(real, imag))
     result = function(*inputs, **kwargs)
-    # TODO(meadowlark): Support returning complex numbers.
-    return tf.math.real(result) + tf.math.imag(result)
+    return tf.math.real(result), tf.math.imag(result)
 
   return decorator
 
@@ -236,6 +235,7 @@ def check_same(ref: Any, tar: Any, rtol: float,
 
   # Base check for numpy arrays.
   elif isinstance(ref, np.ndarray):
+    # TODO(#5359): Simplify this and verify that the types are actually the same
     # Ignore np.bool != np.int8 because the IREE python runtime awkwardly
     # returns np.int8s instead of np.bools.
     if ref.dtype != tar.dtype and not (

@@ -207,8 +207,6 @@ int main(int argc, char **argv) {
       return failure();
     }
     OpPrintingFlags printFlags;
-    printFlags.enableDebugInfo();
-    printFlags.printGenericOpForm();
     module->print(outputFile->os(), printFlags);
     outputFile->os() << "\n";
     outputFile->keep();

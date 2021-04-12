@@ -528,6 +528,46 @@ def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
     HAL_DescriptorSetLayoutBindingAttr,
     "HAL descriptor set layout binding array attribute">;
 
+// TODO(benvanik): drop this when we have a HAL dispatch abstraction.
+def HAL_ExConstantStorageAttr :
+  IREE_StructAttr<"ex.constant_storage",
+                  "ExConstantStorageAttr",
+                  HAL_Dialect, [
+    IREE_StructFieldAttr<"binding", StrAttr>,
+    IREE_StructFieldAttr<"storage", StrAttr>,
+    IREE_StructFieldAttr<"offset", IndexAttr>,
+    IREE_StructFieldAttr<"length", IndexAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+def HAL_ExPushConstantAttr :
+  IREE_StructAttr<"ex.push_constant",
+                  "ExPushConstantAttr",
+                  HAL_Dialect, [
+    IREE_StructFieldAttr<"ordinal", IndexAttr>,
+    IREE_StructFieldAttr<"operand", IndexAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+def HAL_ExOperandBufferAttr :
+  IREE_StructAttr<"ex.operand_buffer",
+                  "ExOperandBufferAttr",
+                  HAL_Dialect, [
+    IREE_StructFieldAttr<"binding", StrAttr>,
+    IREE_StructFieldAttr<"operand", IndexAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+def HAL_ExResultBufferAttr :
+  IREE_StructAttr<"ex.result_buffer",
+                  "ExResultBufferAttr",
+                  HAL_Dialect, [
+    IREE_StructFieldAttr<"binding", StrAttr>,
+    IREE_StructFieldAttr<"result", IndexAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
 //===----------------------------------------------------------------------===//
 // Expression matching attributes
 //===----------------------------------------------------------------------===//
