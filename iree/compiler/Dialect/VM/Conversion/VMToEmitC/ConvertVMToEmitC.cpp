@@ -42,7 +42,7 @@ LogicalResult releaseRefIfLastUse(Operation *operation, Value listOperand) {
   OpBuilder builder(operation);
   builder.setInsertionPointAfter(operation);
 
-  auto funcOp = operation->template getParentOfType<IREE::VM::FuncOp>();
+  auto funcOp = operation->getParentOfType<IREE::VM::FuncOp>();
 
   // TODO(simon-camp): Cache the liveness analysis.
   ValueLiveness liveness;
@@ -54,8 +54,7 @@ LogicalResult releaseRefIfLastUse(Operation *operation, Value listOperand) {
   if (liveness.isLastValueUse(listOperand, operation)) {
     auto refPtrOp = builder.create<emitc::GetAddressOfOp>(
         /*location=*/loc,
-        /*result=*/
-        emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
         /*operand=*/ArrayRef<Value>{listOperand});
 
     builder.create<emitc::CallOp>(
@@ -537,8 +536,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*op=*/setOp,
         /*type=*/TypeRange{},
         /*callee=*/rewriter.getStringAttr("iree_vm_list_set_value"),
-        /*args=*/
-        ArrayAttr{},
+        /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), setOp.index(),
