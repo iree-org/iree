@@ -304,6 +304,7 @@ iree_e2e_cartesian_product_test_suite(
     ",,reciprocal_no_nan,,,tflite"
     ",,reduce_euclidean_norm,,,tflite"
     ",,reduce_logsumexp,,,tflite"
+    ",,reduce_mean,,,tflite"
     ",,reduce_std,,,tflite"
     ",,reduce_variance,,,tflite"
     ",,segment_max,,,tflite"
