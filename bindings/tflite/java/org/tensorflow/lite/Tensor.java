@@ -85,6 +85,7 @@ public final class Tensor {
 
   /** Returns the {@link DataType} of elements stored in the Tensor. */
   public DataType dataType() {
+    checkInitialized();
     return DataType.fromC(nativeType());
   }
 
@@ -95,16 +96,19 @@ public final class Tensor {
    * <p>Will be 0 for a scalar, 1 for a vector, 2 for a matrix, 3 for a 3-dimensional tensor etc.
    */
   public int numDimensions() {
+    checkInitialized();
     return nativeNumDims();
   }
 
   /** Returns the size, in bytes, of the tensor data. */
   public int numBytes() {
+    checkInitialized();
     return nativeBytesSize();
   }
 
   /** Returns the number of elements in a flattened (1-D) view of the tensor. */
   public int numElements() {
+    checkInitialized();
     int[] shape = shape();
     int n = 1;
     for (int i = 0; i < shape.length; ++i) {
@@ -120,6 +124,7 @@ public final class Tensor {
    * @return an array where the i-th element is the size of the i-th dimension of the tensor.
    */
   public int[] shape() {
+    checkInitialized();
     int[] shape = new int[nativeNumDims()];
     for (int i = 0; i < shape.length; ++i) {
       shape[i] = nativeDim(i);
@@ -136,6 +141,7 @@ public final class Tensor {
    * @return an array where the i-th element is the size of the i-th dimension of the tensor.
    */
   public int[] shapeSignature() {
+    checkInitialized();
     return shapeSignature;
   }
 
@@ -144,11 +150,13 @@ public final class Tensor {
    * output tensors indexed starting at 0.
    */
   public int index() {
+    checkInitialized();
     return tensorIndex;
   }
 
   /** Returns the name of the tensor within the owning {@link Interpreter}. */
   public String name() {
+    checkInitialized();
     return nativeName();
   }
 
@@ -159,6 +167,7 @@ public final class Tensor {
    * quantized, the values of scale and zero_point are both 0.
    */
   public QuantizationParams quantizationParams() {
+    checkInitialized();
     return quantizationParams;
   }
 
@@ -237,35 +246,38 @@ public final class Tensor {
     }
 
     if (numBytes != otherBytes) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Capacity of buffer does not match Tensor(%d). Expected %d bytes, got %d bytes",
-              tensorIndex, numBytes, otherBytes));
+      throw new IllegalArgumentException(String.format(
+          "Capacity of buffer does not match Tensor(%d). Expected %d bytes, got %d bytes",
+          tensorIndex, numBytes, otherBytes));
     }
   }
 
-  void copyFromDirectBuffer(Buffer inputBuffer) {
+  private void copyFromDirectBuffer(Buffer inputBuffer) {
     int statusCode = nativeCopyFromDirectBuffer(inputBuffer);
     if (statusCode != 0) {
       throw new IllegalArgumentException(
-          String.format(
-              "Unable to write buffer data for input tensor(%d). Return code: %d",
+          String.format("Unable to write buffer data for input tensor(%d). Return code: %d",
               tensorIndex, statusCode));
     }
   }
 
-  void copyToDirectBuffer(Buffer outputBuffer) {
+  private void copyToDirectBuffer(Buffer outputBuffer) {
     int statusCode = nativeCopyToDirectBuffer(outputBuffer);
     if (statusCode != 0) {
       throw new IllegalArgumentException(
-          String.format(
-              "Unable to write buffer data for output tensor(%d). Return code: %d",
+          String.format("Unable to write buffer data for output tensor(%d). Return code: %d",
               tensorIndex, statusCode));
     }
   }
 
   private ByteBuffer getNativeBuffer() {
     return nativeGetByteBuffer().order(ByteOrder.nativeOrder());
+  }
+
+  private void checkInitialized() {
+    if (nativeAddress == 0) {
+      throw new IllegalStateException("Interpreter hasn't been initialized");
+    }
   }
 
   private final long nativeAddress;

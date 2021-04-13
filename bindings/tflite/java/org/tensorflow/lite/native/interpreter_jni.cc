@@ -29,10 +29,10 @@ namespace {
 // object.
 static TfLiteInterpreter* GetInterpreter(JNIEnv* env, jobject obj) {
   jclass clazz = env->GetObjectClass(obj);
-  IREE_CHECK(clazz);
+  IREE_DCHECK(clazz);
 
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
-  IREE_CHECK(field);
+  IREE_DCHECK(field);
 
   return reinterpret_cast<TfLiteInterpreter*>(env->GetLongField(obj, field));
 }
@@ -63,26 +63,26 @@ JNI_FUNC jlong JNI_PREFIX(nativeNew)(JNIEnv* env, jobject thiz,
 
 JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_CHECK_NE(interpreter, nullptr);
+  IREE_DCHECK_NE(interpreter, nullptr);
   TfLiteInterpreterDelete(interpreter);
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeInputTensorCount)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_CHECK_NE(interpreter, nullptr);
+  IREE_DCHECK_NE(interpreter, nullptr);
   return (jint)TfLiteInterpreterGetInputTensorCount(interpreter);
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeOutputTensorCount)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_CHECK_NE(interpreter, nullptr);
+  IREE_DCHECK_NE(interpreter, nullptr);
 
   return (jint)TfLiteInterpreterGetOutputTensorCount(interpreter);
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeAllocateTensors)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_CHECK_NE(interpreter, nullptr);
+  IREE_DCHECK_NE(interpreter, nullptr);
 
   return (jint)TfLiteInterpreterAllocateTensors(interpreter);
 }
@@ -91,7 +91,7 @@ JNI_FUNC jint JNI_PREFIX(nativeResizeInputTensor)(JNIEnv* env, jobject thiz,
                                                   jint input_index,
                                                   jintArray dims) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_CHECK_NE(interpreter, nullptr);
+  IREE_DCHECK_NE(interpreter, nullptr);
 
   const int dims_size = env->GetArrayLength(dims);
   jint* dims_data = env->GetIntArrayElements(dims, 0);
@@ -105,7 +105,7 @@ JNI_FUNC jint JNI_PREFIX(nativeResizeInputTensor)(JNIEnv* env, jobject thiz,
 
 JNI_FUNC jint JNI_PREFIX(nativeInvoke)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_CHECK_NE(interpreter, nullptr);
+  IREE_DCHECK_NE(interpreter, nullptr);
 
   return (jint)TfLiteInterpreterInvoke(interpreter);
 }

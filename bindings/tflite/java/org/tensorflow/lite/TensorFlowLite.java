@@ -57,11 +57,10 @@ public final class TensorFlowLite {
     } catch (UnsatisfiedLinkError e) {
       // Prefer logging the original library loading exception if native methods are unavailable.
       Throwable exceptionToLog = LOAD_LIBRARY_EXCEPTION != null ? LOAD_LIBRARY_EXCEPTION : e;
-      throw new UnsatisfiedLinkError(
-          "Failed to load native TensorFlow Lite methods. Check "
-              + "that the correct native libraries are present, and, if using "
-              + "a custom native library, have been properly loaded via System.loadLibrary():\n  "
-              + exceptionToLog);
+      throw new UnsatisfiedLinkError("Failed to load native TensorFlow Lite methods. Check "
+          + "that the correct native libraries are present, and, if using "
+          + "a custom native library, have been properly loaded via System.loadLibrary():\n  "
+          + exceptionToLog);
     }
   }
 
