@@ -158,7 +158,8 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
       ConversionPatternRewriter &rewriter) const override {
     memref::LoadOp::Adaptor adaptor(operands);
     if (!isRankZeroOrOneMemRef(adaptor.memref().getType())) {
-      return rewriter.notifyMatchFailure(loadOp, "expected rank > 1");
+      return rewriter.notifyMatchFailure(
+          loadOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex = linearizeIndices(
@@ -179,7 +180,8 @@ struct LinearizeStoreIndices final
       ConversionPatternRewriter &rewriter) const override {
     memref::StoreOp::Adaptor adaptor(operands);
     if (!isRankZeroOrOneMemRef(adaptor.memref().getType())) {
-      return rewriter.notifyMatchFailure(storeOp, "expected rank > 1");
+      return rewriter.notifyMatchFailure(
+          storeOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex =
