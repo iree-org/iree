@@ -65,10 +65,11 @@ namespace Flow {
 // here, but soon we'll be shifting away from that and only accepting upstream
 // dialects like linalg.
 static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createHLOPreprocessingPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createHLOToHLOPreprocessingPass());
   if (clEnableLinalgOnTensorsDispatch) {
-    // TODO(ataei): This should run as part of createHLOPreprocessingPass which
-    // will break VMLA backend.
+    // TODO(ataei): This should run as part of createHLOToHLOPreprocessingPass
+    // which will break VMLA backend.
     passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
   }
 

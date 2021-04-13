@@ -805,8 +805,8 @@ class ReorderBroadcastInDimOpAndElementwiseOp
   }
 };
 
-struct HLOToHLOPreprocessing
-    : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
+struct HLOToHLOPreprocessingPass
+    : public PassWrapper<HLOToHLOPreprocessingPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<shape::ShapeDialect, mhlo::MhloDialect,
                     tensor::TensorDialect>();
@@ -899,11 +899,11 @@ struct HLOToHLOPreprocessing
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass() {
-  return std::make_unique<HLOToHLOPreprocessing>();
+std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass() {
+  return std::make_unique<HLOToHLOPreprocessingPass>();
 }
 
-static PassRegistration<HLOToHLOPreprocessing> legalize_pass(
+static PassRegistration<HLOToHLOPreprocessingPass> legalize_pass(
     "iree-flow-hlo-to-hlo-preprocessing",
     "Apply hlo to hlo transformations for some hlo ops");
 
