@@ -169,8 +169,9 @@ FAILING_STATIC = [
     {
         # Failing on LLVM and Vulkan
         "layer": [
-            "MaxPool3D",
             "AveragePooling3D",
+            "Masking",
+            "MaxPool3D",
         ],
         "target_backends": [
             "iree_llvmaot",
@@ -183,7 +184,6 @@ FAILING_STATIC = [
             "AveragePooling1D",
             "AveragePooling2D",
             "Lambda",
-            "Masking",
             "MaxPool1D",
             "MaxPool2D",
         ],

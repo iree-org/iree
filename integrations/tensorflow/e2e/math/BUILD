@@ -506,6 +506,7 @@ TFLITE_FAILING_DYNAMIC = [
     "reciprocal_no_nan",
     "reduce_euclidean_norm",
     "reduce_logsumexp",
+    "reduce_mean",
     "reduce_std",
     "reduce_variance",
     "segment_max",
