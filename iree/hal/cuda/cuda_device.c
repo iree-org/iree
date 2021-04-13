@@ -152,6 +152,16 @@ static iree_hal_allocator_t* iree_hal_cuda_device_allocator(
   return device->device_allocator;
 }
 
+static iree_status_t iree_hal_cuda_device_query_i32(
+    iree_hal_device_t* base_device, iree_string_view_t key,
+    int32_t* out_value) {
+  // iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  *out_value = 0;
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "unknown device configuration key value '%*.s'",
+                          (int)key.size, key.data);
+}
+
 static iree_status_t iree_hal_cuda_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -279,6 +289,7 @@ const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .id = iree_hal_cuda_device_id,
     .host_allocator = iree_hal_cuda_device_host_allocator,
     .device_allocator = iree_hal_cuda_device_allocator,
+    .query_i32 = iree_hal_cuda_device_query_i32,
     .create_command_buffer = iree_hal_cuda_device_create_command_buffer,
     .create_descriptor_set = iree_hal_cuda_device_create_descriptor_set,
     .create_descriptor_set_layout =

@@ -774,6 +774,21 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_allocator, r, r) {
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32, rr, ii) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_vm_ro_byte_buffer_t* key = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_ro_byte_buffer_check_deref(args->r1, &key));
+  iree_string_view_t key_str = iree_vm_ro_byte_buffer_as_string(key);
+
+  int32_t value = 0;
+  iree_status_t query_status =
+      iree_hal_device_query_i32(device, key_str, &value);
+  rets->i0 = iree_status_consume_code(query_status) == IREE_STATUS_OK ? 1 : 0;
+  rets->i1 = (int32_t)value;
+  return iree_ok_status();
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_device_match_id, rr, i) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
