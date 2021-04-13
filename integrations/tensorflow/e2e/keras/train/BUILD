@@ -51,8 +51,19 @@ iree_e2e_cartesian_product_test_suite(
     name = "training_tests",
     failing_configurations = [
         {
+            "target_backends": "tflite",  # TFLite doesn't support training
+        },
+        {
+            "optimizer": [
+                "adadelta",
+                "adagrad",
+                "adam",
+                "adamax",
+                "ftrl",
+                "nadam",
+                "rmsprop",
+            ],
             "target_backends": [
-                "tflite",  # TFLite doesn't support training
                 # TODO(b/157581521)
                 "iree_vmla",
                 "iree_llvmaot",

@@ -581,7 +581,7 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
             signature_dtypes=[tf.float32, tf.complex64]),
     "top_k":
         tf_test_utils.unit_test_specs_from_signatures(
-            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_shapes=[[[2, 2]]],
             signature_dtypes=[tf.float32],
             kwargs_to_values={"k": [1, 2]}),
     "truediv":
@@ -659,6 +659,12 @@ flags.DEFINE_bool(
     '(and skip running the tests).')
 
 
+def _wrap_top_k(top_k):
+  # top_k returns a tensorflow.python.ops.gen_nn_ops.TopKV2. Wrap it in a tuple
+  # so we don't have to. (The lambda is wrapped to avoid a recursive capture).
+  return lambda *args, **kwargs: tuple(top_k(*args, **kwargs))
+
+
 def create_function_unit_test(
     function_name: str,
     unit_test_spec: tf_test_utils.UnitTestSpec) -> tf.function:
@@ -669,6 +675,8 @@ def create_function_unit_test(
   if tf_utils.is_complex(signature):
     function, signature = tf_utils.rewrite_complex_signature(
         function, signature)
+  if function_name == "top_k":
+    function = _wrap_top_k(function)
   wrapped_function = lambda *args: function(*args, **unit_test_spec.kwargs)
 
   if FLAGS.dynamic_dims:
