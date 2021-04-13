@@ -93,26 +93,26 @@ vm.module @list_ops {
   }
 
   //===--------------------------------------------------------------------===//
-  // vm.list.* with variant types
+  // vm.list.* with control flow
   //===--------------------------------------------------------------------===//
 
   vm.export @test_control_flow
   vm.func @test_control_flow() {
-  // TODO(simon-camp): Implement type conversion
-    %c0 = vm.const.i32 0 : i32
-    %c1 = vm.const.i32 1 : i32
-    %c2 = vm.const.i32 2 : i32
-    %c1_dno = iree.do_not_optimize(%c1) : i32
-    %list = vm.list.alloc %c2 : (i32) -> !vm.list<i32>
-    vm.list.resize %list, %c2 : (!vm.list<i32>, i32)
-    vm.list.set.i32 %list, %c0, %c1 : (!vm.list<i32>, i32, i32)
-    vm.list.set.i32 %list, %c1, %c2 : (!vm.list<i32>, i32, i32)
-    vm.cond_br %c1_dno, ^bb1(%list : !vm.list<i32>), ^bb2
-  ^bb1(%list_0 : !vm.list<i32>):
-    %v = vm.list.get.i32 %list_0, %c0 : (!vm.list<i32>, i32) -> i32
-    vm.check.eq %v, %c1 : i32
-    vm.return
-  ^bb2:
+    // TODO(simon-camp): Implement type converter in the Vm to EmitC conversion. 
+  //   %c0 = vm.const.i32 0 : i32
+  //   %c1 = vm.const.i32 1 : i32
+  //   %c2 = vm.const.i32 2 : i32
+  //   %c1_dno = iree.do_not_optimize(%c1) : i32
+  //   %list = vm.list.alloc %c2 : (i32) -> !vm.list<i32>
+  //   vm.list.resize %list, %c2 : (!vm.list<i32>, i32)
+  //   vm.list.set.i32 %list, %c0, %c1 : (!vm.list<i32>, i32, i32)
+  //   vm.list.set.i32 %list, %c1, %c2 : (!vm.list<i32>, i32, i32)
+  //   vm.cond_br %c1_dno, ^bb1(%list : !vm.list<i32>), ^bb2
+  // ^bb1(%list_0 : !vm.list<i32>):
+  //   %v = vm.list.get.i32 %list_0, %c0 : (!vm.list<i32>, i32) -> i32
+  //   vm.check.eq %v, %c1 : i32
+  //   vm.return
+  // ^bb2:
     vm.return
   }
 >>>>>>> Wrap lists in iree_vm_ref_t
