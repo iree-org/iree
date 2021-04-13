@@ -65,8 +65,9 @@ namespace {
 
 /// Returns true if the given `type` is a MemRef of rank 0 or 1.
 static bool isRankZeroOrOneMemRef(Type type) {
-  if (auto memrefType = type.dyn_cast<MemRefType>())
+  if (auto memrefType = type.dyn_cast<MemRefType>()) {
     return memrefType.hasRank() && memrefType.getRank() <= 1;
+  }
   return false;
 }
 
@@ -130,8 +131,9 @@ static Value linearizeIndices(MemRefType sourceType, ValueRange indices,
   SmallVector<int64_t, 4> strides;
   if (failed(getStridesAndOffset(sourceType, strides, offset)) ||
       llvm::is_contained(strides, MemRefType::getDynamicStrideOrOffset()) ||
-      offset == MemRefType::getDynamicStrideOrOffset())
+      offset == MemRefType::getDynamicStrideOrOffset()) {
     return nullptr;
+  }
 
   AffineExpr sym0, sym1, sym2;
   bindSymbols(builder.getContext(), sym0, sym1, sym2);
@@ -154,8 +156,10 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
   LogicalResult matchAndRewrite(
       memref::LoadOp loadOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    typename memref::LoadOp::Adaptor adaptor(operands);
-    assert(isRankZeroOrOneMemRef(adaptor.memref().getType()));
+    memref::LoadOp::Adaptor adaptor(operands);
+    if (!isRankZeroOrOneMemRef(adaptor.memref().getType())) {
+      return rewriter.notifyMatchFailure(loadOp, "expected rank > 1");
+    }
 
     Value linearIndex = linearizeIndices(
         loadOp.getMemRefType(), loadOp.getIndices(), loadOp.getLoc(), rewriter);
@@ -173,8 +177,10 @@ struct LinearizeStoreIndices final
   LogicalResult matchAndRewrite(
       memref::StoreOp storeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    typename memref::StoreOp::Adaptor adaptor(operands);
-    assert(isRankZeroOrOneMemRef(adaptor.memref().getType()));
+    memref::StoreOp::Adaptor adaptor(operands);
+    if (!isRankZeroOrOneMemRef(adaptor.memref().getType())) {
+      return rewriter.notifyMatchFailure(storeOp, "expected rank > 1");
+    }
 
     Value linearIndex =
         linearizeIndices(storeOp.getMemRefType(), storeOp.getIndices(),
@@ -222,8 +228,17 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     // If the subspan op has a zero byte offset then we are done.
     if (matchPattern(subspanOp.byte_offset(), m_Zero())) return failure();
     // byte length is unsupported for now.
-    if (subspanOp.byte_length()) return failure();
+    if (subspanOp.byte_length()) {
+      return rewriter.notifyMatchFailure(op, "byte length unsupported");
+    }
 
+    // Calculate the offset we need to add to the load/store op, in terms of how
+    // many elements.
+    Optional<int64_t> numBytes = getNumBytes(memrefType.getElementType());
+    if (!numBytes) {
+      return rewriter.notifyMatchFailure(op,
+                                         "cannot deduce element byte count");
+    }
     // Create a new subspan op with zero byte offset.
     Value zero = rewriter.create<ConstantIndexOp>(op.memref().getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
@@ -234,16 +249,12 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     AffineExpr sym0, sym1;
     bindSymbols(context, sym0, sym1);
     auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
-    // We assume that upper layers guarantee the byte offset is perfectly
-    // divisible by the element byte count so the content is well aligned.
     auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
 
-    // Calculate the offset we need to add to the load/store op, in terms of how
-    // many elements.
-    Optional<int64_t> numBytes = getNumBytes(memrefType.getElementType());
-    if (!numBytes) return failure();
     Value byteValue = rewriter.create<ConstantIndexOp>(op.memref().getLoc(),
                                                        numBytes.getValue());
+    // We assume that upper layers guarantee the byte offset is perfectly
+    // divisible by the element byte count so the content is well aligned.
     Value offset = rewriter.create<AffineApplyOp>(
         op.getLoc(), divMap, ValueRange{subspanOp.byte_offset(), byteValue});
 
@@ -278,7 +289,7 @@ struct FlattenMemRefSubspanPass
 
   void runOnFunction() override {
     // First flatten the dimensions of subspan op and their consumer load/store
-    // ops. This requires setting up conversion targets with type conversion.
+    // ops. This requires setting up conversion targets with type converter.
 
     MLIRContext &context = getContext();
     FlattenMemRefTypeConverter typeConverter;
@@ -301,7 +312,7 @@ struct FlattenMemRefSubspanPass
 
     if (failed(applyFullConversion(getFunction(), target,
                                    std::move(flattenPatterns)))) {
-      signalPassFailure();
+      return signalPassFailure();
     }
 
     // Then fold byte offset on subspan ops into consumer load/store ops.
