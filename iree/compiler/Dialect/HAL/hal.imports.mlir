@@ -252,6 +252,13 @@ vm.import @device.allocator(
 ) -> !vm.ref<!hal.allocator>
 attributes {nosideeffects}
 
+// Returns a tuple of (ok, value) for the given configuration key.
+vm.import @device.query.i32(
+  %device : !vm.ref<!hal.device>,
+  %key : !vm.ref<!iree.byte_buffer>
+) -> (i32, i32)
+attributes {nosideeffects}
+
 // Returns true if the device ID matches the pattern.
 vm.import @device.match.id(
   %device : !vm.ref<!hal.device>,

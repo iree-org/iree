@@ -1785,6 +1785,48 @@ def HAL_DeviceMatchMemoryModelOp : HAL_PureOp<"device.match.memory_model"> {
   }];
 }
 
+def HAL_DeviceQueryOp : HAL_PureOp<"device.query"> {
+  let summary = [{returns a runtime configuration parameter from the device}];
+  let description = [{
+    Queries a device configuration parameter with the given key.
+    Returns a status indicating whether the key was recognized/available and if
+    it was the value converted to the specified type. Queries must return the
+    same value for the lifetime of the module though may vary from run to run.
+
+    This is roughly equivalent to the `sysconf` linux syscall
+    (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
+    set of keys available and their interpretation is target-dependent. If there
+    is a HAL match attribute (`#hal.device.match.*`) or op
+    (`hal.device.match.*`) prefer to use that in order to get compile-time
+    propagation when the target is specified and elide the runtime query and
+    get compile-time verification when a runtime query is required.
+
+    Users of the op must check the `ok` result before using the value as what
+    set of keys is available may change over time. If in doubt: don't use this.
+    Each key used adds additional versioning and testing complexity as runtime
+    code path changes will explode combinatorially and should be treated with as
+    much care as a binary file format change. Keys should be prefixed with `ex.`
+    when experimental indicating that they are not expected to be present
+    forever; all non-experimental keys should be vetted.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    StrAttr:$key
+  );
+  let results = (outs
+    I1:$ok,
+    AnyType:$value
+  );
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `key` `(` $key `)`
+    `:` type($ok) `,` type($value)
+    attr-dict-with-keyword
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // !hal.executable / iree_hal_executable_t
 //===----------------------------------------------------------------------===//

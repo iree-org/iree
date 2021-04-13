@@ -40,6 +40,12 @@ iree_hal_device_allocator(iree_hal_device_t* device) {
   return _VTABLE_DISPATCH(device, device_allocator)(device);
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_query_i32(
+    iree_hal_device_t* device, iree_string_view_t key, int32_t* out_value) {
+  IREE_ASSERT_ARGUMENT(device);
+  return _VTABLE_DISPATCH(device, query_i32)(device, key, out_value);
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
