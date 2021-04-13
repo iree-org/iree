@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRMath
     MLIRMathTransforms
     MLIRMemRef
+    MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
     MLIRSCFToStandard
