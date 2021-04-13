@@ -336,14 +336,13 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                                         debugDatabaseRef);
     iree_DyLibExecutableDef_end_as_root(builder);
 
-    uint32_t executableFormat =
-        targetTriple.isWasm()
-            ? static_cast<uint32_t>(IREE::HAL::ExecutableFormat::WASM)
-            : static_cast<uint32_t>(IREE::HAL::ExecutableFormat::DyLib);
+    auto executableFormatAttr = targetTriple.isWasm()
+                                    ? executableBuilder.getStringAttr("WASM")
+                                    : executableBuilder.getStringAttr("DLIB");
 
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(), executableFormat,
+        targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
         builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }

@@ -165,7 +165,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(), targetOp.sym_name(),
-        static_cast<uint32_t>(IREE::HAL::ExecutableFormat::SpirV),
+        executableBuilder.getStringAttr("SPVE"),
         builder.getBufferAttr(executableBuilder.getContext()));
 
     return success();

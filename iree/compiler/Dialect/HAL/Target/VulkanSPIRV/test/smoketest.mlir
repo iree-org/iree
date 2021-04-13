@@ -19,7 +19,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // VKSPV-NEXT:   }
 // VKSPV-NEXT:   hal.executable.binary @vulkan_spirv attributes {
 // VKSPV-SAME:     data = dense
-// VKSPV-SAME:     format = 1397773893 : i32}
+// VKSPV-SAME:     format = "SPVE"
 
 // -----
 
@@ -47,4 +47,4 @@ flow.executable @reduction_ex_reduce_0_dim_0 {
 // VKSPV-NEXT:   }
 // VKSPV-NEXT:   hal.executable.binary @vulkan_spirv attributes {
 // VKSPV-SAME:     data = dense
-// VKSPV-SAME:     format = 1397773893 : i32} {
+// VKSPV-SAME:     format = "SPVE"

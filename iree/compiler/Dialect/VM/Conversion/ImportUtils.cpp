@@ -113,19 +113,11 @@ static Value createStringTableValue(Location loc, StringAttr attrValue,
                       rewriter.getIntegerType(8)),
       stringBytes);
 
-  // Create vm.rodata holding the data.
-  auto funcOp = dyn_cast_or_null<IREE::VM::FuncOp>(
-      rewriter.getInsertionBlock()->getParentOp());
-  assert(funcOp && "value access not in a function");
-  auto insertPoint = rewriter.saveInsertionPoint();
-  rewriter.setInsertionPoint(funcOp);
-  auto rodataOp =
-      rewriter.create<IREE::VM::RodataOp>(loc, safeIdentifier, utf8Bytes);
-  rodataOp.setPrivate();
-  rewriter.restoreInsertionPoint(insertPoint);
-
-  // Load the UTF-8 bytes to pass as a value.
-  return rewriter.create<IREE::VM::ConstRefRodataOp>(loc, rodataOp);
+  // Embed the UTF-8 bytes as a vm.rodata blob.
+  return rewriter.create<IREE::VM::RodataInlineOp>(
+      loc,
+      IREE::VM::RefType::get(IREE::ByteBufferType::get(rewriter.getContext())),
+      rewriter.getStringAttr(safeIdentifier), utf8Bytes);
 }
 
 size_t getSegmentSpanSize(Type spanType) {
