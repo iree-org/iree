@@ -54,6 +54,7 @@ cc_library(
         "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/HLOToLinalg:HLOToLinalgOnTensors",
+        "//iree/compiler/Conversion/LinalgToLinalg",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/Conversion",
         "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",

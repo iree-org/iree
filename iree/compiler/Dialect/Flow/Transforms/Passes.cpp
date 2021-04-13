@@ -18,6 +18,7 @@
 
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
@@ -51,6 +52,12 @@ static llvm::cl::opt<bool> clTraceDispatchTensors(
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
+    "iree-flow-enable-1x1-conv-to-matmul",
+    llvm::cl::desc("Enable converting 1x1 linalg convolution ops to linalg "
+                   "matmul ops pass."),
+    llvm::cl::init(true));
 
 namespace mlir {
 namespace iree_compiler {
@@ -202,6 +209,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     // to be reworked first.
     passManager.addNestedPass<FuncOp>(
         mlir::iree_compiler::createHLOToLinalgOnTensorsPass(true));
+
+    if (clEnable1x1ConvToMatmul) {
+      passManager.addNestedPass<FuncOp>(
+          mlir::iree_compiler::createConvert1x1ConvToMatmulPass());
+    }
 
     passManager.addNestedPass<FuncOp>(
         mlir::createConvertElementwiseToLinalgPass());
