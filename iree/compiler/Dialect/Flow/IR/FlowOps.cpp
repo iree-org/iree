@@ -871,6 +871,18 @@ DispatchRegionOp::cloneReplacementExcludingOperandsAndResults(
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tensor.load
+//===----------------------------------------------------------------------===//
+
+void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
+                                 RankedTensorType returnType, Value source,
+                                 ArrayRef<NamedAttribute> attributes) {
+  build(builder, state, returnType, source, ArrayRef<Value>(),
+        ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
+        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.workgroups
 //===----------------------------------------------------------------------===//
 
@@ -1300,7 +1312,7 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.*
+// flow.tensor.reshape
 //===----------------------------------------------------------------------===//
 
 Value TensorReshapeOp::buildOperandRankedShape(unsigned idx,
@@ -1314,6 +1326,23 @@ Value TensorReshapeOp::buildResultRankedShape(unsigned idx,
   return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
                                          builder);
 }
+
+Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
+  return IREE::TiedOpInterface::findTiedBaseValue(source());
+}
+
+::llvm::Optional<unsigned> TensorReshapeOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // source
+}
+
+SmallVector<int64_t, 4> TensorReshapeOp::getTiedResultOperandIndices() {
+  return {0};  // source
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.*
+//===----------------------------------------------------------------------===//
 
 Value TensorLoadOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
   return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
@@ -1411,7 +1440,7 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
 
 ::llvm::Optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
-  return 0;  // target
+  return {0};  // target
 }
 
 SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
@@ -1540,6 +1569,18 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   // upgrading to support more.
   if (auto constantOp = dyn_cast<ConstantOp>(op)) {
     return constantOp.getType().isIntOrIndexOrFloat();
+  }
+  if (auto loadOp = dyn_cast<VariableLoadOp>(op)) {
+    // Only allow loads of immutable variables to move into the stream.
+    // As they are immutable it's always safe to do so as no synchronization at
+    // the stream entry/exit boundary is required.
+    //
+    // Loads of mutable variables may sometimes be safe to move in as well
+    // however that is best done when we have better cross-stream
+    // synchronization support and can make those guarantees structurally.
+    auto variableOp =
+        SymbolTable::lookupNearestSymbolFrom<VariableOp>(op, loadOp.variable());
+    return variableOp.is_mutable() == false;
   }
   return false;
 }

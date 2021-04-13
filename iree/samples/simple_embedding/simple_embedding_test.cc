@@ -17,7 +17,7 @@
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/dylib/registration/driver_module.h"
 #include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
@@ -43,14 +43,14 @@ std::ostream& operator<<(std::ostream& os, const TestParams& params) {
 }
 
 std::vector<TestParams> GetDriverTestParams() {
-  // The test file was compiled for VMLA+Vulkan, so test on each driver.
+  // The test file was compiled for DyLib+Vulkan, so test on each driver.
   std::vector<TestParams> test_params;
 
-  IREE_CHECK_OK(
-      iree_hal_vmla_driver_module_register(iree_hal_driver_registry_default()));
-  TestParams vmla_params;
-  vmla_params.driver_name = "vmla";
-  test_params.push_back(std::move(vmla_params));
+  IREE_CHECK_OK(iree_hal_dylib_driver_module_register(
+      iree_hal_driver_registry_default()));
+  TestParams dylib_params;
+  dylib_params.driver_name = "dylib";
+  test_params.push_back(std::move(dylib_params));
 
   IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
       iree_hal_driver_registry_default()));

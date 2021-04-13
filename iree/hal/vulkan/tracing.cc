@@ -17,10 +17,10 @@
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #include "iree/base/api.h"
-#include "iree/base/internal/debugging.h"
 #include "iree/base/target_platform.h"
 #include "third_party/tracy/Tracy.hpp"
 #include "third_party/tracy/client/TracyProfiler.hpp"
+#include "third_party/tracy/common/TracyAlloc.hpp"
 
 // Total number of queries the per-queue query pool will contain. This
 // translates to the maximum number of outstanding queries before collection is
@@ -379,13 +379,11 @@ static void iree_hal_vulkan_tracing_prepare_gpu_context(
   }
 
   // Send the name of the context along.
-  // NOTE: we intentionally leak the name here as tracy needs a pointer that
-  // survives until process exit (in case TRACY_NO_EXIT is set and the app waits
-  // in exit() for the profiler to attach).
-  IREE_LEAK_CHECK_DISABLE_PUSH();
-  char* cloned_name = (char*)malloc(queue_name.size);
+  // NOTE: Tracy will unconditionally free the name so we must clone it here.
+  // Since internally Tracy will use its own rpmalloc implementation we must
+  // make sure we allocate from the same source.
+  char* cloned_name = (char*)tracy::tracy_malloc(queue_name.size);
   memcpy(cloned_name, queue_name.data, queue_name.size);
-  IREE_LEAK_CHECK_DISABLE_POP();
   {
     auto* item = tracy::Profiler::QueueSerial();
     tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuContextName);

@@ -19,48 +19,28 @@ import tensorflow.compat.v2 as tf
 
 
 class FftModule(tf.Module):
-  # TODO(natashaknk) when multiple outputs are supported, make into one test.
 
   complex_input_signature = [
       tf.TensorSpec([16], tf.float32),
       tf.TensorSpec([16], tf.float32)
   ]
 
-  real_input_signature = [tf.TensorSpec([32], tf.float32)]
-
   @tf.function(input_signature=complex_input_signature)
-  def fft_real(self, real_array, imag_array):
+  def fft(self, real_array, imag_array):
     complex_in = tf.complex(real_array, imag_array)
     complex_out = tf.signal.fft(complex_in)
-    return tf.math.real(complex_out)
+    return tf.math.real(complex_out), tf.math.imag(complex_out)
 
   @tf.function(input_signature=complex_input_signature)
-  def fft_imag(self, real_array, imag_array):
-    complex_in = tf.complex(real_array, imag_array)
-    complex_out = tf.signal.fft(complex_in)
-    return tf.math.imag(complex_out)
-
-  @tf.function(input_signature=complex_input_signature)
-  def ifft_real(self, real_array, imag_array):
+  def ifft(self, real_array, imag_array):
     complex_in = tf.complex(real_array, imag_array)
     complex_out = tf.signal.ifft(complex_in)
-    return tf.math.real(complex_out)
+    return tf.math.real(complex_out), tf.math.imag(complex_out)
 
-  @tf.function(input_signature=complex_input_signature)
-  def ifft_imag(self, real_array, imag_array):
-    complex_in = tf.complex(real_array, imag_array)
-    complex_out = tf.signal.ifft(complex_in)
-    return tf.math.imag(complex_out)
-
-  @tf.function(input_signature=real_input_signature)
-  def rfft_real(self, real_array):
+  @tf.function(input_signature=[tf.TensorSpec([32], tf.float32)])
+  def rfft(self, real_array):
     complex_out = tf.signal.rfft(real_array)
-    return tf.math.real(complex_out)
-
-  @tf.function(input_signature=real_input_signature)
-  def rfft_imag(self, real_array):
-    complex_out = tf.signal.rfft(real_array)
-    return tf.math.imag(complex_out)
+    return tf.math.real(complex_out), tf.math.imag(complex_out)
 
   # TODO(natashaknk): Enable IRFFT tests when Linalg on tensors changes land.
   # @tf.function(input_signature=complex_input_signature)
@@ -90,56 +70,28 @@ class FftTest(tf_test_utils.TracedModuleTestCase):
     self.long_real_array = np.concatenate((self.real_array, self.real_array),
                                           axis=None)
 
-  def test_fft_real(self):
+  # yapf: disable
+  def test_fft(self):
+    def fft(module):
+      module.fft(self.real_array, self.imag_array, rtol=1e-4)
+    self.compare_backends(fft, self._modules)
 
-    def fft_real(module):
-      module.fft_real(self.real_array, self.imag_array, rtol=1e-4)
+  def test_ifft(self):
+    def ifft(module):
+      module.ifft(self.real_array, self.imag_array, rtol=1e-4)
+    self.compare_backends(ifft, self._modules)
 
-    self.compare_backends(fft_real, self._modules)
-
-  def test_fft_imag(self):
-
-    def fft_imag(module):
-      module.fft_imag(self.real_array, self.imag_array, rtol=1e-4)
-
-    self.compare_backends(fft_imag, self._modules)
-
-  def test_ifft_real(self):
-
-    def ifft_real(module):
-      module.ifft_real(self.real_array, self.imag_array, rtol=1e-4)
-
-    self.compare_backends(ifft_real, self._modules)
-
-  def test_ifft_imag(self):
-
-    def ifft_imag(module):
-      module.ifft_imag(self.real_array, self.imag_array, rtol=1e-4)
-
-    self.compare_backends(ifft_imag, self._modules)
-
-  def test_rfft_real(self):
-
-    def rfft_real(module):
-      module.rfft_real(self.long_real_array, rtol=1e-4)
-
-    self.compare_backends(rfft_real, self._modules)
-
-  def test_rfft_imag(self):
-
-    def rfft_imag(module):
-      module.rfft_imag(self.long_real_array, rtol=1e-4)
-
-    self.compare_backends(rfft_imag, self._modules)
-
+  def test_rfft(self):
+    def rfft(module):
+      module.rfft(self.long_real_array, rtol=1e-4)
+    self.compare_backends(rfft, self._modules)
 
 # TODO(natashaknk): Enable IRFFT tests when Linalg on tensors changes land.
 #   def test_irfft(self):
-
 #     def irfft(module):
 #       module.irfft(self.real_array, self.imag_array, rtol=1e-4)
-
 #     self.compare_backends(irfft, self._modules)
+# yapf: enable
 
 
 def main(argv):
@@ -147,7 +99,6 @@ def main(argv):
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
-
 
 if __name__ == '__main__':
   app.run(main)

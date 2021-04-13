@@ -213,7 +213,7 @@ class SipStructureResultsVisitor {
           bool extended = false;
           int list_size = l.size();
           if (list_size <= index) {
-            while (l.size() <= index) {
+            while (l.size() < index) {
               l.append(py::none());
               extended = true;
             }

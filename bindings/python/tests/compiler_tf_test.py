@@ -53,7 +53,7 @@ class TfCompilerTest(tf.test.TestCase):
 
   def testImportSavedModel(self):
     import_mlir = iree.compiler.tf.compile_saved_model(
-        self.smdir, import_only=True).decode("utf-8")
+        self.smdir, import_only=True, output_generic_mlir=True).decode("utf-8")
     self.assertIn("sym_name = \"simple_matmul\"", import_mlir)
 
   def testCompileSavedModel(self):
