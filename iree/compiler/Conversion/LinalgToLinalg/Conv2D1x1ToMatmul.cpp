@@ -51,12 +51,8 @@ class Convert1x1ConvolutionMatmulOp
         }))
       return failure();
 
-    // Gets an affine dim expression.
-    auto dim = [&](int i) -> AffineExpr {
-      return rewriter.getAffineDimExpr(i);
-    };
-    SmallVector<linalg::ReassociationExprs, 4> reassociationMaps = {
-        {dim(0), dim(1), dim(2)}, {dim(3)}};
+    SmallVector<linalg::ReassociationIndices, 4> reassociationIndices = {
+        {0, 1, 2}, {3}};
 
     auto reshapedInputType =
         RankedTensorType::get({inputShape[1] * inputShape[2], inputShape[3]},
@@ -75,18 +71,19 @@ class Convert1x1ConvolutionMatmulOp
     auto loc = convOp.getLoc();
 
     Value reshapedInput = rewriter.create<linalg::TensorReshapeOp>(
-        loc, reshapedInputType, input, reassociationMaps);
+        loc, reshapedInputType, input, reassociationIndices);
     Value reshapedFilter = rewriter.create<linalg::TensorReshapeOp>(
-        loc, reshapedFilterType, filter, reassociationMaps);
+        loc, reshapedFilterType, filter, reassociationIndices);
     Value reshapedOutput = rewriter.create<linalg::TensorReshapeOp>(
-        loc, reshapedOutputType, output, reassociationMaps);
+        loc, reshapedOutputType, output, reassociationIndices);
 
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
         loc, reshapedOutputType, ArrayRef<Value>{reshapedInput, reshapedFilter},
         ArrayRef<Value>{reshapedOutput});
 
     auto reshapedResult = rewriter.create<linalg::TensorReshapeOp>(
-        loc, outputShapeType, matmulResult.getResults()[0], reassociationMaps);
+        loc, outputShapeType, matmulResult.getResults()[0],
+        reassociationIndices);
 
     rewriter.replaceOp(convOp, ArrayRef<Value>{reshapedResult});
 
