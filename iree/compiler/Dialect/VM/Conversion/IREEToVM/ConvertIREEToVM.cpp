@@ -78,7 +78,7 @@ class UnreachableOpConversion
         rewriter.createOrFold<mlir::ConstantIntOp>(
             srcOp.getLoc(), static_cast<int32_t>(IREE::StatusCode::Unknown),
             32),
-        "unreachable location reached");
+        srcOp.message());
     return success();
   }
 };
