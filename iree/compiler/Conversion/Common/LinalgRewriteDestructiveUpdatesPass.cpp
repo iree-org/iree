@@ -513,14 +513,14 @@ void LinalgRewriteDestructiveUpdates::runOnFunction() {
     // earlier while we still have SSA use-def chains.
     // I.e. revisit later cases such as:
     // ```
-    //   inplace_update_tiles_rooted_at @legacy_io::@arg0, offset = %c0
-    //   %2 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 :
+    //   inplace_update_tiles_rooted_at @io::@arg0, offset = %c0
+    //   %2 = hal.interface.load.tensor @io::@arg0, offset = %c0 :
     //     tensor<2x4xf32>
-    //   hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0
+    //   hal.interface.store.tensor %2, @io::@ret0, offset = %c0
     //     {operand_result_index = 3 : i32} : tensor<2x4xf32>
     //   return
     // ```
-    // where the inplace update could be done directly in @legacy_io::@ret0,
+    // where the inplace update could be done directly in @io::@ret0,
     // offset = %c0.
     if (loadOp.binding() != storeOp.binding() ||
         loadOp.offset() != storeOp.offset())

@@ -1,24 +1,24 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups))" -iree-codegen-spirv-experimental-linalg-on-tensors -cse -canonicalize -split-input-file %s | IreeFileCheck %s
 
 hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @matmul_tensors attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
       func @matmul_tensors() {
         %c0 = constant 0 : index
         %c1 = constant 1 : index
-        %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<?x?xf32>
-        %2 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<?x?xf32>
-        %4 = hal.interface.binding.subspan @legacy_io::@arg2[%c0] : memref<?x?xf32>
-        %6 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<?x?xf32>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>
+        %2 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?xf32>
+        %4 = hal.interface.binding.subspan @io::@arg2[%c0] : memref<?x?xf32>
+        %6 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>
         %M = memref.dim %0, %c0 : memref<?x?xf32>
         %N = memref.dim %2, %c1 : memref<?x?xf32>
         %K = memref.dim %0, %c1 : memref<?x?xf32>
@@ -68,10 +68,10 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[C16:.+]] = constant 16 : index
 //   CHECK-DAG:   %[[C8:.+]] = constant 8 : index
-//   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
-//   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
-//   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @legacy_io::@arg2
-//   CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
+//   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
+//   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @io::@arg1
+//   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @io::@arg2
+//   CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @io::@ret0
 //   CHECK-DAG:   %[[M:.+]] = memref.dim %[[LHS]], %[[C0]]
 //   CHECK-DAG:   %[[N:.+]] = memref.dim %[[RHS]], %[[C1]]
 //   CHECK-DAG:   %[[K:.+]] = memref.dim %[[LHS]], %[[C1]]

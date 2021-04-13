@@ -1,9 +1,9 @@
 // RUN: iree-opt -split-input-file -iree-codegen-vectorize-linalg-ops -canonicalize -cse %s | IreeFileCheck %s
 
 func @broadcast_add() {
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x4xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<3x4xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<3x4xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<3x4xf32>
   linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>,
                                    affine_map<(d0, d1) -> (d0, d1)>,
                                    affine_map<(d0, d1) -> (d0, d1)>],
@@ -17,9 +17,9 @@ func @broadcast_add() {
   return
 }
 // CHECK-LABEL: func @broadcast_add
-//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1xvector<4xf32>>
-//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x1xvector<4xf32>>
-//   CHECK-DAG: %[[BUF2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<3x1xvector<4xf32>>
+//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<1xvector<4xf32>>
+//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<3x1xvector<4xf32>>
+//   CHECK-DAG: %[[BUF2:.+]] = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<3x1xvector<4xf32>>
 //       CHECK: linalg.generic
 //  CHECK-SAME:   ins(%[[BUF0]], %[[BUF1]] :
 //  CHECK-SAME:   outs(%[[BUF2]] :
@@ -30,10 +30,10 @@ func @broadcast_add() {
 // -----
 
 func @log_plus_one() {
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4xf32>
   %c0 = constant 0 : index
   %cst = constant 1.000000e+00 : f32
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4xf32>
   linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
     ins(%1 : memref<4xf32>)
    outs(%0 : memref<4xf32>) {
@@ -45,8 +45,8 @@ func @log_plus_one() {
   return
 }
 // CHECK-LABEL: func @log_plus_one
-//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1xvector<4xf32>>
-//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1xvector<4xf32>>
+//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<1xvector<4xf32>>
+//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<1xvector<4xf32>>
 //   CHECK-DAG: %[[CST:.+]] = constant dense<1.000000e+00> : vector<4xf32>
 //       CHECK: linalg.generic
 //  CHECK-SAME:   ins(%[[BUF0]] :
@@ -59,9 +59,9 @@ func @log_plus_one() {
 // -----
 
 func @cmp_and_select() {
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xi32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4xi32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<4xi32>
+  %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4xi32>
+  %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4xi32>
+  %2 = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<4xi32>
   linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
     ins(%1, %2 : memref<4xi32>, memref<4xi32>)
    outs(%0 : memref<4xi32>) {
@@ -73,9 +73,9 @@ func @cmp_and_select() {
   return
 }
 // CHECK-LABEL: func @cmp_and_select
-//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1xvector<4xi32>>
-//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1xvector<4xi32>>
-//   CHECK-DAG: %[[BUF2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1xvector<4xi32>>
+//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<1xvector<4xi32>>
+//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<1xvector<4xi32>>
+//   CHECK-DAG: %[[BUF2:.+]] = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<1xvector<4xi32>>
 //       CHECK: linalg.generic
 //  CHECK-SAME:   ins(%[[BUF0]], %[[BUF1]] :
 //  CHECK-SAME:   outs(%[[BUF2]] :
@@ -87,9 +87,9 @@ func @cmp_and_select() {
 // -----
 
 func @cmp_convert_mul() {
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<4xi32>
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xi32>
+  %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<4xi32>
+  %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4xi32>
   %cst = constant 0.000000e+00 : f32
   linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
                                    affine_map<(d0) -> (d0)>,
@@ -106,9 +106,9 @@ func @cmp_convert_mul() {
   return
 }
 // CHECK-LABEL: func @cmp_convert_mul
-//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1xvector<4xf32>>
-//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1xvector<4xi32>>
-//   CHECK-DAG: %[[BUF2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1xvector<4xi32>>
+//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<1xvector<4xf32>>
+//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<1xvector<4xi32>>
+//   CHECK-DAG: %[[BUF2:.+]] = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<1xvector<4xi32>>
 //       CHECK: linalg.generic
 //  CHECK-SAME:   ins(%[[BUF0]], %[[BUF1]] :
 //  CHECK-SAME:  outs(%[[BUF2]] :
@@ -121,10 +121,10 @@ func @cmp_convert_mul() {
 // -----
 
 func @not_contiguous() {
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x4xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4x4xf32>
   %c0 = constant 0 : index
   %cst = constant 1.000000e+00 : f32
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x4xf32>
   linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>], iterator_types = ["parallel", "parallel"]}
     ins(%1 : memref<4x4xf32>)
    outs(%0 : memref<4x4xf32>) {
@@ -135,16 +135,16 @@ func @not_contiguous() {
   return
 }
 // CHECK-LABEL: func @not_contiguous
-//   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
-//   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x4xf32>
+//   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x4xf32>
+//   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4x4xf32>
 
 // -----
 
 func @not_4s() {
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x3xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4x3xf32>
   %c0 = constant 0 : index
   %cst = constant 1.000000e+00 : f32
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x3xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x3xf32>
   linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
     ins(%1 : memref<4x3xf32>)
    outs(%0 : memref<4x3xf32>) {
@@ -155,16 +155,16 @@ func @not_4s() {
   return
 }
 // CHECK-LABEL: func @not_4s
-//   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x3xf32>
-//   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x3xf32>
+//   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x3xf32>
+//   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4x3xf32>
 
 // -----
 
 // CHECK-LABEL: func @cst
-//       CHECK: iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
+//       CHECK: iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4xf32>
 func @cst() {
   %cst = constant 1.001000e+00 : f32
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4xf32>
   linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%0 : memref<4xf32>) {
   ^bb0(%arg0: f32):  // no predecessors
     %1 = math.rsqrt %cst : f32

@@ -2,14 +2,14 @@
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x16x16x6xf32>,
         !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
@@ -20,17 +20,17 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @conv_no_padding() {
         %0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x6x14xf32>
+          {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<3x4x6x14xf32>
         %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<2x15x14x6xf32>
+          {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<2x15x14x6xf32>
         %2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x13x11x14xf32>
+          {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<2x13x11x14xf32>
         linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
            ins (%1, %0: memref<2x15x14x6xf32>, memref<3x4x6x14xf32>)
           outs (%2: memref<2x13x11x14xf32>)
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -47,9 +47,9 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 //       CHECK:   hal.return %[[C1]], %[[C4]], %[[C2]]
 //       CHECK: func @conv_no_padding()
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @legacy_io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @legacy_io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @io::@arg0
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @io::@arg1
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @io::@ret0
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //   CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
@@ -69,14 +69,14 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @matmul attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
         !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
@@ -87,16 +87,16 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @matmul() {
         %0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<25x50xf32>
+          {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<25x50xf32>
         %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<50x75xf32>
+          {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<50x75xf32>
         %2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<25x75xf32>
+          {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<25x75xf32>
         linalg.matmul ins(%0, %1 : memref<25x50xf32>, memref<50x75xf32>)
                      outs(%2 : memref<25x75xf32>)
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -113,9 +113,9 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 //       CHECK:   hal.return %[[C5]], %[[C4]], %[[C1]]
 //       CHECK: func @matmul()
 //  CHECK-SAME:   local_size = dense<[16, 8, 1]>
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @legacy_io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @legacy_io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @io::@arg0
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @io::@arg1
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @io::@ret0
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //   CHECK-NOT:   scf.parallel
@@ -136,14 +136,14 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @pooling_nhwc_max attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:2x16x16x6xf32>, !flow.dispatch.tensor<readonly:1x3x4x2xf32>,
         !flow.dispatch.tensor<writeonly:2x14x13x5xf32>) -> ()}
     module attributes {
@@ -154,18 +154,18 @@ hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @pooling_nhwc_max() {
         %0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<2x16x16x6xf32>
+          {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<2x16x16x6xf32>
         %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<3x4xf32>
+          {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<3x4xf32>
         %2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x14x13x6xf32>
+          {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<2x14x13x6xf32>
         linalg.pooling_nhwc_max
           {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
           ins(%0, %1: memref<2x16x16x6xf32>, memref<3x4xf32>)
           outs(%2: memref<2x14x13x6xf32>)
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -182,9 +182,9 @@ hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
 //       CHECK:   hal.return %[[C1]], %[[C4]], %[[C1]]
 //       CHECK: func @pooling_nhwc_max()
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @io::@arg0
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @io::@arg1
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @io::@ret0
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
@@ -200,14 +200,14 @@ hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_fusion attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
         !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
@@ -218,18 +218,18 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @matmul_fusion() {
         %0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<25x50xf32>
+          {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<25x50xf32>
         %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<50x75xf32>
+          {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<50x75xf32>
         %2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<25x75xf32>
+          {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<25x75xf32>
         %cst = constant 0.000000e+00 : f32
         linalg.fill(%2, %cst) : memref<25x75xf32>, f32
         linalg.matmul ins(%0, %1 : memref<25x50xf32>, memref<50x75xf32>)
           outs(%2 : memref<25x75xf32>)
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -246,9 +246,9 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
 //       CHECK:   hal.return %[[C5]], %[[C4]], %[[C1]]
 //       CHECK: func @matmul_fusion()
 //  CHECK-SAME:   local_size = dense<[16, 8, 1]>
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.+}} @legacy_io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.+}} @legacy_io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.+}} @io::@arg0
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.+}} @io::@arg1
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @io::@ret0
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //   CHECK-NOT:   scf.parallel
@@ -270,14 +270,14 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding_fusion attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x15x14x6xf32>,
         !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
@@ -288,11 +288,11 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @conv_no_padding_fusion() {
         %0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x6x14xf32>
+          {binding = @io::@arg0, operand_result_index = 0 : i32} : memref<3x4x6x14xf32>
         %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<2x15x14x6xf32>
+          {binding = @io::@arg1, operand_result_index = 1 : i32} : memref<2x15x14x6xf32>
         %2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x13x11x14xf32>
+          {binding = @io::@ret0, operand_result_index = 2 : i32} : memref<2x13x11x14xf32>
         %cst = constant 0.000000e+00 : f32
         linalg.fill(%2, %cst) : memref<2x13x11x14xf32>, f32
         linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
@@ -300,7 +300,7 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
           outs (%2: memref<2x13x11x14xf32>)
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -317,9 +317,9 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
 //       CHECK:   hal.return %[[C1]], %[[C4]], %[[C2]]
 //       CHECK: func @conv_no_padding_fusion()
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @legacy_io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @legacy_io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @io::@arg0
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @io::@arg1
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @io::@ret0
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //   CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
@@ -342,14 +342,14 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @three_op_fusion attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
         !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
@@ -363,17 +363,17 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
         %c0 = constant 0 : index
         %c1 = constant 1 : index
         %0 = iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
+          {binding = @io::@arg0, operand_result_index = 0 : i32}
           : memref<25x50xf32>
         %1 = iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32}
+          {binding = @io::@arg1, operand_result_index = 1 : i32}
           : memref<50x75xf32>
         %2 = memref.alloc() : memref<25x75xf32>
         %3 =  iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@arg2, operand_result_index = 2 : i32}
+          {binding = @io::@arg2, operand_result_index = 2 : i32}
           : memref<75xf32>
         %4 =  iree.placeholder for "interface buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 3 : i32}
+          {binding = @io::@ret0, operand_result_index = 3 : i32}
           : memref<25x75xf32>
         linalg.fill(%2, %cst) : memref<25x75xf32>, f32
         linalg.matmul ins(%0, %1 : memref<25x50xf32>, memref<50x75xf32>)
@@ -391,7 +391,7 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
           }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -414,10 +414,10 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
 //       CHECK:   hal.return %[[C5]], %[[C4]], %[[C1]]
 //       CHECK: func @three_op_fusion
 //   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc() : memref<8x16xf32, 3>
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @legacy_io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @legacy_io::@arg1
-//   CHECK-DAG:   %[[ARG2:.+]] = iree.placeholder {{.*}} @legacy_io::@arg2
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @io::@arg0
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @io::@arg1
+//   CHECK-DAG:   %[[ARG2:.+]] = iree.placeholder {{.*}} @io::@arg2
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} @io::@ret0
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //   CHECK-NOT:   scf.parallel

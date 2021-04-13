@@ -141,6 +141,8 @@ void iree_arena_deinitialize(iree_arena_allocator_t* arena);
 void iree_arena_reset(iree_arena_allocator_t* arena);
 
 // Allocates |byte_length| contiguous bytes from the arena.
+// The returned bytes will have undefined contents and must be initialized by
+// the caller.
 iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
                                   iree_host_size_t byte_length, void** out_ptr);
 

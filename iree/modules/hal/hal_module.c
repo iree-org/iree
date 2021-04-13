@@ -133,6 +133,7 @@ typedef struct {
   iree_hal_device_t* shared_device;
   iree_hal_executable_cache_t* executable_cache;
 
+  void* deferred_lru[4];
   iree_vm_list_t* deferred_releases;
 } iree_hal_module_state_t;
 
@@ -187,6 +188,24 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device, v, r) {
 
 void iree_hal_module_ex_defer_release(iree_hal_module_state_t* state,
                                       const iree_vm_ref_t value) {
+  // A bulk of the calls to this are for the same (or very recently same)
+  // objects, such as constant pool or transient buffer storage that may be
+  // bound 4-10 times per dispatch. This tiny LRU lets us avoid adding such
+  // repeated patterns in the common case.
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(state->deferred_lru); ++i) {
+    if (state->deferred_lru[i] == value.ptr) {
+      // Hit - keep the list sorted my most->least recently used.
+      state->deferred_lru[i] = state->deferred_lru[0];
+      state->deferred_lru[0] = value.ptr;
+      return;
+    }
+  }
+  // Miss - shift the list down and insert the new item at the head.
+  memmove(&state->deferred_lru[1], &state->deferred_lru[0],
+          sizeof(state->deferred_lru[0]) *
+              (IREE_ARRAYSIZE(state->deferred_lru) - 1));
+  state->deferred_lru[0] = value.ptr;
+
   IREE_IGNORE_ERROR(
       iree_vm_list_push_ref_retain(state->deferred_releases, &value));
 }
@@ -235,6 +254,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait, rr, v) {
   // This will be replaced with resource sets in the future that are attached to
   // each command buffer.
   IREE_RETURN_IF_ERROR(iree_vm_list_resize(state->deferred_releases, 0));
+  memset(state->deferred_lru, 0, sizeof(state->deferred_lru));
 
   return iree_ok_status();
 }

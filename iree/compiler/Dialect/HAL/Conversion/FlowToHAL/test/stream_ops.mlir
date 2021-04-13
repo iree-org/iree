@@ -237,13 +237,13 @@ func @dispatchWithShapeTies(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x1
 // -----
 
 hal.executable @ex attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
-      interface = @legacy_io,
+      interface = @io,
       ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:7x4x24xf32>, !flow.dispatch.tensor<writeonly:4x7x1024xf32>) -> ()
     }
@@ -277,13 +277,13 @@ func @static_tiled_dispatch(%input: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> 
 // -----
 
 hal.executable @ex attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io attributes {push_constants = 4 : index} {
+  hal.interface @io attributes {push_constants = 4 : index} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
-      interface = @legacy_io,
+      interface = @io,
       ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:7x?x24x?xf32>, !flow.dispatch.tensor<writeonly:?x?x1024xf32>, index, index, index, index) -> ()
     }
