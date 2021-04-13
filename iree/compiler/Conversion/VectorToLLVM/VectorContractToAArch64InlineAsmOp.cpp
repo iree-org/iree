@@ -53,7 +53,8 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
     if (accType.getElementType() != rewriter.getIntegerType(32)) {
       return failure();
     }
-    // TODO(ataei) : Remove this when linalg -> vector.contract isn't
+    // TODO(ataei) : Currently linalg op lowering sign extends all operands to
+    // i32 we need to remove this when linalg -> vector.contract isn't
     // explicitly adding sexti ops.
     if (lhsType.getElementType() != rewriter.getIntegerType(8)) {
       if (auto parentOp = cast<SignExtendIOp>(inLhs.getDefiningOp())) {
@@ -71,11 +72,11 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
     }
     auto loc = contractionOp.getLoc();
 
-    auto dstVec =
-        llvm::to_vector<4>(llvm::map_range(llvm::seq<int>(0, 4), [&](int i) {
-          return rewriter.create<vector::ExtractOp>(loc, contractionOp.acc(),
-                                                    i);
-        }));
+    SmallVector<Value> dstVec;
+    for (int i = 0; i < 4; ++i) {
+      dstVec.push_back(
+          rewriter.create<vector::ExtractOp>(loc, contractionOp.acc(), i));
+    }
 
     auto flattnedVectorType = VectorType::get({16}, rewriter.getIntegerType(8));
 
