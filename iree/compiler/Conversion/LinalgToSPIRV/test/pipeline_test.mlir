@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-to-spirv-pipeline))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-spirv-workgroup-tile-size=8,64,4 -iree-spirv-invocation-tile-size=8,4,4 -iree-spirv-workgroup-size=16,1,1 -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-to-spirv-pipeline))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
 
 hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
   hal.interface @io {

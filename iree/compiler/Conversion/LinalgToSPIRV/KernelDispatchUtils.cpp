@@ -128,7 +128,18 @@ static void getMaliBestMatMulTileSizes(
       tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 4}, {8, 2, 1}}));
     }
   } else {
-    tileSizes.push_back(TileWorkgroupSizePair({{8, 64, 4}, {16, 1, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{12, 32, 4}, {8, 2, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{14, 32, 4}, {8, 2, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{10, 32, 4}, {8, 2, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{7, 64, 4}, {16, 1, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 4}, {8, 2, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{6, 32, 4}, {8, 2, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{24, 16, 4}, {2, 8, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 4}, {2, 8, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{24, 8, 4}, {2, 8, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{40, 8, 4}, {2, 8, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 8, 4}, {2, 8, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 8, 4}, {2, 8, 1}}));
   }
 }
 
@@ -740,10 +751,18 @@ Optional<LaunchConfig> initGPULaunchConfig(
     const SPIRVCodegenOptions &options, ArrayRef<linalg::LinalgOp> linalgOps) {
   LaunchConfig launchConfig;
   if (!options.workgroupSize.empty()) {
-    SmallVector<int64_t, 3> tileSizes(options.tileSizes.begin(),
-                                      options.tileSizes.end());
+    SmallVector<int64_t, 3> workgroupTileSizes(
+        options.workgroupTileSizes.begin(), options.workgroupTileSizes.end());
+    SmallVector<int64_t, 3> invocationTileSizes(
+        options.invocationTileSizes.begin(), options.invocationTileSizes.end());
     for (linalg::LinalgOp linalgOp : linalgOps) {
-      launchConfig.setTileSizes(linalgOp.getOperation(), tileSizes, 0);
+      launchConfig.setTileSizes(linalgOp.getOperation(), workgroupTileSizes, 0);
+      // Subgroup level.
+      launchConfig.setTileSizes(linalgOp.getOperation(), {}, 1);
+      // Invocation level.
+      launchConfig.setTileSizes(linalgOp.getOperation(), invocationTileSizes,
+                                2);
+      launchConfig.setVectorize(options.enableVectorization);
     }
     SmallVector<int64_t, 3> workgroupSize(options.workgroupSize.begin(),
                                           options.workgroupSize.end());
@@ -808,9 +827,9 @@ Optional<LaunchConfig> initGPULaunchConfig(
   launchConfig.setRootOperation(*rootOperation);
   if (options.workgroupSize.empty()) {
     launchConfig.setWorkgroupSize(config.workgroupSize);
+    launchConfig.setVectorize(config.vectorize);
   }
   launchConfig.setNumSubgroups(config.numSubgroups);
-  launchConfig.setVectorize(config.vectorize);
 
   if (failed(propogateRootOperationLaunchConfig(launchConfig, *rootOperation,
                                                 dependenceGraph)))

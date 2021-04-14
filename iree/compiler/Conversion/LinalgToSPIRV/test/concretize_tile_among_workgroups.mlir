@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file  -iree-spirv-tile-size=0,4,4,16 -iree-spirv-workgroup-size=4,4,1 -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups))" -canonicalize -cse  %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file  -iree-spirv-workgroup-tile-size=0,4,4,16 -iree-spirv-workgroup-size=4,4,1 -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups))" -canonicalize -cse  %s | IreeFileCheck %s
 
 hal.executable @conv2d_static_shape attributes {sym_visibility = "private"} {
   hal.interface @io {

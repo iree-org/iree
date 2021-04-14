@@ -26,10 +26,16 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
           "Enable vectorization transformations in SPIR-V code generation"),
       llvm::cl::init(false));
 
-  static llvm::cl::list<unsigned> clTileSizes(
-      "iree-spirv-tile-size",
-      llvm::cl::desc("Set tile sizes to use for tiling Linalg operations in "
-                     "SPIR-V code generation"),
+  static llvm::cl::list<unsigned> clWorkgroupTileSizes(
+      "iree-spirv-workgroup-tile-size",
+      llvm::cl::desc("Set tile sizes to use for each workgroup when tiling "
+                     "Linalg ops in SPIR-V code generation"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
+
+  static llvm::cl::list<unsigned> clInvocationTileSizes(
+      "iree-spirv-invocation-tile-size",
+      llvm::cl::desc("Set tile sizes for each invocation when tiling Linalg "
+                     "ops in SPIR-V code generation"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 
   static llvm::cl::opt<bool> clUseWorkgroupMemory(
@@ -55,7 +61,10 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
   SPIRVCodegenOptions options;
   options.workgroupSize.assign(clWorkgroupSizes.begin(),
                                clWorkgroupSizes.end());
-  options.tileSizes.assign(clTileSizes.begin(), clTileSizes.end());
+  options.workgroupTileSizes.assign(clWorkgroupTileSizes.begin(),
+                                    clWorkgroupTileSizes.end());
+  options.invocationTileSizes.assign(clInvocationTileSizes.begin(),
+                                     clInvocationTileSizes.end());
   options.enableVectorization =
       clEnableLinalgOnTensorsSPIRV || clEnableVectorization;
   options.useWorkgroupMemory = clUseWorkgroupMemory;
