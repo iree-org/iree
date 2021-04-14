@@ -153,3 +153,36 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
+
+// -----
+
+// CHECK-LABEL: func @scalarize_vector_transfer_read
+func @scalarize_vector_transfer_read() {
+  %c0 = constant 0: index
+  %f0 = constant 0.0 : f32
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<3xf32>
+  %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<f32>
+  // CHECK-DAG: %[[INDEX0:.+]] = constant 0 : index
+  // CHECK-DAG: %[[INDEX1:.+]] = constant 1 : index
+  // CHECK-DAG: %[[INDEX2:.+]] = constant 2 : index
+  // CHECK-DAG: %[[C0:.+]] = constant 0 : i32
+  // CHECK-DAG: %[[C1:.+]] = constant 1 : i32
+  // CHECK-DAG: %[[C2:.+]] = constant 2 : i32
+  // CHECK-DAG: %[[INIT:.+]] = constant dense<0.000000e+00> : vector<3xf32>
+  // CHECK: %[[ELEM0:.+]] = memref.load %{{.+}}[%[[INDEX0]]]
+  // CHECK: %[[ELEM1:.+]] = memref.load %{{.+}}[%[[INDEX1]]]
+  // CHECK: %[[ELEM2:.+]] = memref.load %{{.+}}[%[[INDEX2]]]
+  // CHECK: %[[INSERT0:.+]] = vector.insertelement %[[ELEM0]], %[[INIT]][%[[C0]] : i32]
+  // CHECK: %[[INSERT1:.+]] = vector.insertelement %[[ELEM1]], %[[INSERT0]][%[[C1]] : i32]
+  // CHECK: %[[INSERT2:.+]] = vector.insertelement %[[ELEM2]], %[[INSERT1]][%[[C2]] : i32]
+  // CHECK: vector.extract %[[INSERT2]]
+  %2 = vector.transfer_read %0[%c0], %f0 : memref<3xf32>, vector<3xf32>
+  %3 = vector.extract %2[0]: vector<3xf32>
+  memref.store %3, %1[] : memref<f32>
+  return
+}
+
+hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write|Discard"
+}
