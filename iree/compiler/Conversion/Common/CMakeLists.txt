@@ -28,7 +28,7 @@ iree_cc_library(
     "VectorTransferOptimization.cpp"
   DEPS
     LLVMSupport
-    MLIRAffine
+    MLIRAffineUtils
     MLIRGPU
     MLIRIR
     MLIRLinalg
