@@ -211,22 +211,6 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   }
 };
 
-/// Translates vector.transfer_read with less than 4 scalars into reading each
-/// scalar and then compose the vector.
-///
-/// This is a very specific pattern for handling corner cases and boundary
-/// cases. For example, in vision models we can have the initial image with
-/// three channels. We cannot perform the native load4 there; by performing
-/// scalar read we lose some benefits of load4 but we can still make sure the
-/// overall vectorization does not fail.
-struct ScalarizeVectorTransferRead final
-    : public OpConversionPattern<vector::TransferReadOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      vector::TransferReadOp readOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override;
-};
-
 /// Base class for lowering to SPIR-V cooperative matrix ops.
 template <typename SourceOp>
 class CoopMatOpLowering : public OpConversionPattern<SourceOp> {
@@ -427,32 +411,6 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
   return success();
 }
 
-LogicalResult ScalarizeVectorTransferRead::matchAndRewrite(
-    vector::TransferReadOp readOp, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter) const {
-  VectorType vectorType = readOp.getType();
-  Type scalarType = vectorType.getElementType();
-  if (vectorType.getRank() != 1 || vectorType.getDimSize(0) >= 4)
-    return failure();
-
-  Location loc = readOp.getLoc();
-  vector::TransferReadOp::Adaptor adaptor(operands,
-                                          readOp->getAttrDictionary());
-
-  SmallVector<Value, 4> scalars;
-  SmallVector<Value, 4> indices(adaptor.indices().begin(),
-                                adaptor.indices().end());
-  for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-    indices.back() = rewriter.createOrFold<ConstantIndexOp>(loc, i);
-    scalars.push_back(rewriter.create<memref::LoadOp>(
-        loc, scalarType, readOp.source(), indices));
-  }
-
-  rewriter.replaceOpWithNewOp<spirv::CompositeConstructOp>(readOp, vectorType,
-                                                           scalars);
-  return success();
-}
-
 static void populateVectorToSPIRVPatterns(
     MLIRContext *context, SPIRVTypeConverter &converter,
     OwningRewritePatternList &patterns,
@@ -508,8 +466,8 @@ void ConvertToSPIRVPass::runOnOperation() {
       HALInterfaceWorkgroupIdAndCountConverter<
           IREE::HAL::InterfaceWorkgroupIDOp, spirv::BuiltIn::WorkgroupId>,
       HALInterfaceWorkgroupIdAndCountConverter<
-          IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>,
-      ScalarizeVectorTransferRead>(typeConverter, context);
+          IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>>(
+      typeConverter, context);
   auto aliasedResources = getAliasedResources(moduleOp);
   patterns.insert<InterfaceOpConverter<IREE::PlaceholderOp>,
                   InterfaceOpConverter<IREE::HAL::InterfaceBindingSubspanOp>>(

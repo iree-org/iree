@@ -251,30 +251,3 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 //       CHECK:     %[[ADDR2:.+]] = spv.mlir.addressof @[[WGCOUNT]]
 //       CHECK:     %[[VAL2:.+]] = spv.Load "Input" %[[ADDR2]]
 //       CHECK:     %[[WGIDY:.+]] = spv.CompositeExtract %[[VAL2]][1 : i32]
-
-// -----
-
-module attributes {
-  spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {
-      max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  // CHECK-LABEL: func @scalarize_vector_transfer_read
-  func @scalarize_vector_transfer_read() {
-    %c0 = constant 0: index
-    %f0 = constant 0.0 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<3xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<f32>
-    // CHECK: %[[LD0:.+]] = spv.Load "StorageBuffer" %{{.+}}: f32
-    // CHECK: %[[LD1:.+]] = spv.Load "StorageBuffer" %{{.+}}: f32
-    // CHECK: %[[LD2:.+]] = spv.Load "StorageBuffer" %{{.+}}: f32
-    // CHECK: %{{.+}} = spv.CompositeConstruct %[[LD0]], %[[LD1]], %[[LD2]] : vector<3xf32>
-    %2 = vector.transfer_read %0[%c0], %f0 : memref<3xf32>, vector<3xf32>
-    %3 = vector.extract %2[0]: vector<3xf32>
-    memref.store %3, %1[] : memref<f32>
-    return
-  }
-
-  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
-  }
-}
