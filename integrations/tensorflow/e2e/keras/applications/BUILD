@@ -108,6 +108,13 @@ KERAS_APPLICATIONS_MODELS = [
 iree_e2e_cartesian_product_test_suite(
     name = "large_cifar10_tests",
     size = "large",
+    failing_configurations = [
+        # Frequently OOMs
+        {
+            "target_backends": "tflite",
+            "model": "VGG19",
+        },
+    ],
     matrix = {
         "src": "applications_test.py",
         "reference_backend": "tf",
