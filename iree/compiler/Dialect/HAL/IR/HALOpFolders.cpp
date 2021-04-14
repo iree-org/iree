@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -349,6 +350,133 @@ struct ExpandAllocatorConstantOp
 void AllocatorConstantOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ExpandAllocatorConstantOp>(context);
+}
+
+LogicalResult AllocatorPackOp::fold(ArrayRef<Attribute> operands,
+                                    SmallVectorImpl<OpFoldResult> &results) {
+  Builder builder(getContext());
+
+  // If there are no slices then the entire pack results in a zero-length slab.
+  if (packed_offsets().empty()) {
+    results.push_back(builder.getZeroAttr(builder.getIndexType()));
+    return success();
+  }
+
+  // If there's a single slice then we just use that as there is no packing to
+  // perform.
+  if (packed_offsets().size() == 1) {
+    // Total length is the slice size and offset is always either 0 or the
+    // provided optional base offset.
+    results.push_back(dynamic_slice_sizes()[0]);
+    if (offset()) {
+      results.push_back(offset());
+    } else {
+      results.push_back(builder.getZeroAttr(builder.getIndexType()));
+    }
+    return success();
+  }
+
+  return failure();
+}
+
+namespace {
+
+/// Propagates base offsets on a pack op to its results.
+/// This allows for better folding of the results after packing has completed.
+/// The offset value is just a convenience for when splitting pack ops and has
+/// no impact on the actual packing operation.
+struct PropagateAllocatorPackBaseOffset
+    : public OpRewritePattern<AllocatorPackOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AllocatorPackOp op,
+                                PatternRewriter &rewriter) const override {
+    // Offset is optional.
+    auto baseOffset = op.offset();
+    if (!baseOffset) return failure();
+
+    // We always strip the offset here.
+    rewriter.updateRootInPlace(op, [&]() { op.offsetMutable().clear(); });
+
+    // Zero offsets don't do anything and can just be removed so we can avoid
+    // inserting a bunch of additional IR.
+    if (auto constantOp =
+            dyn_cast_or_null<ConstantIndexOp>(baseOffset.getDefiningOp())) {
+      if (constantOp.getValue() == 0) {
+        return success();
+      }
+    }
+
+    // Propagate the offset to all returned slice offsets.
+    rewriter.setInsertionPointAfter(op);
+    for (auto sliceOffset : op.packed_offsets()) {
+      auto addOp =
+          rewriter.create<mlir::AddIOp>(op.getLoc(), baseOffset, sliceOffset);
+      SmallPtrSet<Operation *, 1> exclusions;
+      exclusions.insert(addOp);
+      sliceOffset.replaceAllUsesExcept(addOp.result(), exclusions);
+    }
+
+    return success();
+  }
+};
+
+/// Sorts and compacts the slice intervals into a dense ascending order set.
+/// This is not required by the packing algorithm but yields more
+/// consistent-looking IR and makes the range overlaps easier to see for us
+/// meatbags.
+struct CanonicalizeAllocatorPackIntervals
+    : public OpRewritePattern<AllocatorPackOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AllocatorPackOp op,
+                                PatternRewriter &rewriter) const override {
+    // Get the slices in a possibly unsorted order and sort.
+    auto slices = op.getSlices();
+    std::stable_sort(slices.begin(), slices.end());
+
+    // See if the sorted order is different than how they are stored in the op.
+    bool orderChanged = false;
+    for (auto it : llvm::zip(slices, op.packed_offsets())) {
+      if (std::get<0>(it).packedOffset != std::get<1>(it)) {
+        orderChanged = true;
+        break;
+      }
+    }
+    if (!orderChanged) return failure();
+
+    // TODO(benvanik): compact the slice ranges.
+
+    // Rebuild the op with the sorted values.
+    SmallVector<int64_t> lifetimeIntervals(slices.size() * 2);
+    SmallVector<Value> dynamicSliceSizes(slices.size());
+    for (size_t i = 0; i < slices.size(); ++i) {
+      const auto &slice = slices[i];
+      lifetimeIntervals[2 * i + 0] = slice.lifetimeStart;
+      lifetimeIntervals[2 * i + 1] = slice.lifetimeEnd;
+      dynamicSliceSizes[i] = slice.dynamicSize;
+    }
+    SmallVector<Type> packedOffsetTypes(slices.size(), rewriter.getIndexType());
+    auto newOp = rewriter.create<AllocatorPackOp>(
+        op.getLoc(), op.total_length().getType(), packedOffsetTypes,
+        op.allocator(), op.offset(),
+        rewriter.getIndexArrayAttr(lifetimeIntervals), dynamicSliceSizes);
+
+    // Remap existing values to the new values.
+    op.total_length().replaceAllUsesWith(newOp.total_length());
+    for (size_t i = 0; i < newOp.packed_offsets().size(); ++i) {
+      slices[i].packedOffset.replaceAllUsesWith(newOp.packed_offsets()[i]);
+    }
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+}  // namespace
+
+void AllocatorPackOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<PropagateAllocatorPackBaseOffset>(context);
+  results.insert<CanonicalizeAllocatorPackIntervals>(context);
 }
 
 //===----------------------------------------------------------------------===//

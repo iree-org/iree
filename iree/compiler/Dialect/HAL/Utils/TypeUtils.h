@@ -34,6 +34,9 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
   return align(value, alignment.getZExtValue());
 }
 
+// Aligns |value| to |alignment|, rounding up if needed.
+Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder);
+
 // Returns the number of bytes an element of the given type occupies
 // post-conversion. For example, the size of i1 would be '1 byte'.
 int32_t getRoundedElementByteWidth(Type type);

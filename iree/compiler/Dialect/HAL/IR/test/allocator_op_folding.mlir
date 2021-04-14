@@ -34,3 +34,117 @@ func @allocator_constant_buffer_view(%allocator: !hal.allocator) -> !hal.buffer_
   // CHECK-NEXT: return %[[VIEW]]
   return %ref : !hal.buffer_view
 }
+
+// -----
+
+// CHECK-LABEL: @allocator_pack_zero_offset
+func @allocator_pack_zero_offset(%allocator: !hal.allocator, %size : index) -> index {
+  // CHECK-NOT: constant 0
+  %base_offset = constant 0 : index
+  // CHECK: hal.allocator.pack<{{.+}}> slices({
+  %total_length, %offset_0, %offset_1 =
+      hal.allocator.pack<%allocator : !hal.allocator>
+        offset(%base_offset)
+        slices({
+          [0, 4] = %size,
+          [1, 2] = %size,
+        }) : index
+  return %total_length : index
+}
+
+// -----
+
+// A pack with no slices folds to a zero-length slab.
+
+// CHECK-LABEL: @allocator_pack_no_slices
+func @allocator_pack_no_slices(%allocator: !hal.allocator) -> index {
+  // CHECK-NEXT: %[[ZERO_LENGTH:.+]] = constant 0
+  %total_length =
+      hal.allocator.pack<%allocator : !hal.allocator> slices({}) : index
+  // CHECK-NEXT: return %[[ZERO_LENGTH]]
+  return %total_length : index
+}
+
+// -----
+
+// A pack with a single slices folds to just that slice.
+
+// CHECK-LABEL: @allocator_pack_one_slice
+// CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator,
+// CHECK-SAME: %[[OFFSET:.+]]: index,
+// CHECK-SAME: %[[SIZE:.+]]: index
+func @allocator_pack_one_slice(%allocator: !hal.allocator, %offset: index, %size: index) -> (index, index) {
+  // CHECK-NOT: hal.allocator.pack
+  %total_length, %offset_0 =
+      hal.allocator.pack<%allocator : !hal.allocator>
+        offset(%offset)
+        slices({
+          [0, 4] = %size
+        }) : index
+  // CHECK: return %[[SIZE]], %[[OFFSET]]
+  return %total_length, %offset_0 : index, index
+}
+
+// -----
+
+// A constant zero offset operand gets dropped.
+
+// CHECK-LABEL: @allocator_pack_drop_zero_offset
+func @allocator_pack_drop_zero_offset(%allocator: !hal.allocator, %size : index) -> (index, index, index) {
+  // CHECK-NEXT: = hal.allocator.pack<{{.+}}> slices({
+  %base_offset = constant 0 : index
+  %total_length, %offset_0, %offset_1 =
+      hal.allocator.pack<%allocator : !hal.allocator>
+        offset(%base_offset)
+        slices({
+          [0, 4] = %size,
+          [1, 2] = %size,
+        }) : index
+  return %total_length, %offset_0, %offset_1 : index, index, index
+}
+
+// -----
+
+// A base offset operand gets propagated to returned values.
+
+// CHECK-LABEL: @allocator_pack_propagate_base_offset
+// CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator,
+// CHECK-SAME: %[[BASE_OFFSET:.+]]: index,
+// CHECK-SAME: %[[SIZE:.+]]: index
+func @allocator_pack_propagate_base_offset(%allocator: !hal.allocator, %base_offset: index, %size : index) -> (index, index, index) {
+  // CHECK-NEXT: %[[PACKED:.+]]:3 =
+  %total_length, %offset_0, %offset_1 =
+      // CHECK-SAME: hal.allocator.pack<{{.+}}> slices({
+      hal.allocator.pack<%allocator : !hal.allocator>
+        offset(%base_offset)
+        slices({
+          [0, 4] = %size,
+          [1, 2] = %size,
+        }) : index
+  //      CHECK: %[[ADJUSTED_0:.+]] = addi %[[BASE_OFFSET]], %[[PACKED]]#1
+  // CHECK-NEXT: %[[ADJUSTED_1:.+]] = addi %[[BASE_OFFSET]], %[[PACKED]]#2
+  // CHECK-NEXT: return %[[PACKED]]#0, %[[ADJUSTED_0]], %[[ADJUSTED_1]]
+  return %total_length, %offset_0, %offset_1 : index, index, index
+}
+
+// -----
+
+// Intervals should be sorted.
+
+// CHECK-LABEL: @allocator_pack_sort_intervals
+// CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator,
+// CHECK-SAME: %[[SIZE:.+]]: index
+func @allocator_pack_sort_intervals(%allocator: !hal.allocator, %size : index) -> (index, index, index) {
+  // CHECK-NEXT: %[[PACKED:.+]]:3 =
+  %total_length, %offset_0, %offset_1 =
+      // CHECK-SAME: hal.allocator.pack<{{.+}}> slices({
+      hal.allocator.pack<%allocator : !hal.allocator>
+        slices({
+          // CHECK-NEXT: [0, 4] = %[[SIZE]],
+          // CHECK-NEXT: [1, 2] = %[[SIZE]]
+          [1, 2] = %size,
+          [0, 4] = %size,
+        }) : index
+  // CHECK: return %[[PACKED]]#0, %[[PACKED]]#2, %[[PACKED]]#1
+  return %total_length, %offset_0, %offset_1 : index, index, index
+}

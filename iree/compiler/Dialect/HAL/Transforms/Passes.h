@@ -73,9 +73,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
-    TargetOptions executableOptions);
+    TargetOptions targetOptions);
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass(
-    TargetOptions executableOptions);
+    TargetOptions targetOptions);
 
 // Propagates hal.interface.workload.* information when constant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
@@ -83,21 +83,21 @@ createPropagateConstantWorkgroupInfoPass();
 
 // Translates hal.executable.target ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createTranslateExecutablesPass(TargetOptions executableOptions);
+createTranslateExecutablesPass(TargetOptions targetOptions);
 
 // Calls into each target backend to have it link multiple hal.executables
 // together (if that makes sense). For example, the LLVM AOT backend may combine
 // all executable targets for the same architecture into a single executable and
 // link it as a shared library.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass(
-    TargetOptions executableOptions);
+    TargetOptions targetOptions);
 
 // Resolves hal.executable.entry_point references to ordinals.
 std::unique_ptr<OperationPass<ModuleOp>> createResolveEntryPointOrdinalsPass();
 
 // Converts hal.executable.target ops to hal.executable.binary ops.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass(TargetOptions executableOptions);
+createSerializeExecutablesPass(TargetOptions targetOptions);
 
 // For functions that contain reflection metadata in an
 // iree.generateabi.reflection attribute, generate public ABI functions for
@@ -122,11 +122,15 @@ createPackConstantPoolStoragePass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createMaterializeConstantPoolBuffersPass();
 
+// Performs packing and materializes runtime packing code when required.
+std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass(
+    TargetOptions targetOptions);
+
 // Finds all resource lookups (such as hal.executable.lookup), materializes
 // their cache storage and initialization, and rewrites the lookups to
 // references.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
-    TargetOptions executableOptions);
+    TargetOptions targetOptions);
 
 // Eliminates redundant 'load's of variables within functions with no 'store'.
 // TODO(#1124): replace with memory side effects once supported upstream.
@@ -143,21 +147,22 @@ std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
 
 inline void registerHALPasses() {
   registerHALTransformPassPipeline();
-  auto executableOptions = getTargetOptionsFromFlags();
+  auto targetOptions = getTargetOptionsFromFlags();
   createConvertToHALPass();
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
-  createMaterializeInterfacesPass(executableOptions);
-  createTranslateExecutablesPass(executableOptions);
-  createLinkExecutablesPass(executableOptions);
+  createMaterializeInterfacesPass(targetOptions);
+  createTranslateExecutablesPass(targetOptions);
+  createLinkExecutablesPass(targetOptions);
   createResolveEntryPointOrdinalsPass();
-  createSerializeExecutablesPass(executableOptions);
+  createSerializeExecutablesPass(targetOptions);
   createPublicABIGenerationPass();
-  createIdentifyConstantPoolsPass(executableOptions);
+  createIdentifyConstantPoolsPass(targetOptions);
   createPackConstantPoolStoragePass();
   createMaterializeConstantPoolBuffersPass();
-  createMaterializeResourceCachesPass(executableOptions);
+  createPackAllocationsPass(targetOptions);
+  createMaterializeResourceCachesPass(targetOptions);
 }
 
 }  // namespace HAL

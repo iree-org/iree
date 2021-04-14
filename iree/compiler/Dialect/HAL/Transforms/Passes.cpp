@@ -86,6 +86,13 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  // Pack transient allocations in the program that were materialized during
+  // stream conversion.
+  //
+  // NOTE: this works best if canonicalization/CSE has run such that the packed
+  // sizes are as much as possible available as constants.
+  passManager.addNestedPass<FuncOp>(createPackAllocationsPass(targetOptions));
+
   // For each exported function, processes the reflection metadata and
   // generates public ABI wrappers for various calling conventions.
   // Phase ordering note: This operates on functions whose signatures have

@@ -34,6 +34,7 @@ iree_lit_test_suite(
             "materialize_interfaces2.mlir",
             "materialize_resource_caches.mlir",
             "memoize_device_queries.mlir",
+            "pack_allocations.mlir",
             "pack_constant_pool_storage.mlir",
             "propagate_constant_workgroup_info.mlir",
             "public_abi_generation.mlir",

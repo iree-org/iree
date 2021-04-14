@@ -22,6 +22,7 @@ iree_cc_library(
     "ConvertVariableOps.cpp"
   DEPS
     LLVMSupport
+    MLIRAnalysis
     MLIRIR
     MLIRMemRef
     MLIRPass
