@@ -3,6 +3,9 @@ theme:
   name: material
   icon:
     repo: fontawesome/brands/github
+    logo: material/ghost
+  # favicon: TODO(scotttodd): add favicon?
+
   features:
     - navigation.instant
     - navigation.tracking  # TODO(scotttodd): join mkdocs-material insiders for this
