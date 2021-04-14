@@ -882,6 +882,50 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
         builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
 }
 
+void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
+                                 Value source,
+                                 ArrayRef<OpFoldResult> mixedOffsets,
+                                 ArrayRef<OpFoldResult> mixedSizes,
+                                 ArrayRef<OpFoldResult> mixedStrides,
+                                 ArrayRef<NamedAttribute> attributes) {
+  SmallVector<Value> offsets;
+  SmallVector<Value> sizes;
+  SmallVector<Value> strides;
+  SmallVector<int64_t> staticOffsets;
+  SmallVector<int64_t> staticSizes;
+  SmallVector<int64_t> staticStrides;
+
+  auto processOperands =
+      [](ArrayRef<OpFoldResult> operands, SmallVector<Value> &dynamicOperands,
+         SmallVector<int64_t> &staticOperands, int64_t dynamicIndexValue) {
+        for (OpFoldResult operand : operands) {
+          if (auto value = operand.dyn_cast<Value>()) {
+            dynamicOperands.push_back(value);
+            staticOperands.push_back(dynamicIndexValue);
+          } else {
+            auto operandValue =
+                operand.dyn_cast<Attribute>().cast<IntegerAttr>().getValue();
+            staticOperands.push_back(operandValue.getSExtValue());
+          }
+        }
+      };
+
+  processOperands(mixedOffsets, offsets, staticOffsets,
+                  ShapedType::kDynamicStrideOrOffset);
+  processOperands(mixedSizes, sizes, staticSizes, ShapedType::kDynamicSize);
+  processOperands(mixedStrides, strides, staticStrides,
+                  ShapedType::kDynamicStrideOrOffset);
+
+  auto returnType = RankedTensorType::get(
+      staticSizes,
+      source.getType().cast<DispatchTensorType>().getElementType());
+
+  build(builder, state, returnType, source, offsets, sizes, strides,
+        builder.getI64ArrayAttr(staticOffsets),
+        builder.getI64ArrayAttr(staticSizes),
+        builder.getI64ArrayAttr(staticStrides));
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.workgroups
 //===----------------------------------------------------------------------===//

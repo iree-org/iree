@@ -1,14 +1,14 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups,iree-spirv-tile-and-vectorize-in-one-workgroup))" -iree-spirv-enable-vectorization -iree-codegen-spirv-experimental-linalg-on-tensors -canonicalize -cse %s | IreeFileCheck %s
 
 hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @conv_static_shape_f32 attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:1x225x225x16xf32>, !flow.dispatch.tensor<readonly:3x3x16x32xf32>, !flow.dispatch.tensor<writeonly:1x112x112x32xf32>) -> ()}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @conv_static_shape_f32() {
@@ -16,9 +16,9 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
         %c32 = constant 32 : index
         %c112 = constant 112 : index
         %c0 = constant 0 : index
-        %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<1x225x225x16xf32>
-        %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<3x3x16x32xf32>
-        %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<1x112x112x32xf32>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<1x225x225x16xf32>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x3x16x32xf32>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<1x112x112x32xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -54,7 +54,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -89,14 +89,14 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:1x225x225x16xf32>, !flow.dispatch.tensor<readonly:3x3x16x32xf32>, !flow.dispatch.tensor<writeonly:1x112x112x32xf32>) -> ()}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @depthwise_conv_static_shape_f32() {
@@ -104,9 +104,9 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
         %c96 = constant 96 : index
         %c56 = constant 56 : index
         %c0 = constant 0 : index
-        %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<1x113x113x96xf32>
-        %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<3x3x1x96xf32>
-        %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<1x56x56x96xf32>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<1x113x113x96xf32>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x3x1x96xf32>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<1x56x56x96xf32>
         %3 = linalg.reshape %1 [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>] : memref<3x3x1x96xf32> into memref<864xf32>
         %4 = linalg.reshape %3 [affine_map<(d0, d1, d2) -> (d0, d1, d2)>] : memref<864xf32> into memref<3x3x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -144,7 +144,7 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

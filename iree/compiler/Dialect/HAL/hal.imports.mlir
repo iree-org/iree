@@ -252,6 +252,13 @@ vm.import @device.allocator(
 ) -> !vm.ref<!hal.allocator>
 attributes {nosideeffects}
 
+// Returns a tuple of (ok, value) for the given configuration key.
+vm.import @device.query.i32(
+  %device : !vm.ref<!hal.device>,
+  %key : !vm.ref<!iree.byte_buffer>
+) -> (i32, i32)
+attributes {nosideeffects}
+
 // Returns true if the device ID matches the pattern.
 vm.import @device.match.id(
   %device : !vm.ref<!hal.device>,
@@ -266,9 +273,7 @@ attributes {nosideeffects}
 // Creates an executable for use with the specified device.
 vm.import @executable.create(
   %device : !vm.ref<!hal.device>,
-  %executable_format : i32,
-  // TODO(benvanik): replace executable format with a string.
-  // %executable_format : !vm.ref<!iree.byte_buffer>
+  %executable_format : !vm.ref<!iree.byte_buffer>,
   %executable_data : !vm.ref<!iree.byte_buffer>,
   %executable_layouts : !vm.ref<!hal.executable_layout>...
 ) -> !vm.ref<!hal.executable>

@@ -38,10 +38,10 @@ void iree_hal_executable_loader_release(
 bool iree_hal_executable_loader_query_support(
     iree_hal_executable_loader_t* executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
-    iree_hal_executable_format_t executable_format) {
+    iree_string_view_t executable_format) {
   IREE_ASSERT_ARGUMENT(executable_loader);
   return executable_loader->vtable->query_support(
-      executable_loader, executable_format, caching_mode);
+      executable_loader, caching_mode, executable_format);
 }
 
 iree_status_t iree_hal_executable_loader_try_load(

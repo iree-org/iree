@@ -94,7 +94,6 @@ TFLITE_FAILING = [
     "einsum_static_test.py",
     "einsum_vector_test.py",
     "fft_test.py",
-    "gather_test.py",
     "image_resize_test.py",
     "mandelbrot_test.py",
     "pytree_test.py",
@@ -103,7 +102,6 @@ TFLITE_FAILING = [
     "scatter_update_test.py",
     "simple_stateful_test.py",
     "sliding_window_test.py",
-    "strings_test.py",
 ]
 
 # keep sorted
@@ -113,8 +111,6 @@ VMLA_FAILING = [
     "einsum_vector_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)
-    "strings_test.py",
-    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 # keep sorted
@@ -129,15 +125,12 @@ LLVM_FAILING = [
     "einsum_vector_test.py",
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
-    "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
     "quantization_dyn_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "strings_test.py",
-    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 # keep sorted
@@ -152,15 +145,12 @@ VULKAN_FAILING = [
     "einsum_vector_test.py",
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
-    "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
     "quantization_dyn_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "strings_test.py",
-    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 iree_e2e_cartesian_product_test_suite(

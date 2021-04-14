@@ -24,4 +24,4 @@ flow.executable @add_dispatch_0 {
 
 //      CHECK:   hal.executable.binary @vulkan_spirv attributes
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = 1397773893 : i32}
+// CHECK-SAME:     format = "SPVE"

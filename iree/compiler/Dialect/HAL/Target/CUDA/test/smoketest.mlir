@@ -24,4 +24,4 @@ flow.executable @add_dispatch_0 {
 
 //      CHECK:   hal.executable.binary @cuda attributes {
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = 1129661505 : i32}
+// CHECK-SAME:     format = "PTXE"

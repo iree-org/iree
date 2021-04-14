@@ -51,3 +51,13 @@ func @device_matchers(%device : !hal.device) -> i1 {
   %0 = hal.device.match.id<%device : !hal.device> pattern("vulkan-*") : i1
   return %0 : i1
 }
+
+// -----
+
+// CHECK-LABEL: @device_query
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
+func @device_query(%device : !hal.device) -> (i1, i32) {
+  // CHECK: = hal.device.query<%[[DEVICE]] : !hal.device> key("foo") : i1, i32
+  %ok, %value = hal.device.query<%device : !hal.device> key("foo") : i1, i32
+  return %ok, %value : i1, i32
+}

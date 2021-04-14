@@ -133,6 +133,7 @@ typedef struct {
   iree_hal_device_t* shared_device;
   iree_hal_executable_cache_t* executable_cache;
 
+  void* deferred_lru[4];
   iree_vm_list_t* deferred_releases;
 } iree_hal_module_state_t;
 
@@ -187,6 +188,24 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device, v, r) {
 
 void iree_hal_module_ex_defer_release(iree_hal_module_state_t* state,
                                       const iree_vm_ref_t value) {
+  // A bulk of the calls to this are for the same (or very recently same)
+  // objects, such as constant pool or transient buffer storage that may be
+  // bound 4-10 times per dispatch. This tiny LRU lets us avoid adding such
+  // repeated patterns in the common case.
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(state->deferred_lru); ++i) {
+    if (state->deferred_lru[i] == value.ptr) {
+      // Hit - keep the list sorted my most->least recently used.
+      state->deferred_lru[i] = state->deferred_lru[0];
+      state->deferred_lru[0] = value.ptr;
+      return;
+    }
+  }
+  // Miss - shift the list down and insert the new item at the head.
+  memmove(&state->deferred_lru[1], &state->deferred_lru[0],
+          sizeof(state->deferred_lru[0]) *
+              (IREE_ARRAYSIZE(state->deferred_lru) - 1));
+  state->deferred_lru[0] = value.ptr;
+
   IREE_IGNORE_ERROR(
       iree_vm_list_push_ref_retain(state->deferred_releases, &value));
 }
@@ -235,6 +254,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait, rr, v) {
   // This will be replaced with resource sets in the future that are attached to
   // each command buffer.
   IREE_RETURN_IF_ERROR(iree_vm_list_resize(state->deferred_releases, 0));
+  memset(state->deferred_lru, 0, sizeof(state->deferred_lru));
 
   return iree_ok_status();
 }
@@ -754,6 +774,21 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_allocator, r, r) {
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32, rr, ii) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_vm_ro_byte_buffer_t* key = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_ro_byte_buffer_check_deref(args->r1, &key));
+  iree_string_view_t key_str = iree_vm_ro_byte_buffer_as_string(key);
+
+  int32_t value = 0;
+  iree_status_t query_status =
+      iree_hal_device_query_i32(device, key_str, &value);
+  rets->i0 = iree_status_consume_code(query_status) == IREE_STATUS_OK ? 1 : 0;
+  rets->i1 = (int32_t)value;
+  return iree_ok_status();
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_device_match_id, rr, i) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
@@ -770,11 +805,14 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_match_id, rr, i) {
 // iree_hal_executable_t
 //===--------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rirCrD, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rrrCrD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_hal_executable_format_t executable_format =
-      (iree_hal_executable_format_t)args->i1;
+  iree_vm_ro_byte_buffer_t* executable_format = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_ro_byte_buffer_check_deref(args->r1, &executable_format));
+  iree_string_view_t executable_format_str =
+      iree_vm_ro_byte_buffer_as_string(executable_format);
   iree_vm_ro_byte_buffer_t* executable_data = NULL;
   IREE_RETURN_IF_ERROR(
       iree_vm_ro_byte_buffer_check_deref(args->r2, &executable_data));
@@ -795,7 +833,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rirCrD, r) {
   if (iree_status_is_ok(status)) {
     iree_hal_executable_spec_t spec;
     iree_hal_executable_spec_initialize(&spec);
-    spec.executable_format = executable_format;
+    spec.executable_format = executable_format_str;
     spec.executable_data = executable_data->data;
     spec.executable_layout_count = executable_layout_count;
     spec.executable_layouts = executable_layouts;

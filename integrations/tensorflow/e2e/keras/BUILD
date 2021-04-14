@@ -93,9 +93,6 @@ iree_e2e_cartesian_product_test_suite(
             "model": [
                 "att_mh_rnn",
                 "att_rnn",
-                "crnn",
-                "gru",
-                "lstm",
             ],
             "target_backends": "iree_vmla",
         },

@@ -334,8 +334,9 @@ static void iree_hal_legacy_library_loader_destroy(
 static bool iree_hal_legacy_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
-    iree_hal_executable_format_t executable_format) {
-  return executable_format == iree_hal_make_executable_format("DLIB");
+    iree_string_view_t executable_format) {
+  return iree_string_view_equal(executable_format,
+                                iree_make_cstring_view("DLIB"));
 }
 
 static iree_status_t iree_hal_legacy_library_loader_try_load(

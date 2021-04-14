@@ -96,7 +96,7 @@ class HoistUnstreamableOps
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass() {
-  return std::make_unique<HoistUnstreamableOps>();  // NOLINT
+  return std::make_unique<HoistUnstreamableOps>();
 }
 
 static PassRegistration<HoistUnstreamableOps> pass(

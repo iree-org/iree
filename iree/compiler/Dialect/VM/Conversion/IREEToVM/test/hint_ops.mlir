@@ -6,8 +6,8 @@ module {
   // CHECK: vm.func @my_fn
   func @my_fn() {
     // CHECK-NEXT: %[[CODE:.+]] = vm.const.i32 2
-    // CHECK-NEXT: vm.fail %[[CODE]], "unreachable location reached"
-    iree.unreachable
+    // CHECK-NEXT: vm.fail %[[CODE]], "nope!"
+    iree.unreachable "nope!"
   }
 }
 }

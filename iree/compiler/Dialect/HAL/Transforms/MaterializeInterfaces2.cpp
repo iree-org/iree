@@ -924,8 +924,9 @@ static void populateInterfaceBindings(IREE::Flow::ExecutableOp executableOp,
     int primitiveIndex = 0;
     if (operandInfo.usage & DerivedOperandInfo::PUSH_CONSTANT) {
       RegionOperand regionOperand;
+      auto pushConstantOrdinal = interfaceBuilder.definePushConstant();
       regionOperand.type = RegionOperand::Type::PUSH_CONSTANT;
-      regionOperand.pushConstantOrdinal = interfaceBuilder.definePushConstant();
+      regionOperand.pushConstantOrdinal = pushConstantOrdinal;
       interfaceBuilder.mapRegionOperand(operandInfo.operandIndex,
                                         std::move(regionOperand));
 
@@ -935,7 +936,7 @@ static void populateInterfaceBindings(IREE::Flow::ExecutableOp executableOp,
       // remapping.
       DispatchBinding dispatchBinding;
       dispatchBinding.type = DispatchBinding::Type::PUSH_CONSTANT;
-      dispatchBinding.pushConstantOrdinal = regionOperand.pushConstantOrdinal;
+      dispatchBinding.pushConstantOrdinal = pushConstantOrdinal;
       dispatchBinding.sourceIndex = mapRegionOperandToDispatchValue(
           entryFuncOp, operandInfo.operandIndex);
 
@@ -1192,8 +1193,8 @@ class MaterializeInterfaces2Pass
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass(
-    TargetOptions targetOptions) {
-  return std::make_unique<MaterializeInterfaces2Pass>(targetOptions);  // NOLINT
+    TargetOptions executableOptions) {
+  return std::make_unique<MaterializeInterfaces2Pass>(executableOptions);
 }
 
 static PassRegistration<MaterializeInterfaces2Pass> pass(

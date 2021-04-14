@@ -1,14 +1,14 @@
 // RUN: iree-opt -split-input-file  -iree-spirv-tile-size=4,16 -iree-spirv-workgroup-size=4,4,1 -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups))" -canonicalize -cse  %s | IreeFileCheck %s
 
 hal.executable @matmul_dynamic_shape attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @matmul_dynamic_shape attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:1x225x225x16xf32>, !flow.dispatch.tensor<readonly:3x3x16x32xf32>, !flow.dispatch.tensor<writeonly:1x112x112x32xf32>) -> ()}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @matmul_dynamic_shape() {
@@ -16,9 +16,9 @@ hal.executable @matmul_dynamic_shape attributes {sym_visibility = "private"} {
         %c0 = constant 0 : index
         %0 = hal.interface.load.constant offset = 0 : index
         %1 = hal.interface.load.constant offset = 1 : index
-        %2 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<?x?xf32>
-        %3 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<?x?xf32>
-        %4 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<?x?xf32>
+        %2 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>
+        %3 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?xf32>
+        %4 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>
         %5 = hal.interface.load.constant offset = 2 : index
         %6 = hal.interface.load.constant offset = 3 : index
         %7 = hal.interface.load.constant offset = 4 : index
@@ -56,7 +56,7 @@ hal.executable @matmul_dynamic_shape attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

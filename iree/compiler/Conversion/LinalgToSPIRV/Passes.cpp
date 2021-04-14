@@ -38,6 +38,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
@@ -128,7 +129,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(
         createVectorTransferOptimizationPass());
   }
-  pm.nest<ModuleOp>().addPass(createLegalizeStdOpsForSPIRVLoweringPass());
+  pm.nest<ModuleOp>().addPass(memref::createFoldSubViewOpsPass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
   if (options.enableVectorization) {

@@ -18,6 +18,7 @@
 
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
@@ -52,6 +53,12 @@ static llvm::cl::opt<bool> clTraceDispatchTensors(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
+    "iree-flow-enable-1x1-conv-to-matmul",
+    llvm::cl::desc("Enable converting 1x1 linalg convolution ops to linalg "
+                   "matmul ops pass."),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -65,10 +72,11 @@ namespace Flow {
 // here, but soon we'll be shifting away from that and only accepting upstream
 // dialects like linalg.
 static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createHLOPreprocessingPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createHLOToHLOPreprocessingPass());
   if (clEnableLinalgOnTensorsDispatch) {
-    // TODO(ataei): This should run as part of createHLOPreprocessingPass which
-    // will break VMLA backend.
+    // TODO(ataei): This should run as part of createHLOToHLOPreprocessingPass
+    // which will break VMLA backend.
     passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
   }
 
@@ -201,6 +209,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     // to be reworked first.
     passManager.addNestedPass<FuncOp>(
         mlir::iree_compiler::createHLOToLinalgOnTensorsPass(true));
+
+    if (clEnable1x1ConvToMatmul) {
+      passManager.addNestedPass<FuncOp>(
+          mlir::iree_compiler::createConvert1x1ConvToMatmulPass());
+    }
 
     passManager.addNestedPass<FuncOp>(
         mlir::createConvertElementwiseToLinalgPass());

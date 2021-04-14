@@ -19,6 +19,7 @@
 #include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -125,7 +126,7 @@ struct VectorizationPass
       vectorToSCFOptions.setUnroll(true);
       populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                             vectorToSCFOptions);
-      populateStdLegalizationPatternsForSPIRVLowering(vectorToLoopsPatterns);
+      memref::populateFoldSubViewOpPatterns(vectorToLoopsPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(vectorToLoopsPatterns));
     }

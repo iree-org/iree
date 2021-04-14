@@ -189,7 +189,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
           linkedInterfaceOp = dyn_cast<IREE::HAL::InterfaceOp>(
               linkedExecutableBuilder.clone(*sourceInterfaceOp));
           linkedInterfaceOp.setName(
-              llvm::formatv("legacy_io_{0}", linkedInterfaceOps.size()).str());
+              llvm::formatv("io_{0}", linkedInterfaceOps.size()).str());
           linkedInterfaceOps.push_back(linkedInterfaceOp);
         }
 

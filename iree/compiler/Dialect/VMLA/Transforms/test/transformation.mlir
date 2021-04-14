@@ -2,16 +2,16 @@
 
 func @simpleMath_rgn_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<4xf32>
+  %0 = hal.interface.load.tensor @io::@arg0, offset = %c0 : tensor<4xf32>
   %1 = call @simpleMath_rgn_dispatch_0_impl(%0) : (tensor<4xf32>) -> tensor<4xf32>
-  hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<4xf32>
+  hal.interface.store.tensor %1, @io::@ret0, offset = %c0 : tensor<4xf32>
   return
 }
 func private @simpleMath_rgn_dispatch_0_impl(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   return %0 : tensor<4xf32>
 }
-hal.interface @legacy_io attributes {sym_visibility = "private"} {
+hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }

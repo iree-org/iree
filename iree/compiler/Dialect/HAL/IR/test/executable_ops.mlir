@@ -27,8 +27,8 @@ hal.executable @ex {
   hal.executable.binary @backend_binary attributes {
     // CHECK-SAME: data = dense<1> : vector<128xi8>,
     data = dense<1> : vector<128xi8>,
-    // CHECK-SAME: format = 1230128453 : i32
-    format = 1230128453 : i32
+    // CHECK-SAME: format = "some_format"
+    format = "some_format"
   }
 }
 
@@ -64,8 +64,8 @@ hal.executable @ex_with_workgroup_count_region {
   hal.executable.binary @backend_binary attributes {
     // CHECK-SAME: data = dense<1> : vector<128xi8>,
     data = dense<1> : vector<128xi8>,
-    // CHECK-SAME: format = 1230128453 : i32
-    format = 1230128453 : i32
+    // CHECK-SAME: format = "some_format"
+    format = "some_format"
   }
 }
 
@@ -77,8 +77,8 @@ hal.executable @ex_with_source {
   hal.executable.binary @backend_binary attributes {
     // CHECK-SAME: data = dense<1> : vector<128xi8>,
     data = dense<1> : vector<128xi8>,
-    // CHECK-SAME: format = 1230128453 : i32
-    format = 1230128453 : i32
+    // CHECK-SAME: format = "some_format"
+    format = "some_format"
   } {
     // CHECK-NEXT: module {
     module {

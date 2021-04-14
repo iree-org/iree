@@ -46,6 +46,7 @@ iree_lit_test_suite(
             "legalize_input_types.mlir",
             "outline_dispatch_regions2.mlir",
             "outline_large_constants.mlir",
+            "pre_partitioning_conversion.mlir",
             "strip_and_splat_constant_variables.mlir",
             "transformation.mlir",
         ],
