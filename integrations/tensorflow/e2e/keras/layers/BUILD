@@ -169,12 +169,9 @@ FAILING_STATIC = [
     {
         # Failing on LLVM and Vulkan
         "layer": [
-            "Lambda",
-            "Masking",
-            "MaxPool1D",
-            "MaxPool2D",
-            "MaxPool3D",
             "AveragePooling3D",
+            "Masking",
+            "MaxPool3D",
             "LocallyConnected1D",  # TODO(GH-5310): Enable the test.
         ],
         "target_backends": [
@@ -187,7 +184,9 @@ FAILING_STATIC = [
         "layer": [
             "AveragePooling1D",
             "AveragePooling2D",
-            "ThresholdedReLU",
+            "Lambda",
+            "MaxPool1D",
+            "MaxPool2D",
             "Conv3D",  #TODO(GH-5150): Enable the test.
             "Conv3DTranspose",  #TODO(GH-5150): Enable the test.
         ],
