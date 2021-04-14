@@ -97,6 +97,7 @@ inline void registerLinalgToLinalgPasses() {
   static bool init_once = []() {
     // LinalgToLinalg
     createConvert1x1ConvToMatmulPass();
+    createConvertConv2DToImg2ColPass();
     return true;
   }();
   (void)init_once;

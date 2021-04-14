@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "conv1x1_to_matmul.mlir"
+    "conv2d_to_img2col.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
