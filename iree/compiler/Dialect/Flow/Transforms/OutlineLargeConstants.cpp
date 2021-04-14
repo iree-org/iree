@@ -123,8 +123,7 @@ class OutlineLargeConstantsPass
 
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
     size_t minLargeConstantSize) {
-  return std::make_unique<OutlineLargeConstantsPass>(
-      minLargeConstantSize);  // NOLINT
+  return std::make_unique<OutlineLargeConstantsPass>(minLargeConstantSize);
 }
 
 static PassRegistration<OutlineLargeConstantsPass> pass(
