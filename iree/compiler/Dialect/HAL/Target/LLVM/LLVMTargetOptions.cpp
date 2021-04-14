@@ -137,6 +137,13 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::init(llvmTargetOptions.debugSymbols));
   llvmTargetOptions.debugSymbols = clDebugSymbols;
 
+  static llvm::cl::opt<bool> clLinkEmbedded(
+      "iree-llvm-link-embedded",
+      llvm::cl::desc("Links binaries into a platform-agnostic ELF to be loaded "
+                     "by the embedded IREE ELF loader"),
+      llvm::cl::init(llvmTargetOptions.linkEmbedded));
+  llvmTargetOptions.linkEmbedded = clLinkEmbedded;
+
   static llvm::cl::opt<bool> clLinkStatic(
       "iree-llvm-link-static",
       llvm::cl::desc(

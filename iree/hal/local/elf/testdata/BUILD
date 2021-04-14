@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,27 +20,12 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT ${IREE_HAL_DRIVER_DYLIB})
-  return()
-endif()
-""",
-    inline = True,
-)
-
-cc_library(
-    name = "registration",
-    srcs = ["driver_module.cc"],
-    hdrs = ["driver_module.h"],
-    defines = [
-        "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1",
-    ],
-    deps = [
-        "//iree/hal:api",
-        "//iree/hal/local:task_driver",
-        "//iree/hal/local/loaders:embedded_library_loader",
-        "//iree/hal/local/loaders:legacy_library_loader",
-        "@com_google_absl//absl/flags:flag",
-    ],
+cc_embed_data(
+    name = "simple_mul_dispatch",
+    testonly = True,
+    srcs = glob(["simple_mul_dispatch_*.so"]),
+    cc_file_output = "simple_mul_dispatch.cc",
+    cpp_namespace = "iree::elf",
+    flatten = True,
+    h_file_output = "simple_mul_dispatch.h",
 )

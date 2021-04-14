@@ -99,6 +99,7 @@
 #ifndef IREE_BASE_API_H_
 #define IREE_BASE_API_H_
 
+#include <assert.h>
 #include <memory.h>
 #include <stdarg.h>
 #include <stdbool.h>

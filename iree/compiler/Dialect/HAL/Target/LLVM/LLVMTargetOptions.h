@@ -49,6 +49,9 @@ struct LLVMTargetOptions {
   // Sanitizer Kind for CPU Kernels
   SanitizerKind sanitizerKind = SanitizerKind::kNone;
 
+  // Build for the IREE embedded platform-agnostic ELF loader.
+  bool linkEmbedded = false;
+
   // Link any required runtime libraries into the produced binaries statically.
   // This increases resulting binary size but enables the binaries to be used on
   // any machine without requiring matching system libraries to be installed.

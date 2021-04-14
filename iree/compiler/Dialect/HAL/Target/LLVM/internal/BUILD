@@ -22,6 +22,7 @@ cc_library(
     name = "LinkerTools_internal",
     srcs = [
         "AndroidLinkerTool.cpp",
+        "EmbeddedLinkerTool.cpp",
         "LinkerTools.cpp",
         "RiscvLinkerTool.cpp",
         "UnixLinkerTool.cpp",
