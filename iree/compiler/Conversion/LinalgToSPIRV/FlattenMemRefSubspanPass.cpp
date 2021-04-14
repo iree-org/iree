@@ -127,6 +127,8 @@ struct FlattenBindingSubspan final
 /// indexing into the given memref `sourceType`.
 static Value linearizeIndices(MemRefType sourceType, ValueRange indices,
                               Location loc, OpBuilder &builder) {
+  assert(sourceType.hasRank() && sourceType.getRank() != 0);
+
   int64_t offset;
   SmallVector<int64_t, 4> strides;
   if (failed(getStridesAndOffset(sourceType, strides, offset)) ||
@@ -220,7 +222,9 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
   LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
     auto memrefType = op.memref().getType().template cast<MemRefType>();
-    if (!isRankZeroOrOneMemRef(memrefType)) return failure();
+    if (!isRankZeroOrOneMemRef(memrefType)) {
+      return rewriter.notifyMatchFailure(op, "expected 0-D or 1-D memref");
+    }
 
     auto subspanOp =
         op.memref()
