@@ -108,7 +108,7 @@ class ConvertToHALPass
 }  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
-  return std::make_unique<ConvertToHALPass>();  // NOLINT
+  return std::make_unique<ConvertToHALPass>();
 }
 
 static PassRegistration<ConvertToHALPass> pass(
