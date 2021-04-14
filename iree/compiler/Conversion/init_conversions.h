@@ -21,6 +21,7 @@
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToVector/Passes.h"
 
@@ -85,6 +86,15 @@ inline void registerLinalgToLLVMPasses() {
     createLinalgTileAndVectorizeWorkgroupsPass();
     createMaterializeCPULaunchConfigurationPass();
     createUnfusedFMAOpsPass();
+    return true;
+  }();
+  (void)init_once;
+}
+
+inline void registerLinalgToLinalgPasses() {
+  static bool init_once = []() {
+    // LinalgToLinalg
+    createConvert1x1ConvToMatmulPass();
     return true;
   }();
   (void)init_once;

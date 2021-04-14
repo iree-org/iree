@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,16 +19,19 @@ package(
 )
 
 cc_library(
-    name = "init_conversions",
+    name = "LinalgToLinalg",
+    srcs = [
+        "Conv2D1x1ToMatmul.cpp",
+    ],
     hdrs = [
-        "init_conversions.h",
+        "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Conversion/HLOToLinalg",
-        "//iree/compiler/Conversion/LinalgToLLVM",
-        "//iree/compiler/Conversion/LinalgToLinalg",
-        "//iree/compiler/Conversion/LinalgToNVVM",
-        "//iree/compiler/Conversion/LinalgToSPIRV",
-        "//iree/compiler/Conversion/LinalgToVector",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
     ],
 )
