@@ -86,3 +86,17 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s2 * 4 + s3 * 12 + s1 floordiv 4)>
 //      CHECK: func @store_subspan_with_leading_unknown_dim
 //      CHECK:   affine.apply #[[MAP]]()
+
+// -----
+
+func @ignore_load_store_alloc(%value : f32, %i0: index, %i1 : index, %i2: index) -> f32 {
+  %alloc = memref.alloc() : memref<2x3x4xf32, 3>
+  memref.store %value, %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>
+  %val = memref.load %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>
+  return %val: f32
+}
+
+// CHECK-LABEL: func @ignore_load_store_alloc
+//       CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<2x3x4xf32, 3>
+//       CHECK: memref.store %{{[a-z0-9]+}}, %[[ALLOC]]
+//       CHECK: memref.load %[[ALLOC]]

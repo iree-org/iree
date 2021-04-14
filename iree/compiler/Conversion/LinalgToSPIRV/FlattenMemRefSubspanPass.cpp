@@ -305,19 +305,21 @@ struct FlattenMemRefSubspanPass
 
     ConversionTarget target(context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+    target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
+        [](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+          return isRankZeroOrOneMemRef(subspanOp.getType());
+        });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
       return isRankZeroOrOneMemRef(loadOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
       return isRankZeroOrOneMemRef(storeOp.getMemRefType());
     });
-    target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        [](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-          return isRankZeroOrOneMemRef(subspanOp.getType());
-        });
 
-    if (failed(applyFullConversion(getFunction(), target,
-                                   std::move(flattenPatterns)))) {
+    // Use partial conversion here so that we can ignore allocations created by
+    // promotion and their load/store ops.
+    if (failed(applyPartialConversion(getFunction(), target,
+                                      std::move(flattenPatterns)))) {
       return signalPassFailure();
     }
 
