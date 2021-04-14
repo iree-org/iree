@@ -50,26 +50,33 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
     Value inLhs = contractionOp.lhs();
     Value inRhs = contractionOp.rhs();
 
-    if (accType.getElementType() != rewriter.getIntegerType(32)) {
+    auto I8Type = rewriter.getIntegerType(8);
+    auto I32Type = rewriter.getIntegerType(32);
+
+    if (accType.getElementType() != I32Type) {
       return failure();
     }
-    // TODO(ataei) : Currently linalg op lowering sign extends all operands to
-    // i32 we need to remove this when linalg -> vector.contract isn't
-    // explicitly adding sexti ops.
-    if (lhsType.getElementType() != rewriter.getIntegerType(8)) {
-      if (auto parentOp = cast<SignExtendIOp>(inLhs.getDefiningOp())) {
-        inLhs = parentOp.value();
-      } else {
-        return failure();
+
+    auto getI8Value = [&](Value v) -> Value {
+      if (auto parentOp = v.getDefiningOp<SignExtendIOp>()) {
+        if (parentOp.value().getType().cast<VectorType>().getElementType() !=
+            I8Type) {
+          return nullptr;
+        } else {
+          return parentOp.value();
+        }
       }
+      return nullptr;
+    };
+    if (lhsType.getElementType() != I8Type) {
+      inLhs = getI8Value(inLhs);
     }
-    if (rhsType.getElementType() != rewriter.getIntegerType(8)) {
-      if (auto parentOp = cast<SignExtendIOp>(inRhs.getDefiningOp())) {
-        inRhs = parentOp.value();
-      } else {
-        return failure();
-      }
+    if (rhsType.getElementType() != I8Type) {
+      inRhs = getI8Value(inRhs);
     }
+
+    if (!inLhs || !inRhs) return failure();
+
     auto loc = contractionOp.getLoc();
 
     SmallVector<Value> dstVec;
@@ -78,7 +85,7 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
           rewriter.create<vector::ExtractOp>(loc, contractionOp.acc(), i));
     }
 
-    auto flattnedVectorType = VectorType::get({16}, rewriter.getIntegerType(8));
+    auto flattnedVectorType = VectorType::get({16}, I8Type);
 
     auto lhs =
         rewriter.create<vector::ShapeCastOp>(loc, flattnedVectorType, inLhs);
@@ -89,7 +96,7 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
     auto rhs = rewriter.create<vector::ShapeCastOp>(loc, flattnedVectorType,
                                                     inRhsTransposed);
 
-    auto int32x4VType = VectorType::get({4}, rewriter.getIntegerType(32));
+    auto int32x4VType = VectorType::get({4}, I32Type);
 
     auto returnType = LLVM::LLVMStructType::getLiteral(
         rewriter.getContext(),
@@ -119,7 +126,7 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
               rewriter.getI64ArrayAttr({i}));
         }));
 
-    auto int32x4x4xVType = VectorType::get({4, 4}, rewriter.getIntegerType(32));
+    auto int32x4x4xVType = VectorType::get({4, 4}, I32Type);
 
     Value result;
     result = rewriter.create<ConstantOp>(
