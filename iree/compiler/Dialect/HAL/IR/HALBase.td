@@ -224,42 +224,6 @@ def HAL_AccessScopeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-// Values are FourCC codes.
-// See iree/hal/executable_format.h for more info. Keep these in sync with the
-// codes there.
-// https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
-// integer values for inclusion here.
-def HAL_EF_Unspecified : I32EnumAttrCase<"Unspecified", 538976288>;
-def HAL_EF_MlirText : I32EnumAttrCase<"MlirText", 1296845138>;
-def HAL_EF_IreeBytecode : I32EnumAttrCase<"IreeBytecode", 1230128453>;
-def HAL_EF_VMLA : I32EnumAttrCase<"VMLA", 1447906369>;
-def HAL_EF_SpirV : I32EnumAttrCase<"SpirV", 1397773893>;
-def HAL_EF_Metal : I32EnumAttrCase<"Metal", 1297370181>;
-def HAL_EF_LLVM : I32EnumAttrCase<"LLVM", 1280071245>;
-def HAL_EF_DyLib : I32EnumAttrCase<"DyLib", 1145850178>;
-def HAL_EF_CUDA : I32EnumAttrCase<"CUDA", 1129661505>;
-def HAL_EF_WASM : I32EnumAttrCase<"WASM", 1463898957>;
-def HAL_ExecutableFormatAttr :
-    I32EnumAttr<"ExecutableFormat", "IREE HAL Executable format", [
-      HAL_EF_Unspecified,
-      HAL_EF_MlirText,
-      HAL_EF_IreeBytecode,
-      HAL_EF_VMLA,
-      HAL_EF_SpirV,
-      HAL_EF_Metal,
-      HAL_EF_DyLib,
-      HAL_EF_CUDA,
-      HAL_EF_WASM,
-    ]> {
-  let returnType = "IREE::HAL::ExecutableFormat";
-  let convertFromStorage = "static_cast<IREE::HAL::ExecutableFormat>($_self.getInt())";
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
-
-def HAL_ExecutableFormatArrayAttr : TypedArrayAttrBase<
-    HAL_ExecutableFormatAttr,
-    "HAL executable format array attribute">;
-
 //===----------------------------------------------------------------------===//
 // HAL types
 //===----------------------------------------------------------------------===//

@@ -26,7 +26,6 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "smoketest.mlir",
-            "smoketest_linalg_on_tensors.mlir",
         ],
         include = ["*.mlir"],
     ),

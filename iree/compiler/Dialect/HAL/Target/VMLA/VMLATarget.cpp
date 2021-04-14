@@ -124,7 +124,7 @@ class VMLATargetBackend final : public TargetBackend {
     // and future changes will not be observed.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(), targetOp.sym_name(),
-        static_cast<uint32_t>(IREE::HAL::ExecutableFormat::VMLA),
+        executableBuilder.getStringAttr("VMLA"),
         builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }

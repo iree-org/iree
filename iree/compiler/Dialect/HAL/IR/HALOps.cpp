@@ -1324,13 +1324,12 @@ static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
 //===----------------------------------------------------------------------===//
 
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
-                               StringRef symName, uint32_t format,
+                               StringRef symName, StringRef format,
                                std::vector<uint8_t> data) {
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
-  state.addAttribute(
-      "format", builder.getIntegerAttr(builder.getIntegerType(32), format));
+  state.addAttribute("format", builder.getStringAttr(format));
   state.addAttribute("data",
                      DenseIntElementsAttr::get(
                          VectorType::get({static_cast<int64_t>(data.size())},
@@ -1339,13 +1338,12 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 }
 
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
-                               StringRef symName, uint32_t format,
+                               StringRef symName, StringAttr format,
                                DenseIntElementsAttr data) {
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
-  state.addAttribute(
-      "format", builder.getIntegerAttr(builder.getIntegerType(32), format));
+  state.addAttribute("format", format);
   state.addAttribute("data", data);
 }
 

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))' -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-spirv-experimental-linalg-on-tensors=false -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))' -canonicalize -cse %s | IreeFileCheck %s
 
 // TODO(GH-4901): Enable this test when linalg on tensors becomes default.
 // #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>

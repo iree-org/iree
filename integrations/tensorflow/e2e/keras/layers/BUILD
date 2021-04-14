@@ -172,6 +172,7 @@ FAILING_STATIC = [
             "AveragePooling3D",
             "Masking",
             "MaxPool3D",
+            "LocallyConnected1D",  # TODO(GH-5310): Enable the test.
         ],
         "target_backends": [
             "iree_llvmaot",
@@ -186,6 +187,8 @@ FAILING_STATIC = [
             "Lambda",
             "MaxPool1D",
             "MaxPool2D",
+            "Conv3D",  #TODO(GH-5150): Enable the test.
+            "Conv3DTranspose",  #TODO(GH-5150): Enable the test.
         ],
         "target_backends": "iree_vulkan",
     },
@@ -305,6 +308,9 @@ FAILING_FULL_API = [
             "AveragePooling3D",
             "Conv1DTranspose",
             "Conv2DTranspose",
+            "Conv3D",  #TODO(GH-5150): Enable the test.
+            "MaxPool1D",
+            "MaxPool2D",
             "MaxPool3D",
         ],
         "target_backends": [

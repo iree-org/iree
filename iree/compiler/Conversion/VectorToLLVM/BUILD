@@ -12,28 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tests for end-to-end IREE support of specific features to prevent regression.
-# These should focus on support by IREE itself, not for issues with specific runner tools. Place
-# those tests in iree/tools/test/
-
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
-load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_lit_test_suite(
-    name = "lit",
-    srcs = enforce_glob(
-        ["flow_partitioned.mlir"],
-        include = ["*.mlir"],
-    ),
-    data = [
-        "//iree/tools:IreeFileCheck",
-        "//iree/tools:iree-run-mlir",
+cc_library(
+    name = "VectorToLLVM",
+    srcs = [
+        "VectorContractToAArch64InlineAsmOp.cpp",
     ],
-    tags = ["hostonly"],
+    hdrs = [
+        "Passes.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:StandardToLLVM",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorToLLVM",
+    ],
 )

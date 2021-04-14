@@ -18,6 +18,7 @@
 
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
@@ -51,6 +52,12 @@ static llvm::cl::opt<bool> clTraceDispatchTensors(
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
+    "iree-flow-enable-1x1-conv-to-matmul",
+    llvm::cl::desc("Enable converting 1x1 linalg convolution ops to linalg "
+                   "matmul ops pass."),
+    llvm::cl::init(true));
 
 namespace mlir {
 namespace iree_compiler {
@@ -100,7 +107,8 @@ void registerInputTransformPassPipeline() {
       });
 }
 
-void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    bool dispatchLinalgOnTensors) {
   //----------------------------------------------------------------------------
   // Entry dialect cleanup
   //----------------------------------------------------------------------------
@@ -197,11 +205,16 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       IREE::Flow::createPrePartitioningConversionPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
-  if (clEnableLinalgOnTensorsDispatch) {
+  if (dispatchLinalgOnTensors) {
     // TODO(benvanik): move up to input; requires pre-partitioning conversion
     // to be reworked first.
     passManager.addNestedPass<FuncOp>(
         mlir::iree_compiler::createHLOToLinalgOnTensorsPass(true));
+
+    if (clEnable1x1ConvToMatmul) {
+      passManager.addNestedPass<FuncOp>(
+          mlir::iree_compiler::createConvert1x1ConvToMatmulPass());
+    }
 
     passManager.addNestedPass<FuncOp>(
         mlir::createConvertElementwiseToLinalgPass());
@@ -296,7 +309,7 @@ void registerFlowTransformPassPipeline() {
       "iree-flow-transformation-pipeline",
       "Runs the full IREE flow dialect transformation pipeline",
       [](OpPassManager &passManager) {
-        buildFlowTransformPassPipeline(passManager);
+        buildFlowTransformPassPipeline(passManager, false);
       });
 }
 

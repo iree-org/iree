@@ -140,6 +140,13 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
     pm.nest<ModuleOp>().addPass(createCSEPass());
   }
 
+  if (options.usingLinalgOnTensors) {
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createFlattenMemRefSubspanPass());
+    pm.nest<ModuleOp>().addPass(createLowerAffinePass());
+    pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+    pm.nest<ModuleOp>().addPass(createCSEPass());
+  }
+
   //===--------------------------------------------------------------------===//
   // Final conversion to SPIR-V dialect.
   //

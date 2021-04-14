@@ -273,9 +273,7 @@ attributes {nosideeffects}
 // Creates an executable for use with the specified device.
 vm.import @executable.create(
   %device : !vm.ref<!hal.device>,
-  %executable_format : i32,
-  // TODO(benvanik): replace executable format with a string.
-  // %executable_format : !vm.ref<!iree.byte_buffer>
+  %executable_format : !vm.ref<!iree.byte_buffer>,
   %executable_data : !vm.ref<!iree.byte_buffer>,
   %executable_layouts : !vm.ref<!hal.executable_layout>...
 ) -> !vm.ref<!hal.executable>

@@ -52,7 +52,8 @@ void registerInputTransformPassPipeline();
 //   buildInputTransformPassPipeline
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager);
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    bool dispatchLinalgOnTensors = true);
 
 void registerFlowTransformPassPipeline();
 

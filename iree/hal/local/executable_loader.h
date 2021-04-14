@@ -66,7 +66,7 @@ void iree_hal_executable_loader_release(
 bool iree_hal_executable_loader_query_support(
     iree_hal_executable_loader_t* executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
-    iree_hal_executable_format_t executable_format);
+    iree_string_view_t executable_format);
 
 // Tries loading the |executable_data| provided in the given
 // |executable_format|. May fail even if the executable is valid if it requires
@@ -95,7 +95,7 @@ typedef struct iree_hal_executable_loader_vtable_s {
   bool(IREE_API_PTR* query_support)(
       iree_hal_executable_loader_t* executable_loader,
       iree_hal_executable_caching_mode_t caching_mode,
-      iree_hal_executable_format_t executable_format);
+      iree_string_view_t executable_format);
 
   iree_status_t(IREE_API_PTR* try_load)(
       iree_hal_executable_loader_t* executable_loader,
