@@ -100,3 +100,24 @@ func @ignore_load_store_alloc(%value : f32, %i0: index, %i1 : index, %i2: index)
 //       CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<2x3x4xf32, 3>
 //       CHECK: memref.store %{{[a-z0-9]+}}, %[[ALLOC]]
 //       CHECK: memref.load %[[ALLOC]]
+
+// -----
+
+func @use_subspan_with_unrealized_conversion_cast(%offset : index, %i: index) -> f32 {
+  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<6x7x8xf32>
+  %use = unrealized_conversion_cast %subspan : memref<6x7x8xf32> to memref<?xf32>
+  %val = memref.load %use[%i] : memref<?xf32>
+  return %val: f32
+}
+
+hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 floordiv 4)>
+//      CHECK: func @use_subspan_with_unrealized_conversion_cast
+// CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I:.+]]: index)
+//      CHECK:   %[[C0:.+]] = constant 0 : index
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I]], %[[OFFSET]]]
+//      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]

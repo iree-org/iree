@@ -26,7 +26,6 @@ iree_cc_library(
   NAME
     LinalgToSPIRV
   HDRS
-    "CooperativeMatrixAnalysis.h"
     "KernelDispatchUtils.h"
     "MemorySpace.h"
     "Passes.h"
@@ -35,7 +34,6 @@ iree_cc_library(
     "ConcretizeTileAmongWorkgroupsPass.cpp"
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
-    "CooperativeMatrixAnalysis.cpp"
     "FoldGPUProcessorIDUses.cpp"
     "KernelDispatchUtils.cpp"
     "LinalgTileAndDistributePass.cpp"
@@ -44,6 +42,7 @@ iree_cc_library(
     "SplitDispatchFunctionPass.cpp"
     "TileAndVectorizeInOneWorkgroupPass.cpp"
     "Utils.cpp"
+    "VectorToCooperativeMatrixPass.cpp"
     "VectorToGPUPass.cpp"
     "VectorizeMemrefLoadStorePass.cpp"
   DEPS
