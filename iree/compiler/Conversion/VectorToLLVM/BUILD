@@ -19,17 +19,22 @@ package(
 )
 
 cc_library(
-    name = "init_conversions",
+    name = "VectorToLLVM",
+    srcs = [
+        "VectorContractToAArch64InlineAsmOp.cpp",
+    ],
     hdrs = [
-        "init_conversions.h",
+        "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Conversion/HLOToLinalg",
-        "//iree/compiler/Conversion/LinalgToLLVM",
-        "//iree/compiler/Conversion/LinalgToLinalg",
-        "//iree/compiler/Conversion/LinalgToNVVM",
-        "//iree/compiler/Conversion/LinalgToSPIRV",
-        "//iree/compiler/Conversion/LinalgToVector",
-        "//iree/compiler/Conversion/VectorToLLVM",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:StandardToLLVM",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorToLLVM",
     ],
 )
