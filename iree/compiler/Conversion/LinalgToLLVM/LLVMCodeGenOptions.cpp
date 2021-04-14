@@ -22,7 +22,7 @@ namespace iree_compiler {
 static llvm::cl::opt<bool> clEnableLLVMLinalgOnTensors(
     "iree-codegen-llvm-experimental-linalg-on-tensors",
     llvm::cl::desc("Enable the linalg on tensors experimental LLVM path"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clConvImg2ColConversion(
     "iree-codegen-linalg-to-llvm-conv-img2col-conversion",

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-spirv-tile-and-vectorize-in-one-workgroup))' -iree-spirv-enable-vectorization -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-spirv-experimental-linalg-on-tensors=false -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-spirv-tile-and-vectorize-in-one-workgroup))' -iree-spirv-enable-vectorization -canonicalize -cse %s | IreeFileCheck %s
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @conv_no_padding attributes {sym_visibility = "private"} {

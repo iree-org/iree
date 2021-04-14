@@ -66,11 +66,15 @@ iree_e2e_cartesian_product_test_suite(
     ",,Masking,,,,iree_vulkan"
     ",,MaxPool3D,,,,iree_llvmaot"
     ",,MaxPool3D,,,,iree_vulkan"
+    ",,LocallyConnected1D,,,,iree_llvmaot"
+    ",,LocallyConnected1D,,,,iree_vulkan"
     ",,AveragePooling1D,,,,iree_vulkan"
     ",,AveragePooling2D,,,,iree_vulkan"
     ",,Lambda,,,,iree_vulkan"
     ",,MaxPool1D,,,,iree_vulkan"
     ",,MaxPool2D,,,,iree_vulkan"
+    ",,Conv3D,,,,iree_vulkan"
+    ",,Conv3DTranspose,,,,iree_vulkan"
 )
 
 iree_e2e_cartesian_product_test_suite(
@@ -138,6 +142,12 @@ iree_e2e_cartesian_product_test_suite(
     ",,Conv1DTranspose,,,,iree_vulkan"
     ",,Conv2DTranspose,,,,iree_llvmaot"
     ",,Conv2DTranspose,,,,iree_vulkan"
+    ",,Conv3D,,,,iree_llvmaot"
+    ",,Conv3D,,,,iree_vulkan"
+    ",,MaxPool1D,,,,iree_llvmaot"
+    ",,MaxPool1D,,,,iree_vulkan"
+    ",,MaxPool2D,,,,iree_llvmaot"
+    ",,MaxPool2D,,,,iree_vulkan"
     ",,MaxPool3D,,,,iree_llvmaot"
     ",,MaxPool3D,,,,iree_vulkan"
     ",,MaxPool1D,,,,iree_vulkan"

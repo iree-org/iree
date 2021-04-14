@@ -14,9 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "binary_op.mlir"
-    "matmul_op.mlir"
-    "smoketest_linalg_on_tensors.mlir"
+    "smoketest.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

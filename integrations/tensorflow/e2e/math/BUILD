@@ -354,17 +354,27 @@ VULKAN_FAILING = [
     "cumsum",
     "cumulative_logsumexp",
     "divide",  # Failing for integer inputs because iree doesn't output 'f64'.
+    "equal",  # TODO(hanchung): Enable the test after integration.
     "erfinv",
+    "greater",  # TODO(hanchung): Enable the test after integration.
+    "greater_equal",  # TODO(hanchung): Enable the test after integration.
     "igamma",
     "igammac",
     "in_top_k",
     "invert_permutation",
+    "is_inf",  # TODO(hanchung): Enable the test after integration.
+    "is_nan",  # TODO(hanchung): Enable the test after integration.
     "is_non_decreasing",
     "is_strictly_increasing",
+    "less",  # TODO(hanchung): Enable the test after integration.
+    "less_equal",  # TODO(hanchung): Enable the test after integration.
+    "logical_and",  # TODO(hanchung): Enable the test after integration.
     "logical_not",
+    "logical_or",  # TODO(hanchung): Enable the test after integration.
     "logical_xor",
     "ndtri",
     "nextafter",
+    "not_equal",  # TODO(hanchung): Enable the test after integration.
     "polygamma",
     "pow",
     "reduce_all",
