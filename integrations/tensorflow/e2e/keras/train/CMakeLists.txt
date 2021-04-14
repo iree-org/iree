@@ -47,6 +47,9 @@ iree_e2e_cartesian_product_test_suite(
     ",,rmsprop,iree_vmla"
     ",,rmsprop,iree_llvmaot"
     ",,rmsprop,iree_vulkan"
+    ",,sgd,iree_vmla"
+    ",,sgd,iree_llvmaot"
+    ",,sgd,iree_vulkan"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
