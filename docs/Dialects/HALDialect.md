@@ -333,6 +333,85 @@ devices.
 | :----: | ----------- |
 `result` | buffer
 
+### `hal.allocator.pack` (::mlir::iree_compiler::IREE::HAL::AllocatorPackOp)
+
+packs variable-sized slices into a single slab
+
+
+Syntax:
+
+```
+operation ::= `hal.allocator.pack` `<` $allocator `:` type($allocator) `>`
+              (`offset` `(` $offset^ `)`)?
+              `slices` `(` `{`
+              custom<PackSliceRanges>($lifetime_intervals,
+              $dynamic_slice_sizes,
+              type($packed_offsets))
+              `}` `)`
+              `:` type($total_length)
+              attr-dict-with-keyword
+```
+
+Performs a greedy packing of one or more sized slices with specified
+lifetimes and returns their relative offsets in an aliased linear space.
+
+Slices are `[start, end] = %slice_byte_size`, where the start and end values
+define an inclusive lifetime range and the size is the total number of bytes
+required to be live for that range.
+
+```mlir
+// Computes thte total length required for the packed values and the offsets
+// of the 3 slices requested relative to the base of the packed memory:
+%total_length, %offset_0, %offset_1, %offset_2 =
+    hal.allocator.pack<%allocator : !hal.allocator>
+        // Each slice gets one result offset:
+        slices([
+          // 3 slices where A and B overlap and will get unique offsets
+          // while B and C do not overlap and are allowed to alias.
+          [0, 10] = %size_0,  // A => %offset_0
+          [3,  8] = %size_1,  // B => %offset_1
+          [9, 10] = %size_2,  // C => %offset_2
+          ...
+        ]) : index
+```
+
+The lifetime start and end points (inclusive) are only used for relative
+comparisons and may originate with any meaning (op order in block, epoch,
+phase of the moon, etc). The packing algorithm uses the intervals to
+determine slice liveness and when aliasing is safe.
+
+The size of each slice may either be a constant or runtime-computed dynamic
+value. Constant slices can achieve more dense packing than the dynamic
+values and CSE/canonicalization should be applied to ensure that as many of
+the dynamic values are equivalent if possible.
+
+The total length required to pack all slices is returned and can be used to
+acquire storage. The individual slice offsets are 0-based and as such if are
+directly used as buffer offsets may need additional offseting. This can
+either be applied via the optional `offset` operand or slicing of the
+underlying allocation buffer.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`lifetime_intervals` | ::mlir::ArrayAttr | index array attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`allocator` | allocator
+`offset` | index
+`dynamic_slice_sizes` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`total_length` | index
+`packed_offsets` | index
+
 ### `hal.buffer.allocator` (::mlir::iree_compiler::IREE::HAL::BufferAllocatorOp)
 
 buffer allocator accessor operation
@@ -1678,6 +1757,60 @@ device is not known at compile-time.
 | :----: | ----------- |
 `result` | 1-bit signless integer
 
+### `hal.device.query` (::mlir::iree_compiler::IREE::HAL::DeviceQueryOp)
+
+returns a runtime configuration parameter from the device
+
+
+Syntax:
+
+```
+operation ::= `hal.device.query` `<` $device `:` type($device) `>`
+              `key` `(` $key `)`
+              `:` type($ok) `,` type($value)
+              attr-dict-with-keyword
+```
+
+Queries a device configuration parameter with the given key.
+Returns a status indicating whether the key was recognized/available and if
+it was the value converted to the specified type. Queries must return the
+same value for the lifetime of the module though may vary from run to run.
+
+This is roughly equivalent to the `sysconf` linux syscall
+(https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
+set of keys available and their interpretation is target-dependent. If there
+is a HAL match attribute (`#hal.device.match.*`) or op
+(`hal.device.match.*`) prefer to use that in order to get compile-time
+propagation when the target is specified and elide the runtime query and
+get compile-time verification when a runtime query is required.
+
+Users of the op must check the `ok` result before using the value as what
+set of keys is available may change over time. If in doubt: don't use this.
+Each key used adds additional versioning and testing complexity as runtime
+code path changes will explode combinatorially and should be treated with as
+much care as a binary file format change. Keys should be prefixed with `ex.`
+when experimental indicating that they are not expected to be present
+forever; all non-experimental keys should be vetted.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`key` | ::mlir::StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`device` | device
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`ok` | 1-bit signless integer
+`value` | any type
+
 ### `hal.device.switch` (::mlir::iree_compiler::IREE::HAL::DeviceSwitchOp)
 
 runtime device switch pseudo op
@@ -1806,15 +1939,12 @@ compiled executable binary data
 A compiled executable binary with an optional nested module containing the
 IR prior to serialization (for debugging).
 
-The `format` attribute specifies a four character code (FourCC) matching the
-executable format in `iree/hal/executable_format.h`.
-
 #### Attributes:
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
 `sym_name` | ::mlir::StringAttr | string attribute
-`format` | ::mlir::iree_compiler::IREE::HAL::ExecutableFormatAttr | IREE HAL Executable format
+`format` | ::mlir::StringAttr | string attribute
 `data` | ::mlir::DenseIntElementsAttr | 8-bit signless integer elements attribute
 
 ### `hal.executable.create` (::mlir::iree_compiler::IREE::HAL::ExecutableCreateOp)

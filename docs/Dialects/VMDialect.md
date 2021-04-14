@@ -2597,7 +2597,7 @@ inlined constant rodata
 Syntax:
 
 ```
-operation ::= `vm.rodata.inline` attr-dict `:` type($result) `=` $value
+operation ::= `vm.rodata.inline` ($name^)? attr-dict `:` type($result) `=` $value
 ```
 
 vm.rodata that can be embedded inline in functions.
@@ -2606,6 +2606,7 @@ vm.rodata that can be embedded inline in functions.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
+`name` | ::mlir::StringAttr | string attribute
 `value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Results:

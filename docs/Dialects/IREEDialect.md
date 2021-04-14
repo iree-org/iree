@@ -283,7 +283,7 @@ unreachable assertion op
 Syntax:
 
 ```
-operation ::= `iree.unreachable` attr-dict
+operation ::= `iree.unreachable` $message attr-dict
 ```
 
 Signals to the compiler that the parent block should not be reachable.
@@ -296,8 +296,14 @@ stripped during translation.
   cond_br %true, ^bb2, ^bb1
 ^bb1:
   // Indicates that this branch should never be taken.
-  iree.unreachable
+  iree.unreachable "shouldn't be here"
 ^bb2:
   ...
 
 ```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`message` | ::mlir::StringAttr | string attribute
