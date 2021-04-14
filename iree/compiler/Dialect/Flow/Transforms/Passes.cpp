@@ -57,7 +57,7 @@ static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
     "iree-flow-enable-1x1-conv-to-matmul",
     llvm::cl::desc("Enable converting 1x1 linalg convolution ops to linalg "
                    "matmul ops pass."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
