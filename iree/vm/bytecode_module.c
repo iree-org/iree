@@ -28,38 +28,40 @@ static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,
   return x != 0 ? x : lhs_size < rhs.size ? -1 : lhs_size > rhs.size;
 }
 
-// Returns true if the given |type_def| is valid, meaning that the type it was
-// resolved from is registered or known to the system as a builtin.
-static bool iree_vm_type_def_is_valid(iree_vm_type_def_t type_def) {
-  return type_def.value_type != IREE_VM_VALUE_TYPE_NONE ||
-         type_def.ref_type != IREE_VM_REF_TYPE_NULL;
-}
-
 // Resolves a type through either builtin rules or the ref registered types.
-static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
-    iree_vm_TypeDef_table_t type_def) {
-  iree_vm_type_def_t result;
-  memset(&result, 0, sizeof(result));
+static bool iree_vm_bytecode_module_resolve_type(
+    iree_vm_TypeDef_table_t type_def, iree_vm_type_def_t* out_type) {
+  memset(out_type, 0, sizeof(*out_type));
   flatbuffers_string_t full_name = iree_vm_TypeDef_full_name(type_def);
   if (!flatbuffers_string_len(full_name)) {
-    return result;
+    return false;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i8")) == 0) {
-    result.value_type = IREE_VM_VALUE_TYPE_I8;
+    out_type->value_type = IREE_VM_VALUE_TYPE_I8;
+    return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i16")) == 0) {
-    result.value_type = IREE_VM_VALUE_TYPE_I16;
+    out_type->value_type = IREE_VM_VALUE_TYPE_I16;
+    return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i32")) == 0) {
-    result.value_type = IREE_VM_VALUE_TYPE_I32;
+    out_type->value_type = IREE_VM_VALUE_TYPE_I32;
+    return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i64")) == 0) {
-    result.value_type = IREE_VM_VALUE_TYPE_I64;
+    out_type->value_type = IREE_VM_VALUE_TYPE_I64;
+    return true;
+  } else if (iree_vm_flatbuffer_strcmp(
+                 full_name, iree_make_cstring_view("!vm.opaque")) == 0) {
+    out_type->value_type = IREE_VM_VALUE_TYPE_NONE;
+    out_type->ref_type = IREE_VM_REF_TYPE_NULL;
+    return true;
   } else if (full_name[0] == '!') {
     // Note that we drop the ! prefix:
     iree_string_view_t type_name = {full_name + 1,
                                     flatbuffers_string_len(full_name) - 1};
-    if (strncmp(type_name.data, "vm.list<", strlen("vm.list<")) == 0) {
+    if (iree_string_view_starts_with(type_name,
+                                     iree_make_cstring_view("vm.list"))) {
       // This is a !vm.list<...> type. We don't actually care about the type as
       // we allow list types to be widened. Rewrite to just vm.list as that's
       // all we have registered.
@@ -68,10 +70,11 @@ static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
     const iree_vm_ref_type_descriptor_t* type_descriptor =
         iree_vm_ref_lookup_registered_type(type_name);
     if (type_descriptor) {
-      result.ref_type = type_descriptor->type;
+      out_type->ref_type = type_descriptor->type;
     }
+    return true;
   }
-  return result;
+  return false;
 }
 
 // Resolves all types through either builtin rules or the ref registered types.
@@ -80,18 +83,18 @@ static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
 static iree_status_t iree_vm_bytecode_module_resolve_types(
     iree_vm_TypeDef_vec_t type_defs, iree_vm_type_def_t* type_table) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
     iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
-    type_table[i] = iree_vm_bytecode_module_resolve_type(type_def);
-    if (!iree_vm_type_def_is_valid(type_table[i])) {
-      IREE_TRACE_ZONE_END(z0);
-      return iree_make_status(IREE_STATUS_NOT_FOUND,
-                              "no type registered with name '%s'",
-                              iree_vm_TypeDef_full_name(type_def));
+    if (!iree_vm_bytecode_module_resolve_type(type_def, &type_table[i])) {
+      status = iree_make_status(IREE_STATUS_NOT_FOUND,
+                                "no type registered with name '%s'",
+                                iree_vm_TypeDef_full_name(type_def));
+      break;
     }
   }
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 // Verifies the structure of the flatbuffer so that we can avoid doing so during

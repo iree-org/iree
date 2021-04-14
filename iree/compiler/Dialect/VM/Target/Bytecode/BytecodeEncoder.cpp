@@ -92,7 +92,19 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeType(Type type) override {
-    int typeOrdinal = typeTable_->lookup(type);
+    // HACK: it'd be nice to remove the implicit ref wrapper hiding.
+    if (auto refType = type.dyn_cast<IREE::VM::RefType>()) {
+      if (refType.getObjectType().isa<IREE::VM::ListType>()) {
+        type = refType.getObjectType();
+      }
+    }
+    auto it = typeTable_->find(type);
+    if (it == typeTable_->end()) {
+      return currentOp_->emitOpError()
+             << "type " << type
+             << " cannot be encoded; not registered in type table";
+    }
+    int typeOrdinal = it->second;
     return writeUint32(typeOrdinal);
   }
 
