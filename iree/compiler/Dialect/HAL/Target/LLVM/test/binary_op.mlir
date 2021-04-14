@@ -14,4 +14,4 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
 // CHECK-DAG:   hal.executable.binary @llvm_aot attributes {
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = 1145850178 : i32} {
+// CHECK-SAME:     format = "DLIB"

@@ -24,4 +24,4 @@ flow.executable @add_dispatch_0 {
 
 // CHECK:       hal.executable.binary @llvm_aot attributes {
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = 1145850178 : i32} {
+// CHECK-SAME:     format = "DLIB"

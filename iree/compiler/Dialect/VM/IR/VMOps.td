@@ -814,6 +814,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$name,
     ElementsAttr:$value
   );
 
@@ -821,7 +822,15 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
     VM_RefOf<ByteBufferType>:$result
   );
 
-  let assemblyFormat = "attr-dict `:` type($result) `=` $value";
+  let assemblyFormat = "($name^)? attr-dict `:` type($result) `=` $value";
+
+  let builders = [
+    OpBuilder<(ins "Type":$resultType, "ElementsAttr":$value),
+    [{
+      $_state.addTypes({resultType});
+      $_state.addAttribute("value", value);
+    }]>
+  ];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1936,7 +1945,8 @@ def VM_BranchOp : VM_Op<"br", [
     [{
       $_state.addSuccessors(dest);
       $_state.addOperands(destOperands);
-  }]>];
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     Block *getDest();

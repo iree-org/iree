@@ -105,7 +105,7 @@ class CUDATargetBackend final : public TargetBackend {
       return targetOp.emitError() << "failed to translate the MLIR LLVM "
                                      "dialect to the native llvm::Module";
     }
-    std::vector<std::array<int32_t, 3>> workgroup_sizes;
+    std::vector<std::array<int32_t, 3>> workgroupSizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       std::array<int32_t, 3> workgroup_size;
@@ -114,7 +114,7 @@ class CUDATargetBackend final : public TargetBackend {
                                          .getIntValues())) {
         workgroup_size[it.index()] = it.value().getZExtValue();
       }
-      workgroup_sizes.push_back(workgroup_size);
+      workgroupSizes.push_back(workgroup_size);
       llvm::Metadata *llvmMetadata[] = {
           llvm::ValueAsMetadata::get(llvmFunc),
           llvm::MDString::get(llvmModule->getContext(), "kernel"),
@@ -160,11 +160,11 @@ class CUDATargetBackend final : public TargetBackend {
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
     iree_CUDABlockSizeDef_vec_start(builder);
-    auto wg_size = workgroup_sizes.begin();
+    auto blockSizes = workgroupSizes.begin();
     for (auto shader : entryPointNames) {
-      iree_CUDABlockSizeDef_vec_push_create(builder, (*wg_size)[0],
-                                            (*wg_size)[1], (*wg_size)[2]);
-      wg_size++;
+      iree_CUDABlockSizeDef_vec_push_create(builder, (*blockSizes)[0],
+                                            (*blockSizes)[1], (*blockSizes)[2]);
+      ++blockSizes;
     }
     auto blockSizesRef = iree_CUDABlockSizeDef_vec_end(builder);
 
@@ -177,7 +177,7 @@ class CUDATargetBackend final : public TargetBackend {
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(), targetOp.sym_name(),
-        static_cast<uint32_t>(IREE::HAL::ExecutableFormat::CUDA),
+        executableBuilder.getStringAttr("PTXE"),
         builder.getBufferAttr(executableBuilder.getContext()));
 
     return success();

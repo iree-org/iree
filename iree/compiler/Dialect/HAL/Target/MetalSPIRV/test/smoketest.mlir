@@ -19,4 +19,4 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   hal.executable.binary @metal_spirv attributes {
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = 1297370181 : i32}
+// CHECK-SAME:     format = "MTLE"

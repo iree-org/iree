@@ -48,7 +48,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_create(
 IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,
-    iree_hal_executable_format_t executable_format) {
+    iree_string_view_t executable_format) {
   IREE_ASSERT_ARGUMENT(executable_cache);
   return _VTABLE_DISPATCH(executable_cache, can_prepare_format)(
       executable_cache, caching_mode, executable_format);

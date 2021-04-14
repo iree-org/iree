@@ -805,11 +805,14 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_match_id, rr, i) {
 // iree_hal_executable_t
 //===--------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rirCrD, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rrrCrD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_hal_executable_format_t executable_format =
-      (iree_hal_executable_format_t)args->i1;
+  iree_vm_ro_byte_buffer_t* executable_format = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_ro_byte_buffer_check_deref(args->r1, &executable_format));
+  iree_string_view_t executable_format_str =
+      iree_vm_ro_byte_buffer_as_string(executable_format);
   iree_vm_ro_byte_buffer_t* executable_data = NULL;
   IREE_RETURN_IF_ERROR(
       iree_vm_ro_byte_buffer_check_deref(args->r2, &executable_data));
@@ -830,7 +833,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rirCrD, r) {
   if (iree_status_is_ok(status)) {
     iree_hal_executable_spec_t spec;
     iree_hal_executable_spec_initialize(&spec);
-    spec.executable_format = executable_format;
+    spec.executable_format = executable_format_str;
     spec.executable_data = executable_data->data;
     spec.executable_layout_count = executable_layout_count;
     spec.executable_layouts = executable_layouts;

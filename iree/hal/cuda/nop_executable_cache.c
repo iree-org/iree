@@ -69,8 +69,9 @@ static void iree_hal_cuda_nop_executable_cache_destroy(
 static bool iree_hal_cuda_nop_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* base_executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,
-    iree_hal_executable_format_t executable_format) {
-  return executable_format == iree_hal_make_executable_format("PTXE");
+    iree_string_view_t executable_format) {
+  return iree_string_view_equal(executable_format,
+                                iree_make_cstring_view("PTXE"));
 }
 
 static iree_status_t iree_hal_cuda_nop_executable_cache_prepare_executable(

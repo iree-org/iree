@@ -88,7 +88,7 @@ static void iree_hal_local_executable_cache_destroy(
 static bool iree_hal_local_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* base_executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,
-    iree_hal_executable_format_t executable_format) {
+    iree_string_view_t executable_format) {
   iree_hal_local_executable_cache_t* executable_cache =
       iree_hal_local_executable_cache_cast(base_executable_cache);
   for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {

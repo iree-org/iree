@@ -54,11 +54,12 @@ class HoistInlinedRodataPass
       OpBuilder moduleBuilder(moduleOp.getContext());
       moduleBuilder.setInsertionPoint(funcOp);
       for (auto inlineOp : inlineOps) {
-        auto rodataOp =
-            OpBuilder(moduleOp.getContext())
-                .create<IREE::VM::RodataOp>(inlineOp.getLoc(),
-                                            (funcOp.getName() + "_const").str(),
-                                            inlineOp.value());
+        std::string name = inlineOp.name().hasValue()
+                               ? inlineOp.name().getValue().str()
+                               : (funcOp.getName() + "_const").str();
+        auto rodataOp = OpBuilder(moduleOp.getContext())
+                            .create<IREE::VM::RodataOp>(inlineOp.getLoc(), name,
+                                                        inlineOp.value());
         moduleSymbolTable.insert(rodataOp, moduleBuilder.getInsertionPoint());
         rodataOp.setPrivate();
         replaceInlineOpWithRodataRef(inlineOp, rodataOp);

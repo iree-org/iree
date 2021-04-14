@@ -66,7 +66,7 @@ class ExecutableCreateOpConversion
         rewriter.getInsertionBlock()->getParentOp());
     assert(funcOp && "prepare op not in a function");
 
-    // Materialize vm.rodata for each binary format available.
+    // Materialize vm.rodata for the binary.
     auto executableBinaryOp =
         SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableBinaryOp>(
             createOp, createOp.executable_target());
@@ -78,12 +78,17 @@ class ExecutableCreateOpConversion
         executableBinaryOp.getLoc(),
         (StringRef("_") + executableOp.getName() + "_" +
          executableBinaryOp.getName() + "_binary_" +
-         IREE::HAL::stringifyExecutableFormat(executableBinaryOp.format())
-             .lower())
+         executableBinaryOp.format().lower())
             .str(),
         executableBinaryOp.data());
     rodataOp.setPrivate();
     rewriter.restoreInsertionPoint(insertPoint);
+
+    auto executableFormatString = detail::rewriteAttrToOperands(
+        createOp.getLoc(), executableBinaryOp.formatAttr(),
+        importOp.getType().getInput(1), rewriter);
+    assert(executableFormatString.hasValue() &&
+           executableFormatString.getValue().size() == 1);
 
     SmallVector<int16_t, 4> segmentSizes = {
         /*device=*/-1,
@@ -94,8 +99,7 @@ class ExecutableCreateOpConversion
     };
     SmallVector<Value, 8> callOperands = {
         newOperands.device(),
-        rewriter.createOrFold<IREE::VM::ConstI32Op>(
-            loc, executableBinaryOp.formatAttr()),
+        executableFormatString.getValue().front(),
         rewriter.createOrFold<IREE::VM::ConstRefRodataOp>(loc, rodataOp),
     };
     callOperands.append(newOperands.layouts().begin(),

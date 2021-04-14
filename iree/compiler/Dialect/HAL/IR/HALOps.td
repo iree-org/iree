@@ -2101,14 +2101,11 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   let description = [{
     A compiled executable binary with an optional nested module containing the
     IR prior to serialization (for debugging).
-
-    The `format` attribute specifies a four character code (FourCC) matching the
-    executable format in `iree/hal/executable_format.h`.
   }];
 
   let arguments = (ins
     StrAttr:$sym_name,
-    HAL_ExecutableFormatAttr:$format,
+    StrAttr:$format,
     HAL_ExecutableDataAttr:$data
     // TODO(benvanik): add compatibility and versioning attributes.
   );
@@ -2119,12 +2116,12 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   let builders = [
     OpBuilder<(ins
       "StringRef":$name,
-      "uint32_t":$format,
+      "StringRef":$format,
       "std::vector<uint8_t>":$data
     )>,
     OpBuilder<(ins
       "StringRef":$name,
-      "uint32_t":$format,
+      "StringAttr":$format,
       "DenseIntElementsAttr":$data
     )>,
   ];
