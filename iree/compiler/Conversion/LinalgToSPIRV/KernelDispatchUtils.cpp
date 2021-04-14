@@ -751,12 +751,12 @@ Optional<LaunchConfig> initGPULaunchConfig(
     const SPIRVCodegenOptions &options, ArrayRef<linalg::LinalgOp> linalgOps) {
   LaunchConfig launchConfig;
   if (!options.workgroupSize.empty()) {
-    SmallVector<int64_t, 3> tileSizes(options.tileSizes.begin(),
-                                      options.tileSizes.end());
+    SmallVector<int64_t, 3> workgroupTileSizes(
+        options.workgroupTileSizes.begin(), options.workgroupTileSizes.end());
     SmallVector<int64_t, 3> invocationTileSizes(
         options.invocationTileSizes.begin(), options.invocationTileSizes.end());
     for (linalg::LinalgOp linalgOp : linalgOps) {
-      launchConfig.setTileSizes(linalgOp.getOperation(), tileSizes, 0);
+      launchConfig.setTileSizes(linalgOp.getOperation(), workgroupTileSizes, 0);
       // Subgroup level.
       launchConfig.setTileSizes(linalgOp.getOperation(), {}, 1);
       // Invocation level.
