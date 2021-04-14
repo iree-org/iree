@@ -46,6 +46,7 @@ cc_library(
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:NVVMDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFToStandard",

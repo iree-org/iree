@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Matchers.h"
@@ -256,8 +257,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     // ops computation.
     linalg::hoistRedundantVectorTransfers(funcOp);
 
-    // TODO(ataei): Move this to common vector dialect patterns.
-    populateStdLegalizationPatternsForSPIRVLowering(vectorToLoopsPatterns);
+    memref::populateFoldSubViewOpPatterns(vectorToLoopsPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorToLoopsPatterns)))) {
       return signalPassFailure();

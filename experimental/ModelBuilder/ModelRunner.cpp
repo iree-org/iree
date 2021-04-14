@@ -26,6 +26,7 @@
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
@@ -131,7 +132,7 @@ void mlir::ModelRunner::compile(
 
 static void addVulkanLoweringPass(mlir::PassManager& manager) {
   manager.addPass(mlir::createGpuKernelOutliningPass());
-  manager.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
+  manager.addPass(mlir::memref::createFoldSubViewOpsPass());
   manager.addPass(mlir::createConvertGPUToSPIRVPass());
   mlir::OpPassManager& modulePM = manager.nest<mlir::spirv::ModuleOp>();
   modulePM.addPass(mlir::spirv::createLowerABIAttributesPass());
