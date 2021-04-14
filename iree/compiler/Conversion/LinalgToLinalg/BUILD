@@ -22,7 +22,7 @@ cc_library(
     name = "LinalgToLinalg",
     srcs = [
         "Conv2D1x1ToMatmul.cpp",
-        "Conv2DToImg2Col.cpp"
+        "Conv2DToImg2Col.cpp",
     ],
     hdrs = [
         "Passes.h",
