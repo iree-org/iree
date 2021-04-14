@@ -239,4 +239,21 @@ static inline int32_t vm_cmp_nz_i64(int64_t operand) {
   return (operand != 0) ? 1 : 0;
 }
 
+//===------------------------------------------------------------------===//
+// Utility macros
+//===------------------------------------------------------------------===//
+
+// TODO(simon-camp): This macro should resemble the error handling part of the
+// IREE_RETURN_IF_ERROR macro. There are two different definitions in
+// iree/base/api.h depending on a feature flag.
+#define VM_RETURN_IF_ERROR(status) \
+  if (status) {                    \
+    return status;                 \
+  }
+
+#define VM_RETURN_IF_LIST_NULL(list)                       \
+  if (!list) {                                             \
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT); \
+  }
+
 #endif  // IREE_VM_OPS_H_

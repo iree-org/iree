@@ -28,6 +28,32 @@ namespace iree_compiler {
 
 namespace {
 
+/// Generate to calls which resembles the IREE_RETURN_IF_ERROR macro. We need to
+/// split it here becasue we cannot produce a macro invocation of a function
+/// call in emitc.
+emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
+                           StringAttr callee, ArrayAttr args,
+                           ArrayAttr templateArgs, ArrayRef<Value> operands) {
+  auto ctx = rewriter.getContext();
+
+  auto callOp = rewriter.create<emitc::CallOp>(
+      /*location=*/loc,
+      /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
+      /*callee=*/callee,
+      /*args=*/args,
+      /*templateArgs=*/templateArgs,
+      /*operands=*/operands);
+
+  auto failOp = rewriter.create<emitc::CallOp>(
+      /*location=*/loc,
+      /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "VM_RETURN_IF_ERROR"),
+      /*args=*/ArrayAttr{},
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/ArrayRef<Value>{callOp.getResult(0)});
+  return callOp;
+}
+
 SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
   return llvm::to_vector<4>(
       llvm::map_range(llvm::seq<int64_t>(0, n), [&ctx](int64_t i) -> Attribute {
@@ -35,7 +61,10 @@ SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
       }));
 }
 
-LogicalResult releaseRefIfLastUse(Operation *operation, Value listOperand) {
+LogicalResult releaseRefIfLastUse(Operation *operation, Value operand) {
+  // TODO(simon-camp): We need to handle cases where refs get passed via
+  // block arguments, also in combination with the fact that block arguments are
+  // implemented as assignments in the printer for branching ops.
   auto ctx = operation->getContext();
   auto loc = operation->getLoc();
 
@@ -44,18 +73,19 @@ LogicalResult releaseRefIfLastUse(Operation *operation, Value listOperand) {
 
   auto funcOp = operation->getParentOfType<IREE::VM::FuncOp>();
 
-  // TODO(simon-camp): Cache the liveness analysis.
+  // TODO(simon-camp): Uses upstream liveness analysis, which is automatically
+  // cahcehd IIUC.
   ValueLiveness liveness;
   if (failed(liveness.recalculate(funcOp))) {
     return funcOp.emitError()
            << "failed to caclculate required liveness information";
   }
 
-  if (liveness.isLastValueUse(listOperand, operation)) {
+  if (liveness.isLastValueUse(operand, operation)) {
     auto refPtrOp = builder.create<emitc::GetAddressOfOp>(
         /*location=*/loc,
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*operand=*/ArrayRef<Value>{listOperand});
+        /*operand=*/ArrayRef<Value>{operand});
 
     builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -253,10 +283,11 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
  public:
   ListOpConversion(MLIRContext *context, StringRef funcName,
-                   size_t listArgumentIndex)
+                   size_t listArgumentIndex, bool failable)
       : OpConversionPattern<SrcOpTy>(context),
         funcName(funcName),
-        listArgumentIndex(listArgumentIndex) {}
+        listArgumentIndex(listArgumentIndex),
+        failable(failable) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -279,6 +310,14 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{listOperand});
 
+    rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/TypeRange{},
+        /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
+
     // Replace the one list argument (which is wrapped in a ref) with the
     // unwrapped list.
     SmallVector<Value, 4> updatedOperands;
@@ -290,13 +329,25 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
       }
     }
 
-    rewriter.replaceOpWithNewOp<emitc::CallOp>(
-        /*op=*/op,
-        /*type=*/op.getOperation()->getResultTypes(),
-        /*callee=*/rewriter.getStringAttr(funcName),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>(updatedOperands));
+    if (failable) {
+      auto callOp = failableCall(
+          /*rewriter=*/rewriter,
+          /*loc=*/loc,
+          /*callee=*/rewriter.getStringAttr(funcName),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>(updatedOperands));
+
+      rewriter.replaceOp(op, ArrayRef<Value>{});
+    } else {
+      rewriter.replaceOpWithNewOp<emitc::CallOp>(
+          /*op=*/op,
+          /*type=*/op.getOperation()->getResultTypes(),
+          /*callee=*/rewriter.getStringAttr(funcName),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>(updatedOperands));
+    }
 
     return releaseRefIfLastUse(op.getOperation(), listOperand);
   }
@@ -305,6 +356,9 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
   // The index of the list argument. This gets replaced in the conversion.
   size_t listArgumentIndex;
+
+  // Whether the function call can fail, i.e. it returns an iree_status_t.
+  bool failable;
 };
 
 class ListAllocOpConversion
@@ -319,11 +373,13 @@ class ListAllocOpConversion
     // The generated c code looks roughly like this.
     // iree_vm_type_def_t element_type = iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
     // iree_vm_type_def_t* element_type_ptr = &element_type;
-    // iree_vm_ref_t list_ref = {0};
     // iree_vm_list_t* list = NULL;
     // iree_vm_list_t** list_ptr = &list;
-    // iree_vm_list_create(&element_type, {initial_capacity}, state->allocator, &list);
-    // iree_vm_ref_wrap_assign(list, iree_vm_list_type_id(), &list_ref));
+    // iree_vm_list_create(element_type_ptr, {initial_capacity}, state->allocator, list_ptr);
+    // iree_vm_ref_t ref = {0};
+    // iree_vm_ref_t* ref_ptr = &ref
+    // iree_vm_ref_type_t ref_type = iree_vm_list_type_id();
+    // iree_vm_ref_wrap_assign(list, ref_type, ref_ptr));
     // clang-format on
 
     auto ctx = allocOp.getContext();
@@ -368,9 +424,9 @@ class ListAllocOpConversion
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t**"),
         /*operand=*/listOp.getResult());
 
-    rewriter.create<emitc::CallOp>(
+    failableCall(
+        /*rewriter=*/rewriter,
         /*location=*/loc,
-        /*type=*/TypeRange{},
         /*callee=*/rewriter.getStringAttr("iree_vm_list_create"),
         /*args=*/
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0), rewriter.getIndexAttr(1),
@@ -399,9 +455,9 @@ class ListAllocOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    rewriter.create<emitc::CallOp>(
+    failableCall(
+        /*rewriter=*/rewriter,
         /*location=*/loc,
-        /*type=*/TypeRange{},
         /*callee=*/rewriter.getStringAttr("iree_vm_ref_wrap_assign"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -442,7 +498,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
             .Default([](Operation *) { return std::make_pair(None, None); });
 
     if (!valueTypeEnum.hasValue() || !valueExtractor.hasValue()) {
-      return getOp.emitOpError() << " not handeled";
+      return getOp.emitOpError() << "element type not handled";
     }
 
     auto valueOp = rewriter.create<emitc::ConstOp>(
@@ -463,9 +519,17 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{getOp.list()});
 
-    auto getValueOp = rewriter.create<emitc::CallOp>(
+    rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/TypeRange{},
+        /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
+
+    auto getValueOp = failableCall(
+        /*rewriter=*/rewriter,
+        /*location=*/loc,
         /*callee=*/rewriter.getStringAttr("iree_vm_list_get_value_as"),
         /*args=*/
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0), rewriter.getIndexAttr(1),
@@ -532,15 +596,25 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{setOp.list()});
 
-    rewriter.replaceOpWithNewOp<emitc::CallOp>(
-        /*op=*/setOp,
+    rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
         /*type=*/TypeRange{},
+        /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
+
+    auto callOp = failableCall(
+        /*rewriter=*/rewriter,
+        /*loc=*/loc,
         /*callee=*/rewriter.getStringAttr("iree_vm_list_set_value"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), setOp.index(),
                         valuePtrOp.getResult()});
+
+    rewriter.replaceOp(setOp, ArrayRef<Value>{});
 
     return releaseRefIfLastUse(setOp.getOperation(), setOp.list());
   }
@@ -565,11 +639,11 @@ void populateVMToCPatterns(MLIRContext *context,
   // List ops
   patterns.insert<ListAllocOpConversion>(context);
   patterns.insert<ListOpConversion<IREE::VM::ListReserveOp>>(
-      context, "iree_vm_list_reserve", /*listArgumentIndex=*/0);
+      context, "iree_vm_list_reserve", 0, true);
   patterns.insert<ListOpConversion<IREE::VM::ListResizeOp>>(
-      context, "iree_vm_list_resize", /*listArgumentIndex=*/0);
+      context, "iree_vm_list_resize", 0, true);
   patterns.insert<ListOpConversion<IREE::VM::ListSizeOp>>(
-      context, "iree_vm_list_size", /*listArgumentIndex=*/0);
+      context, "iree_vm_list_size", 0, false);
   patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(context);
   patterns.insert<ListSetOpConversion<IREE::VM::ListSetI32Op>>(context);
 
