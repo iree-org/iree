@@ -1194,7 +1194,7 @@ class MaterializeInterfaces2Pass
 
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass(
     TargetOptions executableOptions) {
-  return std::make_unique<MaterializeInterfaces2Pass>(executableOptions);  // NOLINT
+  return std::make_unique<MaterializeInterfaces2Pass>(executableOptions);
 }
 
 static PassRegistration<MaterializeInterfaces2Pass> pass(

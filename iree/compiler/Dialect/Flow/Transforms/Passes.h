@@ -74,7 +74,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
 /// Creates XLA-HLO preprocessing transformation pass. In this pass we should
 /// have all mhlo -> mhlo transformations that are shared between all
 /// backends.
-std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
+std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass();
 
 // Runs pre-partitioning conversion passes to convert to the flow dialect.
 // This converts some input ops directly to flow ops when doing so has a
@@ -167,7 +167,7 @@ inline void registerFlowPasses() {
   registerFlowTransformPassPipeline();
   createConvertToFlowTensorOpsPass();
   createLegalizeInputTypesPass();
-  createHLOPreprocessingPass();
+  createHLOToHLOPreprocessingPass();
   createPrePartitioningConversionPass();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();

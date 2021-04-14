@@ -279,8 +279,8 @@ class TargetBackend {
   //
   // Sample output structure:
   //   hal.executable @linked_executable {
-  //     hal.interface @legacy_io_0 { ... }
-  //     hal.interface @legacy_io_1 { ... }
+  //     hal.interface @io_0 { ... }
+  //     hal.interface @io_1 { ... }
   //     hal.executable.target @target, filter="target-backend" {
   //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
   //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
@@ -294,7 +294,7 @@ class TargetBackend {
   //   }
   //   // Other targets within executables are not modified
   //   hal.executable @main_dispatch_0 {
-  //     hal.interface @legacy_io { ... }
+  //     hal.interface @io { ... }
   //     hal.executable.target @other, filter="other" {
   //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
   //       module { ... }

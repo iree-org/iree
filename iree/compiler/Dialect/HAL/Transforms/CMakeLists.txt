@@ -27,6 +27,7 @@ iree_cc_library(
     "MaterializeInterfaces2.cpp"
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
+    "PackAllocations.cpp"
     "PackConstantPoolStorage.cpp"
     "Passes.cpp"
     "PropagateConstantWorkgroupInfo.cpp"

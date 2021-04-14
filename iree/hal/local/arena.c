@@ -66,9 +66,9 @@ iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
     // to be a need for more anyway.
     uint8_t* block_base = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_allocator_malloc(block_pool->block_allocator,
-                                  block_pool->total_block_size,
-                                  (void**)&block_base));
+        z0, block_pool->block_allocator.alloc(block_pool->block_allocator.self,
+                                              0, block_pool->total_block_size,
+                                              (void**)&block_base));
     block = (iree_arena_block_t*)(block_base + (block_pool->total_block_size -
                                                 sizeof(iree_arena_block_t)));
   }
@@ -135,8 +135,9 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     iree_host_size_t allocation_size =
         sizeof(iree_arena_oversized_allocation_t) + byte_length;
     iree_arena_oversized_allocation_t* allocation = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        block_pool->block_allocator, allocation_size, (void**)&allocation));
+    IREE_RETURN_IF_ERROR(block_pool->block_allocator.alloc(
+        block_pool->block_allocator.self, 0, allocation_size,
+        (void**)&allocation));
     allocation->next = arena->allocation_head;
     arena->allocation_head = allocation;
     arena->total_allocation_size += allocation_size;

@@ -27,6 +27,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/StandardOps/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -429,12 +430,25 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
     return success();
   }
 };
+
+/// A canonicalizer wrapper to replace DispatchTensorLoadOps.
+struct DispatchTensorLoadOpCanonicalizer {
+  void operator()(PatternRewriter &rewriter, DispatchTensorLoadOp op,
+                  DispatchTensorLoadOp newOp) {
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(op, op.getResult().getType(),
+                                                newOp.getResult());
+  }
+};
+
 }  // namespace
 
 void DispatchTensorLoadOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ConvertDimOfDispatchInputLoadToDispatchShape,
-                 ConvertDispatchInputLoadOfTensorToSubTensor>(context);
+                 ConvertDispatchInputLoadOfTensorToSubTensor,
+                 OpWithOffsetSizesAndStridesConstantArgumentFolder<
+                     DispatchTensorLoadOp, DispatchTensorLoadOpCanonicalizer>>(
+      context);
 }
 
 // Inlining producers of an input to the dispatch region results in the

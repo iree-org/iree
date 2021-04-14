@@ -14,7 +14,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     return
   }
 
-  hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
@@ -29,13 +29,13 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
   // CHECK: spv.GlobalVariable @[[ARG1:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.func @resource_bindings_in_same_entry_func()
   func @resource_bindings_in_same_entry_func() {
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x4xf32>
+    %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x4xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x4xf32>
+    %2 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4x4xf32>
     return
   }
 
-  hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }
@@ -54,8 +54,8 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
   func @resource_bindings_in_entry_func1() {
     // CHECK: spv.mlir.addressof @[[FUNC1_ARG:.+]]
     // CHECK: spv.mlir.addressof @[[FUNC1_RET:.+]]
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xvector<4xf32>>
+    %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x4xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4xvector<4xf32>>
     return
   }
 
@@ -63,12 +63,12 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
   func @resource_bindings_in_entry_func2() {
     // CHECK: spv.mlir.addressof @[[FUNC2_ARG]]
     // CHECK: spv.mlir.addressof @[[FUNC2_RET]]
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x4xf32>
+    %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x4xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4x4xf32>
     return
   }
 
-  hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }
@@ -184,12 +184,12 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
   func @interface_binding() {
     %c0 = constant 0 : index
-    %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<8x5xf32>
-    %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<5xf32>
-    %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<8x5xf32>
+    %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<8x5xf32>
+    %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<5xf32>
+    %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<8x5xf32>
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface @io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -212,7 +212,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
     %1 = hal.interface.workgroup.id[1] : index
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface @io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -236,7 +236,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
     %1 = hal.interface.workgroup.count[1] : index
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface @io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -261,8 +261,8 @@ module attributes {
   func @scalarize_vector_transfer_read() {
     %c0 = constant 0: index
     %f0 = constant 0.0 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<3xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<f32>
+    %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<3xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<f32>
     // CHECK: %[[LD0:.+]] = spv.Load "StorageBuffer" %{{.+}}: f32
     // CHECK: %[[LD1:.+]] = spv.Load "StorageBuffer" %{{.+}}: f32
     // CHECK: %[[LD2:.+]] = spv.Load "StorageBuffer" %{{.+}}: f32
@@ -273,7 +273,7 @@ module attributes {
     return
   }
 
-  hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }

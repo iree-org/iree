@@ -484,6 +484,110 @@ def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
   }];
 }
 
+def HAL_AllocatorPackOp : HAL_PureOp<"allocator.pack", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    AttrSizedOperandSegments,
+  ]> {
+  let summary = [{packs variable-sized slices into a single slab}];
+  let description = [{
+    Performs a greedy packing of one or more sized slices with specified
+    lifetimes and returns their relative offsets in an aliased linear space.
+
+    Slices are `[start, end] = %slice_byte_size`, where the start and end values
+    define an inclusive lifetime range and the size is the total number of bytes
+    required to be live for that range.
+
+    ```mlir
+    // Computes thte total length required for the packed values and the offsets
+    // of the 3 slices requested relative to the base of the packed memory:
+    %total_length, %offset_0, %offset_1, %offset_2 =
+        hal.allocator.pack<%allocator : !hal.allocator>
+            // Each slice gets one result offset:
+            slices([
+              // 3 slices where A and B overlap and will get unique offsets
+              // while B and C do not overlap and are allowed to alias.
+              [0, 10] = %size_0,  // A => %offset_0
+              [3,  8] = %size_1,  // B => %offset_1
+              [9, 10] = %size_2,  // C => %offset_2
+              ...
+            ]) : index
+    ```
+
+    The lifetime start and end points (inclusive) are only used for relative
+    comparisons and may originate with any meaning (op order in block, epoch,
+    phase of the moon, etc). The packing algorithm uses the intervals to
+    determine slice liveness and when aliasing is safe.
+
+    The size of each slice may either be a constant or runtime-computed dynamic
+    value. Constant slices can achieve more dense packing than the dynamic
+    values and CSE/canonicalization should be applied to ensure that as many of
+    the dynamic values are equivalent if possible.
+
+    The total length required to pack all slices is returned and can be used to
+    acquire storage. The individual slice offsets are 0-based and as such if are
+    directly used as buffer offsets may need additional offseting. This can
+    either be applied via the optional `offset` operand or slicing of the
+    underlying allocation buffer.
+  }];
+
+  let arguments = (ins
+    HAL_Allocator:$allocator,
+    Optional<HAL_DeviceSize>:$offset,
+    HAL_IndexArrayAttr:$lifetime_intervals,
+    Variadic<HAL_DeviceSize>:$dynamic_slice_sizes
+  );
+  let results = (outs
+    HAL_DeviceSize:$total_length,
+    Variadic<HAL_DeviceSize>:$packed_offsets
+  );
+
+  let assemblyFormat = [{
+    `<` $allocator `:` type($allocator) `>`
+    (`offset` `(` $offset^ `)`)?
+    `slices` `(` `{`
+    custom<PackSliceRanges>($lifetime_intervals,
+                            $dynamic_slice_sizes,
+                            type($packed_offsets))
+    `}` `)`
+    `:` type($total_length)
+    attr-dict-with-keyword
+  }];
+
+  let verifier = [{ return verifyAllocatorPackOp(*this); }];
+
+  let extraClassDeclaration = [{
+    struct Slice {
+      int64_t lifetimeStart;
+      int64_t lifetimeEnd;
+      Value dynamicSize;
+      Value packedOffset;
+
+      bool operator==(const Slice &rhs) const {
+        return lifetimeStart == rhs.lifetimeStart &&
+               lifetimeEnd == rhs.lifetimeEnd;
+      }
+      bool operator!=(const Slice &rhs) const {
+        return !(*this == rhs);
+      }
+      bool operator<(const Slice &rhs) const {
+        return std::make_pair(lifetimeStart, lifetimeEnd) <
+               std::make_pair(rhs.lifetimeStart, rhs.lifetimeEnd);
+      }
+      bool intersects(const Slice &rhs) const {
+        return lifetimeEnd >= rhs.lifetimeStart &&
+               rhs.lifetimeEnd >= lifetimeStart;
+      }
+    };
+
+    /// Returns all of the slices to be packed.
+    /// Order is ascending by lifetime interval (post-canonicalization).
+    SmallVector<Slice> getSlices();
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // !hal.buffer / iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
@@ -1021,6 +1125,8 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     `pattern` `(` $pattern `:` type($pattern) `)`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 // TODO(benvanik): update buffer op.
@@ -1049,6 +1155,8 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
     `length` `(` $length `)`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_CommandBufferPushConstantsOp :
@@ -1777,6 +1885,48 @@ def HAL_DeviceMatchMemoryModelOp : HAL_PureOp<"device.match.memory_model"> {
     `<` $device `:` type($device) `>`
     `value` `(` $model `)`
     `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_DeviceQueryOp : HAL_PureOp<"device.query"> {
+  let summary = [{returns a runtime configuration parameter from the device}];
+  let description = [{
+    Queries a device configuration parameter with the given key.
+    Returns a status indicating whether the key was recognized/available and if
+    it was the value converted to the specified type. Queries must return the
+    same value for the lifetime of the module though may vary from run to run.
+
+    This is roughly equivalent to the `sysconf` linux syscall
+    (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
+    set of keys available and their interpretation is target-dependent. If there
+    is a HAL match attribute (`#hal.device.match.*`) or op
+    (`hal.device.match.*`) prefer to use that in order to get compile-time
+    propagation when the target is specified and elide the runtime query and
+    get compile-time verification when a runtime query is required.
+
+    Users of the op must check the `ok` result before using the value as what
+    set of keys is available may change over time. If in doubt: don't use this.
+    Each key used adds additional versioning and testing complexity as runtime
+    code path changes will explode combinatorially and should be treated with as
+    much care as a binary file format change. Keys should be prefixed with `ex.`
+    when experimental indicating that they are not expected to be present
+    forever; all non-experimental keys should be vetted.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    StrAttr:$key
+  );
+  let results = (outs
+    I1:$ok,
+    AnyType:$value
+  );
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `key` `(` $key `)`
+    `:` type($ok) `,` type($value)
     attr-dict-with-keyword
   }];
 }

@@ -167,14 +167,16 @@ def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
       cond_br %true, ^bb2, ^bb1
     ^bb1:
       // Indicates that this branch should never be taken.
-      iree.unreachable
+      iree.unreachable "shouldn't be here"
     ^bb2:
       ...
 
     ```
   }];
 
-  let assemblyFormat = "attr-dict";
+  let arguments = (ins StrAttr:$message);
+
+  let assemblyFormat = "$message attr-dict";
 }
 
 //===----------------------------------------------------------------------===//
