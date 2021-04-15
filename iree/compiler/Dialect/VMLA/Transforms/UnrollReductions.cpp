@@ -39,7 +39,7 @@ void unrollReduceOp(mhlo::ReduceOp reduceOp) {
 
   // Insert at the same place as the original op.
   OpBuilder builder(reduceOp);
-  SmallVector<Value, 4> temps{reduceOp.operands()};
+  SmallVector<Value, 4> temps{reduceOp.inputs()};
   for (int64_t dimension : sortedDimensions) {
     // Create the new reduction using the results of the previous operation.
     auto singleAttrType =
