@@ -175,119 +175,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_linalg_on_tensors_dylib-llvm-aot_dylib
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "batch_norm_inference.mlir"
-    "broadcast.mlir"
-    "broadcast_add.mlir"
-    "broadcast_in_dim.mlir"
-    "clamp.mlir"
-    "compare.mlir"
-    "concatenate.mlir"
-    "constant.mlir"
-    "convert.mlir"
-    "convolution.mlir"
-    "cosine.mlir"
-    "divide.mlir"
-    "dot.mlir"
-    "dot_general.mlir"
-    "exponential.mlir"
-    "exponential_minus_one.mlir"
-    "floor.mlir"
-    "gather.mlir"
-    "iota.mlir"
-    "log.mlir"
-    "log_plus_one.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "reduce.mlir"
-    "reduce_window.mlir"
-    "remainder.mlir"
-    "reshape.mlir"
-    "reverse.mlir"
-    "rsqrt.mlir"
-    "select.mlir"
-    "sine.mlir"
-    "slice.mlir"
-    "sqrt.mlir"
-    "subtract.mlir"
-    "tanh.mlir"
-    "torch_index_select.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "dylib-llvm-aot"
-  DRIVER
-    "dylib"
-  COMPILER_FLAGS
-    "-iree-flow-dispatch-linalg-on-tensors"
-    "-iree-codegen-llvm-experimental-linalg-on-tensors"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_linalg_on_tensors_vulkan-spirv_vulkan
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "batch_norm_inference.mlir"
-    "broadcast.mlir"
-    "broadcast_add.mlir"
-    "broadcast_in_dim.mlir"
-    "clamp.mlir"
-    "compare.mlir"
-    "concatenate.mlir"
-    "constant.mlir"
-    "convert.mlir"
-    "convolution.mlir"
-    "cosine.mlir"
-    "divide.mlir"
-    "dot.mlir"
-    "dot_general.mlir"
-    "exponential.mlir"
-    "exponential_minus_one.mlir"
-    "floor.mlir"
-    "gather.mlir"
-    "iota.mlir"
-    "log.mlir"
-    "log_plus_one.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "reduce.mlir"
-    "reduce_window.mlir"
-    "remainder.mlir"
-    "reshape.mlir"
-    "reverse.mlir"
-    "rsqrt.mlir"
-    "select.mlir"
-    "sine.mlir"
-    "slice.mlir"
-    "sqrt.mlir"
-    "subtract.mlir"
-    "tanh.mlir"
-    "torch_index_select.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-  COMPILER_FLAGS
-    "-iree-flow-dispatch-linalg-on-tensors"
-    "-iree-codegen-spirv-experimental-linalg-on-tensors"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_linalg_on_tensors_cuda
+    check_cuda
   SRCS
     "add.mlir"
     "broadcast.mlir"
@@ -305,8 +193,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
-  COMPILER_FLAGS
-    "-iree-flow-dispatch-linalg-on-tensors"
   LABELS
     "noasan"
     "nomsan"

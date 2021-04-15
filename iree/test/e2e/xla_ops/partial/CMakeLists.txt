@@ -21,8 +21,6 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "-iree-flow-dispatch-linalg-on-tensors"
-    "-iree-codegen-spirv-experimental-linalg-on-tensors"
     "-iree-vulkan-target-triple=valhall-g77-unknown-android10"
   LABELS
     "notap"
