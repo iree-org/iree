@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -canonicalize -cse %s | IreeFileCheck %s
 
 func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
