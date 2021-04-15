@@ -52,6 +52,13 @@ struct ListTypeStorage : public TypeStorage {
 // static
 bool ListType::isCompatible(Type type) { return true; }
 
+// static
+bool ListType::canImplicitlyCast(Type from, Type to) {
+  if (from.isa<IREE::VariantType>() || to.isa<IREE::VariantType>()) return true;
+  if (from.isa<TensorType>() && to.isa<TensorType>()) return true;
+  return from == to;
+}
+
 ListType ListType::get(Type elementType) {
   return Base::get(elementType.getContext(), elementType);
 }
@@ -244,7 +251,7 @@ void excludeTiedOperandAndResultIndices(
 
 void IREEDialect::registerTypes() {
   addTypes<IREE::ByteBufferType, IREE::ListType, IREE::MutableByteBufferType,
-           IREE::PtrType>();
+           IREE::PtrType, IREE::VariantType>();
 }
 
 }  // namespace iree_compiler

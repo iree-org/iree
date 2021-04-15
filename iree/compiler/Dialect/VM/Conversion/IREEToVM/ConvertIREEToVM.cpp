@@ -87,6 +87,19 @@ class UnreachableOpConversion
 // Lists
 //===----------------------------------------------------------------------===//
 
+class ListCreateOpConversion : public OpConversionPattern<IREE::ListCreateOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::ListCreateOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    IREE::ListCreateOpAdaptor srcOperands(operands);
+    rewriter.replaceOpWithNewOp<IREE::VM::ListAllocOp>(
+        srcOp, typeConverter->convertType(srcOp.result().getType()),
+        srcOperands.initial_capacity());
+    return success();
+  }
+};
+
 class ListSizeOpConversion : public OpConversionPattern<IREE::ListSizeOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -169,13 +182,19 @@ void populateIREEToVMPatterns(MLIRContext *context,
 
   typeConverter.addConversion(
       [&typeConverter](IREE::ListType type) -> Optional<Type> {
-        auto elementType = typeConverter.convertType(type.getElementType());
+        Type elementType;
+        if (type.getElementType().isa<IREE::VariantType>()) {
+          elementType = IREE::VM::OpaqueType::get(type.getContext());
+        } else {
+          elementType = typeConverter.convertType(type.getElementType());
+        }
         if (!elementType) return llvm::None;
         return IREE::VM::RefType::get(IREE::VM::ListType::get(elementType));
       });
-  patterns.insert<ListSizeOpConversion, ListResizeOpConversion,
-                  ListGetOpConversion, ListSetOpConversion>(typeConverter,
-                                                            context);
+  patterns
+      .insert<ListCreateOpConversion, ListSizeOpConversion,
+              ListResizeOpConversion, ListGetOpConversion, ListSetOpConversion>(
+          typeConverter, context);
 }
 
 }  // namespace iree_compiler

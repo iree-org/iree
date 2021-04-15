@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "byte_buffer_ops.mlir"
     "hint_ops.mlir"
+    "list_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

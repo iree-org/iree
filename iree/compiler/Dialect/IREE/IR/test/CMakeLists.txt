@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "byte_buffer_ops.mlir"
     "do_not_optimize.mlir"
+    "list_ops.mlir"
     "parse_print.mlir"
   DATA
     iree::tools::IreeFileCheck
