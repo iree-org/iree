@@ -69,9 +69,7 @@ echo "Building with Ninja"
 cd "${CMAKE_BUILD_DIR?}"
 ninja
 
-# Limit parallelism dramatically to avoid exhausting GPU memory
-# TODO(#5162): Handle this more robustly
-export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 # Only test drivers that use the GPU, since we run all tests on non-GPU machines
 # as well.
