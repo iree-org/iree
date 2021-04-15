@@ -62,11 +62,13 @@ extra_css:
 copyright: Copyright &copy; 2021 Google LLC  # TODO(scotttodd): remove?
 
 markdown_extensions:
+  - abbr
   - admonition
+  - footnotes
   - meta
   - pymdownx.details
-  - pymdownx.tabbed
   - pymdownx.superfences
+  - pymdownx.tabbed
   - tables
   - toc:
       permalink: true  # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
