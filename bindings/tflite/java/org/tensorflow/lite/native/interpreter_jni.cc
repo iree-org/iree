@@ -34,6 +34,10 @@ static TfLiteInterpreter* GetInterpreter(JNIEnv* env, jobject obj) {
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
   IREE_DCHECK(field);
 
+  if (env->ExceptionCheck()) {
+    return nullptr;  // Failed to get field, returning null.
+  }
+
   return reinterpret_cast<TfLiteInterpreter*>(env->GetLongField(obj, field));
 }
 
@@ -82,7 +86,10 @@ JNI_FUNC jint JNI_PREFIX(nativeOutputTensorCount)(JNIEnv* env, jobject thiz) {
 
 JNI_FUNC jint JNI_PREFIX(nativeAllocateTensors)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_DCHECK_NE(interpreter, nullptr);
+  if (!interpreter) {
+    return kTfLiteError;  // Cannot allocate without interpreter. Returning
+                          // error to handle in Java.
+  }
 
   return (jint)TfLiteInterpreterAllocateTensors(interpreter);
 }

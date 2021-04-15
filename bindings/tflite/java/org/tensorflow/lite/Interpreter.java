@@ -292,7 +292,6 @@ public final class Interpreter implements AutoCloseable {
    * @throws IllegalStateException if the graph's tensors could not be successfully allocated.
    */
   public void allocateTensors() {
-    checkInitialized();
     if (nativeAllocateTensors() != 0) {
       throw new IllegalStateException("Failed to allocate Tensors.");
     }
@@ -308,7 +307,6 @@ public final class Interpreter implements AutoCloseable {
    *     number of model inputs; or if error occurs when resizing the specified input.
    */
   public void resizeInput(int inputIndex, @NonNull int[] dims) {
-    checkInitialized();
     if (nativeResizeInputTensor(inputIndex, dims) != 0) {
       throw new IllegalArgumentException("Unable to resize to input tensor.");
     }
@@ -317,7 +315,6 @@ public final class Interpreter implements AutoCloseable {
 
   /** Gets the number of input tensors. */
   public int getInputTensorCount() {
-    checkInitialized();
     return inputTensorCount;
   }
 
@@ -328,7 +325,6 @@ public final class Interpreter implements AutoCloseable {
    *     to initialize the {@link Interpreter}.
    */
   public int getInputIndex(String opName) {
-    checkInitialized();
     for (int i = 0; i < getInputTensorCount(); ++i) {
       if (getInputTensor(i).name().equals(opName)) {
         return i;
@@ -344,7 +340,6 @@ public final class Interpreter implements AutoCloseable {
    *     number of model inputs.
    */
   public Tensor getInputTensor(int index) {
-    checkInitialized();
     if (index < 0 || index >= inputTensors.length) {
       throw new IllegalArgumentException(String.format("Invalid input Tensor index: %d", index));
     }
@@ -356,13 +351,11 @@ public final class Interpreter implements AutoCloseable {
 
   /** Gets the number of output Tensors. */
   public int getOutputTensorCount() {
-    checkInitialized();
     return outputTensorCount;
   }
 
   /** Gets index of an output given the op name of the output or -1 if not found. */
   public int getOutputIndex(String opName) {
-    checkInitialized();
     for (int i = 0; i < getOutputTensorCount(); ++i) {
       if (getOutputTensor(i).name().equals(opName)) {
         return i;
@@ -385,7 +378,6 @@ public final class Interpreter implements AutoCloseable {
    *     number of model outputs.
    */
   public Tensor getOutputTensor(int index) {
-    checkInitialized();
     if (index < 0 || index >= outputTensors.length) {
       throw new IllegalArgumentException(String.format("Invalid output Tensor index: %d", index));
     }
@@ -397,21 +389,13 @@ public final class Interpreter implements AutoCloseable {
 
   /** Returns native inference timing, or -1 if inference isn't complete yet. */
   public Long getLastNativeInferenceDurationNanoseconds() {
-    checkInitialized();
     return inferenceDurationNanoseconds;
   }
 
   /** Release resources associated with the {@code Interpreter}. */
   @Override
   public void close() {
-    checkInitialized();
     nativeFree();
-  }
-
-  private void checkInitialized() {
-    if (nativeAddress == 0) {
-      throw new IllegalStateException("Interpreter hasn't been initialized");
-    }
   }
 
   private native long nativeNew(ByteBuffer modelByteBuffer, int numThreads);

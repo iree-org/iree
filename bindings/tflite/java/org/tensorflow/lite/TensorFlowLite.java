@@ -24,7 +24,7 @@ public final class TensorFlowLite {
   static {
     Throwable loadLibraryException = null;
     try {
-      System.loadLibrary("iree");
+      System.loadLibrary("iree_bindings_tflite");
     } catch (UnsatisfiedLinkError e) {
       loadLibraryException = e;
     }

@@ -34,11 +34,19 @@ public final class Tensor {
   private static final String TAG = Tensor.class.getCanonicalName();
 
   static Tensor inputFromIndex(long nativeInterpreterHandle, int tensorIndex) {
-    return new Tensor(nativeCreateInput(nativeInterpreterHandle, tensorIndex), tensorIndex);
+    long nativeAddress = nativeCreateInput(nativeInterpreterHandle, tensorIndex);
+    if (nativeAddress == 0) {
+      throw new RuntimeException(String.format("Failed to create input tensor %d", tensorIndex));
+    }
+    return new Tensor(nativeAddress, tensorIndex);
   }
 
   static Tensor outputFromIndex(long nativeInterpreterHandle, int tensorIndex) {
-    return new Tensor(nativeCreateOutput(nativeInterpreterHandle, tensorIndex), tensorIndex);
+    long nativeAddress = nativeCreateOutput(nativeInterpreterHandle, tensorIndex);
+    if (nativeAddress == 0) {
+      throw new RuntimeException(String.format("Failed to create output tensor %d", tensorIndex));
+    }
+    return new Tensor(nativeAddress, tensorIndex);
   }
 
   /**
@@ -85,7 +93,6 @@ public final class Tensor {
 
   /** Returns the {@link DataType} of elements stored in the Tensor. */
   public DataType dataType() {
-    checkInitialized();
     return DataType.fromC(nativeType());
   }
 
@@ -96,19 +103,16 @@ public final class Tensor {
    * <p>Will be 0 for a scalar, 1 for a vector, 2 for a matrix, 3 for a 3-dimensional tensor etc.
    */
   public int numDimensions() {
-    checkInitialized();
     return nativeNumDims();
   }
 
   /** Returns the size, in bytes, of the tensor data. */
   public int numBytes() {
-    checkInitialized();
     return nativeBytesSize();
   }
 
   /** Returns the number of elements in a flattened (1-D) view of the tensor. */
   public int numElements() {
-    checkInitialized();
     int[] shape = shape();
     int n = 1;
     for (int i = 0; i < shape.length; ++i) {
@@ -124,7 +128,6 @@ public final class Tensor {
    * @return an array where the i-th element is the size of the i-th dimension of the tensor.
    */
   public int[] shape() {
-    checkInitialized();
     int[] shape = new int[nativeNumDims()];
     for (int i = 0; i < shape.length; ++i) {
       shape[i] = nativeDim(i);
@@ -141,7 +144,6 @@ public final class Tensor {
    * @return an array where the i-th element is the size of the i-th dimension of the tensor.
    */
   public int[] shapeSignature() {
-    checkInitialized();
     return shapeSignature;
   }
 
@@ -150,13 +152,11 @@ public final class Tensor {
    * output tensors indexed starting at 0.
    */
   public int index() {
-    checkInitialized();
     return tensorIndex;
   }
 
   /** Returns the name of the tensor within the owning {@link Interpreter}. */
   public String name() {
-    checkInitialized();
     return nativeName();
   }
 
@@ -167,7 +167,6 @@ public final class Tensor {
    * quantized, the values of scale and zero_point are both 0.
    */
   public QuantizationParams quantizationParams() {
-    checkInitialized();
     return quantizationParams;
   }
 
@@ -272,12 +271,6 @@ public final class Tensor {
 
   private ByteBuffer getNativeBuffer() {
     return nativeGetByteBuffer().order(ByteOrder.nativeOrder());
-  }
-
-  private void checkInitialized() {
-    if (nativeAddress == 0) {
-      throw new IllegalStateException("Interpreter hasn't been initialized");
-    }
   }
 
   private final long nativeAddress;
