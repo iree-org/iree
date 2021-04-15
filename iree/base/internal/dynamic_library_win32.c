@@ -383,8 +383,7 @@ iree_status_t iree_dynamic_library_attach_symbols_from_memory(
   IREE_ASSERT_ARGUMENT(library);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (library->temp_file_count + 1 >=
-      IREE_ARRAYSIZE(library->temp_file_paths)) {
+  if (library->temp_file_count + 1 > IREE_ARRAYSIZE(library->temp_file_paths)) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many temp files attached");
   }
