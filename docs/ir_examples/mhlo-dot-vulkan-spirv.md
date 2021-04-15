@@ -333,31 +333,106 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 {% endraw %}
 
-### IR Dump After mlir::iree_compiler::IREE::Flow::DispatchabilityAnalysisPass
+### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
 
 {% raw %}
 ```
-module  {
-  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    return %0 : tensor<32x64xf32>
-  }
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %2 : tensor<32x64xf32>
 }
 
 ```
 {% endraw %}
 
-### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::IdentifyDispatchRegions2Pass
+### IR Dump After mlir::iree_compiler::{anonymous}::Convert1x1ConvToMatmulPass
 
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> (tensor<32x64xf32>) {
-    %1 = "mhlo.dot"(%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    flow.return %1 : tensor<32x64xf32>
-  }
-  return %0 : tensor<32x64xf32>
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %2 : tensor<32x64xf32>
+}
+
+```
+{% endraw %}
+
+### IR Dump After ConvertElementwiseToLinalg
+
+{% raw %}
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %2 : tensor<32x64xf32>
+}
+
+```
+{% endraw %}
+
+### IR Dump After LinalgFoldUnitExtentDims
+
+{% raw %}
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %2 : tensor<32x64xf32>
+}
+
+```
+{% endraw %}
+
+### IR Dump After Canonicalizer
+
+{% raw %}
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %2 : tensor<32x64xf32>
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
+
+{% raw %}
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %2 : tensor<32x64xf32>
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::ConvertToFlowTensorOpsPass
+
+{% raw %}
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %2 : tensor<32x64xf32>
 }
 
 ```
@@ -368,26 +443,57 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> (tensor<32x64xf32>) {
-    %1 = "mhlo.dot"(%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    flow.return %1 : tensor<32x64xf32>
-  }
-  return %0 : tensor<32x64xf32>
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %2 : tensor<32x64xf32>
 }
 
 ```
 {% endraw %}
 
-### IR Dump After mlir::iree_compiler::IREE::Flow::FoldCompatibleDispatchRegionsPass
+### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::DispatchLinalgOnTensorsPass
 
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> (tensor<32x64xf32>) {
-    %1 = "mhlo.dot"(%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    flow.return %1 : tensor<32x64xf32>
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c1 = constant 1 : index
+  %0 = flow.dispatch.workgroups[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+      (%arg2: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg3: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg4: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+    %cst = constant 0.000000e+00 : f32
+    %c32_0 = constant 32 : index
+    %c64_1 = constant 64 : index
+    %1 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+    %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+    %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+    %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+    %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+    %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+    %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+    %2 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_1, %workgroup_size_1]
+    %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_1, %workgroup_size_1]
+    scf.for %arg5 = %2 to %c32_0 step %3 {
+      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_0, %workgroup_size_0]
+      %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
+      scf.for %arg6 = %4 to %c64_1 step %5 {
+        %6 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 32)>(%arg5, %workgroup_size_1)
+        %7 = flow.dispatch.tensor.load %arg2, offsets = [%arg5, 0], sizes = [%6, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+        %8 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 64)>(%arg6, %workgroup_size_0)
+        %9 = flow.dispatch.tensor.load %arg3, offsets = [0, %arg6], sizes = [1024, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+        %10 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 32)>(%arg5, %workgroup_size_1)
+        %11 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 64)>(%arg6, %workgroup_size_0)
+        %12 = affine.min affine_map<(d0, d1) -> (-d0 + 32, d1)>(%arg5, %workgroup_size_1)
+        %13 = affine.min affine_map<(d0, d1) -> (-d0 + 64, d1)>(%arg6, %workgroup_size_0)
+        %14 = subtensor %1[%arg5, %arg6] [%12, %13] [1, 1] : tensor<32x64xf32> to tensor<?x?xf32>
+        %15 = linalg.fill(%14, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+        %16 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%7, %9 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%15 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        flow.dispatch.tensor.store %16, %arg4, offsets = [%arg5, %arg6], sizes = [%10, %11], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+      }
+    }
+    flow.return
   }
   return %0 : tensor<32x64xf32>
 }
@@ -395,23 +501,105 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 {% endraw %}
 
-### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineDispatchRegionsPass
+### IR Dump After Canonicalizer
 
 {% raw %}
 ```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c1 = constant 1 : index
+  %0 = flow.dispatch.workgroups[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+      (%arg2: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg3: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg4: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+    %cst = constant 0.000000e+00 : f32
+    %c32_0 = constant 32 : index
+    %c64_1 = constant 64 : index
+    %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+    %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+    %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+    %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+    %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+    %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+    %1 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_1, %workgroup_size_1]
+    %2 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_1, %workgroup_size_1]
+    scf.for %arg5 = %1 to %c32_0 step %2 {
+      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_0, %workgroup_size_0]
+      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
+      scf.for %arg6 = %3 to %c64_1 step %4 {
+        %5 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 32)>(%arg5, %workgroup_size_1)
+        %6 = flow.dispatch.tensor.load %arg2, offsets = [%arg5, 0], sizes = [%5, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+        %7 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 64)>(%arg6, %workgroup_size_0)
+        %8 = flow.dispatch.tensor.load %arg3, offsets = [0, %arg6], sizes = [1024, %7], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+        %9 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 32)>(%arg5, %workgroup_size_1)
+        %10 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 64)>(%arg6, %workgroup_size_0)
+        %11 = affine.min affine_map<(d0, d1) -> (-d0 + 32, d1)>(%arg5, %workgroup_size_1)
+        %12 = affine.min affine_map<(d0, d1) -> (-d0 + 64, d1)>(%arg6, %workgroup_size_0)
+        %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf32>
+        %14 = linalg.fill(%13, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+        %15 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%6, %8 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        flow.dispatch.tensor.store %15, %arg4, offsets = [%arg5, %arg6], sizes = [%9, %10], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+      }
+    }
+    flow.return
+  }
+  return %0 : tensor<32x64xf32>
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineDispatchRegions2Pass
+
+{% raw %}
+```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0, d1) -> (d1, -d0 + 32)>
+#map2 = affine_map<(d0, d1) -> (d1, -d0 + 64)>
+#map3 = affine_map<(d0, d1) -> (-d0 + 32, d1)>
+#map4 = affine_map<(d0, d1) -> (-d0 + 64, d1)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3, %workgroup_size_1)
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4, %workgroup_size_0)
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3, %workgroup_size_1)
+            %9 = affine.min #map2(%arg4, %workgroup_size_0)
+            %10 = affine.min #map3(%arg3, %workgroup_size_1)
+            %11 = affine.min #map4(%arg4, %workgroup_size_0)
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %c1 = constant 1 : index
+    %0 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
 }
@@ -424,8 +612,10 @@ module  {
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c1 = constant 1 : index
+  %0 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -436,19 +626,54 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0, d1) -> (d1, -d0 + 32)>
+#map2 = affine_map<(d0, d1) -> (d1, -d0 + 64)>
+#map3 = affine_map<(d0, d1) -> (-d0 + 32, d1)>
+#map4 = affine_map<(d0, d1) -> (-d0 + 64, d1)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3, %workgroup_size_1)
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4, %workgroup_size_0)
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3, %workgroup_size_1)
+            %9 = affine.min #map2(%arg4, %workgroup_size_0)
+            %10 = affine.min #map3(%arg3, %workgroup_size_1)
+            %11 = affine.min #map4(%arg4, %workgroup_size_0)
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %c1 = constant 1 : index
+    %0 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
 }
@@ -461,8 +686,10 @@ module  {
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c1 = constant 1 : index
+  %0 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -474,8 +701,10 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c1 = constant 1 : index
+  %0 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -487,8 +716,10 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %c1 = constant 1 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %0 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -500,8 +731,10 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %c1 = constant 1 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %0 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -513,10 +746,12 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 {% raw %}
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.ex.stream.fragment(%c2048, %arg0, %arg1) : (index, tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
-      (%arg2: index, %arg3: tensor<32x1024xf32>, %arg4: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %c1 = constant 1 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %0 = flow.ex.stream.fragment(%c64, %c32, %c1, %arg0, %arg1) : (index, index, index, tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+      (%arg2: index, %arg3: index, %arg4: index, %arg5: tensor<32x1024xf32>, %arg6: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+    %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%arg2, %arg3, %arg4](%arg5, %arg6) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
   return %0 : tensor<32x64xf32>
@@ -529,21 +764,56 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0, d1) -> (d1, -d0 + 32)>
+#map2 = affine_map<(d0, d1) -> (d1, -d0 + 64)>
+#map3 = affine_map<(d0, d1) -> (-d0 + 32, d1)>
+#map4 = affine_map<(d0, d1) -> (-d0 + 64, d1)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3, %workgroup_size_1)
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4, %workgroup_size_0)
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3, %workgroup_size_1)
+            %9 = affine.min #map2(%arg4, %workgroup_size_0)
+            %10 = affine.min #map3(%arg3, %workgroup_size_1)
+            %11 = affine.min #map4(%arg4, %workgroup_size_0)
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%c2048, %arg0, %arg1) : (index, tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
-        (%arg2: index, %arg3: tensor<32x1024xf32>, %arg4: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %c1 = constant 1 : index
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %0 = flow.ex.stream.fragment(%c64, %c32, %c1, %arg0, %arg1) : (index, index, index, tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: index, %arg3: index, %arg4: index, %arg5: tensor<32x1024xf32>, %arg6: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%arg2, %arg3, %arg4](%arg5, %arg6) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -560,8 +830,10 @@ module  {
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
       (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %c2048 = constant 2048 : index
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %c1 = constant 1 : index
+    %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
   return %0 : tensor<32x64xf32>
@@ -577,8 +849,10 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
       (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %c2048 = constant 2048 : index
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %c1 = constant 1 : index
+    %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
   return %0 : tensor<32x64xf32>
@@ -591,21 +865,56 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0, d1) -> (d1, -d0 + 32)>
+#map2 = affine_map<(d0, d1) -> (d1, -d0 + 64)>
+#map3 = affine_map<(d0, d1) -> (-d0 + 32, d1)>
+#map4 = affine_map<(d0, d1) -> (-d0 + 64, d1)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3, %workgroup_size_1)
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4, %workgroup_size_0)
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3, %workgroup_size_1)
+            %9 = affine.min #map2(%arg4, %workgroup_size_0)
+            %10 = affine.min #map3(%arg3, %workgroup_size_1)
+            %11 = affine.min #map4(%arg4, %workgroup_size_0)
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
         (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %c2048 = constant 2048 : index
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %c64 = constant 64 : index
+      %c32 = constant 32 : index
+      %c1 = constant 1 : index
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -619,21 +928,56 @@ module  {
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map3 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %9 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %10 = affine.min #map3(%arg3)[%workgroup_size_1]
+            %11 = affine.min #map4(%arg4)[%workgroup_size_0]
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
         (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %c2048 = constant 2048 : index
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %c64 = constant 64 : index
+      %c32 = constant 32 : index
+      %c1 = constant 1 : index
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -647,21 +991,56 @@ module  {
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map3 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %9 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %10 = affine.min #map3(%arg3)[%workgroup_size_1]
+            %11 = affine.min #map4(%arg4)[%workgroup_size_0]
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
         (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %c2048 = constant 2048 : index
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %c64 = constant 64 : index
+      %c32 = constant 32 : index
+      %c1 = constant 1 : index
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -675,21 +1054,56 @@ module  {
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map3 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %9 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %10 = affine.min #map3(%arg3)[%workgroup_size_1]
+            %11 = affine.min #map4(%arg4)[%workgroup_size_0]
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
         (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %c2048 = constant 2048 : index
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %c64 = constant 64 : index
+      %c32 = constant 32 : index
+      %c1 = constant 1 : index
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -703,21 +1117,56 @@ module  {
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map3 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %9 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %10 = affine.min #map3(%arg3)[%workgroup_size_1]
+            %11 = affine.min #map4(%arg4)[%workgroup_size_0]
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
         (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %c2048 = constant 2048 : index
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %c64 = constant 64 : index
+      %c32 = constant 32 : index
+      %c1 = constant 1 : index
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -731,21 +1180,56 @@ module  {
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map3 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  flow.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>, workgroup_rank = 3 : index}
     module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+      func @dot_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:32x1024xf32>, %arg1: !flow.dispatch.tensor<readonly:1024x64xf32>, %arg2: !flow.dispatch.tensor<writeonly:32x64xf32>) {
+        %cst = constant 0.000000e+00 : f32
+        %c32 = constant 32 : index
+        %c64 = constant 64 : index
+        %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+        %workgroup_size_1 = flow.dispatch.workgroup.size[1] : index
+        %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+        %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+        %workgroup_id_1 = flow.dispatch.workgroup.id[1] : index
+        %workgroup_count_1 = flow.dispatch.workgroup.count[1] : index
+        %0 = affine.apply #map0()[%workgroup_id_1, %workgroup_size_1]
+        %1 = affine.apply #map0()[%workgroup_count_1, %workgroup_size_1]
+        scf.for %arg3 = %0 to %c32 step %1 {
+          %2 = affine.apply #map0()[%workgroup_id_0, %workgroup_size_0]
+          %3 = affine.apply #map0()[%workgroup_count_0, %workgroup_size_0]
+          scf.for %arg4 = %2 to %c64 step %3 {
+            %4 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %5 = flow.dispatch.tensor.load %arg0, offsets = [%arg3, 0], sizes = [%4, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+            %6 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %7 = flow.dispatch.tensor.load %arg1, offsets = [0, %arg4], sizes = [1024, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+            %8 = affine.min #map1(%arg3)[%workgroup_size_1]
+            %9 = affine.min #map2(%arg4)[%workgroup_size_0]
+            %10 = affine.min #map3(%arg3)[%workgroup_size_1]
+            %11 = affine.min #map4(%arg4)[%workgroup_size_0]
+            %12 = linalg.init_tensor [%10, %11] : tensor<?x?xf32>
+            %13 = linalg.fill(%12, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+            %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %14, %arg2, offsets = [%arg3, %arg4], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+          }
+        }
+        return
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
         (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %c2048 = constant 2048 : index
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %c64 = constant 64 : index
+      %c32 = constant 32 : index
+      %c1 = constant 1 : index
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -759,21 +1243,72 @@ module  {
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map3 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
 module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-    module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    }
+    hal.executable.target @vulkan_spirv, filter="vulkan*" {
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()}
+      module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+        func @dot_dispatch_0() {
+          %c0 = constant 0 : index
+          %cst = constant 0.000000e+00 : f32
+          %c32 = constant 32 : index
+          %c64 = constant 64 : index
+          %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+          %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+          %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+          %workgroup_size_x = hal.interface.workgroup.size[0] : index
+          %workgroup_size_y = hal.interface.workgroup.size[1] : index
+          %workgroup_id_x = hal.interface.workgroup.id[0] : index
+          %workgroup_count_x = hal.interface.workgroup.count[0] : index
+          %workgroup_id_y = hal.interface.workgroup.id[1] : index
+          %workgroup_count_y = hal.interface.workgroup.count[1] : index
+          %3 = affine.apply #map0()[%workgroup_id_y, %workgroup_size_y]
+          %4 = affine.apply #map0()[%workgroup_count_y, %workgroup_size_y]
+          scf.for %arg0 = %3 to %c32 step %4 {
+            %5 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
+            %6 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
+            scf.for %arg1 = %5 to %c64 step %6 {
+              %7 = affine.min #map1(%arg0)[%workgroup_size_y]
+              %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+              %9 = affine.min #map2(%arg1)[%workgroup_size_x]
+              %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [1024, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+              %11 = affine.min #map1(%arg0)[%workgroup_size_y]
+              %12 = affine.min #map2(%arg1)[%workgroup_size_x]
+              %13 = affine.min #map3(%arg0)[%workgroup_size_y]
+              %14 = affine.min #map4(%arg1)[%workgroup_size_x]
+              %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
+              %16 = linalg.fill(%15, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+              %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+              flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+            }
+          }
+          return
+        }
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        }
       }
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
         (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %c2048 = constant 2048 : index
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %c64 = constant 64 : index
+      %c32 = constant 32 : index
+      %c1 = constant 1 : index
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) {hal.bindings = [#hal.ex.operand_buffer<"s0b0_ro_external", 0 : index>, #hal.ex.operand_buffer<"s0b1_ro_external", 1 : index>, #hal.ex.result_buffer<"s0b2_xw_external", 0 : index>]} : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -787,32 +1322,61 @@ module  {
 
 {% raw %}
 ```
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map3 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
 module  {
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan_spirv, filter="vulkan*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()}
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-        func @dot_ex_dispatch_0() {
+        func @dot_dispatch_0() {
           %c0 = constant 0 : index
-          %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-          %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-          %2 = call @dot_ex_dispatch_0_impl(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-          hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+          %cst = constant 0.000000e+00 : f32
+          %c32 = constant 32 : index
+          %c64 = constant 64 : index
+          %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+          %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+          %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+          %workgroup_size_x = hal.interface.workgroup.size[0] : index
+          %workgroup_size_y = hal.interface.workgroup.size[1] : index
+          %workgroup_id_x = hal.interface.workgroup.id[0] : index
+          %workgroup_count_x = hal.interface.workgroup.count[0] : index
+          %workgroup_id_y = hal.interface.workgroup.id[1] : index
+          %workgroup_count_y = hal.interface.workgroup.count[1] : index
+          %3 = affine.apply #map0()[%workgroup_id_y, %workgroup_size_y]
+          %4 = affine.apply #map0()[%workgroup_count_y, %workgroup_size_y]
+          scf.for %arg0 = %3 to %c32 step %4 {
+            %5 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
+            %6 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
+            scf.for %arg1 = %5 to %c64 step %6 {
+              %7 = affine.min #map1(%arg0)[%workgroup_size_y]
+              %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+              %9 = affine.min #map2(%arg1)[%workgroup_size_x]
+              %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [1024, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+              %11 = affine.min #map1(%arg0)[%workgroup_size_y]
+              %12 = affine.min #map2(%arg1)[%workgroup_size_x]
+              %13 = affine.min #map3(%arg0)[%workgroup_size_y]
+              %14 = affine.min #map4(%arg1)[%workgroup_size_x]
+              %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
+              %16 = linalg.fill(%15, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+              %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+              flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+            }
+          }
           return
         }
-        func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-          %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-          return %0 : tensor<32x64xf32>
-        }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
         }
       }
     }
@@ -820,8 +1384,10 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
         (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %c2048 = constant 2048 : index
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %c64 = constant 64 : index
+      %c32 = constant 32 : index
+      %c1 = constant 1 : index
+      %1 = flow.dispatch @dot_dispatch_0::@dot_dispatch_0[%c64, %c32, %c1](%arg2, %arg3) {hal.bindings = [#hal.ex.operand_buffer<"s0b0_ro_external", 0 : index>, #hal.ex.operand_buffer<"s0b1_ro_external", 1 : index>, #hal.ex.result_buffer<"s0b2_xw_external", 0 : index>]} : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -836,24 +1402,48 @@ module  {
 {% raw %}
 ```
 hal.executable.target @vulkan_spirv, filter="vulkan*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()}
   module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-    func @dot_ex_dispatch_0() {
+    func @dot_dispatch_0() {
       %c0 = constant 0 : index
-      %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-      %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-      %2 = call @dot_ex_dispatch_0_impl(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-      hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+      %cst = constant 0.000000e+00 : f32
+      %c32 = constant 32 : index
+      %c64 = constant 64 : index
+      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+      %workgroup_size_x = hal.interface.workgroup.size[0] : index
+      %workgroup_size_y = hal.interface.workgroup.size[1] : index
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_count_x = hal.interface.workgroup.count[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %workgroup_count_y = hal.interface.workgroup.count[1] : index
+      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+      scf.for %arg0 = %3 to %c32 step %4 {
+        %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+        %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+        scf.for %arg1 = %5 to %c64 step %6 {
+          %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+          %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+          %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+          %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [1024, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+          %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+          %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+          %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 32, s0)>(%arg0)[%workgroup_size_y]
+          %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 64, s0)>(%arg1)[%workgroup_size_x]
+          %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
+          %16 = linalg.fill(%15, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+          %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+          flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+        }
+      }
       return
     }
-    func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-      return %0 : tensor<32x64xf32>
-    }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
   }
 }
@@ -865,40 +1455,40 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
 
 {% raw %}
 ```
-func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
-{% endraw %}
-
-### IR Dump After Canonicalizer
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
+func @dot_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = call @dot_ex_dispatch_0_impl(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After Canonicalizer
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+  %cst = constant 0.000000e+00 : f32
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+  %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+  scf.for %arg0 = %3 to %c32 step %4 {
+    %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+    %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+    scf.for %arg1 = %5 to %c64 step %6 {
+      %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+      %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [1024, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+      %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 32, s0)>(%arg0)[%workgroup_size_y]
+      %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 64, s0)>(%arg1)[%workgroup_size_x]
+      %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
+      %16 = linalg.fill(%15, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+      %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+      flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+    }
+  }
   return
 }
 
@@ -910,139 +1500,141 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() {
+  func @dot_dispatch_0() {
     %c0 = constant 0 : index
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-    %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+    %cst = constant 0.000000e+00 : f32
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+    %workgroup_size_x = hal.interface.workgroup.size[0] : index
+    %workgroup_size_y = hal.interface.workgroup.size[1] : index
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_count_x = hal.interface.workgroup.count[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %workgroup_count_y = hal.interface.workgroup.count[1] : index
+    %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+    %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+    scf.for %arg0 = %3 to %c32 step %4 {
+      %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+      %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+      scf.for %arg1 = %5 to %c64 step %6 {
+        %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+        %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+        %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+        %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [1024, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+        %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+        %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+        %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 32, s0)>(%arg0)[%workgroup_size_y]
+        %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 64, s0)>(%arg1)[%workgroup_size_x]
+        %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
+        %16 = linalg.fill(%15, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+      }
+    }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
 ```
 {% endraw %}
 
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
+### IR Dump After mlir::iree_compiler::{anonymous}::BufferAllocViewCleanUpPass
 
 {% raw %}
 ```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %cst = constant 0.000000e+00 : f32
-  %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
-  %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
-  %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After ConvertElementwiseToLinalg
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %cst = constant 0.000000e+00 : f32
-  %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
-  %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
-  %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After LinalgFoldUnitExtentDims
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
+func @dot_dispatch_0() {
   %c0 = constant 0 : index
   %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
-  %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
-  %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+  %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+  scf.for %arg0 = %3 to %c32 step %4 {
+    %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+    %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+    scf.for %arg1 = %5 to %c64 step %6 {
+      %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+      %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [1024, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+      %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 32, s0)>(%arg0)[%workgroup_size_y]
+      %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 64, s0)>(%arg1)[%workgroup_size_x]
+      %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
+      %16 = linalg.fill(%15, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+      %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+      flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
+    }
+  }
+  return
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::{anonymous}::LinalgBufferizePass
+
+{% raw %}
+```
+func @dot_dispatch_0() {
+  %c0 = constant 0 : index
+  %cst = constant 0.000000e+00 : f32
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+  %3 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+  %4 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+  %5 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+  %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+  scf.for %arg0 = %6 to %c32 step %7 {
+    %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+    %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+    scf.for %arg1 = %8 to %c64 step %9 {
+      %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %11 = memref.subview %0[%arg0, 0] [%10, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %12 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0], sizes = [%10, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
+      %13 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %14 = memref.subview %2[0, %arg1] [1024, %13] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %15 = flow.dispatch.tensor.load %3, offsets = [0, %arg1], sizes = [1024, %13], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
+      %16 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %18 = memref.subview %4[%arg0, %arg1] [%16, %17] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 32, s0)>(%arg0)[%workgroup_size_y]
+      %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 64, s0)>(%arg1)[%workgroup_size_x]
+      %21 = linalg.init_tensor [%19, %20] : tensor<?x?xf32>
+      linalg.fill(%18, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+      %22 = linalg.fill(%21, %cst) {__internal_linalg_transform__ = "workgroup"} : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+      linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%11, %14 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%18 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+      %23 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%12, %15 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%22 : tensor<?x?xf32>) -> tensor<?x?xf32>
+    }
+  }
   return
 }
 
@@ -1053,53 +1645,40 @@ func @dot_ex_dispatch_0() {
 
 {% raw %}
 ```
-func @dot_ex_dispatch_0() {
+func @dot_dispatch_0() {
   %c0 = constant 0 : index
   %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
-  %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
-  %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
-  %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
-  %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After Canonicalizer
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
-  %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
-  %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+  %3 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+  %4 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+  %5 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+  %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+  scf.for %arg0 = %6 to %c32 step %7 {
+    %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+    %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+    scf.for %arg1 = %8 to %c64 step %9 {
+      %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %11 = memref.subview %0[%arg0, 0] [%10, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %13 = memref.subview %2[0, %arg1] [1024, %12] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %14 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %15 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %16 = memref.subview %4[%arg0, %arg1] [%14, %15] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      linalg.fill(%16, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+      linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%11, %13 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%16 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+    }
+  }
   return
 }
 
@@ -1110,32 +1689,38 @@ func @dot_ex_dispatch_0() {
 
 {% raw %}
 ```
-func @dot_ex_dispatch_0() {
+func @dot_dispatch_0() {
   %c0 = constant 0 : index
   %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-  %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
-  %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
-  %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
-
-{% raw %}
-```
-func @dot_ex_dispatch_0() {
-  %cst = constant 0.000000e+00 : f32
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-  linalg.fill(%0, %cst) : memref<32x64xf32>, f32 
-  linalg.matmul ins(%1, %2 : memref<32x1024xf32>, memref<1024x64xf32>) outs(%0 : memref<32x64xf32>)
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+  %3 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
+  %4 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+  %5 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+  %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+  scf.for %arg0 = %6 to %c32 step %7 {
+    %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+    %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+    scf.for %arg1 = %8 to %c64 step %9 {
+      %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %11 = memref.subview %0[%arg0, 0] [%10, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %13 = memref.subview %2[0, %arg1] [1024, %12] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %14 = memref.subview %4[%arg0, %arg1] [%10, %12] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      linalg.fill(%14, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+      linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%11, %13 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%14 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+    }
+  }
   return
 }
 
@@ -1146,13 +1731,35 @@ func @dot_ex_dispatch_0() {
 
 {% raw %}
 ```
-func @dot_ex_dispatch_0() {
+func @dot_dispatch_0() {
+  %c0 = constant 0 : index
   %cst = constant 0.000000e+00 : f32
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-  linalg.fill(%0, %cst) : memref<32x64xf32>, f32 
-  linalg.matmul ins(%1, %2 : memref<32x1024xf32>, memref<1024x64xf32>) outs(%0 : memref<32x64xf32>)
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+  %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+  scf.for %arg0 = %3 to %c32 step %4 {
+    %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+    %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+    scf.for %arg1 = %5 to %c64 step %6 {
+      %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+      %8 = memref.subview %0[%arg0, 0] [%7, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+      %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+      linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+    }
+  }
   return
 }
 
@@ -1164,19 +1771,41 @@ func @dot_ex_dispatch_0() {
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() {
+  func @dot_dispatch_0() {
+    %c0 = constant 0 : index
     %cst = constant 0.000000e+00 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    linalg.fill(%0, %cst) : memref<32x64xf32>, f32 
-    linalg.matmul ins(%1, %2 : memref<32x1024xf32>, memref<1024x64xf32>) outs(%0 : memref<32x64xf32>)
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_size_x = hal.interface.workgroup.size[0] : index
+    %workgroup_size_y = hal.interface.workgroup.size[1] : index
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_count_x = hal.interface.workgroup.count[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %workgroup_count_y = hal.interface.workgroup.count[1] : index
+    %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+    %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+    scf.for %arg0 = %3 to %c32 step %4 {
+      %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+      %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+      scf.for %arg1 = %5 to %c64 step %6 {
+        %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+        %8 = memref.subview %0[%arg0, 0] [%7, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+        %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+        linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+      }
+    }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -1188,92 +1817,85 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() {
+  func @dot_dispatch_0() {
+    %c0 = constant 0 : index
     %cst = constant 0.000000e+00 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    linalg.fill(%0, %cst) : memref<32x64xf32>, f32 
-    linalg.matmul ins(%1, %2 : memref<32x1024xf32>, memref<1024x64xf32>) outs(%0 : memref<32x64xf32>)
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_size_x = hal.interface.workgroup.size[0] : index
+    %workgroup_size_y = hal.interface.workgroup.size[1] : index
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_count_x = hal.interface.workgroup.count[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %workgroup_count_y = hal.interface.workgroup.count[1] : index
+    %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+    %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+    scf.for %arg0 = %3 to %c32 step %4 {
+      %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+      %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+      scf.for %arg1 = %5 to %c64 step %6 {
+        %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg0)[%workgroup_size_y]
+        %8 = memref.subview %0[%arg0, 0] [%7, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
+        %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+        linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+      }
+    }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
 ```
 {% endraw %}
 
-### IR Dump After mlir::iree_compiler::{anonymous}::SplitDispatchFunctionPass
+### IR Dump After mlir::iree_compiler::{anonymous}::ConcretizeTileAmongWorkgroupsPass
 
 {% raw %}
 ```
 hal.executable.target @vulkan_spirv, filter="vulkan*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-  module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-    func @dot_ex_dispatch_0() {
-      %cst = constant 0.000000e+00 : f32
-      %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-      %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-      %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-      linalg.fill(%0, %cst) : memref<32x64xf32>, f32 
-      linalg.matmul ins(%1, %2 : memref<32x1024xf32>, memref<1024x64xf32>) outs(%0 : memref<32x64xf32>)
-      return
-    }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-    }
-  }
-}
-
-```
-{% endraw %}
-
-### IR Dump After mlir::iree_compiler::{anonymous}::LinalgTileAndDistributePass
-
-{% raw %}
-```
-hal.executable.target @vulkan_spirv, filter="vulkan*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+  hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-    %c1 = constant 1 : index
-    %c32 = constant 32 : index
     %c4 = constant 4 : index
-    %c64 = constant 64 : index
     %c4_0 = constant 4 : index
-    hal.return %c4_0, %c4, %c1 : index, index, index
+    %c1 = constant 1 : index
+    hal.return %c4, %c4_0, %c1 : index, index, index
   }
   module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-    func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+      %c0 = constant 0 : index
       %cst = constant 0.000000e+00 : f32
-      %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-      %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-      %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-      %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-      %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-      %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %6 = memref.subview %1[%5, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %8 = memref.subview %2[0, %7] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %9 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %10 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %11 = memref.subview %0[%9, %10] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %12 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %13 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %14 = memref.subview %0[%12, %13] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      linalg.fill(%14, %cst) {__internal_linalg_transform__ = "workgroup", launch_info_key = "__op_num_0__"} : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
-      linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op, launch_info_key = "__op_num_0__"} ins(%6, %8 : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+      %c16 = constant 16 : index
+      %c8 = constant 8 : index
+      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %c8]
+      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %c16]
+      %5 = affine.min affine_map<(d0)[s0] -> (8, -d0 + 32)>(%3)[%c8]
+      %6 = memref.subview %0[%3, 0] [%5, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %7 = affine.min affine_map<(d0)[s0] -> (16, -d0 + 64)>(%4)[%c16]
+      %8 = memref.subview %1[0, %4] [1024, %7] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %9 = memref.subview %2[%3, %4] [%5, %7] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      linalg.fill(%9, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+      linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%6, %8 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%9 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
       return
     }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
   }
 }
@@ -1286,41 +1908,39 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
 {% raw %}
 ```
 hal.executable.target @vulkan_spirv, filter="vulkan*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+  hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-    %c1 = constant 1 : index
-    %c32 = constant 32 : index
     %c4 = constant 4 : index
-    %c64 = constant 64 : index
     %c4_0 = constant 4 : index
-    hal.return %c4_0, %c4, %c1 : index, index, index
+    %c1 = constant 1 : index
+    hal.return %c4, %c4_0, %c1 : index, index, index
   }
   module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-    func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+      %c0 = constant 0 : index
       %cst = constant 0.000000e+00 : f32
-      %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-      %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-      %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-      %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-      %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-      %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %6 = memref.subview %1[%5, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %8 = memref.subview %2[0, %7] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %9 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %10 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %11 = memref.subview %0[%9, %10] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %12 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %13 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %14 = memref.subview %0[%12, %13] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      linalg.fill(%14, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
-      linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%6, %8 : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+      %c16 = constant 16 : index
+      %c8 = constant 8 : index
+      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %c8]
+      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %c16]
+      %5 = affine.min affine_map<(d0)[s0] -> (8, -d0 + 32)>(%3)[%c8]
+      %6 = memref.subview %0[%3, 0] [%5, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %7 = affine.min affine_map<(d0)[s0] -> (16, -d0 + 64)>(%4)[%c16]
+      %8 = memref.subview %1[0, %4] [1024, %7] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %9 = memref.subview %2[%3, %4] [%5, %7] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      linalg.fill(%9, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+      linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%6, %8 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%9 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
       return
     }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
   }
 }
@@ -1333,31 +1953,29 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %c0 = constant 0 : index
     %cst = constant 0.000000e+00 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-    %6 = memref.subview %1[%5, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-    %8 = memref.subview %2[0, %7] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %9 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-    %10 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-    %11 = memref.subview %0[%9, %10] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %12 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-    %13 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-    %14 = memref.subview %0[%12, %13] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    linalg.fill(%14, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
-    linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%6, %8 : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_y]
+    %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
+    %5 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 32)>()[%workgroup_id_y]
+    %6 = memref.subview %0[%3, 0] [%5, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %7 = affine.min affine_map<()[s0] -> (16, s0 * -16 + 64)>()[%workgroup_id_x]
+    %8 = memref.subview %1[0, %4] [1024, %7] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %9 = memref.subview %2[%3, %4] [%5, %7] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    linalg.fill(%9, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
+    linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%6, %8 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%9 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -1369,109 +1987,153 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 {% raw %}
 ```
 hal.executable.target @vulkan_spirv, filter="vulkan*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+  hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-    %c1 = constant 1 : index
-    %c32 = constant 32 : index
     %c4 = constant 4 : index
-    %c64 = constant 64 : index
     %c4_0 = constant 4 : index
-    hal.return %c4_0, %c4, %c1 : index, index, index
+    %c1 = constant 1 : index
+    hal.return %c4, %c4_0, %c1 : index, index, index
   }
   module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-    func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
-      %cst = constant 0.000000e+00 : f32
-      %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-      %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-      %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-      %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-      %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-      %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %6 = memref.subview %1[%5, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %8 = memref.subview %2[0, %7] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %9 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %10 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %11 = memref.subview %0[%9, %10] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %12 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
-      %13 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
-      %14 = memref.subview %0[%12, %13] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
       %c0 = constant 0 : index
-      %c8 = constant 8 : index
-      %c1 = constant 1 : index
-      %c16 = constant 16 : index
+      %cst = constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %3 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_y]
+      %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
+      %5 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 32)>()[%workgroup_id_y]
+      %6 = memref.subview %0[%3, 0] [%5, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %7 = affine.min affine_map<()[s0] -> (16, s0 * -16 + 64)>()[%workgroup_id_x]
+      %8 = memref.subview %1[0, %4] [1024, %7] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %9 = memref.subview %2[%3, %4] [%5, %7] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c0_0 = constant 0 : index
-      %c1_1 = constant 1 : index
-      %15 = "gpu.thread_id"() {dimension = "x"} : () -> index
-      %16 = "gpu.block_dim"() {dimension = "x"} : () -> index
-      %17 = "gpu.thread_id"() {dimension = "y"} : () -> index
-      %18 = "gpu.block_dim"() {dimension = "y"} : () -> index
-      %19 = muli %17, %c1_1 : index
-      %20 = addi %c0_0, %19 : index
-      %21 = muli %15, %c1_1 : index
-      %22 = addi %c0_0, %21 : index
-      %23 = cmpi slt, %20, %c8 : index
-      %24 = cmpi slt, %22, %c16 : index
-      %25 = and %23, %24 : i1
-      scf.if %25 {
-        %37 = affine.apply affine_map<(d0) -> (d0)>(%20)
-        %38 = affine.apply affine_map<(d0) -> (d0)>(%22)
-        %39 = memref.load %14[%37, %38] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %40 = affine.apply affine_map<(d0) -> (d0)>(%20)
-        %41 = affine.apply affine_map<(d0) -> (d0)>(%22)
-        memref.store %cst, %14[%40, %41] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %c1 = constant 1 : index
+      %c0_1 = constant 0 : index
+      %c1_2 = constant 1 : index
+      %10 = "gpu.thread_id"() {dimension = "x"} : () -> index
+      %11 = "gpu.block_dim"() {dimension = "x"} : () -> index
+      %12 = "gpu.thread_id"() {dimension = "y"} : () -> index
+      %13 = "gpu.block_dim"() {dimension = "y"} : () -> index
+      %14 = muli %c1_2, %12 : index
+      %15 = addi %c0_1, %14 : index
+      %16 = muli %c1_2, %13 : index
+      %17 = muli %c1_2, %10 : index
+      %18 = addi %c0_1, %17 : index
+      %19 = muli %c1_2, %11 : index
+      scf.for %arg0 = %15 to %5 step %16 {
+        scf.for %arg1 = %18 to %7 step %19 {
+          %30 = affine.apply affine_map<(d0) -> (d0)>(%arg0)
+          %31 = affine.apply affine_map<(d0) -> (d0)>(%arg1)
+          %32 = memref.load %9[%30, %31] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %33 = affine.apply affine_map<(d0) -> (d0)>(%arg0)
+          %34 = affine.apply affine_map<(d0) -> (d0)>(%arg1)
+          memref.store %cst, %9[%33, %34] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        }
       }
-      %c0_2 = constant 0 : index
-      %c8_3 = constant 8 : index
+      %c0_3 = constant 0 : index
       %c1_4 = constant 1 : index
       %c1024 = constant 1024 : index
       %c0_5 = constant 0 : index
       %c1024_6 = constant 1024 : index
       %c1_7 = constant 1 : index
-      %c16_8 = constant 16 : index
-      %c0_9 = constant 0 : index
-      %c8_10 = constant 8 : index
+      %c0_8 = constant 0 : index
+      %c1_9 = constant 1 : index
+      %c0_10 = constant 0 : index
       %c1_11 = constant 1 : index
-      %c16_12 = constant 16 : index
-      %c0_13 = constant 0 : index
-      %c1_14 = constant 1 : index
-      %26 = "gpu.thread_id"() {dimension = "x"} : () -> index
-      %27 = "gpu.block_dim"() {dimension = "x"} : () -> index
-      %28 = "gpu.thread_id"() {dimension = "y"} : () -> index
-      %29 = "gpu.block_dim"() {dimension = "y"} : () -> index
-      %30 = muli %28, %c1_14 : index
-      %31 = addi %c0_13, %30 : index
-      %32 = muli %26, %c1_14 : index
-      %33 = addi %c0_13, %32 : index
-      %34 = cmpi slt, %31, %c8_3 : index
-      %35 = cmpi slt, %33, %c16_8 : index
-      %36 = and %34, %35 : i1
-      scf.if %36 {
-        scf.for %arg0 = %c0_13 to %c1024 step %c1_14 {
-          %37 = affine.apply affine_map<(d0) -> (d0)>(%31)
-          %38 = affine.apply affine_map<(d0) -> (d0)>(%arg0)
-          %39 = memref.load %6[%37, %38] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          %40 = affine.apply affine_map<(d0) -> (d0)>(%arg0)
-          %41 = affine.apply affine_map<(d0) -> (d0)>(%33)
-          %42 = memref.load %8[%40, %41] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          %43 = affine.apply affine_map<(d0) -> (d0)>(%31)
-          %44 = affine.apply affine_map<(d0) -> (d0)>(%33)
-          %45 = memref.load %11[%43, %44] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          %46 = affine.apply affine_map<(d0) -> (d0)>(%31)
-          %47 = affine.apply affine_map<(d0) -> (d0)>(%33)
-          %48 = mulf %39, %42 : f32
-          %49 = addf %45, %48 : f32
-          memref.store %49, %11[%46, %47] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %20 = "gpu.thread_id"() {dimension = "x"} : () -> index
+      %21 = "gpu.block_dim"() {dimension = "x"} : () -> index
+      %22 = "gpu.thread_id"() {dimension = "y"} : () -> index
+      %23 = "gpu.block_dim"() {dimension = "y"} : () -> index
+      %24 = muli %c1_11, %22 : index
+      %25 = addi %c0_10, %24 : index
+      %26 = muli %c1_11, %23 : index
+      %27 = muli %c1_11, %20 : index
+      %28 = addi %c0_10, %27 : index
+      %29 = muli %c1_11, %21 : index
+      scf.for %arg0 = %25 to %5 step %26 {
+        scf.for %arg1 = %28 to %7 step %29 {
+          scf.for %arg2 = %c0_10 to %c1024 step %c1_11 {
+            %30 = affine.apply affine_map<(d0) -> (d0)>(%arg0)
+            %31 = affine.apply affine_map<(d0) -> (d0)>(%arg2)
+            %32 = memref.load %6[%30, %31] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+            %33 = affine.apply affine_map<(d0) -> (d0)>(%arg2)
+            %34 = affine.apply affine_map<(d0) -> (d0)>(%arg1)
+            %35 = memref.load %8[%33, %34] : memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+            %36 = affine.apply affine_map<(d0) -> (d0)>(%arg0)
+            %37 = affine.apply affine_map<(d0) -> (d0)>(%arg1)
+            %38 = memref.load %9[%36, %37] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+            %39 = affine.apply affine_map<(d0) -> (d0)>(%arg0)
+            %40 = affine.apply affine_map<(d0) -> (d0)>(%arg1)
+            %41 = mulf %32, %35 : f32
+            %42 = addf %38, %41 : f32
+            memref.store %42, %9[%39, %40] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          }
         }
       }
       return
     }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
   }
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::{anonymous}::ConvertVectorToGPUPass
+
+{% raw %}
+```
+func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  %cst = constant 0.000000e+00 : f32
+  %c8 = constant 8 : index
+  %c16 = constant 16 : index
+  %c1024 = constant 1024 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %3 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_y]
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
+  %5 = memref.subview %0[%3, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %6 = memref.subview %1[0, %4] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[%3, %4] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %9 = "gpu.block_dim"() {dimension = "x"} : () -> index
+  %10 = "gpu.thread_id"() {dimension = "y"} : () -> index
+  %11 = "gpu.block_dim"() {dimension = "y"} : () -> index
+  scf.for %arg0 = %10 to %c8 step %11 {
+    scf.for %arg1 = %8 to %c16 step %9 {
+      memref.store %cst, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    }
+  }
+  %12 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %13 = "gpu.block_dim"() {dimension = "x"} : () -> index
+  %14 = "gpu.thread_id"() {dimension = "y"} : () -> index
+  %15 = "gpu.block_dim"() {dimension = "y"} : () -> index
+  scf.for %arg0 = %14 to %c8 step %15 {
+    scf.for %arg1 = %12 to %c16 step %13 {
+      scf.for %arg2 = %c0 to %c1024 step %c1 {
+        %16 = memref.load %5[%arg0, %arg2] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %17 = memref.load %6[%arg2, %arg1] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %18 = memref.load %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %19 = mulf %16, %17 : f32
+        %20 = addf %18, %19 : f32
+        memref.store %20, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      }
+    }
+  }
+  return
 }
 
 ```
@@ -1482,91 +2144,56 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
     %cst = constant 0.000000e+00 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
     %c8 = constant 8 : index
-    %5 = muli %4, %c8 : index
-    %6 = memref.subview %1[%5, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
     %c16 = constant 16 : index
-    %7 = muli %3, %c16 : index
-    %8 = memref.subview %2[0, %7] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %c8_0 = constant 8 : index
-    %9 = muli %4, %c8_0 : index
-    %c16_1 = constant 16 : index
-    %10 = muli %3, %c16_1 : index
-    %11 = memref.subview %0[%9, %10] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %c8_2 = constant 8 : index
-    %12 = muli %4, %c8_2 : index
-    %c16_3 = constant 16 : index
-    %13 = muli %3, %c16_3 : index
-    %14 = memref.subview %0[%12, %13] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %c0 = constant 0 : index
-    %c8_4 = constant 8 : index
-    %c1 = constant 1 : index
-    %c16_5 = constant 16 : index
-    %c0_6 = constant 0 : index
-    %c1_7 = constant 1 : index
-    %15 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %16 = "gpu.block_dim"() {dimension = "x"} : () -> index
-    %17 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %18 = "gpu.block_dim"() {dimension = "y"} : () -> index
-    %19 = muli %17, %c1_7 : index
-    %20 = addi %c0_6, %19 : index
-    %21 = muli %15, %c1_7 : index
-    %22 = addi %c0_6, %21 : index
-    %23 = cmpi slt, %20, %c8_4 : index
-    %24 = cmpi slt, %22, %c16_5 : index
-    %25 = and %23, %24 : i1
-    scf.if %25 {
-      %37 = memref.load %14[%20, %22] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      memref.store %cst, %14[%20, %22] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    }
-    %c0_8 = constant 0 : index
-    %c8_9 = constant 8 : index
-    %c1_10 = constant 1 : index
     %c1024 = constant 1024 : index
-    %c0_11 = constant 0 : index
-    %c1024_12 = constant 1024 : index
-    %c1_13 = constant 1 : index
-    %c16_14 = constant 16 : index
-    %c0_15 = constant 0 : index
-    %c8_16 = constant 8 : index
-    %c1_17 = constant 1 : index
-    %c16_18 = constant 16 : index
-    %c0_19 = constant 0 : index
-    %c1_20 = constant 1 : index
-    %26 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %27 = "gpu.block_dim"() {dimension = "x"} : () -> index
-    %28 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %29 = "gpu.block_dim"() {dimension = "y"} : () -> index
-    %30 = muli %28, %c1_20 : index
-    %31 = addi %c0_19, %30 : index
-    %32 = muli %26, %c1_20 : index
-    %33 = addi %c0_19, %32 : index
-    %34 = cmpi slt, %31, %c8_9 : index
-    %35 = cmpi slt, %33, %c16_14 : index
-    %36 = and %34, %35 : i1
-    scf.if %36 {
-      scf.for %arg0 = %c0_19 to %c1024 step %c1_20 {
-        %37 = memref.load %6[%31, %arg0] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %38 = memref.load %8[%arg0, %33] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %39 = memref.load %11[%31, %33] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %40 = mulf %37, %38 : f32
-        %41 = addf %39, %40 : f32
-        memref.store %41, %11[%31, %33] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %c8_0 = constant 8 : index
+    %3 = muli %workgroup_id_y, %c8_0 : index
+    %c16_1 = constant 16 : index
+    %4 = muli %workgroup_id_x, %c16_1 : index
+    %5 = memref.subview %0[%3, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %6 = memref.subview %1[0, %4] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %7 = memref.subview %2[%3, %4] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %9 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %10 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %11 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %10 to %c8 step %11 {
+      scf.for %arg1 = %8 to %c16 step %9 {
+        memref.store %cst, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      }
+    }
+    %12 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %13 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %14 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %15 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %14 to %c8 step %15 {
+      scf.for %arg1 = %12 to %c16 step %13 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %16 = memref.load %5[%arg0, %arg2] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+          %17 = memref.load %6[%arg2, %arg1] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %18 = memref.load %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %19 = mulf %16, %17 : f32
+          %20 = addf %18, %19 : f32
+          memref.store %20, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        }
       }
     }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -1578,57 +2205,54 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
     %cst = constant 0.000000e+00 : f32
-    %c8 = constant 8 : index
     %c1024 = constant 1024 : index
-    %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = memref.subview %1[%5, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %7 = muli %3, %c16 : index
-    %8 = memref.subview %2[0, %7] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %9 = muli %4, %c8 : index
-    %10 = muli %3, %c16 : index
-    %11 = memref.subview %0[%9, %10] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %12 = muli %4, %c8 : index
-    %13 = muli %3, %c16 : index
-    %14 = memref.subview %0[%12, %13] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %15 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %16 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %17 = cmpi slt, %16, %c8 : index
-    %18 = cmpi slt, %15, %c16 : index
-    %19 = and %17, %18 : i1
-    scf.if %19 {
-      memref.store %cst, %14[%16, %15] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = memref.subview %0[%3, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %6 = memref.subview %1[0, %4] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %7 = memref.subview %2[%3, %4] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %9 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %10 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %11 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %10 to %c8 step %11 {
+      scf.for %arg1 = %8 to %c16 step %9 {
+        memref.store %cst, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      }
     }
-    %20 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %21 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %22 = cmpi slt, %21, %c8 : index
-    %23 = cmpi slt, %20, %c16 : index
-    %24 = and %22, %23 : i1
-    scf.if %24 {
-      scf.for %arg0 = %c0 to %c1024 step %c1 {
-        %25 = memref.load %6[%21, %arg0] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %26 = memref.load %8[%arg0, %20] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %27 = memref.load %11[%21, %20] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %28 = mulf %25, %26 : f32
-        %29 = addf %27, %28 : f32
-        memref.store %29, %11[%21, %20] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %12 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %13 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %14 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %15 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %14 to %c8 step %15 {
+      scf.for %arg1 = %12 to %c16 step %13 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %16 = memref.load %5[%arg0, %arg2] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+          %17 = memref.load %6[%arg2, %arg1] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %18 = memref.load %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %19 = mulf %16, %17 : f32
+          %20 = addf %18, %19 : f32
+          memref.store %20, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        }
       }
     }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -1640,47 +2264,50 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
     %cst = constant 0.000000e+00 : f32
-    %c8 = constant 8 : index
     %c1024 = constant 1024 : index
-    %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = memref.subview %1[%5, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %7 = muli %3, %c16 : index
-    %8 = memref.subview %2[0, %7] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %9 = memref.subview %0[%5, %7] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %10 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %11 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %12 = cmpi slt, %11, %c8 : index
-    %13 = cmpi slt, %10, %c16 : index
-    %14 = and %12, %13 : i1
-    scf.if %14 {
-      memref.store %cst, %9[%11, %10] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = memref.subview %0[%3, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %6 = memref.subview %1[0, %4] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %7 = memref.subview %2[%3, %4] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %9 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %10 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %11 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %10 to %c8 step %11 {
+      scf.for %arg1 = %8 to %c16 step %9 {
+        memref.store %cst, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      }
     }
-    scf.if %14 {
-      scf.for %arg0 = %c0 to %c1024 step %c1 {
-        %15 = memref.load %6[%11, %arg0] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %16 = memref.load %8[%arg0, %10] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %17 = memref.load %9[%11, %10] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %18 = mulf %15, %16 : f32
-        %19 = addf %17, %18 : f32
-        memref.store %19, %9[%11, %10] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    scf.for %arg0 = %10 to %c8 step %11 {
+      scf.for %arg1 = %8 to %c16 step %9 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %12 = memref.load %5[%arg0, %arg2] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+          %13 = memref.load %6[%arg2, %arg1] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %14 = memref.load %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %15 = mulf %12, %13 : f32
+          %16 = addf %14, %15 : f32
+          memref.store %16, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        }
       }
     }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -1691,39 +2318,90 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 
 {% raw %}
 ```
-func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
   %cst = constant 0.000000e+00 : f32
-  %c8 = constant 8 : index
   %c1024 = constant 1024 : index
-  %c16 = constant 16 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-  %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-  %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-  %5 = muli %4, %c8 : index
-  %6 = memref.subview %1[%5, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %7 = muli %3, %c16 : index
-  %8 = memref.subview %2[0, %7] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %9 = memref.subview %0[%5, %7] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %10 = "gpu.thread_id"() {dimension = "x"} : () -> index
-  %11 = "gpu.thread_id"() {dimension = "y"} : () -> index
-  %12 = cmpi slt, %11, %c8 : index
-  %13 = cmpi slt, %10, %c16 : index
-  %14 = and %12, %13 : i1
-  scf.if %14 {
-    memref.store %cst, %9[%11, %10] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %c8 = constant 8 : index
+  %c16 = constant 16 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %3 = muli %workgroup_id_y, %c8 : index
+  %4 = muli %workgroup_id_x, %c16 : index
+  %5 = memref.subview %0[%3, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %6 = memref.subview %1[0, %4] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[%3, %4] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %9 = "gpu.block_dim"() {dimension = "x"} : () -> index
+  %10 = "gpu.thread_id"() {dimension = "y"} : () -> index
+  %11 = "gpu.block_dim"() {dimension = "y"} : () -> index
+  scf.for %arg0 = %10 to %c8 step %11 {
+    scf.for %arg1 = %8 to %c16 step %9 {
+      memref.store %cst, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    }
   }
-  scf.if %14 {
-    scf.for %arg0 = %c0 to %c1024 step %c1 {
-      %15 = memref.load %6[%11, %arg0] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %16 = memref.load %8[%arg0, %10] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %17 = memref.load %9[%11, %10] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %18 = mulf %15, %16 : f32
-      %19 = addf %17, %18 : f32
-      memref.store %19, %9[%11, %10] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  scf.for %arg0 = %10 to %c8 step %11 {
+    scf.for %arg1 = %8 to %c16 step %9 {
+      scf.for %arg2 = %c0 to %c1024 step %c1 {
+        %12 = memref.load %5[%arg0, %arg2] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %13 = memref.load %6[%arg2, %arg1] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %14 = memref.load %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %15 = mulf %12, %13 : f32
+        %16 = addf %14, %15 : f32
+        memref.store %16, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      }
+    }
+  }
+  return
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::{anonymous}::VectorTransferOptimizationPass
+
+{% raw %}
+```
+func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  %cst = constant 0.000000e+00 : f32
+  %c1024 = constant 1024 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c8 = constant 8 : index
+  %c16 = constant 16 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %3 = muli %workgroup_id_y, %c8 : index
+  %4 = muli %workgroup_id_x, %c16 : index
+  %5 = memref.subview %0[%3, 0] [8, 1024] [1, 1] : memref<32x1024xf32> to memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %6 = memref.subview %1[0, %4] [1024, 16] [1, 1] : memref<1024x64xf32> to memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[%3, %4] [8, 16] [1, 1] : memref<32x64xf32> to memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %9 = "gpu.block_dim"() {dimension = "x"} : () -> index
+  %10 = "gpu.thread_id"() {dimension = "y"} : () -> index
+  %11 = "gpu.block_dim"() {dimension = "y"} : () -> index
+  scf.for %arg0 = %10 to %c8 step %11 {
+    scf.for %arg1 = %8 to %c16 step %9 {
+      memref.store %cst, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    }
+  }
+  scf.for %arg0 = %10 to %c8 step %11 {
+    scf.for %arg1 = %8 to %c16 step %9 {
+      scf.for %arg2 = %c0 to %c1024 step %c1 {
+        %12 = memref.load %5[%arg0, %arg2] : memref<8x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %13 = memref.load %6[%arg2, %arg1] : memref<1024x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %14 = memref.load %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %15 = mulf %12, %13 : f32
+        %16 = addf %14, %15 : f32
+        memref.store %16, %7[%arg0, %arg1] : memref<8x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      }
     }
   }
   return
@@ -1737,52 +2415,55 @@ func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
     %cst = constant 0.000000e+00 : f32
-    %c8 = constant 8 : index
     %c1024 = constant 1024 : index
-    %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = muli %3, %c16 : index
-    %7 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %8 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %9 = cmpi slt, %8, %c8 : index
-    %10 = cmpi slt, %7, %c16 : index
-    %11 = and %9, %10 : i1
-    scf.if %11 {
-      %12 = addi %5, %8 : index
-      %13 = addi %6, %7 : index
-      memref.store %cst, %0[%12, %13] : memref<32x64xf32>
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        memref.store %cst, %2[%9, %10] : memref<32x64xf32>
+      }
     }
-    scf.if %11 {
-      scf.for %arg0 = %c0 to %c1024 step %c1 {
-        %12 = addi %5, %8 : index
-        %13 = memref.load %1[%12, %arg0] : memref<32x1024xf32>
-        %14 = addi %6, %7 : index
-        %15 = memref.load %2[%arg0, %14] : memref<1024x64xf32>
-        %16 = addi %5, %8 : index
-        %17 = addi %6, %7 : index
-        %18 = memref.load %0[%16, %17] : memref<32x64xf32>
-        %19 = mulf %13, %15 : f32
-        %20 = addf %18, %19 : f32
-        %21 = addi %5, %8 : index
-        %22 = addi %6, %7 : index
-        memref.store %20, %0[%21, %22] : memref<32x64xf32>
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = memref.load %0[%9, %arg2] : memref<32x1024xf32>
+          %11 = addi %4, %arg1 : index
+          %12 = memref.load %1[%arg2, %11] : memref<1024x64xf32>
+          %13 = addi %3, %arg0 : index
+          %14 = addi %4, %arg1 : index
+          %15 = memref.load %2[%13, %14] : memref<32x64xf32>
+          %16 = mulf %10, %12 : f32
+          %17 = addf %15, %16 : f32
+          %18 = addi %3, %arg0 : index
+          %19 = addi %4, %arg1 : index
+          memref.store %17, %2[%18, %19] : memref<32x64xf32>
+        }
       }
     }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -1794,52 +2475,55 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
     %cst = constant 0.000000e+00 : f32
-    %c8 = constant 8 : index
     %c1024 = constant 1024 : index
-    %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = muli %3, %c16 : index
-    %7 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %8 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %9 = cmpi slt, %8, %c8 : index
-    %10 = cmpi slt, %7, %c16 : index
-    %11 = and %9, %10 : i1
-    scf.if %11 {
-      %12 = addi %5, %8 : index
-      %13 = addi %6, %7 : index
-      memref.store %cst, %0[%12, %13] : memref<32x64xf32>
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        memref.store %cst, %2[%9, %10] : memref<32x64xf32>
+      }
     }
-    scf.if %11 {
-      scf.for %arg0 = %c0 to %c1024 step %c1 {
-        %12 = addi %5, %8 : index
-        %13 = memref.load %1[%12, %arg0] : memref<32x1024xf32>
-        %14 = addi %6, %7 : index
-        %15 = memref.load %2[%arg0, %14] : memref<1024x64xf32>
-        %16 = addi %5, %8 : index
-        %17 = addi %6, %7 : index
-        %18 = memref.load %0[%16, %17] : memref<32x64xf32>
-        %19 = mulf %13, %15 : f32
-        %20 = addf %18, %19 : f32
-        %21 = addi %5, %8 : index
-        %22 = addi %6, %7 : index
-        memref.store %20, %0[%21, %22] : memref<32x64xf32>
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = memref.load %0[%9, %arg2] : memref<32x1024xf32>
+          %11 = addi %4, %arg1 : index
+          %12 = memref.load %1[%arg2, %11] : memref<1024x64xf32>
+          %13 = addi %3, %arg0 : index
+          %14 = addi %4, %arg1 : index
+          %15 = memref.load %2[%13, %14] : memref<32x64xf32>
+          %16 = mulf %10, %12 : f32
+          %17 = addf %15, %16 : f32
+          %18 = addi %3, %arg0 : index
+          %19 = addi %4, %arg1 : index
+          memref.store %17, %2[%18, %19] : memref<32x64xf32>
+        }
       }
     }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -1851,48 +2535,537 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 {% raw %}
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-  func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
     %cst = constant 0.000000e+00 : f32
-    %c8 = constant 8 : index
     %c1024 = constant 1024 : index
-    %c16 = constant 16 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = muli %3, %c16 : index
-    %7 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %8 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %9 = cmpi slt, %8, %c8 : index
-    %10 = cmpi slt, %7, %c16 : index
-    %11 = and %9, %10 : i1
-    scf.if %11 {
-      %12 = addi %5, %8 : index
-      %13 = addi %6, %7 : index
-      memref.store %cst, %0[%12, %13] : memref<32x64xf32>
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        memref.store %cst, %2[%9, %10] : memref<32x64xf32>
+      }
     }
-    scf.if %11 {
-      scf.for %arg0 = %c0 to %c1024 step %c1 {
-        %12 = addi %5, %8 : index
-        %13 = memref.load %1[%12, %arg0] : memref<32x1024xf32>
-        %14 = addi %6, %7 : index
-        %15 = memref.load %2[%arg0, %14] : memref<1024x64xf32>
-        %16 = memref.load %0[%12, %14] : memref<32x64xf32>
-        %17 = mulf %13, %15 : f32
-        %18 = addf %16, %17 : f32
-        memref.store %18, %0[%12, %14] : memref<32x64xf32>
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = memref.load %0[%9, %arg2] : memref<32x1024xf32>
+          %11 = addi %4, %arg1 : index
+          %12 = memref.load %1[%arg2, %11] : memref<1024x64xf32>
+          %13 = memref.load %2[%9, %11] : memref<32x64xf32>
+          %14 = mulf %10, %12 : f32
+          %15 = addf %13, %14 : f32
+          memref.store %15, %2[%9, %11] : memref<32x64xf32>
+        }
       }
     }
     return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::{anonymous}::VectorizeMemRefPass
+
+{% raw %}
+```
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %cst = constant 0.000000e+00 : f32
+    %c1024 = constant 1024 : index
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        memref.store %cst, %2[%9, %10] : memref<32x64xf32>
+      }
+    }
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = memref.load %0[%9, %arg2] : memref<32x1024xf32>
+          %11 = addi %4, %arg1 : index
+          %12 = memref.load %1[%arg2, %11] : memref<1024x64xf32>
+          %13 = memref.load %2[%9, %11] : memref<32x64xf32>
+          %14 = mulf %10, %12 : f32
+          %15 = addf %13, %14 : f32
+          memref.store %15, %2[%9, %11] : memref<32x64xf32>
+        }
+      }
+    }
+    return
+  }
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::{anonymous}::ForOpCanonicalizationPass
+
+{% raw %}
+```
+func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  %cst = constant 0.000000e+00 : f32
+  %c1024 = constant 1024 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c8 = constant 8 : index
+  %c16 = constant 16 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %3 = muli %workgroup_id_y, %c8 : index
+  %4 = muli %workgroup_id_x, %c16 : index
+  %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+  %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+  %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+  scf.for %arg0 = %7 to %c8 step %8 {
+    scf.for %arg1 = %5 to %c16 step %6 {
+      %9 = addi %3, %arg0 : index
+      %10 = addi %4, %arg1 : index
+      memref.store %cst, %2[%9, %10] : memref<32x64xf32>
+    }
+  }
+  scf.for %arg0 = %7 to %c8 step %8 {
+    scf.for %arg1 = %5 to %c16 step %6 {
+      scf.for %arg2 = %c0 to %c1024 step %c1 {
+        %9 = addi %3, %arg0 : index
+        %10 = memref.load %0[%9, %arg2] : memref<32x1024xf32>
+        %11 = addi %4, %arg1 : index
+        %12 = memref.load %1[%arg2, %11] : memref<1024x64xf32>
+        %13 = memref.load %2[%9, %11] : memref<32x64xf32>
+        %14 = mulf %10, %12 : f32
+        %15 = addf %13, %14 : f32
+        memref.store %15, %2[%9, %11] : memref<32x64xf32>
+      }
+    }
+  }
+  return
+}
+
+```
+{% endraw %}
+
+### IR Dump After Canonicalizer
+
+{% raw %}
+```
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %cst = constant 0.000000e+00 : f32
+    %c1024 = constant 1024 : index
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        memref.store %cst, %2[%9, %10] : memref<32x64xf32>
+      }
+    }
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = memref.load %0[%9, %arg2] : memref<32x1024xf32>
+          %11 = addi %4, %arg1 : index
+          %12 = memref.load %1[%arg2, %11] : memref<1024x64xf32>
+          %13 = memref.load %2[%9, %11] : memref<32x64xf32>
+          %14 = mulf %10, %12 : f32
+          %15 = addf %13, %14 : f32
+          memref.store %15, %2[%9, %11] : memref<32x64xf32>
+        }
+      }
+    }
+    return
+  }
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+```
+{% endraw %}
+
+### IR Dump After CSE
+
+{% raw %}
+```
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %cst = constant 0.000000e+00 : f32
+    %c1024 = constant 1024 : index
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<32x1024xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1024x64xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        memref.store %cst, %2[%9, %10] : memref<32x64xf32>
+      }
+    }
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = memref.load %0[%9, %arg2] : memref<32x1024xf32>
+          %11 = addi %4, %arg1 : index
+          %12 = memref.load %1[%arg2, %11] : memref<1024x64xf32>
+          %13 = memref.load %2[%9, %11] : memref<32x64xf32>
+          %14 = mulf %10, %12 : f32
+          %15 = addf %13, %14 : f32
+          memref.store %15, %2[%9, %11] : memref<32x64xf32>
+        }
+      }
+    }
+    return
+  }
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+```
+{% endraw %}
+
+### IR Dump After mlir::iree_compiler::{anonymous}::FlattenMemRefSubspanPass
+
+{% raw %}
+```
+func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+  %cst = constant 0.000000e+00 : f32
+  %c8 = constant 8 : index
+  %c16 = constant 16 : index
+  %c1024 = constant 1024 : index
+  %c0 = constant 0 : index
+  %c64 = constant 64 : index
+  %c1 = constant 1 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<?xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<?xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<?xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %3 = muli %workgroup_id_y, %c8 : index
+  %4 = muli %workgroup_id_x, %c16 : index
+  %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+  %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+  %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+  scf.for %arg0 = %7 to %c8 step %8 {
+    scf.for %arg1 = %5 to %c16 step %6 {
+      %9 = addi %3, %arg0 : index
+      %10 = addi %4, %arg1 : index
+      %11 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%9, %c64, %c0]
+      %12 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%10, %c1, %11]
+      memref.store %cst, %2[%12] : memref<?xf32>
+    }
+  }
+  scf.for %arg0 = %7 to %c8 step %8 {
+    scf.for %arg1 = %5 to %c16 step %6 {
+      scf.for %arg2 = %c0 to %c1024 step %c1 {
+        %9 = addi %3, %arg0 : index
+        %10 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%9, %c1024, %c0]
+        %11 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%arg2, %c1, %10]
+        %12 = memref.load %0[%11] : memref<?xf32>
+        %13 = addi %4, %arg1 : index
+        %14 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%arg2, %c64, %c0]
+        %15 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%13, %c1, %14]
+        %16 = memref.load %1[%15] : memref<?xf32>
+        %17 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%9, %c64, %c0]
+        %18 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%13, %c1, %17]
+        %19 = memref.load %2[%18] : memref<?xf32>
+        %20 = mulf %12, %16 : f32
+        %21 = addf %19, %20 : f32
+        %22 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%9, %c64, %c0]
+        %23 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%13, %c1, %22]
+        memref.store %21, %2[%23] : memref<?xf32>
+      }
+    }
+  }
+  return
+}
+
+```
+{% endraw %}
+
+### IR Dump After ConvertAffineToStandard
+
+{% raw %}
+```
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %cst = constant 0.000000e+00 : f32
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %c1024 = constant 1024 : index
+    %c0 = constant 0 : index
+    %c64 = constant 64 : index
+    %c1 = constant 1 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<?xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<?xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<?xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        %11 = muli %9, %c64 : index
+        %12 = addi %11, %c0 : index
+        %13 = muli %10, %c1 : index
+        %14 = addi %13, %12 : index
+        memref.store %cst, %2[%14] : memref<?xf32>
+      }
+    }
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = muli %9, %c1024 : index
+          %11 = addi %10, %c0 : index
+          %12 = muli %arg2, %c1 : index
+          %13 = addi %12, %11 : index
+          %14 = memref.load %0[%13] : memref<?xf32>
+          %15 = addi %4, %arg1 : index
+          %16 = muli %arg2, %c64 : index
+          %17 = addi %16, %c0 : index
+          %18 = muli %15, %c1 : index
+          %19 = addi %18, %17 : index
+          %20 = memref.load %1[%19] : memref<?xf32>
+          %21 = muli %9, %c64 : index
+          %22 = addi %21, %c0 : index
+          %23 = muli %15, %c1 : index
+          %24 = addi %23, %22 : index
+          %25 = memref.load %2[%24] : memref<?xf32>
+          %26 = mulf %14, %20 : f32
+          %27 = addf %25, %26 : f32
+          %28 = muli %9, %c64 : index
+          %29 = addi %28, %c0 : index
+          %30 = muli %15, %c1 : index
+          %31 = addi %30, %29 : index
+          memref.store %27, %2[%31] : memref<?xf32>
+        }
+      }
+    }
+    return
+  }
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+```
+{% endraw %}
+
+### IR Dump After Canonicalizer
+
+{% raw %}
+```
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %cst = constant 0.000000e+00 : f32
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %c1024 = constant 1024 : index
+    %c0 = constant 0 : index
+    %c64 = constant 64 : index
+    %c1 = constant 1 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<?xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<?xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<?xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        %11 = muli %9, %c64 : index
+        %12 = addi %10, %11 : index
+        memref.store %cst, %2[%12] : memref<?xf32>
+      }
+    }
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = muli %9, %c1024 : index
+          %11 = addi %arg2, %10 : index
+          %12 = memref.load %0[%11] : memref<?xf32>
+          %13 = addi %4, %arg1 : index
+          %14 = muli %arg2, %c64 : index
+          %15 = addi %13, %14 : index
+          %16 = memref.load %1[%15] : memref<?xf32>
+          %17 = muli %9, %c64 : index
+          %18 = addi %13, %17 : index
+          %19 = memref.load %2[%18] : memref<?xf32>
+          %20 = mulf %12, %16 : f32
+          %21 = addf %19, %20 : f32
+          %22 = muli %9, %c64 : index
+          %23 = addi %13, %22 : index
+          memref.store %21, %2[%23] : memref<?xf32>
+        }
+      }
+    }
+    return
+  }
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+```
+{% endraw %}
+
+### IR Dump After CSE
+
+{% raw %}
+```
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @dot_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    %cst = constant 0.000000e+00 : f32
+    %c8 = constant 8 : index
+    %c16 = constant 16 : index
+    %c1024 = constant 1024 : index
+    %c0 = constant 0 : index
+    %c64 = constant 64 : index
+    %c1 = constant 1 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<?xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<?xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<?xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = muli %workgroup_id_y, %c8 : index
+    %4 = muli %workgroup_id_x, %c16 : index
+    %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %6 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %7 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %8 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %9 = addi %3, %arg0 : index
+        %10 = addi %4, %arg1 : index
+        %11 = muli %9, %c64 : index
+        %12 = addi %10, %11 : index
+        memref.store %cst, %2[%12] : memref<?xf32>
+      }
+    }
+    scf.for %arg0 = %7 to %c8 step %8 {
+      scf.for %arg1 = %5 to %c16 step %6 {
+        scf.for %arg2 = %c0 to %c1024 step %c1 {
+          %9 = addi %3, %arg0 : index
+          %10 = muli %9, %c1024 : index
+          %11 = addi %arg2, %10 : index
+          %12 = memref.load %0[%11] : memref<?xf32>
+          %13 = addi %4, %arg1 : index
+          %14 = muli %arg2, %c64 : index
+          %15 = addi %13, %14 : index
+          %16 = memref.load %1[%15] : memref<?xf32>
+          %17 = muli %9, %c64 : index
+          %18 = addi %13, %17 : index
+          %19 = memref.load %2[%18] : memref<?xf32>
+          %20 = mulf %12, %16 : f32
+          %21 = addf %19, %20 : f32
+          memref.store %21, %2[%18] : memref<?xf32>
+        }
+      }
+    }
+    return
+  }
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -1907,124 +3080,147 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
   spv.module Logical GLSL450 {
     spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
     spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-    spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-    spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    spv.func @dot_ex_dispatch_0() "None" attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
+    spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    spv.func @dot_dispatch_0() "None" attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
       %0 = spv.Constant 0.000000e+00 : f32
       %1 = spv.Constant 8 : i32
-      %2 = spv.Constant 1024 : i32
-      %3 = spv.Constant 16 : i32
+      %2 = spv.Constant 16 : i32
+      %3 = spv.Constant 1024 : i32
       %4 = spv.Constant 0 : i32
-      %5 = spv.Constant 1 : i32
-      %6 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-      %7 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-      %8 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-      %9 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-      %10 = spv.Load "Input" %9 : vector<3xi32>
-      %11 = spv.CompositeExtract %10[0 : i32] : vector<3xi32>
-      %12 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-      %13 = spv.Load "Input" %12 : vector<3xi32>
-      %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-      %15 = spv.IMul %14, %1 : i32
-      %16 = spv.IMul %11, %3 : i32
-      %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-      %18 = spv.Load "Input" %17 : vector<3xi32>
-      %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
-      %20 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-      %21 = spv.Load "Input" %20 : vector<3xi32>
-      %22 = spv.CompositeExtract %21[1 : i32] : vector<3xi32>
-      %23 = spv.SLessThan %22, %1 : i32
-      %24 = spv.SLessThan %19, %3 : i32
-      %25 = spv.LogicalAnd %23, %24 : i1
-      spv.mlir.selection {
-        spv.BranchConditional %25, ^bb1, ^bb2
-      ^bb1:  // pred: ^bb0
-        %26 = spv.IAdd %15, %22 : i32
-        %27 = spv.IAdd %16, %19 : i32
-        %28 = spv.Constant 0 : i32
-        %29 = spv.Constant 0 : i32
-        %30 = spv.Constant 64 : i32
-        %31 = spv.IMul %30, %26 : i32
-        %32 = spv.IAdd %29, %31 : i32
-        %33 = spv.Constant 1 : i32
-        %34 = spv.IMul %33, %27 : i32
-        %35 = spv.IAdd %32, %34 : i32
-        %36 = spv.AccessChain %6[%28, %35] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        spv.Store "StorageBuffer" %36, %0 : f32
-        spv.Branch ^bb2
-      ^bb2:  // 2 preds: ^bb0, ^bb1
-        spv.mlir.merge
-      }
-      spv.mlir.selection {
-        spv.BranchConditional %25, ^bb1, ^bb2
-      ^bb1:  // pred: ^bb0
+      %5 = spv.Constant 64 : i32
+      %6 = spv.Constant 1 : i32
+      %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+      %11 = spv.Load "Input" %10 : vector<3xi32>
+      %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
+      %13 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+      %14 = spv.Load "Input" %13 : vector<3xi32>
+      %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
+      %16 = spv.IMul %15, %1 : i32
+      %17 = spv.IMul %12, %2 : i32
+      %18 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+      %19 = spv.Load "Input" %18 : vector<3xi32>
+      %20 = spv.CompositeExtract %19[0 : i32] : vector<3xi32>
+      %21 = spv.Constant 16 : i32
+      %22 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+      %23 = spv.Load "Input" %22 : vector<3xi32>
+      %24 = spv.CompositeExtract %23[1 : i32] : vector<3xi32>
+      %25 = spv.Constant 8 : i32
+      spv.mlir.loop {
+        spv.Branch ^bb1(%24 : i32)
+      ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
+        %27 = spv.SLessThan %26, %1 : i32
+        spv.BranchConditional %27, ^bb2, ^bb3
+      ^bb2:  // pred: ^bb1
         spv.mlir.loop {
-          spv.Branch ^bb1(%4 : i32)
-        ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
-          %27 = spv.SLessThan %26, %2 : i32
-          spv.BranchConditional %27, ^bb2, ^bb3
+          spv.Branch ^bb1(%20 : i32)
+        ^bb1(%29: i32):  // 2 preds: ^bb0, ^bb2
+          %30 = spv.SLessThan %29, %2 : i32
+          spv.BranchConditional %30, ^bb2, ^bb3
         ^bb2:  // pred: ^bb1
-          %28 = spv.IAdd %15, %22 : i32
-          %29 = spv.Constant 0 : i32
-          %30 = spv.Constant 0 : i32
-          %31 = spv.Constant 1024 : i32
-          %32 = spv.IMul %31, %28 : i32
-          %33 = spv.IAdd %30, %32 : i32
-          %34 = spv.Constant 1 : i32
-          %35 = spv.IMul %34, %26 : i32
-          %36 = spv.IAdd %33, %35 : i32
-          %37 = spv.AccessChain %7[%29, %36] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-          %38 = spv.Load "StorageBuffer" %37 : f32
-          %39 = spv.IAdd %16, %19 : i32
-          %40 = spv.Constant 0 : i32
-          %41 = spv.Constant 0 : i32
-          %42 = spv.Constant 64 : i32
-          %43 = spv.IMul %42, %26 : i32
-          %44 = spv.IAdd %41, %43 : i32
-          %45 = spv.Constant 1 : i32
-          %46 = spv.IMul %45, %39 : i32
-          %47 = spv.IAdd %44, %46 : i32
-          %48 = spv.AccessChain %8[%40, %47] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-          %49 = spv.Load "StorageBuffer" %48 : f32
-          %50 = spv.Constant 0 : i32
-          %51 = spv.Constant 0 : i32
-          %52 = spv.Constant 64 : i32
-          %53 = spv.IMul %52, %28 : i32
-          %54 = spv.IAdd %51, %53 : i32
-          %55 = spv.Constant 1 : i32
-          %56 = spv.IMul %55, %39 : i32
-          %57 = spv.IAdd %54, %56 : i32
-          %58 = spv.AccessChain %6[%50, %57] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-          %59 = spv.Load "StorageBuffer" %58 : f32
-          %60 = spv.FMul %38, %49 : f32
-          %61 = spv.FAdd %59, %60 : f32
-          %62 = spv.Constant 0 : i32
-          %63 = spv.Constant 0 : i32
-          %64 = spv.Constant 64 : i32
-          %65 = spv.IMul %64, %28 : i32
-          %66 = spv.IAdd %63, %65 : i32
-          %67 = spv.Constant 1 : i32
-          %68 = spv.IMul %67, %39 : i32
-          %69 = spv.IAdd %66, %68 : i32
-          %70 = spv.AccessChain %6[%62, %69] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-          spv.Store "StorageBuffer" %70, %61 : f32
-          %71 = spv.IAdd %26, %5 : i32
-          spv.Branch ^bb1(%71 : i32)
+          %31 = spv.IAdd %16, %26 : i32
+          %32 = spv.IAdd %17, %29 : i32
+          %33 = spv.IMul %31, %5 : i32
+          %34 = spv.IAdd %32, %33 : i32
+          %35 = spv.Constant 0 : i32
+          %36 = spv.Constant 0 : i32
+          %37 = spv.Constant 1 : i32
+          %38 = spv.IMul %37, %34 : i32
+          %39 = spv.IAdd %36, %38 : i32
+          %40 = spv.AccessChain %9[%35, %39] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          spv.Store "StorageBuffer" %40, %0 : f32
+          %41 = spv.IAdd %29, %21 : i32
+          spv.Branch ^bb1(%41 : i32)
         ^bb3:  // pred: ^bb1
           spv.mlir.merge
         }
-        spv.Branch ^bb2
-      ^bb2:  // 2 preds: ^bb0, ^bb1
+        %28 = spv.IAdd %26, %25 : i32
+        spv.Branch ^bb1(%28 : i32)
+      ^bb3:  // pred: ^bb1
+        spv.mlir.merge
+      }
+      spv.mlir.loop {
+        spv.Branch ^bb1(%24 : i32)
+      ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
+        %27 = spv.SLessThan %26, %1 : i32
+        spv.BranchConditional %27, ^bb2, ^bb3
+      ^bb2:  // pred: ^bb1
+        spv.mlir.loop {
+          spv.Branch ^bb1(%20 : i32)
+        ^bb1(%29: i32):  // 2 preds: ^bb0, ^bb2
+          %30 = spv.SLessThan %29, %2 : i32
+          spv.BranchConditional %30, ^bb2, ^bb3
+        ^bb2:  // pred: ^bb1
+          spv.mlir.loop {
+            spv.Branch ^bb1(%4 : i32)
+          ^bb1(%32: i32):  // 2 preds: ^bb0, ^bb2
+            %33 = spv.SLessThan %32, %3 : i32
+            spv.BranchConditional %33, ^bb2, ^bb3
+          ^bb2:  // pred: ^bb1
+            %34 = spv.IAdd %16, %26 : i32
+            %35 = spv.IMul %34, %3 : i32
+            %36 = spv.IAdd %32, %35 : i32
+            %37 = spv.Constant 0 : i32
+            %38 = spv.Constant 0 : i32
+            %39 = spv.Constant 1 : i32
+            %40 = spv.IMul %39, %36 : i32
+            %41 = spv.IAdd %38, %40 : i32
+            %42 = spv.AccessChain %7[%37, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %43 = spv.Load "StorageBuffer" %42 : f32
+            %44 = spv.IAdd %17, %29 : i32
+            %45 = spv.IMul %32, %5 : i32
+            %46 = spv.IAdd %44, %45 : i32
+            %47 = spv.Constant 0 : i32
+            %48 = spv.Constant 0 : i32
+            %49 = spv.Constant 1 : i32
+            %50 = spv.IMul %49, %46 : i32
+            %51 = spv.IAdd %48, %50 : i32
+            %52 = spv.AccessChain %8[%47, %51] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %53 = spv.Load "StorageBuffer" %52 : f32
+            %54 = spv.IMul %34, %5 : i32
+            %55 = spv.IAdd %44, %54 : i32
+            %56 = spv.Constant 0 : i32
+            %57 = spv.Constant 0 : i32
+            %58 = spv.Constant 1 : i32
+            %59 = spv.IMul %58, %55 : i32
+            %60 = spv.IAdd %57, %59 : i32
+            %61 = spv.AccessChain %9[%56, %60] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %62 = spv.Load "StorageBuffer" %61 : f32
+            %63 = spv.FMul %43, %53 : f32
+            %64 = spv.FAdd %62, %63 : f32
+            %65 = spv.Constant 0 : i32
+            %66 = spv.Constant 0 : i32
+            %67 = spv.Constant 1 : i32
+            %68 = spv.IMul %67, %55 : i32
+            %69 = spv.IAdd %66, %68 : i32
+            %70 = spv.AccessChain %9[%65, %69] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            spv.Store "StorageBuffer" %70, %64 : f32
+            %71 = spv.IAdd %32, %6 : i32
+            spv.Branch ^bb1(%71 : i32)
+          ^bb3:  // pred: ^bb1
+            spv.mlir.merge
+          }
+          %31 = spv.IAdd %29, %21 : i32
+          spv.Branch ^bb1(%31 : i32)
+        ^bb3:  // pred: ^bb1
+          spv.mlir.merge
+        }
+        %28 = spv.IAdd %26, %25 : i32
+        spv.Branch ^bb1(%28 : i32)
+      ^bb3:  // pred: ^bb1
         spv.mlir.merge
       }
       spv.Return
     }
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
 
@@ -2038,121 +3234,144 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-  spv.func @dot_ex_dispatch_0() "None" {
+  spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.func @dot_dispatch_0() "None" {
     %0 = spv.Constant 0.000000e+00 : f32
     %1 = spv.Constant 8 : i32
-    %2 = spv.Constant 1024 : i32
-    %3 = spv.Constant 16 : i32
+    %2 = spv.Constant 16 : i32
+    %3 = spv.Constant 1024 : i32
     %4 = spv.Constant 0 : i32
-    %5 = spv.Constant 1 : i32
-    %6 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %7 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-    %10 = spv.Load "Input" %9 : vector<3xi32>
-    %11 = spv.CompositeExtract %10[0 : i32] : vector<3xi32>
-    %12 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-    %13 = spv.Load "Input" %12 : vector<3xi32>
-    %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-    %15 = spv.IMul %14, %1 : i32
-    %16 = spv.IMul %11, %3 : i32
-    %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-    %18 = spv.Load "Input" %17 : vector<3xi32>
-    %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
-    %20 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-    %21 = spv.Load "Input" %20 : vector<3xi32>
-    %22 = spv.CompositeExtract %21[1 : i32] : vector<3xi32>
-    %23 = spv.SLessThan %22, %1 : i32
-    %24 = spv.SLessThan %19, %3 : i32
-    %25 = spv.LogicalAnd %23, %24 : i1
-    spv.mlir.selection {
-      spv.BranchConditional %25, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      %26 = spv.IAdd %15, %22 : i32
-      %27 = spv.IAdd %16, %19 : i32
-      %28 = spv.Constant 0 : i32
-      %29 = spv.Constant 0 : i32
-      %30 = spv.Constant 64 : i32
-      %31 = spv.IMul %30, %26 : i32
-      %32 = spv.IAdd %29, %31 : i32
-      %33 = spv.Constant 1 : i32
-      %34 = spv.IMul %33, %27 : i32
-      %35 = spv.IAdd %32, %34 : i32
-      %36 = spv.AccessChain %6[%28, %35] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-      spv.Store "StorageBuffer" %36, %0 : f32
-      spv.Branch ^bb2
-    ^bb2:  // 2 preds: ^bb0, ^bb1
-      spv.mlir.merge
-    }
-    spv.mlir.selection {
-      spv.BranchConditional %25, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
+    %5 = spv.Constant 64 : i32
+    %6 = spv.Constant 1 : i32
+    %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+    %11 = spv.Load "Input" %10 : vector<3xi32>
+    %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
+    %13 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+    %14 = spv.Load "Input" %13 : vector<3xi32>
+    %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
+    %16 = spv.IMul %15, %1 : i32
+    %17 = spv.IMul %12, %2 : i32
+    %18 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+    %19 = spv.Load "Input" %18 : vector<3xi32>
+    %20 = spv.CompositeExtract %19[0 : i32] : vector<3xi32>
+    %21 = spv.Constant 16 : i32
+    %22 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+    %23 = spv.Load "Input" %22 : vector<3xi32>
+    %24 = spv.CompositeExtract %23[1 : i32] : vector<3xi32>
+    %25 = spv.Constant 8 : i32
+    spv.mlir.loop {
+      spv.Branch ^bb1(%24 : i32)
+    ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
+      %27 = spv.SLessThan %26, %1 : i32
+      spv.BranchConditional %27, ^bb2, ^bb3
+    ^bb2:  // pred: ^bb1
       spv.mlir.loop {
-        spv.Branch ^bb1(%4 : i32)
-      ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
-        %27 = spv.SLessThan %26, %2 : i32
-        spv.BranchConditional %27, ^bb2, ^bb3
+        spv.Branch ^bb1(%20 : i32)
+      ^bb1(%29: i32):  // 2 preds: ^bb0, ^bb2
+        %30 = spv.SLessThan %29, %2 : i32
+        spv.BranchConditional %30, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
-        %28 = spv.IAdd %15, %22 : i32
-        %29 = spv.Constant 0 : i32
-        %30 = spv.Constant 0 : i32
-        %31 = spv.Constant 1024 : i32
-        %32 = spv.IMul %31, %28 : i32
-        %33 = spv.IAdd %30, %32 : i32
-        %34 = spv.Constant 1 : i32
-        %35 = spv.IMul %34, %26 : i32
-        %36 = spv.IAdd %33, %35 : i32
-        %37 = spv.AccessChain %7[%29, %36] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %38 = spv.Load "StorageBuffer" %37 : f32
-        %39 = spv.IAdd %16, %19 : i32
-        %40 = spv.Constant 0 : i32
-        %41 = spv.Constant 0 : i32
-        %42 = spv.Constant 64 : i32
-        %43 = spv.IMul %42, %26 : i32
-        %44 = spv.IAdd %41, %43 : i32
-        %45 = spv.Constant 1 : i32
-        %46 = spv.IMul %45, %39 : i32
-        %47 = spv.IAdd %44, %46 : i32
-        %48 = spv.AccessChain %8[%40, %47] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %49 = spv.Load "StorageBuffer" %48 : f32
-        %50 = spv.Constant 0 : i32
-        %51 = spv.Constant 0 : i32
-        %52 = spv.Constant 64 : i32
-        %53 = spv.IMul %52, %28 : i32
-        %54 = spv.IAdd %51, %53 : i32
-        %55 = spv.Constant 1 : i32
-        %56 = spv.IMul %55, %39 : i32
-        %57 = spv.IAdd %54, %56 : i32
-        %58 = spv.AccessChain %6[%50, %57] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %59 = spv.Load "StorageBuffer" %58 : f32
-        %60 = spv.FMul %38, %49 : f32
-        %61 = spv.FAdd %59, %60 : f32
-        %62 = spv.Constant 0 : i32
-        %63 = spv.Constant 0 : i32
-        %64 = spv.Constant 64 : i32
-        %65 = spv.IMul %64, %28 : i32
-        %66 = spv.IAdd %63, %65 : i32
-        %67 = spv.Constant 1 : i32
-        %68 = spv.IMul %67, %39 : i32
-        %69 = spv.IAdd %66, %68 : i32
-        %70 = spv.AccessChain %6[%62, %69] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        spv.Store "StorageBuffer" %70, %61 : f32
-        %71 = spv.IAdd %26, %5 : i32
-        spv.Branch ^bb1(%71 : i32)
+        %31 = spv.IAdd %16, %26 : i32
+        %32 = spv.IAdd %17, %29 : i32
+        %33 = spv.IMul %31, %5 : i32
+        %34 = spv.IAdd %32, %33 : i32
+        %35 = spv.Constant 0 : i32
+        %36 = spv.Constant 0 : i32
+        %37 = spv.Constant 1 : i32
+        %38 = spv.IMul %37, %34 : i32
+        %39 = spv.IAdd %36, %38 : i32
+        %40 = spv.AccessChain %9[%35, %39] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        spv.Store "StorageBuffer" %40, %0 : f32
+        %41 = spv.IAdd %29, %21 : i32
+        spv.Branch ^bb1(%41 : i32)
       ^bb3:  // pred: ^bb1
         spv.mlir.merge
       }
-      spv.Branch ^bb2
-    ^bb2:  // 2 preds: ^bb0, ^bb1
+      %28 = spv.IAdd %26, %25 : i32
+      spv.Branch ^bb1(%28 : i32)
+    ^bb3:  // pred: ^bb1
+      spv.mlir.merge
+    }
+    spv.mlir.loop {
+      spv.Branch ^bb1(%24 : i32)
+    ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
+      %27 = spv.SLessThan %26, %1 : i32
+      spv.BranchConditional %27, ^bb2, ^bb3
+    ^bb2:  // pred: ^bb1
+      spv.mlir.loop {
+        spv.Branch ^bb1(%20 : i32)
+      ^bb1(%29: i32):  // 2 preds: ^bb0, ^bb2
+        %30 = spv.SLessThan %29, %2 : i32
+        spv.BranchConditional %30, ^bb2, ^bb3
+      ^bb2:  // pred: ^bb1
+        spv.mlir.loop {
+          spv.Branch ^bb1(%4 : i32)
+        ^bb1(%32: i32):  // 2 preds: ^bb0, ^bb2
+          %33 = spv.SLessThan %32, %3 : i32
+          spv.BranchConditional %33, ^bb2, ^bb3
+        ^bb2:  // pred: ^bb1
+          %34 = spv.IAdd %16, %26 : i32
+          %35 = spv.IMul %34, %3 : i32
+          %36 = spv.IAdd %32, %35 : i32
+          %37 = spv.Constant 0 : i32
+          %38 = spv.Constant 0 : i32
+          %39 = spv.Constant 1 : i32
+          %40 = spv.IMul %39, %36 : i32
+          %41 = spv.IAdd %38, %40 : i32
+          %42 = spv.AccessChain %7[%37, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %43 = spv.Load "StorageBuffer" %42 : f32
+          %44 = spv.IAdd %17, %29 : i32
+          %45 = spv.IMul %32, %5 : i32
+          %46 = spv.IAdd %44, %45 : i32
+          %47 = spv.Constant 0 : i32
+          %48 = spv.Constant 0 : i32
+          %49 = spv.Constant 1 : i32
+          %50 = spv.IMul %49, %46 : i32
+          %51 = spv.IAdd %48, %50 : i32
+          %52 = spv.AccessChain %8[%47, %51] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %53 = spv.Load "StorageBuffer" %52 : f32
+          %54 = spv.IMul %34, %5 : i32
+          %55 = spv.IAdd %44, %54 : i32
+          %56 = spv.Constant 0 : i32
+          %57 = spv.Constant 0 : i32
+          %58 = spv.Constant 1 : i32
+          %59 = spv.IMul %58, %55 : i32
+          %60 = spv.IAdd %57, %59 : i32
+          %61 = spv.AccessChain %9[%56, %60] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %62 = spv.Load "StorageBuffer" %61 : f32
+          %63 = spv.FMul %43, %53 : f32
+          %64 = spv.FAdd %62, %63 : f32
+          %65 = spv.Constant 0 : i32
+          %66 = spv.Constant 0 : i32
+          %67 = spv.Constant 1 : i32
+          %68 = spv.IMul %67, %55 : i32
+          %69 = spv.IAdd %66, %68 : i32
+          %70 = spv.AccessChain %9[%65, %69] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          spv.Store "StorageBuffer" %70, %64 : f32
+          %71 = spv.IAdd %32, %6 : i32
+          spv.Branch ^bb1(%71 : i32)
+        ^bb3:  // pred: ^bb1
+          spv.mlir.merge
+        }
+        %31 = spv.IAdd %29, %21 : i32
+        spv.Branch ^bb1(%31 : i32)
+      ^bb3:  // pred: ^bb1
+        spv.mlir.merge
+      }
+      %28 = spv.IAdd %26, %25 : i32
+      spv.Branch ^bb1(%28 : i32)
+    ^bb3:  // pred: ^bb1
       spv.mlir.merge
     }
     spv.Return
   }
-  spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-  spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+  spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+  spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
 }
 
 ```
@@ -2165,92 +3384,117 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-  spv.func @dot_ex_dispatch_0() "None" {
+  spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.func @dot_dispatch_0() "None" {
     %0 = spv.Constant 0.000000e+00 : f32
-    %1 = spv.Constant 8 : i32
-    %2 = spv.Constant 16 : i32
+    %1 = spv.Constant 1024 : i32
+    %2 = spv.Constant 64 : i32
     %3 = spv.Constant 1 : i32
-    %4 = spv.Constant 1024 : i32
-    %5 = spv.Constant 0 : i32
-    %6 = spv.Constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %4 = spv.Constant 16 : i32
+    %5 = spv.Constant 8 : i32
+    %6 = spv.Constant 0 : i32
+    %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
     %13 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %14 = spv.Load "Input" %13 : vector<3xi32>
     %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-    %16 = spv.IMul %15, %1 : i32
-    %17 = spv.IMul %12, %2 : i32
+    %16 = spv.IMul %15, %5 : i32
+    %17 = spv.IMul %12, %4 : i32
     %18 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %19 = spv.Load "Input" %18 : vector<3xi32>
     %20 = spv.CompositeExtract %19[0 : i32] : vector<3xi32>
     %21 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %22 = spv.Load "Input" %21 : vector<3xi32>
     %23 = spv.CompositeExtract %22[1 : i32] : vector<3xi32>
-    %24 = spv.SLessThan %23, %1 : i32
-    %25 = spv.SLessThan %20, %2 : i32
-    %26 = spv.LogicalAnd %24, %25 : i1
-    spv.mlir.selection {
-      spv.BranchConditional %26, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      %27 = spv.IAdd %16, %23 : i32
-      %28 = spv.IAdd %17, %20 : i32
-      %29 = spv.IMul %27, %6 : i32
-      %30 = spv.IAdd %29, %28 : i32
-      %31 = spv.AccessChain %7[%5, %30] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-      spv.Store "StorageBuffer" %31, %0 : f32
-      spv.Branch ^bb2
-    ^bb2:  // 2 preds: ^bb0, ^bb1
-      spv.mlir.merge
-    }
-    spv.mlir.selection {
-      spv.BranchConditional %26, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
+    spv.mlir.loop {
+      spv.Branch ^bb1(%23 : i32)
+    ^bb1(%24: i32):  // 2 preds: ^bb0, ^bb2
+      %25 = spv.SLessThan %24, %5 : i32
+      spv.BranchConditional %25, ^bb2, ^bb3
+    ^bb2:  // pred: ^bb1
       spv.mlir.loop {
-        spv.Branch ^bb1(%5 : i32)
+        spv.Branch ^bb1(%20 : i32)
       ^bb1(%27: i32):  // 2 preds: ^bb0, ^bb2
         %28 = spv.SLessThan %27, %4 : i32
         spv.BranchConditional %28, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
-        %29 = spv.IAdd %16, %23 : i32
-        %30 = spv.IMul %29, %4 : i32
-        %31 = spv.IAdd %30, %27 : i32
-        %32 = spv.AccessChain %8[%5, %31] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %33 = spv.Load "StorageBuffer" %32 : f32
-        %34 = spv.IAdd %17, %20 : i32
-        %35 = spv.IMul %27, %6 : i32
-        %36 = spv.IAdd %35, %34 : i32
-        %37 = spv.AccessChain %9[%5, %36] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %38 = spv.Load "StorageBuffer" %37 : f32
-        %39 = spv.IMul %29, %6 : i32
-        %40 = spv.IAdd %39, %34 : i32
-        %41 = spv.AccessChain %7[%5, %40] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %42 = spv.Load "StorageBuffer" %41 : f32
-        %43 = spv.FMul %33, %38 : f32
-        %44 = spv.FAdd %42, %43 : f32
-        %45 = spv.IMul %29, %6 : i32
-        %46 = spv.IAdd %45, %34 : i32
-        %47 = spv.AccessChain %7[%5, %46] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        spv.Store "StorageBuffer" %47, %44 : f32
-        %48 = spv.IAdd %27, %3 : i32
-        spv.Branch ^bb1(%48 : i32)
+        %29 = spv.IAdd %16, %24 : i32
+        %30 = spv.IAdd %17, %27 : i32
+        %31 = spv.IMul %29, %2 : i32
+        %32 = spv.IAdd %30, %31 : i32
+        %33 = spv.AccessChain %9[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        spv.Store "StorageBuffer" %33, %0 : f32
+        %34 = spv.IAdd %27, %4 : i32
+        spv.Branch ^bb1(%34 : i32)
       ^bb3:  // pred: ^bb1
         spv.mlir.merge
       }
-      spv.Branch ^bb2
-    ^bb2:  // 2 preds: ^bb0, ^bb1
+      %26 = spv.IAdd %24, %5 : i32
+      spv.Branch ^bb1(%26 : i32)
+    ^bb3:  // pred: ^bb1
+      spv.mlir.merge
+    }
+    spv.mlir.loop {
+      spv.Branch ^bb1(%23 : i32)
+    ^bb1(%24: i32):  // 2 preds: ^bb0, ^bb2
+      %25 = spv.SLessThan %24, %5 : i32
+      spv.BranchConditional %25, ^bb2, ^bb3
+    ^bb2:  // pred: ^bb1
+      spv.mlir.loop {
+        spv.Branch ^bb1(%20 : i32)
+      ^bb1(%27: i32):  // 2 preds: ^bb0, ^bb2
+        %28 = spv.SLessThan %27, %4 : i32
+        spv.BranchConditional %28, ^bb2, ^bb3
+      ^bb2:  // pred: ^bb1
+        spv.mlir.loop {
+          spv.Branch ^bb1(%6 : i32)
+        ^bb1(%30: i32):  // 2 preds: ^bb0, ^bb2
+          %31 = spv.SLessThan %30, %1 : i32
+          spv.BranchConditional %31, ^bb2, ^bb3
+        ^bb2:  // pred: ^bb1
+          %32 = spv.IAdd %16, %24 : i32
+          %33 = spv.IMul %32, %1 : i32
+          %34 = spv.IAdd %30, %33 : i32
+          %35 = spv.AccessChain %7[%6, %34] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %36 = spv.Load "StorageBuffer" %35 : f32
+          %37 = spv.IAdd %17, %27 : i32
+          %38 = spv.IMul %30, %2 : i32
+          %39 = spv.IAdd %37, %38 : i32
+          %40 = spv.AccessChain %8[%6, %39] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %41 = spv.Load "StorageBuffer" %40 : f32
+          %42 = spv.IMul %32, %2 : i32
+          %43 = spv.IAdd %37, %42 : i32
+          %44 = spv.AccessChain %9[%6, %43] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %45 = spv.Load "StorageBuffer" %44 : f32
+          %46 = spv.FMul %36, %41 : f32
+          %47 = spv.FAdd %45, %46 : f32
+          %48 = spv.AccessChain %9[%6, %43] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          spv.Store "StorageBuffer" %48, %47 : f32
+          %49 = spv.IAdd %30, %3 : i32
+          spv.Branch ^bb1(%49 : i32)
+        ^bb3:  // pred: ^bb1
+          spv.mlir.merge
+        }
+        %29 = spv.IAdd %27, %4 : i32
+        spv.Branch ^bb1(%29 : i32)
+      ^bb3:  // pred: ^bb1
+        spv.mlir.merge
+      }
+      %26 = spv.IAdd %24, %5 : i32
+      spv.Branch ^bb1(%26 : i32)
+    ^bb3:  // pred: ^bb1
       spv.mlir.merge
     }
     spv.Return
   }
-  spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-  spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+  spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+  spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
 }
 
 ```
@@ -2263,87 +3507,114 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-  spv.func @dot_ex_dispatch_0() "None" {
+  spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.func @dot_dispatch_0() "None" {
     %0 = spv.Constant 0.000000e+00 : f32
-    %1 = spv.Constant 8 : i32
-    %2 = spv.Constant 16 : i32
+    %1 = spv.Constant 1024 : i32
+    %2 = spv.Constant 64 : i32
     %3 = spv.Constant 1 : i32
-    %4 = spv.Constant 1024 : i32
-    %5 = spv.Constant 0 : i32
-    %6 = spv.Constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %4 = spv.Constant 16 : i32
+    %5 = spv.Constant 8 : i32
+    %6 = spv.Constant 0 : i32
+    %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
     %13 = spv.Load "Input" %10 : vector<3xi32>
     %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-    %15 = spv.IMul %14, %1 : i32
-    %16 = spv.IMul %12, %2 : i32
+    %15 = spv.IMul %14, %5 : i32
+    %16 = spv.IMul %12, %4 : i32
     %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %18 = spv.Load "Input" %17 : vector<3xi32>
     %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
     %20 = spv.Load "Input" %17 : vector<3xi32>
     %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-    %22 = spv.SLessThan %21, %1 : i32
-    %23 = spv.SLessThan %19, %2 : i32
-    %24 = spv.LogicalAnd %22, %23 : i1
-    spv.mlir.selection {
-      spv.BranchConditional %24, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      %25 = spv.IAdd %15, %21 : i32
-      %26 = spv.IAdd %16, %19 : i32
-      %27 = spv.IMul %25, %6 : i32
-      %28 = spv.IAdd %27, %26 : i32
-      %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-      spv.Store "StorageBuffer" %29, %0 : f32
-      spv.Branch ^bb2
-    ^bb2:  // 2 preds: ^bb0, ^bb1
-      spv.mlir.merge
-    }
-    spv.mlir.selection {
-      spv.BranchConditional %24, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
+    spv.mlir.loop {
+      spv.Branch ^bb1(%21 : i32)
+    ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+      %23 = spv.SLessThan %22, %5 : i32
+      spv.BranchConditional %23, ^bb2, ^bb3
+    ^bb2:  // pred: ^bb1
       spv.mlir.loop {
-        spv.Branch ^bb1(%5 : i32)
+        spv.Branch ^bb1(%19 : i32)
       ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
         %26 = spv.SLessThan %25, %4 : i32
         spv.BranchConditional %26, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
-        %27 = spv.IAdd %15, %21 : i32
-        %28 = spv.IMul %27, %4 : i32
-        %29 = spv.IAdd %28, %25 : i32
-        %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %31 = spv.Load "StorageBuffer" %30 : f32
-        %32 = spv.IAdd %16, %19 : i32
-        %33 = spv.IMul %25, %6 : i32
-        %34 = spv.IAdd %33, %32 : i32
-        %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %36 = spv.Load "StorageBuffer" %35 : f32
-        %37 = spv.IMul %27, %6 : i32
-        %38 = spv.IAdd %37, %32 : i32
-        %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %40 = spv.Load "StorageBuffer" %39 : f32
-        %41 = spv.FMul %31, %36 : f32
-        %42 = spv.FAdd %40, %41 : f32
-        spv.Store "StorageBuffer" %39, %42 : f32
-        %43 = spv.IAdd %25, %3 : i32
-        spv.Branch ^bb1(%43 : i32)
+        %27 = spv.IAdd %15, %22 : i32
+        %28 = spv.IAdd %16, %25 : i32
+        %29 = spv.IMul %27, %2 : i32
+        %30 = spv.IAdd %28, %29 : i32
+        %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        spv.Store "StorageBuffer" %31, %0 : f32
+        %32 = spv.IAdd %25, %4 : i32
+        spv.Branch ^bb1(%32 : i32)
       ^bb3:  // pred: ^bb1
         spv.mlir.merge
       }
-      spv.Branch ^bb2
-    ^bb2:  // 2 preds: ^bb0, ^bb1
+      %24 = spv.IAdd %22, %5 : i32
+      spv.Branch ^bb1(%24 : i32)
+    ^bb3:  // pred: ^bb1
+      spv.mlir.merge
+    }
+    spv.mlir.loop {
+      spv.Branch ^bb1(%21 : i32)
+    ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+      %23 = spv.SLessThan %22, %5 : i32
+      spv.BranchConditional %23, ^bb2, ^bb3
+    ^bb2:  // pred: ^bb1
+      spv.mlir.loop {
+        spv.Branch ^bb1(%19 : i32)
+      ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+        %26 = spv.SLessThan %25, %4 : i32
+        spv.BranchConditional %26, ^bb2, ^bb3
+      ^bb2:  // pred: ^bb1
+        spv.mlir.loop {
+          spv.Branch ^bb1(%6 : i32)
+        ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+          %29 = spv.SLessThan %28, %1 : i32
+          spv.BranchConditional %29, ^bb2, ^bb3
+        ^bb2:  // pred: ^bb1
+          %30 = spv.IAdd %15, %22 : i32
+          %31 = spv.IMul %30, %1 : i32
+          %32 = spv.IAdd %28, %31 : i32
+          %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %34 = spv.Load "StorageBuffer" %33 : f32
+          %35 = spv.IAdd %16, %25 : i32
+          %36 = spv.IMul %28, %2 : i32
+          %37 = spv.IAdd %35, %36 : i32
+          %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %39 = spv.Load "StorageBuffer" %38 : f32
+          %40 = spv.IMul %30, %2 : i32
+          %41 = spv.IAdd %35, %40 : i32
+          %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %43 = spv.Load "StorageBuffer" %42 : f32
+          %44 = spv.FMul %34, %39 : f32
+          %45 = spv.FAdd %43, %44 : f32
+          spv.Store "StorageBuffer" %42, %45 : f32
+          %46 = spv.IAdd %28, %3 : i32
+          spv.Branch ^bb1(%46 : i32)
+        ^bb3:  // pred: ^bb1
+          spv.mlir.merge
+        }
+        %27 = spv.IAdd %25, %4 : i32
+        spv.Branch ^bb1(%27 : i32)
+      ^bb3:  // pred: ^bb1
+        spv.mlir.merge
+      }
+      %24 = spv.IAdd %22, %5 : i32
+      spv.Branch ^bb1(%24 : i32)
+    ^bb3:  // pred: ^bb1
       spv.mlir.merge
     }
     spv.Return
   }
-  spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-  spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+  spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+  spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
 }
 
 ```
@@ -2356,87 +3627,114 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-  spv.func @dot_ex_dispatch_0() "None" {
+  spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.func @dot_dispatch_0() "None" {
     %0 = spv.Constant 0.000000e+00 : f32
-    %1 = spv.Constant 8 : i32
-    %2 = spv.Constant 16 : i32
+    %1 = spv.Constant 1024 : i32
+    %2 = spv.Constant 64 : i32
     %3 = spv.Constant 1 : i32
-    %4 = spv.Constant 1024 : i32
-    %5 = spv.Constant 0 : i32
-    %6 = spv.Constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %4 = spv.Constant 16 : i32
+    %5 = spv.Constant 8 : i32
+    %6 = spv.Constant 0 : i32
+    %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
     %13 = spv.Load "Input" %10 : vector<3xi32>
     %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-    %15 = spv.IMul %14, %1 : i32
-    %16 = spv.IMul %12, %2 : i32
+    %15 = spv.IMul %14, %5 : i32
+    %16 = spv.IMul %12, %4 : i32
     %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
     %18 = spv.Load "Input" %17 : vector<3xi32>
     %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
     %20 = spv.Load "Input" %17 : vector<3xi32>
     %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-    %22 = spv.SLessThan %21, %1 : i32
-    %23 = spv.SLessThan %19, %2 : i32
-    %24 = spv.LogicalAnd %22, %23 : i1
-    spv.mlir.selection {
-      spv.BranchConditional %24, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      %25 = spv.IAdd %15, %21 : i32
-      %26 = spv.IAdd %16, %19 : i32
-      %27 = spv.IMul %25, %6 : i32
-      %28 = spv.IAdd %27, %26 : i32
-      %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-      spv.Store "StorageBuffer" %29, %0 : f32
-      spv.Branch ^bb2
-    ^bb2:  // 2 preds: ^bb0, ^bb1
-      spv.mlir.merge
-    }
-    spv.mlir.selection {
-      spv.BranchConditional %24, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
+    spv.mlir.loop {
+      spv.Branch ^bb1(%21 : i32)
+    ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+      %23 = spv.SLessThan %22, %5 : i32
+      spv.BranchConditional %23, ^bb2, ^bb3
+    ^bb2:  // pred: ^bb1
       spv.mlir.loop {
-        spv.Branch ^bb1(%5 : i32)
+        spv.Branch ^bb1(%19 : i32)
       ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
         %26 = spv.SLessThan %25, %4 : i32
         spv.BranchConditional %26, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
-        %27 = spv.IAdd %15, %21 : i32
-        %28 = spv.IMul %27, %4 : i32
-        %29 = spv.IAdd %28, %25 : i32
-        %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %31 = spv.Load "StorageBuffer" %30 : f32
-        %32 = spv.IAdd %16, %19 : i32
-        %33 = spv.IMul %25, %6 : i32
-        %34 = spv.IAdd %33, %32 : i32
-        %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %36 = spv.Load "StorageBuffer" %35 : f32
-        %37 = spv.IMul %27, %6 : i32
-        %38 = spv.IAdd %37, %32 : i32
-        %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-        %40 = spv.Load "StorageBuffer" %39 : f32
-        %41 = spv.FMul %31, %36 : f32
-        %42 = spv.FAdd %40, %41 : f32
-        spv.Store "StorageBuffer" %39, %42 : f32
-        %43 = spv.IAdd %25, %3 : i32
-        spv.Branch ^bb1(%43 : i32)
+        %27 = spv.IAdd %15, %22 : i32
+        %28 = spv.IAdd %16, %25 : i32
+        %29 = spv.IMul %27, %2 : i32
+        %30 = spv.IAdd %28, %29 : i32
+        %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+        spv.Store "StorageBuffer" %31, %0 : f32
+        %32 = spv.IAdd %25, %4 : i32
+        spv.Branch ^bb1(%32 : i32)
       ^bb3:  // pred: ^bb1
         spv.mlir.merge
       }
-      spv.Branch ^bb2
-    ^bb2:  // 2 preds: ^bb0, ^bb1
+      %24 = spv.IAdd %22, %5 : i32
+      spv.Branch ^bb1(%24 : i32)
+    ^bb3:  // pred: ^bb1
+      spv.mlir.merge
+    }
+    spv.mlir.loop {
+      spv.Branch ^bb1(%21 : i32)
+    ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+      %23 = spv.SLessThan %22, %5 : i32
+      spv.BranchConditional %23, ^bb2, ^bb3
+    ^bb2:  // pred: ^bb1
+      spv.mlir.loop {
+        spv.Branch ^bb1(%19 : i32)
+      ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+        %26 = spv.SLessThan %25, %4 : i32
+        spv.BranchConditional %26, ^bb2, ^bb3
+      ^bb2:  // pred: ^bb1
+        spv.mlir.loop {
+          spv.Branch ^bb1(%6 : i32)
+        ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+          %29 = spv.SLessThan %28, %1 : i32
+          spv.BranchConditional %29, ^bb2, ^bb3
+        ^bb2:  // pred: ^bb1
+          %30 = spv.IAdd %15, %22 : i32
+          %31 = spv.IMul %30, %1 : i32
+          %32 = spv.IAdd %28, %31 : i32
+          %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %34 = spv.Load "StorageBuffer" %33 : f32
+          %35 = spv.IAdd %16, %25 : i32
+          %36 = spv.IMul %28, %2 : i32
+          %37 = spv.IAdd %35, %36 : i32
+          %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %39 = spv.Load "StorageBuffer" %38 : f32
+          %40 = spv.IMul %30, %2 : i32
+          %41 = spv.IAdd %35, %40 : i32
+          %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          %43 = spv.Load "StorageBuffer" %42 : f32
+          %44 = spv.FMul %34, %39 : f32
+          %45 = spv.FAdd %43, %44 : f32
+          spv.Store "StorageBuffer" %42, %45 : f32
+          %46 = spv.IAdd %28, %3 : i32
+          spv.Branch ^bb1(%46 : i32)
+        ^bb3:  // pred: ^bb1
+          spv.mlir.merge
+        }
+        %27 = spv.IAdd %25, %4 : i32
+        spv.Branch ^bb1(%27 : i32)
+      ^bb3:  // pred: ^bb1
+        spv.mlir.merge
+      }
+      %24 = spv.IAdd %22, %5 : i32
+      spv.Branch ^bb1(%24 : i32)
+    ^bb3:  // pred: ^bb1
       spv.mlir.merge
     }
     spv.Return
   }
-  spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-  spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+  spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+  spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
 }
 
 ```
@@ -2447,105 +3745,130 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
 {% raw %}
 ```
 hal.executable.target @vulkan_spirv, filter="vulkan*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+  hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-    %c1 = constant 1 : index
-    %c32 = constant 32 : index
     %c4 = constant 4 : index
-    %c64 = constant 64 : index
     %c4_0 = constant 4 : index
-    hal.return %c4_0, %c4, %c1 : index, index, index
+    %c1 = constant 1 : index
+    hal.return %c4, %c4_0, %c1 : index, index, index
   }
   module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
     spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
       spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
       spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-      spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-      spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-      spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-      spv.func @dot_ex_dispatch_0() "None" {
+      spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      spv.func @dot_dispatch_0() "None" {
         %0 = spv.Constant 0.000000e+00 : f32
-        %1 = spv.Constant 8 : i32
-        %2 = spv.Constant 16 : i32
+        %1 = spv.Constant 1024 : i32
+        %2 = spv.Constant 64 : i32
         %3 = spv.Constant 1 : i32
-        %4 = spv.Constant 1024 : i32
-        %5 = spv.Constant 0 : i32
-        %6 = spv.Constant 64 : i32
-        %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-        %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-        %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+        %4 = spv.Constant 16 : i32
+        %5 = spv.Constant 8 : i32
+        %6 = spv.Constant 0 : i32
+        %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+        %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+        %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
         %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
         %11 = spv.Load "Input" %10 : vector<3xi32>
         %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
         %13 = spv.Load "Input" %10 : vector<3xi32>
         %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-        %15 = spv.IMul %14, %1 : i32
-        %16 = spv.IMul %12, %2 : i32
+        %15 = spv.IMul %14, %5 : i32
+        %16 = spv.IMul %12, %4 : i32
         %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
         %18 = spv.Load "Input" %17 : vector<3xi32>
         %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
         %20 = spv.Load "Input" %17 : vector<3xi32>
         %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-        %22 = spv.SLessThan %21, %1 : i32
-        %23 = spv.SLessThan %19, %2 : i32
-        %24 = spv.LogicalAnd %22, %23 : i1
-        spv.mlir.selection {
-          spv.BranchConditional %24, ^bb1, ^bb2
-        ^bb1:  // pred: ^bb0
-          %25 = spv.IAdd %15, %21 : i32
-          %26 = spv.IAdd %16, %19 : i32
-          %27 = spv.IMul %25, %6 : i32
-          %28 = spv.IAdd %27, %26 : i32
-          %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-          spv.Store "StorageBuffer" %29, %0 : f32
-          spv.Branch ^bb2
-        ^bb2:  // 2 preds: ^bb0, ^bb1
-          spv.mlir.merge
-        }
-        spv.mlir.selection {
-          spv.BranchConditional %24, ^bb1, ^bb2
-        ^bb1:  // pred: ^bb0
+        spv.mlir.loop {
+          spv.Branch ^bb1(%21 : i32)
+        ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+          %23 = spv.SLessThan %22, %5 : i32
+          spv.BranchConditional %23, ^bb2, ^bb3
+        ^bb2:  // pred: ^bb1
           spv.mlir.loop {
-            spv.Branch ^bb1(%5 : i32)
+            spv.Branch ^bb1(%19 : i32)
           ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
             %26 = spv.SLessThan %25, %4 : i32
             spv.BranchConditional %26, ^bb2, ^bb3
           ^bb2:  // pred: ^bb1
-            %27 = spv.IAdd %15, %21 : i32
-            %28 = spv.IMul %27, %4 : i32
-            %29 = spv.IAdd %28, %25 : i32
-            %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-            %31 = spv.Load "StorageBuffer" %30 : f32
-            %32 = spv.IAdd %16, %19 : i32
-            %33 = spv.IMul %25, %6 : i32
-            %34 = spv.IAdd %33, %32 : i32
-            %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-            %36 = spv.Load "StorageBuffer" %35 : f32
-            %37 = spv.IMul %27, %6 : i32
-            %38 = spv.IAdd %37, %32 : i32
-            %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-            %40 = spv.Load "StorageBuffer" %39 : f32
-            %41 = spv.FMul %31, %36 : f32
-            %42 = spv.FAdd %40, %41 : f32
-            spv.Store "StorageBuffer" %39, %42 : f32
-            %43 = spv.IAdd %25, %3 : i32
-            spv.Branch ^bb1(%43 : i32)
+            %27 = spv.IAdd %15, %22 : i32
+            %28 = spv.IAdd %16, %25 : i32
+            %29 = spv.IMul %27, %2 : i32
+            %30 = spv.IAdd %28, %29 : i32
+            %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            spv.Store "StorageBuffer" %31, %0 : f32
+            %32 = spv.IAdd %25, %4 : i32
+            spv.Branch ^bb1(%32 : i32)
           ^bb3:  // pred: ^bb1
             spv.mlir.merge
           }
-          spv.Branch ^bb2
-        ^bb2:  // 2 preds: ^bb0, ^bb1
+          %24 = spv.IAdd %22, %5 : i32
+          spv.Branch ^bb1(%24 : i32)
+        ^bb3:  // pred: ^bb1
+          spv.mlir.merge
+        }
+        spv.mlir.loop {
+          spv.Branch ^bb1(%21 : i32)
+        ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+          %23 = spv.SLessThan %22, %5 : i32
+          spv.BranchConditional %23, ^bb2, ^bb3
+        ^bb2:  // pred: ^bb1
+          spv.mlir.loop {
+            spv.Branch ^bb1(%19 : i32)
+          ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+            %26 = spv.SLessThan %25, %4 : i32
+            spv.BranchConditional %26, ^bb2, ^bb3
+          ^bb2:  // pred: ^bb1
+            spv.mlir.loop {
+              spv.Branch ^bb1(%6 : i32)
+            ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+              %29 = spv.SLessThan %28, %1 : i32
+              spv.BranchConditional %29, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
+              %30 = spv.IAdd %15, %22 : i32
+              %31 = spv.IMul %30, %1 : i32
+              %32 = spv.IAdd %28, %31 : i32
+              %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              %34 = spv.Load "StorageBuffer" %33 : f32
+              %35 = spv.IAdd %16, %25 : i32
+              %36 = spv.IMul %28, %2 : i32
+              %37 = spv.IAdd %35, %36 : i32
+              %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              %39 = spv.Load "StorageBuffer" %38 : f32
+              %40 = spv.IMul %30, %2 : i32
+              %41 = spv.IAdd %35, %40 : i32
+              %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+              %43 = spv.Load "StorageBuffer" %42 : f32
+              %44 = spv.FMul %34, %39 : f32
+              %45 = spv.FAdd %43, %44 : f32
+              spv.Store "StorageBuffer" %42, %45 : f32
+              %46 = spv.IAdd %28, %3 : i32
+              spv.Branch ^bb1(%46 : i32)
+            ^bb3:  // pred: ^bb1
+              spv.mlir.merge
+            }
+            %27 = spv.IAdd %25, %4 : i32
+            spv.Branch ^bb1(%27 : i32)
+          ^bb3:  // pred: ^bb1
+            spv.mlir.merge
+          }
+          %24 = spv.IAdd %22, %5 : i32
+          spv.Branch ^bb1(%24 : i32)
+        ^bb3:  // pred: ^bb1
           spv.mlir.merge
         }
         spv.Return
       }
-      spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-      spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+      spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+      spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
     }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
   }
 }
@@ -2558,112 +3881,137 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
 {% raw %}
 ```
 module  {
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan_spirv, filter="vulkan*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-        %c1 = constant 1 : index
-        %c32 = constant 32 : index
         %c4 = constant 4 : index
-        %c64 = constant 64 : index
         %c4_0 = constant 4 : index
-        hal.return %c4_0, %c4, %c1 : index, index, index
+        %c1 = constant 1 : index
+        hal.return %c4, %c4_0, %c1 : index, index, index
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-          spv.func @dot_ex_dispatch_0() "None" {
+          spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
+            %1 = spv.Constant 1024 : i32
+            %2 = spv.Constant 64 : i32
             %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
-            %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %4 = spv.Constant 16 : i32
+            %5 = spv.Constant 8 : i32
+            %6 = spv.Constant 0 : i32
+            %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %5 : i32
+            %16 = spv.IMul %12, %4 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
-            %24 = spv.LogicalAnd %22, %23 : i1
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
-              %25 = spv.IAdd %15, %21 : i32
-              %26 = spv.IAdd %16, %19 : i32
-              %27 = spv.IMul %25, %6 : i32
-              %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
-              spv.mlir.merge
-            }
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%19 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
-                %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
-                %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %31 = spv.Load "StorageBuffer" %30 : f32
-                %32 = spv.IAdd %16, %19 : i32
-                %33 = spv.IMul %25, %6 : i32
-                %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %36 = spv.Load "StorageBuffer" %35 : f32
-                %37 = spv.IMul %27, %6 : i32
-                %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %40 = spv.Load "StorageBuffer" %39 : f32
-                %41 = spv.FMul %31, %36 : f32
-                %42 = spv.FAdd %40, %41 : f32
-                spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
-                spv.Branch ^bb1(%43 : i32)
+                %27 = spv.IAdd %15, %22 : i32
+                %28 = spv.IAdd %16, %25 : i32
+                %29 = spv.IMul %27, %2 : i32
+                %30 = spv.IAdd %28, %29 : i32
+                %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                spv.Store "StorageBuffer" %31, %0 : f32
+                %32 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%32 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
               }
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
+              spv.mlir.merge
+            }
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
+              spv.mlir.loop {
+                spv.Branch ^bb1(%19 : i32)
+              ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+                %26 = spv.SLessThan %25, %4 : i32
+                spv.BranchConditional %26, ^bb2, ^bb3
+              ^bb2:  // pred: ^bb1
+                spv.mlir.loop {
+                  spv.Branch ^bb1(%6 : i32)
+                ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+                  %29 = spv.SLessThan %28, %1 : i32
+                  spv.BranchConditional %29, ^bb2, ^bb3
+                ^bb2:  // pred: ^bb1
+                  %30 = spv.IAdd %15, %22 : i32
+                  %31 = spv.IMul %30, %1 : i32
+                  %32 = spv.IAdd %28, %31 : i32
+                  %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %34 = spv.Load "StorageBuffer" %33 : f32
+                  %35 = spv.IAdd %16, %25 : i32
+                  %36 = spv.IMul %28, %2 : i32
+                  %37 = spv.IAdd %35, %36 : i32
+                  %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %39 = spv.Load "StorageBuffer" %38 : f32
+                  %40 = spv.IMul %30, %2 : i32
+                  %41 = spv.IAdd %35, %40 : i32
+                  %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %43 = spv.Load "StorageBuffer" %42 : f32
+                  %44 = spv.FMul %34, %39 : f32
+                  %45 = spv.FAdd %43, %44 : f32
+                  spv.Store "StorageBuffer" %42, %45 : f32
+                  %46 = spv.IAdd %28, %3 : i32
+                  spv.Branch ^bb1(%46 : i32)
+                ^bb3:  // pred: ^bb1
+                  spv.mlir.merge
+                }
+                %27 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%27 : i32)
+              ^bb3:  // pred: ^bb1
+                spv.mlir.merge
+              }
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
               spv.mlir.merge
             }
             spv.Return
           }
-          spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-          spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+          spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+          spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
         }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
         }
       }
     }
@@ -2681,26 +4029,24 @@ module  {
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%sz_1}
     %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
     hal.command_buffer.begin<%cmd : !hal.command_buffer>
-    %c2048 = constant 2048 : index
+    %c64_2 = constant 64 : index
+    %c32_3 = constant 32 : index
+    %c1 = constant 1 : index
     %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
     %c0 = constant 0 : index
-    %c1 = constant 1 : index
+    %c1_4 = constant 1 : index
     %c2 = constant 2 : index
-    %c0_2 = constant 0 : index
-    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0_2] bindings([
+    hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
       %c0 = (%arg0 : !hal.buffer)[%c0, %sz], 
-      %c1 = (%arg1 : !hal.buffer)[%c0, %sz_0], 
+      %c1_4 = (%arg1 : !hal.buffer)[%c0, %sz_0], 
       %c2 = (%buffer : !hal.buffer)[%c0, %sz_1]
     ])
     hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-      %c1_3 = constant 1 : index
-      %c32_4 = constant 32 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64_2 : index, %arg4 = %c32_3 : index, %arg5 = %c1 : index) {
       %c4 = constant 4 : index
-      %c64_5 = constant 64 : index
-      %c4_6 = constant 4 : index
-      %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-      hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4_6, %c4, %c1_3])
+      %c4_5 = constant 4 : index
+      %c1_6 = constant 1 : index
+      hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_dispatch_0::@vulkan_spirv::@dot_dispatch_0) workgroups([%c4, %c4_5, %c1_6])
       hal.return
     }
     hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -2730,26 +4076,24 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%sz_1}
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
   hal.command_buffer.begin<%cmd : !hal.command_buffer>
-  %c2048 = constant 2048 : index
+  %c64_2 = constant 64 : index
+  %c32_3 = constant 32 : index
+  %c1 = constant 1 : index
   %executable_layout = hal.executable_layout.lookup device(%device : !hal.device) layouts([[#hal.descriptor_set_layout_binding<0, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>, #hal.descriptor_set_layout_binding<2, "StorageBuffer", DW>]]) : !hal.executable_layout
   %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c1_4 = constant 1 : index
   %c2 = constant 2 : index
-  %c0_2 = constant 0 : index
-  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0_2] bindings([
+  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout)[%c0] bindings([
     %c0 = (%arg0 : !hal.buffer)[%c0, %sz], 
-    %c1 = (%arg1 : !hal.buffer)[%c0, %sz_0], 
+    %c1_4 = (%arg1 : !hal.buffer)[%c0, %sz_0], 
     %c2 = (%buffer : !hal.buffer)[%c0, %sz_1]
   ])
   hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-    %c1_3 = constant 1 : index
-    %c32_4 = constant 32 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64_2 : index, %arg4 = %c32_3 : index, %arg5 = %c1 : index) {
     %c4 = constant 4 : index
-    %c64_5 = constant 64 : index
-    %c4_6 = constant 4 : index
-    %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-    hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4_6, %c4, %c1_3])
+    %c4_5 = constant 4 : index
+    %c1_6 = constant 1 : index
+    hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_dispatch_0::@vulkan_spirv::@dot_dispatch_0) workgroups([%c4, %c4_5, %c1_6])
     hal.return
   }
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -2769,10 +4113,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2048 = constant 2048 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -2785,11 +4130,10 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
   ])
   hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-    %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
     %c4 = constant 4 : index
-    %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-    hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+    %c1_0 = constant 1 : index
+    hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_dispatch_0::@vulkan_spirv::@dot_dispatch_0) workgroups([%c4, %c4, %c1_0])
     hal.return
   }
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -2809,10 +4153,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2048 = constant 2048 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -2825,11 +4170,10 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
   ])
   hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-    %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
     %c4 = constant 4 : index
-    %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-    hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+    %c1_0 = constant 1 : index
+    hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_dispatch_0::@vulkan_spirv::@dot_dispatch_0) workgroups([%c4, %c4, %c1_0])
     hal.return
   }
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -2849,10 +4193,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2048 = constant 2048 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -2865,11 +4210,10 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
   ])
   hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-    %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
     %c4 = constant 4 : index
-    %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-    hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+    %c1_0 = constant 1 : index
+    hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_dispatch_0::@vulkan_spirv::@dot_dispatch_0) workgroups([%c4, %c4, %c1_0])
     hal.return
   }
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -2886,112 +4230,137 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 {% raw %}
 ```
 module  {
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan_spirv, filter="vulkan*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-        %c1 = constant 1 : index
-        %c32 = constant 32 : index
         %c4 = constant 4 : index
-        %c64 = constant 64 : index
         %c4_0 = constant 4 : index
-        hal.return %c4_0, %c4, %c1 : index, index, index
+        %c1 = constant 1 : index
+        hal.return %c4, %c4_0, %c1 : index, index, index
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-          spv.func @dot_ex_dispatch_0() "None" {
+          spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
+            %1 = spv.Constant 1024 : i32
+            %2 = spv.Constant 64 : i32
             %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
-            %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %4 = spv.Constant 16 : i32
+            %5 = spv.Constant 8 : i32
+            %6 = spv.Constant 0 : i32
+            %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %5 : i32
+            %16 = spv.IMul %12, %4 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
-            %24 = spv.LogicalAnd %22, %23 : i1
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
-              %25 = spv.IAdd %15, %21 : i32
-              %26 = spv.IAdd %16, %19 : i32
-              %27 = spv.IMul %25, %6 : i32
-              %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
-              spv.mlir.merge
-            }
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%19 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
-                %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
-                %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %31 = spv.Load "StorageBuffer" %30 : f32
-                %32 = spv.IAdd %16, %19 : i32
-                %33 = spv.IMul %25, %6 : i32
-                %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %36 = spv.Load "StorageBuffer" %35 : f32
-                %37 = spv.IMul %27, %6 : i32
-                %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %40 = spv.Load "StorageBuffer" %39 : f32
-                %41 = spv.FMul %31, %36 : f32
-                %42 = spv.FAdd %40, %41 : f32
-                spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
-                spv.Branch ^bb1(%43 : i32)
+                %27 = spv.IAdd %15, %22 : i32
+                %28 = spv.IAdd %16, %25 : i32
+                %29 = spv.IMul %27, %2 : i32
+                %30 = spv.IAdd %28, %29 : i32
+                %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                spv.Store "StorageBuffer" %31, %0 : f32
+                %32 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%32 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
               }
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
+              spv.mlir.merge
+            }
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
+              spv.mlir.loop {
+                spv.Branch ^bb1(%19 : i32)
+              ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+                %26 = spv.SLessThan %25, %4 : i32
+                spv.BranchConditional %26, ^bb2, ^bb3
+              ^bb2:  // pred: ^bb1
+                spv.mlir.loop {
+                  spv.Branch ^bb1(%6 : i32)
+                ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+                  %29 = spv.SLessThan %28, %1 : i32
+                  spv.BranchConditional %29, ^bb2, ^bb3
+                ^bb2:  // pred: ^bb1
+                  %30 = spv.IAdd %15, %22 : i32
+                  %31 = spv.IMul %30, %1 : i32
+                  %32 = spv.IAdd %28, %31 : i32
+                  %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %34 = spv.Load "StorageBuffer" %33 : f32
+                  %35 = spv.IAdd %16, %25 : i32
+                  %36 = spv.IMul %28, %2 : i32
+                  %37 = spv.IAdd %35, %36 : i32
+                  %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %39 = spv.Load "StorageBuffer" %38 : f32
+                  %40 = spv.IMul %30, %2 : i32
+                  %41 = spv.IAdd %35, %40 : i32
+                  %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %43 = spv.Load "StorageBuffer" %42 : f32
+                  %44 = spv.FMul %34, %39 : f32
+                  %45 = spv.FAdd %43, %44 : f32
+                  spv.Store "StorageBuffer" %42, %45 : f32
+                  %46 = spv.IAdd %28, %3 : i32
+                  spv.Branch ^bb1(%46 : i32)
+                ^bb3:  // pred: ^bb1
+                  spv.mlir.merge
+                }
+                %27 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%27 : i32)
+              ^bb3:  // pred: ^bb1
+                spv.mlir.merge
+              }
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
               spv.mlir.merge
             }
             spv.Return
           }
-          spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-          spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+          spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+          spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
         }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
         }
       }
     }
@@ -3000,10 +4369,11 @@ module  {
     %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
-    %c2048 = constant 2048 : index
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3016,11 +4386,10 @@ module  {
       %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
     ])
     hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-      %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
       %c4 = constant 4 : index
-      %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-      hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+      %c1_0 = constant 1 : index
+      hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_dispatch_0::@vulkan_spirv::@dot_dispatch_0) workgroups([%c4, %c4, %c1_0])
       hal.return
     }
     hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -3061,112 +4430,137 @@ module  {
 {% raw %}
 ```
 module  {
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan_spirv, filter="vulkan*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-        %c1 = constant 1 : index
-        %c32 = constant 32 : index
         %c4 = constant 4 : index
-        %c64 = constant 64 : index
         %c4_0 = constant 4 : index
-        hal.return %c4_0, %c4, %c1 : index, index, index
+        %c1 = constant 1 : index
+        hal.return %c4, %c4_0, %c1 : index, index, index
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-          spv.func @dot_ex_dispatch_0() "None" {
+          spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
+            %1 = spv.Constant 1024 : i32
+            %2 = spv.Constant 64 : i32
             %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
-            %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %4 = spv.Constant 16 : i32
+            %5 = spv.Constant 8 : i32
+            %6 = spv.Constant 0 : i32
+            %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %5 : i32
+            %16 = spv.IMul %12, %4 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
-            %24 = spv.LogicalAnd %22, %23 : i1
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
-              %25 = spv.IAdd %15, %21 : i32
-              %26 = spv.IAdd %16, %19 : i32
-              %27 = spv.IMul %25, %6 : i32
-              %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
-              spv.mlir.merge
-            }
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%19 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
-                %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
-                %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %31 = spv.Load "StorageBuffer" %30 : f32
-                %32 = spv.IAdd %16, %19 : i32
-                %33 = spv.IMul %25, %6 : i32
-                %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %36 = spv.Load "StorageBuffer" %35 : f32
-                %37 = spv.IMul %27, %6 : i32
-                %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %40 = spv.Load "StorageBuffer" %39 : f32
-                %41 = spv.FMul %31, %36 : f32
-                %42 = spv.FAdd %40, %41 : f32
-                spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
-                spv.Branch ^bb1(%43 : i32)
+                %27 = spv.IAdd %15, %22 : i32
+                %28 = spv.IAdd %16, %25 : i32
+                %29 = spv.IMul %27, %2 : i32
+                %30 = spv.IAdd %28, %29 : i32
+                %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                spv.Store "StorageBuffer" %31, %0 : f32
+                %32 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%32 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
               }
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
+              spv.mlir.merge
+            }
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
+              spv.mlir.loop {
+                spv.Branch ^bb1(%19 : i32)
+              ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+                %26 = spv.SLessThan %25, %4 : i32
+                spv.BranchConditional %26, ^bb2, ^bb3
+              ^bb2:  // pred: ^bb1
+                spv.mlir.loop {
+                  spv.Branch ^bb1(%6 : i32)
+                ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+                  %29 = spv.SLessThan %28, %1 : i32
+                  spv.BranchConditional %29, ^bb2, ^bb3
+                ^bb2:  // pred: ^bb1
+                  %30 = spv.IAdd %15, %22 : i32
+                  %31 = spv.IMul %30, %1 : i32
+                  %32 = spv.IAdd %28, %31 : i32
+                  %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %34 = spv.Load "StorageBuffer" %33 : f32
+                  %35 = spv.IAdd %16, %25 : i32
+                  %36 = spv.IMul %28, %2 : i32
+                  %37 = spv.IAdd %35, %36 : i32
+                  %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %39 = spv.Load "StorageBuffer" %38 : f32
+                  %40 = spv.IMul %30, %2 : i32
+                  %41 = spv.IAdd %35, %40 : i32
+                  %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %43 = spv.Load "StorageBuffer" %42 : f32
+                  %44 = spv.FMul %34, %39 : f32
+                  %45 = spv.FAdd %43, %44 : f32
+                  spv.Store "StorageBuffer" %42, %45 : f32
+                  %46 = spv.IAdd %28, %3 : i32
+                  spv.Branch ^bb1(%46 : i32)
+                ^bb3:  // pred: ^bb1
+                  spv.mlir.merge
+                }
+                %27 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%27 : i32)
+              ^bb3:  // pred: ^bb1
+                spv.mlir.merge
+              }
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
               spv.mlir.merge
             }
             spv.Return
           }
-          spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-          spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+          spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+          spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
         }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
         }
       }
     }
@@ -3175,10 +4569,11 @@ module  {
     %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
-    %c2048 = constant 2048 : index
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3191,11 +4586,10 @@ module  {
       %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
     ])
     hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-      %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
       %c4 = constant 4 : index
-      %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-      hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+      %c1_0 = constant 1 : index
+      hal.command_buffer.dispatch.symbol<%arg2 : !hal.command_buffer> target(@dot_dispatch_0::@vulkan_spirv::@dot_dispatch_0) workgroups([%c4, %c4, %c1_0])
       hal.return
     }
     hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -3236,109 +4630,136 @@ module  {
 {% raw %}
 ```
 module  {
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan_spirv, filter="vulkan*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-        %c1 = constant 1 : index
         %c4 = constant 4 : index
+        %c1 = constant 1 : index
         hal.return %c4, %c4, %c1 : index, index, index
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-          spv.func @dot_ex_dispatch_0() "None" {
+          spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
+            %1 = spv.Constant 1024 : i32
+            %2 = spv.Constant 64 : i32
             %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
-            %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %4 = spv.Constant 16 : i32
+            %5 = spv.Constant 8 : i32
+            %6 = spv.Constant 0 : i32
+            %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %5 : i32
+            %16 = spv.IMul %12, %4 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
-            %24 = spv.LogicalAnd %22, %23 : i1
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
-              %25 = spv.IAdd %15, %21 : i32
-              %26 = spv.IAdd %16, %19 : i32
-              %27 = spv.IMul %25, %6 : i32
-              %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
-              spv.mlir.merge
-            }
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%19 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
-                %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
-                %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %31 = spv.Load "StorageBuffer" %30 : f32
-                %32 = spv.IAdd %16, %19 : i32
-                %33 = spv.IMul %25, %6 : i32
-                %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %36 = spv.Load "StorageBuffer" %35 : f32
-                %37 = spv.IMul %27, %6 : i32
-                %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %40 = spv.Load "StorageBuffer" %39 : f32
-                %41 = spv.FMul %31, %36 : f32
-                %42 = spv.FAdd %40, %41 : f32
-                spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
-                spv.Branch ^bb1(%43 : i32)
+                %27 = spv.IAdd %15, %22 : i32
+                %28 = spv.IAdd %16, %25 : i32
+                %29 = spv.IMul %27, %2 : i32
+                %30 = spv.IAdd %28, %29 : i32
+                %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                spv.Store "StorageBuffer" %31, %0 : f32
+                %32 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%32 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
               }
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
+              spv.mlir.merge
+            }
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
+              spv.mlir.loop {
+                spv.Branch ^bb1(%19 : i32)
+              ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+                %26 = spv.SLessThan %25, %4 : i32
+                spv.BranchConditional %26, ^bb2, ^bb3
+              ^bb2:  // pred: ^bb1
+                spv.mlir.loop {
+                  spv.Branch ^bb1(%6 : i32)
+                ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+                  %29 = spv.SLessThan %28, %1 : i32
+                  spv.BranchConditional %29, ^bb2, ^bb3
+                ^bb2:  // pred: ^bb1
+                  %30 = spv.IAdd %15, %22 : i32
+                  %31 = spv.IMul %30, %1 : i32
+                  %32 = spv.IAdd %28, %31 : i32
+                  %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %34 = spv.Load "StorageBuffer" %33 : f32
+                  %35 = spv.IAdd %16, %25 : i32
+                  %36 = spv.IMul %28, %2 : i32
+                  %37 = spv.IAdd %35, %36 : i32
+                  %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %39 = spv.Load "StorageBuffer" %38 : f32
+                  %40 = spv.IMul %30, %2 : i32
+                  %41 = spv.IAdd %35, %40 : i32
+                  %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %43 = spv.Load "StorageBuffer" %42 : f32
+                  %44 = spv.FMul %34, %39 : f32
+                  %45 = spv.FAdd %43, %44 : f32
+                  spv.Store "StorageBuffer" %42, %45 : f32
+                  %46 = spv.IAdd %28, %3 : i32
+                  spv.Branch ^bb1(%46 : i32)
+                ^bb3:  // pred: ^bb1
+                  spv.mlir.merge
+                }
+                %27 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%27 : i32)
+              ^bb3:  // pred: ^bb1
+                spv.mlir.merge
+              }
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
               spv.mlir.merge
             }
             spv.Return
           }
-          spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-          spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+          spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+          spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
         }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
         }
       }
     }
@@ -3347,10 +4768,11 @@ module  {
     %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
-    %c2048 = constant 2048 : index
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3363,11 +4785,12 @@ module  {
       %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
     ])
     hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-      %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
       %c4 = constant 4 : index
-      %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-      hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+      %c1_0 = constant 1 : index
+      %0 = hal.command_buffer.device<%arg2 : !hal.command_buffer> : !hal.device
+      %exe = hal.executable.lookup device(%0 : !hal.device) executable(@dot_dispatch_0) : !hal.executable
+      hal.command_buffer.dispatch<%arg2 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
       hal.return
     }
     hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -3411,10 +4834,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2048 = constant 2048 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3427,11 +4851,12 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
     %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
   ])
   hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-    %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
     %c4 = constant 4 : index
-    %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-    hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+    %c1_0 = constant 1 : index
+    %0 = hal.command_buffer.device<%arg2 : !hal.command_buffer> : !hal.device
+    %exe = hal.executable.lookup device(%0 : !hal.device) executable(@dot_dispatch_0) : !hal.executable
+    hal.command_buffer.dispatch<%arg2 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
     hal.return
   }
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -3451,10 +4876,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2048 = constant 2048 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3467,11 +4893,12 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
     %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
   ])
   hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-    %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
     %c4 = constant 4 : index
-    %exe = hal.executable.lookup device(%arg4 : !hal.device) executable(@dot_ex_dispatch_0) : !hal.executable
-    hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+    %c1_0 = constant 1 : index
+    %0 = hal.command_buffer.device<%arg2 : !hal.command_buffer> : !hal.device
+    %exe = hal.executable.lookup device(%0 : !hal.device) executable(@dot_dispatch_0) : !hal.executable
+    hal.command_buffer.dispatch<%arg2 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
     hal.return
   }
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -3579,13 +5006,13 @@ module  {
     %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
-  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+  hal.variable @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
     %device = hal.ex.shared_device : !hal.device
     %0 = hal.device.switch<%device : !hal.device> -> !hal.executable
     #hal.device.match.id<"vulkan*">(%arg0 = %device : !hal.device) {
       %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-      %exe = hal.executable.create device(%arg0 : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+      %exe = hal.executable.create device(%arg0 : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
       hal.return %exe : !hal.executable
     },
     #hal.match.always() {
@@ -3594,109 +5021,136 @@ module  {
     }
     return %0 : !hal.executable
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan_spirv, filter="vulkan*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-        %c1 = constant 1 : index
         %c4 = constant 4 : index
+        %c1 = constant 1 : index
         hal.return %c4, %c4, %c1 : index, index, index
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-          spv.func @dot_ex_dispatch_0() "None" {
+          spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
+            %1 = spv.Constant 1024 : i32
+            %2 = spv.Constant 64 : i32
             %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
-            %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %4 = spv.Constant 16 : i32
+            %5 = spv.Constant 8 : i32
+            %6 = spv.Constant 0 : i32
+            %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %5 : i32
+            %16 = spv.IMul %12, %4 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
-            %24 = spv.LogicalAnd %22, %23 : i1
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
-              %25 = spv.IAdd %15, %21 : i32
-              %26 = spv.IAdd %16, %19 : i32
-              %27 = spv.IMul %25, %6 : i32
-              %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
-              spv.mlir.merge
-            }
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%19 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
-                %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
-                %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %31 = spv.Load "StorageBuffer" %30 : f32
-                %32 = spv.IAdd %16, %19 : i32
-                %33 = spv.IMul %25, %6 : i32
-                %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %36 = spv.Load "StorageBuffer" %35 : f32
-                %37 = spv.IMul %27, %6 : i32
-                %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %40 = spv.Load "StorageBuffer" %39 : f32
-                %41 = spv.FMul %31, %36 : f32
-                %42 = spv.FAdd %40, %41 : f32
-                spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
-                spv.Branch ^bb1(%43 : i32)
+                %27 = spv.IAdd %15, %22 : i32
+                %28 = spv.IAdd %16, %25 : i32
+                %29 = spv.IMul %27, %2 : i32
+                %30 = spv.IAdd %28, %29 : i32
+                %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                spv.Store "StorageBuffer" %31, %0 : f32
+                %32 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%32 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
               }
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
+              spv.mlir.merge
+            }
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
+              spv.mlir.loop {
+                spv.Branch ^bb1(%19 : i32)
+              ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+                %26 = spv.SLessThan %25, %4 : i32
+                spv.BranchConditional %26, ^bb2, ^bb3
+              ^bb2:  // pred: ^bb1
+                spv.mlir.loop {
+                  spv.Branch ^bb1(%6 : i32)
+                ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+                  %29 = spv.SLessThan %28, %1 : i32
+                  spv.BranchConditional %29, ^bb2, ^bb3
+                ^bb2:  // pred: ^bb1
+                  %30 = spv.IAdd %15, %22 : i32
+                  %31 = spv.IMul %30, %1 : i32
+                  %32 = spv.IAdd %28, %31 : i32
+                  %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %34 = spv.Load "StorageBuffer" %33 : f32
+                  %35 = spv.IAdd %16, %25 : i32
+                  %36 = spv.IMul %28, %2 : i32
+                  %37 = spv.IAdd %35, %36 : i32
+                  %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %39 = spv.Load "StorageBuffer" %38 : f32
+                  %40 = spv.IMul %30, %2 : i32
+                  %41 = spv.IAdd %35, %40 : i32
+                  %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %43 = spv.Load "StorageBuffer" %42 : f32
+                  %44 = spv.FMul %34, %39 : f32
+                  %45 = spv.FAdd %43, %44 : f32
+                  spv.Store "StorageBuffer" %42, %45 : f32
+                  %46 = spv.IAdd %28, %3 : i32
+                  spv.Branch ^bb1(%46 : i32)
+                ^bb3:  // pred: ^bb1
+                  spv.mlir.merge
+                }
+                %27 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%27 : i32)
+              ^bb3:  // pred: ^bb1
+                spv.mlir.merge
+              }
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
               spv.mlir.merge
             }
             spv.Return
           }
-          spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-          spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+          spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+          spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
         }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
         }
       }
     }
@@ -3705,10 +5159,11 @@ module  {
     %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
-    %c2048 = constant 2048 : index
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3721,11 +5176,12 @@ module  {
       %c2 = (%buffer : !hal.buffer)[%c0, %c8192]
     ])
     hal.device.switch<%device : !hal.device>
-    #hal.device.match.id<"vulkan*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %device : !hal.device) {
-      %c1_0 = constant 1 : index
+    #hal.device.match.id<"vulkan*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c64 : index, %arg4 = %c32 : index, %arg5 = %c1 : index) {
       %c4 = constant 4 : index
-      %1 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-      hal.command_buffer.dispatch<%arg3 : !hal.command_buffer> target(%1 : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+      %c1_0 = constant 1 : index
+      %1 = hal.command_buffer.device<%arg2 : !hal.command_buffer> : !hal.device
+      %2 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
+      hal.command_buffer.dispatch<%arg2 : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
       hal.return
     }
     hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
@@ -3792,13 +5248,13 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 
 {% raw %}
 ```
-func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
   %device = hal.ex.shared_device : !hal.device
   %0 = hal.device.match.id<%device : !hal.device> pattern("vulkan*") : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
   br ^bb5(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %true = constant true
@@ -3823,10 +5279,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2048 = constant 2048 : index
+  %c64 = constant 64 : index
+  %c32 = constant 32 : index
+  %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c2 = constant 2 : index
-  %c0 = constant 0 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -3841,10 +5298,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %1 = hal.device.match.id<%device : !hal.device> pattern("vulkan*") : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %c1_0 = constant 1 : index
   %c4 = constant 4 : index
-  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+  %c1_0 = constant 1 : index
+  %2 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
+  %3 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%3 : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
   br ^bb3
 ^bb2:  // pred: ^bb0
   iree.unreachable "device not supported in the compiled configuration"
@@ -3915,14 +5373,14 @@ module  {
     %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
-  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+  hal.variable @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
     %device = hal.ex.shared_device : !hal.device
     %0 = hal.device.match.id<%device : !hal.device> pattern("vulkan*") : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
     br ^bb5(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
     %true = constant true
@@ -3935,109 +5393,136 @@ module  {
   ^bb5(%3: !hal.executable):  // 2 preds: ^bb1, ^bb3
     return %3 : !hal.executable
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan_spirv, filter="vulkan*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-        %c1 = constant 1 : index
         %c4 = constant 4 : index
+        %c1 = constant 1 : index
         hal.return %c4, %c4, %c1 : index, index, index
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-          spv.func @dot_ex_dispatch_0() "None" {
+          spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
+            %1 = spv.Constant 1024 : i32
+            %2 = spv.Constant 64 : i32
             %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
-            %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %4 = spv.Constant 16 : i32
+            %5 = spv.Constant 8 : i32
+            %6 = spv.Constant 0 : i32
+            %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %5 : i32
+            %16 = spv.IMul %12, %4 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
-            %24 = spv.LogicalAnd %22, %23 : i1
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
-              %25 = spv.IAdd %15, %21 : i32
-              %26 = spv.IAdd %16, %19 : i32
-              %27 = spv.IMul %25, %6 : i32
-              %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
-              spv.mlir.merge
-            }
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%19 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
-                %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
-                %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %31 = spv.Load "StorageBuffer" %30 : f32
-                %32 = spv.IAdd %16, %19 : i32
-                %33 = spv.IMul %25, %6 : i32
-                %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %36 = spv.Load "StorageBuffer" %35 : f32
-                %37 = spv.IMul %27, %6 : i32
-                %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %40 = spv.Load "StorageBuffer" %39 : f32
-                %41 = spv.FMul %31, %36 : f32
-                %42 = spv.FAdd %40, %41 : f32
-                spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
-                spv.Branch ^bb1(%43 : i32)
+                %27 = spv.IAdd %15, %22 : i32
+                %28 = spv.IAdd %16, %25 : i32
+                %29 = spv.IMul %27, %2 : i32
+                %30 = spv.IAdd %28, %29 : i32
+                %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                spv.Store "StorageBuffer" %31, %0 : f32
+                %32 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%32 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
               }
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
+              spv.mlir.merge
+            }
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
+              spv.mlir.loop {
+                spv.Branch ^bb1(%19 : i32)
+              ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+                %26 = spv.SLessThan %25, %4 : i32
+                spv.BranchConditional %26, ^bb2, ^bb3
+              ^bb2:  // pred: ^bb1
+                spv.mlir.loop {
+                  spv.Branch ^bb1(%6 : i32)
+                ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+                  %29 = spv.SLessThan %28, %1 : i32
+                  spv.BranchConditional %29, ^bb2, ^bb3
+                ^bb2:  // pred: ^bb1
+                  %30 = spv.IAdd %15, %22 : i32
+                  %31 = spv.IMul %30, %1 : i32
+                  %32 = spv.IAdd %28, %31 : i32
+                  %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %34 = spv.Load "StorageBuffer" %33 : f32
+                  %35 = spv.IAdd %16, %25 : i32
+                  %36 = spv.IMul %28, %2 : i32
+                  %37 = spv.IAdd %35, %36 : i32
+                  %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %39 = spv.Load "StorageBuffer" %38 : f32
+                  %40 = spv.IMul %30, %2 : i32
+                  %41 = spv.IAdd %35, %40 : i32
+                  %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %43 = spv.Load "StorageBuffer" %42 : f32
+                  %44 = spv.FMul %34, %39 : f32
+                  %45 = spv.FAdd %43, %44 : f32
+                  spv.Store "StorageBuffer" %42, %45 : f32
+                  %46 = spv.IAdd %28, %3 : i32
+                  spv.Branch ^bb1(%46 : i32)
+                ^bb3:  // pred: ^bb1
+                  spv.mlir.merge
+                }
+                %27 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%27 : i32)
+              ^bb3:  // pred: ^bb1
+                spv.mlir.merge
+              }
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
               spv.mlir.merge
             }
             spv.Return
           }
-          spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-          spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+          spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+          spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
         }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
         }
       }
     }
@@ -4046,10 +5531,11 @@ module  {
     %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
-    %c2048 = constant 2048 : index
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4064,10 +5550,11 @@ module  {
     %1 = hal.device.match.id<%device : !hal.device> pattern("vulkan*") : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %c1_0 = constant 1 : index
     %c4 = constant 4 : index
-    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+    %c1_0 = constant 1 : index
+    %2 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
+    %3 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
+    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%3 : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
     br ^bb3
   ^bb2:  // pred: ^bb0
     iree.unreachable "device not supported in the compiled configuration"
@@ -4129,14 +5616,14 @@ module  {
     %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
-  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+  hal.variable @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
     %device = hal.ex.shared_device : !hal.device
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
     br ^bb5(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
     %true = constant true
@@ -4149,109 +5636,136 @@ module  {
   ^bb5(%3: !hal.executable):  // 2 preds: ^bb1, ^bb3
     return %3 : !hal.executable
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vulkan_spirv, filter="vulkan*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:32x1024xf32>, !flow.dispatch.tensor<readonly:1024x64xf32>, !flow.dispatch.tensor<writeonly:32x64xf32>) -> ()} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-        %c1 = constant 1 : index
         %c4 = constant 4 : index
+        %c1 = constant 1 : index
         hal.return %c4, %c4, %c1 : index, index, index
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94069358664320__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069358664032__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94069357665056__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-          spv.func @dot_ex_dispatch_0() "None" {
+          spv.GlobalVariable @__resource_var_94395962764848__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763424__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94395961763568__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
-            %1 = spv.Constant 8 : i32
-            %2 = spv.Constant 16 : i32
+            %1 = spv.Constant 1024 : i32
+            %2 = spv.Constant 64 : i32
             %3 = spv.Constant 1 : i32
-            %4 = spv.Constant 1024 : i32
-            %5 = spv.Constant 0 : i32
-            %6 = spv.Constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94069357665056__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94069358664032__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94069358664320__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %4 = spv.Constant 16 : i32
+            %5 = spv.Constant 8 : i32
+            %6 = spv.Constant 0 : i32
+            %7 = spv.mlir.addressof @__resource_var_94395961763568__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94395961763424__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94395962764848__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
             %13 = spv.Load "Input" %10 : vector<3xi32>
             %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-            %15 = spv.IMul %14, %1 : i32
-            %16 = spv.IMul %12, %2 : i32
+            %15 = spv.IMul %14, %5 : i32
+            %16 = spv.IMul %12, %4 : i32
             %17 = spv.mlir.addressof @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
             %18 = spv.Load "Input" %17 : vector<3xi32>
             %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
             %20 = spv.Load "Input" %17 : vector<3xi32>
             %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-            %22 = spv.SLessThan %21, %1 : i32
-            %23 = spv.SLessThan %19, %2 : i32
-            %24 = spv.LogicalAnd %22, %23 : i1
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
-              %25 = spv.IAdd %15, %21 : i32
-              %26 = spv.IAdd %16, %19 : i32
-              %27 = spv.IMul %25, %6 : i32
-              %28 = spv.IAdd %27, %26 : i32
-              %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              spv.Store "StorageBuffer" %29, %0 : f32
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
-              spv.mlir.merge
-            }
-            spv.mlir.selection {
-              spv.BranchConditional %24, ^bb1, ^bb2
-            ^bb1:  // pred: ^bb0
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
               spv.mlir.loop {
-                spv.Branch ^bb1(%5 : i32)
+                spv.Branch ^bb1(%19 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
                 spv.BranchConditional %26, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
-                %27 = spv.IAdd %15, %21 : i32
-                %28 = spv.IMul %27, %4 : i32
-                %29 = spv.IAdd %28, %25 : i32
-                %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %31 = spv.Load "StorageBuffer" %30 : f32
-                %32 = spv.IAdd %16, %19 : i32
-                %33 = spv.IMul %25, %6 : i32
-                %34 = spv.IAdd %33, %32 : i32
-                %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %36 = spv.Load "StorageBuffer" %35 : f32
-                %37 = spv.IMul %27, %6 : i32
-                %38 = spv.IAdd %37, %32 : i32
-                %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-                %40 = spv.Load "StorageBuffer" %39 : f32
-                %41 = spv.FMul %31, %36 : f32
-                %42 = spv.FAdd %40, %41 : f32
-                spv.Store "StorageBuffer" %39, %42 : f32
-                %43 = spv.IAdd %25, %3 : i32
-                spv.Branch ^bb1(%43 : i32)
+                %27 = spv.IAdd %15, %22 : i32
+                %28 = spv.IAdd %16, %25 : i32
+                %29 = spv.IMul %27, %2 : i32
+                %30 = spv.IAdd %28, %29 : i32
+                %31 = spv.AccessChain %9[%6, %30] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                spv.Store "StorageBuffer" %31, %0 : f32
+                %32 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%32 : i32)
               ^bb3:  // pred: ^bb1
                 spv.mlir.merge
               }
-              spv.Branch ^bb2
-            ^bb2:  // 2 preds: ^bb0, ^bb1
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
+              spv.mlir.merge
+            }
+            spv.mlir.loop {
+              spv.Branch ^bb1(%21 : i32)
+            ^bb1(%22: i32):  // 2 preds: ^bb0, ^bb2
+              %23 = spv.SLessThan %22, %5 : i32
+              spv.BranchConditional %23, ^bb2, ^bb3
+            ^bb2:  // pred: ^bb1
+              spv.mlir.loop {
+                spv.Branch ^bb1(%19 : i32)
+              ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+                %26 = spv.SLessThan %25, %4 : i32
+                spv.BranchConditional %26, ^bb2, ^bb3
+              ^bb2:  // pred: ^bb1
+                spv.mlir.loop {
+                  spv.Branch ^bb1(%6 : i32)
+                ^bb1(%28: i32):  // 2 preds: ^bb0, ^bb2
+                  %29 = spv.SLessThan %28, %1 : i32
+                  spv.BranchConditional %29, ^bb2, ^bb3
+                ^bb2:  // pred: ^bb1
+                  %30 = spv.IAdd %15, %22 : i32
+                  %31 = spv.IMul %30, %1 : i32
+                  %32 = spv.IAdd %28, %31 : i32
+                  %33 = spv.AccessChain %7[%6, %32] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %34 = spv.Load "StorageBuffer" %33 : f32
+                  %35 = spv.IAdd %16, %25 : i32
+                  %36 = spv.IMul %28, %2 : i32
+                  %37 = spv.IAdd %35, %36 : i32
+                  %38 = spv.AccessChain %8[%6, %37] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %39 = spv.Load "StorageBuffer" %38 : f32
+                  %40 = spv.IMul %30, %2 : i32
+                  %41 = spv.IAdd %35, %40 : i32
+                  %42 = spv.AccessChain %9[%6, %41] : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>, i32, i32
+                  %43 = spv.Load "StorageBuffer" %42 : f32
+                  %44 = spv.FMul %34, %39 : f32
+                  %45 = spv.FAdd %43, %44 : f32
+                  spv.Store "StorageBuffer" %42, %45 : f32
+                  %46 = spv.IAdd %28, %3 : i32
+                  spv.Branch ^bb1(%46 : i32)
+                ^bb3:  // pred: ^bb1
+                  spv.mlir.merge
+                }
+                %27 = spv.IAdd %25, %4 : i32
+                spv.Branch ^bb1(%27 : i32)
+              ^bb3:  // pred: ^bb1
+                spv.mlir.merge
+              }
+              %24 = spv.IAdd %22, %5 : i32
+              spv.Branch ^bb1(%24 : i32)
+            ^bb3:  // pred: ^bb1
               spv.mlir.merge
             }
             spv.Return
           }
-          spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-          spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+          spv.EntryPoint "GLCompute" @dot_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+          spv.ExecutionMode @dot_dispatch_0 "LocalSize", 16, 8, 1
         }
-        hal.interface @legacy_io attributes {sym_visibility = "private"} {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface @io attributes {sym_visibility = "private"} {
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+          hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
         }
       }
     }
@@ -4260,10 +5774,11 @@ module  {
     %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
-    %c2048 = constant 2048 : index
+    %c64 = constant 64 : index
+    %c32 = constant 32 : index
+    %c0 = constant 0 : index
     %c1 = constant 1 : index
     %c2 = constant 2 : index
-    %c0 = constant 0 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4278,10 +5793,11 @@ module  {
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %c1_0 = constant 1 : index
     %c4 = constant 4 : index
-    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
+    %c1_0 = constant 1 : index
+    %2 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
+    %3 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
+    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%3 : !hal.executable)[0] workgroups([%c4, %c4, %c1_0])
     br ^bb3
   ^bb2:  // pred: ^bb0
     iree.unreachable "device not supported in the compiled configuration"
@@ -4443,13 +5959,13 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 
 {% raw %}
 ```
-func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
   %device = hal.ex.shared_device : !hal.device
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
   br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %2 = iree.null : !hal.executable
@@ -4465,13 +5981,13 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 
 {% raw %}
 ```
-func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
   %device = hal.ex.shared_device : !hal.device
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
   br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %2 = iree.null : !hal.executable
@@ -4487,13 +6003,13 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 
 {% raw %}
 ```
-func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
   %device = hal.ex.shared_device : !hal.device
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
   br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %2 = iree.null : !hal.executable
@@ -4509,13 +6025,13 @@ func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
 
 {% raw %}
 ```
-hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+  hal.interface @io {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary @vulkan_spirv attributes {data = opaque<"_", "0xDEADBEEF"> : vector<2160xi8>, format = "SPVE"} {
+  hal.executable.binary @vulkan_spirv attributes {data = opaque<"_", "0xDEADBEEF"> : vector<2332xi8>, format = "SPVE"} {
   }
 }
 
@@ -4530,10 +6046,10 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %c4 = constant 4 : index
+  %c1 = constant 1 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4548,7 +6064,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  %2 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1])
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
   hal.command_buffer.end<%cmd : !hal.command_buffer>
@@ -4569,10 +6085,10 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %c4 = constant 4 : index
+  %c1 = constant 1 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4587,7 +6103,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  %2 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1])
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
   hal.command_buffer.end<%cmd : !hal.command_buffer>
@@ -4608,10 +6124,10 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %c4 = constant 4 : index
+  %c1 = constant 1 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4626,7 +6142,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  %2 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1])
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
   hal.command_buffer.end<%cmd : !hal.command_buffer>
@@ -4780,14 +6296,14 @@ module  {
     %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
-  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+  hal.variable @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
     %device = hal.ex.shared_device : !hal.device
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
     br ^bb3(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
     %2 = iree.null : !hal.executable
@@ -4795,23 +6311,23 @@ module  {
   ^bb3(%3: !hal.executable):  // 2 preds: ^bb1, ^bb2
     return %3 : !hal.executable
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @vulkan_spirv attributes {data = opaque<"_", "0xDEADBEEF"> : vector<2160xi8>, format = "SPVE"} {
+    hal.executable.binary @vulkan_spirv attributes {data = opaque<"_", "0xDEADBEEF"> : vector<2332xi8>, format = "SPVE"} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
-    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %c4 = constant 4 : index
+    %c1 = constant 1 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4826,7 +6342,7 @@ module  {
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+    %2 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
     hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1])
     hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
     hal.command_buffer.end<%cmd : !hal.command_buffer>
@@ -4907,13 +6423,13 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 
 {% raw %}
 ```
-func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
   %device = hal.ex.shared_device : !hal.device
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+  %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
   br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
   %2 = iree.null : !hal.executable
@@ -4933,10 +6449,10 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %c131072 = constant 131072 : index
   %c262144 = constant 262144 : index
   %c8192 = constant 8192 : index
-  %c2 = constant 2 : index
   %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c2 = constant 2 : index
   %c4 = constant 4 : index
+  %c1 = constant 1 : index
   %device = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -4951,7 +6467,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noi
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  %2 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1])
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
   hal.command_buffer.end<%cmd : !hal.command_buffer>
@@ -5027,14 +6543,14 @@ module  {
     %executable_layout = hal.executable_layout.create device(%device : !hal.device) push_constants(0) layouts([%0]) : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
-  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+  hal.variable @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_dispatch_0_initializer() -> !hal.executable {
     %device = hal.ex.shared_device : !hal.device
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %exe = hal.executable.create device(%device : !hal.device) target(@dot_ex_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@dot_dispatch_0::@vulkan_spirv) layouts([%1]) : !hal.executable
     br ^bb3(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
     %2 = iree.null : !hal.executable
@@ -5042,23 +6558,23 @@ module  {
   ^bb3(%3: !hal.executable):  // 2 preds: ^bb1, ^bb2
     return %3 : !hal.executable
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @io {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @vulkan_spirv attributes {data = opaque<"_", "0xDEADBEEF"> : vector<2160xi8>, format = "SPVE"} {
+    hal.executable.binary @vulkan_spirv attributes {data = opaque<"_", "0xDEADBEEF"> : vector<2332xi8>, format = "SPVE"} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
     %c131072 = constant 131072 : index
     %c262144 = constant 262144 : index
     %c8192 = constant 8192 : index
-    %c2 = constant 2 : index
     %c0 = constant 0 : index
-    %c1 = constant 1 : index
+    %c2 = constant 2 : index
     %c4 = constant 4 : index
+    %c1 = constant 1 : index
     %device = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
     %buffer = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c8192}
@@ -5073,7 +6589,7 @@ module  {
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+    %2 = hal.variable.load @_executable_dot_dispatch_0 : !hal.executable
     hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%2 : !hal.executable)[0] workgroups([%c4, %c4, %c1])
     hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
     hal.command_buffer.end<%cmd : !hal.command_buffer>
@@ -5147,17 +6663,17 @@ module  {
       %ref_0 = vm.call.variadic @hal.executable_layout.create(%ref, %zero, [%_descriptor_set_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout>
       vm.return %ref_0 : !vm.ref<!hal.executable_layout>
     }
-    vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
-    vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
+    vm.global.ref @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !vm.ref<!hal.executable>
+    vm.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2332xi8>
+    vm.func private @_executable_dot_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_0 = vm.rodata.inline "_utf8_spve_9EB892746B9D70D0" : !vm.ref<!iree.byte_buffer> = dense<[83, 80, 86, 69]> : vector<4xi8>
-      %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-      %ref_1 = vm.call.variadic @hal.executable.create(%ref, %ref_0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+      %ref_1 = vm.call.variadic @hal.executable.create(%ref, %ref_0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
       vm.br ^bb3(%ref_1 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
@@ -5169,10 +6685,10 @@ module  {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
       %c8192 = vm.const.i32 8192 : i32
-      %c2 = vm.const.i32 2 : i32
       %zero = vm.const.i32.zero : i32
-      %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
       %c4 = vm.const.i32 4 : i32
+      %c1 = vm.const.i32 1 : i32
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
       %c50 = vm.const.i32 50 : i32
@@ -5187,9 +6703,9 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
       %zero_4 = vm.const.i32.zero : i32
-      vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_4, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_dispatch_0, %zero_4, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
       %zero_5 = vm.const.i32.zero : i32
@@ -5307,18 +6823,18 @@ vm.module @module {
     %ref_0 = vm.call.variadic @hal.executable_layout.create(%ref, %zero, [%_descriptor_set_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout>
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
-  vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
+  vm.global.ref @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !vm.ref<!hal.executable>
+  vm.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2332xi8>
   vm.rodata @_utf8_spve_9EB892746B9D70D0 dense<[83, 80, 86, 69]> : vector<4xi8>
-  vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
+  vm.func private @_executable_dot_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-    %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-    %ref_0 = vm.call.variadic @hal.executable.create(%ref, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+    %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+    %ref_0 = vm.call.variadic @hal.executable.create(%ref, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
     vm.br ^bb3(%ref_0 : !vm.ref<!hal.executable>)
   ^bb2:  // pred: ^bb0
     %null = vm.const.ref.zero : !vm.ref<!hal.executable>
@@ -5330,10 +6846,10 @@ vm.module @module {
     %c131072 = vm.const.i32 131072 : i32
     %c262144 = vm.const.i32 262144 : i32
     %c8192 = vm.const.i32 8192 : i32
-    %c2 = vm.const.i32 2 : i32
     %zero = vm.const.i32.zero : i32
-    %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
     %c4 = vm.const.i32 4 : i32
+    %c1 = vm.const.i32 1 : i32
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %c50 = vm.const.i32 50 : i32
@@ -5348,9 +6864,9 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
     %zero_4 = vm.const.i32.zero : i32
-    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_4, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_dispatch_0, %zero_4, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
     %c5 = vm.const.i32 5 : i32
     %zero_5 = vm.const.i32.zero : i32
@@ -5467,18 +6983,18 @@ vm.module @module {
     %ref_0 = vm.call.variadic @hal.executable_layout.create(%ref, %zero, [%_descriptor_set_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!hal.descriptor_set_layout> ...) -> !vm.ref<!hal.executable_layout>
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
-  vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
+  vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
+  vm.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2332xi8>
   vm.rodata @_utf8_spve_9EB892746B9D70D0 dense<[83, 80, 86, 69]> : vector<4xi8>
-  vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
+  vm.func private @_executable_dot_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-    %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-    %ref_0 = vm.call.variadic @hal.executable.create(%ref, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+    %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+    %ref_0 = vm.call.variadic @hal.executable.create(%ref, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
     vm.br ^bb3(%ref_0 : !vm.ref<!hal.executable>)
   ^bb2:  // pred: ^bb0
     %null = vm.const.ref.zero : !vm.ref<!hal.executable>
@@ -5490,10 +7006,10 @@ vm.module @module {
     %c131072 = vm.const.i32 131072 : i32
     %c262144 = vm.const.i32 262144 : i32
     %c8192 = vm.const.i32 8192 : i32
-    %c2 = vm.const.i32 2 : i32
     %zero = vm.const.i32.zero : i32
-    %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
     %c4 = vm.const.i32 4 : i32
+    %c1 = vm.const.i32 1 : i32
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
     %c50 = vm.const.i32 50 : i32
@@ -5508,9 +7024,9 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
     %zero_4 = vm.const.i32.zero : i32
-    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_4, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_dispatch_0, %zero_4, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
     %c5 = vm.const.i32 5 : i32
     %zero_5 = vm.const.i32.zero : i32
@@ -5592,8 +7108,8 @@ vm.module @module {
     vm.global.store.ref %ref, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
     %ref_0 = vm.call @_executable_layout_0_initializer() : () -> !vm.ref<!hal.executable_layout>
     vm.global.store.ref %ref_0, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-    %ref_1 = vm.call @_executable_dot_ex_dispatch_0_initializer() : () -> !vm.ref<!hal.executable>
-    vm.global.store.ref %ref_1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    %ref_1 = vm.call @_executable_dot_dispatch_0_initializer() : () -> !vm.ref<!hal.executable>
+    vm.global.store.ref %ref_1, @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
     vm.return
   }
   vm.export @__init
@@ -5613,8 +7129,8 @@ vm.func @__init() {
   vm.global.store.ref %ref, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
   %ref_0 = vm.call @_executable_layout_0_initializer() : () -> !vm.ref<!hal.executable_layout>
   vm.global.store.ref %ref_0, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-  %ref_1 = vm.call @_executable_dot_ex_dispatch_0_initializer() : () -> !vm.ref<!hal.executable>
-  vm.global.store.ref %ref_1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+  %ref_1 = vm.call @_executable_dot_dispatch_0_initializer() : () -> !vm.ref<!hal.executable>
+  vm.global.store.ref %ref_1, @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
   vm.return
 }
 
@@ -5693,8 +7209,8 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.re
   %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
   vm.cond_br %_device_match_id_0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+  %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
+  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
   vm.call @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, %zero) : (!vm.ref<!hal.command_buffer>, i32, i32, i32) -> ()
   vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
   vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -5710,7 +7226,7 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.re
 
 {% raw %}
 ```
-vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
+vm.func private @_executable_dot_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
   %null = vm.const.ref.zero : !vm.ref<!hal.executable>
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -5718,8 +7234,8 @@ vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.exe
 ^bb1:  // pred: ^bb0
   %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
   %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-  %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-  %ref_0 = vm.call.variadic @hal.executable.create(%ref, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+  %ref_0 = vm.call.variadic @hal.executable.create(%ref, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
   vm.br ^bb3(%ref_0 : !vm.ref<!hal.executable>)
 ^bb2:  // pred: ^bb0
   vm.br ^bb3(%null : !vm.ref<!hal.executable>)
@@ -5805,13 +7321,13 @@ vm.func @__init() {
 ^bb1:  // pred: ^bb0
   %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
   %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-  %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-  %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+  %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
   vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
 ^bb2:  // pred: ^bb0
   vm.br ^bb3(%null : !vm.ref<!hal.executable>)
 ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
-  vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+  vm.global.store.ref %1, @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
   vm.return
 }
 
@@ -5900,8 +7416,8 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.re
   %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
   vm.cond_br %_device_match_id_0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+  %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
+  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
   vm.call @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, %zero) : (!vm.ref<!hal.command_buffer>, i32, i32, i32) -> ()
   vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
   vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -5923,8 +7439,8 @@ module  {
     vm.rodata @_utf8_vulkan_7197BF52A22CAFD7 dense<[118, 117, 108, 107, 97, 110, 42]> : vector<7xi8>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
+    vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2332xi8>
     vm.rodata @_utf8_spve_9EB892746B9D70D0 dense<[83, 80, 86, 69]> : vector<4xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
@@ -5949,8 +7465,8 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, %zero) : (!vm.ref<!hal.command_buffer>, i32, i32, i32) -> ()
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -6061,13 +7577,13 @@ module  {
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-      %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
       vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
       vm.br ^bb3(%null : !vm.ref<!hal.executable>)
     ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
-      vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %1, @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
       vm.return
     }
     vm.export @__init
@@ -6087,8 +7603,8 @@ module  {
     vm.rodata @_utf8_vulkan_7197BF52A22CAFD7 dense<[118, 117, 108, 107, 97, 110, 42]> : vector<7xi8>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
+    vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2332xi8>
     vm.rodata @_utf8_spve_9EB892746B9D70D0 dense<[83, 80, 86, 69]> : vector<4xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
@@ -6113,8 +7629,8 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, %zero) : (!vm.ref<!hal.command_buffer>, i32, i32, i32) -> ()
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -6225,13 +7741,13 @@ module  {
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-      %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
       vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
       vm.br ^bb3(%null : !vm.ref<!hal.executable>)
     ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
-      vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %1, @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
       vm.return
     }
     vm.export @__init
@@ -6251,8 +7767,8 @@ module  {
     vm.rodata @_utf8_vulkan_7197BF52A22CAFD7 dense<[118, 117, 108, 107, 97, 110, 42]> : vector<7xi8>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
+    vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2332xi8>
     vm.rodata @_utf8_spve_9EB892746B9D70D0 dense<[83, 80, 86, 69]> : vector<4xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
@@ -6277,8 +7793,8 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, %zero) : (!vm.ref<!hal.command_buffer>, i32, i32, i32) -> ()
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -6370,13 +7886,13 @@ module  {
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-      %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
       vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
       vm.br ^bb3(%null : !vm.ref<!hal.executable>)
     ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
-      vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %1, @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
       vm.return
     }
     vm.export @__init
@@ -6395,8 +7911,8 @@ vm.module @module {
   vm.rodata @_utf8_vulkan_7197BF52A22CAFD7 dense<[118, 117, 108, 107, 97, 110, 42]> : vector<7xi8>
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
   vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-  vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
+  vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
+  vm.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2332xi8>
   vm.rodata @_utf8_spve_9EB892746B9D70D0 dense<[83, 80, 86, 69]> : vector<4xi8>
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6418,9 +7934,9 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
     %c4 = vm.const.i32 4 : i32
-    vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+    vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
     %c5 = vm.const.i32 5 : i32
     vm.call @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, %zero) : (!vm.ref<!hal.command_buffer>, i32, i32, i32) -> ()
@@ -6513,14 +8029,14 @@ vm.module @module {
   ^bb1:  // pred: ^bb0
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-    %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-    %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+    %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+    %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
     vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
   ^bb2:  // pred: ^bb0
     %null = vm.const.ref.zero : !vm.ref<!hal.executable>
     vm.br ^bb3(%null : !vm.ref<!hal.executable>)
   ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
-    vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    vm.global.store.ref %1, @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
     vm.return
   }
   vm.export @__init
@@ -6539,8 +8055,8 @@ module  {
     vm.rodata @_utf8_vulkan_7197BF52A22CAFD7 dense<[118, 117, 108, 107, 97, 110, 42]> : vector<7xi8>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2160xi8>
+    vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve opaque<"_", "0xDEADBEEF"> : vector<2332xi8>
     vm.rodata @_utf8_spve_9EB892746B9D70D0 dense<[83, 80, 86, 69]> : vector<4xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6562,9 +8078,9 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      %_executable_dot_dispatch_0 = vm.global.load.ref @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
       %c4 = vm.const.i32 4 : i32
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_dispatch_0, %zero, %c4, %c4, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
       vm.call @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, %zero) : (!vm.ref<!hal.command_buffer>, i32, i32, i32) -> ()
@@ -6657,14 +8173,14 @@ module  {
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %_utf8_spve_9EB892746B9D70D0 = vm.const.ref.rodata @_utf8_spve_9EB892746B9D70D0 : !vm.ref<!iree.byte_buffer>
-      %_dot_ex_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_ex_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
-      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_ex_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
+      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %_utf8_spve_9EB892746B9D70D0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
       vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
       %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       vm.br ^bb3(%null : !vm.ref<!hal.executable>)
     ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
-      vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %1, @_executable_dot_dispatch_0 : !vm.ref<!hal.executable>
       vm.return
     }
     vm.export @__init
