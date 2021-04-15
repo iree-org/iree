@@ -36,7 +36,7 @@ static llvm::cl::opt<bool> clEnableLinalgOnTensorsDispatch(
     "iree-flow-dispatch-linalg-on-tensors",
     llvm::cl::desc(
         "Enable use of Linalg on tensors for dispatch region creation."),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 // TODO(benvanik): change to a pipeline option.
 static llvm::cl::opt<bool> clExportBenchmarkFuncs(
@@ -109,6 +109,10 @@ void registerInputTransformPassPipeline() {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     bool dispatchLinalgOnTensors) {
+  // TODO(hanchung): Delete the hack. The flag is still useful when Linalg on
+  // buffers path is not deprecated.
+  if (!clEnableLinalgOnTensorsDispatch) dispatchLinalgOnTensors = false;
+
   //----------------------------------------------------------------------------
   // Entry dialect cleanup
   //----------------------------------------------------------------------------
