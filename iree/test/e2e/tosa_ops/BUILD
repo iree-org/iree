@@ -62,7 +62,7 @@ ALL_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "max_pool.mlir" # Currently failing on vulkan.
+        "max_pool.mlir",  # Currently failing on vulkan.
     ],
 )
 
