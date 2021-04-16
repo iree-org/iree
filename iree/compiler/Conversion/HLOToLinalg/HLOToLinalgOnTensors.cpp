@@ -197,7 +197,8 @@ Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
       loc, /*dyn_size=*/ValueRange{}, matrixType.getShape(),
       matrixType.getElementType());
   SmallVector<StringRef, 2> loops(rank, getParallelIteratorTypeName());
-  double kScale = 2 * acos(-1) / matrixType.getDimSize(rank - 1);
+  // scale = 2 * pi / N
+  double kScale = 2 * acos(-1) / matrixType.getDimSize(0);
   if (!isRealPart) kScale = -kScale;  // -sin(x) = sin(-x)
   return b
       .create<linalg::IndexedGenericOp>(
