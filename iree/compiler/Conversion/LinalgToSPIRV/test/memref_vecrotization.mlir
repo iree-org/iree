@@ -36,8 +36,8 @@ func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 // -----
 
 // CHECK-LABEL: func @resource_copy
-//     CHECK: %[[A:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4096x1024xvector<4xf32>>
-//     CHECK: %[[B:.+]] = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4096x1024xvector<4xf32>>
+//     CHECK: %[[A:.+]] = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x1024xvector<4xf32>>
+//     CHECK: %[[B:.+]] = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
 //     CHECK: memref.store %[[V]], %[[B]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[MAT:.+]] = vector.transfer_read %[[A]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x1024xvector<4xf32>>, vector<32x8xf32>
@@ -45,8 +45,8 @@ func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 func @resource_copy() {
   %cst = constant 0.000000e+00 : f32
   %c0 = constant 0 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4096x4096xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4096x4096xf32>
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf32>
+  %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf32>
   %v = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf32>, vector<1x4xf32>
   vector.transfer_write %v, %1[%c0, %c0] : vector<1x4xf32>, memref<4096x4096xf32>
   %mat = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf32>, vector<32x8xf32>
@@ -62,8 +62,8 @@ hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "priv
 // -----
 
 // CHECK-LABEL: func @resource_copy_f16
-//     CHECK: %[[A:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4096x1024xvector<4xf16>>
-//     CHECK: %[[B:.+]] = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4096x1024xvector<4xf16>>
+//     CHECK: %[[A:.+]] = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x1024xvector<4xf16>>
+//     CHECK: %[[B:.+]] = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x1024xvector<4xf16>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf16>>
 //     CHECK: memref.store %[[V]], %[[B]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf16>>
 //     CHECK: %[[MAT:.+]] = vector.transfer_read %[[A]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x1024xvector<4xf16>>, vector<32x8xf16>
@@ -71,8 +71,8 @@ hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "priv
 func @resource_copy_f16() {
   %cst = constant 0.000000e+00 : f16
   %c0 = constant 0 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4096x4096xf16>
-  %1 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4096x4096xf16>
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
+  %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
   %v = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf16>, vector<1x4xf16>
   vector.transfer_write %v, %1[%c0, %c0] : vector<1x4xf16>, memref<4096x4096xf16>
   %mat = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf16>, vector<32x8xf16>
@@ -88,8 +88,8 @@ hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "priv
 // -----
 
 // CHECK-LABEL: func @resource_copy_8xf16
-//     CHECK: %[[A:.+]] = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4096x512xvector<4xf32>>
-//     CHECK: %[[B:.+]] = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4096x512xvector<4xf32>>
+//     CHECK: %[[A:.+]] = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x512xvector<4xf32>>
+//     CHECK: %[[B:.+]] = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x512xvector<4xf32>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x512xvector<4xf32>>
 //     CHECK: memref.store %[[V]], %[[B]][%{{.*}}, %{{.*}}] : memref<4096x512xvector<4xf32>>
 //     CHECK: %[[MAT:.+]] = vector.transfer_read %[[A]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x512xvector<4xf32>>, vector<32x8xf16>
@@ -97,8 +97,8 @@ hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "priv
 func @resource_copy_8xf16() {
   %cst = constant 0.000000e+00 : f16
   %c0 = constant 0 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4096x4096xf16>
-  %1 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4096x4096xf16>
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
+  %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
   %v = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf16>, vector<1x8xf16>
   vector.transfer_write %v, %1[%c0, %c0] : vector<1x8xf16>, memref<4096x4096xf16>
   %mat = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf16>, vector<32x8xf16>
@@ -117,12 +117,12 @@ hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "priv
 func @do_not_vectorize_odd_vector_size() {
   %cst = constant 0.0 : f32
   %c0 = constant 0 : index
-  // CHECK: iree.placeholder
+  // CHECK: hal.interface.binding.subspan
   // CHECK-SAME: memref<4x3xf32>
-  %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<4x3xf32>
-  // CHECK: iree.placeholder
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x3xf32>
+  // CHECK: hal.interface.binding.subspan
   // CHECK-SAME: memref<4x3xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<4x3xf32>
+  %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4x3xf32>
   %v = vector.transfer_read %0[%c0, %c0], %cst : memref<4x3xf32>, vector<3xf32>
   vector.transfer_write %v, %1[%c0, %c0] : vector<3xf32>, memref<4x3xf32>
   return
