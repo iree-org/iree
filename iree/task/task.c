@@ -287,15 +287,15 @@ static uint32_t iree_math_ptr_to_xrgb(const uintptr_t ptr) {
   // This is just a simple hack to give us a unique(ish) per-pointer color.
   // It's only to make it easier to distinguish which tiles are from the same
   // dispatch.
-  #if UINTPTR_MAX == 0xFFFF
-    return (uint32_t) ptr;
-  #elif UINTPTR_MAX == 0xFFFFFFFF
-    return (uint32_t) ptr;
-  #elif UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu
-    return (uint32_t)ptr ^ (uint32_t)(ptr >> 32);
-  #else
-    #error TBD pointer size
-  #endif
+#if UINTPTR_MAX == 0xFFFF
+  return (uint32_t)ptr;
+#elif UINTPTR_MAX == 0xFFFFFFFF
+  return (uint32_t)ptr;
+#elif UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu
+  return (uint32_t)ptr ^ (uint32_t)(ptr >> 32);
+#else
+#error TBD pointer size
+#endif
 }
 
 // Returns an XXBBGGRR color (red in the lowest bits).
