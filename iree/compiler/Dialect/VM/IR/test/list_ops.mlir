@@ -28,7 +28,7 @@ vm.module @module {
 // Typed accessors for lists with i32 elements.
 vm.module @module {
   // CHECK: @list_i32
-  vm.func @list_i32(%arg0 : !vm.list<i32>) {
+  vm.func @list_i32(%arg0: !vm.list<i32>) {
     %c100 = vm.const.i32 100 : i32
 
     // CHECK: vm.list.get.i32 %arg0, %c100 : (!vm.list<i32>, i32) -> i32
@@ -42,7 +42,7 @@ vm.module @module {
   }
 
   // CHECK: @list_i8_coerce
-  vm.func @list_i8_coerce(%arg0 : !vm.list<i8>) {
+  vm.func @list_i8_coerce(%arg0: !vm.list<i8>) {
     %c100 = vm.const.i32 100 : i32
 
     // CHECK: = vm.list.get.i32 %arg0, %c100 : (!vm.list<i8>, i32) -> i32
@@ -60,7 +60,7 @@ vm.module @module {
 // Typed accessors for lists with opaque ref<?> elements.
 vm.module @module {
   // CHECK: @list_ref_any
-  vm.func @list_ref_any(%arg0 : !vm.list<!vm.ref<?>>) {
+  vm.func @list_ref_any(%arg0: !vm.list<!vm.ref<?>>) {
     %c100 = vm.const.i32 100 : i32
 
     // CHECK: %ref = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.ref<?>>, i32) -> !vm.ref<!iree.byte_buffer>
@@ -78,7 +78,7 @@ vm.module @module {
 // Typed accessors for lists with strongly-typed ref elements.
 vm.module @module {
   // CHECK: @list_ref_typed
-  vm.func @list_ref_typed(%arg0 : !vm.list<!vm.ref<!iree.byte_buffer>>) {
+  vm.func @list_ref_typed(%arg0: !vm.list<!vm.ref<!iree.byte_buffer>>) {
     %c100 = vm.const.i32 100 : i32
 
     // CHECK: %ref = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.ref<!iree.byte_buffer>>, i32) -> !vm.ref<!iree.byte_buffer>
@@ -86,6 +86,40 @@ vm.module @module {
 
     // CHECK: vm.list.set.ref %arg0, %c100, %ref : (!vm.list<!vm.ref<!iree.byte_buffer>>, i32, !vm.ref<!iree.byte_buffer>)
     vm.list.set.ref %arg0, %c100, %ref : (!vm.list<!vm.ref<!iree.byte_buffer>>, i32, !vm.ref<!iree.byte_buffer>)
+
+    vm.return
+  }
+}
+
+// -----
+
+// Variant access allows any type access.
+vm.module @module {
+  // CHECK: @list_create_variant
+  vm.func @list_create_variant() {
+    %c42 = vm.const.i32 42 : i32
+    // CHECK: %list = vm.list.alloc %c42 : (i32) -> !vm.list<?>
+    %list = vm.list.alloc %c42 : (i32) -> !vm.list<?>
+
+    vm.return
+  }
+
+  // CHECK: @list_access_variant
+  vm.func @list_access_variant(%arg0: !vm.list<?>) {
+    %c100 = vm.const.i32 100 : i32
+    %c101 = vm.const.i32 101 : i32
+
+    // CHECK: = vm.list.get.i32 %arg0, %c100 : (!vm.list<?>, i32) -> i32
+    %0 = vm.list.get.i32 %arg0, %c100 : (!vm.list<?>, i32) -> i32
+
+    // CHECK: vm.list.set.i32 %arg0, %c100, %0 : (!vm.list<?>, i32, i32)
+    vm.list.set.i32 %arg0, %c100, %0 : (!vm.list<?>, i32, i32)
+
+    // CHECK: %ref = vm.list.get.ref %arg0, %c101 : (!vm.list<?>, i32) -> !vm.ref<!iree.byte_buffer>
+    %ref = vm.list.get.ref %arg0, %c101 : (!vm.list<?>, i32) -> !vm.ref<!iree.byte_buffer>
+
+    // CHECK: vm.list.set.ref %arg0, %c101, %ref : (!vm.list<?>, i32, !vm.ref<!iree.byte_buffer>)
+    vm.list.set.ref %arg0, %c101, %ref : (!vm.list<?>, i32, !vm.ref<!iree.byte_buffer>)
 
     vm.return
   }

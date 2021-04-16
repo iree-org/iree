@@ -73,9 +73,8 @@ static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
     sstream.flush();
     typeMap.try_emplace(type, str);
     if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
-      if (listType.getElementType()) {
-        tryInsertType(listType.getElementType());
-      }
+      assert(listType.getElementType());
+      tryInsertType(listType.getElementType());
     }
   };
   for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
@@ -90,7 +89,7 @@ static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   for (const auto &typeString : typeMap) {
     table.push_back(TypeDef{typeString.first, typeString.second});
   }
-  llvm::sort(
+  llvm::stable_sort(
       table, +[](const TypeDef &lhs, const TypeDef &rhs) {
         // Always sort builtins above custom types.
         if (lhs.full_name[0] != '!' && rhs.full_name[0] == '!') {

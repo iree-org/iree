@@ -590,9 +590,12 @@ def VM_AnyList : DialectType<
 class VM_ListOf<Type type> :
     Type<And<[
       CPred<"$_self.cast<IREE::VM::RefType>().getObjectType().isa<IREE::VM::ListType>()">,
-      SubstLeaves<"$_self",
-                  "$_self.cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType()",
-                  type.predicate>
+      Or<[
+        CPred<"$_self.cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType().isa<IREE::VM::OpaqueType>()">,
+        SubstLeaves<"$_self",
+                    "$_self.cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType()",
+                    type.predicate>
+      ]>,
     ]>, "list<" # type.summary # ">"> {
   // Set the builder call if the base type has a builder call.
   string builderCall = !if(!empty(type.builderCall),
