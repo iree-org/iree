@@ -26,6 +26,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "conv1x1_to_matmul.mlir",
+            "conv2d_to_img2col.mlir",
         ],
         include = ["*.mlir"],
     ),

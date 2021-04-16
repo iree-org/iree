@@ -17,6 +17,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "Conv2D1x1ToMatmul.cpp"
+    "Conv2DToImg2Col.cpp"
   DEPS
     LLVMSupport
     MLIRIR
