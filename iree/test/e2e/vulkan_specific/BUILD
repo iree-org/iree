@@ -31,6 +31,7 @@ iree_check_single_backend_test_suite(
             "compare.mlir",
             "conv.mlir",
             "dot_general.mlir",
+            "fft.mlir",
             "log_plus_one.mlir",
             "pw_add_multiwg.mlir",
             "reduce.mlir",

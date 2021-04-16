@@ -140,7 +140,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
-    srcs = DYLIB_AND_VULKAN_CHECK_TESTS,
+    srcs = DYLIB_AND_VULKAN_CHECK_TESTS + ["fft.mlir"],  #TODO(hanchung): clean this up, like VMLA test suite.
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
