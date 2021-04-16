@@ -32,14 +32,6 @@ void addLinalgToLLVMPasses(OpPassManager &passManager,
                            LLVMCodegenOptions options) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
-
-  if (options.useConvImg2Col) {
-    // linalg::ConvInputNHWCFilterHWCFOp -> (Img2Col packing + matmul).
-    // After convolution is tiled and distributed among workgroups its converted
-    // before vectorize workgroup workload.
-    nestedModulePM.addNestedPass<FuncOp>(
-        createConvImg2ColMatmulConversionPass());
-  }
   nestedModulePM.addNestedPass<FuncOp>(
       createLinalgTileAndVectorizeWorkgroupsPass());
 
