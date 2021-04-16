@@ -130,7 +130,8 @@ static PassRegistration<OutlineLargeConstantsPass> pass(
     "iree-flow-outline-large-constants",
     "Outlines large tensor constants into flow.variables at the module level.",
     [] {
-      return std::make_unique<OutlineLargeConstantsPass>(kMinLargeConstantSize);
+      // TODO(#5493): add a flag for this.
+      return std::make_unique<OutlineLargeConstantsPass>(256);
     });
 
 }  // namespace Flow
