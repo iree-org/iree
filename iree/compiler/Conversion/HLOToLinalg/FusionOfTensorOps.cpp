@@ -90,19 +90,14 @@ struct FusionOfTensorOpsPass
     // will be computed anyway, so the consumers can just use that value.
     linalg::ControlElementwiseOpsFusionFn controlFn =
         [](const OpResult &producer, const OpOperand &consumer) {
-          // TODO(ataei): Enable fusion with reduction consumer. Currently
+          // TODO(GH-5045): Enable fusion with reduction consumer. Currently
           // vectorization doesn't handle generic ops with reduction iterators
           // we will disable for now to allow vectorizing producer pointwise
           // ops.
           auto consumerOp = consumer.getOwner();
-          if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp)) {
-            auto linalgOp = dyn_cast<linalg::LinalgOp>(consumerOp);
-            for (auto iteratorType : linalgOp.iterator_types()) {
-              if (iteratorType.cast<StringAttr>().getValue() ==
-                  getReductionIteratorTypeName()) {
-                return false;
-              }
-            }
+          if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
+              dyn_cast<linalg::LinalgOp>(consumerOp).getNumReductionLoops()) {
+            return false;
           }
 
           llvm::SmallDenseSet<Operation *, 4> numUsers;
