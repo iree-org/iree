@@ -115,7 +115,8 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
           compilation_flags=[
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10",
               "-iree-flow-inline-constants-max-byte-length=2048",
-              "-iree-flow-dispatch-formation-enable-operand-fusion"
+              "-iree-flow-dispatch-formation-enable-operand-fusion",
+              "-iree-flow-tile-and-distribute-elementwise-ops"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -147,7 +148,8 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
               "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
               # TODO(GH-5330): Revisit the number or delete the flag.
               "-iree-flow-inline-constants-max-byte-length=16",
-              "-iree-flow-dispatch-formation-enable-operand-fusion"
+              "-iree-flow-dispatch-formation-enable-operand-fusion",
+              "-iree-flow-tile-and-distribute-elementwise-ops",
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
