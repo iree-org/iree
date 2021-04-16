@@ -392,7 +392,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
                             *reinterpret_cast<const uint16_t*>(data.data)));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%.5f",
+      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
                         *reinterpret_cast<const float*>(data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:

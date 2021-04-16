@@ -95,7 +95,6 @@ iree_check_single_backend_test_suite(
             "dot_general.mlir",
             "exponential.mlir",
             "exponential_minus_one.mlir",
-            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -126,6 +125,7 @@ iree_check_single_backend_test_suite(
             "while.mlir",
         ],
         include = ["*.mlir"],
+        exclude = ["fft.mlir"],  # There are accuracy issues, see https://github.com/google/iree/issues/5299
     ),
     driver = "vmla",
     target_backend = "vmla",

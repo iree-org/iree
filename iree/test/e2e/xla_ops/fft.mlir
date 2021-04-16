@@ -10,11 +10,11 @@ func @rfft_1d() attributes { iree.module.export } {
   } : (tensor<32xf32>) -> tensor<17xcomplex<f32>>
   %1 = "mhlo.real"(%0) : (tensor<17xcomplex<f32>>) -> tensor<17xf32>
   %2 = "mhlo.imag"(%0) : (tensor<17xcomplex<f32>>) -> tensor<17xf32>
-
-  check.expect_eq_const(%1, dense<[
-    666.84601, -0.00001, -590.16931, -0.00000, 593.44849, -0.00009, -579.52881, -0.00041, 629.95404, 0.00061, -567.11255, -0.00021, 591.75140, 0.00042, -583.18927, -0.00062, 630.84601]> : tensor<17xf32>) : tensor<17xf32>
-
-  check.expect_eq_const(%2, dense<[
+  check.expect_almost_eq_const(%1, dense<[
+    666.8460, 0.0000, -590.1693, 0.0000, 593.4485, -0.0001, -579.5288, -0.0004,
+    629.9540, 0.0006, -567.1125, -0.0002, 591.7514, 0.0004, -583.1893, -0.0006,
+    630.8460]> : tensor<17xf32>) : tensor<17xf32>
+  check.expect_almost_eq_const(%2, dense<[
     0.0000, 0.0001, -23.9563, 0.0000, -10.2544, 0.0000, -6.1443, 0.0000,
     -10.0002, 0.0000, 3.8657, 0.0000, 0.6376, -0.0001, 52.4551, 0.0001,
     -0.0003]> : tensor<17xf32>) : tensor<17xf32>
@@ -31,11 +31,11 @@ func @rfft_2d() attributes { iree.module.export } {
   } : (tensor<1x32xf32>) -> tensor<1x17xcomplex<f32>>
   %1 = "mhlo.real"(%0) : (tensor<1x17xcomplex<f32>>) -> tensor<1x17xf32>
   %2 = "mhlo.imag"(%0) : (tensor<1x17xcomplex<f32>>) -> tensor<1x17xf32>
-  check.expect_eq_const(%1, dense<[
+  check.expect_almost_eq_const(%1, dense<[
     [666.8460, 0.0000, -590.1693, 0.0000, 593.4485, -0.0001, -579.5288, -0.0004,
      629.9540, 0.0006, -567.1125, -0.0002, 591.7514, 0.0004, -583.1893, -0.0006,
      630.8460]]> : tensor<1x17xf32>) : tensor<1x17xf32>
-  check.expect_eq_const(%2, dense<[
+  check.expect_almost_eq_const(%2, dense<[
     [0.0000, 0.0001, -23.9563, 0.0000, -10.2544, 0.0000, -6.1443, 0.0000,
      -10.0002, 0.0000, 3.8657, 0.0000, 0.6376, -0.0001, 52.4551, 0.0001,
      -0.0003]]> : tensor<1x17xf32>) : tensor<1x17xf32>

@@ -11,7 +11,7 @@ func @rfft_1d(%input: tensor<32xf32>) -> (tensor<17xf32>, tensor<17xf32>) {
 // CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK:     func @rfft_1d
 // CHECK-SAME:  %[[Arg0:[a-zA-Z0-9_]*]]
-// CHECK-DAG:   %[[CosScale:.+]] = constant 0.196349546: f32
+// CHECK-DAG:   %[[CosScale:.+]] = constant 0.196349546 : f32
 // CHECK-DAG:   %[[SinScale:.+]] = constant -0.196349546 : f32
 // CHECK-DAG:   %[[Zero:.+]] = constant 0.000000e+00 : f32
 // CHECK:       %[[RealMatrixInit:.+]] = linalg.init_tensor [32, 17] : tensor<32x17xf32>
@@ -65,7 +65,7 @@ func @rfft_2d(%input: tensor<1x32xf32>) -> (tensor<1x17xf32>, tensor<1x17xf32>) 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK:     func @rfft_2d
 // CHECK-SAME:  %[[Arg0:[a-zA-Z0-9_]*]]
-// CHECK-DAG:   %[[CosScale:.+]] = constant 0.196349546: f32
+// CHECK-DAG:   %[[CosScale:.+]] = constant 0.196349546 : f32
 // CHECK-DAG:   %[[SinScale:.+]] = constant -0.196349546 : f32
 // CHECK-DAG:   %[[Zero:.+]] = constant 0.000000e+00 : f32
 // CHECK:       %[[RealMatrixInit:.+]] = linalg.init_tensor [32, 17] : tensor<32x17xf32>
