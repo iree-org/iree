@@ -925,6 +925,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
       pullInProducersInSameGroup(
           rewriter, dispatchOp, clonedLinalgOp, shapedOperands,
           /*tiledLoops=*/ArrayRef<Operation *>(), rootOpAttr.getInt());
+      clonedLinalgOp->removeAttr(kRootOpAttr);
     }
 
     rewriter.replaceOpWithIf(op, dispatchOp.getOperation()->getResults(),
