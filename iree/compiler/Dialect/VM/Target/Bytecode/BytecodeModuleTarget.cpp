@@ -275,6 +275,11 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
 static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
                                            IREE::VM::ModuleOp moduleOp,
                                            FlatbufferBuilder &fbb) {
+  // Start the buffer so that we can begin recording data prior to the root
+  // table (which we do at the very end). This does not change the layout of the
+  // file and is only used to prime the flatcc builder.
+  iree_vm_BytecodeModuleDef_start_as_root(fbb);
+
   SymbolTable symbolTable(moduleOp);
   if (!moduleOp.ordinal_counts().hasValue()) {
     return moduleOp.emitError() << "ordinal_counts attribute not found. The "
@@ -315,9 +320,20 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   // layout planning by preserving the order in the IR is useful.
   SmallVector<flatbuffers_uint8_vec_ref_t, 8> rodataContentRefs;
   rodataContentRefs.reserve(rodataOps.size());
+
+  // All constants are defaulted to 16-byte aligned as that is the maximum
+  // (reasonable) alignment of all data types on all platforms. This can be
+  // overridden by creators of the rodata with the `alignment` attribute.
+  static constexpr int kDefaultRodataAlignment = 16;
+
   for (auto rodataOp : llvm::reverse(rodataOps)) {
+    size_t alignment =
+        rodataOp.alignment()
+            ? static_cast<size_t>(rodataOp.alignment().getValue())
+            : 0;
+    if (alignment == 0) alignment = kDefaultRodataAlignment;
     auto rodataRef =
-        serializeConstant(rodataOp.getLoc(), rodataOp.value(), fbb);
+        serializeConstant(rodataOp.getLoc(), rodataOp.value(), alignment, fbb);
     if (!rodataRef) {
       return rodataOp.emitOpError() << "failed to encode";
     }
@@ -461,7 +477,6 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   auto moduleNameRef = fbb.createString(
       moduleOp.sym_name().empty() ? "module" : moduleOp.sym_name());
 
-  iree_vm_BytecodeModuleDef_start_as_root(fbb);
   iree_vm_BytecodeModuleDef_name_add(fbb, moduleNameRef);
   iree_vm_BytecodeModuleDef_types_add(fbb, typesRef);
   iree_vm_BytecodeModuleDef_imported_functions_add(fbb, importFuncsRef);

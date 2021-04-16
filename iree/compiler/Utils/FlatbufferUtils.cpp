@@ -44,8 +44,8 @@ FlatbufferBuilder::FlatbufferBuilder() { flatcc_builder_init(&builder); }
 FlatbufferBuilder::~FlatbufferBuilder() { flatcc_builder_clear(&builder); }
 
 flatbuffers_uint8_vec_ref_t FlatbufferBuilder::streamUint8Vec(
-    std::function<bool(raw_ostream &stream)> fn) {
-  flatbuffers_uint8_vec_start(*this);
+    std::function<bool(raw_ostream &stream)> fn, size_t alignment) {
+  flatcc_builder_start_vector(*this, 1, alignment, FLATBUFFERS_COUNT_MAX(1));
   raw_flatbuffer_uint8_vec_ostream stream(*this);
   if (!fn(stream)) {
     return 0;

@@ -754,18 +754,26 @@ def VM_RodataOp : VM_Op<"rodata", [
     value leaves the module. For example, returning rodata from an exported
     function must keep the data (possibly backed by mmap) valid for its entire
     lifetime.
+
+    By default all rodata will be aligned in the final module output at a
+    16-byte granularity. An optional alignment can be specified to override the
+    default for cases where larger or smaller alignments are needed.
   }];
 
   let arguments = (ins
     StrAttr:$sym_name,
     ElementsAttr:$value,
+    OptionalAttr<I64Attr>:$alignment,
     OptionalAttr<VM_Ordinal>:$ordinal
   );
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "StringRef":$name, "ElementsAttr":$value,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    OpBuilder<(ins
+      "StringRef":$name,
+      "ElementsAttr":$value,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
   ];
 }
 
@@ -810,12 +818,14 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   ]> {
   let summary = [{inlined constant rodata}];
   let description = [{
-    vm.rodata that can be embedded inline in functions.
+    vm.rodata that can be embedded inline in functions. See vm.rodata for more
+    information.
   }];
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$name,
-    ElementsAttr:$value
+    ElementsAttr:$value,
+    OptionalAttr<I64Attr>:$alignment
   );
 
   let results = (outs
