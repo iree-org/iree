@@ -183,7 +183,6 @@ MODEL_BENCHMARKS = [
                                    skipped_target=["cpu2", "vlk2"],
                                    batch_config={
                                        "cpu": 8,
-                                       "vlk": 16
                                    })),
         ]),
     ModelBenchmarkInfo(
@@ -204,7 +203,6 @@ MODEL_BENCHMARKS = [
                 benchmark_key="5618403088793600",
                 targets=get_s20_default_target_list(batch_config={
                     "cpu": 16,
-                    "vlk": 64,
                 })),
         ]),
     ModelBenchmarkInfo(
