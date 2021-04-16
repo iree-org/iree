@@ -950,7 +950,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 /// heuristic is used below, but the mechanism should be general enough to
 /// capture any heuristic.
 
-/// Method to set elementwise operations as root operations.
+/// Sets elementwise operations as root operations.
 // TODO(#5045): After the regression issue on CPU side is addressed, this can be
 // folded into the main logic of fusion.
 template <typename GenericOpTy>
