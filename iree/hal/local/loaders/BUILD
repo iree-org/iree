@@ -43,6 +43,21 @@ cc_library(
 )
 
 cc_library(
+    name = "static_library_loader",
+    srcs = ["static_library_loader.c"],
+    hdrs = ["static_library_loader.h"],
+    defines = [
+        "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1",
+    ],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:tracing",
+        "//iree/hal:api",
+        "//iree/hal/local",
+    ],
+)
+
+cc_library(
     name = "system_library_loader",
     srcs = ["system_library_loader.c"],
     hdrs = ["system_library_loader.h"],
