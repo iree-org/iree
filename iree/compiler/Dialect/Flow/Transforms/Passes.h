@@ -122,9 +122,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createExportBenchmarkFuncsPass();
 
 // Outlines large tensor constants into flow.variables at the module level.
 //
-// NOTE: a total guess :) this feels like about the most per-dispatch-buffer
-// data we'd want to embed in the command buffer.
-static constexpr size_t kMinLargeConstantSize = 256;
+// TODO(#5493): implement the support for inlining constants into the command
+// buffer and raise this value to one that is measured to be good.
+static constexpr size_t kMinLargeConstantSize = 1;
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
     size_t minLargeConstantSize = kMinLargeConstantSize);
 
