@@ -108,7 +108,7 @@ class FlatbufferBuilder {
   //   my_type_uint8_vec_field_add(builder, ref);  // use vec reference
   //   ...
   flatbuffers_uint8_vec_ref_t streamUint8Vec(
-      std::function<bool(raw_ostream &stream)> fn);
+      std::function<bool(raw_ostream &stream)> fn, size_t alignment = 16);
 
   // Captures the current contents of the flatbuffer builder and returns them
   // as a shaped `vector<SIZExi8>` dense attr. The builder is left unmodified.

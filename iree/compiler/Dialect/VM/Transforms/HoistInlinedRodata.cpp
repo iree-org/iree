@@ -60,6 +60,9 @@ class HoistInlinedRodataPass
         auto rodataOp = OpBuilder(moduleOp.getContext())
                             .create<IREE::VM::RodataOp>(inlineOp.getLoc(), name,
                                                         inlineOp.value());
+        if (inlineOp.alignmentAttr()) {
+          rodataOp.alignmentAttr(inlineOp.alignmentAttr());
+        }
         moduleSymbolTable.insert(rodataOp, moduleBuilder.getInsertionPoint());
         rodataOp.setPrivate();
         replaceInlineOpWithRodataRef(inlineOp, rodataOp);

@@ -146,10 +146,12 @@ class CUDATargetBackend final : public TargetBackend {
 
     llvmModule->setDataLayout(targetMachine->createDataLayout());
 
-    std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
+    FlatbufferBuilder builder;
+    iree_CUDAExecutableDef_start_as_root(builder);
+
     // Serialize cuda kernel into the binary that we will embed in the
     // final flatbuffer.
-    FlatbufferBuilder builder;
+    std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
     auto ptxCudeRef = flatbuffers_uint8_vec_create(
         builder, reinterpret_cast<const uint8_t *>(targetISA.c_str()),
         targetISA.size());
@@ -168,7 +170,6 @@ class CUDATargetBackend final : public TargetBackend {
     }
     auto blockSizesRef = iree_CUDABlockSizeDef_vec_end(builder);
 
-    iree_CUDAExecutableDef_start_as_root(builder);
     iree_CUDAExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_CUDAExecutableDef_block_sizes_add(builder, blockSizesRef);
     iree_CUDAExecutableDef_ptx_image_add(builder, ptxCudeRef);
