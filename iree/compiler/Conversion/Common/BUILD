@@ -42,6 +42,7 @@ cc_library(
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",

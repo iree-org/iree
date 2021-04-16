@@ -20,6 +20,7 @@ iree_cc_library(
     "ConvertToNVVM.cpp"
     "KernelConfig.cpp"
     "Passes.cpp"
+    "RemoveTrivialLoops.cpp"
     "TileAndDistribute.cpp"
     "VectorizationPass.cpp"
   DEPS

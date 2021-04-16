@@ -41,6 +41,9 @@ static void addLinalgToNVVMPasses(OpPassManager &pm) {
   pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
   pm.addNestedPass<ModuleOp>(createCSEPass());
 
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
   // Linalg -> vector
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorizationPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());

@@ -102,10 +102,8 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 //   CHECK-LABEL: hal.executable @dot_dispatch_0
 //         CHECK:   hal.executable.target @cuda, filter="cuda" {
 // CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
-// TODO: Re-enable hoisting by enabling loop canonicalization 
-//         CHEC-K:   llvm.br
+//         CHECK:   llvm.br
 // CHECK-COUNT-6:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 // CHECK-COUNT-8:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-// TODO: Re-enable hoisting by enabling loop canonicalization 
-//        CHEC-K:   llvm.br
+//         CHECK:   llvm.br
 // CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
