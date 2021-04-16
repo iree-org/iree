@@ -571,6 +571,9 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
     // Static shape equivalence means we can fast-path the check.
     return true;
   }
+  if (lhsType.getRank() != rhsType.getRank()) {
+    return false;
+  }
   unsigned dynamicDimIndex = 0;
   for (unsigned i = 0; i < lhsType.getRank(); ++i) {
     if (lhsType.isDynamicDim(i) != rhsType.isDynamicDim(i)) {
