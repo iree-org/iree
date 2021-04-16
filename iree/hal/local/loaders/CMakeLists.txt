@@ -33,6 +33,23 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    static_library_loader
+  HDRS
+    "static_library_loader.h"
+  SRCS
+    "static_library_loader.c"
+  DEPS
+    iree::base::api
+    iree::base::tracing
+    iree::hal::api
+    iree::hal::local
+  DEFINES
+    "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     system_library_loader
   HDRS
     "system_library_loader.h"
