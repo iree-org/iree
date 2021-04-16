@@ -40,7 +40,6 @@ gentbl(
 cc_library(
     name = "LinalgToLLVM",
     srcs = [
-        "ConvImg2ColMatmulConversion.cpp",
         "ConvertToLLVM.cpp",
         "FoldTensorExtractOpPass.cpp",
         "KernelDispatch.cpp",

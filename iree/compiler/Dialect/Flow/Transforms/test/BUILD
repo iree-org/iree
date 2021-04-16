@@ -28,6 +28,7 @@ iree_lit_test_suite(
             "convert_to_flow_tensor_ops.mlir",
             "deduplicate_executables.mlir",
             "dispatch_linalg_on_tensors.mlir",
+            "dispatch_linalg_on_tensors_elementwise.mlir",
             "dispatch_linalg_on_tensors_fusion.mlir",
             "expand_variable_dynamic_dims.mlir",
             "export_benchmark_funcs.mlir",

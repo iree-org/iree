@@ -27,7 +27,10 @@ jobs:
       - name: Running bazel_to_cmake for IREE TF Integration Tests
         run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --root_dir=integrations/tensorflow/e2e --verbosity=2
       - name: Checking Diff
-        run: git diff --exit-code
+        run: |
+          # Make sure to pick up new files that have been added.
+          git add -A
+          git diff HEAD --exit-code
 
   buildifier:
     runs-on: ubuntu-18.04
