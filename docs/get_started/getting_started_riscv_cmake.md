@@ -7,7 +7,9 @@ Notes to those updating this guide:
       Notes for optional components should go in separate files.
 -->
 
-This guide walks through cross-compiling IREE core runtime towards the RISC-V Linux platform. Cross-compiling IREE compilers towards RISC-V is not supported at the moment.
+This guide walks through cross-compiling IREE core runtime towards the RISC-V
+Linux platform. Cross-compiling IREE compilers towards RISC-V is not supported
+at the moment.
 
 Cross-compilation involves both a *host* platform and a *target* platform. One
 invokes compiler toolchains on the host platform to generate libraries and
@@ -23,25 +25,40 @@ Execute the following script to download the prebuilt RISC-V toolchain and QEMU:
 # In IREE source root
 $ ./build_tools/riscv/riscv_bootstrap.sh
 ```
+After running the script, an environment variable `RISCV_TOOLCHAIN_ROOT` needs
+to be set to the root directory of the installed GNU toolchain
+(default at ${HOME}/riscv/toolchain/clang/linux/RISCV).
+The variable can be used in building the RISCV target and a LLVM AOT module.
+
 
 NOTE: If you want to build the tools by yourself:
 * RISC-V toolchain is built from https://github.com/llvm/llvm-project (main branch).<br>
--- Currently, our LLVM compiler is built on GNU toolchain, including libgcc, GNU linker, and C libraries. You need to build GNU toolchain first.<br>
--- Clone GNU toolchain from: https://github.com/riscv/riscv-gnu-toolchain (master branch). Switch the "riscv-binutils" submodule to `rvv-1.0.x-zfh ` branch manually.
+  * Currently, our LLVM compiler is built on GNU toolchain, including libgcc,
+    GNU linker, and C libraries. You need to build GNU toolchain first.<br>
+  * Clone GNU toolchain from: https://github.com/riscv/riscv-gnu-toolchain
+    (master branch). Switch the "riscv-binutils" submodule to `rvv-1.0.x-zfh`
+    branch manually.
 * RISC-V QEMU is built from https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh
+* You also need to set `RISCV_TOOLCHAIN_ROOT`.
 
 ## Configure and build
 
 ### Host configuration
 
-Build and install at least the compiler tools on your host machine, or install them from a binary distribution:
+Build and install at least the compiler tools on your host machine, or install
+them from a binary distribution:
 
 ```shell
-$ cmake -G Ninja -B ../iree-build-host/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX=../iree-build-host/install .
+$ cmake -G Ninja -B ../iree-build-host/ \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_INSTALL_PREFIX=../iree-build-host/install \
+    .
 $ cmake --build ../iree-build-host/ --target install
 ```
 
-Debugging note: if `IREE_LLVMAOT_LINKER_PATH` is set for targeting RISC-V then the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
+Debugging note: if `IREE_LLVMAOT_LINKER_PATH` is set for targeting RISC-V then
+the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
 
 ### Target configuration
 
@@ -56,8 +73,10 @@ $ cmake -G Ninja -B ../iree-build-riscv/ \
   .
 ```
 
-*   The above configures IREE to cross-compile towards `rv64` cpu platform.
-*   If user specify different download path (default in `${HOME}/riscv`) in `riscv_bootscrap.sh`, please append `-DRISCV_TOOL_PATH="/path/to/the/downloaded/folder"` in cmake command.
+* The above configures IREE to cross-compile towards `rv64` cpu platform.
+* If user specify different download path (default in `${HOME}/riscv`) in
+  `riscv_bootscrap.sh`, please append
+  `-DRISCV_TOOLCHAIN_ROOT="${RISCV_TOOLCHAIN_ROOT}"` in cmake command.
 
 Build target:
 
@@ -102,11 +121,11 @@ i32=5
 
 ### Dylib LLVM AOT backend
 To compile an IREE module using the Dylib LLVM ahead-of-time (AOT) backend for
-a target RISC-V we need to use the corresponding toolchain which we have downloaded at the `$HOME/riscv` folder.
-Set the AOT linker path environment variable:
+a RISC-V target we need to use the corresponding cross-compile toolchain.
+Set the environment variable `RISCV_TOOLCHAIN_ROOT` if it is not set yet:
 
 ```shell
-$ export IREE_LLVMAOT_LINKER_PATH="$HOME/riscv/toolchain/clang/linux/RISCV/bin/clang++"
+$ export RISCV_TOOLCHAIN_ROOT=<root directory of the RISC-V GNU toolchain>
 ```
 
 Translate a source MLIR into an IREE module:
@@ -144,7 +163,8 @@ i32=5
 ```
 
 #### Enable RVV code-gen [Experimental]
-Through IREE's vectorization pass and LLVM backend, we can generate RVV VLS(Vector Length Specific) style codes.
+Through IREE's vectorization pass and LLVM backend, we can generate RVV
+VLS(Vector Length Specific) style codes.
 
 ```shell
 ../iree-build-host/install/bin/iree-translate \

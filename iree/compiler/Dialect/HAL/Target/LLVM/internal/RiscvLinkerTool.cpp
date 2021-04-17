@@ -34,14 +34,20 @@ class RiscvLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getToolPath() const override {
-    // First check for setting the linker explicitly. For RISC-V targets, it has
-    // to be specified.
+    // First check for setting the linker explicitly.
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
 
-    llvm::errs() << "IREE_LLVMAOT_LINKER_PATH environment variable must be set"
-                 << " to RISC-V linker.\n";
-    return "";
+    char *riscvToolchainRoot = std::getenv("RISCV_TOOLCHAIN_ROOT");
+    if (!riscvToolchainRoot) {
+      llvm::errs() << "RISCV_TOOLCHAIN_ROOT environment variable must be set\n";
+      return "";
+    }
+
+    // Select LLVM linker location based on riscv-gnu-toolchain install code
+    // structure:
+    // https://github.com/riscv/riscv-gnu-toolchain/blob/master/README.md
+    return llvm::Twine(riscvToolchainRoot).concat("/bin/clang").str();
   }
 
   LogicalResult configureModule(
