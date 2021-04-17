@@ -35,7 +35,8 @@ Install [Python 3](https://www.python.org/downloads/) `>= 3.6` and
   during interpreter installation.
 
 (Recommended) Setup a virtual environment with `venv` (or your preferred
-mechanism):t
+mechanism):
+
 ```shell
 # Note that venv is only available in python3 and is therefore a good check
 # that you are in fact running a python3 binary.
@@ -44,10 +45,17 @@ $ source .venv/bin/activate
 # When done: run 'deactivate'
 ```
 
-Install packages:
+As we distribute `manylinux2014` binaries, your pip version should be listed as
+supported on the compatibility table at https://github.com/pypa/manylinux. As
+needed, you can upgrade pip using:
 
 ```shell
 $ python -m pip install --upgrade pip
+```
+
+Install packages:
+
+```shell
 $ python -m pip install numpy absl-py
 ```
 
