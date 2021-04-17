@@ -29,6 +29,7 @@ iree_cc_embed_data(
     "conversion_ops_i64.vmfb"
     "global_ops.vmfb"
     "list_ops.vmfb"
+    "list_variant_ops.vmfb"
     "shift_ops.vmfb"
     "shift_ops_i64.vmfb"
   CC_FILE_OUTPUT
@@ -150,6 +151,18 @@ iree_bytecode_module(
     list_ops
   SRC
     "list_ops.mlir"
+  CC_NAMESPACE
+    "iree::vm::test"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    list_variant_ops
+  SRC
+    "list_variant_ops.mlir"
   CC_NAMESPACE
     "iree::vm::test"
   FLAGS

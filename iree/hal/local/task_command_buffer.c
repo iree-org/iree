@@ -763,6 +763,12 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
                                 workgroup_size, workgroup_count, &cmd->task);
 
   iree_hal_executable_dispatch_state_v0_t* state = &cmd->state;
+
+  // When we support imports we can populate those here based on what the
+  // executable declared (as each executable may import a unique set of
+  // functions).
+  state->imports = NULL;
+
   memcpy(&state->workgroup_size, workgroup_size, sizeof(iree_hal_vec3_t));
   memcpy(&state->workgroup_count, workgroup_count, sizeof(iree_hal_vec3_t));
 

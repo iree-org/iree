@@ -31,8 +31,14 @@ namespace VM {
 
 TypeConverter::TypeConverter(TargetOptions targetOptions)
     : targetOptions_(targetOptions) {
+  // Variant means opaque in VM.
+  addConversion([](IREE::VariantType type) {
+    return IREE::VM::OpaqueType::get(type.getContext());
+  });
+
   // All ref types are passed through unmodified.
   addConversion([](IREE::VM::RefType type) { return type; });
+
   // Wrap ref types.
   addConversion([](Type type) -> Optional<Type> {
     if (RefType::isCompatible(type)) {

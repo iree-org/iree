@@ -872,7 +872,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
-      if (!list) {
+      if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
       uint32_t index = VM_DecOperandRegI32("index");
@@ -882,26 +882,33 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, ListGetRef, {
-      // bool list_is_move;
-      // iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      // iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      // if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-      // uint32_t index = VM_DecOperandRegI32("index");
-      // iree_vm_ref_t* result = VM_DecResultRegRef("result");
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "vm.list.get.ref not implemented");
+      bool list_is_move;
+      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
+      if (IREE_UNLIKELY(!list)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+      }
+      uint32_t index = VM_DecOperandRegI32("index");
+      bool result_is_move;
+      iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
+      return iree_vm_list_get_ref_retain(list, index, result);
     });
 
     DISPATCH_OP(CORE, ListSetRef, {
-      // bool list_is_move;
-      // iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      // iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      // if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-      // uint32_t index = VM_DecOperandRegI32("index");
-      // bool operand_is_move = VM_DecOperandRegRefIsMove("value");
-      // iree_vm_ref_t* operand = VM_DecOperandRegRef("value");
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "vm.list.set.ref not implemented");
+      bool list_is_move;
+      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
+      if (IREE_UNLIKELY(!list)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+      }
+      uint32_t index = VM_DecOperandRegI32("index");
+      bool operand_is_move;
+      iree_vm_ref_t* operand = VM_DecOperandRegRef("value", &operand_is_move);
+      if (operand_is_move) {
+        return iree_vm_list_set_ref_move(list, index, operand);
+      } else {
+        return iree_vm_list_set_ref_retain(list, index, operand);
+      }
     });
 
     //===------------------------------------------------------------------===//

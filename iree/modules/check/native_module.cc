@@ -201,10 +201,11 @@ class CheckModuleState final {
     iree_hal_element_type_t element_type =
         iree_hal_buffer_view_element_type(view);
     iree_hal_buffer_t* buf = iree_hal_buffer_view_buffer(view);
+    iree_device_size_t size = iree_hal_buffer_view_byte_length(view);
     iree_hal_buffer_mapping_t mapped_memory;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        buf, IREE_HAL_MEMORY_ACCESS_READ,
-        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &mapped_memory));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_map_range(buf, IREE_HAL_MEMORY_ACCESS_READ,
+                                  /*byte_offset=*/0, size, &mapped_memory));
     IREE_RETURN_IF_ERROR(
         ::iree::ExpectAllTrue(mapped_memory.contents, element_type));
     iree_hal_buffer_unmap_range(&mapped_memory);
@@ -215,6 +216,8 @@ class CheckModuleState final {
                   vm::ref<iree_hal_buffer_view_t> rhs_ref) {
     auto* lhs = lhs_ref.get();
     auto* rhs = rhs_ref.get();
+
+    iree_device_size_t lhs_size = iree_hal_buffer_view_byte_length(lhs);
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
     std::vector<iree_hal_dim_t> lhs_shape(lhs_rank);
     if (lhs_rank > 0) {
@@ -222,6 +225,7 @@ class CheckModuleState final {
           iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr));
     }
 
+    iree_device_size_t rhs_size = iree_hal_buffer_view_byte_length(rhs);
     size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
     std::vector<iree_hal_dim_t> rhs_shape(rhs_rank);
     if (rhs_rank > 0) {
@@ -238,12 +242,12 @@ class CheckModuleState final {
     iree_hal_buffer_mapping_t lhs_mapped_memory;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &lhs_mapped_memory));
+        /*byte_offset=*/0, lhs_size, &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
     iree_hal_buffer_mapping_t rhs_mapped_memory;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &rhs_mapped_memory));
+        /*byte_offset=*/0, rhs_size, &rhs_mapped_memory));
 
     bool element_types_eq = lhs_element_type == rhs_element_type;
     bool shape_eq = lhs_shape == rhs_shape;
@@ -288,6 +292,8 @@ class CheckModuleState final {
                         vm::ref<iree_hal_buffer_view_t> rhs_ref) {
     auto* lhs = lhs_ref.get();
     auto* rhs = rhs_ref.get();
+
+    iree_device_size_t lhs_size = iree_hal_buffer_view_byte_length(lhs);
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
     std::vector<iree_hal_dim_t> lhs_shape(lhs_rank);
     if (lhs_rank > 0) {
@@ -295,6 +301,7 @@ class CheckModuleState final {
           iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr));
     }
 
+    iree_device_size_t rhs_size = iree_hal_buffer_view_byte_length(rhs);
     size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
     std::vector<iree_hal_dim_t> rhs_shape(rhs_rank);
     if (rhs_rank > 0) {
@@ -311,12 +318,12 @@ class CheckModuleState final {
     iree_hal_buffer_mapping_t lhs_mapped_memory;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &lhs_mapped_memory));
+        /*byte_offset=*/0, lhs_size, &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
     iree_hal_buffer_mapping_t rhs_mapped_memory;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &rhs_mapped_memory));
+        /*byte_offset=*/0, rhs_size, &rhs_mapped_memory));
 
     bool element_types_eq = lhs_element_type == rhs_element_type;
     bool shape_eq = lhs_shape == rhs_shape;

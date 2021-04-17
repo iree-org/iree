@@ -155,43 +155,82 @@ void UnfoldableConstantOp::getCanonicalizationPatterns(
 // Lists
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseListType(OpAsmParser &parser, Type &listType,
-                                 Type &elementType) {
+static ParseResult parseListTypeGet(OpAsmParser &parser, Type &listType,
+                                    Type &elementType) {
   if (failed(parser.parseType(listType))) {
     return parser.emitError(parser.getCurrentLocation(),
-                            "expected !iree.list<> type");
+                            "expected !iree.list<T> type");
   }
-  elementType = listType.cast<ListType>().getElementType();
+  auto listElementType = listType.cast<ListType>().getElementType();
+  if (succeeded(parser.parseOptionalArrow())) {
+    // Use overridden type - required for variants only.
+    if (failed(parser.parseType(elementType))) {
+      return parser.emitError(
+          parser.getCurrentLocation(),
+          "expected an element type when specifying list access types");
+    }
+    if (!ListType::canImplicitlyCast(listElementType, elementType)) {
+      return parser.emitError(
+          parser.getCurrentLocation(),
+          "list access types must match the same base type as the list element "
+          "type (when not variant)");
+    }
+  } else {
+    // Use list element type as the result element type.
+    elementType = listElementType;
+  }
   return success();
 }
 
-static ParseResult parseListType(OpAsmParser &parser, Type &listType,
-                                 SmallVectorImpl<Type> &elementTypes) {
-  if (failed(parser.parseType(listType))) {
-    return parser.emitError(parser.getCurrentLocation(),
-                            "expected !iree.list<> type");
+static void printListTypeGet(OpAsmPrinter &printer, Operation *, Type listType,
+                             Type elementType) {
+  printer.printType(listType);
+  auto listElementType = listType.cast<ListType>().getElementType();
+  if (listElementType != elementType) {
+    printer.printArrowTypeList(ArrayRef<Type>{elementType});
   }
-  for (size_t i = 0; i < elementTypes.size(); ++i) {
-    elementTypes[i] = listType.cast<ListType>().getElementType();
+}
+
+static ParseResult parseListTypeSet(OpAsmParser &parser, Type &listType,
+                                    Type &elementType) {
+  Type leadingType;
+  if (failed(parser.parseType(leadingType))) {
+    return parser.emitError(parser.getCurrentLocation(),
+                            "expected element type or !iree.list<T> type");
+  }
+  if (succeeded(parser.parseOptionalArrow())) {
+    elementType = leadingType;
+    if (failed(parser.parseType(listType)) || !listType.isa<ListType>()) {
+      return parser.emitError(parser.getCurrentLocation(),
+                              "expected an !iree.list<T> type");
+    }
+  } else {
+    if (!leadingType.isa<ListType>()) {
+      return parser.emitError(parser.getCurrentLocation(),
+                              "expected an !iree.list<T> type");
+    }
+    listType = leadingType;
+    elementType = listType.cast<ListType>().getElementType();
   }
   return success();
 }
 
-static void printListType(OpAsmPrinter &printer, Operation *, Type listType,
-                          Type elementType) {
-  printer.printType(listType);
-}
-
-static void printListType(OpAsmPrinter &printer, Operation *, Type listType,
-                          TypeRange elementTypes) {
-  printer.printType(listType);
+static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
+                             Type elementType) {
+  auto listElementType = listType.cast<ListType>().getElementType();
+  if (listElementType != elementType) {
+    printer.printType(elementType);
+    printer.printArrowTypeList(ArrayRef<Type>{listType});
+  } else {
+    printer.printType(listType);
+  }
 }
 
 static LogicalResult verifyListGetOp(ListGetOp &op) {
   auto listType = op.list().getType().cast<IREE::ListType>();
   auto elementType = listType.getElementType();
   auto resultType = op.result().getType();
-  if (resultType != elementType) {
+  if (!ListType::canImplicitlyCast(elementType, resultType)) {
     return op.emitError() << "list contains " << elementType
                           << " and cannot be accessed as " << resultType;
   }
@@ -202,7 +241,7 @@ static LogicalResult verifyListSetOp(ListSetOp &op) {
   auto listType = op.list().getType().cast<IREE::ListType>();
   auto elementType = listType.getElementType();
   auto valueType = op.value().getType();
-  if (valueType != elementType) {
+  if (!ListType::canImplicitlyCast(valueType, elementType)) {
     return op.emitError() << "list contains " << elementType
                           << " and cannot be mutated as " << valueType;
   }

@@ -187,6 +187,22 @@ def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
 // new SSA values. This would make optimizing the list usage much easier and
 // enable hoisting/CSE of list access/mutation.
 
+def IREE_ListCreateOp : IREE_PureOp<"list.create"> {
+  let summary = [{creates a new empty list}];
+  let description = [{
+    Creates a new empty list with an optional initial capacity.
+  }];
+
+  let arguments = (ins
+    Optional<Index>:$initial_capacity
+  );
+  let results = (outs
+    AnyList:$result
+  );
+
+  let assemblyFormat = "($initial_capacity^)? attr-dict `:` type($result)";
+}
+
 def IREE_ListSizeOp : IREE_Op<"list.size"> {
   let summary = [{the size of the list in elements}];
   let description = [{
@@ -234,7 +250,7 @@ def IREE_ListGetOp : IREE_Op<"list.get"> {
     AnyType:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` custom<ListType>(type($list), type($result))";
+  let assemblyFormat = "$list `[` $index `]` attr-dict `:` custom<ListTypeGet>(type($list), type($result))";
 
   let verifier = [{ return verify$cppClass(*this); }];
 }
@@ -251,7 +267,7 @@ def IREE_ListSetOp : IREE_Op<"list.set"> {
     AnyType:$value
   );
 
-  let assemblyFormat = "operands attr-dict `:` custom<ListType>(type($list), type($value))";
+  let assemblyFormat = "$list `[` $index `]` `,` $value attr-dict `:` custom<ListTypeSet>(type($list), type($value))";
 
   let verifier = [{ return verify$cppClass(*this); }];
 }

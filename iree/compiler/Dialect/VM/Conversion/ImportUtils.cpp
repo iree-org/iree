@@ -117,7 +117,8 @@ static Value createStringTableValue(Location loc, StringAttr attrValue,
   return rewriter.create<IREE::VM::RodataInlineOp>(
       loc,
       IREE::VM::RefType::get(IREE::ByteBufferType::get(rewriter.getContext())),
-      rewriter.getStringAttr(safeIdentifier), utf8Bytes);
+      rewriter.getStringAttr(safeIdentifier), utf8Bytes,
+      /*alignment=*/rewriter.getI64IntegerAttr(1));
 }
 
 size_t getSegmentSpanSize(Type spanType) {

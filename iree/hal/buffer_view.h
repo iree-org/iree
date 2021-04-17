@@ -147,6 +147,11 @@ iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view);
 
 // Returns the buffer underlying the buffer view.
 // The caller must retain the returned buffer if they want to continue using it.
+//
+// NOTE: the returned buffer length will almost always be larger than the valid
+// bytes representing this buffer view due to padding. Always query the actual
+// valid length with iree_hal_buffer_view_byte_length instead of assuming the
+// buffer is already clamped.
 IREE_API_EXPORT iree_hal_buffer_t* IREE_API_CALL
 iree_hal_buffer_view_buffer(const iree_hal_buffer_view_t* buffer_view);
 

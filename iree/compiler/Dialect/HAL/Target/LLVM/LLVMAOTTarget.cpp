@@ -305,9 +305,11 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       linkArtifacts.keepAllFiles();
     }
 
+    FlatbufferBuilder builder;
+    iree_DyLibExecutableDef_start_as_root(builder);
+
     // Embed debug symbols at the end of the flatbuffer by adding first in the
     // bottoms-up builder.
-    FlatbufferBuilder builder;
     flatbuffers_uint8_vec_ref_t debugDatabaseRef = 0;
     flatbuffers_string_ref_t debugDatabaseFilenameRef = 0;
     if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
@@ -328,7 +330,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                   << linkArtifacts.libraryFile.path;
     }
 
-    iree_DyLibExecutableDef_start_as_root(builder);
     iree_DyLibExecutableDef_library_embedded_add(builder, libraryEmbeddedRef);
     iree_DyLibExecutableDef_debug_database_filename_add(
         builder, debugDatabaseFilenameRef);

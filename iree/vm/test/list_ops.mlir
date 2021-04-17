@@ -58,15 +58,4 @@ vm.module @list_ops {
     // TODO(benvanik): test vm.list with ref types.
     vm.return
   }
-
-  //===--------------------------------------------------------------------===//
-  // vm.list.* with variant types
-  //===--------------------------------------------------------------------===//
-
-  vm.export @test_variant
-  vm.func @test_variant() {
-    // TODO(benvanik): test vm.list with variant types.
-    vm.return
-  }
-
 }
