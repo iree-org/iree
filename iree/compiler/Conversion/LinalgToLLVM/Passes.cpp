@@ -63,7 +63,6 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager,
   if (options.usingLinalgOnTensors) {
     passManager.addPass(createMaterializeCPULaunchConfigurationPass());
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-    nestedModulePM.addPass(createInlinerPass());
     // TODO(ataei): We want to enable when tensor -> vector pass is fully
     // supported which requires first moving vector-tiling before this step.
     if (options.useLinalgOnTensorsToVectors) {
