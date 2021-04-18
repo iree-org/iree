@@ -55,6 +55,7 @@ iree_cc_library(
     local
   HDRS
     "executable_loader.h"
+    "inline_command_buffer.h"
     "local_descriptor_set.h"
     "local_descriptor_set_layout.h"
     "local_executable.h"
@@ -62,6 +63,7 @@ iree_cc_library(
     "local_executable_layout.h"
   SRCS
     "executable_loader.c"
+    "inline_command_buffer.c"
     "local_descriptor_set.c"
     "local_descriptor_set_layout.c"
     "local_executable.c"
