@@ -30,7 +30,7 @@ func @multipleDispatches(%input: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK-SAME:   usage("Transfer|Dispatch")
   // CHECK-SAME:   : !hal.buffer{%c512}
   //      CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  // CHECK-SAME:   mode(OneShot)
+  // CHECK-SAME:   mode("OneShot|AllowInlineExecution")
   // CHECK-SAME:   categories("Transfer|Dispatch")
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %0 = flow.ex.stream.fragment(%cst, %input) : (index, tensor<128xf32>) -> tensor<128xf32> =
