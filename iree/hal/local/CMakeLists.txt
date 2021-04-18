@@ -81,6 +81,33 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    sync_driver
+  HDRS
+    "sync_device.h"
+    "sync_driver.h"
+    "sync_event.h"
+    "sync_semaphore.h"
+  SRCS
+    "sync_device.c"
+    "sync_driver.c"
+    "sync_event.c"
+    "sync_semaphore.c"
+  DEPS
+    ::arena
+    ::local
+    iree::base::api
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::wait_handle
+    iree::base::synchronization
+    iree::base::tracing
+    iree::hal::api
+    iree::task
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     task_driver
   HDRS
     "task_command_buffer.h"

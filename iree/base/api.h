@@ -841,6 +841,14 @@ static inline iree_timeout_t iree_immediate_timeout() {
   return timeout;
 }
 
+// Returns true if the |timeout| indicates an immediate/polling/nonblocking
+// timeout.
+static inline bool iree_timeout_is_immediate(iree_timeout_t timeout) {
+  return timeout.type == IREE_TIMEOUT_ABSOLUTE
+             ? timeout.nanos == IREE_TIME_INFINITE_PAST
+             : timeout.nanos == IREE_DURATION_ZERO;
+}
+
 // Returns a timeout that will never be reached.
 // This can be used with APIs that can wait to disable the early
 // deadline-exceeded returns when a condition is not met. It should be used with
@@ -850,6 +858,13 @@ static inline iree_timeout_t iree_immediate_timeout() {
 static inline iree_timeout_t iree_infinite_timeout() {
   iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_FUTURE};
   return timeout;
+}
+
+// Returns true if the |timeout| indicates an infinite/forever blocking timeout.
+static inline bool iree_timeout_is_infinite(iree_timeout_t timeout) {
+  return timeout.type == IREE_TIMEOUT_ABSOLUTE
+             ? timeout.nanos == IREE_TIME_INFINITE_FUTURE
+             : timeout.nanos == IREE_DURATION_INFINITE;
 }
 
 // Defines an absolute timeout with the given time in nanoseconds.

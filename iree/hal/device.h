@@ -217,9 +217,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
 // Returns success if the wait is successful and semaphores have been signaled
 // satisfying the |wait_mode|.
 //
-// Returns DEADLINE_EXCEEDED if the |timeout| elapses without the |wait_mode|
-// being satisfied. Note that even on success only a subset of the semaphores
-// may have been signaled and each can be queried to see which ones.
+// Returns IREE_STATUS_DEADLINE_EXCEEDED if the |timeout| elapses without the
+// |wait_mode| being satisfied. Note that even on success only a subset of the
+// semaphores may have been signaled and each can be queried to see which ones.
+//
+// Returns IREE_STATUS_ABORTED if one or more semaphores has failed. Callers can
+// use iree_hal_semaphore_query on the semaphores to find the ones that have
+// failed and get the status.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);

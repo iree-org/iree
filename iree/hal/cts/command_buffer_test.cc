@@ -33,6 +33,12 @@ namespace cts {
 using ::testing::ContainerEq;
 
 class CommandBufferTest : public CtsTestBase {
+ public:
+  CommandBufferTest() {
+    // TODO(#4680): command buffer recording so that this can run on sync HAL.
+    SkipUnavailableDriver("dylib-sync");
+  }
+
  protected:
   static constexpr iree_device_size_t kBufferSize = 4096;
 };

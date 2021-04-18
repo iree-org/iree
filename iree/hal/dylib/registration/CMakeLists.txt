@@ -31,4 +31,20 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    sync
+  HDRS
+    "driver_module_sync.h"
+  SRCS
+    "driver_module_sync.c"
+  DEPS
+    iree::hal::api
+    iree::hal::local::loaders::legacy_library_loader
+    iree::hal::local::sync_driver
+  DEFINES
+    "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1"
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -22,8 +22,12 @@ namespace cts {
 
 class SemaphoreSubmissionTest : public CtsTestBase {
  public:
-  // Disable cuda backend for this test as semaphores are not implemented yet.
-  SemaphoreSubmissionTest() { declareUnavailableDriver("cuda"); }
+  SemaphoreSubmissionTest() {
+    // Disable cuda backend for this test as semaphores are not implemented yet.
+    SkipUnavailableDriver("cuda");
+    // TODO(#4680): command buffer recording so that this can run on sync HAL.
+    SkipUnavailableDriver("dylib-sync");
+  }
 };
 
 TEST_P(SemaphoreSubmissionTest, SubmitWithNoCommandBuffers) {

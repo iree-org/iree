@@ -133,7 +133,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     driver_block_list_.insert(driver_name);
   }
   // Allow skipping tests for unsupported features.
-  void declareUnavailableDriver(const std::string& driver_name) {
+  void SkipUnavailableDriver(const std::string& driver_name) {
     driver_block_list_.insert(driver_name);
   }
 
@@ -170,7 +170,9 @@ struct GenerateTestName {
   template <class ParamType>
   std::string operator()(
       const ::testing::TestParamInfo<ParamType>& info) const {
-    return info.param;
+    std::string name = info.param;
+    std::replace(name.begin(), name.end(), '-', '_');
+    return name;
   }
 };
 

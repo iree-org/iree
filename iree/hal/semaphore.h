@@ -108,9 +108,13 @@ iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status);
 // Returns success if the wait is successful and the semaphore has met or
 // exceeded the required payload value.
 //
-// Returns DEADLINE_EXCEEDED if the |timeout| elapses without the semaphore
-// reaching the required value. If an asynchronous failure occured this will
-// return the failure status that was set immediately.
+// Returns IREE_STATUS_DEADLINE_EXCEEDED if the |timeout| elapses without the
+// semaphore reaching the required value. If an asynchronous failure occured
+// this will return the failure status that was set immediately.
+//
+// Returns IREE_STATUS_ABORTED if one or more semaphores has failed. Callers can
+// use iree_hal_semaphore_query on the semaphores to find the ones that have
+// failed and get the status.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_wait(
     iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout);
 
