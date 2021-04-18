@@ -68,6 +68,12 @@ iree_status_t iree_hal_task_queue_submit(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
 
+iree_status_t iree_hal_task_queue_submit_and_wait(
+    iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches,
+    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
+    iree_timeout_t timeout);
+
 iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
                                             iree_timeout_t timeout);
 

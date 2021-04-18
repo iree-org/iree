@@ -494,24 +494,56 @@ static iree_status_t iree_hal_task_queue_submit_batch(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_task_queue_submit(
+static iree_status_t iree_hal_task_queue_submit_batches(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   // For now we process each batch independently. To elide additional semaphore
   // work and prevent unneeded coordinator scheduling logic we could instead
   // build the whole DAG prior to submitting.
   for (iree_host_size_t i = 0; i < batch_count; ++i) {
     const iree_hal_submission_batch_t* batch = &batches[i];
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_task_queue_submit_batch(queue, batch));
+    IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_batch(queue, batch));
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_task_queue_submit(
+    iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_status_t status =
+      iree_hal_task_queue_submit_batches(queue, batch_count, batches);
+  if (iree_status_is_ok(status)) {
+    iree_task_executor_flush(queue->executor);
   }
 
-  iree_task_executor_flush(queue->executor);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_hal_task_queue_submit_and_wait(
+    iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches,
+    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
+    iree_timeout_t timeout) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_convert_timeout_to_absolute(&timeout);
+
+  // Queue all of the batches.
+  iree_status_t status =
+      iree_hal_task_queue_submit_batches(queue, batch_count, batches);
+  if (iree_status_is_ok(status)) {
+    // Flush the pending submissions and begin processing, then wait until idle.
+    // TODO(benvanik): get a wait_handle we can pass to
+    // iree_task_executor_donate_caller - it'll flush + do work.
+    iree_task_executor_flush(queue->executor);
+    status = iree_hal_task_queue_wait_idle(queue, timeout);
+  }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
