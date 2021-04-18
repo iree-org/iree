@@ -133,6 +133,9 @@ typedef struct {
   iree_hal_device_t* shared_device;
   iree_hal_executable_cache_t* executable_cache;
 
+  iree_hal_semaphore_t* submit_semaphore;
+  uint64_t submit_value;
+
   void* deferred_lru[4];
   iree_vm_list_t* deferred_releases;
 } iree_hal_module_state_t;
@@ -162,6 +165,10 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
       state->shared_device, iree_string_view_empty(),
       &state->executable_cache));
 
+  state->submit_value = 0ull;
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+      state->shared_device, state->submit_value, &state->submit_semaphore));
+
   *out_module_state = (iree_vm_module_state_t*)state;
   return iree_ok_status();
 }
@@ -169,6 +176,7 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
 static void IREE_API_PTR
 iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
+  iree_hal_semaphore_release(state->submit_semaphore);
   iree_vm_list_release(state->deferred_releases);
   iree_hal_executable_cache_release(state->executable_cache);
   iree_hal_device_release(state->shared_device);
@@ -217,10 +225,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait, rr, v) {
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r1, &command_buffer));
 
-  // Temporary semaphore we'll signal from 0->1.
-  iree_hal_semaphore_t* semaphore = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(device, 0ull, &semaphore));
-
   // Batch with our single command buffer.
   iree_hal_submission_batch_t batch;
   memset(&batch, 0, sizeof(batch));
@@ -229,22 +233,16 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait, rr, v) {
   batch.command_buffer_count = IREE_ARRAYSIZE(command_buffer_ptrs);
   batch.command_buffers = command_buffer_ptrs;
 
-  iree_hal_semaphore_t* signal_semaphore_ptrs[] = {semaphore};
-  uint64_t signal_semaphore_values[] = {1ull};
+  uint64_t next_semaphore_value = ++state->submit_value;
+  iree_hal_semaphore_t* signal_semaphore_ptrs[] = {state->submit_semaphore};
+  uint64_t signal_semaphore_values[] = {next_semaphore_value};
   batch.signal_semaphores.count = IREE_ARRAYSIZE(signal_semaphore_ptrs);
   batch.signal_semaphores.semaphores = signal_semaphore_ptrs;
   batch.signal_semaphores.payload_values = signal_semaphore_values;
 
-  iree_status_t status = iree_hal_device_queue_submit(
-      device, IREE_HAL_COMMAND_CATEGORY_ANY, 0, 1, &batch);
-  if (!iree_status_is_ok(status)) {
-    iree_hal_semaphore_release(semaphore);
-    return status;
-  }
-
-  // Block and wait for the semaphore to be signaled (or fail).
-  status = iree_hal_semaphore_wait(semaphore, 1ull, iree_infinite_timeout());
-  iree_hal_semaphore_release(semaphore);
+  iree_status_t status = iree_hal_device_submit_and_wait(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, 0, 1, &batch,
+      state->submit_semaphore, next_semaphore_value, iree_infinite_timeout());
   if (!iree_status_is_ok(status)) {
     return status;
   }
