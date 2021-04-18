@@ -60,6 +60,41 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_submit_and_wait_with_deadline(
+    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches,
+    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
+    iree_time_t deadline_ns) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(!batch_count || batches);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      _VTABLE_DISPATCH(device, submit_and_wait_with_deadline)(
+          device, command_categories, queue_affinity, batch_count, batches,
+          wait_semaphore, wait_value, deadline_ns);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_submit_and_wait_with_timeout(
+    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches,
+    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
+    iree_duration_t timeout_ns) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(!batch_count || batches);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(device, submit_and_wait_with_timeout)(
+      device, command_categories, queue_affinity, batch_count, batches,
+      wait_semaphore, wait_value, timeout_ns);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_device_wait_semaphores_with_deadline(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns) {
