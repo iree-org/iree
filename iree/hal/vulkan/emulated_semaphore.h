@@ -155,7 +155,7 @@ iree_status_t iree_hal_vulkan_emulated_semaphore_acquire_signal_handle(
 // |deadline_ns| elapses.
 iree_status_t iree_hal_vulkan_emulated_semaphore_multi_wait(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns,
+    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
     VkSemaphoreWaitFlags wait_flags);
 
 #ifdef __cplusplus

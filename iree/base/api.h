@@ -781,10 +781,10 @@ typedef int64_t iree_time_t;
 
 // Like absl::Duration, represented as relative nanoseconds.
 typedef int64_t iree_duration_t;
-// Like absl::InfiniteDuration.
-#define IREE_DURATION_INFINITE INT64_MAX
 // Like absl::ZeroDuration.
 #define IREE_DURATION_ZERO 0
+// Like absl::InfiniteDuration.
+#define IREE_DURATION_INFINITE INT64_MAX
 
 // Returns the current system time in unix nanoseconds.
 // Depending on the system architecture and power mode this time may have a
@@ -805,6 +805,61 @@ iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
 // IREE_TIME_INFINITE_FUTURE to avoid extraneous time queries.
 IREE_API_EXPORT iree_duration_t
 iree_absolute_deadline_to_timeout_ns(iree_time_t deadline_ns);
+
+typedef enum {
+  // Timeout is defined by an absolute value `deadline_ns`.
+  IREE_TIMEOUT_ABSOLUTE = 0,
+  // Timeout is defined by a relative value `timeout_ns`.
+  IREE_TIMEOUT_RELATIVE = 1,
+} iree_timeout_type_t;
+
+// A timeout defined either by an absolute or relative value.
+typedef struct {
+  iree_timeout_type_t type;
+  iree_time_t nanos;
+} iree_timeout_t;
+
+// Returns a timeout that will be exceeded immediately.
+// This is useful for polling.
+static inline iree_timeout_t iree_immediate_timeout() {
+  iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_PAST};
+  return timeout;
+}
+
+// Returns a timeout that will never be reached.
+static inline iree_timeout_t iree_infinite_timeout() {
+  iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_FUTURE};
+  return timeout;
+}
+
+// Defines an absolute timeout with the given time in nanoseconds.
+static inline iree_timeout_t iree_make_deadline(iree_time_t deadline_ns) {
+  iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, deadline_ns};
+  return timeout;
+}
+
+// Defines a relative timeout with the given time in nanoseconds.
+static inline iree_timeout_t iree_make_timeout(iree_duration_t timeout_ns) {
+  iree_timeout_t timeout = {IREE_TIMEOUT_RELATIVE, timeout_ns};
+  return timeout;
+}
+
+// Converts a timeout from relative to absolute (if it is).
+// Absolute timeouts (deadlines) are significantly better for long-running
+// tasks or when making calls that may complete in stages.
+static inline void iree_convert_timeout_to_absolute(iree_timeout_t* timeout) {
+  if (timeout->type == IREE_TIMEOUT_RELATIVE) {
+    timeout->type = IREE_TIMEOUT_ABSOLUTE;
+    timeout->nanos = iree_relative_timeout_to_deadline_ns(timeout->nanos);
+  }
+}
+
+// Returns an absolute deadline in nanoseconds from the given timeout.
+static inline iree_time_t iree_timeout_as_deadline_ns(iree_timeout_t timeout) {
+  return timeout.type == IREE_TIMEOUT_ABSOLUTE
+             ? timeout.nanos
+             : iree_relative_timeout_to_deadline_ns(timeout.nanos);
+}
 
 //===----------------------------------------------------------------------===//
 // iree_allocator_t (std::allocator-like interface)

@@ -514,9 +514,10 @@ iree_status_t iree_hal_task_queue_submit(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_task_queue_wait_idle_with_deadline(
-    iree_hal_task_queue_t* queue, iree_time_t deadline_ns) {
+iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
+                                            iree_timeout_t timeout) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
   iree_status_t status = iree_task_scope_wait_idle(&queue->scope, deadline_ns);
   IREE_TRACE_ZONE_END(z0);
   return status;

@@ -88,8 +88,8 @@ static void iree_hal_system_executable_destroy(
 
 static iree_status_t iree_hal_system_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
-    const iree_hal_executable_dispatch_state_v0_t* IREE_RESTRICT dispatch_state,
-    const iree_hal_vec3_t* IREE_RESTRICT workgroup_id) {
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    const iree_hal_vec3_t* workgroup_id) {
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
 

@@ -243,8 +243,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait, rr, v) {
   }
 
   // Block and wait for the semaphore to be signaled (or fail).
-  status = iree_hal_semaphore_wait_with_deadline(semaphore, 1ull,
-                                                 IREE_TIME_INFINITE_FUTURE);
+  status = iree_hal_semaphore_wait(semaphore, 1ull, iree_infinite_timeout());
   iree_hal_semaphore_release(semaphore);
   if (!iree_status_is_ok(status)) {
     return status;
@@ -923,8 +922,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_await, ri, i) {
   uint64_t new_value = (uint32_t)args->i1;
 
   // TODO(benvanik): coroutine magic.
-  iree_status_t status = iree_hal_semaphore_wait_with_deadline(
-      semaphore, new_value, IREE_TIME_INFINITE_FUTURE);
+  iree_status_t status =
+      iree_hal_semaphore_wait(semaphore, new_value, iree_infinite_timeout());
   if (iree_status_is_ok(status)) {
     rets->i0 = 0;
   } else if (iree_status_is_deadline_exceeded(status)) {

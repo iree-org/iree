@@ -279,8 +279,10 @@ iree_status_t SerializingCommandQueue::TryProcessDeferredSubmissions(
   return iree_ok_status();
 }
 
-iree_status_t SerializingCommandQueue::WaitIdle(iree_time_t deadline_ns) {
+iree_status_t SerializingCommandQueue::WaitIdle(iree_timeout_t timeout) {
   iree_status_t status = iree_ok_status();
+
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
   if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
     IREE_TRACE_SCOPE0("SerializingCommandQueue::WaitIdle#vkQueueWaitIdle");

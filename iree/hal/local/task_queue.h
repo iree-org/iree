@@ -68,8 +68,8 @@ iree_status_t iree_hal_task_queue_submit(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
 
-iree_status_t iree_hal_task_queue_wait_idle_with_deadline(
-    iree_hal_task_queue_t* queue, iree_time_t deadline_ns);
+iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
+                                            iree_timeout_t timeout);
 
 #ifdef __cplusplus
 }  // extern "C"
