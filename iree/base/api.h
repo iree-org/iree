@@ -771,19 +771,27 @@ iree_api_version_check(iree_api_version_t expected_version,
 // iree_time_t and iree_duration_t
 //===----------------------------------------------------------------------===//
 
-// Like absl::Time, represented as nanoseconds since unix epoch.
+// A point in time represented as nanoseconds since unix epoch.
 // TODO(benvanik): pick something easy to get into/outof time_t/etc.
 typedef int64_t iree_time_t;
-// Like absl::InfinitePast.
+// A time in the infinite past used to indicate "already happened".
+// This forces APIs that wait for a point in time to act as a poll and always
+// return IREE_STATUS_DEADLINE_EXCEEDED instead of blocking the caller.
 #define IREE_TIME_INFINITE_PAST INT64_MIN
-// Like absl::InfiniteFuture.
+// A time in the infinite future used to indicate "never".
+// This causes APIs that wait for a point in time to wait however long is needed
+// to satisfy the wait condition.
 #define IREE_TIME_INFINITE_FUTURE INT64_MAX
 
-// Like absl::Duration, represented as relative nanoseconds.
+// A duration represented as relative nanoseconds.
 typedef int64_t iree_duration_t;
-// Like absl::ZeroDuration.
+// A zero-length duration.
+// Like IREE_TIME_INFINITE_FUTURE this forces APIs that would wait to instead
+// return IREE_STATUS_DEADLINE_EXCEEDED immediately.
 #define IREE_DURATION_ZERO 0
-// Like absl::InfiniteDuration.
+// An infinite-length duration.
+// Like IREE_TIME_INFINITE_FUTURE this causes APIs that wait to do so until
+// their wait condition is satisfied without returning early.
 #define IREE_DURATION_INFINITE INT64_MAX
 
 // Returns the current system time in unix nanoseconds.
@@ -820,13 +828,25 @@ typedef struct {
 } iree_timeout_t;
 
 // Returns a timeout that will be exceeded immediately.
-// This is useful for polling.
+// This can be used with APIs that would otherwise wait to cause them to poll.
+//
+// Example:
+//   status = iree_wait_for_signal_or_timeout(&obj, iree_immediate_timeout());
+//   if (iree_status_is_deadline_exceeded(status)) {
+//     // Would have waited indicating the signal has not occurred. If the
+//     // timeout was not immediate the call would have blocked the caller.
+//   }
 static inline iree_timeout_t iree_immediate_timeout() {
   iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_PAST};
   return timeout;
 }
 
 // Returns a timeout that will never be reached.
+// This can be used with APIs that can wait to disable the early
+// deadline-exceeded returns when a condition is not met. It should be used with
+// care as it can complicate program state and make termination more prone to
+// hangs. On the other hand, it's really useful to not bother with actual
+// deadlines. YMMV.
 static inline iree_timeout_t iree_infinite_timeout() {
   iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_FUTURE};
   return timeout;
@@ -845,8 +865,19 @@ static inline iree_timeout_t iree_make_timeout(iree_duration_t timeout_ns) {
 }
 
 // Converts a timeout from relative to absolute (if it is).
-// Absolute timeouts (deadlines) are significantly better for long-running
-// tasks or when making calls that may complete in stages.
+//
+// Absolute timeouts (deadlines) are better for long-running tasks or when
+// making calls that may complete in stages as relative ones will tend to skew;
+// if a wait is performed with a relative timeout of 10ms but it takes 5ms to
+// get from the origin of the call to the actual wait using the timeout then
+// the total latency of the call may be 15ms (5ms to prepare + 10ms on the
+// wait). Instead if an absolute deadline is used the caller can ensure that
+// the total time spent in the operation happens regardless of the intervening
+// work that happens.
+//
+// For this reason IREE internal APIs try to convert to absolute times and users
+// may be able to reduce overhead by populating the times as absolute to start
+// with via iree_make_deadline.
 static inline void iree_convert_timeout_to_absolute(iree_timeout_t* timeout) {
   if (timeout->type == IREE_TIMEOUT_RELATIVE) {
     timeout->type = IREE_TIMEOUT_ABSOLUTE;
