@@ -159,7 +159,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain(iree_vm_ref_t* ref,
   }
 
   // Assign ref to out_ref and increment the counter.
-  memcpy(out_ref, ref, sizeof(*out_ref));
+  memmove(out_ref, ref, sizeof(*out_ref));
   if (out_ref->ptr) {
     volatile iree_atomic_ref_count_t* counter =
         iree_vm_get_ref_counter_ptr(out_ref);
@@ -185,7 +185,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain_or_move(
   }
 
   // Assign ref to out_ref and increment the counter if not moving.
-  memcpy(out_ref, ref, sizeof(*out_ref));
+  memmove(out_ref, ref, sizeof(*out_ref));
   if (out_ref->ptr && !is_move) {
     // Retain by incrementing counter and preserving the source ref.
     volatile iree_atomic_ref_count_t* counter =
