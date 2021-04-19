@@ -43,21 +43,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan_vector
-  SRCS
-    "compare.mlir"
-    "log_plus_one.mlir"
-    "pw_add_multiwg.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-  COMPILER_FLAGS
-    "-iree-spirv-enable-memref-vectorization"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_vulkan-spirv_vulkan_vectorized_conv
   SRCS
     "vectorized_conv.mlir"

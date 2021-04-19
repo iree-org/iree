@@ -94,10 +94,6 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   }
 
   pm.addPass(createTileAndVectorizeInOneWorkgroupPass(options));
-  if (options.vectorizeMemref) {
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createLoadStoreVectorizationPass());
-  }
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//
