@@ -146,29 +146,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_linalg_on_tensors_dylib-llvm-aot_dylib",
-    srcs = DYLIB_AND_VULKAN_CHECK_TESTS,
-    compiler_flags = [
-        "-iree-flow-dispatch-linalg-on-tensors",
-        "-iree-codegen-llvm-experimental-linalg-on-tensors",
-    ],
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
-    srcs = DYLIB_AND_VULKAN_CHECK_TESTS,
-    compiler_flags = [
-        "-iree-flow-dispatch-linalg-on-tensors",
-        "-iree-codegen-spirv-experimental-linalg-on-tensors",
-    ],
-    driver = "vulkan",
-    target_backend = "vulkan-spirv",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_linalg_on_tensors_cuda",
+    name = "check_cuda",
     srcs = [
         "add.mlir",
         "broadcast.mlir",
@@ -182,9 +160,6 @@ iree_check_single_backend_test_suite(
         "negate.mlir",
         "select.mlir",
         "subtract.mlir",
-    ],
-    compiler_flags = [
-        "-iree-flow-dispatch-linalg-on-tensors",
     ],
     driver = "cuda",
     tags = [

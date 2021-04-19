@@ -732,9 +732,15 @@ iree_task_t* iree_task_executor_try_steal_task(
 iree_status_t iree_task_executor_donate_caller(iree_task_executor_t* executor,
                                                iree_wait_handle_t* wait_handle,
                                                iree_time_t deadline_ns) {
-  // Not implemented; just wait. Unclear we want this yet and it's complex.
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Perform an immediate flush/coordination (in case the caller queued).
+  iree_task_executor_flush(executor);
+
+  // Wait until completed.
+  // TODO(benvanik): make this steal tasks until wait_handle resolves.
   iree_status_t status = iree_wait_one(wait_handle, deadline_ns);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

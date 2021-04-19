@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
-    "LoadStoreVectorization.cpp"
     "VectorizeConv.cpp"
   DEPS
     LLVMSupport

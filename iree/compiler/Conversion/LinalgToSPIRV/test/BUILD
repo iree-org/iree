@@ -44,7 +44,7 @@ iree_lit_test_suite(
             "matmul_vectorization.mlir",
             "matmul_vectorization_licm.mlir",
             "memref_vecrotization.mlir",
-            "pipeline_test.mlir",
+            "pipeline_matmul_vectorization.mlir",
             "pipeline_test_cooperative_mat.mlir",
             "split_dispatch_function.mlir",
             "tile_and_vectorize_conv.mlir",

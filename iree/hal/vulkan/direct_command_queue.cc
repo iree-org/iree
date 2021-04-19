@@ -124,7 +124,8 @@ iree_status_t DirectCommandQueue::Submit(
   return iree_ok_status();
 }
 
-iree_status_t DirectCommandQueue::WaitIdle(iree_time_t deadline_ns) {
+iree_status_t DirectCommandQueue::WaitIdle(iree_timeout_t timeout) {
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
   if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
     // Fast path for using vkQueueWaitIdle, which is usually cheaper (as it
     // requires fewer calls into the driver).

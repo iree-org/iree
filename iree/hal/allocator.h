@@ -44,14 +44,20 @@ enum iree_hal_buffer_compatibility_e {
   // valid.
   IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE = 1u << 0,
 
+  // Indicates that the allocator could import external buffers of this type and
+  // usage natively. Imports may fail due to runtime conditions (out of handles,
+  // invalid pointer address spaces/page parameters, etc) but are otherwise
+  // valid.
+  IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE = 1u << 1,
+
   // Indicates that the buffer can be used as a transfer source or target on the
   // a device queue (such as being the source or target of a DMA operation,
   // etc). If not set then the buffer may still be usable for
   // iree_hal_buffer_copy_data but not with queued operations.
-  IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER = 1u << 1,
+  IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER = 1u << 10,
 
   // Indicates that the buffer can be used as an input/output to a dispatch.
-  IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH = 1u << 2,
+  IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH = 1u << 11,
 };
 typedef uint32_t iree_hal_buffer_compatibility_t;
 
@@ -110,6 +116,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
     iree_hal_buffer_t** out_buffer);
 
 // Wraps an existing host allocation in a buffer.
+//
+// iree_hal_allocator_query_buffer_compatibility can be used to query whether a
+// buffer can be wrapped when using the given memory type and usage. A
+// compatibility result containing IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE
+// means the wrap may succeed however if the pointer/page range is not in a
+// supported mode (no read access, etc) this call may still fail.
+//
 // |data_allocator| will be used to free the memory when the buffer is
 // destroyed. iree_allocator_null() can be passed to indicate the buffer does
 // not own the data.

@@ -38,8 +38,6 @@ iree_check_single_backend_test_suite(
         "dot_f16.mlir",
     ],
     compiler_flags = [
-        "-iree-flow-dispatch-linalg-on-tensors",
-        "-iree-codegen-spirv-experimental-linalg-on-tensors",
         "-iree-vulkan-target-triple=valhall-g77-unknown-android10",
     ],
     driver = "vulkan",

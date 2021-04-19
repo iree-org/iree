@@ -62,28 +62,3 @@ iree_check_single_backend_test_suite(
     driver = "vmla",
     target_backend = "vmla",
 )
-
-iree_check_single_backend_test_suite(
-    name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
-    srcs = CHECK_FRAMEWORK_TESTS,
-    compiler_flags = [
-        "-iree-flow-dispatch-linalg-on-tensors",
-        "-iree-flow-inline-constants-max-byte-length=2048",
-        "-iree-codegen-spirv-experimental-linalg-on-tensors",
-        "-iree-spirv-enable-vectorization",
-    ],
-    driver = "vulkan",
-    target_backend = "vulkan-spirv",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_linalg_on_tensors_dylib-llvm-aot_dylib",
-    srcs = CHECK_FRAMEWORK_TESTS,
-    compiler_flags = [
-        "-iree-flow-dispatch-linalg-on-tensors",
-        "-iree-flow-inline-constants-max-byte-length=2048",
-        "-iree-codegen-llvm-experimental-linalg-on-tensors",
-    ],
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
-)

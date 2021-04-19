@@ -56,7 +56,7 @@ inline void registerHLOToLinalgPasses() {
 
 inline void registerLinalgToVectorPasses() {
   static bool init_once = []() {
-    createLoadStoreVectorizationPass();
+    createVectorizeLinalgConvPass();
     return true;
   }();
   (void)init_once;

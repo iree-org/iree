@@ -251,23 +251,30 @@ static iree_status_t iree_hal_cuda_device_queue_submit(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_device_wait_semaphores_with_timeout(
+static iree_status_t iree_hal_cuda_device_submit_and_wait(
+    iree_hal_device_t* base_device,
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches,
+    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
+    iree_timeout_t timeout) {
+  // Submit...
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_device_queue_submit(
+      base_device, command_categories, queue_affinity, batch_count, batches));
+
+  // ...and wait.
+  return iree_hal_semaphore_wait(wait_semaphore, wait_value, timeout);
+}
+
+static iree_status_t iree_hal_cuda_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list,
-    iree_duration_t timeout_ns) {
+    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "semaphore not implemented");
 }
 
-static iree_status_t iree_hal_cuda_device_wait_semaphores_with_deadline(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "semaphore not implemented");
-}
-
-static iree_status_t iree_hal_cuda_device_wait_idle_with_deadline(
-    iree_hal_device_t* base_device, iree_time_t deadline_ns) {
+static iree_status_t iree_hal_cuda_device_wait_idle(
+    iree_hal_device_t* base_device, iree_timeout_t timeout) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   // Wait until the stream is done.
   // TODO(thomasraoux): CUDA doesn't support a deadline for wait, figure out how
@@ -276,12 +283,6 @@ static iree_status_t iree_hal_cuda_device_wait_idle_with_deadline(
                        cuStreamSynchronize(device->stream),
                        "cuStreamSynchronize");
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_cuda_device_wait_idle_with_timeout(
-    iree_hal_device_t* base_device, iree_duration_t timeout_ns) {
-  return iree_hal_cuda_device_wait_idle_with_deadline(
-      base_device, iree_relative_timeout_to_deadline_ns(timeout_ns));
 }
 
 const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
@@ -299,10 +300,7 @@ const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .create_executable_layout = iree_hal_cuda_device_create_executable_layout,
     .create_semaphore = iree_hal_cuda_device_create_semaphore,
     .queue_submit = iree_hal_cuda_device_queue_submit,
-    .wait_semaphores_with_deadline =
-        iree_hal_cuda_device_wait_semaphores_with_deadline,
-    .wait_semaphores_with_timeout =
-        iree_hal_cuda_device_wait_semaphores_with_timeout,
-    .wait_idle_with_deadline = iree_hal_cuda_device_wait_idle_with_deadline,
-    .wait_idle_with_timeout = iree_hal_cuda_device_wait_idle_with_timeout,
+    .submit_and_wait = iree_hal_cuda_device_submit_and_wait,
+    .wait_semaphores = iree_hal_cuda_device_wait_semaphores,
+    .wait_idle = iree_hal_cuda_device_wait_idle,
 };

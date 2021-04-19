@@ -1041,9 +1041,24 @@ static iree_status_t iree_hal_vulkan_device_queue_submit(
   return queue->Submit(batch_count, batches);
 }
 
-static iree_status_t iree_hal_vulkan_device_wait_semaphores_with_deadline(
+static iree_status_t iree_hal_vulkan_device_submit_and_wait(
+    iree_hal_device_t* base_device,
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches,
+    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
+    iree_timeout_t timeout) {
+  // Submit...
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_queue_submit(
+      base_device, command_categories, queue_affinity, batch_count, batches));
+
+  // ...and wait.
+  return iree_hal_semaphore_wait(wait_semaphore, wait_value, timeout);
+}
+
+static iree_status_t iree_hal_vulkan_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns) {
+    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   VkSemaphoreWaitFlags wait_flags = 0;
   if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
@@ -1051,34 +1066,19 @@ static iree_status_t iree_hal_vulkan_device_wait_semaphores_with_deadline(
   }
   if (device->semaphore_pool != NULL) {
     return iree_hal_vulkan_emulated_semaphore_multi_wait(
-        device->logical_device, semaphore_list, deadline_ns, wait_flags);
+        device->logical_device, semaphore_list, timeout, wait_flags);
   }
   return iree_hal_vulkan_native_semaphore_multi_wait(
-      device->logical_device, semaphore_list, deadline_ns, wait_flags);
+      device->logical_device, semaphore_list, timeout, wait_flags);
 }
 
-static iree_status_t iree_hal_vulkan_device_wait_semaphores_with_timeout(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list,
-    iree_duration_t timeout_ns) {
-  return iree_hal_vulkan_device_wait_semaphores_with_deadline(
-      base_device, wait_mode, semaphore_list,
-      iree_relative_timeout_to_deadline_ns(timeout_ns));
-}
-
-static iree_status_t iree_hal_vulkan_device_wait_idle_with_deadline(
-    iree_hal_device_t* base_device, iree_time_t deadline_ns) {
+static iree_status_t iree_hal_vulkan_device_wait_idle(
+    iree_hal_device_t* base_device, iree_timeout_t timeout) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
-    IREE_RETURN_IF_ERROR(device->queues[i]->WaitIdle(deadline_ns));
+    IREE_RETURN_IF_ERROR(device->queues[i]->WaitIdle(timeout));
   }
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_vulkan_device_wait_idle_with_timeout(
-    iree_hal_device_t* base_device, iree_duration_t timeout_ns) {
-  return iree_hal_vulkan_device_wait_idle_with_deadline(
-      base_device, iree_relative_timeout_to_deadline_ns(timeout_ns));
 }
 
 const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
@@ -1098,12 +1098,8 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     iree_hal_vulkan_device_create_executable_layout,
     /*.create_semaphore=*/iree_hal_vulkan_device_create_semaphore,
     /*.queue_submit=*/iree_hal_vulkan_device_queue_submit,
-    /*.wait_semaphores_with_deadline=*/
-    iree_hal_vulkan_device_wait_semaphores_with_deadline,
-    /*.wait_semaphores_with_timeout=*/
-    iree_hal_vulkan_device_wait_semaphores_with_timeout,
-    /*.wait_idle_with_deadline=*/
-    iree_hal_vulkan_device_wait_idle_with_deadline,
-    /*.wait_idle_with_timeout=*/
-    iree_hal_vulkan_device_wait_idle_with_timeout,
+    /*.submit_and_wait=*/
+    iree_hal_vulkan_device_submit_and_wait,
+    /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
+    /*.wait_idle=*/iree_hal_vulkan_device_wait_idle,
 };

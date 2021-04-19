@@ -103,26 +103,16 @@ IREE_API_EXPORT void IREE_API_CALL
 iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status);
 
 // Blocks the caller until the semaphore reaches or exceedes the specified
-// payload value or the |deadline_ns| elapses.
+// payload value or the |timeout| elapses.
 //
 // Returns success if the wait is successful and the semaphore has met or
 // exceeded the required payload value.
 //
-// Returns DEADLINE_EXCEEDED if the |deadline_ns| elapses without the semaphore
+// Returns DEADLINE_EXCEEDED if the |timeout| elapses without the semaphore
 // reaching the required value. If an asynchronous failure occured this will
 // return the failure status that was set immediately.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_semaphore_wait_with_deadline(iree_hal_semaphore_t* semaphore,
-                                      uint64_t value, iree_time_t deadline_ns);
-
-// Blocks the caller until the semaphore reaches or exceedes the specified
-// payload value or the |timeout_ns| elapses.
-// A relative-time version of iree_hal_semaphore_wait_with_deadline using the
-// relative nanoseconds from the time the call is made.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
-                                     uint64_t value,
-                                     iree_duration_t timeout_ns);
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_wait(
+    iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t implementation details
@@ -141,11 +131,8 @@ typedef struct {
   void(IREE_API_PTR* fail)(iree_hal_semaphore_t* semaphore,
                            iree_status_t status);
 
-  iree_status_t(IREE_API_PTR* wait_with_deadline)(
-      iree_hal_semaphore_t* semaphore, uint64_t value, iree_time_t deadline_ns);
-  iree_status_t(IREE_API_PTR* wait_with_timeout)(
-      iree_hal_semaphore_t* semaphore, uint64_t value,
-      iree_duration_t timeout_ns);
+  iree_status_t(IREE_API_PTR* wait)(iree_hal_semaphore_t* semaphore,
+                                    uint64_t value, iree_timeout_t timeout);
 } iree_hal_semaphore_vtable_t;
 
 IREE_API_EXPORT void IREE_API_CALL

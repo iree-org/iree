@@ -14,6 +14,7 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
+#include "iree/hal/buffer_heap_impl.h"
 #include "iree/hal/detail.h"
 
 typedef struct iree_hal_heap_allocator_s {
@@ -78,9 +79,11 @@ iree_hal_heap_allocator_query_buffer_compatibility(
   // based on what's both allowed and intended.
   intended_usage &= allowed_usage;
 
-  // All buffers can be allocated on the heap.
+  // All buffers can be allocated on the heap and all heap-accessible buffers
+  // can be imported.
   iree_hal_buffer_compatibility_t compatibility =
-      IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
+      IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE |
+      IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE;
 
   // Buffers can only be used on the queue if they are device visible.
   // This is not a strict requirement of heap buffers but matches devices that
@@ -128,19 +131,10 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_heap_allocator_make_compatible(
       &memory_type, &allowed_access, &allowed_usage));
 
-  iree_byte_span_t data = iree_make_byte_span(NULL, allocation_size);
-  if (allocation_size > 0) {
-    // Zero-length buffers are valid but we don't want to try to malloc them.
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        allocator->host_allocator, allocation_size, (void**)&data.data));
-  }
-  iree_status_t status = iree_hal_heap_buffer_wrap(
+  // Allocate and return the buffer.
+  return iree_hal_heap_buffer_create(
       base_allocator, memory_type, allowed_access, allowed_usage,
-      allocation_size, data, allocator->host_allocator, out_buffer);
-  if (!iree_status_is_ok(status)) {
-    iree_allocator_free(allocator->host_allocator, data.data);
-  }
-  return status;
+      allocation_size, allocator->host_allocator, out_buffer);
 }
 
 static iree_status_t iree_hal_heap_allocator_wrap_buffer(

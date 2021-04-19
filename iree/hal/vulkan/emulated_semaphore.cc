@@ -65,7 +65,7 @@ class EmulatedTimelineSemaphore final {
 
   iree_status_t Signal(uint64_t value);
 
-  iree_status_t Wait(uint64_t value, iree_time_t deadline_ns);
+  iree_status_t Wait(uint64_t value, iree_timeout_t timeout);
 
   void Fail(iree_status_t status);
 
@@ -201,9 +201,11 @@ iree_status_t EmulatedTimelineSemaphore::Signal(uint64_t value) {
 }
 
 iree_status_t EmulatedTimelineSemaphore::Wait(uint64_t value,
-                                              iree_time_t deadline_ns) {
+                                              iree_timeout_t timeout) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::Wait");
   IREE_DVLOG(2) << "EmulatedTimelineSemaphore::Wait";
+
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
   VkFence fence = VK_NULL_HANDLE;
   do {
@@ -611,24 +613,17 @@ static void iree_hal_vulkan_emulated_semaphore_fail(
   semaphore->Fail(status);
 }
 
-static iree_status_t iree_hal_vulkan_emulated_semaphore_wait_with_deadline(
+static iree_status_t iree_hal_vulkan_emulated_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_time_t deadline_ns) {
+    iree_timeout_t timeout) {
   EmulatedTimelineSemaphore* semaphore =
       iree_hal_vulkan_emulated_semaphore_cast(base_semaphore);
-  return semaphore->Wait(value, deadline_ns);
-}
-
-static iree_status_t iree_hal_vulkan_emulated_semaphore_wait_with_timeout(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_duration_t timeout_ns) {
-  return iree_hal_vulkan_emulated_semaphore_wait_with_deadline(
-      base_semaphore, value, iree_relative_timeout_to_deadline_ns(timeout_ns));
+  return semaphore->Wait(value, timeout);
 }
 
 iree_status_t iree_hal_vulkan_emulated_semaphore_multi_wait(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns,
+    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
     VkSemaphoreWaitFlags wait_flags) {
   // TODO(antiagainst): We actually should get the fences associated with the
   // emulated timeline semaphores so that we can wait them in a bunch. This
@@ -636,9 +631,9 @@ iree_status_t iree_hal_vulkan_emulated_semaphore_multi_wait(
   // first semaphore taking extra long time but the following ones signal
   // quickly.
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_emulated_semaphore_wait_with_deadline(
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_emulated_semaphore_wait(
         semaphore_list->semaphores[i], semaphore_list->payload_values[i],
-        deadline_ns));
+        timeout));
     if (wait_flags & VK_SEMAPHORE_WAIT_ANY_BIT) return iree_ok_status();
   }
   return iree_ok_status();
@@ -649,8 +644,6 @@ const iree_hal_semaphore_vtable_t iree_hal_vulkan_emulated_semaphore_vtable = {
     /*.query=*/iree_hal_vulkan_emulated_semaphore_query,
     /*.signal=*/iree_hal_vulkan_emulated_semaphore_signal,
     /*.fail=*/iree_hal_vulkan_emulated_semaphore_fail,
-    /*.wait_with_deadline=*/
-    iree_hal_vulkan_emulated_semaphore_wait_with_deadline,
-    /*.wait_with_timeout=*/
-    iree_hal_vulkan_emulated_semaphore_wait_with_timeout,
+    /*.wait=*/
+    iree_hal_vulkan_emulated_semaphore_wait,
 };

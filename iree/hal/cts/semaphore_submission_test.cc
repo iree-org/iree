@@ -47,8 +47,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithNoCommandBuffers) {
       iree_hal_device_queue_submit(device_, IREE_HAL_COMMAND_CATEGORY_DISPATCH,
                                    /*queue_affinity=*/0,
                                    /*batch_count=*/1, &submission_batch));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-      signal_semaphore, 1ull, IREE_TIME_INFINITE_FUTURE));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_wait(signal_semaphore, 1ull, iree_infinite_timeout()));
 
   iree_hal_semaphore_release(signal_semaphore);
 }
@@ -83,8 +83,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitAndSignal) {
       iree_hal_device_queue_submit(device_, IREE_HAL_COMMAND_CATEGORY_DISPATCH,
                                    /*queue_affinity=*/0,
                                    /*batch_count=*/1, &submission_batch));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-      signal_semaphore, 1ull, IREE_TIME_INFINITE_FUTURE));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_wait(signal_semaphore, 1ull, iree_infinite_timeout()));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(signal_semaphore);
@@ -132,8 +132,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithWait) {
 
   // Signal the wait semaphore, work should begin and complete.
   IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore, 1ull));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-      signal_semaphore, 101ull, IREE_TIME_INFINITE_FUTURE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(signal_semaphore, 101ull,
+                                         iree_infinite_timeout()));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore);
@@ -196,9 +196,9 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithMultipleSemaphores) {
   signal_semaphore_list.semaphores = signal_semaphore_ptrs;
   uint64_t payload_values[] = {1ull, 1ull};
   signal_semaphore_list.payload_values = payload_values;
-  IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_deadline(
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_HAL_WAIT_MODE_ALL, &signal_semaphore_list,
-      IREE_TIME_INFINITE_FUTURE));
+      iree_infinite_timeout()));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore_1);

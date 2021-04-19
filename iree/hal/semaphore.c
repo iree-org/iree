@@ -67,25 +67,12 @@ iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_semaphore_wait_with_deadline(iree_hal_semaphore_t* semaphore,
-                                      uint64_t value, iree_time_t deadline_ns) {
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_wait(
+    iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = _VTABLE_DISPATCH(semaphore, wait_with_deadline)(
-      semaphore, value, deadline_ns);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
-                                     uint64_t value,
-                                     iree_duration_t timeout_ns) {
-  IREE_ASSERT_ARGUMENT(semaphore);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = _VTABLE_DISPATCH(semaphore, wait_with_timeout)(
-      semaphore, value, timeout_ns);
+  iree_status_t status =
+      _VTABLE_DISPATCH(semaphore, wait)(semaphore, value, timeout);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

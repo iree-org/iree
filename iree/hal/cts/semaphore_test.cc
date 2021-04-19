@@ -85,15 +85,19 @@ TEST_P(SemaphoreTest, Failure) {
 
 // Tests waiting on no semaphores.
 TEST_P(SemaphoreTest, EmptyWait) {
-  IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_deadline(
-      device_, IREE_HAL_WAIT_MODE_ANY, NULL, IREE_TIME_INFINITE_FUTURE));
-  IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_deadline(
-      device_, IREE_HAL_WAIT_MODE_ALL, NULL, IREE_TIME_INFINITE_FUTURE));
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
+      device_, IREE_HAL_WAIT_MODE_ANY, NULL,
+      iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
+      device_, IREE_HAL_WAIT_MODE_ALL, NULL,
+      iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
-  IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_timeout(
-      device_, IREE_HAL_WAIT_MODE_ANY, NULL, IREE_DURATION_INFINITE));
-  IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_timeout(
-      device_, IREE_HAL_WAIT_MODE_ALL, NULL, IREE_DURATION_INFINITE));
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
+      device_, IREE_HAL_WAIT_MODE_ANY, NULL,
+      iree_make_timeout(IREE_DURATION_INFINITE)));
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
+      device_, IREE_HAL_WAIT_MODE_ALL, NULL,
+      iree_make_timeout(IREE_DURATION_INFINITE)));
 }
 
 // Tests waiting on a semaphore that has already been signaled.
@@ -103,15 +107,15 @@ TEST_P(SemaphoreTest, DISABLED_WaitAlreadySignaled) {
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
   // Test both previous and current values.
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-      semaphore, 1ull, IREE_TIME_INFINITE_FUTURE));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-      semaphore, 2ull, IREE_TIME_INFINITE_FUTURE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 1ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 2ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_timeout(semaphore, 1ull,
-                                                      IREE_DURATION_INFINITE));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_timeout(semaphore, 2ull,
-                                                      IREE_DURATION_INFINITE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 1ull, iree_make_timeout(IREE_DURATION_INFINITE)));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 2ull, iree_make_timeout(IREE_DURATION_INFINITE)));
 
   iree_hal_semaphore_release(semaphore);
 }
@@ -124,8 +128,8 @@ TEST_P(SemaphoreTest, WaitUnsignaled) {
   // NOTE: we don't actually block here because otherwise we'd lock up.
   // Result status is undefined - some backends may return DeadlineExceededError
   // while others may return success.
-  IREE_IGNORE_ERROR(iree_hal_semaphore_wait_with_deadline(
-      semaphore, 3ull, IREE_TIME_INFINITE_PAST));
+  IREE_IGNORE_ERROR(iree_hal_semaphore_wait(
+      semaphore, 3ull, iree_make_deadline(IREE_TIME_INFINITE_PAST)));
 
   iree_hal_semaphore_release(semaphore);
 }
@@ -150,9 +154,9 @@ TEST_P(SemaphoreTest, WaitAllButNotAllSignaled) {
   // NOTE: we don't actually block here because otherwise we'd lock up.
   // Result status is undefined - some backends may return DeadlineExceededError
   // while others may return success.
-  IREE_IGNORE_ERROR(iree_hal_device_wait_semaphores_with_deadline(
+  IREE_IGNORE_ERROR(iree_hal_device_wait_semaphores(
       device_, IREE_HAL_WAIT_MODE_ALL, &semaphore_list,
-      IREE_TIME_INFINITE_PAST));
+      iree_make_deadline(IREE_TIME_INFINITE_PAST)));
 
   iree_hal_semaphore_release(semaphore_a);
   iree_hal_semaphore_release(semaphore_b);
@@ -175,9 +179,9 @@ TEST_P(SemaphoreTest, WaitAllAndAllSignaled) {
   // NOTE: we don't actually block here because otherwise we'd lock up.
   // Result status is undefined - some backends may return DeadlineExceededError
   // while others may return success.
-  IREE_IGNORE_ERROR(iree_hal_device_wait_semaphores_with_deadline(
+  IREE_IGNORE_ERROR(iree_hal_device_wait_semaphores(
       device_, IREE_HAL_WAIT_MODE_ALL, &semaphore_list,
-      IREE_TIME_INFINITE_FUTURE));
+      iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
   iree_hal_semaphore_release(semaphore_a);
   iree_hal_semaphore_release(semaphore_b);
@@ -198,9 +202,9 @@ TEST_P(SemaphoreTest, DISABLED_WaitAny) {
   uint64_t payload_values[] = {1ull, 1ull};
   semaphore_list.payload_values = payload_values;
 
-  IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_deadline(
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_HAL_WAIT_MODE_ANY, &semaphore_list,
-      IREE_TIME_INFINITE_FUTURE));
+      iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
   iree_hal_semaphore_release(semaphore_a);
   iree_hal_semaphore_release(semaphore_b);
@@ -215,16 +219,16 @@ TEST_P(SemaphoreTest, PingPong) {
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &b2a));
   std::thread thread([&]() {
     // Should advance right past this because the value is already set.
-    IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-        a2b, 0ull, IREE_TIME_INFINITE_FUTURE));
+    IREE_ASSERT_OK(iree_hal_semaphore_wait(
+        a2b, 0ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
     IREE_ASSERT_OK(iree_hal_semaphore_signal(b2a, 1ull));
     // Jump ahead (blocking at first).
-    IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-        a2b, 4ull, IREE_TIME_INFINITE_FUTURE));
+    IREE_ASSERT_OK(iree_hal_semaphore_wait(
+        a2b, 4ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
   });
   // Block until thread signals.
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-      b2a, 1ull, IREE_TIME_INFINITE_FUTURE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      b2a, 1ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
   IREE_ASSERT_OK(iree_hal_semaphore_signal(a2b, 4ull));
   thread.join();
 

@@ -189,9 +189,26 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
 
+// Submits batches of work and waits until |wait_semaphore| reaches or exceeds
+// |wait_value|.
+//
+// This is equivalent to following iree_hal_device_queue_submit with a
+// iree_hal_semaphore_wait on |wait_timeout|/|wait_value| but
+// may help to reduce overhead by preventing thread wakeups, kernel calls, and
+// internal tracking.
+//
+// See iree_hal_device_queue_submit for more information about the queuing
+// behavior and iree_hal_semaphore_wait for the waiting  behavior.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
+    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches,
+    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
+    iree_timeout_t timeout);
+
 // Blocks the caller until the semaphores reach or exceed the specified payload
-// values or the |deadline_ns| elapses. All semaphores in |semaphore_list| must
-// be created from this device (or be imported into it).
+// values or the |timeout| elapses. All semaphores in |semaphore_list| must be
+// created from this device (or be imported into it).
 //
 // |wait_mode| can be used to decide when the wait will proceed; whether *all*
 // semaphores in |semaphore_list| must be signaled or whether *any* (one or
@@ -200,43 +217,25 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
 // Returns success if the wait is successful and semaphores have been signaled
 // satisfying the |wait_mode|.
 //
-// Returns DEADLINE_EXCEEDED if the |deadline_ns| elapses without the
-// |wait_mode| being satisfied. Note that even on success only a subset of the
-// semaphores may have been signaled and each can be queried to see which ones.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_device_wait_semaphores_with_deadline(
+// Returns DEADLINE_EXCEEDED if the |timeout| elapses without the |wait_mode|
+// being satisfied. Note that even on success only a subset of the semaphores
+// may have been signaled and each can be queried to see which ones.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns);
-
-// Blocks the caller until the semaphores reach or exceed the specified payload
-// values or the |timeout_ns| elapses.
-// A relative-time version of iree_hal_device_wait_semaphores_with_deadline
-// using the relative nanoseconds from the time the call is made.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_device_wait_semaphores_with_timeout(
-    iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list,
-    iree_duration_t timeout_ns);
+    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
 
 // Blocks the caller until all outstanding requests on all queues have been
-// completed or the |deadline_ns| elapses. This is equivalent to having waited
+// completed or the |timeout| elapses. This is equivalent to having waited
 // on all semaphores outstanding at the time of the call, meaning that if new
 // work is submitted by another thread it may not be waited on prior to this
 // call returning.
 //
 // Returns success if the device reaches an idle point during the call.
 //
-// Returns DEADLINE_EXCEEDED if the |deadline_ns| elapses without the device
-// having become idle.
-IREE_API_EXPORT iree_status_t iree_hal_device_wait_idle_with_deadline(
-    iree_hal_device_t* device, iree_time_t deadline_ns);
-
-// Blocks the caller until all outstanding requests on all quests have been
-// completed or the |timeout_ns| elapses.
-// A relative-time version of iree_hal_device_wait_idle_with_deadline
-// using the relative nanoseconds from the time the call is made.
-IREE_API_EXPORT iree_status_t iree_hal_device_wait_idle_with_timeout(
-    iree_hal_device_t* device, iree_duration_t timeout_ns);
+// Returns DEADLINE_EXCEEDED if the |timeout| elapses without the device having
+// become idle.
+IREE_API_EXPORT iree_status_t
+iree_hal_device_wait_idle(iree_hal_device_t* device, iree_timeout_t timeout);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t implementation details
@@ -299,18 +298,19 @@ typedef struct {
       iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
       const iree_hal_submission_batch_t* batches);
 
-  iree_status_t(IREE_API_PTR* wait_semaphores_with_deadline)(
-      iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-      const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns);
-  iree_status_t(IREE_API_PTR* wait_semaphores_with_timeout)(
-      iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-      const iree_hal_semaphore_list_t* semaphore_list,
-      iree_duration_t timeout_ns);
+  iree_status_t(IREE_API_PTR* submit_and_wait)(
+      iree_hal_device_t* device, iree_hal_command_category_t command_categories,
+      iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
+      const iree_hal_submission_batch_t* batches,
+      iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
+      iree_timeout_t timeout);
 
-  iree_status_t(IREE_API_PTR* wait_idle_with_deadline)(
-      iree_hal_device_t* device, iree_time_t deadline_ns);
-  iree_status_t(IREE_API_PTR* wait_idle_with_timeout)(
-      iree_hal_device_t* device, iree_duration_t timeout_ns);
+  iree_status_t(IREE_API_PTR* wait_semaphores)(
+      iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
+      const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
+
+  iree_status_t(IREE_API_PTR* wait_idle)(iree_hal_device_t* device,
+                                         iree_timeout_t timeout);
 } iree_hal_device_vtable_t;
 
 IREE_API_EXPORT void IREE_API_CALL
