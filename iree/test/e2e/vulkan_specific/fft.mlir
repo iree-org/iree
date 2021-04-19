@@ -9,13 +9,7 @@ func @rfft_2d() attributes { iree.module.export } {
   } : (tensor<1x32xf32>) -> tensor<1x17xcomplex<f32>>
   %1 = "mhlo.real"(%0) : (tensor<1x17xcomplex<f32>>) -> tensor<1x17xf32>
   %2 = "mhlo.imag"(%0) : (tensor<1x17xcomplex<f32>>) -> tensor<1x17xf32>
-  check.expect_almost_eq_const(%1, dense<[
-    [666.8460, 0.0000, -590.1693, 0.0000, 593.4485, -0.0001, -579.5288, -0.0004,
-     629.9540, 0.0006, -567.1125, -0.0002, 591.7514, 0.0004, -583.1893, -0.0006,
-     630.8460]]> : tensor<1x17xf32>) : tensor<1x17xf32>
-  check.expect_almost_eq_const(%2, dense<[
-    [0.0000, 0.0001, -23.9563, 0.0000, -10.2544, 0.0000, -6.1443, 0.0000,
-     -10.0002, 0.0000, 3.8657, 0.0000, 0.6376, -0.0001, 52.4551, 0.0001,
-     -0.0003]]> : tensor<1x17xf32>) : tensor<1x17xf32>
+  check.expect_almost_eq_const(%1, dense<[[666.8460, 0.0, -590.16925, 0.0, 593.4485, 0.0, -579.52875, 0.0, 629.95404, 0.0, -567.1126, 0.0, 591.75146, 0.0, -583.1894, 0.0, 630.846]]> : tensor<1x17xf32>) : tensor<1x17xf32>
+  check.expect_almost_eq_const(%2, dense<[[0.0, 0.0, -23.956373, 0.0, -10.254326, 0.0, -6.1443653, 0.0, -10.0, 0.0, 3.865515, 0.0, 0.63767385, 0.0, 52.453506, 0.0, 0.0]]> : tensor<1x17xf32>) : tensor<1x17xf32>
   return
 }

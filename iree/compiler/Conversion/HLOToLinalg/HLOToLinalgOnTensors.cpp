@@ -192,32 +192,27 @@ namespace {
 /// https://en.wikipedia.org/wiki/Discrete_Fourier_transform
 Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
                         bool isRealPart) {
-  int rank = matrixType.getRank();
-  auto initTensor = b.create<linalg::InitTensorOp>(
-      loc, /*dyn_size=*/ValueRange{}, matrixType.getShape(),
-      matrixType.getElementType());
-  SmallVector<StringRef, 2> loops(rank, getParallelIteratorTypeName());
+  assert(matrixType.getRank() == 2 && "expected 2D matrix");
+
+  auto initTensor = b.create<linalg::InitTensorOp>(loc, matrixType.getShape(),
+                                                   matrixType.getElementType());
   // scale = 2 * pi / N
-  double kScale = 2 * acos(-1) / matrixType.getDimSize(0);
-  if (!isRealPart) kScale = -kScale;  // -sin(x) = sin(-x)
-  return b
-      .create<linalg::IndexedGenericOp>(
-          loc, ArrayRef<Type>{matrixType}, /*inputs=*/ValueRange{},
-          ValueRange{initTensor}, b.getMultiDimIdentityMap(rank), loops,
-          [&](OpBuilder &b, Location loc, ValueRange indices, ValueRange args) {
-            Value res = b.create<MulIOp>(loc, indices[0], indices[1]);
-            res = b.create<IndexCastOp>(loc, b.getI32Type(), res);
-            res = b.create<SIToFPOp>(loc, matrixType.getElementType(), res);
-            res = b.create<MulFOp>(
-                loc, b.create<ConstantOp>(loc, b.getF32FloatAttr(kScale)), res);
-            if (isRealPart) {
-              res = b.create<math::CosOp>(loc, res);
-            } else {
-              res = b.create<math::SinOp>(loc, res);
-            }
-            b.create<linalg::YieldOp>(loc, res);
-          })
-      .getResult(0);
+  double scale = 2 * acos(-1) / matrixType.getDimSize(0);
+
+  SmallVector<Attribute> values;
+  for (auto i : llvm::seq<unsigned>(0, matrixType.getDimSize(0))) {
+    for (auto j : llvm::seq<unsigned>(0, matrixType.getDimSize(1))) {
+      double v = scale * i * j;
+      if (isRealPart) {
+        v = cos(v);
+      } else {
+        v = -sin(v);
+      }
+      values.push_back(b.getF32FloatAttr(v));
+    }
+  }
+  return b.create<ConstantOp>(loc, matrixType,
+                              DenseFPElementsAttr::get(matrixType, values));
 }
 
 Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
