@@ -21,7 +21,6 @@ package(
 cc_library(
     name = "LinalgToVector",
     srcs = [
-        "LoadStoreVectorization.cpp",
         "VectorizeConv.cpp",
     ],
     hdrs = [

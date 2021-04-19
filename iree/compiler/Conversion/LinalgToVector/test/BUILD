@@ -28,7 +28,6 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "vectorize_linalg_conv.mlir",
-            "vectorize_linalg_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

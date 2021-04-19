@@ -20,9 +20,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Creates a pass to vectorize Linalg operations.
-std::unique_ptr<Pass> createLoadStoreVectorizationPass();
-
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<Pass> createVectorizeLinalgConvPass();
 

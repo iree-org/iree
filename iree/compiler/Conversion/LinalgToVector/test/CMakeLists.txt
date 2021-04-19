@@ -15,7 +15,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "vectorize_linalg_conv.mlir"
-    "vectorize_linalg_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

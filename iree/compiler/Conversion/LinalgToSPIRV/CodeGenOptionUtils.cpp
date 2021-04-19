@@ -43,11 +43,6 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
       llvm::cl::desc("Use workgroup memory in SPIR-V code generation"),
       llvm::cl::init(false));
 
-  static llvm::cl::opt<bool> clVectorizeMemref(
-      "iree-spirv-enable-memref-vectorization",
-      llvm::cl::desc("Vectorize memref if possible in SPIR-V code generation"),
-      llvm::cl::init(false));
-
   static llvm::cl::list<unsigned> clWorkgroupSizes(
       "iree-spirv-workgroup-size",
       llvm::cl::desc("Set workgroup size to use for SPIR-V code generation"),
@@ -68,7 +63,6 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
   options.enableVectorization =
       clEnableLinalgOnTensorsSPIRV || clEnableVectorization;
   options.useWorkgroupMemory = clUseWorkgroupMemory;
-  options.vectorizeMemref = clVectorizeMemref;
   options.usingLinalgOnTensors = clEnableLinalgOnTensorsSPIRV;
   return options;
 }
