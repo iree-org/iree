@@ -109,8 +109,8 @@ TEST_P(EventTest, SubmitWithChainedCommandBuffers) {
       iree_hal_device_queue_submit(device_, IREE_HAL_COMMAND_CATEGORY_DISPATCH,
                                    /*queue_affinity=*/0,
                                    /*batch_count=*/1, &submission_batch));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-      signal_semaphore, 1ull, IREE_TIME_INFINITE_FUTURE));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_wait(signal_semaphore, 1ull, iree_infinite_timeout()));
 
   iree_hal_command_buffer_release(command_buffer_1);
   iree_hal_command_buffer_release(command_buffer_2);

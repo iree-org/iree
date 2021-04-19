@@ -47,7 +47,7 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
 // |deadline_ns| elapses.
 iree_status_t iree_hal_task_semaphore_multi_wait(
     iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns,
+    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
     iree_hal_local_event_pool_t* event_pool,
     iree_arena_block_pool_t* block_pool);
 

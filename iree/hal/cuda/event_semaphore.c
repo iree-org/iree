@@ -82,19 +82,12 @@ static iree_status_t iree_hal_cuda_semaphore_signal(
 static void iree_hal_cuda_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
                                          iree_status_t status) {}
 
-static iree_status_t iree_hal_cuda_semaphore_wait_with_deadline(
+static iree_status_t iree_hal_cuda_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_time_t deadline_ns) {
+    iree_timeout_t timeout) {
   // TODO: Support semaphores completely. Return OK currently as everything is
   // synchronized for each submit to allow things to run.
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_cuda_semaphore_wait_with_timeout(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_duration_t timeout_ns) {
-  return iree_hal_cuda_semaphore_wait_with_deadline(
-      base_semaphore, value, iree_relative_timeout_to_deadline_ns(timeout_ns));
 }
 
 const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable = {
@@ -102,6 +95,5 @@ const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable = {
     .query = iree_hal_cuda_semaphore_query,
     .signal = iree_hal_cuda_semaphore_signal,
     .fail = iree_hal_cuda_semaphore_fail,
-    .wait_with_deadline = iree_hal_cuda_semaphore_wait_with_deadline,
-    .wait_with_timeout = iree_hal_cuda_semaphore_wait_with_timeout,
+    .wait = iree_hal_cuda_semaphore_wait,
 };

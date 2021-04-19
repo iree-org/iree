@@ -195,9 +195,11 @@ static void iree_hal_vulkan_native_semaphore_fail(
 
 iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns,
+    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
     VkSemaphoreWaitFlags wait_flags) {
   if (semaphore_list->count == 0) return iree_ok_status();
+
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
   uint64_t timeout_ns;
   if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
@@ -252,9 +254,9 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
   return VK_RESULT_TO_STATUS(result, "vkWaitSemaphores");
 }
 
-static iree_status_t iree_hal_vulkan_native_semaphore_wait_with_deadline(
+static iree_status_t iree_hal_vulkan_native_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_time_t deadline_ns) {
+    iree_timeout_t timeout) {
   iree_hal_vulkan_native_semaphore_t* semaphore =
       iree_hal_vulkan_native_semaphore_cast(base_semaphore);
   iree_hal_semaphore_list_t semaphore_list = {
@@ -263,14 +265,7 @@ static iree_status_t iree_hal_vulkan_native_semaphore_wait_with_deadline(
       /*.payload_values=*/&value,
   };
   return iree_hal_vulkan_native_semaphore_multi_wait(
-      semaphore->logical_device, &semaphore_list, deadline_ns, 0);
-}
-
-static iree_status_t iree_hal_vulkan_native_semaphore_wait_with_timeout(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_duration_t timeout_ns) {
-  return iree_hal_vulkan_native_semaphore_wait_with_deadline(
-      base_semaphore, value, iree_relative_timeout_to_deadline_ns(timeout_ns));
+      semaphore->logical_device, &semaphore_list, timeout, 0);
 }
 
 const iree_hal_semaphore_vtable_t iree_hal_vulkan_native_semaphore_vtable = {
@@ -278,6 +273,5 @@ const iree_hal_semaphore_vtable_t iree_hal_vulkan_native_semaphore_vtable = {
     /*.query=*/iree_hal_vulkan_native_semaphore_query,
     /*.signal=*/iree_hal_vulkan_native_semaphore_signal,
     /*.fail=*/iree_hal_vulkan_native_semaphore_fail,
-    /*.wait_with_deadline=*/iree_hal_vulkan_native_semaphore_wait_with_deadline,
-    /*.wait_with_timeout=*/iree_hal_vulkan_native_semaphore_wait_with_timeout,
+    /*.wait=*/iree_hal_vulkan_native_semaphore_wait,
 };

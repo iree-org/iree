@@ -117,8 +117,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
                                      /*queue_affinity=*/0,
                                      /*batch_count=*/1, &submission_batch);
     if (iree_status_is_ok(status)) {
-      status = iree_hal_semaphore_wait_with_deadline(signal_semaphore, 1ull,
-                                                     IREE_TIME_INFINITE_FUTURE);
+      status = iree_hal_semaphore_wait(signal_semaphore, 1ull,
+                                       iree_infinite_timeout());
     }
 
     iree_hal_semaphore_release(signal_semaphore);
