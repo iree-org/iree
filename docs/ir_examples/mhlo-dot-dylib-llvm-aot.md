@@ -1506,93 +1506,6 @@ hal.executable.target @llvm_aot, filter="dylib*" {
 ```
 {% endraw %}
 
-### IR Dump After Canonicalizer
-
-{% raw %}
-```
-func @dot_dispatch_0() {
-  %c0 = constant 0 : index
-  %cst = constant 0.000000e+00 : f32
-  %c32 = constant 32 : index
-  %c64 = constant 64 : index
-  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
-  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
-  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
-  %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %workgroup_count_x = hal.interface.workgroup.count[0] : index
-  %workgroup_id_y = hal.interface.workgroup.id[1] : index
-  %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
-  %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
-  scf.for %arg0 = %3 to %c32 step %4 {
-    %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-    %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
-    scf.for %arg1 = %5 to %c64 step %6 {
-      %7 = affine.min affine_map<(d0) -> (64, -d0 + 32)>(%arg0)
-      %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
-      %9 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [1024, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x64xf32>
-      %10 = affine.min affine_map<(d0) -> (64, -d0 + 32)>(%arg0)
-      %11 = affine.min affine_map<(d0) -> (-d0 + 32, 64)>(%arg0)
-      %12 = linalg.init_tensor [%11, 64] : tensor<?x64xf32>
-      %13 = linalg.fill(%12, %cst) {__internal_linalg_transform__ = "workgroup"} : tensor<?x64xf32>, f32 -> tensor<?x64xf32> 
-      %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%8, %9 : tensor<?x1024xf32>, tensor<1024x64xf32>) outs(%13 : tensor<?x64xf32>) -> tensor<?x64xf32>
-      %15 = tensor.cast %14 : tensor<?x64xf32> to tensor<?x?xf32>
-      flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%10, %c64], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
-    }
-  }
-  return
-}
-
-```
-{% endraw %}
-
-### IR Dump After Inliner
-
-{% raw %}
-```
-module  {
-  func @dot_dispatch_0() {
-    %c0 = constant 0 : index
-    %cst = constant 0.000000e+00 : f32
-    %c32 = constant 32 : index
-    %c64 = constant 64 : index
-    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:32x1024xf32>
-    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x64xf32>
-    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:32x64xf32>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
-    %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
-    scf.for %arg0 = %3 to %c32 step %4 {
-      %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-      %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
-      scf.for %arg1 = %5 to %c64 step %6 {
-        %7 = affine.min affine_map<(d0) -> (64, -d0 + 32)>(%arg0)
-        %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
-        %9 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [1024, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x64xf32>
-        %10 = affine.min affine_map<(d0) -> (64, -d0 + 32)>(%arg0)
-        %11 = affine.min affine_map<(d0) -> (-d0 + 32, 64)>(%arg0)
-        %12 = linalg.init_tensor [%11, 64] : tensor<?x64xf32>
-        %13 = linalg.fill(%12, %cst) {__internal_linalg_transform__ = "workgroup"} : tensor<?x64xf32>, f32 -> tensor<?x64xf32> 
-        %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%8, %9 : tensor<?x1024xf32>, tensor<1024x64xf32>) outs(%13 : tensor<?x64xf32>) -> tensor<?x64xf32>
-        %15 = tensor.cast %14 : tensor<?x64xf32> to tensor<?x?xf32>
-        flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%10, %c64], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:32x64xf32>
-      }
-    }
-    return
-  }
-  hal.interface @io attributes {sym_visibility = "private"} {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-}
-
-```
-{% endraw %}
-
 ### IR Dump After mlir::iree_compiler::{anonymous}::LinalgBufferizePass
 
 {% raw %}
@@ -1612,26 +1525,25 @@ func @dot_dispatch_0() {
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
-  %7 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
+  %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %c64]
+  %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %c64]
   scf.for %arg0 = %6 to %c32 step %7 {
-    %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-    %9 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+    %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %c64]
+    %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %c64]
     scf.for %arg1 = %8 to %c64 step %9 {
       %10 = affine.min affine_map<(d0) -> (64, -d0 + 32)>(%arg0)
       %11 = memref.subview %0[%arg0, 0] [%10, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
       %12 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0], sizes = [%10, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:32x1024xf32> -> tensor<?x1024xf32>
-      %13 = memref.subview %2[0, %arg1] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %14 = flow.dispatch.tensor.load %3, offsets = [0, %arg1], sizes = [1024, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x64xf32>
+      %13 = memref.subview %2[0, %arg1] [1024, %c64] [1, 1] : memref<1024x64xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %14 = flow.dispatch.tensor.load %3, offsets = [0, %arg1], sizes = [1024, %c64], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x64xf32> -> tensor<1024x?xf32>
       %15 = affine.min affine_map<(d0) -> (64, -d0 + 32)>(%arg0)
       %16 = memref.subview %4[%arg0, %arg1] [%15, %c64] [1, 1] : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %17 = affine.min affine_map<(d0) -> (-d0 + 32, 64)>(%arg0)
-      %18 = linalg.init_tensor [%17, 64] : tensor<?x64xf32>
+      %18 = linalg.init_tensor [%17, %c64] : tensor<?x?xf32>
       linalg.fill(%16, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
-      %19 = linalg.fill(%18, %cst) {__internal_linalg_transform__ = "workgroup"} : tensor<?x64xf32>, f32 -> tensor<?x64xf32> 
-      linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%11, %13 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%16 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
-      %20 = linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%12, %14 : tensor<?x1024xf32>, tensor<1024x64xf32>) outs(%19 : tensor<?x64xf32>) -> tensor<?x64xf32>
-      %21 = tensor.cast %20 : tensor<?x64xf32> to tensor<?x?xf32>
+      %19 = linalg.fill(%18, %cst) {__internal_linalg_transform__ = "workgroup"} : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+      linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%11, %13 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%16 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+      %20 = linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%12, %14 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%19 : tensor<?x?xf32>) -> tensor<?x?xf32>
     }
   }
   return
@@ -8549,7 +8461,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6898xi8>, format = "DLIB"} {
+  hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6918xi8>, format = "DLIB"} {
   }
 }
 
@@ -8832,7 +8744,7 @@ module  {
       hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6898xi8>, format = "DLIB"} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6918xi8>, format = "DLIB"} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
@@ -9077,7 +8989,7 @@ module  {
       hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6898xi8>, format = "DLIB"} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6918xi8>, format = "DLIB"} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {noinline} {
@@ -9147,7 +9059,7 @@ module  {
     vm.global.i32 @_device_match_id_0 init(@_device_match_id_0_initializer) : i32
     vm.func private @_device_match_id_0_initializer() -> i32 {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_0 = vm.rodata.inline "_utf8_dylib_971286B245550E6D" : !vm.ref<!iree.byte_buffer> = dense<[100, 121, 108, 105, 98, 42]> : vector<6xi8>
+      %ref_0 = vm.rodata.inline "_utf8_dylib_971286B245550E6D" {alignment = 1 : i64} : !vm.ref<!iree.byte_buffer> = dense<[100, 121, 108, 105, 98, 42]> : vector<6xi8>
       %0 = vm.call @hal.device.match.id(%ref, %ref_0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
       vm.return %0 : i32
     }
@@ -9176,14 +9088,14 @@ module  {
       vm.return %ref_0 : !vm.ref<!hal.executable_layout>
     }
     vm.global.ref @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !vm.ref<!hal.executable>
-    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6898xi8>
+    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6918xi8>
     vm.func private @_executable_dot_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %ref_0 = vm.rodata.inline "_utf8_dlib_F45B9BA87AEFAACB" : !vm.ref<!iree.byte_buffer> = dense<[68, 76, 73, 66]> : vector<4xi8>
+      %ref_0 = vm.rodata.inline "_utf8_dlib_F45B9BA87AEFAACB" {alignment = 1 : i64} : !vm.ref<!iree.byte_buffer> = dense<[68, 76, 73, 66]> : vector<4xi8>
       %_dot_dispatch_0_llvm_aot_binary_dlib = vm.const.ref.rodata @_dot_dispatch_0_llvm_aot_binary_dlib : !vm.ref<!iree.byte_buffer>
       %ref_1 = vm.call.variadic @hal.executable.create(%ref, %ref_0, %_dot_dispatch_0_llvm_aot_binary_dlib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
       vm.br ^bb3(%ref_1 : !vm.ref<!hal.executable>)
@@ -9335,7 +9247,7 @@ vm.module @module {
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
   vm.global.ref @_executable_dot_dispatch_0 init(@_executable_dot_dispatch_0_initializer) : !vm.ref<!hal.executable>
-  vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6898xi8>
+  vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6918xi8>
   vm.rodata @_utf8_dlib_F45B9BA87AEFAACB dense<[68, 76, 73, 66]> : vector<4xi8>
   vm.func private @_executable_dot_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -9494,7 +9406,7 @@ vm.module @module {
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
   vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6898xi8>
+  vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6918xi8>
   vm.rodata @_utf8_dlib_F45B9BA87AEFAACB dense<[68, 76, 73, 66]> : vector<4xi8>
   vm.func private @_executable_dot_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -9947,7 +9859,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6898xi8>
+    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6918xi8>
     vm.rodata @_utf8_dlib_F45B9BA87AEFAACB dense<[68, 76, 73, 66]> : vector<4xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
@@ -10110,7 +10022,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6898xi8>
+    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6918xi8>
     vm.rodata @_utf8_dlib_F45B9BA87AEFAACB dense<[68, 76, 73, 66]> : vector<4xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
@@ -10273,7 +10185,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6898xi8>
+    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6918xi8>
     vm.rodata @_utf8_dlib_F45B9BA87AEFAACB dense<[68, 76, 73, 66]> : vector<4xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
@@ -10416,7 +10328,7 @@ vm.module @module {
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
   vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
   vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6898xi8>
+  vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6918xi8>
   vm.rodata @_utf8_dlib_F45B9BA87AEFAACB dense<[68, 76, 73, 66]> : vector<4xi8>
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -10559,7 +10471,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6898xi8>
+    vm.rodata @_dot_dispatch_0_llvm_aot_binary_dlib opaque<"_", "0xDEADBEEF"> : vector<6918xi8>
     vm.rodata @_utf8_dlib_F45B9BA87AEFAACB dense<[68, 76, 73, 66]> : vector<4xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>

@@ -3080,9 +3080,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
   spv.module Logical GLSL450 {
     spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
     spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-    spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
     spv.func @dot_dispatch_0() "None" attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
       %0 = spv.Constant 0.000000e+00 : f32
       %1 = spv.Constant 8 : i32
@@ -3091,9 +3091,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
       %4 = spv.Constant 0 : i32
       %5 = spv.Constant 64 : i32
       %6 = spv.Constant 1 : i32
-      %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-      %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-      %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
       %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
       %11 = spv.Load "Input" %10 : vector<3xi32>
       %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3234,9 +3234,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_dispatch_0() "None" {
     %0 = spv.Constant 0.000000e+00 : f32
     %1 = spv.Constant 8 : i32
@@ -3245,9 +3245,9 @@ spv.module Logical GLSL450 {
     %4 = spv.Constant 0 : i32
     %5 = spv.Constant 64 : i32
     %6 = spv.Constant 1 : i32
-    %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3384,9 +3384,9 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_dispatch_0() "None" {
     %0 = spv.Constant 0.000000e+00 : f32
     %1 = spv.Constant 1024 : i32
@@ -3395,9 +3395,9 @@ spv.module Logical GLSL450 {
     %4 = spv.Constant 16 : i32
     %5 = spv.Constant 8 : i32
     %6 = spv.Constant 0 : i32
-    %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3507,9 +3507,9 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_dispatch_0() "None" {
     %0 = spv.Constant 0.000000e+00 : f32
     %1 = spv.Constant 1024 : i32
@@ -3518,9 +3518,9 @@ spv.module Logical GLSL450 {
     %4 = spv.Constant 16 : i32
     %5 = spv.Constant 8 : i32
     %6 = spv.Constant 0 : i32
-    %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3627,9 +3627,9 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
   spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-  spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_dispatch_0() "None" {
     %0 = spv.Constant 0.000000e+00 : f32
     %1 = spv.Constant 1024 : i32
@@ -3638,9 +3638,9 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
     %4 = spv.Constant 16 : i32
     %5 = spv.Constant 8 : i32
     %6 = spv.Constant 0 : i32
-    %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3756,9 +3756,9 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
     spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
       spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
       spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-      spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-      spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-      spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
       spv.func @dot_dispatch_0() "None" {
         %0 = spv.Constant 0.000000e+00 : f32
         %1 = spv.Constant 1024 : i32
@@ -3767,9 +3767,9 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
         %4 = spv.Constant 16 : i32
         %5 = spv.Constant 8 : i32
         %6 = spv.Constant 0 : i32
-        %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-        %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-        %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+        %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+        %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+        %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
         %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
         %11 = spv.Load "Input" %10 : vector<3xi32>
         %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3899,9 +3899,9 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
             %1 = spv.Constant 1024 : i32
@@ -3910,9 +3910,9 @@ module  {
             %4 = spv.Constant 16 : i32
             %5 = spv.Constant 8 : i32
             %6 = spv.Constant 0 : i32
-            %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -4248,9 +4248,9 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
             %1 = spv.Constant 1024 : i32
@@ -4259,9 +4259,9 @@ module  {
             %4 = spv.Constant 16 : i32
             %5 = spv.Constant 8 : i32
             %6 = spv.Constant 0 : i32
-            %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -4448,9 +4448,9 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
             %1 = spv.Constant 1024 : i32
@@ -4459,9 +4459,9 @@ module  {
             %4 = spv.Constant 16 : i32
             %5 = spv.Constant 8 : i32
             %6 = spv.Constant 0 : i32
-            %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -4647,9 +4647,9 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
             %1 = spv.Constant 1024 : i32
@@ -4658,9 +4658,9 @@ module  {
             %4 = spv.Constant 16 : i32
             %5 = spv.Constant 8 : i32
             %6 = spv.Constant 0 : i32
-            %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -5038,9 +5038,9 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
             %1 = spv.Constant 1024 : i32
@@ -5049,9 +5049,9 @@ module  {
             %4 = spv.Constant 16 : i32
             %5 = spv.Constant 8 : i32
             %6 = spv.Constant 0 : i32
-            %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -5410,9 +5410,9 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
             %1 = spv.Constant 1024 : i32
@@ -5421,9 +5421,9 @@ module  {
             %4 = spv.Constant 16 : i32
             %5 = spv.Constant 8 : i32
             %6 = spv.Constant 0 : i32
-            %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -5653,9 +5653,9 @@ module  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.GlobalVariable @__resource_var_94839874671360__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873641552__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-          spv.GlobalVariable @__resource_var_94839873422432__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857743815344__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742342896__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94857742610816__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_dispatch_0() "None" {
             %0 = spv.Constant 0.000000e+00 : f32
             %1 = spv.Constant 1024 : i32
@@ -5664,9 +5664,9 @@ module  {
             %4 = spv.Constant 16 : i32
             %5 = spv.Constant 8 : i32
             %6 = spv.Constant 0 : i32
-            %7 = spv.mlir.addressof @__resource_var_94839873422432__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94839873641552__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94839874671360__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv.mlir.addressof @__resource_var_94857742610816__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94857742342896__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94857743815344__ : !spv.ptr<!spv.struct<(!spv.rtarray<f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -6635,7 +6635,7 @@ module  {
     vm.global.i32 @_device_match_id_0 init(@_device_match_id_0_initializer) : i32
     vm.func private @_device_match_id_0_initializer() -> i32 {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_0 = vm.rodata.inline "_utf8_vulkan_7197BF52A22CAFD7" : !vm.ref<!iree.byte_buffer> = dense<[118, 117, 108, 107, 97, 110, 42]> : vector<7xi8>
+      %ref_0 = vm.rodata.inline "_utf8_vulkan_7197BF52A22CAFD7" {alignment = 1 : i64} : !vm.ref<!iree.byte_buffer> = dense<[118, 117, 108, 107, 97, 110, 42]> : vector<7xi8>
       %0 = vm.call @hal.device.match.id(%ref, %ref_0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
       vm.return %0 : i32
     }
@@ -6671,7 +6671,7 @@ module  {
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %ref_0 = vm.rodata.inline "_utf8_spve_9EB892746B9D70D0" : !vm.ref<!iree.byte_buffer> = dense<[83, 80, 86, 69]> : vector<4xi8>
+      %ref_0 = vm.rodata.inline "_utf8_spve_9EB892746B9D70D0" {alignment = 1 : i64} : !vm.ref<!iree.byte_buffer> = dense<[83, 80, 86, 69]> : vector<4xi8>
       %_dot_dispatch_0_vulkan_spirv_binary_spve = vm.const.ref.rodata @_dot_dispatch_0_vulkan_spirv_binary_spve : !vm.ref<!iree.byte_buffer>
       %ref_1 = vm.call.variadic @hal.executable.create(%ref, %ref_0, %_dot_dispatch_0_vulkan_spirv_binary_spve, [%_executable_layout_0]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
       vm.br ^bb3(%ref_1 : !vm.ref<!hal.executable>)

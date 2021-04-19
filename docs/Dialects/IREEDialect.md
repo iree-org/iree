@@ -111,6 +111,31 @@ information should be hidden from the compiler and resolved at runtime.
 | :----: | ----------- |
 `result` | tensor of any type values
 
+### `iree.list.create` (::mlir::iree_compiler::IREE::ListCreateOp)
+
+creates a new empty list
+
+
+Syntax:
+
+```
+operation ::= `iree.list.create` ($initial_capacity^)? attr-dict `:` type($result)
+```
+
+Creates a new empty list with an optional initial capacity.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`initial_capacity` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | list
+
 ### `iree.list.get` (::mlir::iree_compiler::IREE::ListGetOp)
 
 element accessor
@@ -119,7 +144,7 @@ element accessor
 Syntax:
 
 ```
-operation ::= `iree.list.get` operands attr-dict `:` custom<ListType>(type($list), type($result))
+operation ::= `iree.list.get` $list `[` $index `]` attr-dict `:` custom<ListTypeGet>(type($list), type($result))
 ```
 
 Returns the value of the element at the given index. Note that the value
@@ -168,7 +193,7 @@ element mutator
 Syntax:
 
 ```
-operation ::= `iree.list.set` operands attr-dict `:` custom<ListType>(type($list), type($value))
+operation ::= `iree.list.set` $list `[` $index `]` `,` $value attr-dict `:` custom<ListTypeSet>(type($list), type($value))
 ```
 
 Sets the element at the given index to the new value.

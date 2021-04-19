@@ -2600,7 +2600,8 @@ Syntax:
 operation ::= `vm.rodata.inline` ($name^)? attr-dict `:` type($result) `=` $value
 ```
 
-vm.rodata that can be embedded inline in functions.
+vm.rodata that can be embedded inline in functions. See vm.rodata for more
+information.
 
 #### Attributes:
 
@@ -2608,6 +2609,7 @@ vm.rodata that can be embedded inline in functions.
 | :-------: | :-------: | ----------- |
 `name` | ::mlir::StringAttr | string attribute
 `value` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`alignment` | ::mlir::IntegerAttr | 64-bit signless integer attribute
 
 #### Results:
 
@@ -2628,12 +2630,17 @@ value leaves the module. For example, returning rodata from an exported
 function must keep the data (possibly backed by mmap) valid for its entire
 lifetime.
 
+By default all rodata will be aligned in the final module output at a
+16-byte granularity. An optional alignment can be specified to override the
+default for cases where larger or smaller alignments are needed.
+
 #### Attributes:
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
 `sym_name` | ::mlir::StringAttr | string attribute
 `value` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`alignment` | ::mlir::IntegerAttr | 64-bit signless integer attribute
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.select.i32` (::mlir::iree_compiler::IREE::VM::SelectI32Op)
