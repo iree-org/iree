@@ -40,3 +40,24 @@ func @subtensor_convert(%arg0 : tensor<?x24x48xf32>, %arg1 : index) ->
 //   CHECK-DAG:   %[[UNMODIFIED2:.+]] = subtensor %[[SLICE2]][0, 0, 0] [%[[D1]], 12, 24] [1, 2, 2]
 //   CHECK-DAG:   %[[UNMODIFIED3:.+]] = subtensor %[[ARG0]][0, %[[ARG1]], 0]
 //       CHECK:   return %[[UNMODIFIED1]], %[[UNMODIFIED2]], %[[UNMODIFIED3]]
+
+// -----
+
+func @rank_reducing_subtensor(%arg0: tensor<2x513xi32>, %arg1: index,
+                              %arg2: index) -> tensor<513xi32> {
+  %0 = subtensor %arg0[%arg1, %arg2] [1, 513] [1, 1] : tensor<2x513xi32> to tensor<513xi32>
+  return %0 : tensor<513xi32>
+}
+// CHECK-LABEL: func @rank_reducing_subtensor
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]*]]
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]*]]
+//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]*]]
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C513:.+]] = constant 513 : index
+//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]]
+//  CHECK-SAME:       [%[[ARG1]], %[[ARG2]] for %[[C1]], %[[C513]]]
+//  CHECK-SAME:       : tensor<2x513xi32>{%[[C2]], %[[C513]]}
+//  CHECK-SAME:       -> tensor<1x513xi32>{%[[C1]], %[[C513]]}
+//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[SLICE]] : tensor<1x513xi32> -> tensor<513xi32>
+//       CHECK:   return %[[RESHAPE]] : tensor<513xi32>
