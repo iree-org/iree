@@ -833,6 +833,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rrrCrD, r) {
   if (iree_status_is_ok(status)) {
     iree_hal_executable_spec_t spec;
     iree_hal_executable_spec_initialize(&spec);
+    spec.caching_mode |=
+        executable_data->origin == IREE_VM_BYTE_BUFFER_ORIGIN_MODULE
+            ? IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA
+            : 0;
     spec.executable_format = executable_format_str;
     spec.executable_data = executable_data->data;
     spec.executable_layout_count = executable_layout_count;
