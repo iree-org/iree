@@ -525,22 +525,25 @@ void iree_task_dispatch_issue_sharded(
   shared_state->dispatch_task = dispatch_task;
 
   // Fetch the workgroup count (directly or indirectly).
-  // By the task being ready to execute we know any dependencies on the
-  // indirection buffer have been satisfied and its safe to read.
   if (dispatch_task->header.flags & IREE_TASK_FLAG_DISPATCH_INDIRECT) {
-    memcpy(shared_state->workgroup_count, dispatch_task->workgroup_count.ptr,
-           sizeof(shared_state->workgroup_count));
-  } else {
-    memcpy(shared_state->workgroup_count, dispatch_task->workgroup_count.value,
-           sizeof(shared_state->workgroup_count));
+    // By the task being ready to execute we know any dependencies on the
+    // indirection buffer have been satisfied and its safe to read. We perform
+    // the indirection here and convert the dispatch to a direct one such that
+    // following code can read the value.
+    // TODO(benvanik): non-one-shot command buffers won't be able to do this as
+    // the intent is that they can be dynamic per execution.
+    const uint32_t* source_ptr = dispatch_task->workgroup_count.ptr;
+    memcpy(dispatch_task->workgroup_count.value, source_ptr,
+           sizeof(dispatch_task->workgroup_count.value));
+    dispatch_task->header.flags ^= IREE_TASK_FLAG_DISPATCH_INDIRECT;
   }
+  const uint32_t* workgroup_count = dispatch_task->workgroup_count.value;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   char xyz_string[32];
-  int xyz_string_length = snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string),
-                                   "%ux%ux%u", shared_state->workgroup_count[0],
-                                   shared_state->workgroup_count[1],
-                                   shared_state->workgroup_count[2]);
+  int xyz_string_length =
+      snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
+               workgroup_count[0], workgroup_count[1], workgroup_count[2]);
   IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
@@ -552,9 +555,8 @@ void iree_task_dispatch_issue_sharded(
   // Setup the iteration space for shards to pull work from the complete grid.
   iree_atomic_store_int32(&shared_state->tile_index, 0,
                           iree_memory_order_relaxed);
-  shared_state->tile_count = shared_state->workgroup_count[0] *
-                             shared_state->workgroup_count[1] *
-                             shared_state->workgroup_count[2];
+  shared_state->tile_count =
+      workgroup_count[0] * workgroup_count[1] * workgroup_count[2];
 
   // Compute shard count - almost always worker_count unless we are a very small
   // dispatch (1x1x1, etc).
@@ -785,7 +787,7 @@ iree_status_t iree_task_dispatch_shard_execute(
   iree_task_tile_context_t tile_context;
   memcpy(&tile_context.workgroup_size, dispatch_task->workgroup_size,
          sizeof(tile_context.workgroup_size));
-  memcpy(&tile_context.workgroup_count, task->shared_state->workgroup_count,
+  memcpy(&tile_context.workgroup_count, dispatch_task->workgroup_count.value,
          sizeof(tile_context.workgroup_count));
   tile_context.shared_memory = shared_state->shared_memory;
   uint32_t workgroup_count_x = tile_context.workgroup_count[0];

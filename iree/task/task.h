@@ -459,10 +459,6 @@ typedef iree_alignas(iree_max_align_t) struct {
   // reasonable number chosen based on the tile and shard counts.
   uint32_t tiles_per_reservation;
 
-  // Total workgroup count for the task. Can be used in conjunction with the
-  // per-invocation workgroup_xyz and workgroup_size to compute offsets/indices.
-  uint32_t workgroup_count[3];
-
   // Incoherent memory shared across all invocations of the task.
   // Aligned to at least the natural pointer size of the machine. Functions must
   // use atomic operations to ensure proper memory ordering.

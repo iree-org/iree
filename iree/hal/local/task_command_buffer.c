@@ -707,7 +707,8 @@ static iree_status_t iree_hal_task_command_buffer_bind_descriptor_set(
 typedef struct {
   iree_task_dispatch_t task;
   iree_hal_local_executable_t* executable;
-  iree_host_size_t ordinal;
+  int32_t ordinal;
+
   iree_hal_executable_dispatch_state_v0_t state;
 } iree_hal_cmd_dispatch_t;
 
