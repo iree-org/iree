@@ -78,9 +78,11 @@ iree_hal_heap_allocator_query_buffer_compatibility(
   // based on what's both allowed and intended.
   intended_usage &= allowed_usage;
 
-  // All buffers can be allocated on the heap.
+  // All buffers can be allocated on the heap and all heap-accessible buffers
+  // can be imported.
   iree_hal_buffer_compatibility_t compatibility =
-      IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
+      IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE |
+      IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE;
 
   // Buffers can only be used on the queue if they are device visible.
   // This is not a strict requirement of heap buffers but matches devices that
