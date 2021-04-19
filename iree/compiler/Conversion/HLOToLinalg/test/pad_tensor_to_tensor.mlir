@@ -1,5 +1,4 @@
 // RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors -iree-linalg-on-tensors-path -canonicalize %s | IreeFileCheck %s
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors -iree-linalg-on-tensors-path %s | IreeFileCheck %s --check-prefix=CHECK-NOCAN
 
 module  {
   func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
@@ -32,9 +31,6 @@ module  {
 //       CHECK:   %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
 //       CHECK:   %[[RESULT:.+]] = subtensor_insert %[[ARG0]] into %[[FILL]][4, %[[ARG2]]] [%[[D0]], %[[D1]]] [1, 1]
 //       CHECK:   return %[[RESULT]]
-//
-// CHECK-NOCAN:      func @pad_tensor
-// CHECK-NOCAN-NOT:    tensor.cast
 
 // -----
 
@@ -60,6 +56,3 @@ module  {
 //       CHECK:   %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
 //       CHECK:   %[[RESULT:.+]] = subtensor_insert %[[ARG0]] into %[[FILL]][4, 5] [12, 4] [1, 1]
 //       CHECK:   return %[[RESULT]]
-//
-// CHECK-NOCAN:      func @pad_tensor_static
-// CHECK-NOCAN-NOT:    tensor.cast

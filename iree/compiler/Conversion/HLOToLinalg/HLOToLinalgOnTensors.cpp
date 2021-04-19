@@ -119,14 +119,8 @@ struct PadTensorOpConversion : public OpConversionPattern<linalg::PadTensorOp> {
     Value fill =
         rewriter.create<linalg::FillOp>(loc, initTensor, yieldVal).getResult(0);
     SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
-    Value replacement = rewriter.create<SubTensorInsertOp>(
-        loc, source, fill, lowPad, sourceShape, strides);
-    // TODO(hanchung): Revisit if this is still the case.
-    if (padTensorOp.getResultType() != replacement.getType()) {
-      replacement = rewriter.create<tensor::CastOp>(
-          loc, padTensorOp.getResultType(), replacement);
-    }
-    rewriter.replaceOp(padTensorOp, replacement);
+    rewriter.replaceOpWithNewOp<SubTensorInsertOp>(
+        padTensorOp, source, fill, lowPad, sourceShape, strides);
     return success();
   }
 };
