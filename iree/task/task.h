@@ -445,9 +445,6 @@ typedef struct iree_task_dispatch_s iree_task_dispatch_t;
 
 // Shared state for all shards processing a dispatch.
 typedef iree_alignas(iree_max_align_t) struct {
-  // Direct reference to the parent dispatch that all shards are processing.
-  iree_task_dispatch_t* dispatch_task;
-
   // The tail tile index; the next reservation will start from here.
   iree_atomic_int32_t tile_index;
 
@@ -648,6 +645,9 @@ void iree_task_dispatch_slice_initialize(iree_task_dispatch_t* dispatch_task,
 typedef iree_alignas(iree_max_align_t) struct {
   // Task header: implementation detail, do not use.
   iree_task_t header;
+
+  // The root dispatch task that this shard is a part of.
+  iree_task_dispatch_t* dispatch_task;
 
   // Active dispatch progress shared across all shards.
   // Each shard will be read/modify/writing this and there's likely to be

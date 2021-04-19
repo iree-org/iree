@@ -522,7 +522,6 @@ void iree_task_dispatch_issue_sharded(
 
   iree_task_dispatch_shard_state_t* shared_state =
       &dispatch_task->shared.shard_state;
-  shared_state->dispatch_task = dispatch_task;
 
   // Fetch the workgroup count (directly or indirectly).
   if (dispatch_task->header.flags & IREE_TASK_FLAG_DISPATCH_INDIRECT) {
@@ -754,6 +753,7 @@ void iree_task_dispatch_shard_initialize(
   iree_task_initialize(IREE_TASK_TYPE_DISPATCH_SHARD,
                        dispatch_task->header.scope, &out_task->header);
   iree_task_set_completion_task(&out_task->header, &dispatch_task->header);
+  out_task->dispatch_task = dispatch_task;
   out_task->shared_state = shared_state;
 }
 
@@ -778,12 +778,12 @@ iree_status_t iree_task_dispatch_shard_execute(
     iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_task_dispatch_shard_state_t* shared_state = task->shared_state;
-  iree_task_dispatch_t* dispatch_task = shared_state->dispatch_task;
+  iree_task_dispatch_t* dispatch_task = task->dispatch_task;
   IREE_TRACE_ZONE_SET_COLOR(
       z0, iree_math_ptr_to_xrgb(dispatch_task->closure.user_context));
 
   // Prepare context shared for all tiles in the shard.
+  iree_task_dispatch_shard_state_t* shared_state = task->shared_state;
   iree_task_tile_context_t tile_context;
   memcpy(&tile_context.workgroup_size, dispatch_task->workgroup_size,
          sizeof(tile_context.workgroup_size));
