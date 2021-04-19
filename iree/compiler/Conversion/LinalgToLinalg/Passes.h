@@ -22,6 +22,8 @@ namespace iree_compiler {
 /// linalg.matmul
 std::unique_ptr<OperationPass<FuncOp>> createConvert1x1ConvToMatmulPass();
 
+std::unique_ptr<OperationPass<FuncOp>> createConvertConv2DToImg2ColPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 #endif  // IREE_COMPILER_CONVERSION_LINALGTOLINALG_PASSES_H_

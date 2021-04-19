@@ -78,8 +78,6 @@ func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %fil
 // CHECK:       linalg.conv_2d_input_nhwc_filter_hwcf
 
 // CHECK: flow.dispatch.workgroups
-// CHECK:   scf.for
-// CHECK:     scf.for
 // CHECK:       linalg.generic
 
 // -----
@@ -116,6 +114,4 @@ func @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x225x16xf32>, %
 // CHECK:       linalg.conv_2d_input_nhwc_filter_hwcf
 
 // CHECK: flow.dispatch.workgroups
-// CHECK:   scf.for
-// CHECK:     scf.for
 // CHECK:       linalg.generic

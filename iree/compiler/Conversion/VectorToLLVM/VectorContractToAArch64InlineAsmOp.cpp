@@ -167,7 +167,6 @@ void VectorToAArch64InlineAsmPass::runOnFunction() {
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     signalPassFailure();
   }
-  return;
 }
 
 std::unique_ptr<FunctionPass> createVectorToAArch64InlineAssemblyPass() {

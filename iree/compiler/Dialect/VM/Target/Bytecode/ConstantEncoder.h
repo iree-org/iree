@@ -28,6 +28,7 @@ namespace VM {
 // Serializes a constant attribute to the FlatBuffer as a binary blob.
 flatbuffers_uint8_vec_ref_t serializeConstant(Location loc,
                                               ElementsAttr elementsAttr,
+                                              size_t alignment,
                                               FlatbufferBuilder &fbb);
 
 }  // namespace VM

@@ -43,15 +43,27 @@
 
 #define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors"
 
+// TODO(ravishankarm): Prune this list. These flags should go away ASAP!!
+
 static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     "iree-flow-dispatch-linalg-on-tensors-tile-sizes",
     llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
     llvm::cl::CommaSeparated);
 
+// TODO(#5040): This works for the most part but the downstream bufferization
+// needs to be sorted out before this can be made the default. Remove after
+// making this default.
 static llvm::cl::opt<bool> clEnableOperandFusion(
     "iree-flow-dispatch-formation-enable-operand-fusion",
     llvm::cl::desc(
         "Enable fusing operand producers during dispatch region formation"),
+    llvm::cl::init(false));
+
+// TODO(#5045): Tile and distribute on CPU causes performance regressions. This
+// needs to be addressed before this can be turned on by default.
+static llvm::cl::opt<bool> clTileAndDistributeElementwiseOps(
+    "iree-flow-tile-and-distribute-elementwise-ops",
+    llvm::cl::desc("Enable tile and distribute on elementwise operations"),
     llvm::cl::init(false));
 
 static const char kRootOpAttr[] = "__root_op__";
@@ -167,7 +179,7 @@ static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
 }
 
 /// Appends the given `op` to the `newGroups` fusion groups.
-static void appendFusionGroups(Operation *op, ArrayRef<int64_t> newGroups) {
+static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
   SmallVector<int64_t, 1> fusionGroups = getFusionGroups(op);
   fusionGroups.append(newGroups.begin(), newGroups.end());
   op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
@@ -223,17 +235,12 @@ static bool isRootOp(Operation *op) {
     }
   }
 
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    return llvm::all_of(genericOp.getIndexingMaps(), [](AffineMap map) {
-      return map.isProjectedPermutation();
-    });
-  }
-
   return isa<linalg::ConvInputNHWCFilterHWCFOp,
              linalg::DepthwiseConvInputNHWCFilterHWCOp,
              linalg::DepthwiseConvInputNHWCFilterHWCFOp,
-             linalg::PoolingNHWCSumFOp, linalg::PoolingNHWCMaxFOp,
-             linalg::PoolingNHWCMinFOp>(op);
+             linalg::PoolingNHWCMaxI8Op, linalg::PoolingNHWCMaxI16Op,
+             linalg::PoolingNHWCMaxI32Op, linalg::PoolingNHWCSumFOp,
+             linalg::PoolingNHWCMaxFOp, linalg::PoolingNHWCMinFOp>(op);
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
@@ -807,17 +814,28 @@ struct TileAndDistributeOnTensorsPattern
 
 /// The workload is computed based on the problem size. For a given operation,
 /// return the problem size.
-static Optional<SmallVector<Value, 4>> getResultShape(PatternRewriter &rewriter,
-                                                      Operation *op) {
+static Optional<SmallVector<Value>> getResultShape(PatternRewriter &rewriter,
+                                                   Operation *op) {
   Location loc = op->getLoc();
-  auto getShapeOfShapedTypeVal = [&](Value v) -> SmallVector<Value, 4> {
-    return llvm::to_vector<4>(llvm::map_range(
-        llvm::seq<int64_t>(0, v.getType().cast<ShapedType>().getRank()),
-        [&](int64_t dim) -> Value {
-          return rewriter.create<memref::DimOp>(loc, v, dim);
-        }));
+  auto getShapeOfShapedTypeVal = [&](Value v) -> SmallVector<Value> {
+    SmallVector<Value> shape;
+    for (auto dim :
+         llvm::seq<int64_t>(0, v.getType().cast<ShapedType>().getRank())) {
+      shape.push_back(rewriter.createOrFold<memref::DimOp>(loc, v, dim));
+    }
+    return shape;
   };
   if (op->getNumResults() != 1) return llvm::None;
+
+  // Check if the op implements the shape interface.
+  if (auto shapedOp = dyn_cast<InferShapedTypeOpInterface>(op)) {
+    SmallVector<SmallVector<Value>> resultShape;
+    if (succeeded(shapedOp.reifyReturnTypeShapesPerResultDim(rewriter,
+                                                             resultShape)) &&
+        resultShape.size() == 1) {
+      return resultShape[0];
+    }
+  }
 
   // TODO(ravishankarm): Since the workload depends on the output shape, set the
   // insertion point to after the operation. After dim canonicalization, the
@@ -857,10 +875,9 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 
     // The workgroup count is based on the result shape.
     if (op->getNumResults() != 1) return failure();
-    Optional<SmallVector<Value, 4>> resultShapeOpt =
-        getResultShape(rewriter, op);
+    Optional<SmallVector<Value>> resultShapeOpt = getResultShape(rewriter, op);
     if (!resultShapeOpt) return failure();
-    SmallVector<Value, 4> resultShape = *resultShapeOpt;
+    SmallVector<Value> resultShape = *resultShapeOpt;
 
     // TODO(ravishankarm): For now the Flow -> HAL conversion only handles
     // workload count of 3, though it should be generalized. For now making sure
@@ -868,7 +885,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     // workloads for all higher dimensions greater than or equal to
     // kNumMaxParallelDims.
     Location loc = op->getLoc();
-    SmallVector<Value, 4> count = resultShape;
+    SmallVector<Value, 4> count(resultShape.begin(), resultShape.end());
     if (count.size() > kNumMaxParallelDims) {
       unsigned numSymbols = 0;
       AffineExpr expr = rewriter.getAffineSymbolExpr(numSymbols++);
@@ -908,6 +925,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
       pullInProducersInSameGroup(
           rewriter, dispatchOp, clonedLinalgOp, shapedOperands,
           /*tiledLoops=*/ArrayRef<Operation *>(), rootOpAttr.getInt());
+      clonedLinalgOp->removeAttr(kRootOpAttr);
     }
 
     rewriter.replaceOpWithIf(op, dispatchOp.getOperation()->getResults(),
@@ -933,45 +951,45 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 /// heuristic is used below, but the mechanism should be general enough to
 /// capture any heuristic.
 
-/// Checks if the `producer` can be fused into the dispatch region of the
-/// `consumer`.
-static bool isProducerFusable(linalg::LinalgOp producer,
-                              linalg::LinalgOp consumer,
-                              OpOperand &consumerOperand) {
-  if (consumer.isInputTensor(&consumerOperand)) {
-    if (!clEnableOperandFusion) return false;
+/// Sets elementwise operations as root operations.
+// TODO(#5045): After the regression issue on CPU side is addressed, this can be
+// folded into the main logic of fusion.
+template <typename GenericOpTy>
+static unsigned makeElementwiseOpsRootOps(FuncOp funcOp, unsigned numRoots) {
+  MLIRContext *context = funcOp.getContext();
+  OpBuilder builder(context);
+  for (Block &block : funcOp) {
+    auto linalgOps = block.getOps<linalg::LinalgOp>();
+    for (linalg::LinalgOp linalgOp : llvm::reverse(linalgOps)) {
+      Operation *op = linalgOp.getOperation();
+      if (op->getAttrOfType<IntegerAttr>(kRootOpAttr) ||
+          op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr))
+        continue;
+      if (!isa<GenericOpTy>(op) ||
+          !llvm::all_of(
+              cast<linalg::LinalgOp>(op).getIndexingMaps(),
+              [](AffineMap map) { return map.isProjectedPermutation(); })) {
+        continue;
+      }
+      unsigned newGroup = numRoots++;
+      op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(newGroup));
 
-    // Make sure that we have an identity indexing map for the operand for now.
-    //
-    // Theoretically with tensor abstraction, we can pull in whatever operand
-    // subrange for fusion. But if the consumer's access patterns for the input
-    // and output are not the same, we must materialize buffers for holding the
-    // temporary result, because we can have multiple levels of distribution.
-    // Identity map makes sure that we can actually avoid a new intermediate
-    // buffer and directly use the one for the consumer.
-    auto map = consumer.getIndexingMap(consumerOperand.getOperandNumber());
-    if (!map.isIdentity()) return false;
-
-    // If the producer's result is used by the consumer as an input, fuse if
-    // this producer has no other users.
-    return consumerOperand.get().hasOneUse();
-  } else {
-    // If the producer's result is used by the consumer as an output
-    // initializer, fuse if the producer is an elementwise parallel operation.
-    auto isElementWiseParallelOp = [](linalg::LinalgOp op) {
-      return llvm::all_of(op.iterator_types(), [](Attribute attr) {
-        return linalg::isParallelIteratorType(attr);
-      });
-    };
-    return isElementWiseParallelOp(producer);
+      for (OpOperand *operand : linalgOp.getOutputTensorsOpOperands()) {
+        auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
+        if (!producer) continue;
+        if (producer.getNumLoops() != producer.getNumParallelLoops()) continue;
+        appendToFusionGroup(producer, newGroup);
+      }
+    }
   }
+  return numRoots;
 }
 
 /// For a given block partition the LinalgOps in the block into fusable
 /// groups. All analysis of what to fuse happens here. For now this is just
 /// hard-wiring from basic heuristic but this could be adapted to have 1) better
 /// heuristics and 2) use a search approach to decide what all should be fused.
-static void decideFusableLinalgOps(FuncOp funcOp) {
+static unsigned decideFusableLinalgOps(FuncOp funcOp) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp.getContext();
   OpBuilder builder(context);
@@ -985,42 +1003,53 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
       // Start with a root operation and fuse its producers.
       Operation *op = linalgOp.getOperation();
       if (!isRootOp(op)) continue;
-
-      // This might be a root op that is already fused into another root op.
-      // In that case, it has fusion groups attached on it.
-      SmallVector<int64_t, 1> fusionGroups = getFusionGroups(op);
-      if (fusionGroups.empty()) {
-        // Otherwise, create a new group.
-        unsigned newGroup = numRootOps++;
-        fusionGroups.push_back(newGroup);
-        op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(newGroup));
-      }
-
-      for (OpOperand *operand : linalgOp.getInputTensorsOpOperands()) {
-        auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
-        if (!producer) continue;
-        Operation *producerOp = producer.getOperation();
-        if (!isProducerFusable(producer, op, *operand)) continue;
-
-        appendFusionGroups(producerOp, fusionGroups);
-
-        // For input operands, only allow fusing the first one for now. This
-        // avoids pulling in two many operations in the same region. Multiple
-        // inputs also means it's less likely to elide all the intermediate
-        // buffers.
-        break;
-      }
+      unsigned newGroup = numRootOps++;
+      op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(newGroup));
 
       for (OpOperand *operand : linalgOp.getOutputTensorsOpOperands()) {
         auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
         if (!producer) continue;
-        Operation *producerOp = producer.getOperation();
-        if (!isProducerFusable(producer, op, *operand)) continue;
+        if (producer.getNumLoops() != producer.getNumParallelLoops()) continue;
+        appendToFusionGroup(producer, newGroup);
+      }
+    }
 
-        appendFusionGroups(producerOp, fusionGroups);
+    if (clEnableOperandFusion) {
+      // To fuse root operations with their consumers, for all root ops chosen.
+      // If, 1) The root op has a single use 2) The consumer is an elementwise
+      // operation 3) The indexing map in the producer and consumer are identity
+      // maps The root operation can be fused with its consumer. To do this,
+      // mark the consumer as the root and add the operation to the fusion
+      // group.
+      for (linalg::LinalgOp linalgOp : linalgOps) {
+        Operation *op = linalgOp.getOperation();
+        IntegerAttr rootOpAttr = op->getAttrOfType<IntegerAttr>(kRootOpAttr);
+        if (!rootOpAttr) continue;
+        if (op->getNumResults() != 1 || !op->hasOneUse()) continue;
+        OpOperand &use = *op->use_begin();
+        Operation *user = use.getOwner();
+        if (user->getAttrOfType<IntegerAttr>(kRootOpAttr) ||
+            user->getAttrOfType<IntegerAttr>(kFusionGroupsAttr))
+          continue;
+        linalg::LinalgOp consumer = dyn_cast<linalg::LinalgOp>(use.getOwner());
+        if (!consumer ||
+            consumer.getNumLoops() != consumer.getNumParallelLoops())
+          continue;
+        AffineMap consumerIndexingMap =
+            consumer.getInputIndexingMap(use.getOperandNumber());
+        AffineMap producerIndexingMap = linalgOp.getOutputIndexingMap(0);
+        if (!consumerIndexingMap.isIdentity() ||
+            producerIndexingMap.getResults() !=
+                consumerIndexingMap.getResults()) {
+          continue;
+        }
+        user->setAttr(kRootOpAttr, rootOpAttr);
+        op->removeAttr(kRootOpAttr);
+        appendToFusionGroup(op, rootOpAttr.getInt());
       }
     }
   }
+  return numRootOps;
 }
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
@@ -1031,7 +1060,10 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   MLIRContext *context = funcOp->getContext();
   context->allowUnregisteredDialects(true);
 
-  decideFusableLinalgOps(funcOp);
+  unsigned numRoots = decideFusableLinalgOps(funcOp);
+  if (clTileAndDistributeElementwiseOps) {
+    makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
+  }
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
@@ -1111,6 +1143,18 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     patterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(context);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
+
+  // If elementwise operations are not tiled and distributed, the wont be marked
+  // as root ops previously. Mark them so here to allow fusion of `fill` etc.
+  numRoots = makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
+  makeElementwiseOpsRootOps<linalg::IndexedGenericOp>(funcOp, numRoots);
+
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs()
+        << "\n--- After annotating linalg op fusion scheme for fallback ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures.

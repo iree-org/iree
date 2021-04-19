@@ -740,6 +740,9 @@ static LogicalResult getPoolingOpLaunchConfig(
                                     config);                            \
   }
 
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxI8Op)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxI16Op)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxI32Op)
 DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxFOp)
 DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMinFOp)
 DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCSumFOp)
@@ -796,6 +799,9 @@ Optional<LaunchConfig> initGPULaunchConfig(
     DISPATCH(linalg::ConvInputNHWCFilterHWCFOp)
     DISPATCH(linalg::ConvInputNDHWCFilterDHWCFOp)
     DISPATCH(linalg::MatmulOp)
+    DISPATCH(linalg::PoolingNHWCMaxI8Op)
+    DISPATCH(linalg::PoolingNHWCMaxI16Op)
+    DISPATCH(linalg::PoolingNHWCMaxI32Op)
     DISPATCH(linalg::PoolingNHWCMaxFOp)
     DISPATCH(linalg::PoolingNHWCMinFOp)
     DISPATCH(linalg::PoolingNHWCSumFOp)

@@ -24,8 +24,7 @@ class LLVMTypeConverter;
 namespace iree_compiler {
 
 /// A pass that converts vector dialect operations to inline assembly
-std::unique_ptr<OperationPass<ModuleOp>>
-createVectorToAArch64InlineAssemblyPass();
+std::unique_ptr<FunctionPass> createVectorToAArch64InlineAssemblyPass();
 
 /// Populates `patterns` to convert vector.contract op to a sequence
 /// of AArch64 inline assembly operations.

@@ -957,7 +957,10 @@ iree_status_to_string(iree_status_t status, char** out_buffer,
                                         /*buffer=*/NULL, &buffer_length))) {
     return false;
   }
-  char* buffer = (char*)malloc(buffer_length + 1);
+  // Buffer capacity needs to be +1 to account for the terminating null of
+  // snprintf.
+  buffer_length++;
+  char* buffer = (char*)malloc(buffer_length);
   if (IREE_UNLIKELY(!buffer)) return false;
   bool ret =
       iree_status_format(status, buffer_length, buffer, out_buffer_length);

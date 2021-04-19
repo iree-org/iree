@@ -85,7 +85,7 @@ struct SplitIndependentReductionOpConversion
         int operandSetIndex =
             std::distance(block.args_begin(),
                           llvm::find(block.getArguments(), operand)) %
-            newOperands.operands().size();
+            newOperands.inputs().size();
         if (operandSetIndex != opSetIndex) {
           // Operand is not coming from the same set as the other operands of
           // this op; unsupported.
@@ -102,7 +102,7 @@ struct SplitIndependentReductionOpConversion
       }
 
       // Create the new op for this set.
-      Value operandArg = srcOp.operands()[opSetIndex];
+      Value operandArg = srcOp.inputs()[opSetIndex];
       Value initArg = srcOp.init_values()[opSetIndex];
       auto splitOp = rewriter.create<mhlo::ReduceOp>(
           op.getLoc(), ValueRange{operandArg}, ValueRange{initArg},
@@ -156,7 +156,7 @@ struct BuiltinReduceOpConversion : public OpConversionPattern<mhlo::ReduceOp> {
 
     auto operand = operands[0];
     auto operandShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.operands()[0], typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.inputs()[0], typeConverter, rewriter);
     auto initValue = operands[1];
     auto initValueShape = VMLAConversionTarget::getTensorShape(
         srcOp.getLoc(), srcOp.init_values()[0], typeConverter, rewriter);
@@ -166,7 +166,7 @@ struct BuiltinReduceOpConversion : public OpConversionPattern<mhlo::ReduceOp> {
     auto dstShape = VMLAConversionTarget::getTensorShape(
         srcOp.getLoc(), srcOp.getResults()[0], typeConverter, rewriter);
     auto elementType =
-        srcOp.operands()[0].getType().cast<ShapedType>().getElementType();
+        srcOp.inputs()[0].getType().cast<ShapedType>().getElementType();
 
     auto &computeOp = *srcOp.body().front().begin();
     if (isa<mlir::AddIOp>(computeOp) || isa<mlir::AddFOp>(computeOp) ||

@@ -27,7 +27,6 @@ iree_cc_library(
     "LLVMCodeGenOptions.h"
     "Passes.h"
   SRCS
-    "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
     "FoldTensorExtractOpPass.cpp"
     "KernelDispatch.cpp"

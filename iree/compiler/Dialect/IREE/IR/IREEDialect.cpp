@@ -39,7 +39,9 @@ IREEDialect::IREEDialect(MLIRContext* context)
 Type IREEDialect::parseType(DialectAsmParser& parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (spec.consume_front("ptr")) {
+  if (spec == "variant") {
+    return IREE::VariantType::get(getContext());
+  } else if (spec.consume_front("ptr")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
           << "malformed ptr type '" << parser.getFullSymbolSpec() << "'";
@@ -63,7 +65,12 @@ Type IREEDialect::parseType(DialectAsmParser& parser) const {
           << "malformed list type '" << parser.getFullSymbolSpec() << "'";
       return Type();
     }
-    auto elementType = mlir::parseType(spec, getContext());
+    Type elementType;
+    if (spec == "?") {
+      elementType = IREE::VariantType::get(getContext());
+    } else {
+      elementType = mlir::parseType(spec, getContext());
+    }
     if (!elementType) {
       parser.emitError(parser.getCurrentLocation())
           << "invalid list element type specification: '"
@@ -77,14 +84,22 @@ Type IREEDialect::parseType(DialectAsmParser& parser) const {
 }
 
 void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
-  if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
+  if (type.isa<IREE::VariantType>()) {
+    os << "variant";
+  } else if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
     os << "ptr<" << ptrType.getTargetType() << ">";
   } else if (type.isa<IREE::ByteBufferType>()) {
     os << "byte_buffer";
   } else if (type.isa<IREE::MutableByteBufferType>()) {
     os << "mutable_byte_buffer";
   } else if (auto listType = type.dyn_cast<IREE::ListType>()) {
-    os << "list<" << listType.getElementType() << ">";
+    os << "list<";
+    if (listType.getElementType().isa<IREE::VariantType>()) {
+      os << "?";
+    } else {
+      os << listType.getElementType();
+    }
+    os << ">";
   } else {
     llvm_unreachable("unhandled IREE type");
   }

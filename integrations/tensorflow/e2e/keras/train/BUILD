@@ -62,6 +62,7 @@ iree_e2e_cartesian_product_test_suite(
                 "ftrl",
                 "nadam",
                 "rmsprop",
+                "sgd",
             ],
             "target_backends": [
                 # TODO(b/157581521)

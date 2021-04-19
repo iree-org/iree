@@ -106,7 +106,7 @@ Value rewriteReduce(RankedShapeType resultShape, ReduceOp reduceOp,
   Value operandShape;
   SmallVector<Value, 4> operandShapes;
   RankedShapeType operandRs;
-  for (auto operand : reduceOp.operands()) {
+  for (auto operand : reduceOp.inputs()) {
     auto shape = builder.create<GetRankedShapeOp>(loc, operand);
     operandRs = shape.getRankedShape();
     operandShapes.push_back(shape);

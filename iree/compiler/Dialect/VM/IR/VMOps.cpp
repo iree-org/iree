@@ -693,17 +693,19 @@ static LogicalResult verifyListGetRefOp(ListGetRefOp &op) {
                       .cast<IREE::VM::ListType>();
   auto elementType = listType.getElementType();
   auto resultType = op.result().getType();
-  if (elementType.isa<IREE::VM::RefType>() !=
-      resultType.isa<IREE::VM::RefType>()) {
-    // Attempting to go between a primitive type and ref type.
-    return op.emitError() << "cannot convert between list type " << elementType
-                          << " and result type " << resultType;
-  } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
-    if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
-        elementType != resultType) {
-      // List has a concrete type, verify it matches.
-      return op.emitError() << "list contains " << elementType
-                            << " that cannot be accessed as " << resultType;
+  if (!elementType.isa<IREE::VM::OpaqueType>()) {
+    if (elementType.isa<IREE::VM::RefType>() !=
+        resultType.isa<IREE::VM::RefType>()) {
+      // Attempting to go between a primitive type and ref type.
+      return op.emitError() << "cannot convert between list type "
+                            << elementType << " and result type " << resultType;
+    } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
+      if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
+          elementType != resultType) {
+        // List has a concrete type, verify it matches.
+        return op.emitError() << "list contains " << elementType
+                              << " that cannot be accessed as " << resultType;
+      }
     }
   }
   return success();
@@ -717,17 +719,19 @@ static LogicalResult verifyListSetRefOp(ListSetRefOp &op) {
                       .cast<IREE::VM::ListType>();
   auto elementType = listType.getElementType();
   auto valueType = op.value().getType();
-  if (elementType.isa<IREE::VM::RefType>() !=
-      valueType.isa<IREE::VM::RefType>()) {
-    // Attempting to go between a primitive type and ref type.
-    return op.emitError() << "cannot convert between list type " << elementType
-                          << " and value type " << valueType;
-  } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
-    if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
-        elementType != valueType) {
-      // List has a concrete type, verify it matches.
-      return op.emitError() << "list contains " << elementType
-                            << " that cannot be mutated as " << valueType;
+  if (!elementType.isa<IREE::VM::OpaqueType>()) {
+    if (elementType.isa<IREE::VM::RefType>() !=
+        valueType.isa<IREE::VM::RefType>()) {
+      // Attempting to go between a primitive type and ref type.
+      return op.emitError() << "cannot convert between list type "
+                            << elementType << " and value type " << valueType;
+    } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
+      if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
+          elementType != valueType) {
+        // List has a concrete type, verify it matches.
+        return op.emitError() << "list contains " << elementType
+                              << " that cannot be mutated as " << valueType;
+      }
     }
   }
   return success();

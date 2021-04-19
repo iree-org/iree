@@ -283,6 +283,16 @@ void iree_task_wait_retire(iree_task_wait_t* task,
 
 // Returns an XXBBGGRR color (red in the lowest bits).
 // Must not be 0 (tracy will ignore).
+static uint32_t iree_math_ptr_to_xrgb(const uintptr_t ptr) {
+  // This is just a simple hack to give us a unique(ish) per-pointer color.
+  // It's only to make it easier to distinguish which tiles are from the same
+  // dispatch.
+  uint64_t ptr64 = ptr;
+  return (uint32_t)ptr64 ^ (uint32_t)(ptr64 >> 32);
+}
+
+// Returns an XXBBGGRR color (red in the lowest bits).
+// Must not be 0 (tracy will ignore).
 static uint32_t iree_task_tile_to_color(
     const iree_task_tile_context_t* tile_context);
 
@@ -666,6 +676,8 @@ iree_status_t iree_task_dispatch_slice_execute(
     iree_task_dispatch_slice_t* task,
     iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_SET_COLOR(z0,
+                            iree_math_ptr_to_xrgb(task->closure.user_context));
 
   // TODO(benvanik): coroutine support. Ideally this function can be called
   // multiple times for the same slice, and we'll have a way to ready up the
@@ -766,6 +778,8 @@ iree_status_t iree_task_dispatch_shard_execute(
 
   iree_task_dispatch_shard_state_t* shared_state = task->shared_state;
   iree_task_dispatch_t* dispatch_task = shared_state->dispatch_task;
+  IREE_TRACE_ZONE_SET_COLOR(
+      z0, iree_math_ptr_to_xrgb(dispatch_task->closure.user_context));
 
   // Prepare context shared for all tiles in the shard.
   iree_task_tile_context_t tile_context;
