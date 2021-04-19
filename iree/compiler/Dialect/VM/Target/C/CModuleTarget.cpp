@@ -654,7 +654,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 
   printInclude("iree/vm/api.h");
   printInclude("iree/vm/ops.h");
-  printInclude("iree/vm/shims.h");
+  printInclude("iree/vm/shims_emitc.h");
   output << "\n";
 
   printModuleComment(moduleOp, output);

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_TEST_EMITC_SHIMS_H_
-#define IREE_VM_TEST_EMITC_SHIMS_H_
+#ifndef IREE_VM_SHIMS_EMITC_H_
+#define IREE_VM_SHIMS_EMITC_H_
 
 #include "iree/vm/module.h"
 #include "iree/vm/stack.h"
@@ -80,4 +80,4 @@ static iree_status_t call_0ii_i_shim(iree_vm_stack_t* stack,
                    &results->ret0);
 }
 
-#endif  // IREE_VM_TEST_EMITC_SHIMS_H_
+#endif  // IREE_VM_SHIMS_EMITC_H_

@@ -312,8 +312,8 @@ cc_library(
 )
 
 cc_library(
-    name = "shims",
+    name = "shims_emitc",
     hdrs = [
-        "shims.h",
+        "shims_emitc.h",
     ],
 )

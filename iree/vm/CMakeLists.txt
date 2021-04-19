@@ -272,9 +272,9 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    shims
+    shims_emitc
   HDRS
-    "shims.h"
+    "shims_emitc.h"
   PUBLIC
 )
 
