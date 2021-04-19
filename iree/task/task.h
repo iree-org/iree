@@ -392,6 +392,8 @@ void iree_task_wait_initialize(iree_task_scope_t* scope,
 // #ifdefs.
 typedef struct {
   // TODO(benvanik): statistics counters.
+  // NOTE: each of these increases the command buffer storage requirements; we
+  // should always guard these with a compiler flag.
   iree_atomic_int32_t reserved;
 } iree_task_dispatch_statistics_t;
 
@@ -538,7 +540,7 @@ typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_s {
   // Optional transient shared memory size to allocate and pass into the
   // iree_task_context_t::shared_memory of each invocation of the task
   // closure.
-  iree_host_size_t shared_memory_size;
+  uint32_t shared_memory_size;
 
   // Statistics storage used for aggregating counters across all slices.
   iree_task_dispatch_statistics_t statistics;

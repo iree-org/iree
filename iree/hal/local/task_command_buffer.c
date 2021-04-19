@@ -709,7 +709,18 @@ typedef struct {
   iree_hal_local_executable_t* executable;
   int32_t ordinal;
 
-  iree_hal_executable_dispatch_state_v0_t state;
+  // Total number of available 4 byte push constant values in |push_constants|.
+  uint16_t push_constant_count;
+
+  // Total number of binding base pointers in |binding_ptrs| and
+  // |binding_lengths|. The set is packed densely based on which binidngs are
+  // used (known at compile-time).
+  uint16_t binding_count;
+
+  // Following this structure in memory there are 3 tables:
+  // - const uint32_t push_constants[push_constant_count];
+  // - void* binding_ptrs[binding_count];
+  // - const size_t binding_lengths[binding_count];
 } iree_hal_cmd_dispatch_t;
 
 static iree_status_t iree_hal_cmd_dispatch_tile(
@@ -719,8 +730,32 @@ static iree_status_t iree_hal_cmd_dispatch_tile(
       (const iree_hal_cmd_dispatch_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_executable_dispatch_state_v0_t state;
+  memset(&state, 0, sizeof(state));
+  memcpy(state.workgroup_count.value, tile_context->workgroup_count,
+         sizeof(state.workgroup_count));
+  memcpy(state.workgroup_size.value, tile_context->workgroup_size,
+         sizeof(state.workgroup_size));
+
+  uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
+
+  state.push_constant_count = cmd->push_constant_count;
+  state.push_constants = (uint32_t*)cmd_ptr;
+  cmd_ptr += cmd->push_constant_count * sizeof(*state.push_constants);
+
+  state.binding_count = cmd->binding_count;
+  state.binding_ptrs = (void**)cmd_ptr;
+  cmd_ptr += cmd->binding_count * sizeof(*state.binding_ptrs);
+  state.binding_lengths = (size_t*)cmd_ptr;
+  cmd_ptr += cmd->binding_count * sizeof(*state.binding_lengths);
+
+  // When we support imports we can populate those here based on what the
+  // executable declared (as each executable may import a unique set of
+  // functions).
+  state.imports = NULL;
+
   iree_status_t status = iree_hal_local_executable_issue_call(
-      cmd->executable, cmd->ordinal, &cmd->state,
+      cmd->executable, cmd->ordinal, &state,
       (const iree_hal_vec3_t*)tile_context->workgroup_xyz);
 
   IREE_TRACE_ZONE_END(z0);
@@ -744,6 +779,13 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
   iree_host_size_t used_binding_count =
       iree_math_count_ones_u64(used_binding_mask);
 
+  // To save a few command buffer bytes we narrow these:
+  if (IREE_UNLIKELY(push_constant_count >= UINT16_MAX) ||
+      IREE_UNLIKELY(used_binding_count >= UINT16_MAX)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "too many bindings/push constants");
+  }
+
   iree_hal_cmd_dispatch_t* cmd = NULL;
   iree_host_size_t total_cmd_size =
       sizeof(*cmd) + push_constant_count * sizeof(uint32_t) +
@@ -754,6 +796,8 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
 
   cmd->executable = local_executable;
   cmd->ordinal = entry_point;
+  cmd->push_constant_count = push_constant_count;
+  cmd->binding_count = used_binding_count;
 
   const uint32_t workgroup_count[3] = {workgroup_x, workgroup_y, workgroup_z};
   // TODO(benvanik): expose on API or keep fixed on executable.
@@ -763,24 +807,12 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
                                     iree_hal_cmd_dispatch_tile, (uintptr_t)cmd),
                                 workgroup_size, workgroup_count, &cmd->task);
 
-  iree_hal_executable_dispatch_state_v0_t* state = &cmd->state;
-
-  // When we support imports we can populate those here based on what the
-  // executable declared (as each executable may import a unique set of
-  // functions).
-  state->imports = NULL;
-
-  memcpy(&state->workgroup_size, workgroup_size, sizeof(iree_hal_vec3_t));
-  memcpy(&state->workgroup_count, workgroup_count, sizeof(iree_hal_vec3_t));
-
   // Copy only the push constant range used by the executable.
   uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
   uint32_t* push_constants = (uint32_t*)cmd_ptr;
   memcpy(push_constants, command_buffer->state.push_constants,
          push_constant_count * sizeof(*push_constants));
   cmd_ptr += push_constant_count * sizeof(*push_constants);
-  state->push_constant_count = push_constant_count;
-  state->push_constants = push_constants;
 
   // Produce the dense binding list based on the declared bindings used.
   // This allows us to change the descriptor sets and bindings counts supported
@@ -790,7 +822,6 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
   // Note that we are just directly setting the binding data pointers here with
   // no ownership/retaining/etc - it's part of the HAL contract that buffers are
   // kept valid for the duration they may be in use.
-  state->binding_count = used_binding_count;
   void** binding_ptrs = (void**)cmd_ptr;
   cmd_ptr += used_binding_count * sizeof(*binding_ptrs);
   size_t* binding_lengths = (size_t*)cmd_ptr;
@@ -808,8 +839,6 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
                               "(flat) binding %d is NULL", binding_ordinal);
     }
   }
-  state->binding_ptrs = binding_ptrs;
-  state->binding_lengths = binding_lengths;
 
   *out_cmd = cmd;
   return iree_hal_task_command_buffer_emit_execution_task(command_buffer,
