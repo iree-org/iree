@@ -20,6 +20,15 @@ func @reshapeNoOpStatic(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 // -----
 
+// CHECK-LABEL: @reshapeRankDifferent
+func @reshapeRankDifferent(%arg0: tensor<1xf32>) -> tensor<f32> {
+  // CHECK-NEXT: flow.tensor.reshape %arg0
+  %0 = flow.tensor.reshape %arg0 : tensor<1xf32> -> tensor<f32>
+  return %0 : tensor<f32>
+}
+
+// -----
+
 // CHECK-LABEL: @reshapeStaticDifferent
 func @reshapeStaticDifferent(%arg0: tensor<1x4xf32>) -> tensor<4x1xf32> {
   // CHECK-NEXT: flow.tensor.reshape %arg0
