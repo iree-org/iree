@@ -14,6 +14,7 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
+#include "iree/hal/buffer_heap_impl.h"
 #include "iree/hal/detail.h"
 
 typedef struct iree_hal_heap_allocator_s {
@@ -130,19 +131,10 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_heap_allocator_make_compatible(
       &memory_type, &allowed_access, &allowed_usage));
 
-  iree_byte_span_t data = iree_make_byte_span(NULL, allocation_size);
-  if (allocation_size > 0) {
-    // Zero-length buffers are valid but we don't want to try to malloc them.
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        allocator->host_allocator, allocation_size, (void**)&data.data));
-  }
-  iree_status_t status = iree_hal_heap_buffer_wrap(
+  // Allocate and return the buffer.
+  return iree_hal_heap_buffer_create(
       base_allocator, memory_type, allowed_access, allowed_usage,
-      allocation_size, data, allocator->host_allocator, out_buffer);
-  if (!iree_status_is_ok(status)) {
-    iree_allocator_free(allocator->host_allocator, data.data);
-  }
-  return status;
+      allocation_size, allocator->host_allocator, out_buffer);
 }
 
 static iree_status_t iree_hal_heap_allocator_wrap_buffer(
