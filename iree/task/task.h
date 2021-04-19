@@ -392,6 +392,8 @@ void iree_task_wait_initialize(iree_task_scope_t* scope,
 // #ifdefs.
 typedef struct {
   // TODO(benvanik): statistics counters.
+  // NOTE: each of these increases the command buffer storage requirements; we
+  // should always guard these with a compiler flag.
   iree_atomic_int32_t reserved;
 } iree_task_dispatch_statistics_t;
 
@@ -445,9 +447,6 @@ typedef struct iree_task_dispatch_s iree_task_dispatch_t;
 
 // Shared state for all shards processing a dispatch.
 typedef iree_alignas(iree_max_align_t) struct {
-  // Direct reference to the parent dispatch that all shards are processing.
-  iree_task_dispatch_t* dispatch_task;
-
   // The tail tile index; the next reservation will start from here.
   iree_atomic_int32_t tile_index;
 
@@ -458,10 +457,6 @@ typedef iree_alignas(iree_max_align_t) struct {
   // Bounded by IREE_TASK_DISPATCH_MAX_TILES_PER_SHARD_RESERVATION and a
   // reasonable number chosen based on the tile and shard counts.
   uint32_t tiles_per_reservation;
-
-  // Total workgroup count for the task. Can be used in conjunction with the
-  // per-invocation workgroup_xyz and workgroup_size to compute offsets/indices.
-  uint32_t workgroup_count[3];
 
   // Incoherent memory shared across all invocations of the task.
   // Aligned to at least the natural pointer size of the machine. Functions must
@@ -545,7 +540,7 @@ typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_s {
   // Optional transient shared memory size to allocate and pass into the
   // iree_task_context_t::shared_memory of each invocation of the task
   // closure.
-  iree_host_size_t shared_memory_size;
+  uint32_t shared_memory_size;
 
   // Statistics storage used for aggregating counters across all slices.
   iree_task_dispatch_statistics_t statistics;
@@ -652,6 +647,9 @@ void iree_task_dispatch_slice_initialize(iree_task_dispatch_t* dispatch_task,
 typedef iree_alignas(iree_max_align_t) struct {
   // Task header: implementation detail, do not use.
   iree_task_t header;
+
+  // The root dispatch task that this shard is a part of.
+  iree_task_dispatch_t* dispatch_task;
 
   // Active dispatch progress shared across all shards.
   // Each shard will be read/modify/writing this and there's likely to be
