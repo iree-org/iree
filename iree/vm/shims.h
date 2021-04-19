@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_MODULES_HAL_SHIMS_H_
-#define IREE_MODULES_HAL_SHIMS_H_
+#ifndef IREE_VM_SHIMS_H_
+#define IREE_VM_SHIMS_H_
 
 #include "iree/base/api.h"
 #include "iree/base/attributes.h"
-#include "iree/vm/api.h"
+#include "iree/base/target_platform.h"
+#include "iree/vm/ref.h"
+#include "iree/vm/stack.h"
+#include "iree/vm/value.h"
 
 //===----------------------------------------------------------------------===//
 // Argument/result struct utilities
@@ -99,11 +102,11 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
     return target_fn(stack, module, module_state, args, rets);                 \
   }
 
-#define IREE_VM_ABI_EXPORT(function_name, arg_types, ret_types)         \
-  static iree_status_t function_name(                                   \
-      iree_vm_stack_t* IREE_RESTRICT stack, void* IREE_RESTRICT module, \
-      iree_hal_module_state_t* IREE_RESTRICT state,                     \
-      IREE_VM_ABI_TYPE_NAME(arg_types) * IREE_RESTRICT args,            \
+#define IREE_VM_ABI_EXPORT(function_name, module_state, arg_types, ret_types) \
+  static iree_status_t function_name(                                         \
+      iree_vm_stack_t* IREE_RESTRICT stack, void* IREE_RESTRICT module,       \
+      module_state* IREE_RESTRICT state,                                      \
+      IREE_VM_ABI_TYPE_NAME(arg_types) * IREE_RESTRICT args,                  \
       IREE_VM_ABI_TYPE_NAME(ret_types) * IREE_RESTRICT rets)
 
 // TODO(benvanik): special case when source type and target type match.
@@ -400,4 +403,4 @@ IREE_VM_ABI_DECLARE_SHIM(v, i);
 IREE_VM_ABI_DECLARE_SHIM(v, r);
 IREE_VM_ABI_DECLARE_SHIM(v, v);
 
-#endif  // IREE_MODULES_HAL_SHIMS_H_
+#endif  // IREE_VM_SHIMS_H_

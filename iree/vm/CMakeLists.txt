@@ -51,6 +51,7 @@ iree_cc_library(
     "module.h"
     "native_module.h"
     "ref.h"
+    "shims.h"
     "stack.h"
     "type_def.h"
     "value.h"
@@ -63,6 +64,7 @@ iree_cc_library(
     "module.c"
     "native_module.c"
     "ref.c"
+    "shims.c"
     "stack.c"
   DEPS
     iree::base::api

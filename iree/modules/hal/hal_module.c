@@ -20,7 +20,6 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/modules/hal/shims.h"
 #include "iree/vm/api.h"
 
 // Limit the number of bindings we pass down through the HAL. This can be tuned
@@ -189,7 +188,9 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
 // NOTE: Ex* APIs are experimental and likely to be removed soon. Modules
 // using these APIs are not forward compatible.
 
-IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device, v, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device,  //
+                   iree_hal_module_state_t,           //
+                   v, r) {
   rets->r0 = iree_hal_device_retain_ref(state->shared_device);
   return iree_ok_status();
 }
@@ -218,7 +219,9 @@ void iree_hal_module_ex_defer_release(iree_hal_module_state_t* state,
       iree_vm_list_push_ref_retain(state->deferred_releases, &value));
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait, rr, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait,  //
+                   iree_hal_module_state_t,             //
+                   rr, v) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_command_buffer_t* command_buffer = NULL;
@@ -260,7 +263,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait, rr, v) {
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate, riii, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
+                   iree_hal_module_state_t,             //
+                   riii, r) {
   iree_hal_allocator_t* allocator = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
   iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
@@ -274,7 +279,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate, riii, r) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer, riirii, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
+                   iree_hal_module_state_t,                     //
+                   riirii, r) {
   iree_hal_allocator_t* allocator = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
   iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
@@ -318,14 +325,18 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer, riirii, r) {
 // iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_allocator, r, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_allocator,  //
+                   iree_hal_module_state_t,           //
+                   r, r) {
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
   rets->r0 = iree_hal_allocator_retain_ref(iree_hal_buffer_allocator(buffer));
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan, rii, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan,  //
+                   iree_hal_module_state_t,         //
+                   rii, r) {
   iree_hal_buffer_t* source_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &source_buffer));
   iree_vm_size_t source_offset = (iree_vm_size_t)args->i1;
@@ -341,7 +352,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan, rii, r) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_load, rii, i) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_load,  //
+                   iree_hal_module_state_t,      //
+                   rii, i) {
   iree_hal_buffer_t* source_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &source_buffer));
   iree_vm_size_t source_offset = (iree_vm_size_t)args->i1;
@@ -360,7 +373,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_load, rii, i) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store, irii, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store,  //
+                   iree_hal_module_state_t,       //
+                   irii, v) {
   int32_t value = args->i0;
   iree_hal_buffer_t* target_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r1, &target_buffer));
@@ -387,7 +402,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store, irii, v) {
 // iree_hal_buffer_view_t
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create, riCiD, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
+                   iree_hal_module_state_t,             //
+                   riCiD, r) {
   iree_hal_buffer_t* source_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &source_buffer));
   iree_hal_element_type_t element_type = (iree_hal_element_type_t)args->i1;
@@ -403,7 +420,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create, riCiD, r) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_buffer, r, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_buffer,  //
+                   iree_hal_module_state_t,             //
+                   r, r) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
@@ -412,7 +431,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_buffer, r, r) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_byte_length, r, i) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_byte_length,  //
+                   iree_hal_module_state_t,                  //
+                   r, i) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
@@ -420,7 +441,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_byte_length, r, i) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_element_type, r, i) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_element_type,  //
+                   iree_hal_module_state_t,                   //
+                   r, i) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
@@ -428,7 +451,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_element_type, r, i) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_rank, r, i) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_rank,  //
+                   iree_hal_module_state_t,           //
+                   r, i) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
@@ -436,7 +461,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_rank, r, i) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_dim, ri, i) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_dim,  //
+                   iree_hal_module_state_t,          //
+                   ri, i) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
@@ -445,7 +472,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_dim, ri, i) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace, rCrD, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace,  //
+                   iree_hal_module_state_t,            //
+                   rCrD, v) {
   iree_vm_ro_byte_buffer_t* key = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_ro_byte_buffer_check_deref(args->r0, &key));
   iree_string_view_t key_str = iree_vm_ro_byte_buffer_as_string(key);
@@ -490,7 +519,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace, rCrD, v) {
 // iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create, rii, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create,  //
+                   iree_hal_module_state_t,                //
+                   rii, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_command_buffer_mode_t modes =
@@ -506,7 +537,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create, rii, r) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_begin, r, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_begin,  //
+                   iree_hal_module_state_t,               //
+                   r, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -514,7 +547,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_begin, r, v) {
   return iree_hal_command_buffer_begin(command_buffer);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end, r, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end,  //
+                   iree_hal_module_state_t,             //
+                   r, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -522,7 +557,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end, r, v) {
   return iree_hal_command_buffer_end(command_buffer);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_execution_barrier, riii, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_execution_barrier,  //
+                   iree_hal_module_state_t,                           //
+                   riii, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -543,7 +580,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_execution_barrier, riii, v) {
       &global_barrier, 0, NULL);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer, rriii, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
+                   iree_hal_module_state_t,                     //
+                   rriii, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -560,7 +599,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer, rriii, v) {
                                              sizeof(pattern));
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer, rririi, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer,  //
+                   iree_hal_module_state_t,                     //
+                   rririi, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -580,7 +621,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer, rririi, v) {
                                              target_offset, length);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_constants, rriCiD, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_constants,  //
+                   iree_hal_module_state_t,                        //
+                   rriCiD, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -596,7 +639,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_constants, rriCiD, v) {
       value_count * sizeof(uint32_t));
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
+                   iree_hal_module_state_t,                             //
                    rriCiriiD, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
@@ -629,8 +673,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,
       command_buffer, executable_layout, set, binding_count, bindings);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_bind_descriptor_set, rrirCiD,
-                   v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_bind_descriptor_set,  //
+                   iree_hal_module_state_t,                             //
+                   rrirCiD, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -653,7 +698,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_bind_descriptor_set, rrirCiD,
       dynamic_offset_count, dynamic_offsets);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch, rriiii, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch,  //
+                   iree_hal_module_state_t,                  //
+                   rriiii, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -671,7 +718,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch, rriiii, v) {
                                           workgroup_z);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect, rriri, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
+                   iree_hal_module_state_t,                           //
+                   rriri, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -695,7 +744,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect, rriri, v) {
 // iree_hal_descriptor_set_t
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_create, rrCiriiD, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_create,  //
+                   iree_hal_module_state_t,                //
+                   rrCiriiD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_descriptor_set_layout_t* set_layout = NULL;
@@ -731,7 +782,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_create, rrCiriiD, r) {
 // iree_hal_descriptor_set_layout
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create, riCiiiD, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
+                   iree_hal_module_state_t,                       //
+                   riCiiiD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_descriptor_set_layout_usage_type_t usage_type =
@@ -764,14 +817,18 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create, riCiiiD, r) {
 // iree_hal_device_t
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_device_allocator, r, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_device_allocator,  //
+                   iree_hal_module_state_t,           //
+                   r, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   rets->r0 = iree_hal_allocator_retain_ref(iree_hal_device_allocator(device));
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32, rr, ii) {
+IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32,  //
+                   iree_hal_module_state_t,           //
+                   rr, ii) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_vm_ro_byte_buffer_t* key = NULL;
@@ -786,7 +843,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32, rr, ii) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_device_match_id, rr, i) {
+IREE_VM_ABI_EXPORT(iree_hal_module_device_match_id,  //
+                   iree_hal_module_state_t,          //
+                   rr, i) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_vm_ro_byte_buffer_t* pattern = NULL;
@@ -802,7 +861,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_match_id, rr, i) {
 // iree_hal_executable_t
 //===--------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rrrCrD, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
+                   iree_hal_module_state_t,            //
+                   rrrCrD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_vm_ro_byte_buffer_t* executable_format = NULL;
@@ -851,7 +912,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create, rrrCrD, r) {
 // iree_hal_executable_layout_t
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_executable_layout_create, riCrD, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_executable_layout_create,  //
+                   iree_hal_module_state_t,                   //
+                   riCrD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   int32_t push_constants = (int32_t)args->i1;
@@ -873,7 +936,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_layout_create, riCrD, r) {
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_create, ri, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_create,  //
+                   iree_hal_module_state_t,           //
+                   ri, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   uint32_t initial_value = (uint32_t)args->i1;
@@ -885,7 +950,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_create, ri, r) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_query, r, ii) {
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_query,  //
+                   iree_hal_module_state_t,          //
+                   r, ii) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_check_deref(args->r0, &semaphore));
 
@@ -896,7 +963,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_query, r, ii) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_signal, ri, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_signal,  //
+                   iree_hal_module_state_t,           //
+                   ri, v) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_check_deref(args->r0, &semaphore));
   uint32_t new_value = (uint32_t)args->i1;
@@ -904,7 +973,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_signal, ri, v) {
   return iree_hal_semaphore_signal(semaphore, new_value);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_fail, ri, v) {
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_fail,  //
+                   iree_hal_module_state_t,         //
+                   ri, v) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_check_deref(args->r0, &semaphore));
   iree_status_code_t status_code =
@@ -914,7 +985,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_fail, ri, v) {
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_await, ri, i) {
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_await,  //
+                   iree_hal_module_state_t,          //
+                   ri, i) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_check_deref(args->r0, &semaphore));
   uint64_t new_value = (uint32_t)args->i1;
