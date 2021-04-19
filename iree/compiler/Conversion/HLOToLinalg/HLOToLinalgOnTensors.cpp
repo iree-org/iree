@@ -192,14 +192,11 @@ namespace {
 /// https://en.wikipedia.org/wiki/Discrete_Fourier_transform
 Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
                         bool isRealPart) {
-  assert(matrixType.getRank() == 2 && "expected 2D matrix");
-
-  auto initTensor = b.create<linalg::InitTensorOp>(loc, matrixType.getShape(),
-                                                   matrixType.getElementType());
   // scale = 2 * pi / N
   double scale = 2 * acos(-1) / matrixType.getDimSize(0);
 
   SmallVector<Attribute> values;
+  assert(matrixType.getRank() == 2 && "expected 2D matrix");
   for (auto i : llvm::seq<unsigned>(0, matrixType.getDimSize(0))) {
     for (auto j : llvm::seq<unsigned>(0, matrixType.getDimSize(1))) {
       double v = scale * i * j;
