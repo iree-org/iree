@@ -87,7 +87,7 @@ struct PadTensorOpConversion : public OpConversionPattern<linalg::PadTensorOp> {
 
     // TODO(ravishankarm): Use shape inference interface to get this.
     SmallVector<OpFoldResult> sourceShape;
-    SmallVector<Value> outputShape;
+    SmallVector<OpFoldResult> outputShape;
     for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
       SmallVector<Value> mapValues;
       Value sourceDim = rewriter.createOrFold<memref::DimOp>(loc, source, dim);
@@ -106,21 +106,21 @@ struct PadTensorOpConversion : public OpConversionPattern<linalg::PadTensorOp> {
       };
       expr = addValueOrAttr(expr, lowPad[dim]);
       expr = addValueOrAttr(expr, highPad[dim]);
-      outputShape.push_back(linalg::applyMapToValues(
-          rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0]);
+      Value v = linalg::applyMapToValues(
+          rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
+      if (auto cst = v.getDefiningOp<ConstantOp>()) {
+        outputShape.push_back(cst.value());
+      } else {
+        outputShape.push_back(v);
+      }
     }
     Value initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, outputShape, sourceType.getElementType());
     Value fill =
         rewriter.create<linalg::FillOp>(loc, initTensor, yieldVal).getResult(0);
     SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
-    Value replacement = rewriter.create<SubTensorInsertOp>(
-        loc, source, fill, lowPad, sourceShape, strides);
-    if (padTensorOp.getResultType() != replacement.getType()) {
-      replacement = rewriter.create<tensor::CastOp>(
-          loc, padTensorOp.getResultType(), replacement);
-    }
-    rewriter.replaceOp(padTensorOp, replacement);
+    rewriter.replaceOpWithNewOp<SubTensorInsertOp>(
+        padTensorOp, source, fill, lowPad, sourceShape, strides);
     return success();
   }
 };
