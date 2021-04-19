@@ -27,7 +27,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-ALL_SRCS = enforce_glob(
+VULKAN_SRCS = enforce_glob(
     [
         "abs.mlir",
         "add.mlir",
@@ -62,20 +62,61 @@ ALL_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "reduce.mlir",  # Currently failing on vulkan.
         "max_pool.mlir",  # Currently failing on vulkan.
     ],
 )
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = ALL_SRCS,
+    srcs = VULKAN_SRCS,
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
 
+LLVM_SRCS = enforce_glob(
+    [
+        "abs.mlir",
+        "add.mlir",
+        "bitwise_and.mlir",
+        "bitwise_or.mlir",
+        "bitwise_xor.mlir",
+        "ceil.mlir",
+        "clamp.mlir",
+        "const.mlir",
+        "exp.mlir",
+        "floor.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
+        "if.mlir",
+        "log.mlir",
+        "logical_left_shift.mlir",
+        "logical_right_shift.mlir",
+        "max_pool.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "mul.mlir",
+        "negate.mlir",
+        "pad.mlir",
+        "reduce.mlir",
+        "reluN.mlir",
+        "reshape.mlir",
+        "rsqrt.mlir",
+        "select.mlir",
+        "sub.mlir",
+        "table.mlir",
+        "tanh.mlir",
+        "transpose.mlir",
+        "while.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+    ],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
-    srcs = ALL_SRCS,
+    srcs = LLVM_SRCS,
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
