@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=dylib-llvm-aot --iree-flow-dispatch-linalg-on-tensors -iree-codegen-llvm-experimental-linalg-on-tensors %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=dylib-llvm-aot %s | IreeFileCheck %s
 
 #map = affine_map<(d0) -> (d0)>
 flow.executable @add_dispatch_0 {

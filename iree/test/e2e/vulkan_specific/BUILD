@@ -62,9 +62,6 @@ iree_check_single_backend_test_suite(
         "vectorized_conv.mlir",
     ],
     compiler_flags = [
-        "-iree-flow-dispatch-linalg-on-tensors",
-        "-iree-codegen-spirv-experimental-linalg-on-tensors",
-        "-iree-spirv-enable-vectorization",
         "-iree-vulkan-target-triple=valhall-g77-unknown-android10",
     ],
     driver = "vulkan",

@@ -1,6 +1,5 @@
 // RUN: iree-run-mlir -export-all -iree-hal-target-backends=vmla %s | IreeFileCheck %s
 // RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=dylib-llvm-aot %s | IreeFileCheck %s)
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=dylib-llvm-aot -iree-flow-dispatch-linalg-on-tensors -iree-codegen-llvm-experimental-linalg-on-tensors %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @dynamic_tensor
 func @dynamic_tensor() -> tensor<?x?xf32> attributes { iree.module.export } {
