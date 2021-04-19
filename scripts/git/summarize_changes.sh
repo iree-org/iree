@@ -36,6 +36,7 @@ NEW_REF="${2:-HEAD}"
 
 git log \
   "${BASE_REF?}..${NEW_REF?}" \
+  --first-parent \
   --decorate=no \
   --pretty='format:* %h %<(80,trunc)%s' \
   | awk '{$1=$1;print}'
