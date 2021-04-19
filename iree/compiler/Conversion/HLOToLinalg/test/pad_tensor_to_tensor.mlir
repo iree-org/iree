@@ -61,5 +61,5 @@ module  {
 //       CHECK:   %[[RESULT:.+]] = subtensor_insert %[[ARG0]] into %[[FILL]][4, 5] [12, 4] [1, 1]
 //       CHECK:   return %[[RESULT]]
 //
-// CHECK-NOCAN:      func @pad_tensor
+// CHECK-NOCAN:      func @pad_tensor_static
 // CHECK-NOCAN-NOT:    tensor.cast
