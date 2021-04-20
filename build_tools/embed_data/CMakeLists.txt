@@ -22,7 +22,21 @@ if(NOT CMAKE_CROSSCOMPILING)
     absl::flags_parse
     absl::strings
   )
+
+  add_executable(generate_c_embed_data)
+  target_sources(generate_c_embed_data PRIVATE generate_c_embed_data_main.cc)
+  set_target_properties(generate_c_embed_data PROPERTIES OUTPUT_NAME generate_c_embed_data)
+
+  target_link_libraries(generate_c_embed_data
+    absl::flags
+    absl::flags_parse
+    absl::strings
+  )
+
   install(TARGETS generate_cc_embed_data
           COMPONENT generate_cc_embed_data
+          RUNTIME DESTINATION bin)
+  install(TARGETS generate_c_embed_data
+          COMPONENT generate_c_embed_data
           RUNTIME DESTINATION bin)
 endif()
