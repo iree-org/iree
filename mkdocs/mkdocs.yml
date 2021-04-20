@@ -6,6 +6,7 @@ theme:
     logo: material/ghost
   favicon: assets/images/favicon.png
   logo: assets/images/favicon.png
+  custom_dir: overrides
 
   features:
     - navigation.instant
