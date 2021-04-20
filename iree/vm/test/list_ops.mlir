@@ -81,16 +81,6 @@ vm.module @list_ops {
   }
 
   //===--------------------------------------------------------------------===//
-  // vm.list.* with variant types
-  //===--------------------------------------------------------------------===//
-
-  vm.export @test_variant
-  vm.func @test_variant() {
-    // TODO(benvanik): test vm.list with variant types.
-    vm.return
-  }
-
-  //===--------------------------------------------------------------------===//
   // Failure tests
   //===--------------------------------------------------------------------===//
 
@@ -100,6 +90,25 @@ vm.module @list_ops {
     %c1 = vm.const.i32 1 : i32
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<i32>
     vm.list.set.i32 %list, %c0, %c1 : (!vm.list<i32>, i32, i32)
+    vm.return
+  }
+
+  vm.export @fail_out_of_bounds_read
+  vm.func @fail_out_of_bounds_read() {
+    %c1 = vm.const.i32 1 : i32
+    %list = vm.list.alloc %c1 : (i32) -> !vm.list<i32>
+    vm.list.resize %list, %c1 : (!vm.list<i32>, i32)
+    %v = vm.list.get.i32 %list, %c1 : (!vm.list<i32>, i32) -> i32
+    %v_dno = iree.do_not_optimize(%v) : i32
+    vm.return
+  }
+
+  vm.export @fail_out_of_bounds_write
+  vm.func @fail_out_of_bounds_write() {
+    %c1 = vm.const.i32 1 : i32
+    %list = vm.list.alloc %c1 : (i32) -> !vm.list<i32>
+    vm.list.resize %list, %c1 : (!vm.list<i32>, i32)
+    vm.list.set.i32 %list, %c1, %c1 : (!vm.list<i32>, i32, i32)
     vm.return
   }
 }
