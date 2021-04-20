@@ -16,6 +16,7 @@ iree_cc_library(
   SRCS
     "AndroidLinkerTool.cpp"
     "LinkerTools.cpp"
+    "RiscvLinkerTool.cpp"
     "UnixLinkerTool.cpp"
     "WasmLinkerTool.cpp"
     "WindowsLinkerTool.cpp"
