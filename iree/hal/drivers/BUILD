@@ -30,6 +30,7 @@ cc_library(
     ] + [
         # TODO(*): select() and only pull in based on build configuration.
         "//iree/hal/dylib/registration",
+        "//iree/hal/dylib/registration:sync",
         "//iree/hal/vmla/registration",
         "//iree/hal/vulkan/registration",
     ] + IREE_CUDA_DEPS,

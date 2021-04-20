@@ -20,20 +20,14 @@ if(${IREE_HAL_DRIVER_CUDA})
 endif()
 if(${IREE_HAL_DRIVER_DYLIB})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::dylib::registration)
+  # TODO(benvanik): add a IREE_HAL_DRIVER_DYLIB_SYNC or global flag.
+  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::dylib::registration::sync)
 endif()
 if(${IREE_HAL_DRIVER_VMLA})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vmla::registration)
 endif()
 if(${IREE_HAL_DRIVER_VULKAN})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vulkan::registration)
-endif()
-
-# TODO: Move to either hal/metal/CMakeLists.txt or
-# hal/metal/registration/CMakeLists.txt if bazel-to-cmake issues can be
-# resolved.
-if(APPLE)
-  find_library(Foundation Foundation)
-  find_library(Metal Metal)
 endif()
 
 iree_cc_library(
@@ -47,8 +41,5 @@ iree_cc_library(
     iree::base::api
     iree::base::tracing
     ${IREE_HAL_DRIVER_MODULES}
-    # TODO: Also move as above if bazel-to-cmake issues can be resolved.
-    $<$<PLATFORM_ID:Darwin>:${Foundation}>
-    $<$<PLATFORM_ID:Darwin>:${Metal}>
   PUBLIC
 )

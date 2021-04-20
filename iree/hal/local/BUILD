@@ -91,6 +91,34 @@ cc_library(
 )
 
 cc_library(
+    name = "sync_driver",
+    srcs = [
+        "sync_device.c",
+        "sync_driver.c",
+        "sync_event.c",
+        "sync_semaphore.c",
+    ],
+    hdrs = [
+        "sync_device.h",
+        "sync_driver.h",
+        "sync_event.h",
+        "sync_semaphore.h",
+    ],
+    deps = [
+        ":arena",
+        ":local",
+        "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/base:synchronization",
+        "//iree/base:tracing",
+        "//iree/base/internal",
+        "//iree/base/internal:wait_handle",
+        "//iree/hal:api",
+        "//iree/task",
+    ],
+)
+
+cc_library(
     name = "task_driver",
     srcs = [
         "task_command_buffer.c",
