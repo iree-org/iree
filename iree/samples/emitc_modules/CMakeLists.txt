@@ -36,6 +36,6 @@ if(${IREE_ENABLE_EMITC})
       iree::vm
       iree::vm::cc
       iree::vm::ops
-      iree::vm::shims
+      iree::vm::shims_emitc
   )
 endif()

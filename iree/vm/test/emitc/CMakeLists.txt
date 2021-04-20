@@ -29,7 +29,7 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::vm::cc
     iree::vm::ops
-    iree::vm::shims
+    iree::vm::shims_emitc
     ::arithmetic_ops
     ::arithmetic_ops_i64
     ::assignment_ops
