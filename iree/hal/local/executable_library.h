@@ -34,6 +34,8 @@
 #define IREE_RESTRICT __restrict
 #elif defined(_MSC_VER)
 #define IREE_RESTRICT
+#elif defined(__cplusplus)
+#define IREE_RESTRICT __restrict__
 #else
 #define IREE_RESTRICT restrict
 #endif  // _MSC_VER
