@@ -64,6 +64,7 @@ cc_library(
     name = "local",
     srcs = [
         "executable_loader.c",
+        "inline_command_buffer.c",
         "local_descriptor_set.c",
         "local_descriptor_set_layout.c",
         "local_executable.c",
@@ -72,6 +73,7 @@ cc_library(
     ],
     hdrs = [
         "executable_loader.h",
+        "inline_command_buffer.h",
         "local_descriptor_set.h",
         "local_descriptor_set_layout.h",
         "local_executable.h",

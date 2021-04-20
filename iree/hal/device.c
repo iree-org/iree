@@ -46,6 +46,29 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_query_i32(
   return _VTABLE_DISPATCH(device, query_i32)(device, key, out_value);
 }
 
+// Validates that the submission is well-formed.
+static iree_status_t iree_hal_device_validate_submission(
+    iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
+  for (iree_host_size_t i = 0; i < batch_count; ++i) {
+    for (iree_host_size_t j = 0; j < batches[i].command_buffer_count; ++j) {
+      if (batches[i].wait_semaphores.count > 0 &&
+          iree_all_bits_set(
+              iree_hal_command_buffer_mode(batches[i].command_buffers[j]),
+              IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+        // Inline command buffers are not allowed to wait (as they could have
+        // already been executed!). This is a requirement of the API so we
+        // validate it across all backends even if they don't support inline
+        // execution and ignore it.
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "inline command buffer submitted with a wait; inline command "
+            "buffers must be ready to execute immediately");
+      }
+    }
+  }
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
@@ -53,6 +76,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(!batch_count || batches);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_device_validate_submission(batch_count, batches));
   iree_status_t status = _VTABLE_DISPATCH(device, queue_submit)(
       device, command_categories, queue_affinity, batch_count, batches);
   IREE_TRACE_ZONE_END(z0);
@@ -68,6 +93,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(!batch_count || batches);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_device_validate_submission(batch_count, batches));
   iree_status_t status = _VTABLE_DISPATCH(device, submit_and_wait)(
       device, command_categories, queue_affinity, batch_count, batches,
       wait_semaphore, wait_value, timeout);

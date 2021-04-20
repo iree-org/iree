@@ -1118,7 +1118,10 @@ class ExStreamFragmentOpConversion
     // In a real version we would want to pick the device based on the placement
     // information attached to the stream.
     // TODO(benvanik): choose buffer mode/category based on stream commands.
-    auto mode = IREE::HAL::CommandBufferModeBitfield::OneShot;
+    // NOTE: we are not doing any overlapping work today and can always allow
+    // inline execution.
+    auto mode = IREE::HAL::CommandBufferModeBitfield::OneShot |
+                IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution;
     auto category = IREE::HAL::CommandCategoryBitfield::Dispatch |
                     IREE::HAL::CommandCategoryBitfield::Transfer;
     auto commandBuffer =

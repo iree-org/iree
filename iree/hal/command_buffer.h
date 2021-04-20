@@ -46,6 +46,27 @@ enum iree_hal_command_buffer_mode_e {
   // TODO(benvanik): IREE_HAL_COMMAND_BUFFER_MODE_REUSABLE = 1u << 1,
   // TODO(benvanik): IREE_HAL_COMMAND_BUFFER_MODE_PRIMARY = 1u << 2,
   // TODO(benvanik): IREE_HAL_COMMAND_BUFFER_MODE_SECONDARY = 1u << 3,
+
+  // Indicates that the command buffer execution is allowed to execute inline
+  // with recording. The exact execution behavior is unspecified by the API and
+  // intentionally unknowable and must always assume to happen entirely
+  // asynchronously and that it will only have completed after waiting on device
+  // idle or the wait semaphores specified in the submission are signaled.
+  //
+  // Local backends can use this to avoid recording when the calling program can
+  // guarantee that it makes no assumptions about execution being deferred until
+  // a submission. The command buffer must still be submitted for scheduling and
+  // must have no wait semaphores specified. This allows the same program code
+  // to execute work both synchronously and asynchronously as remote backends
+  // are allowed to ignore this.
+  //
+  // Remote backends can use this to flush the command buffer more aggressively
+  // to begin early execution and overlap with continued recording.
+  //
+  // Requires IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT and
+  // IREE_HAL_COMMAND_BUFFER_MODE_PRIMARY. Compatible with
+  // IREE_HAL_COMMAND_BUFFER_MODE_REUSABLE.
+  IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION = 1u << 4,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
@@ -226,6 +247,10 @@ iree_hal_command_buffer_retain(iree_hal_command_buffer_t* command_buffer);
 // Releases the given |command_buffer| from the caller.
 IREE_API_EXPORT void IREE_API_CALL
 iree_hal_command_buffer_release(iree_hal_command_buffer_t* command_buffer);
+
+// Returns a bitmask indicating the behavior of the command buffer.
+IREE_API_EXPORT iree_hal_command_buffer_mode_t IREE_API_CALL
+iree_hal_command_buffer_mode(const iree_hal_command_buffer_t* command_buffer);
 
 // Returns a bitmask indicating which command categories this command buffer
 // can record.
@@ -453,11 +478,12 @@ typedef struct {
 
   void(IREE_API_PTR* destroy)(iree_hal_command_buffer_t* command_buffer);
 
+  iree_hal_command_buffer_mode_t(IREE_API_PTR* mode)(
+      const iree_hal_command_buffer_t* command_buffer);
   iree_hal_command_category_t(IREE_API_PTR* allowed_categories)(
       const iree_hal_command_buffer_t* command_buffer);
 
   iree_status_t(IREE_API_PTR* begin)(iree_hal_command_buffer_t* command_buffer);
-
   iree_status_t(IREE_API_PTR* end)(iree_hal_command_buffer_t* command_buffer);
 
   iree_status_t(IREE_API_PTR* execution_barrier)(

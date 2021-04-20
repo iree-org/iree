@@ -77,7 +77,7 @@ def HAL_MemoryTypeBitfieldAttr :
       HAL_MemoryType_HostCached,
       HAL_MemoryType_HostLocal,
       HAL_MemoryType_DeviceVisible,
-      HAL_MemoryType_DeviceLocal
+      HAL_MemoryType_DeviceLocal,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
@@ -97,7 +97,7 @@ def HAL_MemoryAccessBitfieldAttr :
       HAL_MemoryAccess_Discard,
       HAL_MemoryAccess_DiscardWrite,
       HAL_MemoryAccess_MayAlias,
-      HAL_MemoryAccess_All
+      HAL_MemoryAccess_All,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
@@ -115,17 +115,19 @@ def HAL_BufferUsageBitfieldAttr :
       HAL_BufferUsage_Transfer,
       HAL_BufferUsage_Mapping,
       HAL_BufferUsage_Dispatch,
-      HAL_BufferUsage_All
+      HAL_BufferUsage_All,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
 def HAL_CommandBufferMode_None : BitEnumAttrCase<"None", 0x0000>;
 def HAL_CommandBufferMode_OneShot : BitEnumAttrCase<"OneShot", 0x0001>;
+def HAL_CommandBufferMode_AllowInlineExecution : BitEnumAttrCase<"AllowInlineExecution", 0x0010>;
 def HAL_CommandBufferModeBitfieldAttr :
     BitEnumAttr<"CommandBufferModeBitfield", "valid CommandBufferMode", [
       HAL_CommandBufferMode_None,
-      HAL_CommandBufferMode_OneShot
+      HAL_CommandBufferMode_OneShot,
+      HAL_CommandBufferMode_AllowInlineExecution,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
@@ -137,7 +139,7 @@ def HAL_CommandCategoryBitfieldAttr :
     BitEnumAttr<"CommandCategoryBitfield", "valid CommandCategory", [
       HAL_CommandCategory_None,
       HAL_CommandCategory_Transfer,
-      HAL_CommandCategory_Dispatch
+      HAL_CommandCategory_Dispatch,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }

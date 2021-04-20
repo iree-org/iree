@@ -115,7 +115,7 @@ iree_status_t iree_hal_task_command_buffer_create(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
-  if (mode != IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) {
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
     // If we want reuse we'd need to support duplicating the task DAG after
     // recording or have some kind of copy-on-submit behavior that does so if
     // a command buffer is submitted for execution twice. Allowing for the same
@@ -175,6 +175,11 @@ static void iree_hal_task_command_buffer_destroy(
   iree_allocator_free(host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+static iree_hal_command_buffer_mode_t iree_hal_task_command_buffer_mode(
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  return ((const iree_hal_task_command_buffer_t*)base_command_buffer)->mode;
 }
 
 static iree_hal_command_category_t
@@ -546,7 +551,7 @@ static iree_status_t iree_hal_task_command_buffer_update_buffer(
       command_buffer->scope,
       iree_task_make_call_closure(iree_hal_cmd_update_buffer, (uintptr_t)cmd),
       &cmd->task);
-  cmd->target_buffer = (iree_hal_buffer_t*)target_buffer;
+  cmd->target_buffer = target_buffer;
   cmd->target_offset = target_offset;
   cmd->length = length;
 
@@ -602,9 +607,9 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
       command_buffer->scope,
       iree_task_make_call_closure(iree_hal_cmd_copy_buffer, (uintptr_t)cmd),
       &cmd->task);
-  cmd->source_buffer = (iree_hal_buffer_t*)source_buffer;
+  cmd->source_buffer = source_buffer;
   cmd->source_offset = source_offset;
-  cmd->target_buffer = (iree_hal_buffer_t*)target_buffer;
+  cmd->target_buffer = target_buffer;
   cmd->target_offset = target_offset;
   cmd->length = length;
 
@@ -881,6 +886,7 @@ static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_task_command_buffer_vtable = {
         .destroy = iree_hal_task_command_buffer_destroy,
+        .mode = iree_hal_task_command_buffer_mode,
         .allowed_categories = iree_hal_task_command_buffer_allowed_categories,
         .begin = iree_hal_task_command_buffer_begin,
         .end = iree_hal_task_command_buffer_end,
