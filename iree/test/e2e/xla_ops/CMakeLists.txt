@@ -142,6 +142,7 @@ iree_check_single_backend_test_suite(
     "dot_general.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
+    "fft.mlir"
     "floor.mlir"
     "gather.mlir"
     "iota.mlir"
