@@ -193,7 +193,7 @@ namespace {
 Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
                         bool isRealPart) {
   // scale = 2 * pi / N
-  double scale = 2 * acos(-1) / matrixType.getDimSize(0);
+  double scale = 2 * M_PI / matrixType.getDimSize(0);
 
   SmallVector<Attribute> values;
   assert(matrixType.getRank() == 2 && "expected 2D matrix");
