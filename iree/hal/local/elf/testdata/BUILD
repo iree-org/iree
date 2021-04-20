@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,27 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
-    name = "LinkerTools_internal",
-    srcs = [
-        "AndroidLinkerTool.cpp",
-        "EmbeddedLinkerTool.cpp",
-        "LinkerTools.cpp",
-        "RiscvLinkerTool.cpp",
-        "UnixLinkerTool.cpp",
-        "WasmLinkerTool.cpp",
-        "WindowsLinkerTool.cpp",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/HAL/Target/LLVM:LinkerTool_hdrs",
-        "@llvm-project//llvm:Core",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Support",
-    ],
+cc_embed_data(
+    name = "simple_mul_dispatch",
+    testonly = True,
+    srcs = glob(["simple_mul_dispatch_*.so"]),
+    cc_file_output = "simple_mul_dispatch.cc",
+    cpp_namespace = "iree::elf",
+    flatten = True,
+    h_file_output = "simple_mul_dispatch.h",
 )

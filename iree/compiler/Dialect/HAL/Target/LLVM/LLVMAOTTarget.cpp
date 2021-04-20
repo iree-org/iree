@@ -305,46 +305,65 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       linkArtifacts.keepAllFiles();
     }
 
-    FlatbufferBuilder builder;
-    iree_DyLibExecutableDef_start_as_root(builder);
+    if (options_.linkEmbedded) {
+      // Load the linked ELF file and pack into an attr.
+      auto elfFile = linkArtifacts.libraryFile.read();
+      if (!elfFile.hasValue()) {
+        return targetOp.emitError() << "failed to read back dylib temp file at "
+                                    << linkArtifacts.libraryFile.path;
+      }
+      auto bufferAttr = DenseIntElementsAttr::get(
+          VectorType::get({static_cast<int64_t>(elfFile->size())},
+                          IntegerType::get(executableBuilder.getContext(), 8)),
+          std::move(elfFile.getValue()));
 
-    // Embed debug symbols at the end of the flatbuffer by adding first in the
-    // bottoms-up builder.
-    flatbuffers_uint8_vec_ref_t debugDatabaseRef = 0;
-    flatbuffers_string_ref_t debugDatabaseFilenameRef = 0;
-    if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
-      debugDatabaseRef = builder.streamUint8Vec([&](raw_ostream &stream) {
-        return linkArtifacts.debugFile.readInto(stream);
-      });
-      debugDatabaseFilenameRef = builder.createString(
-          llvm::sys::path::filename(linkArtifacts.debugFile.path));
-    }
+      // Add the binary to the parent hal.executable.
+      auto executableFormatAttr = executableBuilder.getStringAttr("EX_ELF");
+      executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+          targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
+          bufferAttr);
+    } else {
+      FlatbufferBuilder builder;
+      iree_DyLibExecutableDef_start_as_root(builder);
 
-    // Embed entire dynamic library output.
-    flatbuffers_uint8_vec_ref_t libraryEmbeddedRef =
-        builder.streamUint8Vec([&](raw_ostream &stream) {
-          return linkArtifacts.libraryFile.readInto(stream);
+      // Embed debug symbols at the end of the flatbuffer by adding first in the
+      // bottoms-up builder.
+      flatbuffers_uint8_vec_ref_t debugDatabaseRef = 0;
+      flatbuffers_string_ref_t debugDatabaseFilenameRef = 0;
+      if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
+        debugDatabaseRef = builder.streamUint8Vec([&](raw_ostream &stream) {
+          return linkArtifacts.debugFile.readInto(stream);
         });
-    if (!libraryEmbeddedRef) {
-      return targetOp.emitError() << "failed to read back dylib temp file at "
-                                  << linkArtifacts.libraryFile.path;
+        debugDatabaseFilenameRef = builder.createString(
+            llvm::sys::path::filename(linkArtifacts.debugFile.path));
+      }
+
+      // Embed entire dynamic library output.
+      flatbuffers_uint8_vec_ref_t libraryEmbeddedRef =
+          builder.streamUint8Vec([&](raw_ostream &stream) {
+            return linkArtifacts.libraryFile.readInto(stream);
+          });
+      if (!libraryEmbeddedRef) {
+        return targetOp.emitError() << "failed to read back dylib temp file at "
+                                    << linkArtifacts.libraryFile.path;
+      }
+
+      iree_DyLibExecutableDef_library_embedded_add(builder, libraryEmbeddedRef);
+      iree_DyLibExecutableDef_debug_database_filename_add(
+          builder, debugDatabaseFilenameRef);
+      iree_DyLibExecutableDef_debug_database_embedded_add(builder,
+                                                          debugDatabaseRef);
+      iree_DyLibExecutableDef_end_as_root(builder);
+
+      auto executableFormatAttr = targetTriple.isWasm()
+                                      ? executableBuilder.getStringAttr("WASM")
+                                      : executableBuilder.getStringAttr("DLIB");
+
+      // Add the binary data to the target executable.
+      executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+          targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
+          builder.getBufferAttr(executableBuilder.getContext()));
     }
-
-    iree_DyLibExecutableDef_library_embedded_add(builder, libraryEmbeddedRef);
-    iree_DyLibExecutableDef_debug_database_filename_add(
-        builder, debugDatabaseFilenameRef);
-    iree_DyLibExecutableDef_debug_database_embedded_add(builder,
-                                                        debugDatabaseRef);
-    iree_DyLibExecutableDef_end_as_root(builder);
-
-    auto executableFormatAttr = targetTriple.isWasm()
-                                    ? executableBuilder.getStringAttr("WASM")
-                                    : executableBuilder.getStringAttr("DLIB");
-
-    // Add the binary data to the target executable.
-    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
-        builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }
 

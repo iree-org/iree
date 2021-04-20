@@ -49,6 +49,7 @@
 // IREE_PLATFORM_ANDROID_EMULATOR
 // IREE_PLATFORM_APPLE (IOS | MACOS)
 // IREE_PLATFORM_EMSCRIPTEN
+// IREE_PLATFORM_GENERIC
 // IREE_PLATFORM_IOS
 // IREE_PLATFORM_IOS_SIMULATOR
 // IREE_PLATFORM_LINUX
@@ -243,8 +244,9 @@
 //==============================================================================
 
 #if !defined(IREE_PLATFORM_ANDROID) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
-    !defined(IREE_PLATFORM_IOS) && !defined(IREE_PLATFORM_LINUX) &&          \
-    !defined(IREE_PLATFORM_MACOS) && !defined(IREE_PLATFORM_WINDOWS)
+    !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_IOS) &&        \
+    !defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_MACOS) &&        \
+    !defined(IREE_PLATFORM_WINDOWS)
 #error Unknown platform.
 #endif  // all archs
 

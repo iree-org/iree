@@ -24,6 +24,8 @@ namespace HAL {
 
 std::unique_ptr<LinkerTool> createAndroidLinkerTool(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+std::unique_ptr<LinkerTool> createEmbeddedLinkerTool(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createRiscvLinkerTool(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createUnixLinkerTool(
@@ -36,7 +38,9 @@ std::unique_ptr<LinkerTool> createWindowsLinkerTool(
 // static
 std::unique_ptr<LinkerTool> LinkerTool::getForTarget(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
-  if (targetTriple.isAndroid()) {
+  if (targetOptions.linkEmbedded) {
+    return createEmbeddedLinkerTool(targetTriple, targetOptions);
+  } else if (targetTriple.isAndroid()) {
     return createAndroidLinkerTool(targetTriple, targetOptions);
   } else if (targetTriple.isOSWindows() ||
              targetTriple.isWindowsMSVCEnvironment()) {
