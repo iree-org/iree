@@ -124,3 +124,35 @@ endif()
 """,
     inline = True,
 )
+
+iree_cmake_extra_content(
+    content = """
+if(${IREE_HAL_DRIVER_VMVX})
+""",
+    inline = True,
+)
+
+cc_library(
+    name = "vmvx_module_loader",
+    srcs = ["vmvx_module_loader.c"],
+    hdrs = ["vmvx_module_loader.h"],
+    defines = [
+        "IREE_HAL_HAVE_VMVX_MODULE_LOADER=1",
+    ],
+    deps = [
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/modules/vmvx",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
+)

@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "IREE_CUDA_DEPS")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,19 +20,31 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+if(${IREE_HAL_DRIVER_VMVX})
+""",
+    inline = True,
+)
+
 cc_library(
-    name = "drivers",
-    srcs = ["init.c"],
-    hdrs = ["init.h"],
+    name = "registration",
+    srcs = ["driver_module.c"],
+    hdrs = ["driver_module.h"],
+    defines = [
+        "IREE_HAL_HAVE_VMVX_DRIVER_MODULE=1",
+    ],
     deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-    ] + [
-        # TODO(*): select() and only pull in based on build configuration.
-        "//iree/hal/dylib/registration",
-        "//iree/hal/dylib/registration:sync",
-        "//iree/hal/vmla/registration",
-        "//iree/hal/vmvx/registration",
-        "//iree/hal/vulkan/registration",
-    ] + IREE_CUDA_DEPS,
+        "//iree/hal",
+        "//iree/hal/local:task_driver",
+        "//iree/hal/local/loaders:vmvx_module_loader",
+        "//iree/task:api",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

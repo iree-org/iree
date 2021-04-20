@@ -125,6 +125,7 @@ set(IREE_ALL_HAL_DRIVERS
   Cuda
   DyLib
   VMLA
+  VMVX
   Vulkan
 )
 
