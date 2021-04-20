@@ -27,6 +27,7 @@ if(${IREE_ENABLE_EMITC})
       MLIRPass
       MLIREmitC
       MLIRTransforms
+      iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
     INCLUDES
       "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"

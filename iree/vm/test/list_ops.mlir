@@ -79,8 +79,6 @@ vm.module @list_ops {
     // TODO(benvanik): test vm.list with ref types.
     vm.return
   }
-<<<<<<< HEAD
-=======
 
   //===--------------------------------------------------------------------===//
   // vm.list.* with variant types
@@ -104,5 +102,4 @@ vm.module @list_ops {
     vm.list.set.i32 %list, %c0, %c1 : (!vm.list<i32>, i32, i32)
     vm.return
   }
->>>>>>> Wrap lists in iree_vm_ref_t
 }

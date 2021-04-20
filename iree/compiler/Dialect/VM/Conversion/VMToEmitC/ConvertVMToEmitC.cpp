@@ -16,7 +16,7 @@
 
 #include "emitc/Dialect/EmitC/EmitCDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
+#include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -59,43 +59,6 @@ SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
       llvm::map_range(llvm::seq<int64_t>(0, n), [&ctx](int64_t i) -> Attribute {
         return IntegerAttr::get(IndexType::get(ctx), i);
       }));
-}
-
-LogicalResult releaseRefIfLastUse(Operation *operation, Value operand) {
-  // TODO(simon-camp): We need to handle cases where refs get passed via
-  // block arguments, also in combination with the fact that block arguments are
-  // implemented as assignments in the printer for branching ops.
-  auto ctx = operation->getContext();
-  auto loc = operation->getLoc();
-
-  OpBuilder builder(operation);
-  builder.setInsertionPointAfter(operation);
-
-  auto funcOp = operation->getParentOfType<IREE::VM::FuncOp>();
-
-  // TODO(simon-camp): Uses upstream liveness analysis, which is automatically
-  // cahcehd IIUC.
-  ValueLiveness liveness;
-  if (failed(liveness.recalculate(funcOp))) {
-    return funcOp.emitError()
-           << "failed to caclculate required liveness information";
-  }
-
-  if (liveness.isLastValueUse(operand, operation)) {
-    auto refPtrOp = builder.create<emitc::GetAddressOfOp>(
-        /*location=*/loc,
-        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*operand=*/ArrayRef<Value>{operand});
-
-    builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refPtrOp});
-  }
-  return success();
 }
 
 template <typename AccessOpTy, typename GlobalOpTy>
@@ -302,13 +265,22 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
     Value listOperand = op.getOperation()->getOperand(listArgumentIndex);
 
+    // deref
+    auto refOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+        /*callee=*/rewriter.getStringAttr("*"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{listOperand});
+
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
         /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{listOperand});
+        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -349,7 +321,7 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
           /*operands=*/ArrayRef<Value>(updatedOperands));
     }
 
-    return releaseRefIfLastUse(op.getOperation(), listOperand);
+    return success();
   }
 
   StringRef funcName;
@@ -375,11 +347,12 @@ class ListAllocOpConversion
     // iree_vm_type_def_t* element_type_ptr = &element_type;
     // iree_vm_list_t* list = NULL;
     // iree_vm_list_t** list_ptr = &list;
-    // iree_vm_list_create(element_type_ptr, {initial_capacity}, state->allocator, list_ptr);
-    // iree_vm_ref_t ref = {0};
-    // iree_vm_ref_t* ref_ptr = &ref
+    // iree_status_t status = iree_vm_list_create(element_type_ptr, {initial_capacity}, state->allocator, list_ptr);
+    // VM_RETURN_IF_ERROR(status);
+    // iree_vm_ref_t* ref_ptr = &local_refs[{ordinal}];
     // iree_vm_ref_type_t ref_type = iree_vm_list_type_id();
-    // iree_vm_ref_wrap_assign(list, ref_type, ref_ptr));
+    // iree_status_t status2 = iree_vm_ref_wrap_assign(list, ref_type, ref_ptr));
+    // VM_RETURN_IF_ERROR(status2);
     // clang-format on
 
     auto ctx = allocOp.getContext();
@@ -437,15 +410,27 @@ class ListAllocOpConversion
         ArrayRef<Value>{elementTypePtrOp.getResult(), operands[0],
                         listPtrOp.getResult()});
 
-    auto refOp = rewriter.replaceOpWithNewOp<emitc::ConstOp>(
-        /*op=*/allocOp,
-        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*value=*/StringAttr::get(ctx, "{0}"));
+    // TODO(simon-camp): This is expensive as we recalculate the
+    // RegisterAllocation for every alloc in a function. We could make it
+    // compatible with the analysis framework in MLIR which would cache it
+    // automatically IIUC. See here for reference
+    // https://mlir.llvm.org/docs/PassManagement/#analysis-management
+    auto funcOp = allocOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
+    RegisterAllocation registerAllocation;
+    if (failed(registerAllocation.recalculate(funcOp))) {
+      return allocOp.emitOpError() << "unable to perform register allocation";
+    }
 
-    auto refPtrOp = rewriter.create<emitc::GetAddressOfOp>(
-        /*location=*/loc,
-        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*operand=*/refOp.getResult());
+    int32_t ordinal =
+        registerAllocation.mapToRegister(allocOp.getResult()).ordinal();
+
+    auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::CallOp>(
+        /*op=*/allocOp,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        /*callee=*/rewriter.getStringAttr("VM_GET_REF_ADDRESS"),
+        /*args=*/ArrayAttr::get(ctx, {rewriter.getI32IntegerAttr(ordinal)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{});
 
     auto refTypeOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -463,7 +448,7 @@ class ListAllocOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listOp.getResult(), refTypeOp.getResult(0),
-                        refPtrOp.getResult()});
+                        refPtrOp.getResult(0)});
 
     return success();
   }
@@ -511,13 +496,21 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t*"),
         /*operand=*/valueOp.getResult());
 
+    auto refOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+        /*callee=*/rewriter.getStringAttr("*"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{getOp.list()});
+
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
         /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{getOp.list()});
+        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -548,7 +541,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{valuePtrOp.getResult()});
 
-    return releaseRefIfLastUse(getOp.getOperation(), getOp.list());
+    return success();
   }
 };
 
@@ -588,13 +581,21 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t*"),
         /*operand=*/valueOp.getResult(0));
 
+    auto refOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+        /*callee=*/rewriter.getStringAttr("*"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{setOp.list()});
+
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
         /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{setOp.list()});
+        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -616,7 +617,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
 
     rewriter.replaceOp(setOp, ArrayRef<Value>{});
 
-    return releaseRefIfLastUse(setOp.getOperation(), setOp.list());
+    return success();
   }
 };
 }  // namespace

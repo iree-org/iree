@@ -32,6 +32,7 @@ if(${IREE_ENABLE_EMITC})
       MLIRIR
       MLIRPass
       MLIRSupport
+      iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Conversion::VMToEmitC
       iree::compiler::Dialect::VM::Target::CallingConventionUtils
