@@ -4,7 +4,8 @@ theme:
   icon:
     repo: fontawesome/brands/github
     logo: material/ghost
-  # favicon: TODO(scotttodd): add favicon?
+  favicon: assets/images/favicon.png
+  logo: assets/images/favicon.png
 
   features:
     - navigation.instant
@@ -54,6 +55,9 @@ extra:
       name: IREE Discord Server
   generator: false  # TODO(scotttodd): join mkdocs-material insiders for this
 
+extra_css:
+  - assets/stylesheets/extra.css
+
 copyright: Copyright &copy; 2021 Google LLC  # TODO(scotttodd): remove?
 
 markdown_extensions:
@@ -69,22 +73,22 @@ markdown_extensions:
 # Navigation with explicit ordering and nesting.
 # https://www.mkdocs.org/user-guide/configuration/#nav
 nav:
-    - Home: 'index.md'
-    - 'Frontends':
-      - TensorFlow: 'frontends/tensorflow.md'
-      - TensorFlow Lite: 'frontends/tensorflow-lite.md'
-      - JAX: 'frontends/jax.md'
-    - 'Backends':
-      - CPU - LLVM: 'backends/cpu-llvm.md'
-      - GPU - Vulkan: 'backends/gpu-vulkan.md'
-    - 'Building from source':
-      # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
-      - 'building-from-source/getting-started.md'
-      - Python bindings: 'building-from-source/python.md'
-      - Android cross-compilation: 'building-from-source/android.md'
-    - 'Bindings':
-      - Python: 'bindings/python.md'
-      - C API: 'bindings/c-api.md'
-      - TensorFlow Lite: 'bindings/tensorflow-lite.md'
-    - 'Community':
-      - Projects: 'community/projects.md'
+  - Home: 'index.md'
+  - 'Frontends':
+    - TensorFlow: 'frontends/tensorflow.md'
+    - TensorFlow Lite: 'frontends/tensorflow-lite.md'
+    - JAX: 'frontends/jax.md'
+  - 'Backends':
+    - CPU - LLVM: 'backends/cpu-llvm.md'
+    - GPU - Vulkan: 'backends/gpu-vulkan.md'
+  - 'Building from source':
+    # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
+    - 'building-from-source/getting-started.md'
+    - Python bindings: 'building-from-source/python.md'
+    - Android cross-compilation: 'building-from-source/android.md'
+  - 'Bindings':
+    - Python: 'bindings/python.md'
+    - C API: 'bindings/c-api.md'
+    - TensorFlow Lite: 'bindings/tensorflow-lite.md'
+  - 'Community':
+    - Projects: 'community/projects.md'
