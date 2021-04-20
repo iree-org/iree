@@ -76,20 +76,20 @@ markdown_extensions:
 nav:
   - Home: 'index.md'
   - 'Frontends':
-    - TensorFlow: 'frontends/tensorflow.md'
-    - TensorFlow Lite: 'frontends/tensorflow-lite.md'
-    - JAX: 'frontends/jax.md'
+      - TensorFlow: 'frontends/tensorflow.md'
+      - TensorFlow Lite: 'frontends/tensorflow-lite.md'
+      - JAX: 'frontends/jax.md'
   - 'Backends':
-    - CPU - LLVM: 'backends/cpu-llvm.md'
-    - GPU - Vulkan: 'backends/gpu-vulkan.md'
+      - CPU - LLVM: 'backends/cpu-llvm.md'
+      - GPU - Vulkan: 'backends/gpu-vulkan.md'
   - 'Building from source':
-    # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
-    - 'building-from-source/getting-started.md'
-    - Python bindings: 'building-from-source/python.md'
-    - Android cross-compilation: 'building-from-source/android.md'
+      # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
+      - 'building-from-source/getting-started.md'
+      - Python bindings: 'building-from-source/python.md'
+      - Android cross-compilation: 'building-from-source/android.md'
   - 'Bindings':
-    - Python: 'bindings/python.md'
-    - C API: 'bindings/c-api.md'
-    - TensorFlow Lite: 'bindings/tensorflow-lite.md'
+      - Python: 'bindings/python.md'
+      - C API: 'bindings/c-api.md'
+      - TensorFlow Lite: 'bindings/tensorflow-lite.md'
   - 'Community':
-    - Projects: 'community/projects.md'
+      - Projects: 'community/projects.md'
