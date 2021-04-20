@@ -28,9 +28,9 @@ namespace iree_compiler {
 
 namespace {
 
-/// Generate to calls which resembles the IREE_RETURN_IF_ERROR macro. We need to
-/// split it here becasue we cannot produce a macro invocation of a function
-/// call in emitc.
+/// Generate two calls which resemble the IREE_RETURN_IF_ERROR macro. We need
+/// to split it here becasue we cannot produce a macro invocation with a
+/// function call as argument in emitc.
 emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
                            StringAttr callee, ArrayAttr args,
                            ArrayAttr templateArgs, ArrayRef<Value> operands) {
