@@ -480,11 +480,11 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
             getOp.getOperation())
             .Case<IREE::VM::ListGetI32Op>([&](auto op) {
               return std::make_pair(StringRef("IREE_VM_VALUE_TYPE_I32"),
-                                    StringRef("vm_list_value_extract_i32"));
+                                    StringRef("iree_vm_value_get_i32"));
             })
             .template Case<IREE::VM::ListGetI64Op>([&](auto op) {
               return std::make_pair(StringRef("IREE_VM_VALUE_TYPE_I64"),
-                                    StringRef("vm_list_value_extract_i64"));
+                                    StringRef("iree_vm_value_get_i64"));
             })
             .Default([](Operation *) { return std::make_pair(None, None); });
 

@@ -36,14 +36,6 @@ static inline void vm_global_store_i32(uint8_t* base, uint32_t byte_offset,
 }
 
 //===------------------------------------------------------------------===//
-// List ops
-//===------------------------------------------------------------------===//
-
-static inline int32_t vm_list_value_extract_i32(iree_vm_value_t* value) {
-  return value->i32;
-}
-
-//===------------------------------------------------------------------===//
 // Conditional assignment
 //===------------------------------------------------------------------===//
 
@@ -146,14 +138,6 @@ static inline iree_status_t vm_fail_or_ok(int32_t status_code,
                                 message);
   }
   return iree_ok_status();
-}
-
-//===------------------------------------------------------------------===//
-// ExtI64: List ops
-//===------------------------------------------------------------------===//
-
-static inline int64_t vm_list_value_extract_i64(iree_vm_value_t* value) {
-  return value->i64;
 }
 
 //===------------------------------------------------------------------===//
