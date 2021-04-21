@@ -99,7 +99,7 @@ python -m pip install iree-compiler-snapshot \
     -f https://github.com/google/iree/releases
 ```
 
-!!! note
+!!! tip
     `iree-translate` is installed as `/path/to/python/site-packages/iree/tools/core/iree-translate`.
     You can find out the full path to the `site-packages` directory via the
     `python -m site` command.
