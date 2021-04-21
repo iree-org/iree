@@ -29,22 +29,18 @@ python -m pip install \
 
 ## Importing models
 
+IREE compilers transform a model into its final deployable format in several
+sequential steps. The first step for a TensorFlow model is to use either the
+`iree-tf-import` command-line tool or IREE's Python APIs to import the model
+into a format (i.e., [MLIR](https://mlir.llvm.org/)) compatible with the generic
+IREE compilers.
+
 ### From SavedModel on TensorFlow Hub
 
 IREE supports importing and using SavedModels from
 [TensorFlow Hub](https://www.tensorflow.org/hub).
 
 #### Using the command-line tool
-
-IREE compilers transform a model into its final deployable format in many
-sequential steps. The first step is to import the model authored with Python
-in TensorFlow into a format (i.e., [MLIR](https://mlir.llvm.org/)) expected
-by main IREE compilers. This can be done via the `iree-tf-import` tool.
-
-!!! tip
-    `iree-tf-import` is installed as `/path/to/python/site-packages/iree/tools/tf/iree-tf-import`
-    via the `iree-tools-tf-snapshot` Python package. You can find out the full
-    path to the `site-packages` directory via the `python -m site` command.
 
 First download the SavedModel and load it to get the serving signature, which
 is used as the entry point for IREE compilation flow:
@@ -56,9 +52,9 @@ print(list(imported_with_signatures.signatures.keys()))
 ```
 
 !!! note
-    If there is no serving signatures in the original SavedModel, you may check
-    to add it by yourself by following ["Missing serving signature in
-    SavedModel"](#missing-serving-signature-in-savedmodel).
+    If there are no serving signatures in the original SavedModel, you may add
+    them by yourself by following
+    ["Missing serving signature in SavedModel"](#missing-serving-signature-in-savedmodel).
 
 Then you can import the model with `iree-tf-import`. You can read the options
 supported via `iree-tf-import -help`. Using [MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
@@ -72,6 +68,10 @@ iree-tf-import
 ```
 
 !!! tip
+
+    `iree-tf-import` is installed as `/path/to/python/site-packages/iree/tools/tf/iree-tf-import`.
+    You can find out the full path to the `site-packages` directory via the
+    `python -m site` command.
 
     `-tf-import-type` needs to match the SavedModel version. You can try both v1
     and v2 if you see one of them gives an empty dump.
@@ -101,7 +101,7 @@ directory.
 
 ### Missing serving signature in SavedModel
 
-Sometimes SavedModel are exported without explicit [serving signatures](https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export).
+Sometimes SavedModels are exported without explicit [serving signatures](https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export).
 This happens by default for TensorFlow Hub SavedModels. However, serving
 signatures are required as entry points for IREE compilation flow. You
 can use Python to load and re-export the SavedModel to give it serving
