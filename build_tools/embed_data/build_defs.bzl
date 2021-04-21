@@ -57,7 +57,7 @@ def cc_embed_data(
       identifier: The identifier to use in generated names (defaults to name).
       **kwargs: Args to pass to the cc_library.
     """
-    generator = "//build_tools/embed_data:generate_cc_embed_data"
+    generator = "//build_tools/embed_data:generate_embed_data"
     generator_location = "$(location %s)" % generator
     if identifier == None:
         identifier = name
@@ -66,6 +66,7 @@ def cc_embed_data(
         cc_file_output,
     )
     flags += " --identifier='%s'" % (identifier,)
+    flags += " --c_output=false"
     if cpp_namespace != None:
         flags += " --cpp_namespace='%s'" % (cpp_namespace,)
     if strip_prefix != None:
@@ -126,7 +127,7 @@ def c_embed_data(
         #endif // __cplusplus
 
     The 'this_rule_name()' function will return an array of FileToc
-    structs terminated by one that has nullptr 'name' and 'data' fields.
+    structs terminated by one that has NULL 'name' and 'data' fields.
     The 'data' field always has an extra null terminator at the end (which
     is not included in the size).
 
@@ -134,7 +135,7 @@ def c_embed_data(
       name: The rule name, which will also be the identifier of the generated
         code symbol.
       srcs: List of files to embed.
-      c_file_output: The CC implementation file to output.
+      c_file_output: The C implementation file to output.
       h_file_output: The H header file to output.
       testonly: If True, only testonly targets can depend on this target.
       strip_prefix: Strips this verbatim prefix from filenames (in the TOC).
@@ -142,7 +143,7 @@ def c_embed_data(
       identifier: The identifier to use in generated names (defaults to name).
       **kwargs: Args to pass to the cc_library.
     """
-    generator = "//build_tools/embed_data:generate_c_embed_data"
+    generator = "//build_tools/embed_data:generate_embed_data"
     generator_location = "$(location %s)" % generator
     if identifier == None:
         identifier = name
@@ -150,6 +151,7 @@ def c_embed_data(
         h_file_output,
         c_file_output,
     )
+    flags += " --c_output=true"
     flags += " --identifier='%s'" % (identifier,)
     if strip_prefix != None:
         flags += " --strip_prefix='%s'" % (strip_prefix,)

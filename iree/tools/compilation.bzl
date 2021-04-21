@@ -62,7 +62,7 @@ def iree_bytecode_module(
     if c_output:
         c_embed_data(
             name = "%s_c" % (name),
-            identifier = name,
+            identifier = "%s_c" % (name),
             srcs = ["%s.vmfb" % (name)],
             c_file_output = "%s_c.c" % (name),
             h_file_output = "%s_c.h" % (name),

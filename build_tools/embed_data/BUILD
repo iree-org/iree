@@ -23,18 +23,8 @@ package(
 )
 
 cc_binary(
-    name = "generate_cc_embed_data",
-    srcs = ["generate_cc_embed_data_main.cc"],
-    deps = [
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_binary(
-    name = "generate_c_embed_data",
-    srcs = ["generate_c_embed_data_main.cc"],
+    name = "generate_embed_data",
+    srcs = ["generate_embed_data_main.cc"],
     deps = [
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",

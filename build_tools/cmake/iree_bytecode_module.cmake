@@ -40,8 +40,8 @@ include(CMakeParseArguments)
 function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY"
-    "NAME;SRC;TRANSLATE_TOOL;CC_NAMESPACE;C_OUTPUT"
+    "PUBLIC;TESTONLY;C_OUTPUT"
+    "NAME;SRC;TRANSLATE_TOOL;CC_NAMESPACE"
     "FLAGS"
     ${ARGN}
   )
@@ -106,7 +106,7 @@ function(iree_bytecode_module)
     )
   endif()
 
-  if(DEFINED _RULE_C_OUTPUT)
+  if(_RULE_C_OUTPUT)
     iree_c_embed_data(
       NAME
         "${_RULE_NAME}_c"

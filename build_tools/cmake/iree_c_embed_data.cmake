@@ -57,6 +57,7 @@ function(iree_c_embed_data)
   list(APPEND _ARGS "--output_header=${_RULE_H_FILE_OUTPUT}")
   list(APPEND _ARGS "--output_impl=${_RULE_C_FILE_OUTPUT}")
   list(APPEND _ARGS "--identifier=${_IDENTIFIER}")
+  list(APPEND _ARGS "--c_output=true")
   if(DEFINED _RULE_STRIP_PREFIX})
     list(APPEND _ARGS "--strip_prefix=${_RULE_STRIP_PREFIX}")
   endif()
@@ -71,7 +72,7 @@ function(iree_c_embed_data)
     list(APPEND _ARGS "${SRC}")
   endforeach(SRC)
 
-  iree_get_executable_path(_EXE_PATH generate_c_embed_data)
+  iree_get_executable_path(_EXE_PATH generate_embed_data)
 
   add_custom_command(
     OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_C_FILE_OUTPUT}"

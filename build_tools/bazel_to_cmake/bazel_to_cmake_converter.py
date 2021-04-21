@@ -498,7 +498,7 @@ class BuildFileFunctions(object):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
     namespace_block = _convert_string_arg_block("CC_NAMESPACE", cc_namespace)
-    c_output_block = _convert_string_arg_block("C_OUTPUT", c_output)
+    c_output_block = _convert_option_block("C_OUTPUT", c_output)
     translate_tool_block = _convert_translate_tool_block(translate_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
     testonly_block = _convert_option_block("TESTONLY", testonly)
