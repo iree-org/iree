@@ -41,7 +41,7 @@ sequential steps. The first step is to import the model authored with Python
 in TensorFlow into a format (i.e., [MLIR](https://mlir.llvm.org/)) expected
 by main IREE compilers. This can be done via the `iree-tf-import` tool.
 
-!!! note
+!!! tip
     `iree-tf-import` is installed as `/path/to/python/site-packages/iree/tools/tf/iree-tf-import`
     via the `iree-tools-tf-snapshot` Python package. You can find out the full
     path to the `site-packages` directory via the `python -m site` command.
@@ -71,7 +71,7 @@ iree-tf-import
   /path/to/savedmodel -o iree_input.mlir
 ```
 
-!!! note
+!!! tip
 
     `-tf-import-type` needs to match the SavedModel version. You can try both v1
     and v2 if you see one of them gives an empty dump.
