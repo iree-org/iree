@@ -214,7 +214,7 @@ static LogicalResult analyseConstantOp(ConstantOp constantOp,
 
 /// Adds the result of the `flow.dispatch.tensor.load` op to the same
 /// equivalence class as the source.
-static LogicalResult analyseInterfaceLoadTensorOp(
+static LogicalResult analyseInterfaceLoadOp(
     IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
   plan.unionSets(loadOp.result(), loadOp.source());
   return success();
@@ -363,6 +363,13 @@ LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
   return success();
 }
 
+/// Adds the source and target of load-like operations to the same equivalence
+/// class.
+LogicalResult analyseLoadOp(Value source, Value dest, BufferizationPlan &plan) {
+  plan.unionSets(source, dest);
+  return success();
+}
+
 /// For operations that have a single operand and result, adds both to the same
 /// equivalence class.
 LogicalResult analyseSingleOperandResultOp(Value source, Value result,
@@ -378,15 +385,14 @@ LogicalResult analyseSingleOperandResultOp(Value source, Value result,
 
 /// Adds the `dest` and `result` tensor of a subtensor insert operation into the
 /// same equivalence class.
-LogicalResult analyseSubTensorInsertOp(SubTensorInsertOp subTensorInsertOp,
-                                       BufferizationPlan &plan) {
-  Value dest = subTensorInsertOp.dest();
-  Value result = subTensorInsertOp.result();
+LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
+                                         Value dest, Value result,
+                                         BufferizationPlan &plan) {
   if (dest.hasOneUse() && !isFromReadOnlyTensor(dest)) {
     plan.unionSets(dest, result);
   }
-  if (plan.isEquivalent(subTensorInsertOp.source(), dest)) {
-    return subTensorInsertOp.emitError(
+  if (plan.isEquivalent(source, dest)) {
+    return op->emitError(
         "unexpected source and dest being mapped to same buffer");
   }
   plan.insert(dest);
@@ -402,7 +408,7 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
         })
         .Case<IREE::Flow::DispatchTensorLoadOp>(
             [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-              return analyseInterfaceLoadTensorOp(loadOp, plan);
+              return analyseLoadOp(loadOp.source(), loadOp.result(), plan);
             })
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
@@ -430,12 +436,25 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
                                               subTensorOp.result(), plan);
         })
         .Case<SubTensorInsertOp>([&](SubTensorInsertOp subTensorInsertOp) {
-          return analyseSubTensorInsertOp(subTensorInsertOp, plan);
+          return analyseDestructiveUpdateOp(
+              subTensorInsertOp, subTensorInsertOp.source(),
+              subTensorInsertOp.dest(), subTensorInsertOp.result(), plan);
         })
         .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
           return analyseSingleOperandResultOp(castOp.source(), castOp.dest(),
                                               plan);
         })
+        .Case<vector::TransferReadOp>(
+            [&](vector::TransferReadOp transferReadOp) {
+              return analyseLoadOp(transferReadOp.source(),
+                                   transferReadOp.vector(), plan);
+            })
+        .Case<vector::TransferWriteOp>(
+            [&](vector::TransferWriteOp transferWriteOp) {
+              return analyseDestructiveUpdateOp(
+                  transferWriteOp, transferWriteOp.vector(),
+                  transferWriteOp.source(), transferWriteOp.result(), plan);
+            })
         .Default([&](Operation *op) { return success(); });
   };
   if (funcOp.walk(bufferMappingFn).wasInterrupted()) {
@@ -448,6 +467,20 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
 //===----------------------------------------------------------------------===//
 // Bufferization helper functions using BlockAndValueMapping.
 //===----------------------------------------------------------------------===//
+
+/// Returns the dynamic dimensions of a Value `v` that is assumed to be
+/// ShapedType.
+static SmallVector<Value, 4> getDynamicDims(OpBuilder &b, Location loc,
+                                            Value v) {
+  SmallVector<Value, 4> dynamicDims;
+  for (auto shape : enumerate(v.getType().cast<ShapedType>().getShape())) {
+    if (shape.value() == ShapedType::kDynamicSize) {
+      dynamicDims.push_back(
+          b.createOrFold<memref::DimOp>(loc, v, shape.index()));
+    }
+  }
+  return dynamicDims;
+}
 
 /// Allocates a memref for the results of an operation. Uses the
 /// `InferShapedTypeOpInterface` where possible to get the shape of the output
@@ -474,13 +507,9 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
   } else if (auto subTensorOp = dyn_cast<SubTensorOp>(op)) {
     dynamicDims = llvm::to_vector<4>(subTensorOp.sizes());
   } else if (auto subTensorInsertOp = dyn_cast<SubTensorInsertOp>(op)) {
-    Value dest = subTensorInsertOp.dest();
-    for (auto shape : enumerate(dest.getType().cast<ShapedType>().getShape())) {
-      if (shape.value() == ShapedType::kDynamicSize) {
-        dynamicDims.push_back(
-            b.createOrFold<memref::DimOp>(loc, dest, shape.index()));
-      }
-    }
+    dynamicDims = getDynamicDims(b, loc, subTensorInsertOp.dest());
+  } else if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
+    dynamicDims = getDynamicDims(b, loc, transferWriteOp.source());
   } else {
     return nullptr;
   }
@@ -650,7 +679,7 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
   for (auto op : traversedOps) {
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
-            .Case<linalg::LinalgOp, SubTensorInsertOp>(
+            .Case<linalg::LinalgOp, SubTensorInsertOp, vector::TransferWriteOp>(
                 [&](auto op) { return resultBuffer; })
             .Case<linalg::TensorReshapeOp>(
                 [&](linalg::TensorReshapeOp reshapeOp) {
@@ -931,8 +960,6 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
                                               SubTensorInsertOp op,
                                               BlockAndValueMapping &bvm,
                                               BufferizationPlan &plan) {
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(op);
   Location loc = op.getLoc();
   Value result = op.getResult();
   ShapedType resultType = op.getType();
@@ -962,6 +989,40 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
   Value subViewOp = createSubviewOp(b, loc, resultBuffer, offsets, sizes,
                                     strides, subViewResultType);
   b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
+  return success();
+}
+
+/// Converts a vector.transfer_read op to use memref operands for source.
+static LogicalResult convertVectorTransferReadOp(
+    OpBuilder &b, vector::TransferReadOp transferReadOp,
+    BlockAndValueMapping &bvm) {
+  Value source = transferReadOp.source();
+  if (!source.getType().isa<RankedTensorType>()) return success();
+  Value memref = bvm.lookup(source);
+  transferReadOp.sourceMutable().assign(memref);
+  return success();
+}
+
+/// Converts a vector.transfer_write op to use memref operands for source.
+static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
+                                                  vector::TransferWriteOp op,
+                                                  BlockAndValueMapping &bvm,
+                                                  BufferizationPlan &plan) {
+  Location loc = op.getLoc();
+  Value result = op.result();
+  RankedTensorType resultType = result.getType().dyn_cast<RankedTensorType>();
+  if (!resultType) return success();
+  Value resultBuffer = bvm.lookup(result);
+
+  if (!plan.isEquivalent(op.source(), result)) {
+    Value destBuffer = bvm.lookup(op.source());
+    b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
+  }
+
+  // Create a new vector.transfer_write operation without a result value.
+  b.create<vector::TransferWriteOp>(
+      loc, op.vector(), resultBuffer, op.indices(), op.permutation_map(),
+      op.mask(), op.in_bounds() ? *op.in_bounds() : ArrayAttr());
   return success();
 }
 
@@ -1089,6 +1150,20 @@ void LinalgBufferizePass::runOnFunction() {
         .Case<tensor::ExtractOp>([&](tensor::ExtractOp extractOp) {
           return convertTensorExtractOp(b, extractOp, bvm);
         })
+        .Case<vector::TransferReadOp>(
+            [&](vector::TransferReadOp transferReadOp) {
+              return convertVectorTransferReadOp(b, transferReadOp, bvm);
+            })
+        .Case<vector::TransferWriteOp>(
+            [&](vector::TransferWriteOp transferWriteOp) {
+              if (failed(getOrAllocateResultBuffers(b, transferWriteOp,
+                                                    transferWriteOp.source(),
+                                                    bvm, plan, allocationFn))) {
+                return failure();
+              }
+              return convertVectorTransferWriteOp(b, transferWriteOp, bvm,
+                                                  plan);
+            })
         .Default([&](Operation *op) {
           // Replace any scalar remapped operands to the new values.
           // TODO(GH-5013): This is really hacky solution, but gets us past for
