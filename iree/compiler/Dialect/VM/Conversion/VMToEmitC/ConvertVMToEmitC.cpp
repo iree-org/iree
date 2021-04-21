@@ -48,7 +48,9 @@ emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
       /*location=*/loc,
       /*type=*/TypeRange{},
       /*callee=*/StringAttr::get(ctx, "VM_RETURN_IF_ERROR"),
-      /*args=*/ArrayAttr{},
+      /*args=*/
+      ArrayAttr::get(
+          ctx, {rewriter.getIndexAttr(0), StringAttr::get(ctx, "local_refs")}),
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{callOp.getResult(0)});
   return callOp;
@@ -286,7 +288,9 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
         /*location=*/loc,
         /*type=*/TypeRange{},
         /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
-        /*args=*/ArrayAttr{},
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                             StringAttr::get(ctx, "local_refs")}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
 
@@ -427,8 +431,10 @@ class ListAllocOpConversion
     auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::CallOp>(
         /*op=*/allocOp,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*callee=*/rewriter.getStringAttr("VM_GET_REF_ADDRESS"),
-        /*args=*/ArrayAttr::get(ctx, {rewriter.getI32IntegerAttr(ordinal)}),
+        /*callee=*/rewriter.getStringAttr("VM_ARRAY_ELEMENT_ADDRESS"),
+        /*args=*/
+        ArrayAttr::get(ctx, {StringAttr::get(ctx, "local_refs"),
+                             rewriter.getI32IntegerAttr(ordinal)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
@@ -516,7 +522,9 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*location=*/loc,
         /*type=*/TypeRange{},
         /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
-        /*args=*/ArrayAttr{},
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                             StringAttr::get(ctx, "local_refs")}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
 
@@ -601,7 +609,9 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*location=*/loc,
         /*type=*/TypeRange{},
         /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
-        /*args=*/ArrayAttr{},
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                             StringAttr::get(ctx, "local_refs")}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
 

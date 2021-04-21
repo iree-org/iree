@@ -227,7 +227,7 @@ static LogicalResult translateFailOp(IREE::VM::FailOp failOp,
   auto status = failOp.status();
 
   if (hasRefs) {
-    output << "VM_RELEASE_REFS();\n";
+    output << "VM_REF_ARRAY_RELEASE(local_refs);\n";
   }
 
   output << "return vm_fail_or_ok(" << emitter.getOrCreateName(status)
@@ -249,7 +249,7 @@ static LogicalResult translateReturnOpToC(
   }
 
   if (hasRefs) {
-    output << "VM_RELEASE_REFS();\n";
+    output << "VM_REF_ARRAY_RELEASE(local_refs);\n";
   }
 
   output << "return iree_ok_status();\n";

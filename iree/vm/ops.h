@@ -240,28 +240,30 @@ static inline int32_t vm_cmp_nz_i64(int64_t operand) {
 }
 
 //===------------------------------------------------------------------===//
-// Utility macros
+// Utility macros (Used for things that EmitC can't hadnle)
 //===------------------------------------------------------------------===//
 
-#define VM_GET_REF_ADDRESS(index) &local_refs[index]
+// Get the address of an array element
+#define VM_ARRAY_ELEMENT_ADDRESS(array, index) &array[index]
 
-#define VM_RELEASE_REFS()                                \
-  for (int i = 0; i < IREE_ARRAYSIZE(local_refs); i++) { \
-    iree_vm_ref_release(VM_GET_REF_ADDRESS(i));          \
+// Release all refs from the given array
+#define VM_REF_ARRAY_RELEASE(array)                          \
+  for (int i = 0; i < IREE_ARRAYSIZE(array); i++) {          \
+    iree_vm_ref_release(VM_ARRAY_ELEMENT_ADDRESS(array, i)); \
   }
 
 // TODO(simon-camp): This macro should resemble the error handling part of the
 // IREE_RETURN_IF_ERROR macro. There are two different definitions in
 // iree/base/api.h depending on a feature flag.
-#define VM_RETURN_IF_ERROR(status) \
-  if (status) {                    \
-    VM_RELEASE_REFS();             \
-    return status;                 \
+#define VM_RETURN_IF_ERROR(status, array) \
+  if (status) {                           \
+    VM_REF_ARRAY_RELEASE(array);          \
+    return status;                        \
   }
 
-#define VM_RETURN_IF_LIST_NULL(list)                       \
+#define VM_RETURN_IF_LIST_NULL(list, array)                \
   if (!list) {                                             \
-    VM_RELEASE_REFS();                                     \
+    VM_REF_ARRAY_RELEASE(array);                           \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT); \
   }
 
