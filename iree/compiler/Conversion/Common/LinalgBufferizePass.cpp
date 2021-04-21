@@ -271,7 +271,6 @@ static bool canSetStoreValueAndTargetAsEquivalent(
     }
     // If the binding and offsets are the same, make sure that the
     // !flow.dispatch.tensor is read-write.
-    auto targetType = target.getType().cast<IREE::Flow::DispatchTensorType>();
     auto sourceType =
         valueInterfaceOp.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
     return sourceType &&
@@ -693,8 +692,6 @@ static Value getAliasingBufferForReshapeResult(OpBuilder &b,
                                                BlockAndValueMapping &bvm) {
   Location loc = op.getLoc();
   Value srcTensor = op.src();
-  RankedTensorType srcTensorType = op.getSrcType();
-  Value resultTensor = op.result();
   RankedTensorType resultTensorType = op.getResultType();
   Value inputBuffer = bvm.lookup(srcTensor);
 
@@ -712,7 +709,6 @@ static Value getAliasingBufferForSubtensorResult(OpBuilder &b, SubTensorOp op,
                                                  BlockAndValueMapping &bvm) {
   Location loc = op.getLoc();
   Value srcTensor = op.source();
-  Value resultTensor = op.result();
   Value inputBuffer = bvm.lookup(srcTensor);
 
   ShapedType sourceType = op.getSourceType();
