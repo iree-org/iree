@@ -14,7 +14,7 @@
 
 # Generates source files with embedded file contents.
 
-load(":build_defs.bzl", "cc_embed_data", "c_embed_data")
+load(":build_defs.bzl", "c_embed_data", "cc_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],

@@ -448,22 +448,22 @@ class BuildFileFunctions(object):
                             f"  PUBLIC\n)\n\n")
 
   def c_embed_data(self,
-                    name,
-                    srcs,
-                    c_file_output,
-                    h_file_output,
-                    testonly=None,
-                    strip_prefix=None,
-                    flatten=None,
-                    identifier=None,
-                    **kwargs):
+                   name,
+                   srcs,
+                   c_file_output,
+                   h_file_output,
+                   testonly=None,
+                   strip_prefix=None,
+                   flatten=None,
+                   identifier=None,
+                   **kwargs):
     if identifier:
       self._convert_unimplemented_function("c_embed_data",
                                            name + " has identifier")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     c_file_output_block = _convert_string_arg_block("C_FILE_OUTPUT",
-                                                     c_file_output)
+                                                    c_file_output)
     h_file_output_block = _convert_string_arg_block("H_FILE_OUTPUT",
                                                     h_file_output)
     testonly_block = _convert_option_block("TESTONLY", testonly)
