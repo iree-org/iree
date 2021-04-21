@@ -57,5 +57,10 @@ std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 // allocations and view operations.
 std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass();
 
+// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
+// subspan ops to the consumer load/store ops, in preparation for lowering to
+// backends that require linearized access.
+std::unique_ptr<FunctionPass> createFlattenMemRefSubspanPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir

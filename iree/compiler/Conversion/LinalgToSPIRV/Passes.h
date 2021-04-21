@@ -87,11 +87,6 @@ createConcretizeTileAmongWorkgroupsPass(const SPIRVCodegenOptions &options);
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createTileAndDistributeAmongWorkgroupsPass(const SPIRVCodegenOptions &options);
 
-// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
-// subspan ops to the consumer load/store ops, in preparation for lowering to
-// SPIR-V.
-std::unique_ptr<FunctionPass> createFlattenMemRefSubspanPass();
-
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//
