@@ -14,6 +14,8 @@
 
 #include "iree/hal/local/elf/elf_module.h"
 
+#include <inttypes.h>
+
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/local/elf/platform.h"
@@ -151,11 +153,12 @@ static iree_status_t iree_elf_module_verify_phdr_table(
     const iree_elf_phdr_t* phdr = &load_state->phdr_table[i];
     if (phdr->p_type != IREE_ELF_PT_LOAD) continue;
     if (phdr->p_offset + phdr->p_filesz > raw_data.data_length) {
-      return iree_make_status(
-          IREE_STATUS_FAILED_PRECONDITION,
-          "phdr reference outside of file extents: %zu-%zu of max %zu",
-          phdr->p_offset, phdr->p_offset + phdr->p_filesz,
-          raw_data.data_length);
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "phdr reference outside of file extents: %" PRIu64
+                              "-%" PRIu64 "of max %" PRIu64,
+                              (uint64_t)phdr->p_offset,
+                              (uint64_t)(phdr->p_offset + phdr->p_filesz),
+                              (uint64_t)raw_data.data_length);
     }
   }
   return iree_ok_status();
