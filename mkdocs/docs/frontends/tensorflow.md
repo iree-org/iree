@@ -101,11 +101,13 @@ directory.
 
 ### Missing serving signature in SavedModel
 
-Sometimes SavedModel are exported without explicit [serving signature](https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export).
+Sometimes SavedModel are exported without explicit [serving signatures](https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export).
 This happens by default for TensorFlow Hub SavedModels. However, serving
 signatures are required as entry points for IREE compilation flow. You
-can use the following Python snippet to load and re-export the SavedModel
-to give it serving signatures:
+can use Python to load and re-export the SavedModel to give it serving
+signatures. For example, for [MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification),
+assuming we want the serving signature to be `predict` and operating on a
+224x224 RGB image:
 
 ``` python
 import tensorflow.compat.v2 as tf
