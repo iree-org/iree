@@ -23,7 +23,7 @@ def iree_bytecode_module(
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
         cc_namespace = None,
-        c_output = None,
+        c_output = False,
         **kwargs):
     native.genrule(
         name = name,
