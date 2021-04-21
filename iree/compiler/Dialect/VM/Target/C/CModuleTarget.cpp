@@ -365,12 +365,11 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
     return funcOp.emitOpError() << "unable to perform register allocation";
   }
 
-  const auto numRefs = registerAllocation.getMaxRefRegisterOrdinal();
-  const bool hasRefs = numRefs > -1;
+  const size_t numRefs = registerAllocation.getMaxRefRegisterOrdinal() + 1;
+  const bool hasRefs = numRefs > 0;
 
   if (hasRefs) {
-    auto ref_initializers =
-        SmallVector<StringRef, 4>{static_cast<size_t>(numRefs), "{0}"};
+    auto ref_initializers = SmallVector<StringRef, 4>{numRefs, "{0}"};
     output << "iree_vm_ref_t local_refs[" << numRefs << "] = {"
            << llvm::join(ref_initializers, ", ") << "};\n";
   }
