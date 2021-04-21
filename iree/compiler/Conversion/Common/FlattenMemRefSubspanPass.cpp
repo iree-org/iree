@@ -340,7 +340,7 @@ std::unique_ptr<FunctionPass> createFlattenMemRefSubspanPass() {
 }
 
 static PassRegistration<FlattenMemRefSubspanPass> pass(
-    "iree-spirv-flatten-memref-subspan",
+    "iree-codegen-flatten-memref-subspan",
     "Flatten n-D MemRef subspan ops to 1-D ones and fold byte offsets on "
     "subspan ops to the consumer load/store ops");
 
