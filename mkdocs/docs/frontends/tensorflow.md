@@ -49,35 +49,32 @@ by main IREE compilers. This can be done via the `iree-tf-import` tool.
     via the `iree-tools-tf-snapshot` Python package. You can find out the full
     path to the `site-packages` directory via the `python -m site` command.
 
-First download the SavedModel and re-save it with a [serving signature](https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export).
-
-!!! info
-    This is necessary because by default TensorFlow Hub SavedModels might not
-    have serving signatures, which are required for IREE compilation flow.
+First download the SavedModel and load it to get the serving signature, which
+is used as the entry point for IREE compilation flow:
 
 ``` python
 import tensorflow.compat.v2 as tf
 loaded_model = tf.saved_model.load('/path/to/downloaded/model/')
-call = loaded_model.__call__.get_concrete_function(
-         tf.TensorSpec([1, 224, 224, 3], tf.float32))
-signatures = {'predict': call}
-tf.saved_model.save(loaded_model,
-  '/path/to/resaved/model/', signatures=signatures)
+print(list(imported_with_signatures.signatures.keys()))
 ```
 
-The above will create a new SavedModel with a serving signature, `predict`, and
-save it to `/path/to/resaved/model/` Then you can import it via
-`iree-tf-import`:
+!!! note
+    If there is no serving signatures in the original SavedModel, you may need
+    to add it by yourself by following ["Missing serving signature in
+    SavedModel"](#missing-serving-signature-in-savedmodel).
+
+Then you can import the model with `iree-tf-import` (assuming the serving
+signature is `predict`):
 
 ``` shell
 iree-tf-import
   --tf-savedmodel-exported-names=predict \
   --tf-import-type=savedmodel_v1 \
-  /path/to/resaved/model -o iree_input.mlir
+  /path/to/savedmodel -o iree_input.mlir
 ```
 
-Afterwards you can further compile the model for [CPU](/backends/cpu-llvm/) or
-[GPU](/backends/gpu-vulkan/).
+Afterwards you can further compile the model in `iree_input.mlir` for
+[CPU](/backends/cpu-llvm/) or [GPU](/backends/gpu-vulkan/).
 
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
 
@@ -96,3 +93,26 @@ Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.
 End-to-end execution tests can be found in IREE's
 [integrations/tensorflow/e2e/](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e)
 directory.
+
+## Troubleshooting
+
+### Missing serving signature in SavedModel
+
+Sometimes SavedModel are exported without explicit [serving signature](https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export).
+This happens by default for TensorFlow Hub SavedModels. However, serving
+signatures are required as entry points for IREE compilation flow. You
+can use the following Python snippet to load and re-export the SavedModel
+to give it serving signatures:
+
+``` python
+import tensorflow.compat.v2 as tf
+loaded_model = tf.saved_model.load('/path/to/downloaded/model/')
+call = loaded_model.__call__.get_concrete_function(
+         tf.TensorSpec([1, 224, 224, 3], tf.float32))
+signatures = {'predict': call}
+tf.saved_model.save(loaded_model,
+  '/path/to/resaved/model/', signatures=signatures)
+```
+
+The above will create a new SavedModel with a serving signature, `predict`, and
+save it to `/path/to/resaved/model/`.
