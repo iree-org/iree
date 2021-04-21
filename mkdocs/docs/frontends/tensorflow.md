@@ -32,10 +32,7 @@ python -m pip install \
 ### From SavedModel on TensorFlow Hub
 
 IREE supports importing and using SavedModels from
-[TensorFlow Hub](https://www.tensorflow.org/hub). Here we use [MobileNet
-v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification) as
-an example.
-
+[TensorFlow Hub](https://www.tensorflow.org/hub).
 
 #### Using the command-line tool
 
@@ -59,19 +56,25 @@ print(list(imported_with_signatures.signatures.keys()))
 ```
 
 !!! note
-    If there is no serving signatures in the original SavedModel, you may need
+    If there is no serving signatures in the original SavedModel, you may check
     to add it by yourself by following ["Missing serving signature in
     SavedModel"](#missing-serving-signature-in-savedmodel).
 
-Then you can import the model with `iree-tf-import` (assuming the serving
-signature is `predict`):
+Then you can import the model with `iree-tf-import`. You can read the options
+supported via `iree-tf-import -help`. Using [MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
+as an example and assuming the serving signature is `predict`:
 
 ``` shell
 iree-tf-import
-  --tf-savedmodel-exported-names=predict \
-  --tf-import-type=savedmodel_v1 \
+  -tf-import-type=savedmodel_v1 \
+  -tf-savedmodel-exported-names=predict \
   /path/to/savedmodel -o iree_input.mlir
 ```
+
+!!! note
+
+    `-tf-import-type` needs to match the SavedModel version. You can try both v1
+    and v2 if you see one of them gives an empty dump.
 
 Afterwards you can further compile the model in `iree_input.mlir` for
 [CPU](/backends/cpu-llvm/) or [GPU](/backends/gpu-vulkan/).
