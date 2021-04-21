@@ -92,7 +92,7 @@ IREE uses continuous integration services to compile and publish artifacts into
 [GitHub Releases][iree-releases] page. Right now these are just snapshots of
 the `main` development branch.
 
-You can install the Python package containing SPIR-V compiler by
+You can install the Python package containing the SPIR-V compiler by
 
 ``` shell
 python -m pip install iree-compiler-snapshot \
