@@ -10,7 +10,7 @@ https://www.mkdocs.org/.
 Develop (from mkdocs/ folder):
 
 ```
-$ mkdocs --serve
+$ mkdocs serve
 ```
 
 Deploy:
