@@ -4,8 +4,12 @@
 vm.module @add_module {
   // CHECK: iree_status_t add_module_add_1_impl(int32_t v1, int32_t v2, int32_t *out0, int32_t *out1, add_module_state_t* state) {
   vm.func @add_1(%arg0 : i32, %arg1 : i32) -> (i32, i32) {
+    // CHECK-NEXT: VARIABLE DECLARATIONS
+    // CHECK-NEXT: RESULTS
     // CHECK-NEXT: int32_t v3;
     // CHECK-NEXT: int32_t v4;
+    // CHECK-NEXT: BASIC BLOCK ARGUMENTS
+    // CHECK-NEXT: END VARIABLE DECLARATIONS
     // CHECK-NEXT: v3 = vm_add_i32(v1, v2);
     %0 = vm.add.i32 %arg0, %arg1 : i32
     // CHECK-NEXT: v4 = vm_add_i32(v3, v3);

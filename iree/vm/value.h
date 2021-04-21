@@ -67,11 +67,21 @@ static inline iree_vm_value_t iree_vm_value_make_i32(int32_t value) {
   return result;
 }
 
+// TODO(#5542) Check the value type before accessing the union
+static inline int32_t iree_vm_value_get_i32(iree_vm_value_t *value) {
+  return value->i32;
+}
+
 static inline iree_vm_value_t iree_vm_value_make_i64(int64_t value) {
   iree_vm_value_t result;
   result.type = IREE_VM_VALUE_TYPE_I64;
   result.i64 = value;
   return result;
+}
+
+// TODO(#5542) Check the value type before accessing the union
+static inline int64_t iree_vm_value_get_i64(iree_vm_value_t *value) {
+  return value->i64;
 }
 
 #ifdef __cplusplus

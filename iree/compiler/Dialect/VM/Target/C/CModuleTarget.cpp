@@ -17,6 +17,7 @@
 #include "emitc/Target/Cpp.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -219,10 +220,15 @@ static LogicalResult translateCondBranchOp(IREE::VM::CondBranchOp condBranchOp,
 }
 
 static LogicalResult translateFailOp(IREE::VM::FailOp failOp,
-                                     mlir::emitc::CppEmitter &emitter) {
+                                     mlir::emitc::CppEmitter &emitter,
+                                     bool hasRefs) {
   llvm::raw_ostream &output = emitter.ostream();
 
   auto status = failOp.status();
+
+  if (hasRefs) {
+    output << "VM_REF_ARRAY_RELEASE(local_refs);\n";
+  }
 
   output << "return vm_fail_or_ok(" << emitter.getOrCreateName(status)
          << ", iree_make_cstring_view(\"" << failOp.message() << "\"));\n";
@@ -231,23 +237,30 @@ static LogicalResult translateFailOp(IREE::VM::FailOp failOp,
 
 static LogicalResult translateReturnOpToC(
     IREE::VM::ReturnOp returnOp, mlir::emitc::CppEmitter &emitter,
-    SmallVector<std::string, 4> resultNames) {
+    SmallVector<std::string, 4> resultNames, bool hasRefs) {
+  llvm::raw_ostream &output = emitter.ostream();
+
   for (std::tuple<Value, std::string> tuple :
        llvm::zip(returnOp.getOperands(), resultNames)) {
     Value operand = std::get<0>(tuple);
     std::string resultName = std::get<1>(tuple);
-    emitter.ostream() << "*" << resultName << " = "
-                      << emitter.getOrCreateName(operand) << ";\n";
+    output << "*" << resultName << " = " << emitter.getOrCreateName(operand)
+           << ";\n";
   }
 
-  emitter.ostream() << "return iree_ok_status();\n";
+  if (hasRefs) {
+    output << "VM_REF_ARRAY_RELEASE(local_refs);\n";
+  }
+
+  output << "return iree_ok_status();\n";
 
   return success();
 }
 
 static LogicalResult translateOpToC(Operation &op,
                                     mlir::emitc::CppEmitter &emitter,
-                                    SmallVector<std::string, 4> resultNames) {
+                                    SmallVector<std::string, 4> resultNames,
+                                    bool hasRefs) {
   if (auto branchOp = dyn_cast<IREE::VM::BranchOp>(op))
     return translateBranchOp(branchOp, emitter);
   if (auto callOp = dyn_cast<IREE::VM::CallOp>(op))
@@ -255,9 +268,9 @@ static LogicalResult translateOpToC(Operation &op,
   if (auto condBranchOp = dyn_cast<IREE::VM::CondBranchOp>(op))
     return translateCondBranchOp(condBranchOp, emitter);
   if (auto failOp = dyn_cast<IREE::VM::FailOp>(op))
-    return translateFailOp(failOp, emitter);
+    return translateFailOp(failOp, emitter, hasRefs);
   if (auto returnOp = dyn_cast<IREE::VM::ReturnOp>(op))
-    return translateReturnOpToC(returnOp, emitter, resultNames);
+    return translateReturnOpToC(returnOp, emitter, resultNames, hasRefs);
   // Fall back to generic emitc printer
   if (succeeded(emitter.emitOperation(op, /*trailingSemicolon=*/true))) {
     return success();
@@ -305,15 +318,21 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
   // struct argument name here must not be changed.
   output << moduleName << "_state_t* state) {\n";
 
-  // We forward declare all result variables.
+  // We forward declare all result variables except for the ones with RefType.
+  output << "// VARIABLE DECLARATIONS\n";
+  output << "// RESULTS\n";
   for (auto &op : funcOp.getOps()) {
     for (auto result : op.getResults()) {
+      if (result.getType().isa<IREE::VM::RefType>()) {
+        continue;
+      }
       if (failed(emitter.emitVariableDeclaration(result,
                                                  /*trailingSemicolon=*/true))) {
         return op.emitError() << "Unable to declare result variable for op";
       }
     }
   }
+  output << "// BASIC BLOCK ARGUMENTS\n";
 
   auto &blocks = funcOp.getBlocks();
   // Create label names for basic blocks.
@@ -321,16 +340,38 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
     emitter.getOrCreateName(block);
   }
 
-  // Emit variables for basic block arguments.
+  // Emit variables for basic block arguments (omitting the first).
   for (auto it = std::next(blocks.begin()); it != blocks.end(); ++it) {
     Block &block = *it;
     for (auto &arg : block.getArguments()) {
-      if (emitter.hasValueInScope(arg)) return failure();
+      if (emitter.hasValueInScope(arg)) {
+        // This shouldn't happen
+        return failure();
+      }
       if (failed(emitter.emitType(arg.getType()))) {
         return failure();
       }
       output << " " << emitter.getOrCreateName(arg) << ";\n";
     }
+  }
+
+  output << "// END VARIABLE DECLARATIONS\n";
+
+  // We reuse the register allocation pass and emit an array for all Values with
+  // ref type instead of generating one variable per Value. This makes the
+  // deallocation process easier for us.
+  RegisterAllocation registerAllocation;
+  if (failed(registerAllocation.recalculate(funcOp))) {
+    return funcOp.emitOpError() << "unable to perform register allocation";
+  }
+
+  const size_t numRefs = registerAllocation.getMaxRefRegisterOrdinal() + 1;
+  const bool hasRefs = numRefs > 0;
+
+  if (hasRefs) {
+    auto ref_initializers = SmallVector<StringRef, 4>{numRefs, "{0}"};
+    output << "iree_vm_ref_t local_refs[" << numRefs << "] = {"
+           << llvm::join(ref_initializers, ", ") << "};\n";
   }
 
   for (auto &block : blocks) {
@@ -341,7 +382,8 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
       }
     }
     for (Operation &op : block.getOperations()) {
-      if (failed(translateOpToC(op, emitter, resultNames))) {
+      if (failed(
+              translateOpToC(op, emitter, resultNames, /*hasRefs=*/hasRefs))) {
         return failure();
       }
     }
@@ -655,6 +697,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printInclude("iree/vm/api.h");
   printInclude("iree/vm/ops.h");
   printInclude("iree/vm/shims_emitc.h");
+  printInclude("iree/vm/value.h");
   output << "\n";
 
   printModuleComment(moduleOp, output);

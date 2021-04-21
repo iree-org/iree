@@ -28,6 +28,7 @@
 #include "iree/vm/test/emitc/conversion_ops.h"
 #include "iree/vm/test/emitc/conversion_ops_i64.h"
 #include "iree/vm/test/emitc/global_ops.h"
+#include "iree/vm/test/emitc/list_ops.h"
 #include "iree/vm/test/emitc/shift_ops.h"
 #include "iree/vm/test/emitc/shift_ops_i64.h"
 
@@ -48,7 +49,8 @@ struct ModuleDescription {
 };
 
 std::ostream& operator<<(std::ostream& os, const TestParams& params) {
-  return os << absl::StrReplaceAll(params.local_name, {{":", "_"}, {".", "_"}});
+  std::string qualified_name = params.module_name + "." + params.local_name;
+  return os << absl::StrReplaceAll(qualified_name, {{":", "_"}, {".", "_"}});
 }
 
 std::vector<TestParams> GetModuleTestParams() {
@@ -66,6 +68,7 @@ std::vector<TestParams> GetModuleTestParams() {
       {conversion_ops_descriptor_, conversion_ops_create},
       {conversion_ops_i64_descriptor_, conversion_ops_i64_create},
       {global_ops_descriptor_, global_ops_create},
+      {list_ops_descriptor_, list_ops_create},
       {shift_ops_descriptor_, shift_ops_create},
       {shift_ops_i64_descriptor_, shift_ops_i64_create}};
 
@@ -130,7 +133,6 @@ class VMCModuleTest : public ::testing::Test,
 
   iree_vm_instance_t* instance_ = nullptr;
   iree_vm_context_t* context_ = nullptr;
-  iree_vm_module_t* bytecode_module_ = nullptr;
 };
 
 TEST_P(VMCModuleTest, Check) {

@@ -16,7 +16,9 @@
 
 #include "emitc/Dialect/EmitC/EmitCDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -25,6 +27,34 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
+/// Generate two calls which resemble the IREE_RETURN_IF_ERROR macro. We need
+/// to split it here becasue we cannot produce a macro invocation with a
+/// function call as argument in emitc.
+emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
+                           StringAttr callee, ArrayAttr args,
+                           ArrayAttr templateArgs, ArrayRef<Value> operands) {
+  auto ctx = rewriter.getContext();
+
+  auto callOp = rewriter.create<emitc::CallOp>(
+      /*location=*/loc,
+      /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
+      /*callee=*/callee,
+      /*args=*/args,
+      /*templateArgs=*/templateArgs,
+      /*operands=*/operands);
+
+  auto failOp = rewriter.create<emitc::CallOp>(
+      /*location=*/loc,
+      /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "VM_RETURN_IF_ERROR"),
+      /*args=*/
+      ArrayAttr::get(
+          ctx, {rewriter.getIndexAttr(0), StringAttr::get(ctx, "local_refs")}),
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/ArrayRef<Value>{callOp.getResult(0)});
+  return callOp;
+}
 
 SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
   return llvm::to_vector<4>(
@@ -154,9 +184,9 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
     auto type = loadOp.getOperation()->getResultTypes();
     StringAttr callee = rewriter.getStringAttr(funcName);
 
-    // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
-    // buffer where globals live after code generation as well as the state
-    // struct argument name are hardcoded here.
+    // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so
+    // the buffer where globals live after code generation as well as the
+    // state struct argument name are hardcoded here.
     ArrayAttr args = rewriter.getArrayAttr(
         {rewriter.getStringAttr("state->rwdata"),
          rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
@@ -190,9 +220,9 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
     auto type = storeOp.getOperation()->getResultTypes();
     StringAttr callee = rewriter.getStringAttr(funcName);
 
-    // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
-    // buffer where globals live after code generation as well as the state
-    // struct argument name are hardcoded here.
+    // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so
+    // the buffer where globals live after code generation as well as the
+    // state struct argument name are hardcoded here.
     ArrayAttr args = rewriter.getArrayAttr(
         {rewriter.getStringAttr("state->rwdata"),
          rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
@@ -209,6 +239,397 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
   StringRef funcName;
 };
 
+// Convert vm list operations to two emitc calls. The wrapping ref pointer is
+// first dereferenced and the result is used as the argument of the specified
+// function name.
+template <typename SrcOpTy>
+class ListOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+ public:
+  ListOpConversion(MLIRContext *context, StringRef funcName,
+                   size_t listArgumentIndex, bool failable)
+      : OpConversionPattern<SrcOpTy>(context),
+        funcName(funcName),
+        listArgumentIndex(listArgumentIndex),
+        failable(failable) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto ctx = op.getContext();
+    auto loc = op.getLoc();
+
+    if (listArgumentIndex >= operands.size()) {
+      return op.emitError() << " index for list argument out of range";
+    }
+
+    Value listOperand = op.getOperation()->getOperand(listArgumentIndex);
+
+    // deref
+    auto refOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+        /*callee=*/rewriter.getStringAttr("*"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{listOperand});
+
+    auto listDerefOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
+
+    rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/TypeRange{},
+        /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                             StringAttr::get(ctx, "local_refs")}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
+
+    // Replace the one list argument (which is wrapped in a ref) with the
+    // unwrapped list.
+    SmallVector<Value, 4> updatedOperands;
+    for (auto &operand : llvm::enumerate(operands)) {
+      if (operand.index() == listArgumentIndex) {
+        updatedOperands.push_back(listDerefOp.getResult(0));
+      } else {
+        updatedOperands.push_back(operand.value());
+      }
+    }
+
+    if (failable) {
+      auto callOp = failableCall(
+          /*rewriter=*/rewriter,
+          /*loc=*/loc,
+          /*callee=*/rewriter.getStringAttr(funcName),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>(updatedOperands));
+
+      rewriter.replaceOp(op, ArrayRef<Value>{});
+    } else {
+      rewriter.replaceOpWithNewOp<emitc::CallOp>(
+          /*op=*/op,
+          /*type=*/op.getOperation()->getResultTypes(),
+          /*callee=*/rewriter.getStringAttr(funcName),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>(updatedOperands));
+    }
+
+    return success();
+  }
+
+  StringRef funcName;
+
+  // The index of the list argument. This gets replaced in the conversion.
+  size_t listArgumentIndex;
+
+  // Whether the function call can fail, i.e. it returns an iree_status_t.
+  bool failable;
+};
+
+class ListAllocOpConversion
+    : public OpConversionPattern<IREE::VM::ListAllocOp> {
+  using OpConversionPattern<IREE::VM::ListAllocOp>::OpConversionPattern;
+
+ private:
+  LogicalResult matchAndRewrite(
+      IREE::VM::ListAllocOp allocOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // clang-format off
+    // The generated c code looks roughly like this.
+    // iree_vm_type_def_t element_type = iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
+    // iree_vm_type_def_t* element_type_ptr = &element_type;
+    // iree_vm_list_t* list = NULL;
+    // iree_vm_list_t** list_ptr = &list;
+    // iree_status_t status = iree_vm_list_create(element_type_ptr, {initial_capacity}, state->allocator, list_ptr);
+    // VM_RETURN_IF_ERROR(status);
+    // iree_vm_ref_t* ref_ptr = &local_refs[{ordinal}];
+    // iree_vm_ref_type_t ref_type = iree_vm_list_type_id();
+    // iree_status_t status2 = iree_vm_ref_wrap_assign(list, ref_type, ref_ptr));
+    // VM_RETURN_IF_ERROR(status2);
+    // clang-format on
+
+    auto ctx = allocOp.getContext();
+    auto loc = allocOp.getLoc();
+
+    auto listType = allocOp.getType()
+                        .cast<IREE::VM::RefType>()
+                        .getObjectType()
+                        .cast<IREE::VM::ListType>();
+    auto elementType = listType.getElementType();
+    std::string elementTypeStr;
+    StringRef elementTypeConstructor;
+    if (elementType.isa<IntegerType>()) {
+      unsigned int bitWidth = elementType.getIntOrFloatBitWidth();
+      elementTypeStr =
+          std::string("IREE_VM_VALUE_TYPE_I") + std::to_string(bitWidth);
+      elementTypeConstructor = "iree_vm_type_def_make_value_type";
+    } else {
+      return allocOp.emitError() << "Unhandeled element type " << elementType;
+    }
+
+    auto elementTypeOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
+        /*callee=*/rewriter.getStringAttr(elementTypeConstructor),
+        /*args=*/ArrayAttr::get(ctx, {StringAttr::get(ctx, elementTypeStr)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{});
+
+    auto elementTypePtrOp = rewriter.create<emitc::GetAddressOfOp>(
+        /*location=*/loc,
+        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t*"),
+        /*operand=*/elementTypeOp.getResult(0));
+
+    auto listOp = rewriter.create<emitc::ConstOp>(
+        /*location=*/loc,
+        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*value=*/StringAttr::get(ctx, "NULL"));
+
+    auto listPtrOp = rewriter.create<emitc::GetAddressOfOp>(
+        /*location=*/loc,
+        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t**"),
+        /*operand=*/listOp.getResult());
+
+    failableCall(
+        /*rewriter=*/rewriter,
+        /*location=*/loc,
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_create"),
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0), rewriter.getIndexAttr(1),
+                             StringAttr::get(ctx, "state->allocator"),
+                             rewriter.getIndexAttr(2)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/
+        ArrayRef<Value>{elementTypePtrOp.getResult(), operands[0],
+                        listPtrOp.getResult()});
+
+    // TODO(simon-camp): This is expensive as we recalculate the
+    // RegisterAllocation for every alloc in a function. We could make it
+    // compatible with the analysis framework in MLIR which would cache it
+    // automatically IIUC. See here for reference
+    // https://mlir.llvm.org/docs/PassManagement/#analysis-management
+    auto funcOp = allocOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
+    RegisterAllocation registerAllocation;
+    if (failed(registerAllocation.recalculate(funcOp))) {
+      return allocOp.emitOpError() << "unable to perform register allocation";
+    }
+
+    int32_t ordinal =
+        registerAllocation.mapToRegister(allocOp.getResult()).ordinal();
+
+    auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::CallOp>(
+        /*op=*/allocOp,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        /*callee=*/rewriter.getStringAttr("VM_ARRAY_ELEMENT_ADDRESS"),
+        /*args=*/
+        ArrayAttr::get(ctx, {StringAttr::get(ctx, "local_refs"),
+                             rewriter.getI32IntegerAttr(ordinal)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{});
+
+    auto refTypeOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_type_id"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{});
+
+    failableCall(
+        /*rewriter=*/rewriter,
+        /*location=*/loc,
+        /*callee=*/rewriter.getStringAttr("iree_vm_ref_wrap_assign"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/
+        ArrayRef<Value>{listOp.getResult(), refTypeOp.getResult(0),
+                        refPtrOp.getResult(0)});
+
+    return success();
+  }
+};
+
+template <typename GetOpTy>
+class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
+  using OpConversionPattern<GetOpTy>::OpConversionPattern;
+
+ private:
+  LogicalResult matchAndRewrite(
+      GetOpTy getOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto ctx = getOp.getContext();
+    auto loc = getOp.getLoc();
+
+    Optional<StringRef> valueTypeEnum;
+    Optional<StringRef> valueExtractor;
+
+    std::tie(valueTypeEnum, valueExtractor) =
+        TypeSwitch<Operation *,
+                   std::pair<Optional<StringRef>, Optional<StringRef>>>(
+            getOp.getOperation())
+            .Case<IREE::VM::ListGetI32Op>([&](auto op) {
+              return std::make_pair(StringRef("IREE_VM_VALUE_TYPE_I32"),
+                                    StringRef("iree_vm_value_get_i32"));
+            })
+            .template Case<IREE::VM::ListGetI64Op>([&](auto op) {
+              return std::make_pair(StringRef("IREE_VM_VALUE_TYPE_I64"),
+                                    StringRef("iree_vm_value_get_i64"));
+            })
+            .Default([](Operation *) { return std::make_pair(None, None); });
+
+    if (!valueTypeEnum.hasValue() || !valueExtractor.hasValue()) {
+      return getOp.emitOpError() << "element type not handled";
+    }
+
+    auto valueOp = rewriter.create<emitc::ConstOp>(
+        /*location=*/loc,
+        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t"),
+        /*value=*/StringAttr::get(ctx, ""));
+
+    auto valuePtrOp = rewriter.create<emitc::GetAddressOfOp>(
+        /*location=*/loc,
+        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t*"),
+        /*operand=*/valueOp.getResult());
+
+    auto refOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+        /*callee=*/rewriter.getStringAttr("*"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{getOp.list()});
+
+    auto listDerefOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
+
+    rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/TypeRange{},
+        /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                             StringAttr::get(ctx, "local_refs")}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
+
+    auto getValueOp = failableCall(
+        /*rewriter=*/rewriter,
+        /*location=*/loc,
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_get_value_as"),
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0), rewriter.getIndexAttr(1),
+                             StringAttr::get(ctx, valueTypeEnum.getValue()),
+                             rewriter.getIndexAttr(2)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/
+        ArrayRef<Value>{listDerefOp.getResult(0), getOp.index(),
+                        valuePtrOp.getResult()});
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(
+        /*op=*/getOp,
+        /*type=*/getOp.getType(),
+        /*callee=*/rewriter.getStringAttr(valueExtractor.getValue()),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{valuePtrOp.getResult()});
+
+    return success();
+  }
+};
+
+template <typename SetOpTy>
+class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
+  using OpConversionPattern<SetOpTy>::OpConversionPattern;
+
+ private:
+  LogicalResult matchAndRewrite(
+      SetOpTy setOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto ctx = setOp.getContext();
+    auto loc = setOp.getLoc();
+
+    Optional<StringRef> valueConstructor =
+        TypeSwitch<Operation *, Optional<StringRef>>(setOp.getOperation())
+            .Case<IREE::VM::ListSetI32Op>(
+                [&](auto op) { return StringRef("iree_vm_value_make_i32"); })
+            .template Case<IREE::VM::ListSetI64Op>(
+                [&](auto op) { return StringRef("iree_vm_value_make_i64"); })
+            .Default([](Operation *) { return None; });
+
+    if (!valueConstructor.hasValue()) {
+      return setOp.emitOpError() << " not handeled";
+    }
+
+    auto valueOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t"),
+        /*callee=*/rewriter.getStringAttr(valueConstructor.getValue()),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{setOp.value()});
+
+    auto valuePtrOp = rewriter.create<emitc::GetAddressOfOp>(
+        /*location=*/loc,
+        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t*"),
+        /*operand=*/valueOp.getResult(0));
+
+    auto refOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+        /*callee=*/rewriter.getStringAttr("*"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{setOp.list()});
+
+    auto listDerefOp = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
+
+    rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/TypeRange{},
+        /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                             StringAttr::get(ctx, "local_refs")}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
+
+    auto callOp = failableCall(
+        /*rewriter=*/rewriter,
+        /*loc=*/loc,
+        /*callee=*/rewriter.getStringAttr("iree_vm_list_set_value"),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/
+        ArrayRef<Value>{listDerefOp.getResult(0), setOp.index(),
+                        valuePtrOp.getResult()});
+
+    rewriter.replaceOp(setOp, ArrayRef<Value>{});
+
+    return success();
+  }
+};
 }  // namespace
 
 void populateVMToCPatterns(MLIRContext *context,
@@ -225,6 +646,17 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI32ZeroOp>>(context);
   patterns.insert<ConstRefZeroOpConversion>(context);
+
+  // List ops
+  patterns.insert<ListAllocOpConversion>(context);
+  patterns.insert<ListOpConversion<IREE::VM::ListReserveOp>>(
+      context, "iree_vm_list_reserve", 0, true);
+  patterns.insert<ListOpConversion<IREE::VM::ListResizeOp>>(
+      context, "iree_vm_list_resize", 0, true);
+  patterns.insert<ListOpConversion<IREE::VM::ListSizeOp>>(
+      context, "iree_vm_list_size", 0, false);
+  patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(context);
+  patterns.insert<ListSetOpConversion<IREE::VM::ListSetI32Op>>(context);
 
   // Conditional assignment ops
   patterns.insert<CallOpConversion<IREE::VM::SelectI32Op>>(context,
@@ -283,6 +715,10 @@ void populateVMToCPatterns(MLIRContext *context,
   // ExtI64: Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI64Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI64ZeroOp>>(context);
+
+  // ExtI64: List ops
+  patterns.insert<ListGetOpConversion<IREE::VM::ListGetI64Op>>(context);
+  patterns.insert<ListSetOpConversion<IREE::VM::ListSetI64Op>>(context);
 
   // ExtI64: Conditional assignment ops
   patterns.insert<CallOpConversion<IREE::VM::SelectI64Op>>(context,
@@ -366,8 +802,9 @@ class ConvertVMToEmitCPass
     target.addLegalOp<IREE::VM::BranchOp>();
     target.addLegalOp<IREE::VM::CallOp>();
     target.addLegalOp<IREE::VM::CondBranchOp>();
-    // Note: We translate the fail op to two function calls in the end, but we
-    // can't simply convert it here because it is a terminator.
+    // Note: We translate the fail op to two function calls in the
+    // end, but we can't simply convert it here because it is a
+    // terminator.
     target.addLegalOp<IREE::VM::FailOp>();
     target.addLegalOp<IREE::VM::ReturnOp>();
 
