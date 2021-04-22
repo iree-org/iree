@@ -32,13 +32,13 @@ class ELFModuleTest : public ::testing::Test {
   const iree_const_byte_span_t GetCurrentPlatformFile() {
     iree_string_view_t pattern = iree_string_view_empty();
 #if defined(IREE_ARCH_ARM_32)
-    pattern = iree_make_cstring_view("*_armeabi.so");
+    pattern = iree_make_cstring_view("*_arm_32.so");
 #elif defined(IREE_ARCH_ARM_64)
-    pattern = iree_make_cstring_view("*_aarch64.so");
+    pattern = iree_make_cstring_view("*_arm_64.so");
 #elif defined(IREE_ARCH_RISCV_32)
-    pattern = iree_make_cstring_view("*_riscv32.so");
+    pattern = iree_make_cstring_view("*_riscv_32.so");
 #elif defined(IREE_ARCH_RISCV_64)
-    pattern = iree_make_cstring_view("*_riscv64.so");
+    pattern = iree_make_cstring_view("*_riscv_64.so");
 #elif defined(IREE_ARCH_X86_32)
     pattern = iree_make_cstring_view("*_x86_32.so");
 #elif defined(IREE_ARCH_X86_64)

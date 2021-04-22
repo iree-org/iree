@@ -48,8 +48,10 @@ iree_cc_library(
   HDRS
     "arch.h"
   SRCS
-    "arch/aarch64.c"
+    "arch/arm_32.c"
+    "arch/arm_64.c"
     "arch/riscv.c"
+    "arch/x86_32.c"
     "arch/x86_64.c"
     "elf_types.h"
   DEPS
