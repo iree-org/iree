@@ -13,16 +13,17 @@
 # limitations under the License.
 
 if(NOT CMAKE_CROSSCOMPILING)
-  add_executable(generate_cc_embed_data)
-  target_sources(generate_cc_embed_data PRIVATE generate_cc_embed_data_main.cc)
-  set_target_properties(generate_cc_embed_data PROPERTIES OUTPUT_NAME generate_cc_embed_data)
+  add_executable(generate_embed_data)
+  target_sources(generate_embed_data PRIVATE generate_embed_data_main.cc)
+  set_target_properties(generate_embed_data PROPERTIES OUTPUT_NAME generate_embed_data)
 
-  target_link_libraries(generate_cc_embed_data
+  target_link_libraries(generate_embed_data
     absl::flags
     absl::flags_parse
     absl::strings
   )
-  install(TARGETS generate_cc_embed_data
-          COMPONENT generate_cc_embed_data
+
+  install(TARGETS generate_embed_data
+          COMPONENT generate_embed_data
           RUNTIME DESTINATION bin)
 endif()
