@@ -105,8 +105,8 @@
 //==============================================================================
 
 // See https://stackoverflow.com/q/51616057
-static_assert(sizeof(void*) == sizeof(uintptr_t),
-              "can't determine pointer size");
+_Static_assert(sizeof(void*) == sizeof(uintptr_t),
+               "can't determine pointer size");
 
 #if UINTPTR_MAX == 0xFFFFFFFF
 #define IREE_PTR_SIZE_32
