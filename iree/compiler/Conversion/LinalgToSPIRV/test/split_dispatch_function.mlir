@@ -386,7 +386,7 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
     hal.executable.entry_point @kernel attributes {
       interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:1x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
-        !flow.dispatch.tensor<writeonly:1x1x1x512xf32>) -> ()}
+        !flow.dispatch.tensor<writeonly:1x1x1x1xf32>) -> ()}
     // CHECK-NOT: hal.entry_point_schedule
     module {
       // CHECK-LABEL: @kernel()
@@ -394,12 +394,12 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
         %cst = constant 0.000000e+00 : f32
         %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<1x3x3x512xf32>
         %1 = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<3x3x512x1xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<1x1x1x512xf32>
+        %2 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<1x1x1x1xf32>
         linalg.conv_2d_input_nhwc_filter_hwcf {
           dilations = dense<1> : tensor<2xi64>,
           strides = dense<2> : tensor<2xi64>}
            ins(%0, %1 : memref<1x3x3x512xf32>, memref<3x3x512x1xf32>)
-          outs(%2 : memref<1x1x1x512xf32>)
+          outs(%2 : memref<1x1x1x1xf32>)
         return
       }
       // CHECK-LABEL: @kernel__num_workgroups__
@@ -428,21 +428,21 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
     hal.executable.entry_point @kernel attributes {
       interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x3x512xf32>, !flow.dispatch.tensor<readonly:3x512x1xf32>,
-        !flow.dispatch.tensor<writeonly:?x1x512xf32>) -> ()}
+        !flow.dispatch.tensor<writeonly:?x1x1xf32>) -> ()}
     module {
       // expected-error @+1 {{cannot separate Linalg/Parallel ops into multiple kernels}}
       func @kernel() {
         %cst = constant 0.000000e+00 : f32
         %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0} : memref<1x3x3x512xf32>
         %1 = iree.placeholder for "interface buffer" {binding = @io::@arg1} : memref<3x3x512x1xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<1x1x1x512xf32>
-        linalg.fill(%2, %cst) : memref<1x1x1x512xf32>, f32
+        %2 = iree.placeholder for "interface buffer" {binding = @io::@ret0} : memref<1x1x1x1xf32>
+        linalg.fill(%2, %cst) : memref<1x1x1x1xf32>, f32
         "some_op"() : () -> ()
         linalg.conv_2d_input_nhwc_filter_hwcf {
           dilations = dense<1> : tensor<2xi64>,
           strides = dense<2> : tensor<2xi64>}
            ins(%0, %1 : memref<1x3x3x512xf32>, memref<3x3x512x1xf32>)
-          outs(%2 : memref<1x1x1x512xf32>)
+          outs(%2 : memref<1x1x1x1xf32>)
         return
       }
       hal.interface @io attributes {sym_visibility = "private"} {
