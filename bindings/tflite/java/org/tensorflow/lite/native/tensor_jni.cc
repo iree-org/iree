@@ -34,6 +34,10 @@ static TfLiteTensor* GetTensor(JNIEnv* env, jobject obj) {
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
   IREE_DCHECK(field);
 
+  if (env->ExceptionCheck()) {
+    return nullptr;  // Failed to get field, returning null.
+  }
+
   return reinterpret_cast<TfLiteTensor*>(env->GetLongField(obj, field));
 }
 
@@ -43,7 +47,9 @@ JNI_FUNC jlong JNI_PREFIX(nativeCreateInput)(JNIEnv* env, jclass clazz,
                                              jlong interpreter_handle,
                                              jint input_index) {
   TfLiteInterpreter* interpreter = (TfLiteInterpreter*)interpreter_handle;
-  IREE_DCHECK_NE(interpreter, nullptr);
+  if (!interpreter) {
+    return kTfLiteError;  // Null handle input. Returning to error in Java.
+  }
 
   TfLiteTensor* input_tensor =
       TfLiteInterpreterGetInputTensor(interpreter, input_index);
@@ -54,7 +60,9 @@ JNI_FUNC jlong JNI_PREFIX(nativeCreateOutput)(JNIEnv* env, jclass clazz,
                                               jlong interpreter_handle,
                                               jint output_index) {
   TfLiteInterpreter* interpreter = (TfLiteInterpreter*)interpreter_handle;
-  IREE_DCHECK_NE(interpreter, nullptr);
+  if (!interpreter) {
+    return kTfLiteError;  // Null handle input. Returning to error in Java.
+  }
 
   const TfLiteTensor* output_tensor =
       TfLiteInterpreterGetOutputTensor(interpreter, output_index);
@@ -63,39 +71,50 @@ JNI_FUNC jlong JNI_PREFIX(nativeCreateOutput)(JNIEnv* env, jclass clazz,
 
 JNI_FUNC jint JNI_PREFIX(nativeType)(JNIEnv* env, jobject thiz) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
+  if (!tensor) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
   return (jint)TfLiteTensorType(tensor);
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeNumDims)(JNIEnv* env, jobject thiz) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
+  if (!tensor) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
   return (jint)TfLiteTensorNumDims(tensor);
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeDim)(JNIEnv* env, jobject thiz, jint dim_index) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
+  if (!tensor) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
   return (jint)TfLiteTensorDim(tensor, dim_index);
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeBytesSize)(JNIEnv* env, jobject thiz) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
-  // size_t is an unsigned int. This may roll over;
+  if (!tensor) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }                       // size_t is an unsigned int. This may roll over;
   return (jint)TfLiteTensorByteSize(tensor);
 }
 
 JNI_FUNC jstring JNI_PREFIX(nativeName)(JNIEnv* env, jobject thiz) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
+  if (!tensor) {
+    return nullptr;  // Failed get handle. Returning to error in Java.
+  }
   auto msg = TfLiteTensorName(tensor);
   return env->NewStringUTF(msg);
 }
 
 JNI_FUNC jfloat JNI_PREFIX(nativeQuantizationScale)(JNIEnv* env, jobject thiz) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
+  if (!tensor) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
   auto params = TfLiteTensorQuantizationParams(tensor);
   return (jfloat)params.scale;
 }
@@ -103,7 +122,9 @@ JNI_FUNC jfloat JNI_PREFIX(nativeQuantizationScale)(JNIEnv* env, jobject thiz) {
 JNI_FUNC jint JNI_PREFIX(nativeQuantizationZeroPoint)(JNIEnv* env,
                                                       jobject thiz) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
+  if (!tensor) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
   auto params = TfLiteTensorQuantizationParams(tensor);
   return (jfloat)params.zero_point;
 }
@@ -111,8 +132,9 @@ JNI_FUNC jint JNI_PREFIX(nativeQuantizationZeroPoint)(JNIEnv* env,
 JNI_FUNC jint JNI_PREFIX(nativeCopyFromDirectBuffer)(
     JNIEnv* env, jobject thiz, jobject input_byte_buffer) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
-
+  if (!tensor) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
   const char* buf =
       static_cast<char*>(env->GetDirectBufferAddress(input_byte_buffer));
 
@@ -126,8 +148,9 @@ JNI_FUNC jint JNI_PREFIX(nativeCopyFromDirectBuffer)(
 JNI_FUNC jint JNI_PREFIX(nativeCopyToDirectBuffer)(JNIEnv* env, jobject thiz,
                                                    jobject output_byte_buffer) {
   const TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
-
+  if (!tensor) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
   char* buf =
       static_cast<char*>(env->GetDirectBufferAddress(output_byte_buffer));
 
@@ -140,7 +163,9 @@ JNI_FUNC jint JNI_PREFIX(nativeCopyToDirectBuffer)(JNIEnv* env, jobject thiz,
 
 JNI_FUNC jobject JNI_PREFIX(nativeGetByteBuffer)(JNIEnv* env, jobject thiz) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
-  IREE_DCHECK_NE(tensor, nullptr);
+  if (!tensor) {
+    return nullptr;  // Failed get handle. Returning to error in Java.
+  }
   return env->NewDirectByteBuffer(
       static_cast<void*>(TfLiteTensorData(tensor)),
       static_cast<jlong>(TfLiteTensorByteSize(tensor)));

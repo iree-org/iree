@@ -87,8 +87,7 @@ JNI_FUNC jint JNI_PREFIX(nativeOutputTensorCount)(JNIEnv* env, jobject thiz) {
 JNI_FUNC jint JNI_PREFIX(nativeAllocateTensors)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
   if (!interpreter) {
-    return kTfLiteError;  // Cannot allocate without interpreter. Returning
-                          // error to handle in Java.
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
   }
 
   return (jint)TfLiteInterpreterAllocateTensors(interpreter);
@@ -98,7 +97,9 @@ JNI_FUNC jint JNI_PREFIX(nativeResizeInputTensor)(JNIEnv* env, jobject thiz,
                                                   jint input_index,
                                                   jintArray dims) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_DCHECK_NE(interpreter, nullptr);
+  if (!interpreter) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
 
   const int dims_size = env->GetArrayLength(dims);
   jint* dims_data = env->GetIntArrayElements(dims, 0);
@@ -112,7 +113,9 @@ JNI_FUNC jint JNI_PREFIX(nativeResizeInputTensor)(JNIEnv* env, jobject thiz,
 
 JNI_FUNC jint JNI_PREFIX(nativeInvoke)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_DCHECK_NE(interpreter, nullptr);
+  if (!interpreter) {
+    return kTfLiteError;  // Failed get handle. Returning to error in Java.
+  }
 
   return (jint)TfLiteInterpreterInvoke(interpreter);
 }
