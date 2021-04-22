@@ -50,6 +50,19 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    executable_library_test
+  SRCS
+    "executable_library_demo.c"
+    "executable_library_demo.h"
+    "executable_library_test.c"
+  DEPS
+    iree::base::api
+    iree::base::core_headers
+    iree::hal::local::executable_library
+)
+
 iree_cc_library(
   NAME
     local
