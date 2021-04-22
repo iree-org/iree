@@ -59,13 +59,6 @@ static llvm::cl::opt<bool> clEnableOperandFusion(
         "Enable fusing operand producers during dispatch region formation"),
     llvm::cl::init(false));
 
-// TODO(#5045): Tile and distribute on CPU causes performance regressions. This
-// needs to be addressed before this can be turned on by default.
-static llvm::cl::opt<bool> clTileAndDistributeElementwiseOps(
-    "iree-flow-tile-and-distribute-elementwise-ops",
-    llvm::cl::desc("Enable tile and distribute on elementwise operations"),
-    llvm::cl::init(false));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -1061,9 +1054,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   context->allowUnregisteredDialects(true);
 
   unsigned numRoots = decideFusableLinalgOps(funcOp);
-  if (clTileAndDistributeElementwiseOps) {
-    makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
-  }
+  makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
