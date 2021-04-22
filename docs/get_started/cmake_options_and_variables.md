@@ -52,6 +52,14 @@ Builds IREE sample projects. Defaults to `ON`.
 
 Builds the IREE python bindings. Defaults to `OFF`.
 
+#### `IREE_BUILD_BINDINGS_TFLITE`:BOOL
+
+Builds the IREE TFLite C API compatibility shim. Defaults to `ON`.
+
+### `IREE_BUILD_BINDINGS_TFLITE_JAVA`:BOOL
+
+Builds the IREE TFLite Java bindings with the C API compatibility shim. Defaults to `ON`.
+
 #### `IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS`:BOOL
 
 Builds the experimental java bindings. Defaults to `OFF`.
@@ -133,6 +141,7 @@ Path to prebuilt TensorFlow integration binaries to be used by the Python
 bindings. Defaults to
 "${CMAKE_SOURCE_DIR}/integrations/tensorflow/bazel-bin/iree_tf_compiler", which
 is where they would be placed by a `bazel build` invocation.
+
 
 ## MLIR-specific CMake Options and Variables
 
