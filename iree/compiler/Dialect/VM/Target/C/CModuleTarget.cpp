@@ -62,6 +62,8 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
          << moduleOp.ordinal_counts().getValue().global_bytes() << "];\n";
   output << "iree_vm_ref_t refs["
          << moduleOp.ordinal_counts().getValue().global_refs() << "];\n";
+  output << "iree_vm_buffer_t rodata_refs["
+         << moduleOp.ordinal_counts().getValue().rodatas() << "];\n";
   output << "};\n";
 
   output << "typedef struct " << moduleName << "_t " << moduleName << "_t;\n";
@@ -113,8 +115,8 @@ static LogicalResult printFuncOpResults(
       });
 }
 
-static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
-                                       mlir::emitc::CppEmitter &emitter) {
+static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
+                                     mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
 
   for (auto globalOp : moduleOp.getOps<IREE::VM::GlobalI32Op>()) {
@@ -135,8 +137,11 @@ static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
              << "Initializers for globals not supported yet";
     }
   }
-
   // TODO(simon-camp): Support vm.global.i64 and vm.global.ref
+
+  for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
+    rodataOp.emitRemark("Initialization of rodata ops not supported yet.");
+  }
 
   return success();
 }
@@ -560,8 +565,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "state->allocator = allocator;\n";
 
   // initialize globals
-  if (failed(initializeGlobals(moduleOp, emitter))) {
-    return moduleOp.emitError() << "Failed to emit global initialization";
+  if (failed(initializeState(moduleOp, emitter))) {
+    return moduleOp.emitError() << "Failed to emit state members";
   }
 
   output << "*out_module_state = (iree_vm_module_state_t*)state;\n"

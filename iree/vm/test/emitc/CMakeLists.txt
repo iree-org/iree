@@ -35,6 +35,7 @@ iree_cc_test(
     ::conversion_ops_i64
     ::global_ops
     ::list_ops
+    ::list_variant_ops
     ::shift_ops
     ::shift_ops_i64
 )
@@ -154,6 +155,15 @@ iree_c_module(
     "../list_ops.mlir"
   H_FILE_OUTPUT
     "list_ops.h"
+)
+
+iree_c_module(
+  NAME
+    list_variant_ops
+  SRC
+    "../list_variant_ops.mlir"
+  H_FILE_OUTPUT
+    "list_variant_ops.h"
 )
 
 iree_c_module(
