@@ -108,32 +108,38 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return writeUint32(typeOrdinal);
   }
 
-  LogicalResult encodeIntAttr(IntegerAttr value) override {
-    auto attr = value.cast<IntegerAttr>();
+  LogicalResult encodePrimitiveAttr(Attribute attr) override {
     unsigned int bitWidth = attr.getType().getIntOrFloatBitWidth();
-    uint64_t limitedValue = attr.getValue().extractBitsAsZExtValue(bitWidth, 0);
-    switch (bitWidth) {
-      case 8:
-        return writeUint8(static_cast<uint8_t>(limitedValue));
-      case 16:
-        return writeUint16(static_cast<uint16_t>(limitedValue));
-      case 32:
-        return writeUint32(static_cast<uint32_t>(limitedValue));
-      case 64:
-        return writeUint64(static_cast<uint64_t>(limitedValue));
-      default:
-        return currentOp_->emitOpError()
-               << "attribute of bitwidth " << bitWidth << " not supported";
+    if (auto integerAttr = attr.dyn_cast<IntegerAttr>()) {
+      uint64_t limitedValue =
+          integerAttr.getValue().extractBitsAsZExtValue(bitWidth, 0);
+      switch (bitWidth) {
+        case 8:
+          return writeUint8(static_cast<uint8_t>(limitedValue));
+        case 16:
+          return writeUint16(static_cast<uint16_t>(limitedValue));
+        case 32:
+          return writeUint32(static_cast<uint32_t>(limitedValue));
+        case 64:
+          return writeUint64(static_cast<uint64_t>(limitedValue));
+        default:
+          return currentOp_->emitOpError()
+                 << "attribute of bitwidth " << bitWidth << " not supported";
+      }
+    } else {
+      return currentOp_->emitOpError()
+             << "attribute type not supported for primitive serialization: "
+             << attr;
     }
   }
 
-  LogicalResult encodeIntArrayAttr(DenseIntElementsAttr value) override {
+  LogicalResult encodePrimitiveArrayAttr(DenseElementsAttr value) override {
     if (value.getNumElements() > UINT16_MAX ||
         failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";
     }
     for (auto el : value.getAttributeValues()) {
-      if (failed(encodeIntAttr(el.cast<IntegerAttr>()))) {
+      if (failed(encodePrimitiveAttr(el))) {
         return currentOp_->emitOpError() << "failed to encode element " << el;
       }
     }

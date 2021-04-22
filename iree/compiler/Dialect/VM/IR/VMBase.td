@@ -393,12 +393,12 @@ class VM_EncType<string expr> : VM_EncEncodeExpr<
     "e.encodeType(" # expr # ")">;
 class VM_EncTypeOf<string name> : VM_EncEncodeExpr<
     "e.encodeType(" # name # "())">;
-class VM_EncIntAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodeIntAttr(getOperation()->getAttrOfType<IntegerAttr>(\"" # name # "\"))"> {
+class VM_EncPrimitiveAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
+    "e.encodePrimitiveAttr(getOperation()->getAttrOfType<Attribute>(\"" # name # "\"))"> {
   int bitwidth = thisBitwidth;
 }
-class VM_EncIntArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodeIntArrayAttr(getOperation()->getAttrOfType<DenseIntElementsAttr>(\"" # name # "\"))"> {
+class VM_EncPrimitiveArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
+    "e.encodePrimitiveArrayAttr(getOperation()->getAttrOfType<DenseElementsAttr>(\"" # name # "\"))"> {
   int bitwidth = thisBitwidth;
 }
 class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
@@ -634,7 +634,7 @@ def VM_PrimitiveType : AnyTypeOf<[
   FloatOfWidths<[16, 32, 64]>,
 ]>;
 
-class VM_ConstIntValueAttr<I type> : Attr<
+class VM_ConstantIntegerValueAttr<I type> : Attr<
     Or<[
       SignlessIntegerAttrBase<type,
                               type.bitwidth # "-bit integer value">.predicate,
