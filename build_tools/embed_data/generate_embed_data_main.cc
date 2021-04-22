@@ -195,8 +195,8 @@ bool GenerateImpl(const std::string& impl_file,
   } else {
     f << "  {nullptr, nullptr, 0},\n";
     f << "};\n";
-    f << "const struct ::iree::iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
-      << "_create() {\n";
+    f << "const struct ::iree::iree_file_toc_t* "
+      << absl::GetFlag(FLAGS_identifier) << "_create() {\n";
   }
   f << "  return &toc[0];\n";
   f << "}\n";
