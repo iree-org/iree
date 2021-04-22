@@ -125,6 +125,8 @@ hal.executable @add attributes {sym_visibility = "private"} {
     }
   }
 }
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //       CHECK: hal.executable @add
 //       CHECK: hal.executable.entry_point @add
 //  CHECK-NEXT:   ^{{[a-zA-Z0-9_]+}}(
@@ -132,4 +134,6 @@ hal.executable @add attributes {sym_visibility = "private"} {
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: index
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-//       CHECK:     hal.return %[[C1]], %[[C1]], %[[C1]]
+//   CHECK-DAG:     %[[WGX:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
+//   CHECK-DAG:     %[[WGY:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
+//       CHECK:     hal.return %[[WGX]], %[[WGY]], %[[C1]]
