@@ -64,6 +64,7 @@ cc_library(
     name = "local",
     srcs = [
         "executable_loader.c",
+        "inline_command_buffer.c",
         "local_descriptor_set.c",
         "local_descriptor_set_layout.c",
         "local_executable.c",
@@ -72,6 +73,7 @@ cc_library(
     ],
     hdrs = [
         "executable_loader.h",
+        "inline_command_buffer.h",
         "local_descriptor_set.h",
         "local_descriptor_set_layout.h",
         "local_executable.h",
@@ -85,6 +87,34 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/hal:api",
+    ],
+)
+
+cc_library(
+    name = "sync_driver",
+    srcs = [
+        "sync_device.c",
+        "sync_driver.c",
+        "sync_event.c",
+        "sync_semaphore.c",
+    ],
+    hdrs = [
+        "sync_device.h",
+        "sync_driver.h",
+        "sync_event.h",
+        "sync_semaphore.h",
+    ],
+    deps = [
+        ":arena",
+        ":local",
+        "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/base:synchronization",
+        "//iree/base:tracing",
+        "//iree/base/internal",
+        "//iree/base/internal:wait_handle",
+        "//iree/hal:api",
+        "//iree/task",
     ],
 )
 

@@ -25,7 +25,7 @@ namespace cts {
 class SemaphoreTest : public CtsTestBase {
  public:
   // Disable cuda backend for this test as semaphores are not implemented yet.
-  SemaphoreTest() { declareUnavailableDriver("cuda"); }
+  SemaphoreTest() { SkipUnavailableDriver("cuda"); }
 };
 
 // Tests that a semaphore that is unused properly cleans itself up.

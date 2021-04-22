@@ -29,7 +29,7 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::vm::cc
     iree::vm::ops
-    iree::vm::shims
+    iree::vm::shims_emitc
     ::arithmetic_ops
     ::arithmetic_ops_i64
     ::assignment_ops
@@ -40,6 +40,7 @@ iree_cc_test(
     ::conversion_ops
     ::conversion_ops_i64
     ::global_ops
+    ::list_ops
     ::shift_ops
     ::shift_ops_i64
 )
@@ -132,6 +133,15 @@ iree_c_module(
     "../global_ops.mlir"
   H_FILE_OUTPUT
     "global_ops.h"
+)
+
+iree_c_module(
+  NAME
+    list_ops
+  SRC
+    "../list_ops.mlir"
+  H_FILE_OUTPUT
+    "list_ops.h"
 )
 
 iree_c_module(

@@ -264,7 +264,9 @@ class MaterializeConstantPoolBuffersPass
     auto commandBufferValue =
         funcBuilder.createOrFold<IREE::HAL::CommandBufferCreateOp>(
             variableLoc, IREE::HAL::CommandBufferType::get(context),
-            deviceValue, IREE::HAL::CommandBufferModeBitfield::OneShot,
+            deviceValue,
+            IREE::HAL::CommandBufferModeBitfield::OneShot |
+                IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution,
             IREE::HAL::CommandCategoryBitfield::Transfer);
     funcBuilder.create<IREE::HAL::CommandBufferBeginOp>(variableLoc,
                                                         commandBufferValue);

@@ -34,6 +34,8 @@
 #define IREE_RESTRICT __restrict
 #elif defined(_MSC_VER)
 #define IREE_RESTRICT
+#elif defined(__cplusplus)
+#define IREE_RESTRICT __restrict__
 #else
 #define IREE_RESTRICT restrict
 #endif  // _MSC_VER
@@ -155,7 +157,7 @@ typedef struct {
   const uint32_t* push_constants;
 
   // Total number of binding base pointers in |binding_ptrs| and
-  // |binding_lengths|. The set is packed densely based on which binidngs are
+  // |binding_lengths|. The set is packed densely based on which bindings are
   // used (known at compile-time).
   size_t binding_count;
   // Base pointers to each binding buffer.

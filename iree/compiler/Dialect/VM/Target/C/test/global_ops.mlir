@@ -14,7 +14,11 @@ vm.module @global_ops {
   vm.export @test_global_load_i32
   // CHECK-LABEL: iree_status_t global_ops_test_global_load_i32_impl(
   vm.func @test_global_load_i32() -> i32 {
+    // CHECK-NEXT: VARIABLE DECLARATIONS
+    // CHECK-NEXT: RESULTS
     // CHECK-NEXT: int32_t v1;
+    // CHECK-NEXT: BASIC BLOCK ARGUMENTS
+    // CHECK-NEXT: END VARIABLE DECLARATIONS
     // CHECK-NEXT: v1 = vm_global_load_i32(state->rwdata, 0);
     %value = vm.global.load.i32 @c42 : i32
     vm.return %value : i32
@@ -23,8 +27,12 @@ vm.module @global_ops {
   vm.export @test_global_store_i32
   // CHECK-LABEL: iree_status_t global_ops_test_global_store_i32_impl(
   vm.func @test_global_store_i32() -> i32 {
+    // CHECK-NEXT: VARIABLE DECLARATIONS
+    // CHECK-NEXT: RESULTS
     // CHECK-NEXT: int32_t v1;
     // CHECK-NEXT: int32_t v2;
+    // CHECK-NEXT: BASIC BLOCK ARGUMENTS
+    // CHECK-NEXT: END VARIABLE DECLARATIONS
     // CHECK-NEXT: v1 = 17;
     %c17 = vm.const.i32 17 : i32
     // CHECK-NEXT: vm_global_store_i32(state->rwdata, 4, v1);

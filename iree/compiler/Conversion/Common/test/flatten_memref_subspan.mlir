@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-spirv-flatten-memref-subspan -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-flatten-memref-subspan -canonicalize %s | IreeFileCheck %s
 
 func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2: index) -> f32 {
   %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<6x7x8xf32>

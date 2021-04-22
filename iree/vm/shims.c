@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/modules/hal/shims.h"
+#include "iree/vm/shims.h"
 
 IREE_VM_ABI_DEFINE_SHIM(irii, v);
 IREE_VM_ABI_DEFINE_SHIM(r, i);

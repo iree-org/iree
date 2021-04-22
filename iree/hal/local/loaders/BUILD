@@ -24,6 +24,23 @@ package(
 )
 
 cc_library(
+    name = "embedded_library_loader",
+    srcs = ["embedded_library_loader.c"],
+    hdrs = ["embedded_library_loader.h"],
+    defines = [
+        "IREE_HAL_HAVE_ELF_LIBRARY_LOADER=1",
+    ],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+        "//iree/hal:api",
+        "//iree/hal/local",
+        "//iree/hal/local/elf:elf_module",
+    ],
+)
+
+cc_library(
     name = "legacy_library_loader",
     srcs = ["legacy_library_loader.c"],
     hdrs = ["legacy_library_loader.h"],

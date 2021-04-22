@@ -16,11 +16,15 @@ vm.module @control_flow_module {
   }
 }
 // CHECK: iree_status_t control_flow_module_control_flow_test_impl(int32_t [[A:[^ ]*]], int32_t [[COND:[^ ]*]], int32_t *[[RESULT:[^ ]*]], control_flow_module_state_t* [[STATE:[^ ]*]]) {
+  // CHECK-NEXT: VARIABLE DECLARATIONS
+  // CHECK-NEXT: RESULTS
   // CHECK-NEXT: int32_t [[B:[^ ]*]];
   // CHECK-NEXT: int32_t [[V0:[^ ]*]];
+  // CHECK-NEXT: BASIC BLOCK ARGUMENTS
   // CHECK-NEXT: int32_t [[C:[^ ]*]];
   // CHECK-NEXT: int32_t [[D:[^ ]*]];
   // CHECK-NEXT: int32_t [[E:[^ ]*]];
+  // CHECK-NEXT: END VARIABLE DECLARATIONS
   // CHECK-NEXT: [[BB0:[^ ]*]]:
   // CHECK-NEXT: if ([[COND]]) {
   // CHECK-NEXT: goto [[BB1:[^ ]*]];

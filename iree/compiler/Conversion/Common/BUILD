@@ -22,6 +22,7 @@ cc_library(
     name = "Common",
     srcs = [
         "BufferAllocViewCleanUpPass.cpp",
+        "FlattenMemRefSubspanPass.cpp",
         "LaunchConfig.cpp",
         "LinalgBufferizePass.cpp",
         "LinalgRewriteDestructiveUpdatesPass.cpp",
@@ -42,6 +43,7 @@ cc_library(
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:GPUDialect",

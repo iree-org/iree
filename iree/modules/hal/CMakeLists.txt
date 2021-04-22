@@ -19,8 +19,6 @@ iree_cc_library(
     "exports.inl"
   SRCS
     "hal_module.c"
-    "shims.c"
-    "shims.h"
   DEPS
     iree::base::api
     iree::base::tracing

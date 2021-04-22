@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "decompose_hlo_clamp.mlir"
     "dot.mlir"
     "dynamic_shape.mlir"
+    "fft.mlir"
     "fusion.mlir"
     "linalg_tensor_to_buffer.mlir"
     "pad_tensor.mlir"

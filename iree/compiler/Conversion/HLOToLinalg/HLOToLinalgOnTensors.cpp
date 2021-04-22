@@ -182,6 +182,112 @@ struct ConcatenateOpConversion
 };
 }  // namespace
 
+//===----------------------------------------------------------------------===//
+// mhlo.fft conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Creats coefficients based on DFT definition, see
+/// https://en.wikipedia.org/wiki/Discrete_Fourier_transform
+Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
+                        bool isRealPart) {
+  // scale = 2 * pi / N
+  double scale = 2 * M_PI / matrixType.getDimSize(0);
+
+  SmallVector<Attribute> values;
+  assert(matrixType.getRank() == 2 && "expected 2D matrix");
+  for (auto i : llvm::seq<unsigned>(0, matrixType.getDimSize(0))) {
+    for (auto j : llvm::seq<unsigned>(0, matrixType.getDimSize(1))) {
+      double v = scale * i * j;
+      if (isRealPart) {
+        v = cos(v);
+      } else {
+        v = -sin(v);
+      }
+      values.push_back(b.getF32FloatAttr(v));
+    }
+  }
+  return b.create<ConstantOp>(loc, matrixType,
+                              DenseFPElementsAttr::get(matrixType, values));
+}
+
+Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
+                                  RankedTensorType resultType, Value lhs,
+                                  Value rhs) {
+  Value zero =
+      b.create<ConstantOp>(loc, b.getZeroAttr(resultType.getElementType()));
+  auto initTensor = b.create<linalg::InitTensorOp>(
+      loc, /*dyn_size=*/ValueRange{}, resultType.getShape(),
+      resultType.getElementType());
+  Value zeroTensor =
+      b.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+
+  switch (lhs.getType().cast<RankedTensorType>().getRank()) {
+    case 1:
+      return b
+          .create<linalg::VecmatOp>(loc, TypeRange{resultType},
+                                    ValueRange{lhs, rhs},
+                                    ValueRange{zeroTensor})
+          .getResult(0);
+    case 2:
+      return b
+          .create<linalg::MatmulOp>(loc, TypeRange{resultType},
+                                    ValueRange{lhs, rhs},
+                                    ValueRange{zeroTensor})
+          .getResult(0);
+    default:
+      llvm_unreachable("unhandled matmul type");
+  }
+}
+
+/// Converts mhlo.fft operation to Linalg ops.
+struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
+  using OpConversionPattern<mhlo::FftOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::FftOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override {
+    if (op.fft_type() != "RFFT") {
+      return rewriter.notifyMatchFailure(op,
+                                         "non RFFT types are supported yet");
+    }
+
+    mhlo::FftOpAdaptor adaptor(args);
+    auto inputType = adaptor.operand().getType().dyn_cast<RankedTensorType>();
+    if (!inputType || !inputType.hasStaticShape() || inputType.getRank() > 2) {
+      return rewriter.notifyMatchFailure(op, "only static 1D or 2D dft ops");
+    }
+
+    int rank = inputType.getRank();
+    int n = inputType.getDimSize(rank - 1);
+    int fftLength =
+        op.fft_length().getSplatValue().cast<IntegerAttr>().getInt() / 2 + 1;
+
+    Location loc = op.getLoc();
+    auto matrixType =
+        RankedTensorType::get({n, fftLength}, inputType.getElementType());
+    auto resultType =
+        RankedTensorType::get(op.getType().cast<RankedTensorType>().getShape(),
+                              inputType.getElementType());
+
+    auto realMatrix =
+        getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/true);
+    auto real = createLinalgMatmulOnTensors(rewriter, loc, resultType,
+                                            adaptor.operand(), realMatrix);
+
+    auto imagMatrix =
+        getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/false);
+    auto imag = createLinalgMatmulOnTensors(rewriter, loc, resultType,
+                                            adaptor.operand(), imagMatrix);
+
+    // Pack the results back to mhlo::ComplexOp.
+    rewriter.replaceOpWithNewOp<mhlo::ComplexOp>(op, op.getType(), real, imag);
+    return success();
+  }
+};
+}  // namespace
+
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
   ConvertHLOToLinalgOnTensorsPass(bool useLinalgOnTensorsPath = false)
@@ -203,6 +309,18 @@ struct ConvertHLOToLinalgOnTensorsPass
 
     ConversionTarget target(getContext());
     target.addIllegalDialect<mhlo::MhloDialect>();
+
+    // TODO(hanchung): Do it in a cleaner way.
+    // We don't see complex types in codegen. This assumes that we run
+    // LowerComplexPass before, and all the complex types were folded away.
+    // Mark them legal and rely on canonicalization patterns to fold them away.
+    target.addDynamicallyLegalOp<mhlo::ComplexOp>(
+        [](mhlo::ComplexOp op) { return true; });
+    target.addDynamicallyLegalOp<mhlo::RealOp>(
+        [](mhlo::RealOp op) { return true; });
+    target.addDynamicallyLegalOp<mhlo::ImagOp>(
+        [](mhlo::ImagOp op) { return true; });
+
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     if (useLinalgOnTensorsPath) {
@@ -212,7 +330,7 @@ struct ConvertHLOToLinalgOnTensorsPass
 
     if (failed(applyPartialConversion(getFunction(), target,
                                       std::move(patterns)))) {
-      signalPassFailure();
+      return signalPassFailure();
     }
   }
 
@@ -243,7 +361,8 @@ struct ConstOpConversion : public OpRewritePattern<mhlo::ConstOp> {
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
-  patterns.insert<ConstOpConversion, ConcatenateOpConversion>(context);
+  patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion>(
+      context);
 }
 
 static llvm::cl::opt<bool> clUseLinalgOnTensorsPath(

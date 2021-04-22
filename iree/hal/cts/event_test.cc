@@ -21,7 +21,13 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class EventTest : public CtsTestBase {};
+class EventTest : public CtsTestBase {
+ public:
+  EventTest() {
+    // TODO(#4680): command buffer recording so that this can run on sync HAL.
+    SkipUnavailableDriver("dylib-sync");
+  }
+};
 
 TEST_P(EventTest, Create) {
   iree_hal_event_t* event;

@@ -152,6 +152,13 @@ VkCommandBuffer iree_hal_vulkan_direct_command_buffer_handle(
   return command_buffer->handle;
 }
 
+static iree_hal_command_buffer_mode_t
+iree_hal_vulkan_direct_command_buffer_mode(
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  return ((const iree_hal_vulkan_direct_command_buffer_t*)base_command_buffer)
+      ->mode;
+}
+
 static iree_hal_command_category_t
 iree_hal_vulkan_direct_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* base_command_buffer) {
@@ -632,6 +639,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
 const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_direct_command_buffer_vtable = {
         /*.destroy=*/iree_hal_vulkan_direct_command_buffer_destroy,
+        /*.mode=*/
+        iree_hal_vulkan_direct_command_buffer_mode,
         /*.allowed_categories=*/
         iree_hal_vulkan_direct_command_buffer_allowed_categories,
         /*.begin=*/iree_hal_vulkan_direct_command_buffer_begin,

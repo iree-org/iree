@@ -36,6 +36,7 @@ namespace iree_compiler {
 inline void registerCommonConversionPasses() {
   static bool init_once = []() {
     // Common
+    createFlattenMemRefSubspanPass();
     createLinalgBufferizePass();
     createLinalgRewriteDestructiveUpdatesPass();
     return true;
@@ -66,7 +67,6 @@ inline void registerLinalgToSPIRVPasses() {
   static bool init_once = []() {
     // LinalgToSPIRV
     createConvertToGPUPass(SPIRVCodegenOptions());
-    createFlattenMemRefSubspanPass();
     createFoldProcessorIDUsesPass();
     createTileAndDistributeAmongWorkgroupsPass(SPIRVCodegenOptions());
     createTileAndVectorizeInOneWorkgroupPass(SPIRVCodegenOptions());

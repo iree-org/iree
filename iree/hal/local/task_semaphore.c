@@ -210,6 +210,7 @@ static void iree_hal_task_semaphore_destroy(
 
   iree_status_free(semaphore->failure_status);
   iree_notification_deinitialize(&semaphore->notification);
+  iree_slim_mutex_deinitialize(&semaphore->mutex);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -382,19 +383,23 @@ static iree_status_t iree_hal_task_semaphore_wait(
   iree_hal_task_semaphore_t* semaphore =
       iree_hal_task_semaphore_cast(base_semaphore);
 
-  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-
   iree_slim_mutex_lock(&semaphore->mutex);
 
-  if (semaphore->current_value >= value) {
+  if (!iree_status_is_ok(semaphore->failure_status)) {
+    // Fastest path: failed; return an error to tell callers to query for it.
+    iree_slim_mutex_unlock(&semaphore->mutex);
+    return iree_status_from_code(IREE_STATUS_ABORTED);
+  } else if (semaphore->current_value >= value) {
     // Fast path: already satisfied.
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_ok_status();
-  } else if (deadline_ns == IREE_TIME_INFINITE_PAST) {
+  } else if (iree_timeout_is_immediate(timeout)) {
     // Not satisfied but a poll, so can avoid the expensive wait handle work.
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   }
+
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
   // Slow path: acquire a timepoint while we hold the lock.
   iree_hal_task_timepoint_t timepoint;

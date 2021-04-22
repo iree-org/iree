@@ -17,6 +17,7 @@
 #include <inttypes.h>
 
 #include "absl/flags/flag.h"
+#include "iree/hal/local/loaders/embedded_library_loader.h"
 #include "iree/hal/local/loaders/legacy_library_loader.h"
 #include "iree/hal/local/task_driver.h"
 
@@ -74,10 +75,18 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
         &topology);
   }
 
-  iree_hal_executable_loader_t* dylib_loader = NULL;
-  iree_status_t status =
-      iree_hal_legacy_library_loader_create(allocator, &dylib_loader);
-  iree_hal_executable_loader_t* loaders[1] = {dylib_loader};
+  iree_status_t status = iree_ok_status();
+
+  iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
+  iree_host_size_t loader_count = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_embedded_library_loader_create(allocator,
+                                                     &loaders[loader_count++]);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_legacy_library_loader_create(allocator,
+                                                   &loaders[loader_count++]);
+  }
 
   iree_task_executor_t* executor = NULL;
   if (iree_status_is_ok(status)) {
@@ -88,12 +97,14 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
         iree_make_cstring_view("dylib"), &default_params, executor,
-        IREE_ARRAYSIZE(loaders), loaders, allocator, out_driver);
+        loader_count, loaders, allocator, out_driver);
   }
 
   iree_task_executor_release(executor);
   iree_task_topology_deinitialize(&topology);
-  iree_hal_executable_loader_release(dylib_loader);
+  for (iree_host_size_t i = 0; i < loader_count; ++i) {
+    iree_hal_executable_loader_release(loaders[i]);
+  }
   return status;
 }
 

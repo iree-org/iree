@@ -20,6 +20,7 @@ iree_cc_library(
     "Transforms.h"
   SRCS
     "BufferAllocViewCleanUpPass.cpp"
+    "FlattenMemRefSubspanPass.cpp"
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
     "LinalgRewriteDestructiveUpdatesPass.cpp"
@@ -28,6 +29,7 @@ iree_cc_library(
     "VectorTransferOptimization.cpp"
   DEPS
     LLVMSupport
+    MLIRAffine
     MLIRAffineUtils
     MLIRGPU
     MLIRIR

@@ -107,7 +107,7 @@ class UnixLinkerTool : public LinkerTool {
 
     // Strip debug information (only, no relocations) when not requested.
     if (!targetOptions.debugSymbols) {
-      flags.push_back("-Wl,--strip-debug");
+      flags.push_back("--strip-debug");
     }
 
     // Link all input objects. Note that we are not linking whole-archive as
