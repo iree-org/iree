@@ -17,6 +17,10 @@
 
 #include "iree/base/api.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
 //===----------------------------------------------------------------------===//
 // Flag parsing
 //===----------------------------------------------------------------------===//
@@ -55,5 +59,9 @@ iree_status_t iree_flags_parse(int* argc, char*** argv);
 // what you want when embedded in a host process. You don't want to have a flag
 // typo and shut down your entire server/sandbox/Android app/etc.
 void iree_flags_parse_checked(int* argc, char*** argv);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_BASE_INTERNAL_FLAGS_H_
