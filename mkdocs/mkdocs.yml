@@ -59,12 +59,17 @@ extra:
 extra_css:
   - assets/stylesheets/extra.css
 
-copyright: Copyright &copy; 2021 Google LLC  # TODO(scotttodd): remove?
+copyright: Copyright &copy; 2021 Google LLC
 
 markdown_extensions:
+  - abbr
   - admonition
+  - footnotes
   - meta
   - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
   - pymdownx.tabbed
   - pymdownx.superfences
   - tables
