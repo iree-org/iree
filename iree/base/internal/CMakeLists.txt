@@ -147,11 +147,34 @@ iree_cc_library(
   HDRS
     "flags.h"
   SRCS
-    "flags.cc"
+    "flags.c"
   DEPS
-    absl::flags_parse
+    ::internal
     iree::base::api
+    iree::base::tracing
   PUBLIC
+)
+
+iree_cc_binary(
+  NAME
+    flags_demo
+  SRCS
+    "flags_demo.c"
+  DEPS
+    ::flags
+    iree::base::core_headers
+)
+
+iree_lit_test_suite(
+  NAME
+    flags_test
+  SRCS
+    "flags_test.txt"
+  DATA
+    ::flags_demo
+    iree::tools::IreeFileCheck
+  LABELS
+    "hostonly"
 )
 
 iree_cc_library(
