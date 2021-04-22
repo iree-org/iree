@@ -71,6 +71,11 @@ enum iree_hal_executable_caching_mode_e {
   // Device must support the IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING feature
   // and executables must support the ExecutableFeature::kProfiling feature.
   IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING = 1u << 5,
+  // Disables verification of executable layouts and modes.
+  // This is useful when debugging with partial information but should never
+  // be enabled for real usage as the verification is the best way to catch
+  // API misuse.
+  IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION = 1u << 6,
 };
 typedef uint32_t iree_hal_executable_caching_mode_t;
 

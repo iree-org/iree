@@ -52,6 +52,21 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    executable_library_benchmark
+  SRCS
+    "executable_library_benchmark.c"
+  DEPS
+    ::executable_library
+    ::local
+    iree::base::api
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal::local::loaders::embedded_library_loader
+    iree::testing::benchmark
+)
+
+iree_cc_test(
+  NAME
     executable_library_test
   SRCS
     "executable_library_demo.c"

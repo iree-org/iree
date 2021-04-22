@@ -61,6 +61,20 @@ cc_library(
 )
 
 cc_test(
+    name = "executable_library_benchmark",
+    srcs = ["executable_library_benchmark.c"],
+    deps = [
+        ":executable_library",
+        ":local",
+        "//iree/base:api",
+        "//iree/base:tracing",
+        "//iree/base/internal:flags",
+        "//iree/hal/local/loaders:embedded_library_loader",
+        "//iree/testing:benchmark",
+    ],
+)
+
+cc_test(
     name = "executable_library_test",
     srcs = [
         "executable_library_demo.c",

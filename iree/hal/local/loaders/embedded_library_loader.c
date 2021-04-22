@@ -85,6 +85,7 @@ static iree_status_t iree_hal_elf_executable_query_library(
 }
 
 static iree_status_t iree_hal_elf_executable_create(
+    iree_hal_executable_caching_mode_t caching_mode,
     iree_const_byte_span_t elf_data, iree_host_size_t executable_layout_count,
     iree_hal_executable_layout_t* const* executable_layouts,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
@@ -118,7 +119,10 @@ static iree_status_t iree_hal_elf_executable_create(
     // Query metadata and get the entry point function pointers.
     status = iree_hal_elf_executable_query_library(executable);
   }
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) &&
+      !iree_all_bits_set(
+          caching_mode,
+          IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION)) {
     // Check to make sure that the entry point count matches the layouts
     // provided.
     if (executable->library.v0->entry_point_count != executable_layout_count) {
@@ -267,7 +271,7 @@ static iree_status_t iree_hal_embedded_library_loader_try_load(
 
   // Perform the load of the ELF and wrap it in an executable handle.
   iree_status_t status = iree_hal_elf_executable_create(
-      executable_spec->executable_data,
+      executable_spec->caching_mode, executable_spec->executable_data,
       executable_spec->executable_layout_count,
       executable_spec->executable_layouts, executable_loader->host_allocator,
       out_executable);

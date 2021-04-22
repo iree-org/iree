@@ -28,7 +28,7 @@ cc_library(
     srcs = ["embedded_library_loader.c"],
     hdrs = ["embedded_library_loader.h"],
     defines = [
-        "IREE_HAL_HAVE_ELF_LIBRARY_LOADER=1",
+        "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1",
     ],
     deps = [
         "//iree/base:api",
