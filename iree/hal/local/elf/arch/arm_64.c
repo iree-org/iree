@@ -128,6 +128,11 @@ void* iree_elf_call_p_i(const void* symbol_ptr, int a0) {
   return ((ptr_t)symbol_ptr)(a0);
 }
 
+void* iree_elf_call_p_ip(const void* symbol_ptr, int a0, void* a1) {
+  typedef void* (*ptr_t)(int, void*);
+  return ((ptr_t)symbol_ptr)(a0, a1);
+}
+
 int iree_elf_call_i_pp(const void* symbol_ptr, void* a0, void* a1) {
   typedef int (*ptr_t)(void*, void*);
   return ((ptr_t)symbol_ptr)(a0, a1);

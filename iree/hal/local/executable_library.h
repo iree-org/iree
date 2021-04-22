@@ -116,7 +116,7 @@ typedef struct {
 // than the max version supported by the caller.
 typedef const iree_hal_executable_library_header_t** (
     *iree_hal_executable_library_query_fn_t)(
-    iree_hal_executable_library_version_t max_version);
+    iree_hal_executable_library_version_t max_version, void* reserved);
 
 // Function name exported from dynamic libraries (pass to dlsym).
 #define IREE_HAL_EXECUTABLE_LIBRARY_EXPORT_NAME \
