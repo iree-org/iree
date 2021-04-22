@@ -410,6 +410,8 @@ enum {
 #define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xrgb)
 #define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value)
 #define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, ...)
+#define IREE_TRACE_ZONE_APPEND_TEXT_CSTRING(zone_id, value)
+#define IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(zone_id, value, value_length)
 #define IREE_TRACE_ZONE_END(zone_id)
 #define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
   IREE_RETURN_IF_ERROR(__VA_ARGS__)
