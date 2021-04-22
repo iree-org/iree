@@ -294,7 +294,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 #   https://discourse.cmake.org/t/how-to-fix-build-warning-d9025-overriding-gr-with-gr/878
 #   https://gitlab.kitware.com/cmake/cmake/-/issues/20610
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-  string(REPLACE "/GR" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+  string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
 if(NOT ANDROID)
