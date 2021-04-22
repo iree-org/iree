@@ -57,7 +57,7 @@ namespace iree_compiler {
 //
 // Problem statement:
 //
-// The bufferization in this file is inteded for converting tensor-operations
+// The bufferization in this file is intended for converting tensor-operations
 // into memref-operations for ops within a dispatch region. The goal is to reuse
 // the buffers provided as inputs/outputs by the hal layer as memrefs for each
 // of the operations. If the transformation cannot reuse input/output buffer to
@@ -77,7 +77,7 @@ namespace iree_compiler {
 //   analysis driving the transformation is based on the tensor values.
 //   - Converting tensor operations to memref operations when all operands use
 //     either buffers that are inputs to the dispatch or are allocated
-//     temporarily within the dispatch region can be achieved by a a
+//     temporarily within the dispatch region can be achieved by a
 //     straight-forward walk.
 //   - Reusing memref for the result of the dispatch for operations is more
 //     involved and explained below.
@@ -221,7 +221,7 @@ static LogicalResult analyseInterfaceLoadTensorOp(
 }
 
 /// Helper method to return an instruction of type `OpType` whose result is in
-/// the same equivalence set as `value`. Returns an operaiton if there is only
+/// the same equivalence set as `value`. Returns an operation if there is only
 /// one such op in the equivalence set or nullptr in all other cases.
 template <typename OpType>
 static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
@@ -239,7 +239,7 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
 
 /// Returns true if the value and target of a `flow.dispatch.tensor.store`
 /// operation can be added to the same equivalence set. This can be done only if
-/// - the `value` is not from a equivalence set that contains a read-only
+/// - The `value` is not from a equivalence set that contains a read-only
 ///   tensor.
 /// - All `hal.interface.binding.subspan` operations in the equivalence class of
 ///   `value` and `target` have the same binding and offset. For now, it is
@@ -259,10 +259,6 @@ static bool canSetStoreValueAndTargetAsEquivalent(
   if (auto valueInterfaceOp =
           getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(value,
                                                                       plan)) {
-    if (!valueInterfaceOp) {
-      return true;
-    }
-
     if (targetInterfaceOp.binding() != valueInterfaceOp.binding() ||
         targetInterfaceOp.byte_offset() != valueInterfaceOp.byte_offset()) {
       // If the binding and offsets are different, map these to different
@@ -307,13 +303,15 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
   return success();
 }
 
+/// For every result of the LinalgOp, gets the operands (`ins` or `outs`) whose
+/// buffer can be reused for the result.
 static SmallVector<Value> getTiedOperandsForLinalgOps(
     linalg::LinalgOp linalgOp) {
   SmallVector<Value> tiedOperands(linalgOp.getOperation()->getNumResults());
   for (auto outTensor : llvm::enumerate(linalgOp.getOutputs())) {
     if (linalgOp.payloadUsesValueFromOutputOperandIndex(outTensor.index())) {
       // If the `outs` tensor has a single use (this op) and is not from a
-      // read-only buffer.
+      // read-only buffer, the `outs` tensor can be tied to the result.
       if (outTensor.value().hasOneUse() &&
           !isFromReadOnlyTensor(outTensor.value())) {
         tiedOperands[outTensor.index()] = outTensor.value();
@@ -327,8 +325,9 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
     // then vectorization + load-store forwarding to remove the intermediate
     // buffer. This requires vectorization to handle all cases downstream. This
     // is a WAR for current use cases.
-    if (linalgOp.payloadUsesValueFromOutputOperandIndex(result.index()))
+    if (linalgOp.payloadUsesValueFromOutputOperandIndex(result.index())) {
       continue;
+    }
     for (auto input : llvm::enumerate(linalgOp.getInputTensors())) {
       auto producerOp = input.value().getDefiningOp<linalg::LinalgOp>();
       if (producerOp && input.value().hasOneUse() &&
@@ -751,11 +750,11 @@ static Value getAliasingBufferForSubtensorResult(OpBuilder &b, SubTensorOp op,
 }
 
 /// Computes the `memrefs` to use for the result of an operation based on
-/// - if the result has a tied operand reuse the buffer for the tied operand (or
+/// - If the result has a tied operand reuse the buffer for the tied operand (or
 ///   an alias of it) as the buffer for the result. The `tiedOperands` vector is
-///   expected to be as large as the number of results. If the result has no
-///   tied operands, the corresponding position in the `tiedOperands` list must
-///   be `nullptr`.
+///   expected to be as large as the number of results.
+/// - If the result has no tied operands, the corresponding position in the
+///   `tiedOperands` list must be `nullptr`.
 /// - If the result is in the same equivalence set as the result of the dispatch
 ///   region (i.e. `value` operand of a `flow.dispatch.tensor.store`) then
 ///   return an alias/view of the buffer passed into the dispatch region to
