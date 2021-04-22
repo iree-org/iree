@@ -29,6 +29,8 @@ filegroup(
     srcs = enforce_glob(
         [
             "VMBase.td",
+            "VMOpcodesCore.td",
+            "VMOpcodesI64.td",
             "VMOps.td",
         ],
         include = ["*.td"],
