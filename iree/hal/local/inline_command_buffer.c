@@ -43,17 +43,15 @@ typedef struct {
     // iree_hal_buffer_mapping_t and map/unmap where appropriate.
     void* full_bindings[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
                         IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
-    iree_device_size_t
-        full_binding_lengths[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
-                             IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
+    size_t full_binding_lengths[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
+                                IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
 
     // Packed bindings scratch space used during dispatch. Executable bindings
     // are packed into a dense list with unused bindings removed.
     void* packed_bindings[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
                           IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
-    iree_device_size_t
-        packed_binding_lengths[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
-                               IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
+    size_t packed_binding_lengths[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
+                                  IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
 
     // All available push constants updated each time push_constants is called.
     // Reset only with the command buffer and otherwise will maintain its values

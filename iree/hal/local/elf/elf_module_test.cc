@@ -94,7 +94,7 @@ TEST_F(ELFModuleTest, Check) {
   float arg0[4] = {1.0f, 2.0f, 3.0f, 4.0f};
   float arg1[4] = {100.0f, 200.0f, 300.0f, 400.0f};
   float ret0[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  iree_device_size_t binding_lengths[3] = {
+  size_t binding_lengths[3] = {
       sizeof(arg0),
       sizeof(arg1),
       sizeof(ret0),
