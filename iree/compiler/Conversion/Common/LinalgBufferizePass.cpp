@@ -214,7 +214,7 @@ static LogicalResult analyseConstantOp(ConstantOp constantOp,
 
 /// Adds the result of the `flow.dispatch.tensor.load` op to the same
 /// equivalence class as the source.
-static LogicalResult analyseInterfaceLoadOp(
+static LogicalResult analyseInterfaceLoadTensorOp(
     IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
   plan.unionSets(loadOp.result(), loadOp.source());
   return success();
@@ -301,7 +301,7 @@ static LogicalResult analyseInterfaceStoreTensorOp(
   return success();
 }
 
-LogicalResult analyseInterfaceBindingSubspanOp(
+static LogicalResult analyseInterfaceBindingSubspanOp(
     IREE::HAL::InterfaceBindingSubspanOp subspanOp, BufferizationPlan &plan) {
   plan.insert(subspanOp.getResult());
   return success();
@@ -346,8 +346,8 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
 
 /// Adds the corresponding `outs` and result tensors of the linalg op into the
 /// same equivalence class.
-LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
-                               BufferizationPlan &plan) {
+static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
+                                      BufferizationPlan &plan) {
   if (!linalgOp.hasTensorSemantics()) return success();
   auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp);
   for (auto it :
@@ -363,17 +363,10 @@ LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
   return success();
 }
 
-/// Adds the source and target of load-like operations to the same equivalence
-/// class.
-LogicalResult analyseLoadOp(Value source, Value dest, BufferizationPlan &plan) {
-  plan.unionSets(source, dest);
-  return success();
-}
-
 /// For operations that have a single operand and result, adds both to the same
 /// equivalence class.
-LogicalResult analyseSingleOperandResultOp(Value source, Value result,
-                                           BufferizationPlan &plan) {
+static LogicalResult analyseSingleOperandResultOp(Value source, Value result,
+                                                  BufferizationPlan &plan) {
   if (source.hasOneUse() || isFromReadOnlyTensor(source)) {
     plan.unionSets(source, result);
     return success();
@@ -384,14 +377,15 @@ LogicalResult analyseSingleOperandResultOp(Value source, Value result,
 }
 
 /// Adds the `dest` and `result` tensor of a subtensor insert operation into the
-/// same equivalence class.
-LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
-                                         Value dest, Value result,
-                                         BufferizationPlan &plan) {
+/// same equivalence class. If `source` is not null also checks that the
+/// `source` and `dest` are not equivalent.
+static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
+                                                Value dest, Value result,
+                                                BufferizationPlan &plan) {
   if (dest.hasOneUse() && !isFromReadOnlyTensor(dest)) {
     plan.unionSets(dest, result);
   }
-  if (plan.isEquivalent(source, dest)) {
+  if (source && plan.isEquivalent(source, dest)) {
     return op->emitError(
         "unexpected source and dest being mapped to same buffer");
   }
@@ -408,7 +402,7 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
         })
         .Case<IREE::Flow::DispatchTensorLoadOp>(
             [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-              return analyseLoadOp(loadOp.source(), loadOp.result(), plan);
+              return analyseInterfaceLoadTensorOp(loadOp, plan);
             })
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
@@ -446,14 +440,14 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
         })
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
-              return analyseLoadOp(transferReadOp.source(),
-                                   transferReadOp.vector(), plan);
+              plan.insert(transferReadOp.source());
+              return success();
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
-              return analyseDestructiveUpdateOp(
-                  transferWriteOp, transferWriteOp.vector(),
-                  transferWriteOp.source(), transferWriteOp.result(), plan);
+              return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
+                                                transferWriteOp.source(),
+                                                transferWriteOp.result(), plan);
             })
         .Default([&](Operation *op) { return success(); });
   };
@@ -704,8 +698,8 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
 
 /// Converts a `tensor.cast` operation into a `memref.cast` operation with the
 /// result aliasing the buffer for the operand.
-Value getAliasingBufferForCastResult(OpBuilder &b, tensor::CastOp castOp,
-                                     BlockAndValueMapping &bvm) {
+static Value getAliasingBufferForCastResult(OpBuilder &b, tensor::CastOp castOp,
+                                            BlockAndValueMapping &bvm) {
   Value inputBuffer = bvm.lookup(castOp.source());
   Value resultTensor = castOp.dest();
   auto outputType = getMemrefTypeForTensor(
@@ -916,7 +910,7 @@ static LogicalResult convertTensorExtractOp(OpBuilder &b, tensor::ExtractOp op,
   return success();
 }
 
-LogicalResult convertInterfaceLoadTensorOp(
+static LogicalResult convertInterfaceLoadTensorOp(
     OpBuilder &b, IREE::Flow::DispatchTensorLoadOp loadOp,
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
@@ -932,7 +926,7 @@ LogicalResult convertInterfaceLoadTensorOp(
 /// Converts a `flow.dispatch.tensor.store` operation to memrefs. If the `value`
 /// and `target` are in the same equivalent set, then there is nothing to do. If
 /// no create a subview into the result buffer and copy the `value`.
-LogicalResult convertInterfaceStoreTensorOp(
+static LogicalResult convertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp,
     BlockAndValueMapping &bvm, BufferizationPlan &plan) {
   if (plan.isEquivalent(storeOp.target(), storeOp.value())) {
