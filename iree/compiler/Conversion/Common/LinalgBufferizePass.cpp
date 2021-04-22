@@ -14,13 +14,34 @@
 
 //===- LinalgBufferizePass.cpp.cpp - Pass to bufferize Linalg on tensors --===//
 //
-// Pass to convert from Linalg ops on tensors to Linalg ops on buffers.
-// This just inserts AllocOp to address space 0 that can be later hoisted,
-// promoted and generally rewritten to the desired backend.
+// The overall bufferizarion algorithm is summarized here. Each of the
+// individual steps are explained in detail later.
 //
-// TODO(nicolasvasilache): the implementation of this pass is unnecessarily
-// convoluted due to asymmetries arising from tie_shape weirdness. Revisit once
-// this abstraction is replaced.
+// Problem statement:
+//
+// The bufferization in this file is intended for converting tensor-operations
+// into memref-operations for ops within a dispatch region. The goal is to reuse
+// the buffers provided as inputs/outputs by the hal layer as memrefs for each
+// of the operations. If the transformation cannot reuse input/output buffer to
+// store an intermediate tensor, an allocation is done. This allocation is
+// typically meant to be to target scratchspace memory.
+//
+// The algorithm has two phases an analysis phase and a tranformation phase.
+//
+// - The analysis phase walks the function and organizes relevant tensors
+//   (tensors that need to be converted to memrefs) into equivalence clases. Two
+//   tensors are part of the same equivalence class if they can eventually be
+//   mapped to the same memref. This allows determining which operations can use
+//   the buffer provided for the outputs to compute the results in place.
+// - The transformation phase walks the function again and inserts corresponding
+//   memref operations. The tensor operations are still kept around since the
+//   analysis driving the transformation is based on the tensor values.
+//   - Converting tensor operations to memref operations when all operands use
+//     either buffers that are inputs to the dispatch or are allocated
+//     temporarily within the dispatch region can be achieved by a
+//     straight-forward walk.
+//   - Reusing memref for the result of the dispatch for operations is more
+//     involved and explained below.
 //
 //===----------------------------------------------------------------------===//
 
@@ -50,42 +71,7 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Algorithm description.
-//
-// The overall bufferizarion algorithm is summarized here. Each of the
-// individual steps are explained in detail later.
-//
-// Problem statement:
-//
-// The bufferization in this file is intended for converting tensor-operations
-// into memref-operations for ops within a dispatch region. The goal is to reuse
-// the buffers provided as inputs/outputs by the hal layer as memrefs for each
-// of the operations. If the transformation cannot reuse input/output buffer to
-// store an intermediate tensor, an allocation is done. This allocation is
-// typically meant to be to target scratchspace memory.
-//
-// The algorithm has two phases
-// and analysis phase and a tranformation phase.
-//
-// - The analysis phase walks the function and organizes relevant tensors
-//   (tensors that need to be converted to memrefs) into equivalence clases. Two
-//   tensors are part of the same equivalence class if they can eventually be
-//   mapped to the same memref. This allows determining which operations can use
-//   the buffer provided for the outputs to compute the results in place.
-// - The transformation phase walks the function again and inserts corresponding
-//   memref operations. The tensor operations are still kept around since the
-//   analysis driving the transformation is based on the tensor values.
-//   - Converting tensor operations to memref operations when all operands use
-//     either buffers that are inputs to the dispatch or are allocated
-//     temporarily within the dispatch region can be achieved by a
-//     straight-forward walk.
-//   - Reusing memref for the result of the dispatch for operations is more
-//     involved and explained below.
-//
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// ANALYSIS TO COMPUTE EQUIVALENCE SETS
+// Analysis to compute equivalence sets.
 //
 // These functions compute the equivalence relationships between all tensors in
 // the program. Two tensors are equivalent if they are to be mapped to the same
@@ -95,13 +81,11 @@ namespace iree_compiler {
 // class. Eventually the result of the dispatch tensor is added to some
 // equivalence set. All tensors in that equivalence set can reuse the result
 // buffer and compute the values in place. You can add tensors to equivalence
-// setonly if
+// set only if
 // - They have a single use
 // - They are derived from a read-only buffer.
 //
 //===----------------------------------------------------------------------===//
-
-using UnionFindSet = llvm::EquivalenceClasses<void *>;
 
 /// Walks the use-def chain and see if this value comes from a read-only tensor.
 static bool isFromReadOnlyTensor(Value v) {
@@ -130,23 +114,6 @@ static bool isFromReadOnlyTensor(Value v) {
 /// `Value` not directly supported as a value type by this class.
 class BufferizationPlan {
  public:
-  void dump() {
-    llvm::dbgs() << "BufferMappings : \n";
-    unsigned numSets = 0;
-    for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
-         ++it) {
-      if (!it->isLeader()) continue;
-      llvm::dbgs() << "\tSet " << numSets << ":\n";
-      for (auto member : llvm::make_range(mappedTensors.member_begin(it),
-                                          mappedTensors.member_end())) {
-        llvm::dbgs() << "\t\t";
-        getValue(member).print(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      }
-      numSets++;
-    }
-  }
-
   llvm::EquivalenceClasses<void *>::iterator findValue(Value v) {
     return mappedTensors.findValue(getPointer(v));
   }
@@ -186,6 +153,23 @@ class BufferizationPlan {
   /// the dispatch region.
   bool isInStoreSet(Value v) { return storeLeaders.count(getLeaderValue(v)); }
 
+  void dump() {
+    llvm::dbgs() << "BufferMappings : \n";
+    unsigned numSets = 0;
+    for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
+         ++it) {
+      if (!it->isLeader()) continue;
+      llvm::dbgs() << "\tSet " << numSets << ":\n";
+      for (auto member : llvm::make_range(mappedTensors.member_begin(it),
+                                          mappedTensors.member_end())) {
+        llvm::dbgs() << "\t\t";
+        getValue(member).print(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
+      numSets++;
+    }
+  }
+
  private:
   Value getLeaderValue(Value v1) {
     return getValue(mappedTensors.getLeaderValue(getPointer(v1)));
@@ -220,7 +204,7 @@ static LogicalResult analyseInterfaceLoadTensorOp(
   return success();
 }
 
-/// Helper method to return an instruction of type `OpType` whose result is in
+/// Helper method to returns an operation of type `OpType` whose result is in
 /// the same equivalence set as `value`. Returns an operation if there is only
 /// one such op in the equivalence set or nullptr in all other cases.
 template <typename OpType>
@@ -538,7 +522,7 @@ static Value createSubviewOp(OpBuilder &b, Location loc, Value src,
 // computes the value (say a `linalg` operation) through a series of `reshapes`,
 // `cast` etc. When trying to reuse the buffer for the result passed in to the
 // dispatch region for these operations, these operations need to be "replayed"
-// in reverse do that the type of the buffer in the operation computing the
+// in reverse so that the type of the buffer in the operation computing the
 // value matches what is expected.
 //
 // For example,
@@ -638,7 +622,7 @@ static Value getReverseOfCastOp(OpBuilder &b, tensor::CastOp castOp,
 }
 
 /// For an operation whose `resultValue` is the result of the dispatch region,
-/// get the buffer to use to compute the value in-place.
+/// gets the buffer to use to compute the value in-place.
 static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
                                     BlockAndValueMapping &bvm) {
   Operation *currOp = resultValue.getOwner();
@@ -766,7 +750,7 @@ static LogicalResult getOrAllocateResultBuffers(
     BlockAndValueMapping &bvm, BufferizationPlan &plan,
     WorkgroupMemoryAllocationFn allocationFn) {
   for (auto result : llvm::enumerate(op->getResults())) {
-    if (bvm.lookupOrNull(result.value())) continue;
+    if (bvm.contains(result.value())) continue;
     Value buffer;
     if (tiedOperands[result.index()] &&
         plan.isEquivalent(tiedOperands[result.index()], result.value())) {
