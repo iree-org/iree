@@ -32,6 +32,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
@@ -84,7 +85,7 @@ static void addLoweringPasses(mlir::PassManager &pm,
                               llvm::ArrayRef<Type> args) {
   pm.addPass(mlir::iree_compiler::createVectorToGPUPass());
   pm.addPass(mlir::createLowerAffinePass());
-  pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
+  pm.addPass(memref::createFoldSubViewOpsPass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::iree_compiler::createVectorizeMemref());

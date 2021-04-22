@@ -27,7 +27,6 @@ iree_cc_library(
     "LLVMCodeGenOptions.h"
     "Passes.h"
   SRCS
-    "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
     "FoldTensorExtractOpPass.cpp"
     "KernelDispatch.cpp"
@@ -50,6 +49,7 @@ iree_cc_library(
     MLIRMath
     MLIRMathTransforms
     MLIRMemRef
+    MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
     MLIRSCFToStandard
@@ -69,6 +69,7 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLLVM::FoldTensorExtractOpIncGen
+    iree::compiler::Conversion::VectorToLLVM
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR

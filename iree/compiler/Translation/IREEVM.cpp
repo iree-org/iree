@@ -129,7 +129,15 @@ static void buildIREEVMTransformPassPipeline(
     IREE::TFLite::buildTransformPassPipeline(passManager);
   }
   IREE::Flow::buildInputTransformPassPipeline(passManager);
-  IREE::Flow::buildFlowTransformPassPipeline(passManager);
+  // VMLA must go with legacy path.
+  bool dispatchLinalgOnTensors = true;
+  if (std::find(executableOptions.targets.begin(),
+                executableOptions.targets.end(),
+                "vmla") != executableOptions.targets.end()) {
+    dispatchLinalgOnTensors = false;
+  }
+  IREE::Flow::buildFlowTransformPassPipeline(passManager,
+                                             dispatchLinalgOnTensors);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());

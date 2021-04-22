@@ -210,6 +210,7 @@ static void iree_hal_task_semaphore_destroy(
 
   iree_status_free(semaphore->failure_status);
   iree_notification_deinitialize(&semaphore->notification);
+  iree_slim_mutex_deinitialize(&semaphore->mutex);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -376,23 +377,29 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
   return status;
 }
 
-static iree_status_t iree_hal_task_semaphore_wait_with_deadline(
+static iree_status_t iree_hal_task_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_time_t deadline_ns) {
+    iree_timeout_t timeout) {
   iree_hal_task_semaphore_t* semaphore =
       iree_hal_task_semaphore_cast(base_semaphore);
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
-  if (semaphore->current_value >= value) {
+  if (!iree_status_is_ok(semaphore->failure_status)) {
+    // Fastest path: failed; return an error to tell callers to query for it.
+    iree_slim_mutex_unlock(&semaphore->mutex);
+    return iree_status_from_code(IREE_STATUS_ABORTED);
+  } else if (semaphore->current_value >= value) {
     // Fast path: already satisfied.
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_ok_status();
-  } else if (deadline_ns == IREE_TIME_INFINITE_PAST) {
+  } else if (iree_timeout_is_immediate(timeout)) {
     // Not satisfied but a poll, so can avoid the expensive wait handle work.
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   }
+
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
   // Slow path: acquire a timepoint while we hold the lock.
   iree_hal_task_timepoint_t timepoint;
@@ -415,16 +422,9 @@ static iree_status_t iree_hal_task_semaphore_wait_with_deadline(
   return status;
 }
 
-static iree_status_t iree_hal_task_semaphore_wait_with_timeout(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_duration_t timeout_ns) {
-  return iree_hal_task_semaphore_wait_with_deadline(
-      base_semaphore, value, iree_relative_timeout_to_deadline_ns(timeout_ns));
-}
-
 iree_status_t iree_hal_task_semaphore_multi_wait(
     iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns,
+    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
     iree_hal_local_event_pool_t* event_pool,
     iree_arena_block_pool_t* block_pool) {
   IREE_ASSERT_ARGUMENT(semaphore_list);
@@ -432,12 +432,13 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
     return iree_ok_status();
   } else if (semaphore_list->count == 1) {
     // Fast-path for a single semaphore.
-    return iree_hal_semaphore_wait_with_deadline(
-        semaphore_list->semaphores[0], semaphore_list->payload_values[0],
-        deadline_ns);
+    return iree_hal_semaphore_wait(semaphore_list->semaphores[0],
+                                   semaphore_list->payload_values[0], timeout);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
   // Avoid heap allocations by using the device block pool for the wait set.
   iree_arena_allocator_t arena;
@@ -506,6 +507,5 @@ static const iree_hal_semaphore_vtable_t iree_hal_task_semaphore_vtable = {
     .query = iree_hal_task_semaphore_query,
     .signal = iree_hal_task_semaphore_signal,
     .fail = iree_hal_task_semaphore_fail,
-    .wait_with_deadline = iree_hal_task_semaphore_wait_with_deadline,
-    .wait_with_timeout = iree_hal_task_semaphore_wait_with_timeout,
+    .wait = iree_hal_task_semaphore_wait,
 };

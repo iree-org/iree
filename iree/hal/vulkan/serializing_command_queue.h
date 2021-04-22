@@ -64,7 +64,7 @@ class SerializingCommandQueue final : public CommandQueue {
   iree_status_t Submit(iree_host_size_t batch_count,
                        const iree_hal_submission_batch_t* batches) override;
 
-  iree_status_t WaitIdle(iree_time_t deadline_ns) override;
+  iree_status_t WaitIdle(iree_timeout_t timeout) override;
 
   // Releases all deferred submissions ready to submit to the GPU.
   iree_status_t AdvanceQueueSubmission();

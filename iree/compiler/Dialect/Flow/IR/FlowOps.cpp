@@ -882,6 +882,50 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
         builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
 }
 
+void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
+                                 Value source,
+                                 ArrayRef<OpFoldResult> mixedOffsets,
+                                 ArrayRef<OpFoldResult> mixedSizes,
+                                 ArrayRef<OpFoldResult> mixedStrides,
+                                 ArrayRef<NamedAttribute> attributes) {
+  SmallVector<Value> offsets;
+  SmallVector<Value> sizes;
+  SmallVector<Value> strides;
+  SmallVector<int64_t> staticOffsets;
+  SmallVector<int64_t> staticSizes;
+  SmallVector<int64_t> staticStrides;
+
+  auto processOperands =
+      [](ArrayRef<OpFoldResult> operands, SmallVector<Value> &dynamicOperands,
+         SmallVector<int64_t> &staticOperands, int64_t dynamicIndexValue) {
+        for (OpFoldResult operand : operands) {
+          if (auto value = operand.dyn_cast<Value>()) {
+            dynamicOperands.push_back(value);
+            staticOperands.push_back(dynamicIndexValue);
+          } else {
+            auto operandValue =
+                operand.dyn_cast<Attribute>().cast<IntegerAttr>().getValue();
+            staticOperands.push_back(operandValue.getSExtValue());
+          }
+        }
+      };
+
+  processOperands(mixedOffsets, offsets, staticOffsets,
+                  ShapedType::kDynamicStrideOrOffset);
+  processOperands(mixedSizes, sizes, staticSizes, ShapedType::kDynamicSize);
+  processOperands(mixedStrides, strides, staticStrides,
+                  ShapedType::kDynamicStrideOrOffset);
+
+  auto returnType = RankedTensorType::get(
+      staticSizes,
+      source.getType().cast<DispatchTensorType>().getElementType());
+
+  build(builder, state, returnType, source, offsets, sizes, strides,
+        builder.getI64ArrayAttr(staticOffsets),
+        builder.getI64ArrayAttr(staticSizes),
+        builder.getI64ArrayAttr(staticStrides));
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.workgroups
 //===----------------------------------------------------------------------===//
@@ -1312,7 +1356,7 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.*
+// flow.tensor.reshape
 //===----------------------------------------------------------------------===//
 
 Value TensorReshapeOp::buildOperandRankedShape(unsigned idx,
@@ -1326,6 +1370,23 @@ Value TensorReshapeOp::buildResultRankedShape(unsigned idx,
   return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
                                          builder);
 }
+
+Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
+  return IREE::TiedOpInterface::findTiedBaseValue(source());
+}
+
+::llvm::Optional<unsigned> TensorReshapeOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // source
+}
+
+SmallVector<int64_t, 4> TensorReshapeOp::getTiedResultOperandIndices() {
+  return {0};  // source
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.*
+//===----------------------------------------------------------------------===//
 
 Value TensorLoadOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
   return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
@@ -1423,7 +1484,7 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
 
 ::llvm::Optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
-  return 0;  // target
+  return {0};  // target
 }
 
 SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
@@ -1552,6 +1613,18 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   // upgrading to support more.
   if (auto constantOp = dyn_cast<ConstantOp>(op)) {
     return constantOp.getType().isIntOrIndexOrFloat();
+  }
+  if (auto loadOp = dyn_cast<VariableLoadOp>(op)) {
+    // Only allow loads of immutable variables to move into the stream.
+    // As they are immutable it's always safe to do so as no synchronization at
+    // the stream entry/exit boundary is required.
+    //
+    // Loads of mutable variables may sometimes be safe to move in as well
+    // however that is best done when we have better cross-stream
+    // synchronization support and can make those guarantees structurally.
+    auto variableOp =
+        SymbolTable::lookupNearestSymbolFrom<VariableOp>(op, loadOp.variable());
+    return variableOp.is_mutable() == false;
   }
   return false;
 }

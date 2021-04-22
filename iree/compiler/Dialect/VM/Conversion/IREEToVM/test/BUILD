@@ -27,6 +27,7 @@ iree_lit_test_suite(
         [
             "byte_buffer_ops.mlir",
             "hint_ops.mlir",
+            "list_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

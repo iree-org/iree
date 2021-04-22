@@ -1,12 +1,69 @@
+# 2021 Q2 Objectives (OKRs)
+
+## This Quarter's High-level Themes
+
+**IREE Production Use Cases**
+
+1. **ASR.** Continue to improve IREE capabilities and performance for targeting lingvo-like ASR models.
+1. **TFLite/TOSA.** Demonstrate a complete user journey with an e2e quantized TFLite model running in a sample Android app using TOSA.
+
+**IREE Codegen**
+
+1. **Code Health.** As we deprecate the legacy compilation of Linalg on buffers, revisit all the passes/ordering of transformations to see if there are still relevant. Better structure of the codegeneration pipeline to address more use cases.
+1. **Performance.** Focus on performance improvements that are likely to benefit the ASR models, with a mix of near-term and 1-2 quarter long investments. Two main buckets here
+    1. **Architecture-independent optimizations.** Make sure that lowering of model is not introducing unnecessary overheads.
+    1. **Architecture-specific optimizations.** Last-mile tuning for a particular hardware.
+
+## Specific OKRs
+
+### P0 O: Demonstrate e2e compilation and execution of a TFLite model on Android using IREE
+
++ P1 KR: TOSA supports all non-MobileNet floating point models in tracking list (internal)
++ P1 KR: Android demo running IREE runtime through Java and/or C APIs
++ P1 KR: Documented workflows for compiling TFLite models to an IREE-compatible format
+
+### P1 O: Improve IREE code health and extensibility
+
++ P0 KR: Removed legacy MHLO based dispatch region creation and associated code in the backends to support that path
++ P1 KR: Made the backend less monolithic and easily extensible.
+    + Note: All operations go through the same compilation steps making changes hard. Instead have multiple codegen strategies that could define their own scope but still usable within IREE
++ P2 KR: Removed VMLA backend
+
+#### P1 O: Track and improve kernel performance of code-generation backends for ASR-like models
+
++ P1 KR: Created microbenchmarks for matmuls/convolutions based on configurations used in models like ASR and track the performance on CPU/GPU backends
++ P1 KR: Improved performance of depthwise convolution on CPU backend
++ P1 KR: Improved performance of different transpose variants of matmuls on CPU and GPU
++ P1 KR: Improved performance of convolution/matmul with padding on CPU and GPU backends
++ P1 KR: Address inefficiencies in the lowering of models through IREE compilation pipeline
++ P1 KR: Find and improve inefficient dispatch region creation on the Linalg on tensors path.
++ P1 KR: Overhead of buffer allocation on MobileBERT e2e test < 10ms
+
+### P1 O: Improve IREE infrastructure for targeting different CPU/GPU hardware
+
++ P1 KR: Define proper class abstractions and utilities for GPU target triples
++ P1 KR: Flesh out target feature queries (fp16, etc.) at runtime and be consistent with capabilities used in shaders
++ P1 KR: Integrate with CI to build/test models according to target environment
++ P2 KR: Support dynamically select kernel flavors at runtime
+
+### P1 O: Improve e2e testing, benchmarking, and build infrastructure
+
++ P0 KR: Benchmark results can be pulled into a presentation without consultation
+    + Note: This implies they should be accurate, well-documented, and readily interpretable.
++ P1 KR: Defined a roadmap for robust multi-level testing
++ P1 KR: Made significant step toward initial e2e testing milestone
++ P1 KR: Handed off maintenance of LLVM Bazel BUILD
+
+
 # 2020 Q4 Objectives (OKRs)
 
-## This Quarter's HIGH-LEVEL THEME
+## This Quarter's High-level themes
 
 1.  **CPU perf burndown.** Bring up the perf burndown process and turn the crank a few times on CPU codegen. The initial workload we'll be targeting is the MobileBERT encoder. In parallel we will assess potential alternative workloads for next quarter.
 1.  **GPU back-end.** Continue to land critical infrastructure, take a moment to pause and evaluate where we stand on performance, and pursue any low-hanging perf fruit in anticipation of a GPU perf burndown in Q1. To the extent it makes sense, prioritize work that benefits both CPU and GPU perf.
 1.  **Infrastructure.** Continue to make critical improvements to build infrastructure that improve development velocity. Support the CPU perf burndown effort by ensuring that benchmarking can be performed easily and its results are meaningful and reliable.
 
-## SPECIFIC OKRs
+## Specific OKRs
 
 ### P1 O: [Perf burndown] Bring up and execute perf burndown process for MobileBERT workload
 

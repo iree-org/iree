@@ -62,6 +62,7 @@ function(iree_cc_embed_data)
   list(APPEND _ARGS "--output_header=${_RULE_H_FILE_OUTPUT}")
   list(APPEND _ARGS "--output_impl=${_RULE_CC_FILE_OUTPUT}")
   list(APPEND _ARGS "--identifier=${_IDENTIFIER}")
+  list(APPEND _ARGS "--c_output=false")
   if(DEFINED _RULE_CPP_NAMESPACE)
     list(APPEND _ARGS "--cpp_namespace=${_RULE_CPP_NAMESPACE}")
   endif()
@@ -79,7 +80,7 @@ function(iree_cc_embed_data)
     list(APPEND _ARGS "${SRC}")
   endforeach(SRC)
 
-  iree_get_executable_path(_EXE_PATH generate_cc_embed_data)
+  iree_get_executable_path(_EXE_PATH generate_embed_data)
 
   add_custom_command(
     OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_CC_FILE_OUTPUT}"

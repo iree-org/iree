@@ -120,6 +120,13 @@ CUgraphExec iree_hal_cuda_graph_command_buffer_handle(
   return command_buffer->exec;
 }
 
+static iree_hal_command_buffer_mode_t iree_hal_cuda_graph_command_buffer_mode(
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  const iree_hal_cuda_graph_command_buffer_t* command_buffer =
+      (const iree_hal_cuda_graph_command_buffer_t*)(base_command_buffer);
+  return command_buffer->mode;
+}
+
 static iree_hal_command_category_t
 iree_hal_cuda_graph_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* base_command_buffer) {
@@ -398,6 +405,7 @@ CUgraphExec iree_hal_cuda_graph_command_buffer_exec(
 const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable = {
         .destroy = iree_hal_cuda_graph_command_buffer_destroy,
+        .mode = iree_hal_cuda_graph_command_buffer_mode,
         .allowed_categories =
             iree_hal_cuda_graph_command_buffer_allowed_categories,
         .begin = iree_hal_cuda_graph_command_buffer_begin,

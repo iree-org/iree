@@ -33,17 +33,6 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): eliminate fourccs and just use strings.
-// An identifier for executable formats used to query support.
-typedef uint32_t iree_hal_executable_format_t;
-
-// Constructs an iree_hal_executable_format_t 4cc at compile-time.
-static inline iree_hal_executable_format_t iree_hal_make_executable_format(
-    char const four_cc[5]) {
-  return (four_cc[0] << 24) | (four_cc[1] << 16) | (four_cc[2] << 8) |
-         four_cc[3];
-}
-
 // Defines how the executable cache performs preparation.
 enum iree_hal_executable_caching_mode_e {
   // Allows the cache to reference the provided executable_data after it has
@@ -93,7 +82,7 @@ typedef struct {
   iree_hal_executable_caching_mode_t caching_mode;
 
   // Indicates the format of the data in |executable_data|.
-  iree_hal_executable_format_t executable_format;
+  iree_string_view_t executable_format;
 
   // Opaque compiler-generated executable data.
   // By default the memory storing the executable data is owned by the caller
@@ -160,7 +149,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_cache_release(
 IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,
-    iree_hal_executable_format_t executable_format);
+    iree_string_view_t executable_format);
 
 // Prepares the executable defined by |executable_spec| for use.
 // The provided |executable_data| (in a format defined by |executable_format|)
@@ -194,7 +183,7 @@ typedef struct {
   bool(IREE_API_PTR* can_prepare_format)(
       iree_hal_executable_cache_t* executable_cache,
       iree_hal_executable_caching_mode_t caching_mode,
-      iree_hal_executable_format_t executable_format);
+      iree_string_view_t executable_format);
 
   iree_status_t(IREE_API_PTR* prepare_executable)(
       iree_hal_executable_cache_t* executable_cache,

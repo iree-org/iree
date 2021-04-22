@@ -2,14 +2,14 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-llvm-linalg-tile-and-distribute)),hal.executable(hal.executable.target(module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file %s | IreeFileCheck %s
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-llvm-linalg-tile-and-distribute)),hal.executable(hal.executable.target(module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file -iree-codegen-llvm-promote-workgroup-to-full-tiles -cse %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
 hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @matmul_128x128x128 attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:128x128xf32>, !flow.dispatch.tensor<readonly:128x128xf32>,
         !flow.dispatch.tensor<writeonly:128x128xf32>) -> ()}
     module {
@@ -83,14 +83,14 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @dynamic_matmul_i8_i8_i32 attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @matmul_i8_i8_i32_128x128x128 attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:128x128xi8>, !flow.dispatch.tensor<readonly:128x128xi8>,
         !flow.dispatch.tensor<writeonly:128x128xi32>) -> ()}
     module {

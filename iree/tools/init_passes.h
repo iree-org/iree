@@ -36,6 +36,8 @@ inline void registerAllPasses() {
   registerLinalgToSPIRVPasses();
   registerHLOToLinalgPasses();
   registerLinalgToLLVMPasses();
+  registerLinalgToLinalgPasses();
+  registerVectorToLLVMPasses();
 }
 
 }  // namespace iree_compiler

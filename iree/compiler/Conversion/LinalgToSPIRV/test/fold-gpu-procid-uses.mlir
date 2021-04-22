@@ -1,11 +1,11 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-fold-gpu-procid-uses))" %s | IreeFileCheck %s
 
 hal.executable @fold_block_id attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_block_id attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = () -> ()} {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = constant 112: index
@@ -35,11 +35,11 @@ hal.executable @fold_block_id attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_interface_workgroup_id attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = () -> ()} {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = constant 112: index
@@ -69,11 +69,11 @@ hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "privat
 // -----
 
 hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_thread_id attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = () -> ()}
     module {
       func @fold_thread_id() -> (index, index, index)
@@ -98,11 +98,11 @@ hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_mod attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = () -> ()}
     module {
       func @does_not_fold_mod() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
@@ -119,11 +119,11 @@ hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_div attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = () -> ()}
     module {
       func @does_not_fold_div() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
@@ -140,11 +140,11 @@ hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @does_not_fold_symbol_mul_symbol attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+  hal.interface @io {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_symbol_mul_symbol attributes {
-      interface = @legacy_io, ordinal = 0 : index,
+      interface = @io, ordinal = 0 : index,
       signature = () -> ()}
     module {
       func @does_not_fold_symbol_mul_symbol() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {

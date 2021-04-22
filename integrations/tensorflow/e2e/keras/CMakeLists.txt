@@ -31,9 +31,6 @@ iree_e2e_cartesian_product_test_suite(
   FAILING_CONFIGURATIONS
     ",,,att_mh_rnn,iree_vmla"
     ",,,att_rnn,iree_vmla"
-    ",,,crnn,iree_vmla"
-    ",,,gru,iree_vmla"
-    ",,,lstm,iree_vmla"
     ",,,att_mh_rnn,iree_vulkan"
     ",,,att_rnn,iree_vulkan"
     ",,,gru,iree_vulkan"

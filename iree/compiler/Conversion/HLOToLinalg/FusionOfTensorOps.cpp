@@ -25,7 +25,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -85,8 +85,35 @@ struct FusionOfTensorOpsPass
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        frozenInterfacePatterns);
 
-    populateLinalgTensorOpsFusionPatterns(fusionPatterns,
-                                          /*allowFoldingUnitDimReshapes=*/true);
+    // Only fuse operations where all uses of the producer are generic or
+    // indexed generic operations. If an operation is used in a named op, it
+    // will be computed anyway, so the consumers can just use that value.
+    linalg::ControlElementwiseOpsFusionFn controlFn =
+        [](const OpResult &producer, const OpOperand &consumer) {
+          // TODO(GH-5045): Enable fusion with reduction consumer. Currently
+          // vectorization doesn't handle generic ops with reduction iterators
+          // we will disable for now to allow vectorizing producer pointwise
+          // ops.
+          auto consumerOp = consumer.getOwner();
+          if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
+              dyn_cast<linalg::LinalgOp>(consumerOp).getNumReductionLoops()) {
+            return false;
+          }
+
+          llvm::SmallDenseSet<Operation *, 4> numUsers;
+          for (Operation *user : producer.getUsers()) {
+            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(user))
+              continue;
+            numUsers.insert(user);
+          }
+          return numUsers.empty();
+        };
+
+    linalg::populateElementwiseOpsFusionPatterns(
+        fusionPatterns, linalg::LinalgElementwiseFusionOptions()
+                            .setAllowFoldingUnitDimReshapes(true)
+                            .setControlElementwiseOpsFusionFn(controlFn));
+
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));
 

@@ -22,11 +22,25 @@
 extern "C" {
 #endif  // __cplusplus
 
+// Describes where a byte buffer originates from and what guarantees can be made
+// about its lifetime and ownership.
+enum iree_vm_byte_buffer_origin_e {
+  // Buffer references memory in the module space (rodata or rwdata) that is
+  // guaranteed to be live for the lifetime of the module.
+  IREE_VM_BYTE_BUFFER_ORIGIN_MODULE = 0,
+  // Buffer references memory created by the guest module code. It has a
+  // lifetime less than that of the module but is always tracked with proper
+  // references (a handle existing to the memory implies it is valid).
+  IREE_VM_BYTE_BUFFER_ORIGIN_GUEST = 1,
+};
+typedef uint32_t iree_vm_byte_buffer_origin_t;
+
 // The built-in constant buffer type.
 // This simply points at a span of memory. The memory could be owned (in which
 // case a destroy function must be provided) or unowned (NULL destroy function).
 typedef struct {
   iree_vm_ref_object_t ref_object;
+  iree_vm_byte_buffer_origin_t origin;
   iree_const_byte_span_t data;
   iree_vm_ref_destroy_t destroy;
 } iree_vm_ro_byte_buffer_t;
@@ -44,6 +58,7 @@ static inline iree_string_view_t iree_vm_ro_byte_buffer_as_string(
 // case a destroy function must be provided) or unowned (NULL destroy function).
 typedef struct {
   iree_vm_ref_object_t ref_object;
+  iree_vm_byte_buffer_origin_t origin;
   iree_byte_span_t data;
   iree_vm_ref_destroy_t destroy;
 } iree_vm_rw_byte_buffer_t;

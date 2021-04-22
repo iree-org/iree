@@ -147,7 +147,7 @@ class HoistShapeCalculations
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createHoistShapeCalculationsPass() {
-  return std::make_unique<HoistShapeCalculations>();  // NOLINT
+  return std::make_unique<HoistShapeCalculations>();
 }
 
 static PassRegistration<HoistShapeCalculations> pass(

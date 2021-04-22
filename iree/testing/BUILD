@@ -21,12 +21,28 @@ package(
 )
 
 cc_library(
+    name = "benchmark",
+    testonly = True,
+    srcs = [
+        "benchmark_full.cc",
+    ],
+    hdrs = [
+        "benchmark.h",
+    ],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:tracing",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_library(
     name = "benchmark_main",
     testonly = True,
-    srcs = ["benchmark_main.cc"],
+    srcs = ["benchmark_main.c"],
     deps = [
+        ":benchmark",
         "//iree/base/internal:flags",
-        "@com_google_benchmark//:benchmark",
     ],
 )
 

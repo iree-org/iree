@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 constexpr int kMaxVectorizationSizeInBits = 128;
 constexpr int kMaxVectorNumElements = 4;
@@ -215,7 +216,8 @@ class ProcessTransferRead final
     }
 
     Location loc = read.getLoc();
-    vector::TransferReadOp::Adaptor adaptor(operands);
+    vector::TransferReadOp::Adaptor adaptor(operands,
+                                            read->getAttrDictionary());
 
     auto scalarMemrefType = read.source().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
@@ -271,7 +273,8 @@ class ProcessTransferWrite final
     }
 
     Location loc = write.getLoc();
-    vector::TransferWriteOp::Adaptor adaptor(operands);
+    vector::TransferWriteOp::Adaptor adaptor(operands,
+                                             write->getAttrDictionary());
 
     auto scalarMemrefType = write.source().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
@@ -395,6 +398,50 @@ class ProcessInterfaceBinding final
   }
 };
 
+/// Translates vector.transfer_read with less than 4 scalars into reading each
+/// scalar and then compose the vector.
+///
+/// This is a very specific pattern for handling corner cases and boundary
+/// cases. For example, in vision models we can have the initial image with
+/// three channels. We cannot perform the native load4 there; by performing
+/// scalar read we lose some benefits of load4 but we can still make sure the
+/// overall vectorization does not fail.
+struct ScalarizeVectorTransferRead final
+    : public OpRewritePattern<vector::TransferReadOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
+                                PatternRewriter &rewriter) const override {
+    VectorType vectorType = readOp.getType();
+    Type scalarType = vectorType.getElementType();
+    if (vectorType.getRank() != 1 || vectorType.getDimSize(0) >= 4)
+      return failure();
+
+    Location loc = readOp.getLoc();
+
+    SmallVector<Value, 4> scalars;
+    SmallVector<Value, 4> indices(readOp.indices().begin(),
+                                  readOp.indices().end());
+    for (int i = 0; i < vectorType.getDimSize(0); ++i) {
+      indices.back() = rewriter.createOrFold<ConstantIndexOp>(loc, i);
+      scalars.push_back(rewriter.create<memref::LoadOp>(
+          loc, scalarType, readOp.source(), indices));
+    }
+
+    Value newVector = rewriter.create<ConstantOp>(
+        loc, vectorType, rewriter.getZeroAttr(vectorType));
+    for (int i = 0; i < vectorType.getDimSize(0); ++i) {
+      Value index = rewriter.createOrFold<ConstantOp>(
+          loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(i));
+      newVector = rewriter.create<vector::InsertElementOp>(loc, scalars[i],
+                                                           newVector, index);
+    }
+
+    rewriter.replaceOp(readOp, newVector);
+
+    return success();
+  }
+};
+
 class VectorizeMemRefPass final
     : public PassWrapper<VectorizeMemRefPass, OperationPass<ModuleOp>> {
   void runOnOperation() override;
@@ -440,10 +487,11 @@ void VectorizeMemRefPass::runOnOperation() {
 
   memrefUsageAnalysis = &getAnalysis<MemRefUsageAnalysis>();
 
-  OwningRewritePatternList patterns(&getContext());
-  patterns.insert<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
-                  ProcessAlloc, ProcessPlaceHolder, ProcessInterfaceBinding>(
-      context, *memrefUsageAnalysis);
+  RewritePatternSet conversionPatterns(context);
+  conversionPatterns
+      .add<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
+           ProcessAlloc, ProcessPlaceHolder, ProcessInterfaceBinding>(
+          context, *memrefUsageAnalysis);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
@@ -467,8 +515,16 @@ void VectorizeMemRefPass::runOnOperation() {
       return !memrefUsageAnalysis->transferConvert(op);
     return true;
   });
-  if (failed(applyPartialConversion(module, target, std::move(patterns))))
+  if (failed(applyPartialConversion(module, target,
+                                    std::move(conversionPatterns))))
     return signalPassFailure();
+
+  for (FuncOp func : module.getOps<FuncOp>()) {
+    RewritePatternSet rewritingPatterns(context);
+    rewritingPatterns.add<ScalarizeVectorTransferRead>(context);
+
+    (void)applyPatternsAndFoldGreedily(func, std::move(rewritingPatterns));
+  }
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref() {

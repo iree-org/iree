@@ -3,9 +3,9 @@
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 func @abs_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<16xf32>
-  %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<16xf32>
-  %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<16xf32>
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<16xf32>
+  %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<16xf32>
+  %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
@@ -17,7 +17,7 @@ func @abs_ex_dispatch_0() {
   memref.store %11, %0[%7] : memref<16xf32>
   return
 }
-hal.interface @legacy_io attributes {sym_visibility = "private"} {
+hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

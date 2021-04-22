@@ -20,14 +20,17 @@ iree_cc_library(
     "ConvertToNVVM.cpp"
     "KernelConfig.cpp"
     "Passes.cpp"
+    "RemoveTrivialLoops.cpp"
     "TileAndDistribute.cpp"
     "VectorizationPass.cpp"
   DEPS
+    MLIRAffine
     MLIRGPU
     MLIRGPUToNVVMTransforms
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMemRefTransforms
     MLIRNVVMIR
     MLIRPass
     MLIRSCFToStandard

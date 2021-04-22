@@ -198,13 +198,16 @@ static llvm::Constant *getStringConstant(StringRef value,
 llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   auto &context = module->getContext();
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  auto *ptrType = llvm::Type::getInt8PtrTy(context);
   auto *libraryHeaderType = makeLibraryHeaderType(context);
 
-  // %struct.iree_hal_executable_library_header_t** @iree_hal_library_query(i32)
+  // %struct.iree_hal_executable_library_header_t**
+  // @iree_hal_library_query(i32, void*)
   auto *queryFuncType =
       llvm::FunctionType::get(libraryHeaderType->getPointerTo(),
                               {
                                   i32Type,
+                                  ptrType,
                               },
                               /*isVarArg=*/false);
   auto *func =

@@ -116,6 +116,17 @@ LogicalResult tileAndFuseLinalgBufferOps(
 /// divisible by N.
 void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns);
 
+using GetMinMaxExprFn =
+    std::function<Optional<std::pair<AffineExpr, AffineExpr>>(
+        Value value, SmallVectorImpl<Value> &dims,
+        SmallVectorImpl<Value> &symbols)>;
+
+/// Insert pattern to remove single iteration loop. The pattern will detect
+/// single iteration loops based on the range returned by the lambda
+/// |getMinMaxFn| for some know values.
+void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
+                                              GetMinMaxExprFn getMinMaxFn);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -1,50 +1,27 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s -check-prefix=VKSPV
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=vulkan-spirv -iree-codegen-spirv-experimental-linalg-on-tensors %s | IreeFileCheck %s
 
-flow.executable @simpleMath_ex_dispatch_0 {
-  flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
-    workload = 4 : index
+#map = affine_map<(d0) -> (d0)>
+flow.executable @add_dispatch_0 {
+  flow.dispatch.entry @add_dispatch_0 attributes {
+    signature = (tensor<16xf32>, tensor<16xf32>) -> tensor<16xf32>,
+    workgroup_rank = 3 : index
   }
-  module {
-    func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
-      return %0 : tensor<4xf32>
+  module  {
+    func @add_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:16xf32>, %arg1: !flow.dispatch.tensor<readonly:16xf32>, %arg2: !flow.dispatch.tensor<writeonly:16xf32>) {
+      %0 = linalg.init_tensor [16] : tensor<16xf32>
+      %1 = flow.dispatch.tensor.load %arg0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %2 = flow.dispatch.tensor.load %arg1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]} ins(%1, %2 : tensor<16xf32>, tensor<16xf32>) outs(%0 : tensor<16xf32>) {
+      ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
+        %4 = addf %arg3, %arg4 : f32
+        linalg.yield %4 : f32
+      } -> tensor<16xf32>
+      flow.dispatch.tensor.store %3, %arg2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
+      return
     }
   }
 }
 
-// VKSPV-LABEL: hal.executable @simpleMath_ex_dispatch_0
-// VKSPV-NEXT:   hal.interface @legacy_io {
-// VKSPV-DAG:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// VKSPV-DAG:      hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
-// VKSPV-NEXT:   }
-// VKSPV-NEXT:   hal.executable.binary @vulkan_spirv attributes {
-// VKSPV-SAME:     data = dense
-// VKSPV-SAME:     format = 1397773893 : i32}
-
-// -----
-
-flow.executable @reduction_ex_reduce_0_dim_0 {
-  flow.dispatch.entry @reduction_rgn_reduce_0_dim_0_entry attributes {
-    workload = 4 : index
-  }
-  module {
-    func @reduction_rgn_reduce_0_dim_0_entry(%arg0 : tensor<4x8xf32>, %arg1 : tensor<f32>) -> tensor<4xf32> {
-      %0 = "mhlo.reduce"(%arg0, %arg1) ( {
-      ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
-        %1 = mhlo.add %arg3, %arg4 : tensor<f32>
-        "mhlo.return"(%1) : (tensor<f32>) -> ()
-      }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
-      return %0 : tensor<4xf32>
-    }
-  }
-}
-
-// VKSPV-LABEL: hal.executable @reduction_ex_reduce_0_dim_0
-// VKSPV-NEXT:   hal.interface @legacy_io {
-// VKSPV-DAG:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// VKSPV-DAG:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// VKSPV-DAG:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-// VKSPV-NEXT:   }
-// VKSPV-NEXT:   hal.executable.binary @vulkan_spirv attributes {
-// VKSPV-SAME:     data = dense
-// VKSPV-SAME:     format = 1397773893 : i32} {
+//      CHECK:   hal.executable.binary @vulkan_spirv attributes
+// CHECK-SAME:     data = dense
+// CHECK-SAME:     format = "SPVE"

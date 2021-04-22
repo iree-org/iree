@@ -52,7 +52,8 @@ void registerInputTransformPassPipeline();
 //   buildInputTransformPassPipeline
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager);
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    bool dispatchLinalgOnTensors = true);
 
 void registerFlowTransformPassPipeline();
 
@@ -74,7 +75,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
 /// Creates XLA-HLO preprocessing transformation pass. In this pass we should
 /// have all mhlo -> mhlo transformations that are shared between all
 /// backends.
-std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
+std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass();
 
 // Runs pre-partitioning conversion passes to convert to the flow dialect.
 // This converts some input ops directly to flow ops when doing so has a
@@ -121,9 +122,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createExportBenchmarkFuncsPass();
 
 // Outlines large tensor constants into flow.variables at the module level.
 //
-// NOTE: a total guess :) this feels like about the most per-dispatch-buffer
-// data we'd want to embed in the command buffer.
-static constexpr size_t kMinLargeConstantSize = 256;
+// TODO(#5493): implement the support for inlining constants into the command
+// buffer and raise this value to one that is measured to be good.
+static constexpr size_t kMinLargeConstantSize = 1;
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
     size_t minLargeConstantSize = kMinLargeConstantSize);
 
@@ -167,7 +168,7 @@ inline void registerFlowPasses() {
   registerFlowTransformPassPipeline();
   createConvertToFlowTensorOpsPass();
   createLegalizeInputTypesPass();
-  createHLOPreprocessingPass();
+  createHLOToHLOPreprocessingPass();
   createPrePartitioningConversionPass();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();

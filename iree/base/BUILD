@@ -84,6 +84,12 @@ cc_library(
     name = "logging",
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
+    linkopts = select({
+        "//iree:iree_is_android": [
+            "-llog",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":core_headers",
         ":tracing",

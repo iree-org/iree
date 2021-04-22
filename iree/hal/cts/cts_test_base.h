@@ -117,8 +117,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
                                      /*queue_affinity=*/0,
                                      /*batch_count=*/1, &submission_batch);
     if (iree_status_is_ok(status)) {
-      status = iree_hal_semaphore_wait_with_deadline(signal_semaphore, 1ull,
-                                                     IREE_TIME_INFINITE_FUTURE);
+      status = iree_hal_semaphore_wait(signal_semaphore, 1ull,
+                                       iree_infinite_timeout());
     }
 
     iree_hal_semaphore_release(signal_semaphore);
@@ -133,7 +133,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     driver_block_list_.insert(driver_name);
   }
   // Allow skipping tests for unsupported features.
-  void declareUnavailableDriver(const std::string& driver_name) {
+  void SkipUnavailableDriver(const std::string& driver_name) {
     driver_block_list_.insert(driver_name);
   }
 
@@ -170,7 +170,9 @@ struct GenerateTestName {
   template <class ParamType>
   std::string operator()(
       const ::testing::TestParamInfo<ParamType>& info) const {
-    return info.param;
+    std::string name = info.param;
+    std::replace(name.begin(), name.end(), '-', '_');
+    return name;
   }
 };
 

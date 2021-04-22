@@ -28,6 +28,7 @@ declare -a excluded_files_patterns=(
   "\.pb$"
   "\.fb$"
   "\.jar$"
+  "\.so$"
 )
 
 # Join on |

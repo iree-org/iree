@@ -12,6 +12,25 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    embedded_library_loader
+  HDRS
+    "embedded_library_loader.h"
+  SRCS
+    "embedded_library_loader.c"
+  DEPS
+    iree::base::api
+    iree::base::core_headers
+    iree::base::tracing
+    iree::hal::api
+    iree::hal::local
+    iree::hal::local::elf::elf_module
+  DEFINES
+    "IREE_HAL_HAVE_ELF_LIBRARY_LOADER=1"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     legacy_library_loader
   HDRS
     "legacy_library_loader.h"
@@ -28,6 +47,23 @@ iree_cc_library(
     iree::schemas::dylib_executable_def_c_fbs
   DEFINES
     "IREE_HAL_HAVE_LEGACY_LIBRARY_LOADER=1"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    static_library_loader
+  HDRS
+    "static_library_loader.h"
+  SRCS
+    "static_library_loader.c"
+  DEPS
+    iree::base::api
+    iree::base::tracing
+    iree::hal::api
+    iree::hal::local
+  DEFINES
+    "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
   PUBLIC
 )
 

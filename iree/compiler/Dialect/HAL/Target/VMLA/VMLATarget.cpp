@@ -102,8 +102,10 @@ class VMLATargetBackend final : public TargetBackend {
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpBuilder &executableBuilder) override {
-    // Serialize the VM module to bytes directly into a flatbuffer.
     FlatbufferBuilder builder;
+    iree_VMLAExecutableDef_start_as_root(builder);
+
+    // Serialize the VM module to bytes directly into a flatbuffer.
     IREE::VM::BytecodeTargetOptions bytecodeOptions;
     auto dataRef = builder.streamUint8Vec([&](raw_ostream &stream) {
       return succeeded(translateModuleToBytecode(targetOp.getInnerModule(),
@@ -115,7 +117,6 @@ class VMLATargetBackend final : public TargetBackend {
 
     // Pack the executable definition and get the bytes with the proper header.
     // The header is used to verify the contents at runtime.
-    iree_VMLAExecutableDef_start_as_root(builder);
     iree_VMLAExecutableDef_bytecode_module_add(builder, dataRef);
     iree_VMLAExecutableDef_end_as_root(builder);
 
@@ -124,7 +125,7 @@ class VMLATargetBackend final : public TargetBackend {
     // and future changes will not be observed.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(), targetOp.sym_name(),
-        static_cast<uint32_t>(IREE::HAL::ExecutableFormat::VMLA),
+        executableBuilder.getStringAttr("VMLA"),
         builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }

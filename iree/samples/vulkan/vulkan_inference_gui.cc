@@ -442,8 +442,9 @@ extern "C" int iree_main(int argc, char** argv) {
         // TODO(scotttodd): Samples showing non-blocking async execution
         //   * poll during update loop
         //   * pipeline execution (use signal from one as wait for another)
-        IREE_CHECK_OK(iree_hal_semaphore_wait_with_timeout(
-            signal_semaphore.get(), 1, IREE_TIME_INFINITE_FUTURE));
+        IREE_CHECK_OK(iree_hal_semaphore_wait(
+            signal_semaphore.get(), 1,
+            iree_make_timeout(IREE_TIME_INFINITE_FUTURE)));
 
         // Read back the results.
         IREE_DLOG(INFO) << "Reading back results...";

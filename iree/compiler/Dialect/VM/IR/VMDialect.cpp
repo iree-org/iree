@@ -236,7 +236,12 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
           << "malformed list type '" << parser.getFullSymbolSpec() << "'";
       return Type();
     }
-    auto elementType = mlir::parseType(spec, getContext());
+    Type elementType;
+    if (spec == "?") {
+      elementType = OpaqueType::get(getContext());
+    } else {
+      elementType = mlir::parseType(spec, getContext());
+    }
     if (!elementType) {
       parser.emitError(parser.getCurrentLocation())
           << "invalid list element type specification: '"
@@ -284,7 +289,13 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
   } else if (type.isa<IREE::VM::OpaqueType>()) {
     os << "opaque";
   } else if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
-    os << "list<" << listType.getElementType() << ">";
+    os << "list<";
+    if (listType.getElementType().isa<OpaqueType>()) {
+      os << "?";
+    } else {
+      os << listType.getElementType();
+    }
+    os << ">";
   } else {
     llvm_unreachable("unhandled VM type");
   }

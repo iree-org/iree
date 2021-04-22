@@ -65,6 +65,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Each executable needs a hal.interface to specify how the host and device
   // comminucate across the ABI boundary.
+  passManager.addPass(createMaterializeInterfaces2Pass(targetOptions));
   passManager.addPass(createMaterializeInterfacesPass(targetOptions));
 
   passManager.nest<ExecutableOp>().addNestedPass<ExecutableTargetOp>(
@@ -84,6 +85,13 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
+
+  // Pack transient allocations in the program that were materialized during
+  // stream conversion.
+  //
+  // NOTE: this works best if canonicalization/CSE has run such that the packed
+  // sizes are as much as possible available as constants.
+  passManager.addNestedPass<FuncOp>(createPackAllocationsPass(targetOptions));
 
   // For each exported function, processes the reflection metadata and
   // generates public ABI wrappers for various calling conventions.

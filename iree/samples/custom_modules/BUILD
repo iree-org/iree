@@ -34,7 +34,10 @@ iree_bytecode_module(
     name = "custom_modules_test_module",
     src = "custom_modules_test.mlir",
     cc_namespace = "iree::samples::custom_modules",
-    flags = ["-iree-mlir-to-vm-bytecode-module"],
+    flags = [
+        "-iree-mlir-to-vm-bytecode-module",
+        "-iree-hal-target-backends=dylib-llvm-aot",
+    ],
     translate_tool = "//iree/samples/custom_modules/dialect:custom-translate",
 )
 

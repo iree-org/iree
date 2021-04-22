@@ -26,6 +26,41 @@ typedef struct iree_hal_heap_buffer_s {
 
 static const iree_hal_buffer_vtable_t iree_hal_heap_buffer_vtable;
 
+iree_status_t iree_hal_heap_buffer_create(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_heap_buffer_t* buffer = NULL;
+  iree_host_size_t header_size = iree_math_align(sizeof(*buffer), 16);
+  iree_host_size_t total_size = header_size + allocation_size;
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, total_size, (void**)&buffer);
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_heap_buffer_vtable,
+                                 &buffer->base.resource);
+    buffer->base.allocator = allocator;
+    buffer->base.allocated_buffer = &buffer->base;
+    buffer->base.allocation_size = allocation_size;
+    buffer->base.byte_offset = 0;
+    buffer->base.byte_length = allocation_size;
+    buffer->base.memory_type = memory_type;
+    buffer->base.allowed_access = allowed_access;
+    buffer->base.allowed_usage = allowed_usage;
+    buffer->data =
+        iree_make_byte_span((uint8_t*)buffer + header_size, allocation_size);
+    buffer->data_allocator = iree_allocator_null();  // freed with the buffer
+    *out_buffer = &buffer->base;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,

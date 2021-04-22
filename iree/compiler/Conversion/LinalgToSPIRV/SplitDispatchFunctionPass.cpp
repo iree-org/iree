@@ -98,11 +98,11 @@ static bool isFusableWithCurrentOpsList(
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::BatchMatmulOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCMaxOp,
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCMaxFOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCMinOp,
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCMinFOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCSumOp,
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCSumFOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::MatmulOp, linalg::GenericOp,
                      linalg::LinalgDependenceGraph::DependenceType::RAW)

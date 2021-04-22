@@ -128,9 +128,11 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     ModuleOp innerModuleOp = targetOp.getInnerModule();
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
 
+    FlatbufferBuilder builder;
+    iree_SpirVExecutableDef_start_as_root(builder);
+
     // Serialize the spirv::ModuleOp into the binary that we will embed in the
     // final flatbuffer.
-    FlatbufferBuilder builder;
     SmallVector<uint32_t, 256> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
       return targetOp.emitError() << "failed to serialize spv.module";
@@ -157,7 +159,6 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     }
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
-    iree_SpirVExecutableDef_start_as_root(builder);
     iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
     iree_SpirVExecutableDef_end_as_root(builder);
@@ -165,7 +166,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(), targetOp.sym_name(),
-        static_cast<uint32_t>(IREE::HAL::ExecutableFormat::SpirV),
+        executableBuilder.getStringAttr("SPVE"),
         builder.getBufferAttr(executableBuilder.getContext()));
 
     return success();

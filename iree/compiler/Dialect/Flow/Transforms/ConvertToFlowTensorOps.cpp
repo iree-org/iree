@@ -77,9 +77,29 @@ struct SubTensorToTensorSlice : OpRewritePattern<SubTensorOp> {
     Value source = subTensorOp.source();
     SmallVector<Value, 4> sourceSizesVals = sizesVals;
     sourceSizesVals[0] = rewriter.createOrFold<memref::DimOp>(loc, source, 0);
-    rewriter.replaceOpWithNewOp<TensorSliceOp>(
-        subTensorOp, subTensorOp.getType(), subTensorOp.source(),
-        sourceSizesVals, offsetVals, sizesVals, sizesVals);
+
+    // Different from SubTensor op, a TensorSliceOp does not have
+    // rank-reducing behavior.
+    Type type = SubTensorOp::inferResultType(subTensorOp.getSourceType(),
+                                             offsets, sizes, strides);
+    Value tensorSliceOp = rewriter.create<TensorSliceOp>(
+        loc, type, subTensorOp.source(), sourceSizesVals, offsetVals, sizesVals,
+        sizesVals);
+
+    if (type == subTensorOp.getType()) {
+      // Not rank-reducing subtensor, can replace with it directly.
+      rewriter.replaceOp(subTensorOp, tensorSliceOp);
+    } else {
+      // Rank-reducing subtensor, need a reshape op.
+      SmallVector<Value, 4> sourceDynSizes, resultDynSizes;
+      auto sourceType = tensorSliceOp.getType().cast<RankedTensorType>();
+      for (auto i : llvm::seq<unsigned>(0, sourceType.getNumDynamicDims())) {
+        sourceDynSizes.push_back(rewriter.create<ConstantIndexOp>(
+            loc, sourceType.getDynamicDimIndex(i)));
+      }
+      rewriter.replaceOpWithNewOp<TensorReshapeOp>(
+          subTensorOp, subTensorOp.getType(), tensorSliceOp, sourceDynSizes);
+    }
     return success();
   }
 };

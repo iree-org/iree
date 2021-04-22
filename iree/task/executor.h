@@ -352,7 +352,8 @@ void iree_task_executor_submit(iree_task_executor_t* executor,
 void iree_task_executor_flush(iree_task_executor_t* executor);
 
 // Donates the calling thread to the executor until either |wait_handle|
-// resolves or |deadline_ns| is exceeded.
+// resolves or |deadline_ns| is exceeded. Flushes any pending task batches prior
+// to doing any work or waiting.
 //
 // If there are no tasks available then the calling thread will block as if
 // iree_wait_one had been used on |wait_handle|. If tasks are ready then the

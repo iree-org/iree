@@ -30,28 +30,11 @@ namespace iree_compiler {
 
 void addLinalgToLLVMPasses(OpPassManager &passManager,
                            LLVMCodegenOptions options) {
-  // Distribute linalg op among a 3d grid of parallel threads. Tile each
-  // workgroup thread memory then vectorize the linalg op.
-
-  if (options.usingLinalgOnTensors) {
-    passManager.addPass(createMaterializeCPULaunchConfigurationPass());
-  } else {
-    passManager.addPass(createLinalgTileAndDistributePass());
-  }
-
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
-
-  if (options.useConvImg2Col) {
-    // linalg::ConvInputNHWCFilterHWCFOp -> (Img2Col packing + matmul).
-    // After convolution is tiled and distributed among workgroups its converted
-    // before vectorize workgroup workload.
-    nestedModulePM.addNestedPass<FuncOp>(
-        createConvImg2ColMatmulConversionPass());
-  }
-
   nestedModulePM.addNestedPass<FuncOp>(
       createLinalgTileAndVectorizeWorkgroupsPass());
+
   nestedModulePM.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
 
   // Linalg -> SCF
@@ -77,13 +60,14 @@ void addLinalgToLLVMPasses(OpPassManager &passManager,
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager,
                                     LLVMCodegenOptions options) {
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-
-  nestedModulePM.addPass(createInlinerPass());
-
-  // HLO -> Linalg on buffers.
   if (options.usingLinalgOnTensors) {
-    nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
+    passManager.addPass(createMaterializeCPULaunchConfigurationPass());
+    OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+    // TODO(ataei): We want to enable when tensor -> vector pass is fully
+    // supported which requires first moving vector-tiling before this step.
+    if (options.useLinalgOnTensorsToVectors) {
+      nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
+    }
     // Use stack allocation on CPU side.
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
@@ -94,6 +78,11 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager,
     addLinalgBufferizePasses(nestedModulePM, allocationFn);
     nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
   } else {
+    // Distribute linalg op among a 3d grid of parallel threads. Tile each
+    // workgroup thread memory then vectorize the linalg op.
+    OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+    nestedModulePM.addPass(createInlinerPass());
+    passManager.addPass(createLinalgTileAndDistributePass());
     // Propagates dynamic shapes computation on tensors.
     nestedModulePM.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
     nestedModulePM.addNestedPass<FuncOp>(

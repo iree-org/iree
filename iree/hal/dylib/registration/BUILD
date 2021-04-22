@@ -39,7 +39,22 @@ cc_library(
     deps = [
         "//iree/hal:api",
         "//iree/hal/local:task_driver",
+        "//iree/hal/local/loaders:embedded_library_loader",
         "//iree/hal/local/loaders:legacy_library_loader",
         "@com_google_absl//absl/flags:flag",
+    ],
+)
+
+cc_library(
+    name = "sync",
+    srcs = ["driver_module_sync.c"],
+    hdrs = ["driver_module_sync.h"],
+    defines = [
+        "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1",
+    ],
+    deps = [
+        "//iree/hal:api",
+        "//iree/hal/local:sync_driver",
+        "//iree/hal/local/loaders:legacy_library_loader",
     ],
 )

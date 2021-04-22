@@ -18,9 +18,11 @@ iree_cc_library(
   DEPS
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLLVM
+    iree::compiler::Conversion::LinalgToLinalg
     iree::compiler::Conversion::LinalgToNVVM
     iree::compiler::Conversion::LinalgToSPIRV
     iree::compiler::Conversion::LinalgToVector
+    iree::compiler::Conversion::VectorToLLVM
   PUBLIC
 )
 

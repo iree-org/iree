@@ -15,6 +15,7 @@
 #ifndef IREE_BASE_TARGET_PLATFORM_H_
 #define IREE_BASE_TARGET_PLATFORM_H_
 
+#include <assert.h>
 #include <stdint.h>
 
 // The build system defines one of the following top-level platforms and then
@@ -49,6 +50,7 @@
 // IREE_PLATFORM_ANDROID_EMULATOR
 // IREE_PLATFORM_APPLE (IOS | MACOS)
 // IREE_PLATFORM_EMSCRIPTEN
+// IREE_PLATFORM_GENERIC
 // IREE_PLATFORM_IOS
 // IREE_PLATFORM_IOS_SIMULATOR
 // IREE_PLATFORM_LINUX
@@ -103,12 +105,18 @@
 // IREE_PTR_SIZE_*
 //==============================================================================
 
-#if UINTPTR_MAX > UINT_MAX
+// See https://stackoverflow.com/q/51616057
+static_assert(sizeof(void*) == sizeof(uintptr_t),
+              "can't determine pointer size");
+
+#if UINTPTR_MAX == 0xFFFFFFFF
+#define IREE_PTR_SIZE_32
+#define IREE_PTR_SIZE 4
+#elif UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu
 #define IREE_PTR_SIZE_64
 #define IREE_PTR_SIZE 8
 #else
-#define IREE_PTR_SIZE_32
-#define IREE_PTR_SIZE 4
+#error "can't determine pointer size"
 #endif
 
 //==============================================================================
@@ -243,8 +251,9 @@
 //==============================================================================
 
 #if !defined(IREE_PLATFORM_ANDROID) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
-    !defined(IREE_PLATFORM_IOS) && !defined(IREE_PLATFORM_LINUX) &&          \
-    !defined(IREE_PLATFORM_MACOS) && !defined(IREE_PLATFORM_WINDOWS)
+    !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_IOS) &&        \
+    !defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_MACOS) &&        \
+    !defined(IREE_PLATFORM_WINDOWS)
 #error Unknown platform.
 #endif  // all archs
 

@@ -123,6 +123,9 @@ case ${answer:0:1} in
                   ${RISCV_CLANG_TOOLCHAIN_FILE_NAME} \
                   ${TOOLCHAIN_PATH_PREFIX} \
                   wget_google_drive
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo " PLEASE run 'export RISCV_TOOLCHAIN_ROOT=${TOOLCHAIN_PATH_PREFIX}'   "
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   ;;
   * )
     echo "Skip RISCV clang toolchain."

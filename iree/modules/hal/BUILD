@@ -22,8 +22,6 @@ cc_library(
     name = "hal",
     srcs = [
         "hal_module.c",
-        "shims.c",
-        "shims.h",
     ],
     hdrs = [
         "hal_module.h",

@@ -20,11 +20,17 @@ if(POLICY CMP0092)
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(iree CXX C)
+project(iree ASM C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+if(${MSVC})
+  enable_language(ASM_MASM)
+else()
+  enable_language(ASM)
+endif()
 
 #-------------------------------------------------------------------------------
 # Project component configuration
@@ -213,6 +219,7 @@ include(iree_cc_test)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_cc_embed_data)
+include(iree_c_embed_data)
 include(iree_bytecode_module)
 include(iree_c_module)
 include(iree_python)

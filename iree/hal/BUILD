@@ -36,6 +36,7 @@ cc_library(
         "buffer.c",
         "buffer.h",
         "buffer_heap.c",
+        "buffer_heap_impl.h",
         "buffer_view.c",
         "buffer_view.cc",
         "buffer_view.h",

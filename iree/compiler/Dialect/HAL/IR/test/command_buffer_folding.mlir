@@ -20,6 +20,55 @@ func @skip_command_buffer_device() -> !hal.executable {
 
 // -----
 
+// CHECK-LABEL: @fold_buffer_subspan_into_fill_buffer
+//  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
+func @fold_buffer_subspan_into_fill_buffer(
+    %cmd: !hal.command_buffer,
+    %buffer: !hal.buffer
+  ) {
+  %c0 = constant 0 : index
+  %c8192 = constant 8192 : index
+  %c100000 = constant 100000 : index
+  %c262144 = constant 262144 : index
+  %c1234_i32 = constant 1234 : i32
+  %target_subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c8192, %c262144] : !hal.buffer
+  // CHECK: hal.command_buffer.fill_buffer
+  hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
+      // CHECK-SAME: target(%[[BASE_BUFFER]] : !hal.buffer)[%c108192, %c8192]
+      target(%target_subspan : !hal.buffer)[%c100000, %c8192]
+      pattern(%c1234_i32 : i32)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @fold_buffer_subspan_into_copy_buffer
+//  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
+func @fold_buffer_subspan_into_copy_buffer(
+    %cmd: !hal.command_buffer,
+    %buffer: !hal.buffer
+  ) {
+  %c0 = constant 0 : index
+  %c4096 = constant 4096 : index
+  %c8192 = constant 8192 : index
+  %c100000 = constant 100000 : index
+  %c262144 = constant 262144 : index
+  %source_subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c4096, %c262144] : !hal.buffer
+  %target_subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c8192, %c262144] : !hal.buffer
+  // CHECK: hal.command_buffer.copy_buffer
+  hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer>
+      // CHECK-SAME: source(%[[BASE_BUFFER]] : !hal.buffer)[%c4096]
+      source(%source_subspan : !hal.buffer)[%c0]
+      // CHECK-SAME: target(%[[BASE_BUFFER]] : !hal.buffer)[%c108192]
+      target(%target_subspan : !hal.buffer)[%c100000]
+      length(%c8192)
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @fold_buffer_subspan_into_push_descriptor_set
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[LAYOUT:.+]]: !hal.executable_layout,

@@ -102,16 +102,17 @@ KERAS_APPLICATIONS_MODELS = [
     "ResNet50V2",
     "VGG16",
     "VGG19",
+    "Xception",
 ]
 
 iree_e2e_cartesian_product_test_suite(
     name = "large_cifar10_tests",
     size = "large",
     failing_configurations = [
+        # Frequently OOMs
         {
-            # TODO(#5268): Failing on Vulkan due to OOM.
-            "model": "ResNet50",
-            "target_backends": "iree_vulkan",
+            "target_backends": "tflite",
+            "model": "VGG19",
         },
     ],
     matrix = {
@@ -148,30 +149,6 @@ iree_e2e_cartesian_product_test_suite(
 iree_e2e_cartesian_product_test_suite(
     name = "enormous_cifar10_tests",
     size = "enormous",
-    failing_configurations = [
-        {
-            # Failing on vmla with negative inputs.
-            "model": [
-                "NASNetLarge",
-                "NASNetMobile",
-            ],
-            "target_backends": "iree_vmla",
-        },
-        {
-            # Failing on llvm and vulkan:
-            "model": [
-                "NASNetLarge",
-                "NASNetMobile",
-                "ResNet50V2",
-                "ResNet101V2",
-                "ResNet152V2",
-            ],
-            "target_backends": [
-                "iree_llvmaot",
-                "iree_vulkan",
-            ],
-        },
-    ],
     matrix = {
         "src": "applications_test.py",
         "reference_backend": "tf",
@@ -257,41 +234,6 @@ iree_e2e_cartesian_product_test_suite(
 iree_e2e_cartesian_product_test_suite(
     name = "imagenet_non_hermetic_tests",
     size = "enormous",
-    failing_configurations = [
-        {
-            # Failing on vmla with negative inputs.
-            "model": [
-                "NASNetLarge",
-                "NASNetMobile",
-            ],
-            "target_backends": "iree_vmla",
-        },
-        {
-            # Failing vulkan:
-            "model": [
-                "InceptionResNetV2",
-                "InceptionV3",
-            ],
-            "target_backends": [
-                "iree_vulkan",
-            ],
-        },
-        {
-            # Failing llvm and vulkan:
-            "model": [
-                "NASNetLarge",
-                "NASNetMobile",
-                "ResNet50V2",
-                "ResNet101V2",
-                "ResNet152V2",
-                "Xception",
-            ],
-            "target_backends": [
-                "iree_llvmaot",
-                "iree_vulkan",
-            ],
-        },
-    ],
     matrix = {
         "src": "applications_test.py",
         "reference_backend": "tf",

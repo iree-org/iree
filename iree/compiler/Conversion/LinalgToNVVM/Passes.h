@@ -31,6 +31,8 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorizationPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createTileAndDistributeToThreads();
 
+std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
+
 /// Populates passes needed to lower a XLA HLO op to NVVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.

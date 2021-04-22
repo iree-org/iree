@@ -124,7 +124,7 @@ static iree_status_t iree_hal_legacy_executable_query_library(
 
   // Query for a compatible version of the library.
   executable->library.header =
-      query_fn(IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+      query_fn(IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION, /*reserved=*/NULL);
   if (!executable->library.header) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -143,14 +143,18 @@ static iree_status_t iree_hal_legacy_executable_query_library(
       // however checks outside will (often) still trigger when guard pages are
       // dirtied/etc.
       break;
-#if !defined(IREE_SANITIZER_ADDRESS)
+#if defined(IREE_SANITIZER_ADDRESS)
+    case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_ADDRESS:
+      // ASAN is compiled into the host and we can load this library.
+      break;
+#else
     case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_ADDRESS:
       return iree_make_status(
           IREE_STATUS_UNAVAILABLE,
           "executable library is compiled with ASAN support but the host "
           "runtime is not compiled with it enabled; add -fsanitize=address to "
           "the runtime compilation options");
-#endif  // !IREE_SANITIZER_ADDRESS
+#endif  // IREE_SANITIZER_ADDRESS
     default:
       return iree_make_status(
           IREE_STATUS_UNAVAILABLE,
@@ -330,8 +334,9 @@ static void iree_hal_legacy_library_loader_destroy(
 static bool iree_hal_legacy_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
-    iree_hal_executable_format_t executable_format) {
-  return executable_format == iree_hal_make_executable_format("DLIB");
+    iree_string_view_t executable_format) {
+  return iree_string_view_equal(executable_format,
+                                iree_make_cstring_view("DLIB"));
 }
 
 static iree_status_t iree_hal_legacy_library_loader_try_load(

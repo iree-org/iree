@@ -40,7 +40,6 @@ gentbl(
 cc_library(
     name = "LinalgToLLVM",
     srcs = [
-        "ConvImg2ColMatmulConversion.cpp",
         "ConvertToLLVM.cpp",
         "FoldTensorExtractOpPass.cpp",
         "KernelDispatch.cpp",
@@ -64,6 +63,7 @@ cc_library(
         "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/LinalgToLLVM:FoldTensorExtractOpIncGen",
+        "//iree/compiler/Conversion/VectorToLLVM",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/IR",
@@ -83,6 +83,7 @@ cc_library(
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MathTransforms",
         "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:StandardOps",

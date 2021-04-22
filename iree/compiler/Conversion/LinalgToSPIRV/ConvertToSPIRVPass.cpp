@@ -53,82 +53,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 //===----------------------------------------------------------------------===//
-// Resource and push constant variable utilities
+// Resource utilities
 //===----------------------------------------------------------------------===//
-// TODO(antiagainst): move these utilities to MLIR core.
-
-/// Returns the pointer type for the push constant storage containing
-/// `elementCount` 32-bit integer values.
-spirv::PointerType getPushConstantStorageType(unsigned elementCount,
-                                              Builder &builder) {
-  auto arrayType = spirv::ArrayType::get(
-      SPIRVTypeConverter::getIndexType(builder.getContext()), elementCount,
-      /*stride=*/4);
-  auto structType = spirv::StructType::get({arrayType}, /*offsetInfo=*/0);
-  return spirv::PointerType::get(structType, spirv::StorageClass::PushConstant);
-}
-
-/// Returns the push constant varible containing `elementCount` 32-bit integer
-/// values in `body`. Returns null op if such an op does not exit.
-spirv::GlobalVariableOp getPushConstantVariable(Block &body,
-                                                unsigned elementCount) {
-  for (auto varOp : body.getOps<spirv::GlobalVariableOp>()) {
-    auto ptrType = varOp.type().cast<spirv::PointerType>();
-    // Note that Vulkan requires "There must be no more than one push constant
-    // block statically used per shader entry point." So we should always reuse
-    // the existing one.
-    if (ptrType.getStorageClass() == spirv::StorageClass::PushConstant) {
-      auto numElements = ptrType.getPointeeType()
-                             .cast<spirv::StructType>()
-                             .getElementType(0)
-                             .cast<spirv::ArrayType>()
-                             .getNumElements();
-      if (numElements == elementCount) return varOp;
-    }
-  }
-  return nullptr;
-}
-
-/// Gets or inserts a global variable for push constant storage containing
-/// `elementCount` 32-bit integer values in `block`.
-spirv::GlobalVariableOp getOrInsertPushConstantVariable(Location loc,
-                                                        Block &block,
-                                                        unsigned elementCount,
-                                                        OpBuilder &b) {
-  if (auto varOp = getPushConstantVariable(block, elementCount)) return varOp;
-
-  auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
-  auto type = getPushConstantStorageType(elementCount, builder);
-  StringRef name = "__push_constant_var__";
-  return builder.create<spirv::GlobalVariableOp>(loc, type, name,
-                                                 /*initializer=*/nullptr);
-}
-
-/// Gets the value at the given `offset` of the push constant storage. A global
-/// variable will be created for the push constant storage if not existing. Load
-/// ops will be created via the given `builder` to load values from the push
-/// constant.
-Value getPushConstantValue(Operation *op, unsigned elementCount,
-                           unsigned offset, OpBuilder &builder) {
-  Location loc = op->getLoc();
-  Operation *parent = SymbolTable::getNearestSymbolTable(op->getParentOp());
-  if (!parent) {
-    op->emitError("expected operation to be within a module-like op");
-    return nullptr;
-  }
-
-  spirv::GlobalVariableOp varOp = getOrInsertPushConstantVariable(
-      loc, parent->getRegion(0).front(), elementCount, builder);
-
-  auto i32Type = SPIRVTypeConverter::getIndexType(builder.getContext());
-  Value zeroOp = spirv::ConstantOp::getZero(i32Type, loc, builder);
-  Value offsetOp = builder.create<spirv::ConstantOp>(
-      loc, i32Type, builder.getI32IntegerAttr(offset));
-  auto addrOp = builder.create<spirv::AddressOfOp>(loc, varOp);
-  auto acOp = builder.create<spirv::AccessChainOp>(
-      loc, addrOp, llvm::makeArrayRef({zeroOp, offsetOp}));
-  return builder.create<spirv::LoadOp>(loc, acOp);
-}
 
 /// Inserts a resource evariable of the given `type` into `block` and bind
 /// it to `set` and `binding`. `id` uniquely identifies the inserted variable.
@@ -285,22 +211,6 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   }
 };
 
-/// Translates vector.transfer_read with less than 4 scalars into reading each
-/// scalar and then compose the vector.
-///
-/// This is a very specific pattern for handling corner cases and boundary
-/// cases. For example, in vision models we can have the initial image with
-/// three channels. We cannot perform the native load4 there; by performing
-/// scalar read we lose some benefits of load4 but we can still make sure the
-/// overall vectorization does not fail.
-struct ScalarizeVectorTransferRead final
-    : public OpConversionPattern<vector::TransferReadOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      vector::TransferReadOp readOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override;
-};
-
 /// Base class for lowering to SPIR-V cooperative matrix ops.
 template <typename SourceOp>
 class CoopMatOpLowering : public OpConversionPattern<SourceOp> {
@@ -338,6 +248,7 @@ class TransferToCoopMatLoadStore final : public CoopMatOpLowering<OpTy> {
   LogicalResult matchAndRewrite(
       OpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    if (op.mask()) return failure();
     if (!cooperativeMatrixAnalysis.usesCooperativeMatrixType(op))
       return failure();
     auto loc = op.getLoc();
@@ -493,34 +404,10 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
 
   // The following function generates SPIR-V ops with i32 types. So it does type
   // "conversion" (index -> i32) implicitly.
-  auto value = getPushConstantValue(loadOp, elementCount, offset, rewriter);
+  auto value =
+      spirv::getPushConstantValue(loadOp, elementCount, offset, rewriter);
 
   rewriter.replaceOp(loadOp, value);
-  return success();
-}
-
-LogicalResult ScalarizeVectorTransferRead::matchAndRewrite(
-    vector::TransferReadOp readOp, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter) const {
-  VectorType vectorType = readOp.getType();
-  Type scalarType = vectorType.getElementType();
-  if (vectorType.getRank() != 1 || vectorType.getDimSize(0) >= 4)
-    return failure();
-
-  Location loc = readOp.getLoc();
-  vector::TransferReadOp::Adaptor adaptor(operands);
-
-  SmallVector<Value, 4> scalars;
-  SmallVector<Value, 4> indices(adaptor.indices().begin(),
-                                adaptor.indices().end());
-  for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-    indices.back() = rewriter.createOrFold<ConstantIndexOp>(loc, i);
-    scalars.push_back(rewriter.create<memref::LoadOp>(
-        loc, scalarType, readOp.source(), indices));
-  }
-
-  rewriter.replaceOpWithNewOp<spirv::CompositeConstructOp>(readOp, vectorType,
-                                                           scalars);
   return success();
 }
 
@@ -579,8 +466,8 @@ void ConvertToSPIRVPass::runOnOperation() {
       HALInterfaceWorkgroupIdAndCountConverter<
           IREE::HAL::InterfaceWorkgroupIDOp, spirv::BuiltIn::WorkgroupId>,
       HALInterfaceWorkgroupIdAndCountConverter<
-          IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>,
-      ScalarizeVectorTransferRead>(typeConverter, context);
+          IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>>(
+      typeConverter, context);
   auto aliasedResources = getAliasedResources(moduleOp);
   patterns.insert<InterfaceOpConverter<IREE::PlaceholderOp>,
                   InterfaceOpConverter<IREE::HAL::InterfaceBindingSubspanOp>>(

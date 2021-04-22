@@ -330,8 +330,7 @@ class MaterializeResourceCachesPass
 
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
     TargetOptions targetOptions) {
-  return std::make_unique<MaterializeResourceCachesPass>(
-      targetOptions);  // NOLINT
+  return std::make_unique<MaterializeResourceCachesPass>(targetOptions);
 }
 
 static PassRegistration<MaterializeResourceCachesPass> pass(

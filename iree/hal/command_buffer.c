@@ -32,11 +32,29 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (iree_all_bits_set(mode,
+                        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+    // Inline command buffers must be one-shot and primary.
+    if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "inline command buffers must be one-shot and primary");
+    }
+  }
+
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_command_buffer)(
           device, mode, command_categories, queue_affinity, out_command_buffer);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+IREE_API_EXPORT iree_hal_command_buffer_mode_t IREE_API_CALL
+iree_hal_command_buffer_mode(const iree_hal_command_buffer_t* command_buffer) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  return _VTABLE_DISPATCH(command_buffer, mode)(command_buffer);
 }
 
 IREE_API_EXPORT iree_hal_command_category_t IREE_API_CALL

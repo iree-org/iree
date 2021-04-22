@@ -554,7 +554,11 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     // Builder for tensor.load with empty offset, sizes and strides operands.
     // This is used to load an entire tensor.
     OpBuilder<(ins "RankedTensorType":$resultType, "Value":$source,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    // Builder for tensor.load with mixed static/dynamic opperands.
+    OpBuilder<(ins "Value":$source, "ArrayRef<OpFoldResult>":$offsets,
+      "ArrayRef<OpFoldResult>":$sizes, "ArrayRef<OpFoldResult>":$strides,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 
   let extraClassDeclaration = [{
@@ -786,6 +790,11 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     FLOW_StreamableOp,
     AllElementTypesMatch<["source", "result"]>,
     AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+        "getTiedResult",
+        "getTiedResultOperandIndex",
+        "getTiedResultOperandIndices",
+    ]>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{reshapes a tensor}];
@@ -826,8 +835,8 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     bool isTransfer() { return true; }
   }];
 
-  // TODO(benvanik): canonicalize away if resulting ops don't care.
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
