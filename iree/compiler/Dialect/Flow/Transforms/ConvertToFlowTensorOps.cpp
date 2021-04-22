@@ -249,6 +249,7 @@ struct ConvertToFlowTensorOpsPass
     patterns.insert<LinalgTensorReshapeToFlowTensorReshape,
                     SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(
         context);
+    IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }

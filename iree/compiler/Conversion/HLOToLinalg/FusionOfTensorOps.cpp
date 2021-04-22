@@ -117,6 +117,12 @@ struct FusionOfTensorOpsPass
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));
 
+    OwningRewritePatternList foldUnitDimReshapes(&getContext());
+    linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
+        foldUnitDimReshapes);
+    (void)applyPatternsAndFoldGreedily(op->getRegions(),
+                                       std::move(foldUnitDimReshapes));
+
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        frozenInterfacePatterns);
   }
