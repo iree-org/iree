@@ -20,7 +20,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/debugging.h"
 
 #ifdef __cplusplus
 extern "C" {

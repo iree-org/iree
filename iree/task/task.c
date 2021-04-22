@@ -16,7 +16,6 @@
 
 #include <stdio.h>
 
-#include "iree/base/internal/debugging.h"
 #include "iree/task/task_impl.h"
 
 //==============================================================================

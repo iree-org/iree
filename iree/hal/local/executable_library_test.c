@@ -44,13 +44,14 @@ int main(int argc, char** argv) {
   library.header = demo_executable_library_query(
       IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION, /*reserved=*/NULL);
   const iree_hal_executable_library_header_t* header = *library.header;
-  assert(header != NULL && "version may not have matched");
-  assert(header->version <= IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION &&
-         "expecting the library to have the same or older version as us");
-  assert(strcmp(header->name, "demo_library") == 0 &&
-         "library name can be used to rendezvous in a registry");
-  assert(library.v0->entry_point_count > 0 &&
-         "expected at least one entry point");
+  IREE_ASSERT_NE(header, NULL, "version may not have matched");
+  IREE_ASSERT_LE(
+      header->version, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+      "expecting the library to have the same or older version as us");
+  IREE_ASSERT(strcmp(header->name, "demo_library") == 0,
+              "library name can be used to rendezvous in a registry");
+  IREE_ASSERT_GT(library.v0->entry_point_count, 0,
+                 "expected at least one entry point");
 
   // Push constants are an array of 4-byte values that are much more efficient
   // to specify (no buffer pointer indirection) and more efficient to access
@@ -96,9 +97,10 @@ int main(int argc, char** argv) {
         // Invoke the workgroup (x, y, z).
         iree_hal_vec3_t workgroup_id = {{x, y, z}};
         int ret = entry_fn_ptr(&dispatch_state, &workgroup_id);
-        assert(ret == 0 &&
-               "if we have bounds checking enabled the executable will signal "
-               "us of badness");
+        IREE_ASSERT_EQ(
+            ret, 0,
+            "if we have bounds checking enabled the executable will signal "
+            "us of badness");
       }
     }
   }
@@ -106,7 +108,7 @@ int main(int argc, char** argv) {
   // Ensure it worked.
   bool all_match = true;
   for (size_t i = 0; i < IREE_ARRAYSIZE(ret0_expected); ++i) {
-    assert(ret0[i] == ret0_expected[i] && "math is hard");
+    IREE_ASSERT_EQ(ret0[i], ret0_expected[i], "math is hard");
     all_match = all_match && ret0[i] == ret0_expected[i];
   }
   return all_match ? 0 : 1;
