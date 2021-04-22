@@ -66,26 +66,22 @@ if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|x86_64|AMD64")
   return()
 endif()
 
-iree_cc_test(
+iree_run_binary_test(
   NAME
-    simple_embedding_test
-  SRCS
-    "simple_embedding_test.cc"
-  DEPS
-    ::simple_embedding_test_bytecode_module_cc
-    absl::span
-    absl::strings
-    iree::base::api
-    iree::base::logging
-    iree::hal::api
-    iree::hal::dylib::registration
-    iree::hal::vulkan::registration
-    iree::modules::hal
-    iree::testing::gtest
-    iree::testing::gtest_main
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::cc
+    "simple_embedding_dylib_test"
+  ARGS
+    "dylib"
+  TEST_BINARY
+    ::simple_embedding_run
+)
+
+iree_run_binary_test(
+  NAME
+    "simple_embedding_vulkan_test"
+  ARGS
+    "vulkan"
+  TEST_BINARY
+    ::simple_embedding_run
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

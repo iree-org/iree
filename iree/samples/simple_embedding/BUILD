@@ -14,6 +14,7 @@
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
@@ -95,23 +96,14 @@ endif()
     inline = True,
 )
 
-cc_test(
-    name = "simple_embedding_test",
-    srcs = ["simple_embedding_test.cc"],
-    deps = [
-        ":simple_embedding_test_bytecode_module_cc",
-        "//iree/base:api",
-        "//iree/base:logging",
-        "//iree/hal:api",
-        "//iree/hal/dylib/registration",
-        "//iree/hal/vulkan/registration",
-        "//iree/modules/hal",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-        "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
+run_binary_test(
+    name = "simple_embedding_dylib_test",
+    args = ["dylib"],
+    test_binary = ":simple_embedding_run",
+)
+
+run_binary_test(
+    name = "simple_embedding_vulkan_test",
+    args = ["vulkan"],
+    test_binary = ":simple_embedding_run",
 )
