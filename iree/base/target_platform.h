@@ -15,6 +15,7 @@
 #ifndef IREE_BASE_TARGET_PLATFORM_H_
 #define IREE_BASE_TARGET_PLATFORM_H_
 
+#include <assert.h>
 #include <stdint.h>
 
 // The build system defines one of the following top-level platforms and then
@@ -105,8 +106,8 @@
 //==============================================================================
 
 // See https://stackoverflow.com/q/51616057
-_Static_assert(sizeof(void*) == sizeof(uintptr_t),
-               "can't determine pointer size");
+static_assert(sizeof(void*) == sizeof(uintptr_t),
+              "can't determine pointer size");
 
 #if UINTPTR_MAX == 0xFFFFFFFF
 #define IREE_PTR_SIZE_32
