@@ -61,11 +61,18 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
     }
     if (auto globalLoadOp = dyn_cast<GlobalLoadI32Op>(op)) {
       os << globalLoadOp.global();
+    } else if (auto globalLoadOp = dyn_cast<GlobalLoadI64Op>(op)) {
+      os << globalLoadOp.global();
+    } else if (auto globalLoadOp = dyn_cast<GlobalLoadF32Op>(op)) {
+      os << globalLoadOp.global();
+    } else if (auto globalLoadOp = dyn_cast<GlobalLoadF64Op>(op)) {
+      os << globalLoadOp.global();
     } else if (auto globalLoadOp = dyn_cast<GlobalLoadRefOp>(op)) {
       os << globalLoadOp.global();
     } else if (isa<ConstRefZeroOp>(op)) {
       os << "null";
-    } else if (isa<ConstI32ZeroOp>(op) || isa<ConstI64ZeroOp>(op)) {
+    } else if (isa<ConstI32ZeroOp>(op) || isa<ConstI64ZeroOp>(op) ||
+               isa<ConstF32ZeroOp>(op) || isa<ConstF64ZeroOp>(op)) {
       os << "zero";
     } else if (auto constOp = dyn_cast<ConstI32Op>(op)) {
       getIntegerName(constOp.value().dyn_cast<IntegerAttr>(), os);
@@ -319,6 +326,18 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
       return builder.create<VM::ConstI64ZeroOp>(loc);
     }
     return builder.create<VM::ConstI64Op>(loc, convertedValue);
+  } else if (ConstF32Op::isBuildableWith(value, type)) {
+    auto convertedValue = ConstF32Op::convertConstValue(value);
+    if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
+      return builder.create<VM::ConstF32ZeroOp>(loc);
+    }
+    return builder.create<VM::ConstF32Op>(loc, convertedValue);
+  } else if (ConstF64Op::isBuildableWith(value, type)) {
+    auto convertedValue = ConstF64Op::convertConstValue(value);
+    if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
+      return builder.create<VM::ConstF64ZeroOp>(loc);
+    }
+    return builder.create<VM::ConstF64Op>(loc, convertedValue);
   } else if (type.isa<IREE::VM::RefType>()) {
     // The only constant type we support for refs is null so we can just
     // emit that here.

@@ -126,6 +126,28 @@ class V0BytecodeEncoder : public BytecodeEncoder {
           return currentOp_->emitOpError()
                  << "attribute of bitwidth " << bitWidth << " not supported";
       }
+    } else if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
+      switch (bitWidth) {
+        case 32: {
+          union {
+            float f32;
+            uint32_t u32;
+          } value;
+          value.f32 = floatAttr.getValue().convertToFloat();
+          return writeUint32(value.u32);
+        }
+        case 64: {
+          union {
+            double f64;
+            uint64_t u64;
+          } value;
+          value.f64 = floatAttr.getValue().convertToDouble();
+          return writeUint64(value.u64);
+        }
+        default:
+          return currentOp_->emitOpError()
+                 << "attribute of bitwidth " << bitWidth << " not supported";
+      }
     } else {
       return currentOp_->emitOpError()
              << "attribute type not supported for primitive serialization: "

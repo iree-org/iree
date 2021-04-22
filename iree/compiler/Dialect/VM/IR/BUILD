@@ -30,6 +30,8 @@ filegroup(
         [
             "VMBase.td",
             "VMOpcodesCore.td",
+            "VMOpcodesF32.td",
+            "VMOpcodesF64.td",
             "VMOpcodesI64.td",
             "VMOps.td",
         ],

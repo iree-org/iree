@@ -51,7 +51,8 @@ class OrdinalAllocationPass
     int nextExportOrdinal = 0;
     int nextGlobalRefOrdinal = 0;
     int nextRodataOrdinal = 0;
-    SmallVector<SmallVector<VMGlobalOp, 4>, 8> primitiveGlobalOps(8);
+    SmallVector<SmallVector<VMGlobalOp, 4>, 8> primitiveGlobalOps(
+        sizeof(int64_t) + 1);
     for (auto &op : getOperation().getBlock().getOperations()) {
       Optional<int> ordinal = llvm::None;
       if (auto funcOp = dyn_cast<FuncOp>(op)) {

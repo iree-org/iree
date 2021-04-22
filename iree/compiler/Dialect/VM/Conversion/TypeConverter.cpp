@@ -79,6 +79,37 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     return llvm::None;
   });
 
+  // Convert floating-point types.
+  addConversion([this](FloatType floatType) -> Optional<Type> {
+    if (floatType.getIntOrFloatBitWidth() < 32) {
+      if (targetOptions_.f32Extension) {
+        // Promote f16 -> f32.
+        return FloatType::getF32(floatType.getContext());
+      } else if (targetOptions_.truncateUnsupportedIntegers) {
+        // f32 is not supported; can't compile.
+        return llvm::None;
+      }
+    } else if (floatType.isF32()) {
+      if (targetOptions_.f32Extension) {
+        return floatType;
+      } else if (targetOptions_.truncateUnsupportedIntegers) {
+        // f32 is not supported; can't compile.
+        return llvm::None;
+      }
+    } else if (floatType.isF64()) {
+      if (targetOptions_.f64Extension) {
+        // f64 is supported by the VM, use directly.
+        return floatType;
+      } else if (targetOptions_.f32Extension &&
+                 targetOptions_.truncateUnsupportedFloats) {
+        // f64 is not supported and we still want to compile, so truncate to
+        // f32 (unsafe if all bits are actually required!).
+        return FloatType::getF32(floatType.getContext());
+      }
+    }
+    return llvm::None;
+  });
+
   // Convert index types to the target bit width.
   addConversion([this](IndexType indexType) -> Optional<Type> {
     return IntegerType::get(indexType.getContext(), targetOptions_.indexBits);

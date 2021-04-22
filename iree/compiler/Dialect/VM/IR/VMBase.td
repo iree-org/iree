@@ -56,8 +56,14 @@ def VM_Dialect : Dialect {
 // Opcode tables
 //===----------------------------------------------------------------------===//
 
+// Mandatory:
 include "iree/compiler/Dialect/VM/IR/VMOpcodesCore.td"
+// Optional:
 include "iree/compiler/Dialect/VM/IR/VMOpcodesI64.td"
+// Optional:
+include "iree/compiler/Dialect/VM/IR/VMOpcodesF32.td"
+// Optional:
+include "iree/compiler/Dialect/VM/IR/VMOpcodesF64.td"
 
 //===----------------------------------------------------------------------===//
 // Declarative encoding framework
@@ -359,6 +365,14 @@ class VM_ConstantIntegerValueAttr<I type> : Attr<
     ]>> {
   let storageType = "Attribute";
   let returnType = "Attribute";
+  let convertFromStorage = "$_self";
+  let constBuilderCall = "$0";
+}
+
+class VM_ConstantFloatValueAttr<F type> :
+    FloatAttrBase<type, type.bitwidth # "-bit floating-point value"> {
+  let storageType = "FloatAttr";
+  let returnType = "FloatAttr";
   let convertFromStorage = "$_self";
   let constBuilderCall = "$0";
 }
