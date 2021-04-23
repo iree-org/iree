@@ -117,6 +117,7 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
               "-iree-flow-inline-constants-max-byte-length=2048",
               "-iree-flow-dispatch-formation-enable-operand-fusion",
               "-iree-flow-tile-and-distribute-elementwise-ops"
+              "-iree-enable-fusion-with-reduction-ops"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
