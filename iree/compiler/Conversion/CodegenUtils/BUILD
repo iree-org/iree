@@ -23,13 +23,11 @@ package(
 cc_library(
     name = "CodegenUtils",
     srcs = [
-        "ForOpCanonicalization.cpp",
         "FunctionUtils.cpp",
         "MarkerUtils.cpp",
         "TransformUtils.cpp",
     ],
     hdrs = [
-        "ForOpCanonicalization.h",
         "FunctionUtils.h",
         "MarkerUtils.h",
         "TransformUtils.h",

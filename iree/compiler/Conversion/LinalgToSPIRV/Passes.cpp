@@ -20,7 +20,6 @@
 
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 
-#include "iree/compiler/Conversion/CodegenUtils/ForOpCanonicalization.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
