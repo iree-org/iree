@@ -24,6 +24,7 @@
 #  "@cpuinfo//"
 #  "@cuda_headers//"
 #  "@com_github_dvidelabs_flatcc//"
+#  "@com_github_kimgr_getopt_port//"
 #  "@half//"
 #  "@com_google_googletest//"
 #  "@llvm-project//"

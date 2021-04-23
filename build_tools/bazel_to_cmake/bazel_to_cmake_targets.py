@@ -61,6 +61,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_benchmark//:benchmark": ["benchmark"],
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
+    "@com_github_kimgr_getopt_port//:getopt": ["getopt"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@pffft": ["pffft"],
