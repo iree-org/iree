@@ -14,12 +14,10 @@ iree_cc_library(
   NAME
     CodegenUtils
   HDRS
-    "ForOpCanonicalization.h"
     "FunctionUtils.h"
     "MarkerUtils.h"
     "TransformUtils.h"
   SRCS
-    "ForOpCanonicalization.cpp"
     "FunctionUtils.cpp"
     "MarkerUtils.cpp"
     "TransformUtils.cpp"

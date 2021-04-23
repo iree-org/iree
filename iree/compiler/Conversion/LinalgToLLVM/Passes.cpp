@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
-
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
@@ -60,39 +58,23 @@ void addLinalgToLLVMPasses(OpPassManager &passManager,
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager,
                                     LLVMCodegenOptions options) {
-  if (options.usingLinalgOnTensors) {
-    passManager.addPass(createMaterializeCPULaunchConfigurationPass());
-    OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-    // TODO(ataei): We want to enable when tensor -> vector pass is fully
-    // supported which requires first moving vector-tiling before this step.
-    if (options.useLinalgOnTensorsToVectors) {
-      nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
-    }
-    // Use stack allocation on CPU side.
-    WorkgroupMemoryAllocationFn allocationFn =
-        [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
-           Type elementType, ArrayRef<Value> dynamicSizes) {
-          MemRefType allocType = MemRefType::get(staticShape, elementType);
-          return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
-        };
-    addLinalgBufferizePasses(nestedModulePM, allocationFn);
-    nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
-  } else {
-    // Distribute linalg op among a 3d grid of parallel threads. Tile each
-    // workgroup thread memory then vectorize the linalg op.
-    OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-    nestedModulePM.addPass(createInlinerPass());
-    passManager.addPass(createLinalgTileAndDistributePass());
-    // Propagates dynamic shapes computation on tensors.
-    nestedModulePM.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
-    nestedModulePM.addNestedPass<FuncOp>(
-        Shape::createMaterializeShapeCalculationsPass());
-    nestedModulePM.addNestedPass<FuncOp>(
-        Shape::createHoistShapeCalculationsPass());
-    nestedModulePM.addNestedPass<FuncOp>(createConvert1x1ConvToDotPass());
-    nestedModulePM.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
-    addHLOToLinalgOnBuffersPasses(nestedModulePM);
+  passManager.addPass(createMaterializeCPULaunchConfigurationPass());
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  // TODO(ataei): We want to enable when tensor -> vector pass is fully
+  // supported which requires first moving vector-tiling before this step.
+  if (options.useLinalgOnTensorsToVectors) {
+    nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
   }
+  // Use stack allocation on CPU side.
+  WorkgroupMemoryAllocationFn allocationFn =
+      [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
+         Type elementType, ArrayRef<Value> dynamicSizes) {
+        MemRefType allocType = MemRefType::get(staticShape, elementType);
+        return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
+      };
+  addLinalgBufferizePasses(nestedModulePM, allocationFn);
+  nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
+
   // Linalg -> LLVM passes.
   addLinalgToLLVMPasses(passManager, options);
 }

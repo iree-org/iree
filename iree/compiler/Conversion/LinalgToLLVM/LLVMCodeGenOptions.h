@@ -22,7 +22,6 @@ namespace iree_compiler {
 
 // Options used to configure LLVM passes.
 struct LLVMCodegenOptions {
-  bool usingLinalgOnTensors = false;
   bool useConvImg2Col = false;
   // Target specific options.
   bool unfuseFMAOps = false;

@@ -61,6 +61,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerGlobalTensorsPass();
 // metadata.
 std::unique_ptr<OperationPass<ModuleOp>> createLowerExportedFunctionsPass();
 
+// In a module tagged with `tf_saved_model.semantics`, creates IREE ABI
+// functions for any saved model exported functions.
+std::unique_ptr<OperationPass<ModuleOp>> createSavedModelToIREEABIPass();
+
 // Push resource casts forward to better propagate resource related shapes.
 std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCastsPass();
 
@@ -89,6 +93,7 @@ inline void registerAllPasses() {
   createLowerGlobalTensorsPass();
   createLowerExportedFunctionsPass();
   createPropagateResourceCastsPass();
+  createSavedModelToIREEABIPass();
   createStripAssertsPass();
   createStripModuleMetadataPass();
   createStripFunctionMetadataPass();
