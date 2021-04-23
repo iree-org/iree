@@ -112,8 +112,8 @@ static LogicalResult getOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
 static void getMaliBestMatMulTileSizes(
     Type elementType, SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
     int64_t dstSize) {
-  const int64_t smallMatrixSizeThreshold = 512 * 512;
   if (elementType.isF16()) {
+    const int64_t smallMatrixSizeThreshold = 512 * 512;
     // For smaller destination size we cannot fill out the GPU with bigger tile
     // sizes. Instead we pick smaller tiles along M and N to increase the number
     // of workgroups and a larger K tile size since we have lower pressure and
@@ -128,6 +128,12 @@ static void getMaliBestMatMulTileSizes(
       tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 4}, {8, 2, 1}}));
     }
   } else {
+    // TODO: Heuristic picked based on MobileNet performance. We need
+    // auto-tuning to be able to make a smarter choice.
+    const int64_t smallMatrixSizeThreshold = 20000;
+    if (dstSize <= smallMatrixSizeThreshold) {
+      tileSizes.push_back(TileWorkgroupSizePair({{4, 32, 16}, {8, 2, 1}}));
+    }
     tileSizes.push_back(TileWorkgroupSizePair({{12, 32, 4}, {8, 2, 1}}));
     tileSizes.push_back(TileWorkgroupSizePair({{14, 32, 4}, {8, 2, 1}}));
     tileSizes.push_back(TileWorkgroupSizePair({{10, 32, 4}, {8, 2, 1}}));
@@ -140,6 +146,9 @@ static void getMaliBestMatMulTileSizes(
     tileSizes.push_back(TileWorkgroupSizePair({{40, 8, 4}, {2, 8, 1}}));
     tileSizes.push_back(TileWorkgroupSizePair({{32, 8, 4}, {2, 8, 1}}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 8, 4}, {2, 8, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{1, 32, 16}, {8, 1, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{1, 32, 8}, {8, 1, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{1, 32, 4}, {8, 1, 1}}));
   }
 }
 

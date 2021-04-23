@@ -53,6 +53,10 @@ createLinalgRewriteDestructiveUpdatesPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 
+/// An ad-hoc pass to canonicalize selected loop carried dependencies on
+/// scf.for.
+std::unique_ptr<FunctionPass> createForOpCanonicalizationPass();
+
 // Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 // allocations and view operations.
 std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass();

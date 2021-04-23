@@ -127,6 +127,7 @@ cc_binary(
         "//experimental/ModelBuilder:ModelRunner",
         "//experimental/ModelBuilder:VulkanLaunchWrapper",
         "//iree/compiler/Conversion/CodegenUtils",
+        "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:GPUToVulkanTransforms",
