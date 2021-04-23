@@ -27,29 +27,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Creates XLA-HLO to Linalg on buffers transformation pass.
-std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
-
 /// Resolves shape related ops (std.dim, shapex.tie_shape, etc.) by tracing
 /// them back to the original HAL interface bindings.
 std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();
-
-/// Populates the patterns that convert from XLA to Linalg on buffers. Currently
-/// only implements conversions when the XLA op is the only op XLA op in the
-/// dispatch region.
-using TensorToBufferMap = DenseMap<Value, Value>;
-void populateHLOToLinalgOnBuffersConversionPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns,
-    TensorToBufferMap const &resultTensorToBufferMap);
-
-/// Populates passes to convert from XLA-HLO to Linalg on buffers as well as
-/// handling some IREE specific conversions (like iree.interface.* and
-/// iree.placeholder op). At the end of the pass, the dispatch function will
-/// only contain linalg ops or standard ops if the pipeline succeeds. The pass
-/// manager `pm` passed in here is expected to operate on the module within the
-/// IREE::HAL::ExecutableTargetOp.
-void addHLOToLinalgOnBuffersPasses(OpPassManager &pm);
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

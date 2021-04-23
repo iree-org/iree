@@ -19,11 +19,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::cl::opt<bool> clEnableLLVMLinalgOnTensors(
-    "iree-codegen-llvm-experimental-linalg-on-tensors",
-    llvm::cl::desc("Enable the linalg on tensors experimental LLVM path"),
-    llvm::cl::init(true));
-
 static llvm::cl::opt<bool> clConvImg2ColConversion(
     "iree-codegen-linalg-to-llvm-conv-img2col-conversion",
     llvm::cl::desc("Enable rewriting linalg.conv_2d_input_nhwc_filter_hwcf "
@@ -43,7 +38,6 @@ static llvm::cl::opt<bool> clEnableLinalgOnTensorsToVectors(
 
 LLVMCodegenOptions getLLVMCodegenOptionsFromClOptions() {
   LLVMCodegenOptions options;
-  options.usingLinalgOnTensors = clEnableLLVMLinalgOnTensors;
   options.useConvImg2Col = clConvImg2ColConversion;
   options.unfuseFMAOps = clUnfusedFMA;
   options.useLinalgOnTensorsToVectors = clEnableLinalgOnTensorsToVectors;

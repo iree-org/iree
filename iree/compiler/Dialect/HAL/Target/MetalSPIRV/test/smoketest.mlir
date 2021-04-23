@@ -1,22 +1,27 @@
 // RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=metal-spirv %s | IreeFileCheck %s
 
-flow.executable @simpleMath_ex_dispatch_0 {
-  flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
-      workload = 4 : index
+#map = affine_map<(d0) -> (d0)>
+flow.executable @add_dispatch_0 {
+  flow.dispatch.entry @add_dispatch_0 attributes {
+    signature = (tensor<16xf32>, tensor<16xf32>) -> tensor<16xf32>,
+    workgroup_rank = 3 : index
   }
-  module {
-    func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
-      return %0 : tensor<4xf32>
+  module  {
+    func @add_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:16xf32>, %arg1: !flow.dispatch.tensor<readonly:16xf32>, %arg2: !flow.dispatch.tensor<writeonly:16xf32>) {
+      %0 = linalg.init_tensor [16] : tensor<16xf32>
+      %1 = flow.dispatch.tensor.load %arg0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %2 = flow.dispatch.tensor.load %arg1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]} ins(%1, %2 : tensor<16xf32>, tensor<16xf32>) outs(%0 : tensor<16xf32>) {
+      ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
+        %4 = addf %arg3, %arg4 : f32
+        linalg.yield %4 : f32
+      } -> tensor<16xf32>
+      flow.dispatch.tensor.store %3, %arg2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
+      return
     }
   }
 }
 
-// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-// CHECK-NEXT:   hal.interface @legacy_io {
-// CHECK-DAG:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-DAG:      hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
-// CHECK-NEXT:   }
-// CHECK-NEXT:   hal.executable.binary @metal_spirv attributes {
+// CHECK:        hal.executable.binary @metal_spirv attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = "MTLE"

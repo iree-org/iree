@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=vulkan-spirv -iree-codegen-spirv-experimental-linalg-on-tensors %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s
 
 #map = affine_map<(d0) -> (d0)>
 flow.executable @add_dispatch_0 {

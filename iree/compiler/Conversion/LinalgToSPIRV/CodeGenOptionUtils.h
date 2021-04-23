@@ -39,7 +39,7 @@ struct SPIRVCodegenOptions {
 
   bool enableVectorization = false;
   bool useWorkgroupMemory = false;
-  bool usingLinalgOnTensors = false;
+  bool usingLinalgOnTensors = true;
 };
 
 // Returns SPIR-V CodeGen options from command-line options.

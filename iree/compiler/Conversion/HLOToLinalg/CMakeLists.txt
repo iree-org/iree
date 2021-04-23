@@ -44,30 +44,17 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
-    "HLOToLinalgOnBuffers.cpp"
-    "Passes.cpp"
     "ResolveShapeOps.cpp"
   DEPS
-    ::HLOToLinalgOnTensors
     LLVMSupport
-    MLIRAffine
     MLIRIR
-    MLIRLinalg
-    MLIRLinalgTransforms
     MLIRMemRef
     MLIRPass
-    MLIRSPIRV
     MLIRStandard
     MLIRSupport
-    MLIRTensor
     MLIRTransforms
-    iree::compiler::Conversion::CodegenUtils
-    iree::compiler::Conversion::HLOToHLO
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )
 
