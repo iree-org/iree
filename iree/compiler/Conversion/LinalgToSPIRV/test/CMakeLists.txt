@@ -23,7 +23,6 @@ iree_lit_test_suite(
     "elementwise_vectorization.mlir"
     "fold-gpu-procid-uses.mlir"
     "forop_canonicalization.mlir"
-    "linalg_tile_and_fuse.mlir"
     "materialize_launch_configuration.mlir"
     "materialize_launch_configuration2.mlir"
     "matmul_fused_vectorization.mlir"
