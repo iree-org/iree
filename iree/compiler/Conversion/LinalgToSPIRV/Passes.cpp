@@ -128,7 +128,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
   if (options.enableVectorization) {
-    pm.nest<ModuleOp>().addPass(createVectorizeMemref());
+    pm.nest<ModuleOp>().addPass(createVectorizeMemrefLoadStorePass());
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(
         createForOpCanonicalizationPass());
     pm.nest<ModuleOp>().addPass(createCanonicalizerPass());

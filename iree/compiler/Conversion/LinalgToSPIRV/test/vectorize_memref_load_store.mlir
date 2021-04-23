@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-spirv-vectorize-memref -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-spirv-vectorize-memref-load-store -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @copy
 //  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x1024xvector<4xf32>>

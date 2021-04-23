@@ -65,7 +65,7 @@ std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
 /// Converts memref of scalar to memref of vector of efficent size. This will
 /// allow to convert memory accesses to vector load/store in SPIR-V without
 /// having pointer bitcast.
-std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref();
+std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemrefLoadStorePass();
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
