@@ -32,12 +32,6 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-static llvm::cl::opt<bool> clEnableLinalgOnTensorsDispatch(
-    "iree-flow-dispatch-linalg-on-tensors",
-    llvm::cl::desc(
-        "Enable use of Linalg on tensors for dispatch region creation."),
-    llvm::cl::init(false));
-
 // TODO(benvanik): change to a pipeline option.
 static llvm::cl::opt<bool> clExportBenchmarkFuncs(
     "iree-flow-export-benchmark-funcs",
@@ -74,11 +68,9 @@ namespace Flow {
 static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createHLOToHLOPreprocessingPass());
-  if (clEnableLinalgOnTensorsDispatch) {
-    // TODO(ataei): This should run as part of createHLOToHLOPreprocessingPass
-    // which will break VMLA backend.
-    passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
-  }
+  // TODO(ataei): This should run as part of createHLOToHLOPreprocessingPass
+  // which will break VMLA backend.
+  passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
