@@ -119,7 +119,6 @@ hal.executable @conv_promote_workgroup_memory attributes {sym_visibility = "priv
   }
 }
 
-
 // CHECK-LABEL: func @conv_promote_workgroup_memory()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external
