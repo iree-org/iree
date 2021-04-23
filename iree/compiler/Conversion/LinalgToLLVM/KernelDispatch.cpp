@@ -33,41 +33,38 @@ static llvm::cl::list<unsigned> clLLVMTileSizes(
     llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 
 static llvm::cl::opt<int> matmulWorkgroupTileSize(
-    "iree-codegen-linalg-to-llvm-kernel-dispatch-matmul-workgroup-tile-size",
+    "iree-codegen-llvm-matmul-workgroup-size",
     llvm::cl::desc(
         "linalg.matmul tile size for workgroups spliting of M, N dimension"),
     llvm::cl::init(64));
-
 static llvm::cl::opt<int> matmulL1TileSize(
-    "iree-codegen-linalg-to-llvm-kernel-dispatch-matmul-l1-tile-size",
+    "iree-codegen-llvm-matmul-l1-size",
     llvm::cl::desc(
-        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+        "linalg.matmul tile size for L1 spliting of M, N, K dimension"),
     llvm::cl::init(32));
-
 static llvm::cl::opt<int> matmulL2TileSize(
-    "iree-codegen-linalg-to-llvm-kernel-dispatch-matmul-l2-tile-size",
-    llvm::cl::desc(
-        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
-    llvm::cl::init(4));
+    "iree-codegen-llvm-matmul-vector-size",
+    llvm::cl::desc("linalg.matmul vector tile size"), llvm::cl::init(4));
 
 static llvm::cl::opt<int> batchMatmulWorkgroupTileSize(
-    "iree-codegen-linalg-to-llvm-kernel-dispatch-batch-matmul-workgroup-tile-"
-    "size",
-    llvm::cl::desc(
-        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+    "iree-codegen-llvm-batch-matmul-workgroup-size",
+    llvm::cl::desc("linalg.batch_matmul tile size for workgroups spliting of "
+                   "M, N dimension"),
     llvm::cl::init(32));
-
 static llvm::cl::opt<int> batchMatmulL1TileSize(
-    "iree-codegen-linalg-to-llvm-kernel-dispatch-batch-matmul-l1-tile-size",
+    "iree-codegen-llvm-batch-matmul-l1-size",
     llvm::cl::desc(
-        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+        "linalg.batch_matmul tile size for L1 spliting of M, N, K dimensions"),
     llvm::cl::init(16));
-
 static llvm::cl::opt<int> batchMatmulL2TileSize(
-    "iree-codegen-linalg-to-llvm-kernel-dispatch-batch-matmul-l2-tile-size",
+    "iree-codegen-llvm-batch-matmul-vector-size",
+    llvm::cl::desc("linalg.batch_matmul vector tile size"), llvm::cl::init(4));
+
+static llvm::cl::opt<int> genericOpsWorkgroupTileSize(
+    "iree-codegen-llvm-generic-ops-workgroup-size",
     llvm::cl::desc(
-        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
-    llvm::cl::init(4));
+        "linalg.generic and linalg.indexed_generic workgroup tile size"),
+    llvm::cl::init(128));
 
 namespace {
 template <TilingLevel tilingLevel>
@@ -104,6 +101,31 @@ llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) {
     }
   }
 
+  if (isa<linalg::GenericOp>(op)) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    switch (tilingLevel) {
+      case TilingLevel::WorkGroupTiles: {
+        llvm::SmallVector<int64_t, 4> workgroupTileSizes;
+        int iterationRank = linalgOp.iterator_types().size();
+        for (int i = 0; i < std::min(iterationRank, 3); ++i) {
+          auto iteratorType = linalgOp.iterator_types()[i];
+          if (iteratorType.cast<StringAttr>().getValue() ==
+              getParallelIteratorTypeName()) {
+            workgroupTileSizes.push_back(genericOpsWorkgroupTileSize);
+          } else {
+            // Don't tile workgroup across reduction dimensions.
+            workgroupTileSizes.push_back(0);
+          }
+        }
+        return workgroupTileSizes;
+      }
+      // TODO(ataei): Set the parameters when we enable vectorization.
+      case TilingLevel::Level1Tiles:
+      case TilingLevel::Level2Tiles:
+        return {1, 1, 1};
+    }
+  }
+
   return {1, 1, 1};
 }
 }  // namespace
@@ -129,6 +151,17 @@ DEFINE_TILE_SIZE_FN(TilingLevel::Level2Tiles)
 
 #undef DEFINE_TILE_SIZE_FN
 
+bool isDispatchOp(Operation *op) {
+  if (auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op)) {
+    if (contractionOp.isRowMajorMatmul() ||
+        contractionOp.isRowMajorBatchMatmul()) {
+      return true;
+    }
+  }
+  if (isa<linalg::GenericOp>(op)) return true;
+  return false;
+}
+
 Optional<LaunchConfig> initCPULaunchConfig(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     ArrayRef<linalg::LinalgOp> linalgOps) {
@@ -136,28 +169,21 @@ Optional<LaunchConfig> initCPULaunchConfig(
 
   Optional<linalg::LinalgOp> rootOperation = llvm::None;
   for (auto linalgOp : linalgOps) {
-    if (auto contractionOp =
-            dyn_cast<linalg::ContractionOpInterface>(linalgOp.getOperation())) {
-      if (!contractionOp.isRowMajorMatmul() &&
-          !contractionOp.isRowMajorBatchMatmul()) {
-        continue;
-      }
-      if (rootOperation) {
-        contractionOp.emitError(
-            "unhandled multiple root operations in dispatch region");
-        return llvm::None;
-      }
-      rootOperation = linalgOp;
-      SmallVector<int64_t, 4> opTileSizes;
-      if (!clLLVMTileSizes.empty()) {
-        opTileSizes.assign(clLLVMTileSizes.begin(), clLLVMTileSizes.end());
-      } else {
-        opTileSizes = getTileSizes<TilingLevel::WorkGroupTiles>(contractionOp);
-      }
-      config.setTileSizes(contractionOp, opTileSizes, 0);
-      config.setRootOperation(contractionOp);
-      continue;
+    if (!isDispatchOp(linalgOp)) continue;
+    if (rootOperation) {
+      linalgOp.emitError(
+          "unhandled multiple root operations in dispatch region");
+      return llvm::None;
     }
+    rootOperation = linalgOp;
+    SmallVector<int64_t, 4> opTileSizes;
+    if (!clLLVMTileSizes.empty()) {
+      opTileSizes.assign(clLLVMTileSizes.begin(), clLLVMTileSizes.end());
+    } else {
+      opTileSizes = getTileSizes<TilingLevel::WorkGroupTiles>(linalgOp);
+    }
+    config.setTileSizes(linalgOp, opTileSizes, 0);
+    config.setRootOperation(linalgOp);
   }
   if (!rootOperation) {
     return config;
