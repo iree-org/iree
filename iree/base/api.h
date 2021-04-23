@@ -653,7 +653,60 @@ typedef struct iree_status_handle_t* iree_status_t;
 // TODO(#2843): better logging of status checks.
 #define IREE_CHECK_OK(expr) \
   IREE_CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
-#define IREE_ASSERT_ARGUMENT(name) assert(name)
+
+//===----------------------------------------------------------------------===//
+// IREE_ASSERT macros
+//===----------------------------------------------------------------------===//
+// These are no-oped in builds with NDEBUG defined (by default anything but
+// `-c dbg`/`-DCMAKE_BUILD_TYPE=Debug`). They differ from assert in that
+// they avoid unused variable warnings when NDEBUG is defined. As with normal
+// assert() ensure that side-effecting behavior is avoided as the expression
+// will not be evaluated when the asserts are removed!
+
+// TODO(benvanik): move to iree/base/assert.h.
+#if defined(NDEBUG)  // N(o) DEBUG
+
+// Assertions disabled:
+
+#define IREE_ASSERT(condition, ...) \
+  while (false && (condition)) {    \
+  }
+
+// TODO(benvanik): replace the status_matchers version with a test macro.
+// #define IREE_ASSERT_OK(status) IREE_ASSERT(iree_status_is_ok(status))
+
+// However, we still want the compiler to parse x and y because
+// we don't want to lose potentially useful errors and warnings
+// (and want to hide unused variable warnings when asserts are disabled).
+// _IREE_ASSERT_CMP is a helper and should not be used outside of this file.
+#define _IREE_ASSERT_CMP(x, op, y, ...)        \
+  while (false && ((void)(x), (void)(y), 0)) { \
+  }
+
+#else
+
+// Assertions enabled:
+
+#define IREE_ASSERT(condition, ...) assert(condition)
+
+// TODO(#2843): better logging of status assertions.
+// #define IREE_ASSERT_OK(status) IREE_ASSERT(iree_status_is_ok(status))
+
+#define _IREE_ASSERT_CMP(x, op, y, ...) IREE_ASSERT(((x)op(y)), __VA_ARGS__)
+
+#endif  // NDEBUG
+
+#define IREE_ASSERT_ARGUMENT(name) IREE_ASSERT(name)
+
+#define IREE_ASSERT_TRUE(expr, ...) IREE_ASSERT(!!(expr), __VA_ARGS__)
+#define IREE_ASSERT_FALSE(expr, ...) IREE_ASSERT(!(expr), __VA_ARGS__)
+
+#define IREE_ASSERT_EQ(x, y, ...) _IREE_ASSERT_CMP(x, ==, y, __VA_ARGS__)
+#define IREE_ASSERT_NE(x, y, ...) _IREE_ASSERT_CMP(x, !=, y, __VA_ARGS__)
+#define IREE_ASSERT_LE(x, y, ...) _IREE_ASSERT_CMP(x, <=, y, __VA_ARGS__)
+#define IREE_ASSERT_LT(x, y, ...) _IREE_ASSERT_CMP(x, <, y, __VA_ARGS__)
+#define IREE_ASSERT_GE(x, y, ...) _IREE_ASSERT_CMP(x, >=, y, __VA_ARGS__)
+#define IREE_ASSERT_GT(x, y, ...) _IREE_ASSERT_CMP(x, >, y, __VA_ARGS__)
 
 // Returns the canonical status code for the given errno value.
 // https://en.cppreference.com/w/cpp/error/errno_macros

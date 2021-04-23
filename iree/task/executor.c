@@ -14,7 +14,6 @@
 
 #include "iree/task/executor.h"
 
-#include "iree/base/internal/debugging.h"
 #include "iree/base/internal/math.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/task_impl.h"

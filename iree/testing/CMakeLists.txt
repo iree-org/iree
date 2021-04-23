@@ -12,11 +12,26 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    benchmark_main
+    benchmark
+  HDRS
+    "benchmark.h"
   SRCS
-    "benchmark_main.cc"
+    "benchmark_full.cc"
   DEPS
     benchmark
+    iree::base::api
+    iree::base::tracing
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    benchmark_main
+  SRCS
+    "benchmark_main.c"
+  DEPS
+    ::benchmark
     iree::base::internal::flags
   TESTONLY
   PUBLIC

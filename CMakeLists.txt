@@ -70,6 +70,7 @@ if(${IREE_BUILD_TENSORFLOW_COMPILER} OR
 endif()
 
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
+option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
 # Default python bindings to enabled for some features.
 if(${IREE_ENABLE_TENSORFLOW})
@@ -218,6 +219,7 @@ include(iree_cc_test)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_cc_embed_data)
+include(iree_c_embed_data)
 include(iree_bytecode_module)
 include(iree_c_module)
 include(iree_python)

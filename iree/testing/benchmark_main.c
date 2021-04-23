@@ -12,16 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "benchmark/benchmark.h"
 #include "iree/base/internal/flags.h"
+#include "iree/testing/benchmark.h"
 
-namespace iree {
-
-extern "C" int main(int argc, char** argv) {
-  ::benchmark::Initialize(&argc, argv);
+int main(int argc, char** argv) {
+  iree_benchmark_initialize(&argc, argv);
   iree_flags_parse_checked(&argc, &argv);
-  ::benchmark::RunSpecifiedBenchmarks();
+  iree_benchmark_run_specified();
   return 0;
 }
-
-}  // namespace iree

@@ -82,8 +82,9 @@ TEST_F(ELFModuleTest, Check) {
     const iree_hal_executable_library_v0_t* v0;
   } library;
   library.header =
-      (const iree_hal_executable_library_header_t**)iree_elf_call_p_i(
-          query_fn_ptr, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+      (const iree_hal_executable_library_header_t**)iree_elf_call_p_ip(
+          query_fn_ptr, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+          /*reserved=*/NULL);
   ASSERT_TRUE(library.header != NULL);
 
   auto* header = *library.header;

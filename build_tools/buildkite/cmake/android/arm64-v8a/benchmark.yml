@@ -89,3 +89,5 @@ steps:
       - "mako-uploader=true"
       - "test-desktop-gpu=false"
     branches: "main"
+    soft_fail:
+      - exit_status: 1

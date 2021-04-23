@@ -124,7 +124,7 @@ static iree_status_t iree_hal_legacy_executable_query_library(
 
   // Query for a compatible version of the library.
   executable->library.header =
-      query_fn(IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+      query_fn(IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION, /*reserved=*/NULL);
   if (!executable->library.header) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,

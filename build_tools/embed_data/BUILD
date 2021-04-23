@@ -14,7 +14,7 @@
 
 # Generates source files with embedded file contents.
 
-load(":build_defs.bzl", "cc_embed_data")
+load(":build_defs.bzl", "c_embed_data", "cc_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -23,8 +23,8 @@ package(
 )
 
 cc_binary(
-    name = "generate_cc_embed_data",
-    srcs = ["generate_cc_embed_data_main.cc"],
+    name = "generate_embed_data",
+    srcs = ["generate_embed_data_main.cc"],
     deps = [
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
@@ -62,6 +62,28 @@ cc_test(
     deps = [
         ":testembed1",
         ":testembed2",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+c_embed_data(
+    name = "testembed1_c",
+    # do not sort
+    srcs = [
+        "file1.txt",
+        "data/file2.txt",
+    ],
+    c_file_output = "testembed1_c.c",
+    flatten = True,
+    h_file_output = "testembed1_c.h",
+)
+
+cc_test(
+    name = "c_embed_data_test",
+    srcs = ["c_embed_data_test.cc"],
+    deps = [
+        ":testembed1_c",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

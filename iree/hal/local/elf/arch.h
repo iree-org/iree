@@ -58,6 +58,9 @@ void iree_elf_call_v_v(const void* symbol_ptr);
 // void*(*)(int)
 void* iree_elf_call_p_i(const void* symbol_ptr, int a0);
 
+// void*(*)(int, void*)
+void* iree_elf_call_p_ip(const void* symbol_ptr, int a0, void* a1);
+
 // int(*)(void*, void*)
 int iree_elf_call_i_pp(const void* symbol_ptr, void* a0, void* a1);
 

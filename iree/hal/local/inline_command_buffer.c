@@ -14,7 +14,6 @@
 
 #include "iree/hal/local/inline_command_buffer.h"
 
-#include "iree/base/internal/debugging.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"

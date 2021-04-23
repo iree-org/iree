@@ -25,11 +25,24 @@
 ABSL_FLAG(std::string, identifier, "resources",
           "name of the resources function");
 ABSL_FLAG(std::string, output_header, "", "output header file");
-ABSL_FLAG(std::string, output_impl, "", "output cc impl file");
+ABSL_FLAG(std::string, output_impl, "", "output impl file");
 ABSL_FLAG(std::string, cpp_namespace, "", "generate in a c++ namespace");
+ABSL_FLAG(bool, c_output, false, "generate a c output");
 ABSL_FLAG(std::string, strip_prefix, "", "strip prefix from filenames");
 ABSL_FLAG(bool, flatten, false,
           "whether to flatten the directory structure (only include basename)");
+
+void GenerateExternCOpen(std::ofstream& f) {
+  f << "\n#if __cplusplus\n";
+  f << "extern \"C\" {\n";
+  f << "#endif // __cplusplus\n";
+}
+
+void GenerateExternCClose(std::ofstream& f) {
+  f << "#if __cplusplus\n";
+  f << "}\n";
+  f << "#endif // __cplusplus\n\n";
+}
 
 void GenerateNamespaceOpen(std::ofstream& f) {
   const auto& ns = absl::GetFlag(FLAGS_cpp_namespace);
@@ -54,32 +67,58 @@ void GenerateNamespaceClose(std::ofstream& f) {
 }
 
 void GenerateTocStruct(std::ofstream& f) {
+  const auto& c_output = absl::GetFlag(FLAGS_c_output);
   f << "#ifndef IREE_FILE_TOC\n";
   f << "#define IREE_FILE_TOC\n";
-  f << "namespace iree {\n";
-  f << "struct FileToc {\n";
+  if (c_output) {
+    GenerateExternCOpen(f);
+  } else {
+    f << "namespace iree {\n";
+  }
+  f << "struct iree_file_toc_t {\n";
   f << "  const char* name;             // the file's original name\n";
   f << "  const char* data;             // beginning of the file\n";
-  f << "  std::size_t size;             // length of the file\n";
-  f << "};\n";
-  f << "}  // namespace iree\n";
+  if (c_output) {
+    f << "  size_t size;                  // length of the file\n";
+    f << "};\n";
+    GenerateExternCClose(f);
+  } else {
+    f << "  std::size_t size;             // length of the file\n";
+    f << "};\n";
+    f << "}  // namespace iree\n";
+  }
   f << "#endif  // IREE_FILE_TOC\n";
 }
 
 bool GenerateHeader(const std::string& header_file,
                     const std::vector<std::string>& toc_files) {
   std::ofstream f(header_file, std::ios::out | std::ios::trunc);
+  const auto& c_output = absl::GetFlag(FLAGS_c_output);
+
   f << "#pragma once\n";  // Pragma once isn't great but is the best we can do.
-  f << "#include <cstddef>\n";
-  GenerateTocStruct(f);
-  GenerateNamespaceOpen(f);
-  f << "extern const struct ::iree::FileToc* "
-    << absl::GetFlag(FLAGS_identifier) << "_create();\n";
-  f << "static inline std::size_t " << absl::GetFlag(FLAGS_identifier)
-    << "_size() { \n";
-  f << "  return " << toc_files.size() << ";\n";
-  f << "}\n";
-  GenerateNamespaceClose(f);
+  if (c_output) {
+    f << "#include <stddef.h>\n";
+    GenerateTocStruct(f);
+    GenerateExternCOpen(f);
+    f << "const struct iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
+      << "_create();\n";
+    f << "static inline size_t " << absl::GetFlag(FLAGS_identifier)
+      << "_size() {\n";
+    f << "  return " << toc_files.size() << ";\n";
+    f << "}\n";
+    GenerateExternCClose(f);
+  } else {
+    f << "#include <cstddef>\n";
+    GenerateTocStruct(f);
+    GenerateNamespaceOpen(f);
+    f << "extern const struct ::iree::iree_file_toc_t* "
+      << absl::GetFlag(FLAGS_identifier) << "_create();\n";
+    f << "static inline std::size_t " << absl::GetFlag(FLAGS_identifier)
+      << "_size() { \n";
+    f << "  return " << toc_files.size() << ";\n";
+    f << "}\n";
+    GenerateNamespaceClose(f);
+  }
   f.close();
   return f.good();
 }
@@ -109,9 +148,16 @@ bool GenerateImpl(const std::string& impl_file,
                   const std::vector<std::string>& input_files,
                   const std::vector<std::string>& toc_files) {
   std::ofstream f(impl_file, std::ios::out | std::ios::trunc);
-  f << "#include <cstddef>\n";
-  GenerateTocStruct(f);
-  GenerateNamespaceOpen(f);
+  const auto& c_output = absl::GetFlag(FLAGS_c_output);
+  if (c_output) {
+    f << "#include <stddef.h>\n";
+    f << "#include <stdalign.h>\n";
+    GenerateTocStruct(f);
+  } else {
+    f << "#include <cstddef>\n";
+    GenerateTocStruct(f);
+    GenerateNamespaceOpen(f);
+  }
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "alignas(alignof(void*)) static char const file_" << i << "[] = {\n";
     std::string contents;
@@ -128,7 +174,11 @@ bool GenerateImpl(const std::string& impl_file,
     }
     f << "};\n";
   }
-  f << "static const struct ::iree::FileToc toc[] = {\n";
+  if (c_output) {
+    f << "static const struct iree_file_toc_t toc[] = {\n";
+  } else {
+    f << "static const struct ::iree::iree_file_toc_t toc[] = {\n";
+  }
   assert(input_files.size() == toc_files.size());
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "  {\n";
@@ -137,14 +187,22 @@ bool GenerateImpl(const std::string& impl_file,
     f << "    sizeof(file_" << i << ") - 1\n";
     f << "  },\n";
   }
-  f << "  {nullptr, nullptr, 0},\n";
-  f << "};\n";
-  f << "const struct ::iree::FileToc* " << absl::GetFlag(FLAGS_identifier)
-    << "_create() {\n";
+  if (c_output) {
+    f << "  {NULL, NULL, 0},\n";
+    f << "};\n";
+    f << "const struct iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
+      << "_create() {\n";
+  } else {
+    f << "  {nullptr, nullptr, 0},\n";
+    f << "};\n";
+    f << "const struct ::iree::iree_file_toc_t* "
+      << absl::GetFlag(FLAGS_identifier) << "_create() {\n";
+  }
   f << "  return &toc[0];\n";
   f << "}\n";
-
-  GenerateNamespaceClose(f);
+  if (!c_output) {
+    GenerateNamespaceClose(f);
+  }
   f.close();
   return f.good();
 }
@@ -175,7 +233,12 @@ int main(int argc, char** argv) {
     }
     toc_files.push_back(toc_file);
   }
-
+  // Can either generate the c or c++ output.
+  if (!absl::GetFlag(FLAGS_cpp_namespace).empty() &&
+      absl::GetFlag(FLAGS_c_output)) {
+    std::cerr << "Can only generate either c or c++ output.\n";
+    return 1;
+  }
   if (!absl::GetFlag(FLAGS_output_header).empty()) {
     if (!GenerateHeader(absl::GetFlag(FLAGS_output_header), toc_files)) {
       std::cerr << "Error generating headers.\n";

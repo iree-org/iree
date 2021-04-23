@@ -60,6 +60,20 @@ cc_library(
     hdrs = ["executable_library.h"],
 )
 
+cc_test(
+    name = "executable_library_test",
+    srcs = [
+        "executable_library_demo.c",
+        "executable_library_demo.h",
+        "executable_library_test.c",
+    ],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/hal/local:executable_library",
+    ],
+)
+
 cc_library(
     name = "local",
     srcs = [

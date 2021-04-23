@@ -32,7 +32,7 @@
 namespace {
 
 struct TestParams {
-  const iree::FileToc& module_file;
+  const iree::iree_file_toc_t& module_file;
   std::string function_name;
 };
 
