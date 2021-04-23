@@ -75,7 +75,7 @@ void GenerateTocStruct(std::ofstream& f) {
   } else {
     f << "namespace iree {\n";
   }
-  f << "struct FileToc {\n";
+  f << "struct iree_file_toc_t {\n";
   f << "  const char* name;             // the file's original name\n";
   f << "  const char* data;             // beginning of the file\n";
   if (c_output) {
@@ -100,7 +100,7 @@ bool GenerateHeader(const std::string& header_file,
     f << "#include <stddef.h>\n";
     GenerateTocStruct(f);
     GenerateExternCOpen(f);
-    f << "const struct FileToc* " << absl::GetFlag(FLAGS_identifier)
+    f << "const struct iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
       << "_create();\n";
     f << "static inline size_t " << absl::GetFlag(FLAGS_identifier)
       << "_size() {\n";
@@ -111,7 +111,7 @@ bool GenerateHeader(const std::string& header_file,
     f << "#include <cstddef>\n";
     GenerateTocStruct(f);
     GenerateNamespaceOpen(f);
-    f << "extern const struct ::iree::FileToc* "
+    f << "extern const struct ::iree::iree_file_toc_t* "
       << absl::GetFlag(FLAGS_identifier) << "_create();\n";
     f << "static inline std::size_t " << absl::GetFlag(FLAGS_identifier)
       << "_size() { \n";
@@ -175,9 +175,9 @@ bool GenerateImpl(const std::string& impl_file,
     f << "};\n";
   }
   if (c_output) {
-    f << "static const struct FileToc toc[] = {\n";
+    f << "static const struct iree_file_toc_t toc[] = {\n";
   } else {
-    f << "static const struct ::iree::FileToc toc[] = {\n";
+    f << "static const struct ::iree::iree_file_toc_t toc[] = {\n";
   }
   assert(input_files.size() == toc_files.size());
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
@@ -190,13 +190,13 @@ bool GenerateImpl(const std::string& impl_file,
   if (c_output) {
     f << "  {NULL, NULL, 0},\n";
     f << "};\n";
-    f << "const struct FileToc* " << absl::GetFlag(FLAGS_identifier)
+    f << "const struct iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
       << "_create() {\n";
   } else {
     f << "  {nullptr, nullptr, 0},\n";
     f << "};\n";
-    f << "const struct ::iree::FileToc* " << absl::GetFlag(FLAGS_identifier)
-      << "_create() {\n";
+    f << "const struct ::iree::iree_file_toc_t* "
+      << absl::GetFlag(FLAGS_identifier) << "_create() {\n";
   }
   f << "  return &toc[0];\n";
   f << "}\n";

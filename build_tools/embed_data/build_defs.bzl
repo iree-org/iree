@@ -29,17 +29,17 @@ def cc_embed_data(
 
     Generates a header like:
       namespace iree {
-        struct FileToc {
+        struct iree_file_toc_t {
           const char* name;             // the file's original name
           const char* data;             // beginning of the file
           size_t size;                  // length of the file
         };
       }
       namespace foo {
-      extern const struct ::iree::FileToc* this_rule_name_create();
+      extern const struct ::iree::iree_file_toc_t* this_rule_name_create();
       }
 
-    The 'this_rule_name()' function will return an array of FileToc
+    The 'this_rule_name()' function will return an array of iree_file_toc_t
     structs terminated by one that has nullptr 'name' and 'data' fields.
     The 'data' field always has an extra null terminator at the end (which
     is not included in the size).
@@ -109,7 +109,7 @@ def c_embed_data(
         #if __cplusplus
         extern "C" {
         #endif // __cplusplus
-        struct FileToc {
+        struct iree_file_toc_t {
           const char* name;             // the file's original name
           const char* data;             // beginning of the file
           size_t size;                  // length of the file
@@ -121,12 +121,12 @@ def c_embed_data(
         #if __cplusplus
         extern "C" {
         #endif // __cplusplus
-        const struct FileToc* this_rule_name__create();
+        const struct iree_file_toc_t* this_rule_name__create();
         #if __cplusplus
         }
         #endif // __cplusplus
 
-    The 'this_rule_name()' function will return an array of FileToc
+    The 'this_rule_name()' function will return an array of iree_file_toc_t
     structs terminated by one that has NULL 'name' and 'data' fields.
     The 'data' field always has an extra null terminator at the end (which
     is not included in the size).
