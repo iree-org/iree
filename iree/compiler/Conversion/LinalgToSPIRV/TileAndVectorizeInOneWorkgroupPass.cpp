@@ -52,7 +52,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopUtils.h"
 
-#define DEBUG_TYPE "iree-linalg-tile-and-fuse"
+#define DEBUG_TYPE "iree-spirv-tile-and-vectorize-in-one-workgroup"
 
 namespace mlir {
 namespace iree_compiler {
@@ -427,7 +427,7 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
     LaunchConfig &launchConfig = *launchConfigOpt;
 
     LLVM_DEBUG({
-      llvm::dbgs() << "\n--- IREE Linalg tile and fuse configuration ---\n";
+      llvm::dbgs() << "\n--- IREE Linalg tile configuration ---\n";
       llvm::dbgs() << "@func " << funcOp.getName() << ": # workgroup sizes: [";
       interleaveComma(launchConfig.getWorkgroupSize(), llvm::dbgs());
       llvm::dbgs() << "]\n";
