@@ -19,7 +19,6 @@
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
-#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
@@ -47,7 +46,6 @@ inline void registerCommonConversionPasses() {
 inline void registerHLOToLinalgPasses() {
   static bool init_once = []() {
     createDecomposeHLOClampPass();
-    createHLOToLinalgOnBuffersPass();
     createHLOToLinalgOnTensorsPass();
     createDemoteF32ToF16Pass();
     return true;

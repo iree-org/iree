@@ -232,7 +232,6 @@ if(${IREE_BUILD_COMPILER})
       ::init_mlir_passes_and_dialects
       ::init_xla_dialects
       iree::compiler::Conversion::init_conversions
-      iree::compiler::Conversion::HLOToLinalg
       iree::compiler::Dialect::HAL::Conversion::Passes
     INCLUDES
       "${IREE_EMITC_INCLUDES}"

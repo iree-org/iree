@@ -174,54 +174,15 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   // TODO(antiagainst): re-evaluate the inlining timing.
   //===--------------------------------------------------------------------===//
   pm.nest<ModuleOp>().addPass(createInlinerPass());
-
-  if (options.usingLinalgOnTensors) {
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createBufferAllocViewCleanUpPass());
-
-    WorkgroupMemoryAllocationFn allocationFn =
-        [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
-           Type elementType, ArrayRef<Value> dynamicSizes) {
-          MemRefType allocType = MemRefType::get(staticShape, elementType, {},
-                                                 getWorkgroupMemorySpace());
-          return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
-        };
-    addLinalgBufferizePasses(pm.nest<ModuleOp>(), allocationFn);
-  } else {
-    //===--------------------------------------------------------------------===//
-    // Inject shape calculation for output buffers.
-    //
-    // Pre-conditions:
-    //   - All transformations altering the tensor-level shapes have been done.
-    //   - "Root" dynamic tensors all pass through a single shapex.tie_shape
-    //     use which associates them to their shape.
-    //   - Loose, non-associated shapex.get_ranked_shape ops can exist anywhere
-    //     and will be resolved.
-    // Post-conditions:
-    //   - All dynamic tensors bridge through a shapex.tie_shape op with the
-    //     appropriate shape.
-    //   - No shapex.get_ranked_shape ops exist.
-    //   - Shape folding and canonicalization has been done.
-    //===--------------------------------------------------------------------===//
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        Shape::createTieDynamicShapesPass());
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        Shape::createMaterializeShapeCalculationsPass());
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        Shape::createHoistShapeCalculationsPass());
-
-    //===--------------------------------------------------------------------===//
-    // Convert XLA HLO ops to Linalg ops with buffer semantics.
-    //
-    // Post-conditions:
-    //   - All XLA HLO ops are converted.
-    //   - All Linalg ops are operating on buffers.
-    //===--------------------------------------------------------------------===//
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createDecomposeHLOClampPass());
-    addHLOToLinalgOnBuffersPasses(pm.nest<ModuleOp>());
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createBufferAllocViewCleanUpPass());
-  }
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createBufferAllocViewCleanUpPass());
+  WorkgroupMemoryAllocationFn allocationFn =
+      [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
+         Type elementType, ArrayRef<Value> dynamicSizes) {
+        MemRefType allocType = MemRefType::get(staticShape, elementType, {},
+                                               getWorkgroupMemorySpace());
+        return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
+      };
+  addLinalgBufferizePasses(pm.nest<ModuleOp>(), allocationFn);
 
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to SPIR-V ops.

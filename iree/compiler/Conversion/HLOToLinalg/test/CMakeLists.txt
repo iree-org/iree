@@ -16,16 +16,10 @@ iree_lit_test_suite(
   SRCS
     "concatenate.mlir"
     "decompose_hlo_clamp.mlir"
-    "dot.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
     "fusion.mlir"
-    "linalg_tensor_to_buffer.mlir"
-    "pad_tensor.mlir"
     "pad_tensor_to_tensor.mlir"
-    "pipeline_test.mlir"
-    "subtensor.mlir"
-    "subtensor_insert.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

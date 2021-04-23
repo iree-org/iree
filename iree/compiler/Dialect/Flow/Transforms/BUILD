@@ -52,7 +52,6 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Conversion/HLOToHLO",
-        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/HLOToLinalg:HLOToLinalgOnTensors",
         "//iree/compiler/Conversion/LinalgToLinalg",
         "//iree/compiler/Dialect/Flow/Analysis",
