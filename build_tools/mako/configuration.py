@@ -18,7 +18,9 @@ class TargetInfo:
   """Information of a target backend.
 
   Attributes:
-    name: The target name used in iree-translate, e.g., vulkan-spirv.
+    driver: The driver used in iree-benchmark-module, e.g., vulkan.
+    hal_target_backend: The target name used in iree-translate, e.g., vulkan-spirv.
+    taskset: The value used for taskset when benchmarking the IREE module.
     mako_tag: The value_key in Mako config. This will be used in Mako metric
       info, which should match to the config.
     compilation_flags: Addition compilation flags. This is useful to target
@@ -34,8 +36,6 @@ class TargetInfo:
                mako_tag,
                compilation_flags=None,
                runtime_flags=None):
-    if "_" in name:
-      raise ValueError("The target name contains invalid char '_'")
     if compilation_flags is None:
       compilation_flags = []
     if runtime_flags is None:
