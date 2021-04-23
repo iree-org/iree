@@ -45,7 +45,7 @@ iree_cc_library(
     "TileAndVectorizeInOneWorkgroupPass.cpp"
     "Utils.cpp"
     "VectorToGPUPass.cpp"
-    "VectorizeMemref.cpp"
+    "VectorizeMemrefLoadStorePass.cpp"
   DEPS
     ::CodeGenOptionUtils
     LLVMSupport

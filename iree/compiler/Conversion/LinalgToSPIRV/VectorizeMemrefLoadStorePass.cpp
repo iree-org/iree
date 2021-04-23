@@ -14,13 +14,16 @@
 
 //===----------------------------------------------------------------------===//
 //
-// Pass to convert memref into memref of vector.
+// This file implements a pass to vectorize scalar interface memrefs into vector
+// ones in order to perform vector load/store on these memrefs to achieve better
+// memory access patterns.
 //
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -29,18 +32,18 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-constexpr int kMaxVectorizationSizeInBits = 128;
+constexpr int kMaxVectorNumBits = 128;
 constexpr int kMaxVectorNumElements = 4;
 
 namespace mlir {
 namespace iree_compiler {
 
-/// Returns true if all uses are transfer read/write operations. If it returns
-/// true also return the uses of memref.
-static bool getUsesIfAllTransferOp(Value v,
+/// Writes all uses of the given memref `value` and returns true if all uses are
+/// transfer read/write operations.
+static bool getUsesIfAllTransferOp(Value value,
                                    SmallVectorImpl<Operation *> &uses) {
   assert(uses.empty() && "expected uses to be empty");
-  for (Operation *userOp : v.getUsers()) {
+  for (Operation *userOp : value.getUsers()) {
     if (isa<memref::DeallocOp>(userOp)) continue;
     // Only vectorize memref used by vector transfer ops.
     if (!isa<vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
@@ -65,9 +68,9 @@ static Optional<unsigned> getBitWidth(Type type) {
   return {};
 }
 
-// Calculate the vector size we want to use based on the memref uses.
+// Calculates the vector size we want to use based on the memref uses.
 static unsigned calculateMemrefVecSize(SmallVectorImpl<Operation *> &uses) {
-  unsigned minSize = kMaxVectorizationSizeInBits;
+  unsigned minSize = kMaxVectorNumBits;
   for (Operation *op : uses) {
     auto transferOp = dyn_cast<VectorTransferOpInterface>(op);
     if (!transferOp) return 0;
@@ -81,9 +84,9 @@ static unsigned calculateMemrefVecSize(SmallVectorImpl<Operation *> &uses) {
 /// If the memref is vectorizable return the vector size we want to use,
 /// otherwise return 0. If it returns a value greater than 0 it also returns the
 /// memref uses.
-static unsigned isMemRefAndVectorizable(Value v,
+static unsigned isMemRefAndVectorizable(Value value,
                                         SmallVectorImpl<Operation *> &uses) {
-  auto memrefType = v.getType().dyn_cast<MemRefType>();
+  auto memrefType = value.getType().dyn_cast<MemRefType>();
 
   // Require scalar element type
   if (!memrefType || memrefType.getElementType().isa<VectorType>()) return 0;
@@ -97,85 +100,58 @@ static unsigned isMemRefAndVectorizable(Value v,
   // buffer.
   if (memrefType.getShape().back() % 2 != 0) return 0;
 
-  if (kMaxVectorizationSizeInBits % memrefType.getElementTypeBitWidth() != 0)
-    return 0;
+  if (kMaxVectorNumBits % memrefType.getElementTypeBitWidth() != 0) return 0;
 
-  if (getUsesIfAllTransferOp(v, uses)) return calculateMemrefVecSize(uses);
+  if (getUsesIfAllTransferOp(value, uses)) return calculateMemrefVecSize(uses);
   return 0;
 }
 
 namespace {
 /// Analyze memref usages to decide if it should be vectorized. Right now the
-/// logic is to vectorize memref only if it is used by
-/// vectortransfer_read/vectortransfer_write operations.
+/// logic is to vectorize memref only if it is used by vector transfer
+/// read/write ops.
 class MemRefUsageAnalysis {
  public:
   explicit MemRefUsageAnalysis(mlir::Operation *);
 
   // Returns true if the memref should be converted to a vector of memref.
-  bool vectorizeMemRef(Value v) const { return vectorization_size.count(v); }
+  bool vectorizeMemRef(Value value) const {
+    return valueToVectorBitsMap.count(value);
+  }
 
   // Return the size of the vector we want to use for memref vectorization.
-  unsigned getMemRefVectorSizeInBits(Value v) const {
-    return vectorization_size.find(v)->second;
+  unsigned getMemRefVectorSizeInBits(Value value) const {
+    return valueToVectorBitsMap.find(value)->second;
   }
   // Returns true if the transfer operation needs to be updated during memref
   // vectorization.
   bool transferConvert(Operation *op) const { return transferOps.count(op); }
 
  private:
-  void analyzeFunc(FuncOp funcOp);
-  void analyzeAlloc(memref::AllocOp allocOp);
-  void analyzePlaceholder(IREE::PlaceholderOp placeholderOp);
-  void analyzeInterfaceBinding(IREE::HAL::InterfaceBindingSubspanOp bindingOp);
-  llvm::DenseMap<Value, unsigned> vectorization_size;
+  void analyzeMemRefValue(Value value);
+
+  llvm::DenseMap<Value, unsigned> valueToVectorBitsMap;
   llvm::DenseSet<Operation *> transferOps;
 };
 
 MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
   op->walk([&](Operation *op) {
-    if (auto func = dyn_cast<FuncOp>(op)) analyzeFunc(func);
-    if (auto alloc = dyn_cast<memref::AllocOp>(op)) analyzeAlloc(alloc);
-    if (auto placeholder = dyn_cast<IREE::PlaceholderOp>(op))
-      analyzePlaceholder(placeholder);
-    if (auto bindingOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op))
-      analyzeInterfaceBinding(bindingOp);
+    TypeSwitch<Operation *>(op)
+        .Case<FuncOp>([this](FuncOp funcOp) {
+          for (Value arg : funcOp.getArguments()) {
+            analyzeMemRefValue(arg);
+          }
+        })
+        .Case<memref::AllocOp, IREE::PlaceholderOp,
+              IREE::HAL::InterfaceBindingSubspanOp>(
+            [this](auto op) { analyzeMemRefValue(op); });
   });
 }
 
-void MemRefUsageAnalysis::analyzeFunc(FuncOp funcOp) {
-  for (Value arg : funcOp.getArguments()) {
-    SmallVector<Operation *, 4> vectorUses;
-    if (unsigned vectorSize = isMemRefAndVectorizable(arg, vectorUses)) {
-      vectorization_size.insert(std::make_pair(arg, vectorSize));
-      transferOps.insert(vectorUses.begin(), vectorUses.end());
-    }
-  }
-}
-
-void MemRefUsageAnalysis::analyzePlaceholder(
-    IREE::PlaceholderOp placeholderOp) {
+void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
   SmallVector<Operation *, 4> vectorUses;
-  if (unsigned vectorSize =
-          isMemRefAndVectorizable(placeholderOp, vectorUses)) {
-    vectorization_size.insert(std::make_pair(placeholderOp, vectorSize));
-    transferOps.insert(vectorUses.begin(), vectorUses.end());
-  }
-}
-
-void MemRefUsageAnalysis::analyzeInterfaceBinding(
-    IREE::HAL::InterfaceBindingSubspanOp bindingOp) {
-  SmallVector<Operation *, 4> vectorUses;
-  if (unsigned vectorSize = isMemRefAndVectorizable(bindingOp, vectorUses)) {
-    vectorization_size.insert(std::make_pair(bindingOp, vectorSize));
-    transferOps.insert(vectorUses.begin(), vectorUses.end());
-  }
-}
-
-void MemRefUsageAnalysis::analyzeAlloc(memref::AllocOp allocOp) {
-  SmallVector<Operation *, 4> vectorUses;
-  if (unsigned vectorSize = isMemRefAndVectorizable(allocOp, vectorUses)) {
-    vectorization_size.insert(std::make_pair(allocOp, vectorSize));
+  if (unsigned vectorSize = isMemRefAndVectorizable(value, vectorUses)) {
+    valueToVectorBitsMap.insert(std::make_pair(value, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
 }
@@ -527,12 +503,13 @@ void VectorizeMemRefPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref() {
+std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemrefLoadStorePass() {
   return std::make_unique<VectorizeMemRefPass>();
 }
 
 static PassRegistration<VectorizeMemRefPass> pass(
-    "iree-spirv-vectorize-memref",
-    "Vectorize memref arguments and allocations");
+    "iree-spirv-vectorize-memref-load-store",
+    "Vectorize interface memrefs and their load/store for better memory "
+    "access");
 }  // namespace iree_compiler
 }  // namespace mlir

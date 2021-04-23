@@ -74,7 +74,7 @@ inline void registerLinalgToSPIRVPasses() {
     createVectorToGPUPass();
     createMatMulTileAndVectorizeGPUPass();
     createForOpCanonicalizationPass();
-    createVectorizeMemref();
+    createVectorizeMemrefLoadStorePass();
     return true;
   }();
   (void)init_once;
