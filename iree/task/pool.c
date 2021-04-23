@@ -14,7 +14,6 @@
 
 #include "iree/task/pool.h"
 
-#include "iree/base/internal/debugging.h"
 #include "iree/base/internal/math.h"
 
 // Minimum byte size of a block in bytes, including the tasks as well as the
