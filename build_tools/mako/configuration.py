@@ -42,7 +42,7 @@ class TargetInfo:
       runtime_flags = []
     self.driver = driver
     self.hal_target_backend = hal_target_backend
-    self.taskset = taskset,
+    self.taskset = taskset
     self.mako_tag = mako_tag
     self.compilation_flags = compilation_flags
     self.runtime_flags = runtime_flags
