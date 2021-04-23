@@ -47,7 +47,7 @@ cc_library(
         "TileAndVectorizeInOneWorkgroupPass.cpp",
         "Utils.cpp",
         "VectorToGPUPass.cpp",
-        "VectorizeMemref.cpp",
+        "VectorizeMemrefLoadStorePass.cpp",
     ],
     hdrs = [
         "CooperativeMatrixAnalysis.h",

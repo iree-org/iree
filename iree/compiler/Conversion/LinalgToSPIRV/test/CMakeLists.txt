@@ -29,7 +29,6 @@ iree_lit_test_suite(
     "matmul_fused_vectorization.mlir"
     "matmul_vectorization.mlir"
     "matmul_vectorization_licm.mlir"
-    "memref_vecrotization.mlir"
     "pipeline_matmul_vectorization.mlir"
     "pipeline_test_cooperative_mat.mlir"
     "promote_workgroup_memory.mlir"
@@ -37,6 +36,7 @@ iree_lit_test_suite(
     "tile_and_vectorize_conv.mlir"
     "tile_and_vectorize_matmul.mlir"
     "vector_to_gpu.mlir"
+    "vectorize_memref_load_store.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

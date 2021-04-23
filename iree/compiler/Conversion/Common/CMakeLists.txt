@@ -21,6 +21,7 @@ iree_cc_library(
   SRCS
     "BufferAllocViewCleanUpPass.cpp"
     "FlattenMemRefSubspanPass.cpp"
+    "ForOpCanonicalizationPass.cpp"
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
     "LinalgRewriteDestructiveUpdatesPass.cpp"
