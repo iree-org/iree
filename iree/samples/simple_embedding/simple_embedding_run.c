@@ -140,17 +140,12 @@ iree_status_t Run(char* hal_driver_name) {
   iree_hal_buffer_release(arg0_buffer);
   iree_hal_buffer_release(arg1_buffer);
 
-  // Setup call inputs with our buffers. The vm list is allocated statically.
+  // Setup call inputs with our buffers.
   iree_vm_list_t* inputs = NULL;
-  iree_host_size_t input_list_size = iree_vm_list_storage_size(
-      /*element_type=*/NULL, /*capacity=*/2);
-  void* input_list_storage = iree_alloca(input_list_size);
-  IREE_RETURN_IF_ERROR(
-      iree_vm_list_initialize(
-          iree_make_byte_span(input_list_storage, input_list_size),
-          /*element_type=*/NULL,
-          /*capacity=*/2, &inputs),
-      "can't allocate input vm list");
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(
+                           /*element_type=*/NULL,
+                           /*capacity=*/2, iree_allocator_system(), &inputs),
+                       "can't allocate input vm list");
 
   iree_vm_ref_t arg0_buffer_view_ref =
       iree_hal_buffer_view_move_ref(arg0_buffer_view);
@@ -164,15 +159,10 @@ iree_status_t Run(char* hal_driver_name) {
   // Prepare outputs list to accept the results from the invocation.
   // The output vm list is allocated statically.
   iree_vm_list_t* outputs = NULL;
-  iree_host_size_t output_list_size = iree_vm_list_storage_size(
-      /*element_type=*/NULL, /*capacity=*/1);
-  void* output_list_storage = iree_alloca(output_list_size);
-  IREE_RETURN_IF_ERROR(
-      iree_vm_list_initialize(
-          iree_make_byte_span(output_list_storage, output_list_size),
-          /*element_type=*/NULL,
-          /*capacity=*/1, &outputs),
-      "can't allocate output vm list");
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(
+                           /*element_type=*/NULL,
+                           /*capacity=*/1, iree_allocator_system(), &outputs),
+                       "can't allocate output vm list");
 
   // Synchronously invoke the function.
   IREE_RETURN_IF_ERROR(iree_vm_invoke(context, main_function,
@@ -200,9 +190,8 @@ iree_status_t Run(char* hal_driver_name) {
   }
   iree_hal_buffer_unmap_range(&mapped_memory);
 
-  // Deinitialize the statically allocated input/output vm lists.
-  iree_vm_list_deinitialize(inputs);
-  iree_vm_list_deinitialize(outputs);
+  iree_vm_list_release(inputs);
+  iree_vm_list_release(outputs);
   iree_hal_device_release(device);
   iree_vm_context_release(context);
   iree_vm_instance_release(instance);
