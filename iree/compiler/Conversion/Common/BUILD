@@ -23,6 +23,7 @@ cc_library(
     srcs = [
         "BufferAllocViewCleanUpPass.cpp",
         "FlattenMemRefSubspanPass.cpp",
+        "ForOpCanonicalizationPass.cpp",
         "LaunchConfig.cpp",
         "LinalgBufferizePass.cpp",
         "LinalgRewriteDestructiveUpdatesPass.cpp",

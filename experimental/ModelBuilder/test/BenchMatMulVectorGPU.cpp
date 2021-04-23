@@ -16,8 +16,8 @@
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
 #include "experimental/ModelBuilder/VulkanWrapperPass.h"
-#include "iree/compiler/Conversion/CodegenUtils/ForOpCanonicalization.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
+#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
@@ -88,7 +88,7 @@ static void addLoweringPasses(mlir::PassManager &pm,
   pm.addPass(memref::createFoldSubViewOpsPass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
-  pm.addPass(mlir::iree_compiler::createVectorizeMemref());
+  pm.addPass(mlir::iree_compiler::createVectorizeMemrefLoadStorePass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::iree_compiler::createForOpCanonicalizationPass());
   pm.addPass(mlir::createCSEPass());
