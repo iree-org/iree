@@ -37,7 +37,8 @@ def main() -> None:
         subprocess.run(args=[
             IREE_TRANSLATE_PATH, model_benchmark.model_path,
             "--iree-mlir-to-vm-bytecode-module",
-            f"--iree-hal-target-backends={target.name}", "-o", module_name
+            f"--iree-hal-target-backends={target.hal_target_backend}", "-o",
+            module_name
         ] + target.compilation_flags,
                        check=True)
 
