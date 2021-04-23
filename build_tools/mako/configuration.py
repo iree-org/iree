@@ -114,7 +114,7 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
                      "-iree-flow-dispatch-formation-enable-operand-fusion"
                  ]),
       TargetInfo(
-          dirver="vulkan",
+          driver="vulkan",
           hal_target_backend="vulkan-spirv",
           taskset="f0",
           mako_tag="vlk",
@@ -152,7 +152,7 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
                      "-iree-flow-dispatch-formation-enable-operand-fusion"
                  ]),
       TargetInfo(
-          dirver="vulkan",
+          driver="vulkan",
           hal_target_backend="vulkan-spirv",
           taskset="f0",
           mako_tag="vlk",
