@@ -71,13 +71,13 @@ iree_status_t Run(char* hal_driver_name) {
 
   // Load bytecode module from the embedded data.
 #if IREE_ARCH_RISCV_64
-  const struct FileToc* module_file_toc =
+  const struct iree_file_toc_t* module_file_toc =
       simple_embedding_test_llvm_aot_rv64_create();
 #else
   // Note the setup here only supports native build. The bytecode is not built
   // for the cross-compile execution. The code can be compiled but it will
   // hit runtime error in a cross-compile environment.
-  const struct FileToc* module_file_toc =
+  const struct iree_file_toc_t* module_file_toc =
       simple_embedding_test_bytecode_module_c_create();
 #endif
 

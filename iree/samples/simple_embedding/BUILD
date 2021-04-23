@@ -22,6 +22,17 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# The prebuilt simple_embedding_test-llvm-aot_rv64 bytecode module is build with
+# RISC-V 64-bit cross-compile toolchain (with RISCV_TOOLCHAIN_ROOT defined):
+# iree-translate \
+#     -iree-mlir-to-vm-bytecode-module \
+#     -iree-hal-target-backends=dylib-llvm-aot \
+#     -iree-llvm-target-triple=riscv64 \
+#     -iree-llvm-target-cpu=generic-rv64 \
+#     -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c" \
+#     -iree-llvm-target-abi=lp64d \
+#     iree/samples/simple_embedding/simple_embedding_test.mlir \
+#     -o /tmp/simple_embedding_test-llvm-aot_rv64.vmfb
 c_embed_data(
     name = "simple_embedding_test_llvm_aot_rv64",
     srcs = [
