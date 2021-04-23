@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree_tf_compiler/TFL/Passes.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"

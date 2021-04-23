@@ -17,6 +17,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/StringExtras.h"
 
 namespace mlir {
 namespace iree_integrations {
