@@ -119,7 +119,10 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   // - It assumes that tf_saved_model.bound_inputs have been eliminated
   // - It removes tf_saved_model.semantics from the module, which we can only
   //   do at the very end.
-  pm.addPass(createLowerExportedFunctionsPass());
+  // pm.addPass(createLowerExportedFunctionsPass());
+  pm.addPass(createSavedModelToIREEABIPass());
+  // Inline the wrapper functions.
+  pm.addPass(createInlinerPass());
 
   //----------------------------------------------------------------------------
   // Ensure that all Tensorflow has been legalized away

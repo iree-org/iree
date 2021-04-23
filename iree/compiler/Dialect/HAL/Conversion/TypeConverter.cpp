@@ -43,7 +43,7 @@ HALTypeConverter::HALTypeConverter(
     // HAL only should be concerned with numeric values.
     if (HALTypeConverter::shouldConvertToBuffer(type)) {
       // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
-      return IREE::HAL::BufferType::get(type.getContext());
+      return IREE::HAL::BufferViewType::get(type.getContext());
     }
     return llvm::None;
   });
