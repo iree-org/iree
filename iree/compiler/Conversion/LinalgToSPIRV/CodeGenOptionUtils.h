@@ -36,9 +36,9 @@ struct SPIRVCodegenOptions {
   llvm::SmallVector<unsigned, 3> workgroupSize = {};
   llvm::SmallVector<unsigned, 3> workgroupTileSizes = {};
   llvm::SmallVector<unsigned, 3> invocationTileSizes = {};
+
   bool enableVectorization = false;
   bool useWorkgroupMemory = false;
-  bool vectorizeMemref = false;
   bool usingLinalgOnTensors = false;
 };
 
