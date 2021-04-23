@@ -102,7 +102,7 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
   targets = [
       TargetInfo(driver="vmla",
                  hal_target_backend="vmla",
-                 taskset="f0",
+                 taskset="80",
                  mako_tag="vmla"),
       TargetInfo(driver="dylib-sync",
                  hal_target_backend="dylib-llvm-aot",
@@ -116,7 +116,7 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
       TargetInfo(
           driver="vulkan",
           hal_target_backend="vulkan-spirv",
-          taskset="f0",
+          taskset="80",
           mako_tag="vlk",
           compilation_flags=[
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10",
@@ -140,7 +140,7 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
   targets = [
       TargetInfo(driver="vmla",
                  hal_target_backend="vmla",
-                 taskset="f0",
+                 taskset="80",
                  mako_tag="vmla"),
       TargetInfo(driver="dylib-sync",
                  hal_target_backend="dylib-llvm-aot",
@@ -154,7 +154,7 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
       TargetInfo(
           driver="vulkan",
           hal_target_backend="vulkan-spirv",
-          taskset="f0",
+          taskset="80",
           mako_tag="vlk",
           compilation_flags=[
               "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
