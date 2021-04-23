@@ -339,6 +339,10 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n);
 
+// Removes leading and trailing whitespace.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_string_view_trim(iree_string_view_t value);
+
 // Returns a substring of the string view at offset |pos| and length |n|.
 // Use |n| == INTPTR_MAX to take the remaineder of the string after |pos|.
 // Returns empty string on failure.
