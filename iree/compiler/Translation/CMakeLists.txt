@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTranslation
+    iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::SIP::Transforms
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Dialect::Flow::IR

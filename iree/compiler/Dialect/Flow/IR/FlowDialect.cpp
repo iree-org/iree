@@ -34,6 +34,28 @@ namespace Flow {
 
 namespace {
 
+// Used to control inlining behavior.
+struct FlowInlinerInterface : public DialectInlinerInterface {
+  using DialectInlinerInterface::DialectInlinerInterface;
+
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    // Sure!
+    return true;
+  }
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+};
+
 struct FlowFolderInterface : public DialectFoldInterface {
   using DialectFoldInterface::DialectFoldInterface;
 
@@ -47,7 +69,7 @@ struct FlowFolderInterface : public DialectFoldInterface {
 
 FlowDialect::FlowDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<FlowDialect>()) {
-  addInterfaces<FlowFolderInterface>();
+  addInterfaces<FlowInlinerInterface, FlowFolderInterface>();
   addTypes<DispatchTensorType>();
 
 #define GET_OP_LIST

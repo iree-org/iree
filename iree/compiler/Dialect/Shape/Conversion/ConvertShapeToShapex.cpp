@@ -128,6 +128,27 @@ class ConvertShapeOfOp : public OpConversionPattern<shape::ShapeOfOp> {
   }
 };
 
+class ConvertTensorExtract : public OpConversionPattern<tensor::ExtractOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      tensor::ExtractOp op, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    tensor::ExtractOpAdaptor operands(rawOperands);
+    if (!operands.tensor().getType().isa<RankedShapeType>()) {
+      return rewriter.notifyMatchFailure(op, "not acting on a ranked shape");
+    }
+    auto dim = operands.indices().front();
+    auto dimConstOp = dyn_cast_or_null<ConstantIndexOp>(dim.getDefiningOp());
+    if (!dimConstOp) {
+      return rewriter.notifyMatchFailure(op, "extract index not constant");
+    }
+    rewriter.replaceOpWithNewOp<Shape::RankedDimOp>(
+        op, rewriter.getIndexType(), operands.tensor(),
+        dimConstOp.value().cast<IntegerAttr>());
+    return success();
+  }
+};
+
 class ConvertGetExtent : public OpConversionPattern<shape::GetExtentOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -287,6 +308,7 @@ class ConvertShapeToShapex
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<ConvertConstShapeOp>(context);
     patterns.insert<ConvertShapeOfOp>(context);
+    patterns.insert<ConvertTensorExtract>(context);
     patterns.insert<ConvertGetExtent>(context);
     patterns.insert<ConvertFromExtents>(context);
     patterns.insert<ConvertSplitAtOp>(context);

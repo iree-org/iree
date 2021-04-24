@@ -48,6 +48,20 @@ HALTypeConverter::HALTypeConverter(
     return llvm::None;
   });
 
+  addTargetMaterialization([](OpBuilder &builder, IREE::HAL::BufferType type,
+                              ValueRange inputs, Location loc) -> Value {
+    assert(inputs.size() == 1);
+    assert(inputs[0].getType().isa<TensorType>());
+    return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputs[0]);
+  });
+  addTargetMaterialization([](OpBuilder &builder,
+                              IREE::HAL::BufferViewType type, ValueRange inputs,
+                              Location loc) -> Value {
+    assert(inputs.size() == 1);
+    assert(inputs[0].getType().isa<TensorType>());
+    return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputs[0]);
+  });
+
   // Recursively handle pointer target types (we want to convert
   // ptr<tensor<...>> to ptr<!hal.buffer<...>>, for example).
   addConversion([this](IREE::PtrType type) -> Type {
