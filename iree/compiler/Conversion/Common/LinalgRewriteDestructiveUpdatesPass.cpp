@@ -516,8 +516,8 @@ void LinalgRewriteDestructiveUpdates::runOnFunction() {
     //   inplace_update_tiles_rooted_at @io::@arg0, offset = %c0
     //   %2 = hal.interface.load.tensor @io::@arg0, offset = %c0 :
     //     tensor<2x4xf32>
-    //   hal.interface.store.tensor %2, @io::@ret0, offset = %c0
-    //     {operand_result_index = 3 : i32} : tensor<2x4xf32>
+    //   hal.interface.store.tensor %2, @io::@ret0, offset = %c0 :
+    //     tensor<2x4xf32>
     //   return
     // ```
     // where the inplace update could be done directly in @io::@ret0,
