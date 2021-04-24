@@ -16,8 +16,9 @@
 #include "iree/testing/gtest.h"
 
 extern "C" int main(int argc, char** argv) {
+  // Pass through flags to gtest.
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   ::testing::InitGoogleTest(&argc, argv);
-  iree_flags_parse_checked(&argc, &argv);
 
   return RUN_ALL_TESTS();
 }

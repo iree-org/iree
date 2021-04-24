@@ -22,7 +22,7 @@ iree_cc_library(
   SRCS
     "driver_module.cc"
   DEPS
-    absl::flags
+    iree::base::internal::flags
     iree::hal::api
     iree::hal::local::loaders::embedded_library_loader
     iree::hal::local::loaders::legacy_library_loader

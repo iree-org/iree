@@ -79,15 +79,18 @@ func @add(%lhs: tensor<4xf32>, %rhs: tensor<4xf32>) -> tensor<4xf32>
 # First translate into a VM bytecode module using linalg on tensors path.
 $ ../iree-build/iree/tools/iree-translate \
  -iree-mlir-to-vm-bytecode-module \
- --iree-hal-target-backends=cuda \
+ -iree-hal-target-backends=cuda \
  -iree-flow-dispatch-linalg-on-tensors \
  /tmp/add.mlir \
  -o /tmp/mhlo-add.vmfb
 
 # Run the module through CUDA HAL backend.
 $ ../iree-build/iree/tools/iree-run-module \
--module_file=/tmp/mhlo-add.vmfb -driver=cuda -entry_function=add \
---function_inputs='4xf32=[1 2 3 4], 4xf32=[2 2 2 2]'
+  --driver=cuda \
+  --module_file=/tmp/mhlo-add.vmfb \
+  --entry_function=add \
+  --function_input="4xf32=[1 2 3 4]" \
+  --function_input="4xf32=[2 2 2 2]"
 
 EXEC @add
 4xf32=3 4 5 6

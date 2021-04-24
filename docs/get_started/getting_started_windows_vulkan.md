@@ -132,10 +132,18 @@ Pass the flag `-driver=vulkan` to `iree-run-module.exe`:
 ```powershell
 # -- CMake --
 > cmake --build ..\iree-build\ --target iree_tools_iree-run-module
-> ..\iree-build\iree\tools\iree-run-module.exe -module_file=.\build\module.vmfb -driver=vulkan -entry_function=abs -function_inputs="i32=-2"
+> ..\iree-build\iree\tools\iree-run-module.exe \
+    --driver=vulkan \
+    --module_file=.\build\module.vmfb \
+    --entry_function=abs \
+    --function_input=i32=-2
 
 # -- Bazel --
-> bazel run iree/tools:iree-run-module -- -module_file=.\build\module.vmfb -driver=vulkan -entry_function=abs -function_inputs="i32=-2"
+> bazel run iree/tools:iree-run-module -- \
+    --driver=vulkan \
+    --module_file=.\build\module.vmfb \
+    --entry_function=abs \
+    --function_input=i32=-2
 ```
 
 ## Running IREE's Vulkan Samples

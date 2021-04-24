@@ -39,9 +39,6 @@ cc_binary(
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/flags:usage",
         "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
     ],
@@ -64,7 +61,6 @@ cc_binary(
         "//iree/testing:gtest",
         "//iree/tools/utils:vm_util",
         "//iree/vm:bytecode_module",
-        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -254,7 +250,6 @@ cc_binary(
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:Support",
@@ -280,7 +275,6 @@ cc_binary(
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
     ],
 )
