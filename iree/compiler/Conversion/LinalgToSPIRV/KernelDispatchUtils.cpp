@@ -343,7 +343,9 @@ LogicalResult getGenericOpLaunchConfig(linalg::LinalgOp linalgOp,
   config.workgroupSize[0] = subgroupSize;
   config.workgroupSize[1] = 1;
   config.workgroupSize[2] = 1;
-  ShapedType outputShape = linalgOp.getOutputShapedType(0);
+  SmallVector<ShapedType> inputTypes, outputTypes;
+  std::tie(inputTypes, outputTypes) = getInputOutputTypes(linalgOp);
+  ShapedType outputShape = outputTypes[0];
 
   SmallVector<int64_t, 4> candidateTileSizes;
   // When Vectororization is not enabled we skil the second level of tiling and
