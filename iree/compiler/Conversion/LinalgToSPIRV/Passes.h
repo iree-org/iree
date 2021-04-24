@@ -45,16 +45,6 @@ createConvertToGPUPass();
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
-/// Pass to split computation workload to multiple sequential dispatch
-/// functions. This pass operates on Linalg ops and prepares for lowering to
-/// GPU, where we need to tile the workload to workgroups and workitems. If the
-/// workload involves computation A and B, where B is dependent on A and A needs
-/// all workgroups to complete, then we need to split A and B into different
-/// kernels because there is no mechanism to perform cross-workgroup
-/// synchronization within a single kernel.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createSplitDispatchFunctionPass();
-
 /// Pass to convert vector operations to GPU level operations. Instructions of
 /// vector size equal to subgroup size are distributed across the subgroup.
 std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
@@ -85,11 +75,6 @@ createMaterializeEntryPointsPass();
 /// tiling and distribution scheme.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createConcretizeTileAmongWorkgroupsPass(const SPIRVCodegenOptions &options);
-
-/// Tiles and distributes Linalg operations on buffers among multiple
-/// workgroups.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createTileAndDistributeAmongWorkgroupsPass(const SPIRVCodegenOptions &options);
 
 //===----------------------------------------------------------------------===//
 // Pipelines
