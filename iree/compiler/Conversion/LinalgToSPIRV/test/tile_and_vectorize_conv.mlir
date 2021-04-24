@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups,iree-spirv-tile-and-vectorize-in-one-workgroup))" -iree-spirv-enable-vectorization -iree-codegen-spirv-experimental-linalg-on-tensors -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups,iree-spirv-tile-and-vectorize-in-one-workgroup))" -canonicalize -cse %s | IreeFileCheck %s
 
 hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
   hal.interface @io {

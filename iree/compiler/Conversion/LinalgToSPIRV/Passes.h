@@ -37,7 +37,7 @@ createTileAndVectorizeInOneWorkgroupPass(const SPIRVCodegenOptions &options);
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createConvertToGPUPass(const SPIRVCodegenOptions &options);
+createConvertToGPUPass();
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 /// This pass converts remaining interface ops into SPIR-V global variables,

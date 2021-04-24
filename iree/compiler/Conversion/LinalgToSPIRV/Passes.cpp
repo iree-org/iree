@@ -83,14 +83,10 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     - The Linalg op is kept untouched.
   //
   //===--------------------------------------------------------------------===//
-  if (options.usingLinalgOnTensors) {
-    // flow.dispatch.workgroups performed abstract tiling and distribution. Make
-    // them concrete now since we know the target and settings now.
-    pm.addPass(createConcretizeTileAmongWorkgroupsPass(options));
-  } else {
-    pm.addPass(createSplitDispatchFunctionPass());
-    pm.addPass(createTileAndDistributeAmongWorkgroupsPass(options));
-  }
+
+  // flow.dispatch.workgroups performed abstract tiling and distribution. Make
+  // them concrete now since we know the target and settings now.
+  pm.addPass(createConcretizeTileAmongWorkgroupsPass(options));
 
   pm.addPass(createTileAndVectorizeInOneWorkgroupPass(options));
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
@@ -103,10 +99,8 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     workgroups.
   //   - Linalg ops are converted to loop.for ops and mapped to workitems.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createConvertToGPUPass(options));
-  if (options.enableVectorization) {
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorToGPUPass());
-  }
+  pm.addPass(createConvertToGPUPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorToGPUPass());
   pm.nest<ModuleOp>().addPass(createLowerAffinePass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
@@ -120,29 +114,22 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - Load/store on std.subview ops are converted into load/store on the
   //     original buffers.
   //===--------------------------------------------------------------------===//
-  if (options.enableVectorization) {
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createVectorTransferOptimizationPass());
-  }
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+      createVectorTransferOptimizationPass());
   pm.nest<ModuleOp>().addPass(memref::createFoldSubViewOpsPass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
-  if (options.enableVectorization) {
-    pm.nest<ModuleOp>().addPass(createVectorizeMemrefLoadStorePass());
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createConvertVectorToCooperativeMatrixPass());
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createForOpCanonicalizationPass());
-    pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
-    pm.nest<ModuleOp>().addPass(createCSEPass());
-  }
+  pm.nest<ModuleOp>().addPass(createVectorizeMemrefLoadStorePass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+      createConvertVectorToCooperativeMatrixPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addPass(createCSEPass());
 
-  if (options.usingLinalgOnTensors) {
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createFlattenMemRefSubspanPass());
-    pm.nest<ModuleOp>().addPass(createLowerAffinePass());
-    pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
-    pm.nest<ModuleOp>().addPass(createCSEPass());
-  }
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createFlattenMemRefSubspanPass());
+  pm.nest<ModuleOp>().addPass(createLowerAffinePass());
+  pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addPass(createCSEPass());
 
   //===--------------------------------------------------------------------===//
   // Final conversion to SPIR-V dialect.

@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))" -iree-codegen-spirv-experimental-linalg-on-tensors -cse -canonicalize -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))" -canonicalize -cse -split-input-file %s | IreeFileCheck %s
 
 hal.executable @add attributes {sym_visibility = "private"} {
   hal.interface @io {

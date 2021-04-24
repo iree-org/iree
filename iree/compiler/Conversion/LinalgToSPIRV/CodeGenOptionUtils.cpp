@@ -20,12 +20,6 @@ namespace mlir {
 namespace iree_compiler {
 
 SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
-  static llvm::cl::opt<bool> clEnableVectorization(
-      "iree-spirv-enable-vectorization",
-      llvm::cl::desc(
-          "Enable vectorization transformations in SPIR-V code generation"),
-      llvm::cl::init(false));
-
   static llvm::cl::list<unsigned> clWorkgroupTileSizes(
       "iree-spirv-workgroup-tile-size",
       llvm::cl::desc("Set tile sizes to use for each workgroup when tiling "
@@ -48,11 +42,6 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
       llvm::cl::desc("Set workgroup size to use for SPIR-V code generation"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 
-  static llvm::cl::opt<bool> clEnableLinalgOnTensorsSPIRV(
-      "iree-codegen-spirv-experimental-linalg-on-tensors",
-      llvm::cl::desc("Enable the linalg on tensors on SPIR-V path"),
-      llvm::cl::init(true));
-
   SPIRVCodegenOptions options;
   options.workgroupSize.assign(clWorkgroupSizes.begin(),
                                clWorkgroupSizes.end());
@@ -60,10 +49,7 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
                                     clWorkgroupTileSizes.end());
   options.invocationTileSizes.assign(clInvocationTileSizes.begin(),
                                      clInvocationTileSizes.end());
-  options.enableVectorization =
-      clEnableLinalgOnTensorsSPIRV || clEnableVectorization;
   options.useWorkgroupMemory = clUseWorkgroupMemory;
-  options.usingLinalgOnTensors = clEnableLinalgOnTensorsSPIRV;
   return options;
 }
 

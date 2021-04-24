@@ -499,22 +499,14 @@ static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
 
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
-class ConvertToGPUPass
+struct ConvertToGPUPass
     : public PassWrapper<ConvertToGPUPass,
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
- public:
-  ConvertToGPUPass(const SPIRVCodegenOptions &passOptions)
-      : options(passOptions) {}
-  ConvertToGPUPass(const ConvertToGPUPass &pass) : options(pass.options) {}
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect,
                     ShapeDialect>();
   }
   void runOnOperation() override;
-
- private:
-  SPIRVCodegenOptions options;
 };
 
 struct SerializeParallelLoopPattern
@@ -601,15 +593,14 @@ LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
 template <typename LinalgOpTy>
 struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   MapLinalgOpToLocalInvocationId(MLIRContext *context,
-                                 bool usingLinalgOnTensorsPath,
                                  PatternBenefit benefit = 1)
-      : OpConversionPattern<LinalgOpTy>(context, benefit),
-        usingLinalgOnTensorsPath(usingLinalgOnTensorsPath) {}
+      : OpConversionPattern<LinalgOpTy>(context, benefit) {}
+
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (failed(mapLinalgOpToLocalInvocationIdImpl(linalgOp, operands, rewriter,
-                                                  usingLinalgOnTensorsPath)))
+    if (failed(mapLinalgOpToLocalInvocationIdImpl(
+            linalgOp, operands, rewriter, /*optimizeControlFlow=*/true)))
       return failure();
 
     // If the `linalgOp` writes to workgroup memory insert barrier after the
@@ -626,13 +617,6 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
     rewriter.eraseOp(linalgOp);
     return success();
   }
-
- private:
-  /// Flag to signify if Linalg on tensors path is being used. The control flow
-  /// optimizations implemented on legacy path seems to be failing on this
-  /// path. Assuming this overhead is not too much, for now just generated the
-  /// extra loops.
-  bool usingLinalgOnTensorsPath;
 };
 
 /// Given the workload return the workgroup count along X obtained by
@@ -655,10 +639,8 @@ template <typename LinalgOpTy>
 struct MapLinalgOpToGlobalInvocationId
     : public OpConversionPattern<LinalgOpTy> {
   MapLinalgOpToGlobalInvocationId(MLIRContext *context,
-                                  bool usingLinalgOnTensorsPath,
                                   PatternBenefit benefit = 1)
-      : OpConversionPattern<LinalgOpTy>(context, benefit),
-        usingLinalgOnTensorsPath(usingLinalgOnTensorsPath) {}
+      : OpConversionPattern<LinalgOpTy>(context, benefit) {}
 
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
@@ -685,46 +667,15 @@ struct MapLinalgOpToGlobalInvocationId
         workgroupSize = {32, 1, 1};
       }
     }
-    if (usingLinalgOnTensorsPath) {
-      WorkgroupCountRegionBuilder regionBuilder =
-          [&workgroupSize](
-              OpBuilder &b, Location loc,
-              std::array<Value, 3> workload) -> std::array<Value, 3> {
-        Value one = b.create<ConstantIndexOp>(loc, 1);
-        return {getWorkgroupCountX(b, loc, workload, workgroupSize[0]), one,
-                one};
-      };
-      if (failed(defineWorkgroupCountRegion(rewriter, funcOp, regionBuilder))) {
-        return failure();
-      }
-    } else {
-      // TODO (GH-4901): Only support static shapes on this path. This should be
-      // removed when moved to linalg on tensors.
-      Optional<SmallVector<int64_t, 4>> staticLoopRange =
-          linalgOp.getStaticLoopRanges();
-      if (!staticLoopRange ||
-          llvm::any_of(staticLoopRange.getValue(), [](int64_t d) {
-            return d == ShapedType::kDynamicSize;
-          })) {
-        return linalgOp.emitError("failed to find statlc loop bounds");
-      }
-      ArrayRef<int64_t> parallelLoopRange(staticLoopRange.getValue());
-      unsigned numOuterParallel = getNumOuterParallelLoops(linalgOp);
-      parallelLoopRange = parallelLoopRange.take_front(numOuterParallel);
-      WorkgroupCountRegionBuilder regionBuilder =
-          [&parallelLoopRange, &workgroupSize](
-              OpBuilder &b, Location loc,
-              std::array<Value, 3> workload) -> std::array<Value, 3> {
-        Value one = b.create<ConstantIndexOp>(loc, 1);
-        auto values = llvm::to_vector<4>(
-            llvm::map_range(parallelLoopRange, [&](int64_t dim) -> Value {
-              return b.create<ConstantIndexOp>(loc, dim);
-            }));
-        return {getWorkgroupCountX(b, loc, values, workgroupSize[0]), one, one};
-      };
-      if (failed(defineWorkgroupCountRegion(rewriter, funcOp, regionBuilder))) {
-        return failure();
-      }
+    WorkgroupCountRegionBuilder regionBuilder =
+        [&workgroupSize](OpBuilder &b, Location loc,
+                         std::array<Value, 3> workload) {
+          Value one = b.create<ConstantIndexOp>(loc, 1);
+          return std::array<Value, 3>{
+              getWorkgroupCountX(b, loc, workload, workgroupSize[0]), one, one};
+        };
+    if (failed(defineWorkgroupCountRegion(rewriter, funcOp, regionBuilder))) {
+      return failure();
     }
     if (failed(updateWorkGroupSize(funcOp, workgroupSize))) {
       return failure();
@@ -732,13 +683,6 @@ struct MapLinalgOpToGlobalInvocationId
     rewriter.eraseOp(linalgOp);
     return success();
   }
-
- private:
-  /// Flag to signify if Linalg on tensors path is being used. This changes the
-  /// way the number of workgroups is computed. With the linalg on tensors path,
-  /// the hal.executable.entry_point will be updated to contain a region that
-  /// gives the number of workgroups to use.
-  bool usingLinalgOnTensorsPath;
 };
 
 /// Remove the linalg.range operation created when lowering to loops.
@@ -843,8 +787,7 @@ void ConvertToGPUPass::runOnOperation() {
       MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCMaxFOp>,
       MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCMinFOp>,
       MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCSumFOp>,
-      RemoveLinalgRange, SerializeParallelLoopPattern>(
-      context, options.usingLinalgOnTensors);
+      RemoveLinalgRange, SerializeParallelLoopPattern>(context);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
   for (FuncOp funcOp : getOperation().getInnerModule().getOps<FuncOp>()) {
@@ -860,15 +803,13 @@ void ConvertToGPUPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createConvertToGPUPass(const SPIRVCodegenOptions &options) {
-  return std::make_unique<ConvertToGPUPass>(options);
+createConvertToGPUPass() {
+  return std::make_unique<ConvertToGPUPass>();
 }
 
 static PassRegistration<ConvertToGPUPass> pass(
-    "iree-codegen-convert-to-gpu", "Map tiled linalg and loop ops to GPU", [] {
-      SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
-      return std::make_unique<ConvertToGPUPass>(options);
-    });
+    "iree-codegen-convert-to-gpu", "Map tiled linalg and loop ops to GPU",
+    [] { return std::make_unique<ConvertToGPUPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir
