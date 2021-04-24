@@ -8,12 +8,41 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
+iree_add_all_subdirs()
+
+iree_c_embed_data(
+  NAME
+    simple_embedding_test_llvm_aot_rv64
+  SRCS
+    "data/simple_embedding_test-llvm-aot_rv64.vmfb"
+  C_FILE_OUTPUT
+    "simple_embedding_test_llvm_aot_rv64.c"
+  H_FILE_OUTPUT
+    "simple_embedding_test_llvm_aot_rv64.h"
+  FLATTEN
+  PUBLIC
+)
+
+iree_cc_binary(
+  NAME
+    simple_embedding_run
+  SRCS
+    "simple_embedding_run.c"
+  DEPS
+    ::simple_embedding_test_bytecode_module_c
+    ::simple_embedding_test_llvm_aot_rv64
+    iree::base::api
+    iree::hal::api
+    iree::hal::drivers
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+)
+
 if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
    OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
   return()
 endif()
-
-iree_add_all_subdirs()
 
 iree_bytecode_module(
   NAME
@@ -22,12 +51,20 @@ iree_bytecode_module(
     "simple_embedding_test.mlir"
   CC_NAMESPACE
     "iree::samples"
+  C_OUTPUT
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=dylib-llvm-aot"
     "-iree-hal-target-backends=vulkan-spirv"
   PUBLIC
 )
+
+# Bytecode is built without cross-compilation. Bypass the following test if it
+# is not built for the host machine.
+
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|x86_64|AMD64")
+  return()
+endif()
 
 iree_cc_test(
   NAME
