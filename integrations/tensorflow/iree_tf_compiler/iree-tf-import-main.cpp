@@ -24,6 +24,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -160,6 +161,11 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Save the resultant IR to this file (useful for saving an "
                      "intermediate in a pipeline)"),
       llvm::cl::init(""));
+  static llvm::cl::opt<bool> prettifyTfDebugInfo(
+      "prettify-tf-debug-info",
+      llvm::cl::desc("Prettifies TF debug information to make it easier "
+                     "to look at"),
+      llvm::cl::init(true));
 
   // Register any command line options.
   registerAsmPrinterCLOptions();
@@ -172,6 +178,10 @@ int main(int argc, char **argv) {
 
   MLIRContext context(registry);
   context.loadAllAvailableDialects();
+
+  llvm::SourceMgr sourceMgr;
+  mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
+
   OwningModuleRef module;
 
   auto saveToFile = [&](llvm::StringRef savePath) -> LogicalResult {
@@ -209,6 +219,10 @@ int main(int argc, char **argv) {
   // Run passes.
   PassManager pm(&context, PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
+
+  if (prettifyTfDebugInfo) {
+    pm.addPass(iree_integrations::TF::createPrettifyDebugInfoPass());
+  }
 
   iree_integrations::TF::buildTFImportPassPipeline(pm);
   if (failed(pm.run(*module))) {
