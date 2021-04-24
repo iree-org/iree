@@ -177,17 +177,6 @@ Status ParseToVariantList(
   return ParseToVariantList(descs, allocator, input_views, out_list);
 }
 
-Status ParseToVariantListFromFile(
-    absl::Span<const RawSignatureParser::Description> descs,
-    iree_hal_allocator_t* allocator, const std::string& filename,
-    iree_vm_list_t** out_list) {
-  std::string contents;
-  IREE_RETURN_IF_ERROR(file_io::GetFileContents(filename.c_str(), &contents));
-  std::vector<absl::string_view> input_views(
-      absl::StrSplit(contents, '\n', absl::SkipEmpty()));
-  return ParseToVariantList(descs, allocator, input_views, out_list);
-}
-
 Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                         iree_vm_list_t* variant_list, std::ostream* os) {
   for (int i = 0; i < iree_vm_list_size(variant_list); ++i) {

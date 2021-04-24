@@ -39,7 +39,6 @@
 #include <iostream>
 #include <utility>
 
-#include "absl/flags/flag.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
@@ -118,13 +117,6 @@ static llvm::cl::list<std::string> function_inputs_flag{
     "function-input",
     llvm::cl::desc("Input shapes and optional values"),
     llvm::cl::ZeroOrMore,
-};
-
-static llvm::cl::opt<std::string> function_inputs_file_flag{
-    "function-input-file",
-    llvm::cl::desc("Provides a file for input shapes and optional values (see "
-                   "ParseToVariantListFromFile in vm_util.h for details)"),
-    llvm::cl::init(""),
 };
 
 static llvm::cl::opt<bool> run_flag{
@@ -274,21 +266,11 @@ Status EvaluateFunction(iree_vm_context_t* context,
   std::vector<RawSignatureParser::Description> input_descs;
   IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
   vm::ref<iree_vm_list_t> inputs;
-  if (!function_inputs_file_flag.empty()) {
-    if (!function_inputs_flag.empty()) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "expected only one of function_inputs and "
-                              "function_inputs_file to be set");
-    }
-    IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
-        input_descs, allocator, function_inputs_file_flag, &inputs));
-  } else {
-    auto function_inputs_list = absl::MakeConstSpan(
-        function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
-        function_inputs_flag.size());
-    IREE_RETURN_IF_ERROR(ParseToVariantList(input_descs, allocator,
-                                            function_inputs_list, &inputs));
-  }
+  auto function_inputs_list = absl::MakeConstSpan(
+      function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
+      function_inputs_flag.size());
+  IREE_RETURN_IF_ERROR(ParseToVariantList(input_descs, allocator,
+                                          function_inputs_list, &inputs));
 
   std::vector<RawSignatureParser::Description> output_descs;
   IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
@@ -520,7 +502,8 @@ extern "C" int main(int argc, char** argv) {
   }
   argc_absl += run_args_flag.size();
   char** argv_absl_ptr = argv_absl.data();
-  iree_flags_parse_checked(&argc_absl, &argv_absl_ptr);
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc_absl,
+                           &argv_absl_ptr);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
 

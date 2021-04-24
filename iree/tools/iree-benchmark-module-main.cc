@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "absl/flags/flag.h"
-#include "absl/flags/internal/parse.h"
-#include "absl/flags/usage.h"
-#include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
@@ -27,39 +23,54 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
-ABSL_FLAG(std::string, module_file, "-",
+IREE_FLAG(string, module_file, "-",
           "File containing the module to load that contains the entry "
           "function. Defaults to stdin.");
 
 // TODO(hanchung): Extract the batch size using
 // iree_vm_function_reflection_attr.
-ABSL_FLAG(
-    int, batch_size, 1,
+IREE_FLAG(
+    int32_t, batch_size, 1,
     "The number of batch size, which is expected to match "
     "iree-hal-benchmark-dispatch-repeat-count when translating the module");
 
-ABSL_FLAG(std::string, entry_function, "",
+IREE_FLAG(string, entry_function, "",
           "Name of a function contained in the module specified by module_file "
           "to run. If this is not set, all the exported functions will be "
           "benchmarked and they are expected to not have input arguments.");
 
-ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
+IREE_FLAG(string, driver, "vmla", "Backend driver to use.");
 
-ABSL_FLAG(std::vector<std::string>, function_inputs, {},
-          "A comma-separated list of of input buffers of the format:"
-          "[shape]xtype=[value]\n"
-          "2x2xi32=1 2 3 4\n"
-          "Optionally, brackets may be used to separate the element values. "
-          "They are ignored by the parser.\n"
-          "2x2xi32=[[1 2][3 4]]\n"
-          "Due to the absence of repeated flags in absl, commas should not be "
-          "used to separate elements. They are reserved for separating input "
-          "values:\n"
-          "2x2xi32=[[1 2][3 4]], 1x2xf32=[[1 2]]");
-
-ABSL_FLAG(std::string, function_inputs_file, "",
-          "Provides a file for input shapes and optional values (see "
-          "ParseToVariantListFromFile in vm_util.h for details)");
+static iree_status_t parse_function_input(iree_string_view_t flag_name,
+                                          void* storage,
+                                          iree_string_view_t value) {
+  auto* list = (std::vector<std::string>*)storage;
+  list->push_back(std::string(value.data, value.size));
+  return iree_ok_status();
+}
+static void print_function_input(iree_string_view_t flag_name, void* storage,
+                                 FILE* file) {
+  auto* list = (std::vector<std::string>*)storage;
+  if (list->empty()) {
+    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
+  } else {
+    for (size_t i = 0; i < list->size(); ++i) {
+      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
+              list->at(i).c_str());
+    }
+  }
+}
+static std::vector<std::string> FLAG_function_inputs;
+IREE_FLAG_CALLBACK(
+    parse_function_input, print_function_input, &FLAG_function_inputs,
+    function_input,
+    "An input value or buffer of the format:\n"
+    "  [shape]xtype=[value]\n"
+    "  2x2xi32=1 2 3 4\n"
+    "Optionally, brackets may be used to separate the element values:\n"
+    "  2x2xi32=[[1 2][3 4]]\n"
+    "Each occurrence of the flag indicates an input in the order they were\n"
+    "specified on the command line.");
 
 namespace iree {
 namespace {
@@ -91,7 +102,7 @@ void RegisterModuleBenchmarks(
     iree_vm_function_t function, iree_vm_list_t* inputs,
     const std::vector<RawSignatureParser::Description>& output_descs) {
   auto benchmark_name = "BM_" + function_name;
-  int batch_size = absl::GetFlag(FLAGS_batch_size);
+  int batch_size = FLAG_batch_size;
   benchmark::RegisterBenchmark(
       benchmark_name.c_str(),
       [benchmark_name, batch_size, context, function, inputs,
@@ -116,7 +127,7 @@ void RegisterModuleBenchmarks(
 
 Status GetModuleContentsFromFlags(std::string* out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
-  auto module_file = absl::GetFlag(FLAGS_module_file);
+  auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
     *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
                                 std::istreambuf_iterator<char>()};
@@ -156,7 +167,7 @@ class IREEBenchmark {
       IREE_RETURN_IF_ERROR(Init());
     }
 
-    auto function_name = absl::GetFlag(FLAGS_entry_function);
+    auto function_name = std::string(FLAG_entry_function);
     if (!function_name.empty()) {
       IREE_RETURN_IF_ERROR(RegisterSpecificFunction(function_name));
     } else {
@@ -178,7 +189,7 @@ class IREEBenchmark {
 
     // Create IREE's device and module.
     IREE_RETURN_IF_ERROR(
-        iree::CreateDevice(absl::GetFlag(FLAGS_driver), &device_));
+        iree::CreateDevice(std::string(FLAG_driver), &device_));
     IREE_RETURN_IF_ERROR(CreateHalModule(device_, &hal_module_));
     IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data_, &input_module_));
 
@@ -206,15 +217,9 @@ class IREEBenchmark {
     // Construct inputs.
     std::vector<RawSignatureParser::Description> input_descs;
     IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-    if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
-      IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
-          input_descs, iree_hal_device_allocator(device_),
-          absl::GetFlag(FLAGS_function_inputs_file), &inputs_));
-    } else {
-      IREE_RETURN_IF_ERROR(
-          ParseToVariantList(input_descs, iree_hal_device_allocator(device_),
-                             absl::GetFlag(FLAGS_function_inputs), &inputs_));
-    }
+    IREE_CHECK_OK(ParseToVariantList(input_descs,
+                                     iree_hal_device_allocator(device_),
+                                     FLAG_function_inputs, &inputs_));
 
     // Creates output signature.
     std::vector<RawSignatureParser::Description> output_descs;
@@ -266,25 +271,12 @@ class IREEBenchmark {
 int main(int argc, char** argv) {
   IREE_TRACE_SCOPE0("main");
 
-  // We have to contend with two flag parsing libraries here: absl's and
-  // benchmark's. To make matters worse, both define the `--help` flag. To
-  // ensure that each is able to parse its own flags, we use an absl "internal"
-  // function (still with public visibility) to parse while ignoring undefined
-  // flags. If it sees `--help` it will exit here, so we include the benchmark
-  // library usage information in the manually-set help output. Then we let
-  // benchmark parse its flags. Finally we call the normal initialization
-  // function to do other IREE initialization including flag parsing with
-  // normal options. Any remaining flags will be unknown and result in an error.
-  absl::SetProgramUsageMessage(
-      "iree-benchmark-module \n"
-      "    --module_file=module.vmfb\n"
-      "    --entry_function=exported_function_to_benchmark\n"
-      "      If this is not set, all the exported functions will be \n"
-      "      benchmarked and they are expected to not have input arguments\n"
-      "    [--function_inputs=2xi32=1 2,1x2xf32=2 1 | \n"
-      "     --function_inputs_file=file_with_function_inputs]\n"
-      "    [--driver=vmla]\n"
-      "\n\n"
+  // We have to contend with two flag parsing libraries here: IREE's and
+  // benchmark's. We let flags go to IREE first and then it'll pass any it
+  // doesn't recognize on to benchmark. We let IREE handle the help, though, so
+  // we need to include the relevant benchmark flags for users.
+  iree_flags_set_usage(
+      "iree-benchmark-module",
       "  Optional flags from third_party/benchmark/src/benchmark.cc:\n"
       "    [--benchmark_list_tests={true|false}]\n"
       "    [--benchmark_filter=<regex>]\n"
@@ -298,12 +290,8 @@ int main(int argc, char** argv) {
       "    [--benchmark_color={auto|true|false}]\n"
       "    [--benchmark_counters_tabular={true|false}]\n"
       "    [--v=<verbosity>]\n");
-  absl::flags_internal::ParseCommandLineImpl(
-      argc, argv, absl::flags_internal::ArgvListAction::kRemoveParsedArgs,
-      absl::flags_internal::UsageFlagsAction::kHandleUsage,
-      absl::flags_internal::OnUndefinedFlag::kIgnoreUndefined);
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   ::benchmark::Initialize(&argc, argv);
-  iree_flags_parse_checked(&argc, &argv);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
 

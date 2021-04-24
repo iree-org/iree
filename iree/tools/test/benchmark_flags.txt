@@ -1,22 +1,16 @@
-// HELP: iree-benchmark-module
-// HELP: --module_file
-// HELP: --benchmark_list_tests
 // RUN: ( iree-benchmark-module --help || [[ $? == 1 ]] )  | IreeFileCheck --check-prefix=HELP %s
-// RUN: ( iree-benchmark-module --helpshort || [[ $? == 1 ]] ) | IreeFileCheck --check-prefix=HELP %s
+// HELP: --benchmark_list_tests
+// HELP: --module_file
 
-// UNKNOWN: unknown-flag
-// RUN: ( iree-benchmark-module --unknown-flag 2>&1 || [[ $? == 1 ]] ) | IreeFileCheck --check-prefix=UNKNOWN %s
-// RUN: ( iree-benchmark-module --driver=vmla --unknown-flag --benchmark_list_tests 2>&1 || [[ $? == 1 ]] ) | IreeFileCheck --check-prefix=UNKNOWN %s
-
-// LIST-BENCHMARKS: BM_foo1
-// LIST-BENCHMARKS: BM_foo2
 // RUN: ( iree-translate --iree-hal-target-backends=vmla -iree-mlir-to-vm-bytecode-module %s | iree-benchmark-module --benchmark_list_tests --driver=vmla --benchmark_list_tests ) | IreeFileCheck --check-prefix=LIST-BENCHMARKS %s
 module {
+  // LIST-BENCHMARKS: BM_foo1
   func @foo1() -> tensor<4xf32> attributes { iree.module.export } {
     %input = iree.unfoldable_constant dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf32>
     %result = "mhlo.exponential"(%input) : (tensor<4xf32>) -> tensor<4xf32>
     return %result : tensor<4xf32>
   }
+  // LIST-BENCHMARKS: BM_foo2
   func @foo2() -> tensor<4xf32> attributes { iree.module.export } {
     %input = iree.unfoldable_constant dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf32>
     %result = "mhlo.abs"(%input) : (tensor<4xf32>) -> tensor<4xf32>

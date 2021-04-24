@@ -137,9 +137,11 @@ Example:
 ```shell
 TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module \
   --driver=dylib \
-  --function_inputs='1x384xi32,1x384xi32,1x384xi32' \
   --module_file=/data/local/tmp/android_module.fbvm \
-  --entry_function=serving_default
+  --entry_function=serving_default \
+  --function_input=1x384xi32 \
+  --function_input=1x384xi32 \
+  --function_input=1x384xi32
 ```
 
 ## Running the Tracy profiler UI, connecting and visualizing

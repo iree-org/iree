@@ -99,7 +99,7 @@ cc_library(
     deps = [
         ":core_headers",
         ":tracing",
-        "@com_google_absl//absl/flags:flag",
+        "//iree/base/internal:flags",
         "@com_google_absl//absl/strings:str_format",
     ],
 )
