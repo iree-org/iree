@@ -13,11 +13,11 @@
 // limitations under the License.
 
 #include "iree_tf_compiler/TFL/Passes.h"
+#include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
-#include "llvm/ADT/StringExtras.h"
 
 namespace mlir {
 namespace iree_integrations {
