@@ -58,6 +58,7 @@ def iree_bytecode_module(
             flatten = True,
             **kwargs
         )
+
     # Embed the module for use in C.
     if c_output:
         c_embed_data(
