@@ -315,11 +315,11 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index
         %c0 = constant 0 : index
-        %0 = iree.placeholder for "interface buffer" {binding = @io::@arg0, operand_result_num = 0 : i32} : memref<4096x4096xf16>
-        %1 = iree.placeholder for "interface buffer" {binding = @io::@arg1, operand_result_num = 1 : i32} : memref<4096x4096xf16>
-        %2 = iree.placeholder for "interface buffer" {binding = @io::@ret0, operand_result_num = 2 : i32} : memref<4096x4096xf16>
-        %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-        %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4096x4096xf16>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
+        %3 = hal.interface.workgroup.size[0] : index
+        %4 = hal.interface.workgroup.size[1] : index
         scf.for %arg0 = %c0 to %c4096 step %c32 {
           %5 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%4]
           %6 = memref.subview %0[%5, %arg0] [128, 32] [1, 1] : memref<4096x4096xf16> to memref<128x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
