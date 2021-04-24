@@ -24,7 +24,6 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"

@@ -16,7 +16,6 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/LLVMCodeGenOptions.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
