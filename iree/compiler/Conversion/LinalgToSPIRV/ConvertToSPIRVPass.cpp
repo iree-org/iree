@@ -71,11 +71,6 @@ spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
 
 /// Returns the IREE::HAL::InterfaceBindingOp from an interface op.
 IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
-  if (auto placeholderOp = dyn_cast<IREE::PlaceholderOp>(op)) {
-    return cast<IREE::HAL::InterfaceBindingOp>(
-        SymbolTable::lookupNearestSymbolFrom(
-            op, op->getAttrOfType<SymbolRefAttr>("binding")));
-  }
   if (auto bindingSubspanOp =
           dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op)) {
     return bindingSubspanOp.queryBindingOp();
@@ -83,8 +78,8 @@ IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
   llvm_unreachable("unknown interface binding op");
 }
 
-/// Returns the (set, binding) pair for the given placeholder op.
-std::pair<int32_t, int32_t> getPlaceholderSetAndBinding(Operation *op) {
+/// Returns the (set, binding) pair for the given interface op.
+std::pair<int32_t, int32_t> getInterfaceSetAndBinding(Operation *op) {
   IREE::HAL::InterfaceBindingOp bindingOp = getBindingOp(op);
   return {bindingOp.set().getSExtValue(), bindingOp.binding().getSExtValue()};
 }
@@ -94,15 +89,15 @@ llvm::DenseSet<Operation *> getAliasedResources(ModuleOp module) {
   llvm::DenseSet<Operation *> aliasedResources;
 
   for (FuncOp func : module.getOps<FuncOp>()) {
-    // Collect all placeholder ops and their (set, binding) pairs in this
+    // Collect all interface ops and their (set, binding) pairs in this
     // function.
-    SmallVector<Operation *, 4> placeholderOps;
+    SmallVector<Operation *, 4> interfaceOps;
     SmallVector<std::pair<uint32_t, uint32_t>, 4> setBindings;
     llvm::DenseMap<std::pair<uint32_t, uint32_t>, unsigned> setBindingCount;
     func.walk([&](Operation *op) {
-      if (isa<IREE::PlaceholderOp, IREE::HAL::InterfaceBindingSubspanOp>(op)) {
-        placeholderOps.emplace_back(op);
-        setBindings.emplace_back(getPlaceholderSetAndBinding(op));
+      if (isa<IREE::HAL::InterfaceBindingSubspanOp>(op)) {
+        interfaceOps.emplace_back(op);
+        setBindings.emplace_back(getInterfaceSetAndBinding(op));
         ++setBindingCount[setBindings.back()];
       }
     });
@@ -110,9 +105,9 @@ llvm::DenseSet<Operation *> getAliasedResources(ModuleOp module) {
     // Perform analysis to determine whether we need to mark the resource as
     // alias. This should happen when we have multiple resources binding to the
     // same (set, binding) pair and they are used in the same function.
-    for (unsigned i = 0; i < placeholderOps.size(); ++i) {
+    for (unsigned i = 0; i < interfaceOps.size(); ++i) {
       if (setBindingCount[setBindings[i]] > 1) {
-        aliasedResources.insert(placeholderOps[i]);
+        aliasedResources.insert(interfaceOps[i]);
       }
     }
   }
@@ -157,9 +152,9 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
   }
 };
 
-/// A pattern to convert iree.placeholdder/hal.interface.binding.subspan into a
-/// sequence of SPIR-V ops to get the address to a global variable representing
-/// the resource buffer.
+/// A pattern to convert hal.interface.binding.subspan into a sequence of SPIR-V
+/// ops to get the address to a global variable representing the resource
+/// buffer.
 template <typename InterfaceOpTy>
 struct InterfaceOpConverter final : public OpConversionPattern<InterfaceOpTy> {
   InterfaceOpConverter(TypeConverter &typeConverter, MLIRContext *context,
@@ -181,8 +176,8 @@ struct InterfaceOpConverter final : public OpConversionPattern<InterfaceOpTy> {
     }
     auto bindingOp = getBindingOp(interfaceOp.getOperation());
 
-    // We always create a new resource variable for the placeholder and use the
-    // placeholder op's pointer address as the `id`.
+    // We always create a new resource variable for the interface and use the
+    // interface op's pointer address as the `id`.
     spirv::GlobalVariableOp varOp = insertResourceVariable(
         interfaceOp.getLoc(), convertedType,
         reinterpret_cast<uint64_t>(interfaceOp.getOperation()),
@@ -318,8 +313,7 @@ void ConvertToSPIRVPass::runOnOperation() {
           IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>>(
       typeConverter, context);
   auto aliasedResources = getAliasedResources(moduleOp);
-  patterns.insert<InterfaceOpConverter<IREE::PlaceholderOp>,
-                  InterfaceOpConverter<IREE::HAL::InterfaceBindingSubspanOp>>(
+  patterns.insert<InterfaceOpConverter<IREE::HAL::InterfaceBindingSubspanOp>>(
       typeConverter, context, aliasedResources);
   /// Fold operations as no-ops
   /// - linalg.reshape becomes a no-op since all memrefs are linearized in

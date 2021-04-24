@@ -72,29 +72,6 @@ def IREE_ByteBufferConstantOp : IREE_PureOp<"byte_buffer.constant"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Executable ABI DO NOT ADD THINGS HERE
-//===----------------------------------------------------------------------===//
-
-// ***WARNING***: this is going away soon - please don't extend or add more
-// things like this to this file. Ops should go to the dialect they relate to
-// (HAL, in this case).
-def IREE_PlaceholderOp : IREE_Op<"placeholder", [MemoryEffects<[MemAlloc]>]> {
-  let summary = "A placeholder op to feed a value/buffer into computation";
-  let description = [{
-    This op is intended as a way to represent a value or buffer that will be fed
-    into computation. It can host additional attributes related to the value or
-    buffer. This op can be used for the cases where one need to feed in value or
-    buffer to computation in a function but cannot do that via the function
-    argument due to ABI or contract issues.
-  }];
-
-  let arguments = (ins StrAttr:$purpose);
-  let results = (outs Res<AnyType, "", [MemAlloc]>:$output);
-
-  let assemblyFormat = [{ `for` $purpose attr-dict `:` type($output) }];
-}
-
-//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
