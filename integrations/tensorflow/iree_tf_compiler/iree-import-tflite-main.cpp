@@ -76,6 +76,9 @@ int main(int argc, char **argv) {
   MLIRContext context(registry);
   context.loadAllAvailableDialects();
 
+  llvm::SourceMgr sourceMgr;
+  mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
+
   // Load input buffer.
   std::string errorMessage;
   auto inputFile = openInputFile(inputPath, &errorMessage);
