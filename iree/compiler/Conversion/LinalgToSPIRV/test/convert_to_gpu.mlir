@@ -1,80 +1,79 @@
-// RUN: iree-opt -split-input-file -iree-codegen-spirv-experimental-linalg-on-tensors=false -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))' -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))' -canonicalize -cse %s | IreeFileCheck %s
 
-// TODO(GH-4901): Enable this test when linalg on tensors becomes default.
-// #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// hal.executable @parallel_4D attributes {sym_visibility = "private"} {
-//   hal.interface @io {
-//     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-//     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-//     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-//   }
-//   hal.executable.target @vulkan, filter="vulkan*" {
-//     hal.executable.entry_point @parallel_4D attributes {
-//       interface = @io, ordinal = 0 : index,
-//       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
-//         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
-//     module attributes {
-//       spv.target_env =
-//         #spv.target_env<#spv.vce<v1.3,
-//         [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-//         {max_compute_workgroup_invocations = 128 : i32,
-//          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-//       func @parallel_4D() {
-//         %c0 = constant 0 : index
-//         %arg0 = hal.interface.subspan @io::@arg0[%c0] : memref<?x?x?x?xf32>
-//         %arg1 = hal.interface.subspan @io::@arg1[%c0] : memref<?x?x?x?xf32>
-//         %arg2 = hal.interface.subspan @io::@ret0[%c0] : memref<?x?x?x?xf32>
-//         linalg.generic {
-//            indexing_maps = [#map0, #map0, #map0],
-//            iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-//           ins(%arg0, %arg1 : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>)
-//          outs(%arg2 : memref<?x?x?x?xf32>) {
-//         ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
-//           %0 = addf %arg3, %arg4 : f32
-//           linalg.yield %0 : f32
-//         }
-//         return
-//       }
-//       func private @parallel_4D__num_workgroups__
-//         (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
-//          !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
-//       hal.interface @io attributes {sym_visibility = "private"} {
-//         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-//         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-//         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-//       }
-//     }
-//   }
-// }
-// // NOCHECK-LABEL: func @parallel_4D
-// //  NOCHECK-SAME:   local_size = dense<[32, 1, 1]>
-// //   NOCHECK-DAG:     %[[C0:.+]] = constant 0 : index
-// //   NOCHECK-DAG:     %[[C1:.+]] = constant 1 : index
-// //   NOCHECK-DAG:     %[[C2:.+]] = constant 2 : index
-// //   NOCHECK-DAG:     %[[C3:.+]] = constant 3 : index
-// //   NOCHECK-DAG:     %[[UB0:.+]] = memref.dim %{{.+}}, %[[C0]]
-// //   NOCHECK-DAG:     %[[UB1:.+]] = memref.dim %{{.+}}, %[[C1]]
-// //   NOCHECK-DAG:     %[[UB2:.+]] = memref.dim %{{.+}}, %[[C2]]
-// //   NOCHECK-DAG:     %[[UB3:.+]] = memref.dim %{{.+}}, %[[C3]]
-// //       NOCHECK:     %[[T4:.+]] = muli %[[UB3]], %[[UB2]]
-// //       NOCHECK:     %[[T5:.+]] = muli %[[T4]], %[[UB1]]
-// //       NOCHECK:     %[[UB:.+]] = muli %[[T5]], %[[UB0]]
-// //   NOCHECK-DAG:     %[[BID:.+]] = "gpu.block_id"() {dimension = "x"}
-// //   NOCHECK-DAG:     %[[BDIM:.+]] = "gpu.block_dim"() {dimension = "x"}
-// //   NOCHECK-DAG:     %[[TID:.+]] = "gpu.thread_id"() {dimension = "x"}
-// //       NOCHECK:     %[[BOFFSET:.+]] = muli %[[BID]], %[[BDIM]]
-// //       NOCHECK:     %[[IV:.+]] = addi %[[BOFFSET]], %[[TID]]
-// //       NOCHECK:     %[[COND:.+]] = cmpi slt, %[[IV]], %[[UB]]
-// //       NOCHECK:     scf.if %[[COND]]
-// //       NOCHECK:       %[[IV0:.+]] = divi_signed %[[IV]], %[[T5]]
-// //       NOCHECK:       %[[T14:.+]] = remi_signed %[[IV]], %[[T5]]
-// //       NOCHECK:       %[[IV1:.+]] = divi_signed %[[T14]], %[[T4]]
-// //       NOCHECK:       %[[T16:.+]] = remi_signed %[[T14]], %[[T4]]
-// //       NOCHECK:       %[[IV2:.+]] = divi_signed %[[T16]], %[[UB3]]
-// //       NOCHECK:       %[[IV3:.+]] = remi_signed %[[T16]], %[[UB3]]
-// //       NOCHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
-// //       NOCHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
-// //       NOCHECK:       store %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+hal.executable @parallel_4D attributes {sym_visibility = "private"} {
+  hal.interface @io {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.entry_point @parallel_4D attributes {
+      interface = @io, ordinal = 0 : index,
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
+    module attributes {
+      spv.target_env =
+        #spv.target_env<#spv.vce<v1.3,
+        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+        {max_compute_workgroup_invocations = 128 : i32,
+         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+      func @parallel_4D() {
+        %c0 = constant 0 : index
+        %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?x?x?xf32>
+        %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?x?x?xf32>
+        %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?x?x?xf32>
+        linalg.generic {
+           indexing_maps = [#map0, #map0, #map0],
+           iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+          ins(%arg0, %arg1 : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>)
+         outs(%arg2 : memref<?x?x?x?xf32>) {
+        ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
+          %0 = addf %arg3, %arg4 : f32
+          linalg.yield %0 : f32
+        }
+        return
+      }
+      func private @parallel_4D__num_workgroups__
+        (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
+         !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
+      hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+// CHECK-LABEL: func @parallel_4D
+//  CHECK-SAME:   local_size = dense<[32, 1, 1]>
+//   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
+//   CHECK-DAG:     %[[C3:.+]] = constant 3 : index
+//   CHECK-DAG:     %[[UB0:.+]] = memref.dim %{{.+}}, %[[C0]]
+//   CHECK-DAG:     %[[UB1:.+]] = memref.dim %{{.+}}, %[[C1]]
+//   CHECK-DAG:     %[[UB2:.+]] = memref.dim %{{.+}}, %[[C2]]
+//   CHECK-DAG:     %[[UB3:.+]] = memref.dim %{{.+}}, %[[C3]]
+//       CHECK:     %[[T4:.+]] = muli %[[UB3]], %[[UB2]]
+//       CHECK:     %[[T5:.+]] = muli %[[T4]], %[[UB1]]
+//       CHECK:     %[[UB:.+]] = muli %[[T5]], %[[UB0]]
+//   CHECK-DAG:     %[[BID:.+]] = "gpu.block_id"() {dimension = "x"}
+//   CHECK-DAG:     %[[BDIM:.+]] = "gpu.block_dim"() {dimension = "x"}
+//   CHECK-DAG:     %[[TID:.+]] = "gpu.thread_id"() {dimension = "x"}
+//       CHECK:     %[[BOFFSET:.+]] = muli %[[BID]], %[[BDIM]]
+//       CHECK:     %[[IV:.+]] = addi %[[BOFFSET]], %[[TID]]
+//       CHECK:     %[[COND:.+]] = cmpi slt, %[[IV]], %[[UB]]
+//       CHECK:     scf.if %[[COND]]
+//       CHECK:       %[[IV0:.+]] = divi_signed %[[IV]], %[[T5]]
+//       CHECK:       %[[T14:.+]] = remi_signed %[[IV]], %[[T5]]
+//       CHECK:       %[[IV1:.+]] = divi_signed %[[T14]], %[[T4]]
+//       CHECK:       %[[T16:.+]] = remi_signed %[[T14]], %[[T4]]
+//       CHECK:       %[[IV2:.+]] = divi_signed %[[T16]], %[[UB3]]
+//       CHECK:       %[[IV3:.+]] = remi_signed %[[T16]], %[[UB3]]
+//       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+//       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+//       CHECK:       store %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
 
 // -----
 
@@ -120,11 +119,13 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
     }
   }
 }
+//       CHECK: #[[COUNT_MAP:.+]] = affine_map<()[s0, s1, s2] -> (((s0 * s1) * s2) ceildiv 32)>
 //       CHECK: hal.executable.entry_point @parallel_4D_static
+//       CHECK: ^{{.*}}(%[[WORKLOAD_X:.+]]: index, %[[WORKLOAD_Y:.+]]: index, %[[WORKLOAD_Z:.+]]: index):
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[C12:.+]] = constant 12 : index
-//       CHECK:   hal.return %[[C12]], %[[C1]], %[[C1]]
-//       CHECK: func @parallel_4D_static()
+//   CHECK-DAG:   %[[COUNT:.+]] = affine.apply #[[COUNT_MAP]]()[%[[WORKLOAD_X]], %[[WORKLOAD_Y]], %[[WORKLOAD_Z]]]
+//       CHECK:   hal.return %[[COUNT]], %[[C1]], %[[C1]]
+//  CHECK-LABEL: func @parallel_4D_static()
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]>
 //   CHECK-DAG:     %[[C360:.+]] = constant 360 : index
 //   CHECK-DAG:     %[[C120:.+]] = constant 120 : index
@@ -195,9 +196,12 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
     }
   }
 }
+//       CHECK: #[[COUNT_MAP:.+]] = affine_map<()[s0, s1, s2] -> ((s0 * s1) * s2)>
 //       CHECK: hal.executable.entry_point @scalar_add
-//       CHECK:   %[[C1:.+]] = constant 1
-//       CHECK:   hal.return %[[C1]], %[[C1]], %[[C1]]
+//       CHECK: ^{{.*}}(%[[WORKLOAD_X:.+]]: index, %[[WORKLOAD_Y:.+]]: index, %[[WORKLOAD_Z:.+]]: index):
+//   CHECK-DAG:   %[[C1:.+]] = constant 1
+//   CHECK-DAG:   %[[COUNT:.+]] = affine.apply #[[COUNT_MAP]]()[%[[WORKLOAD_X]], %[[WORKLOAD_Y]], %[[WORKLOAD_Z]]]
+//       CHECK:   hal.return %[[COUNT]], %[[C1]], %[[C1]]
 // CHECK-LABEL: func @scalar_add()
 //       CHECK:     load
 //  CHECK-NEXT:     load
@@ -252,11 +256,13 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
     }
   }
 }
+//       CHECK: #[[COUNT_MAP:.+]] = affine_map<()[s0, s1, s2] -> (((s0 * s1) * s2) ceildiv 32)>
 //       CHECK: hal.executable.entry_point @reduce_sum
+//       CHECK: ^{{.*}}(%[[WORKLOAD_X:.+]]: index, %[[WORKLOAD_Y:.+]]: index, %[[WORKLOAD_Z:.+]]: index):
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
-//       CHECK:   hal.return %[[C2]], %[[C1]], %[[C1]]
-//       CHECK: func @reduce_sum
+//   CHECK-DAG:   %[[COUNT:.+]] = affine.apply #[[COUNT_MAP]]()[%[[WORKLOAD_X]], %[[WORKLOAD_Y]], %[[WORKLOAD_Z]]]
+//       CHECK:   hal.return %[[COUNT]], %[[C1]], %[[C1]]
+//CHECK-LABEL: func @reduce_sum
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]> : vector<3xi32>
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C40:.+]] = constant 40 : index
@@ -342,12 +348,12 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 //       CHECK:   scf.for
 //   CHECK-DAG:     %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:     %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK:     %[[INBOUNDY:.+]] = cmpi slt, %[[TIDY]], %{{.*}}
-//       CHECK:     %[[INBOUNDX:.+]] = cmpi slt, %[[TIDX]], %{{.*}}
-//       CHECK:     %[[COND:.+]] = and %[[INBOUNDY]], %[[INBOUNDX]]
-//       CHECK:     scf.if %[[COND]]
-//       CHECK:       scf.for %{{.+}} = %[[C0]] to %{{.*}} step %[[C1]]
-//   CHECK-NOT:         linalg.matmul
+//   CHECK-DAG:     %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
+//   CHECK-DAG:     %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
+//       CHECK:     scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//       CHECK:       scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//       CHECK:         scf.for %{{.+}} = %[[C0]] to %{{.*}} step %[[C1]]
+//   CHECK-NOT:           linalg.matmul
 
 // -----
 
@@ -394,10 +400,9 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
   }
 }
 
-//       CHECK: func @conv_1d
-//       CHECK: scf.if
-//  CHECK-NEXT:   scf.for
-//   CHECK-NOT:     linalg.conv_1d_input_nwc_filter_wcf
+//         CHECK: func @conv_1d
+// CHECK-COUNT-4:   scf.for
+//     CHECK-NOT:     linalg.conv_1d_input_nwc_filter_wcf
 
 // -----
 
@@ -484,46 +489,43 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
-//   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//       CHECK: func @conv_no_padding
-//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[C2:.+]] = constant 2
-//   CHECK-DAG:   %[[N:.+]] = memref.dim %[[ARG1]], %[[C0]]
-//   CHECK-DAG:   %[[P:.+]] = memref.dim %[[RET0]], %[[C1]]
-//   CHECK-DAG:   %[[Q:.+]] = memref.dim %[[RET0]], %[[C2]]
-//   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
-//   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
-//   CHECK-DAG:   %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"}
-//   CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
-//   CHECK-DAG:   %[[NBLOCKSZ:.+]] = "gpu.grid_dim"() {dimension = "z"}
-//       CHECK:   %[[BOFFSETY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//       CHECK:   %[[BSTEPY:.+]] = affine.apply #[[MAP0]]()[%[[NBLOCKSY]]]
-//       CHECK:   %[[BOFFSETX:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
-//       CHECK:   %[[BSTEPX:.+]] = affine.apply #[[MAP1]]()[%[[NBLOCKSX]]]
-//       CHECK:   scf.for %[[IV3:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
-//       CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
-//       CHECK:       scf.for %[[IV5:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
-//       CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//       CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//   CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//   CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//       CHECK:         %[[C1:.+]] = cmpi slt, %[[TIDZ]], %{{.*}}
-//       CHECK:         %[[C2:.+]] = cmpi slt, %[[TIDY]], %{{.*}}
-//       CHECK:         %[[C3:.+]] = and %[[C1]], %[[C2]]
-//       CHECK:         %[[C4:.+]] = cmpi slt, %[[TIDX]], %{{.*}}
-//       CHECK:         %[[COND:.+]] = and %[[C3]], %[[C4]]
-//       CHECK:         scf.if %[[COND]]
-//       CHECK:           scf.for
-//       CHECK:             scf.for
-//       CHECK:               scf.for
-//       CHECK:                 scf.for
-//   CHECK-NOT:                   linalg.conv_2d_input_nhwc_filter_hwcf
+//     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
+//     CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//         CHECK: func @conv_no_padding
+//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
+//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
+//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//     CHECK-DAG:   %[[C1:.+]] = constant 1
+//     CHECK-DAG:   %[[C2:.+]] = constant 2
+//     CHECK-DAG:   %[[N:.+]] = memref.dim %[[ARG1]], %[[C0]]
+//     CHECK-DAG:   %[[P:.+]] = memref.dim %[[RET0]], %[[C1]]
+//     CHECK-DAG:   %[[Q:.+]] = memref.dim %[[RET0]], %[[C2]]
+//     CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
+//     CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
+//     CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
+//     CHECK-DAG:   %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"}
+//     CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
+//     CHECK-DAG:   %[[NBLOCKSZ:.+]] = "gpu.grid_dim"() {dimension = "z"}
+//         CHECK:   %[[BOFFSETY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
+//         CHECK:   %[[BSTEPY:.+]] = affine.apply #[[MAP0]]()[%[[NBLOCKSY]]]
+//         CHECK:   %[[BOFFSETX:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
+//         CHECK:   %[[BSTEPX:.+]] = affine.apply #[[MAP1]]()[%[[NBLOCKSX]]]
+//         CHECK:   scf.for %[[IV3:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
+//         CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
+//         CHECK:       scf.for %[[IV5:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
+//         CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
+//         CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
+//     CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//     CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//     CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
+//     CHECK-DAG:         %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
+//     CHECK-DAG:         %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
+//     CHECK-DAG:         %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//         CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+// CHECK-COUNT-4:               scf.for
+//     CHECK-NOT:               linalg.conv_2d_input_nhwc_filter_hwcf
 
 // -----
 
@@ -568,15 +570,18 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
   }
 }
 
-//       CHECK: func @conv_3d
-//       CHECK: scf.if
-//  CHECK-NEXT:   scf.for
-//  CHECK-NEXT:     scf.for
-//  CHECK-NEXT:       scf.for
-//  CHECK-NEXT:         scf.for
-//  CHECK-NEXT:           scf.for
-//  CHECK-NEXT:             scf.for
-//   CHECK-NOT:               linalg.conv_3d_input_ndhwc_filter_dhwcf
+//         CHECK: func @conv_3d
+//     CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//     CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//     CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
+//     CHECK-DAG:         %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
+//     CHECK-DAG:         %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
+//     CHECK-DAG:         %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//         CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+// CHECK-COUNT-6:               scf.for
+//     CHECK-NOT:               linalg.conv_3d_input_ndhwc_filter_dhwcf
 
 // -----
 
@@ -631,28 +636,26 @@ module  {
   }
 }
 
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
-//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//       CHECK: func @pooling_nhwc_max
-//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
-//       CHECK:   %[[IV1:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//       CHECK:   %[[IV2:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
-//       CHECK:   %[[SV1:.+]] = memref.subview %[[ARG0]][0, %[[IV1]], %[[IV2]], 0]
-//       CHECK:   %[[SV2:.+]] = memref.subview %[[RET0]][0, %[[IV1]], %[[IV2]], 0]
-//   CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//   CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//       CHECK:   %[[C1:.+]] = cmpi slt, %[[TIDZ]], %{{.*}}
-//       CHECK:   %[[C2:.+]] = cmpi slt, %[[TIDY]], %{{.*}}
-//       CHECK:   %[[C3:.+]] = and %[[C1]], %[[C2]] : i1
-//       CHECK:   %[[C4:.+]] = cmpi slt, %[[TIDX]], %{{.*}}
-//       CHECK:   %[[COND:.+]] = and %[[C3]], %[[C4]]
-//       CHECK:   scf.if %[[COND]]
-//       CHECK:     scf.for
-//       CHECK:       scf.for
-//       CHECK:         scf.for
-//   CHECK-NOT:           linalg.pooling_nhwc_max
+//     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
+//     CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//         CHECK: func @pooling_nhwc_max
+//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
+//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
+//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//     CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
+//     CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
+//         CHECK:   %[[IV1:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
+//         CHECK:   %[[IV2:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
+//         CHECK:   %[[SV1:.+]] = memref.subview %[[ARG0]][0, %[[IV1]], %[[IV2]], 0]
+//         CHECK:   %[[SV2:.+]] = memref.subview %[[RET0]][0, %[[IV1]], %[[IV2]], 0]
+//     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//     CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//     CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
+//     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
+//     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
+//     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//         CHECK:   scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:     scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:       scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+// CHECK-COUNT-3:         scf.for
+//     CHECK-NOT:           linalg.pooling_nhwc_max
