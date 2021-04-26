@@ -1,5 +1,5 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-to-spirv-pipeline))" %s | IreeFileCheck %s
-// XXX: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-to-spirv-pipeline))" -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s
+// TODO(#5608): iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-to-spirv-pipeline))" -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s
 
 hal.executable @matmul_cooperative_matrix attributes {sym_visibility = "private"} {
   hal.interface @io {
