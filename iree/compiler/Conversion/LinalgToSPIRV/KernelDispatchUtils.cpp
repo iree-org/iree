@@ -480,14 +480,18 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
     // memory available (maybe). For now, just hard-wire it.
     tileSizeK = 32;
   }
-  assert(tileSizes.empty());
-  int64_t M = op.inputs()[0].getType().cast<ShapedType>().getShape()[0];
-  int64_t N = op.inputs()[1].getType().cast<ShapedType>().getShape()[1];
-  int64_t K = op.inputs()[0].getType().cast<ShapedType>().getShape()[1];
+
+  SmallVector<ShapedType> inputTypes;
+  std::tie(inputTypes, std::ignore) = getInputOutputTypes(op);
+  int64_t M = inputTypes[0].getShape()[0];
+  int64_t N = inputTypes[1].getShape()[1];
+  int64_t K = inputTypes[0].getShape()[1];
+
   SmallVector<int64_t, 4> ts = {
       getMinIfShapeStatic(M, nRowsPerWorkitem * config.workgroupSize[1]),
       getMinIfShapeStatic(N, nColsPerWorkitem * config.workgroupSize[0]),
       getMinIfShapeStatic(K, tileSizeK)};
+  assert(tileSizes.empty());
   tileSizes.emplace_back(std::move(ts));
   return success();
 }
