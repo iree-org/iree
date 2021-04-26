@@ -83,6 +83,7 @@
 // FLAGFILE: FLAG[test_bool] = false
 --test_bool=false
 // FLAGFILE: FLAG[test_int64] = 123111
+// Note that whitespace is ignored in case you are copy/pasting flags around.
   --test_int64=123111
 // FLAGFILE: FLAG[test_float] = 55.1
 --test_float=55.1
