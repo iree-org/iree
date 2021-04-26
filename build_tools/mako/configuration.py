@@ -123,7 +123,7 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
                      "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ],
                  runtime_flags=[
-                     "--dylib_worker_count=3",
+                     "--task_topology_group_count=3",
                  ]),
       TargetInfo(
           driver="vulkan",
@@ -172,7 +172,7 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
                      "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ],
                  runtime_flags=[
-                     "--dylib_worker_count=3",
+                     "--task_topology_group_count=3",
                  ]),
       TargetInfo(
           driver="vulkan",

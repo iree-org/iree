@@ -12,6 +12,20 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    api
+  HDRS
+    "api.h"
+  SRCS
+    "api.c"
+  DEPS
+    ::task
+    iree::base::internal::flags
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     task
   HDRS
     "affinity_set.h"
