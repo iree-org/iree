@@ -1,46 +1,53 @@
-// RUN: iree-opt -split-input-file -iree-spirv-workgroup-tile-size=1,8,64,4 -iree-spirv-invocation-tile-size=1,8,4,4 -iree-spirv-workgroup-size=16,1,1 -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-spirv-tile-and-vectorize-in-one-workgroup,canonicalize,cse))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups,iree-spirv-tile-and-vectorize-in-one-workgroup))" -canonicalize -cse -iree-spirv-workgroup-tile-size=1,8,64,4 -iree-spirv-invocation-tile-size=1,8,4,4 -iree-spirv-workgroup-size=16,1,1 %s | IreeFileCheck %s
 
 hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"} {
-  hal.interface @io {
+  hal.interface @io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
+  hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @batch_matmul_static_shape attributes {
       interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
-        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-          [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
-           StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
-           UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
-           GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
-           GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
-           VariablePointersStorageBuffer],
-          [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
-           SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
-          ARM:IntegratedGPU,
-          {max_compute_shared_memory_size = 32768 : i32,
-           max_compute_workgroup_invocations = 512 : i32,
-           max_compute_workgroup_size = dense<512> : vector<3xi32>,
-           subgroup_size = 16 : i32}>} {
-      func @batch_matmul_static_shape()
-        attributes {vkspv.num_workgroups_fn = @matmul_static_shape__num_workgroups__} {
-        %arg0 = iree.placeholder for "interface buffer"
-          {binding = @io::@arg0, operand_result_num = 0 : i32} : memref<4x1024x1024xf32>
-        %arg1 = iree.placeholder for "interface buffer"
-          {binding = @io::@arg1, operand_result_num = 1 : i32} : memref<4x1024x1024xf32>
-        %ret0 = iree.placeholder for "interface buffer"
-          {binding = @io::@ret0, operand_result_num = 2 : i32} : memref<4x1024x1024xf32>
-        linalg.batch_matmul ins(%arg0, %arg1 : memref<4x1024x1024xf32>, memref<4x1024x1024xf32>) outs(%ret0 : memref<4x1024x1024xf32>)
+      signature = (!flow.dispatch.tensor<readonly:4x1024x1024xf32>, !flow.dispatch.tensor<readonly:4x1024x1024xf32>, !flow.dispatch.tensor<writeonly:4x1024x1024xf32>) -> ()}
+    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+      func @batch_matmul_static_shape() {
+        %c0 = constant 0 : index
+        %c4 = constant 4 : index
+        %c1024 = constant 1024 : index
+        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<4x1024x1024xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4x1024x1024xf32>
+        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<4x1024x1024xf32>
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_size_z = hal.interface.workgroup.size[2] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_z, %workgroup_size_z]
+        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_z, %workgroup_size_z]
+        scf.for %arg0 = %3 to %c4 step %4 {
+          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+          scf.for %arg1 = %5 to %c1024 step %6 {
+            %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+            %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+            scf.for %arg2 = %7 to %c1024 step %8 {
+              %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
+              %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg1)[%workgroup_size_y]
+              %11 = memref.subview %0[%arg0, %arg1, 0] [%9, %10, 1024] [1, 1, 1] : memref<4x1024x1024xf32> to memref<?x?x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>
+              %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg2)[%workgroup_size_x]
+              %13 = memref.subview %1[%arg0, 0, %arg2] [%9, 1024, %12] [1, 1, 1] : memref<4x1024x1024xf32> to memref<?x1024x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>
+              %14 = memref.subview %2[%arg0, %arg1, %arg2] [%9, %10, %12] [1, 1, 1] : memref<4x1024x1024xf32> to memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>
+              linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"} ins(%11, %13 : memref<?x?x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>, memref<?x1024x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>) outs(%14 : memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>)
+            }
+          }
+        }
         return
       }
-      func private @matmul_static_shape__num_workgroups__
-        (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
-         !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
       hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -49,15 +56,15 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 8)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //      CHECK: func @batch_matmul_static_shape
-//  CHECK-DAG:  %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @io::@arg0
-//  CHECK-DAG:  %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @io::@arg1
-//  CHECK-DAG:  %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @io::@ret0
+//  CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0]
+//  CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0]
+//  CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0]
 //  CHECK-DAG:  %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:  %[[CST:.+]] = constant 0.0
 //  CHECK-DAG:  %[[C1:.+]] = constant 1 : index
 //  CHECK-DAG:  %[[C2:.+]] = constant 2 : index
 //  CHECK-DAG:  %[[C3:.+]] = constant 3 : index
@@ -65,11 +72,15 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:  %[[C5:.+]] = constant 5 : index
 //  CHECK-DAG:  %[[C6:.+]] = constant 6 : index
 //  CHECK-DAG:  %[[C7:.+]] = constant 7 : index
-//      CHECK:  %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//      CHECK:  %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
-//      CHECK:  %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
+//      CHECK:  %[[BIDX:.+]] = hal.interface.workgroup.id[0]
+//      CHECK:  %[[BIDY:.+]] = hal.interface.workgroup.id[1]
+//      CHECK:  %[[BIDZ:.+]] = hal.interface.workgroup.id[2]
 //  CHECK-DAG:  %[[BOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //  CHECK-DAG:  %[[BOFFSET_X:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
+//      CHECK:  %[[SUBVIEW_ARG0:.+]] = memref.subview %[[ARG0]]
+// CHECK-SAME:      [%[[BIDZ]], %[[BOFFSET_Y]], 0] [1, 8, 1024]
+//      CHECK:  %[[SUBVIEW_ARG1:.+]] = memref.subview %[[ARG1]]
+// CHECK-SAME:      [%[[BIDZ]], 0, %[[BOFFSET_X]]] [1, 1024, 64]
 //      CHECK:  %[[SUBVIEW_RESULT:.+]] = memref.subview %[[RET0]]
 // CHECK-SAME:      [%[[BIDZ]], %[[BOFFSET_Y]], %[[BOFFSET_X]]] [1, 8, 64]
 //      CHECK:  %[[IIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
@@ -105,12 +116,10 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 // CHECK-SAME:  %[[ACC_5:.+]] = %[[READ_INIT_5]],
 // CHECK-SAME:  %[[ACC_6:.+]] = %[[READ_INIT_6]],
 // CHECK-SAME:  %[[ACC_7:.+]] = %[[READ_INIT_7]])
-//  CHECK-DAG:    %[[SUBVIEW_LHS:.+]] = memref.subview %[[ARG0]]
-// CHECK-SAME:      [%[[BIDZ]], %[[BOFFSET_Y]], %[[IV0]]] [1, 8, 4]
-//  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[ARG1]]
-// CHECK-SAME:      [%[[BIDZ]], %[[IV0]], %[[BOFFSET_X]]] [1, 4, 64]
-//  CHECK-DAG:    %[[SUBVIEW_RHS_2:.+]] = memref.subview %[[SUBVIEW_RHS]]
-// CHECK-SAME:      [%[[IIDZ]], 0, %[[IOFFSET_X]]] [1, 4, 4] [1, 1, 1]
+//  CHECK-DAG:    %[[SUBVIEW_LHS:.+]] = memref.subview %[[SUBVIEW_ARG0]]
+// CHECK-SAME:      [%[[IIDZ]], %[[IOFFSET_Y]], %[[IV0]]] [1, 8, 4]
+//  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[SUBVIEW_ARG1]]
+// CHECK-SAME:      [%[[IIDZ]], %[[IV0]], %[[IOFFSET_X]]] [1, 4, 4] [1, 1, 1]
 
 //  CHECK-DAG:    %[[READ_LHS_0:.+]] = vector.transfer_read
 // CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C0]], %[[C0]]]
@@ -130,13 +139,13 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 // CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C7]], %[[C0]]]
 
 //  CHECK-DAG:    %[[READ_RHS_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C0]], %[[C0]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C0]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_RHS_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C0]], %[[C1]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C1]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_RHS_2:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C0]], %[[C2]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C2]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_RHS_3:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C0]], %[[C3]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C3]], %[[C0]]]
 
 //  CHECK-DAG:    %[[READ_LHS_0_0:.+]] = vector.extract_strided_slice
 // CHECK-SAME:      %[[READ_LHS_0]] {offsets = [0, 0, 0]
@@ -290,49 +299,56 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 
 // -----
 
-hal.executable @batch_matmul_fused_fillop attributes {sym_visibility = "private"} {
-  hal.interface @io {
+hal.executable @fused_fill_batch_matmul attributes {sym_visibility = "private"} {
+  hal.interface @io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
-    hal.executable.entry_point @batch_matmul_fused_fillop attributes {
+  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+    hal.executable.entry_point @fused_fill_batch_matmul attributes {
       interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
-        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-          [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
-           StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
-           UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
-           GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
-           GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
-           VariablePointersStorageBuffer],
-          [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
-           SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
-          ARM:IntegratedGPU,
-          {max_compute_shared_memory_size = 32768 : i32,
-           max_compute_workgroup_invocations = 512 : i32,
-           max_compute_workgroup_size = dense<512> : vector<3xi32>,
-           subgroup_size = 16 : i32}>} {
-      func @batch_matmul_fused_fillop()
-        attributes {vkspv.num_workgroups_fn = @batch_matmul_fused_fillop__num_workgroups__} {
-        %cst = constant 0.000000e+00 : f32
-        %arg0 = iree.placeholder for "interface buffer"
-          {binding = @io::@arg0, operand_result_num = 0 : i32} : memref<4x1024x1024xf32>
-        %arg1 = iree.placeholder for "interface buffer"
-          {binding = @io::@arg1, operand_result_num = 1 : i32} : memref<4x1024x1024xf32>
-        %ret0 = iree.placeholder for "interface buffer"
-          {binding = @io::@ret0, operand_result_num = 2 : i32} : memref<4x1024x1024xf32>
-        linalg.fill(%ret0, %cst) : memref<4x1024x1024xf32>, f32
-        linalg.batch_matmul ins(%arg0, %arg1 : memref<4x1024x1024xf32>, memref<4x1024x1024xf32>) outs(%ret0 : memref<4x1024x1024xf32>)
+      signature = (!flow.dispatch.tensor<readonly:4x1024x1024xf32>, !flow.dispatch.tensor<readonly:4x1024x1024xf32>, !flow.dispatch.tensor<writeonly:4x1024x1024xf32>) -> ()}
+    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+      func @fused_fill_batch_matmul() {
+        %zero = constant 0.0 : f32
+        %c0 = constant 0 : index
+        %c4 = constant 4 : index
+        %c1024 = constant 1024 : index
+        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<4x1024x1024xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4x1024x1024xf32>
+        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<4x1024x1024xf32>
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_size_z = hal.interface.workgroup.size[2] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_z, %workgroup_size_z]
+        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_z, %workgroup_size_z]
+        scf.for %arg0 = %3 to %c4 step %4 {
+          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+          scf.for %arg1 = %5 to %c1024 step %6 {
+            %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+            %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+            scf.for %arg2 = %7 to %c1024 step %8 {
+              %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
+              %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg1)[%workgroup_size_y]
+              %11 = memref.subview %0[%arg0, %arg1, 0] [%9, %10, 1024] [1, 1, 1] : memref<4x1024x1024xf32> to memref<?x?x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>
+              %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg2)[%workgroup_size_x]
+              %13 = memref.subview %1[%arg0, 0, %arg2] [%9, 1024, %12] [1, 1, 1] : memref<4x1024x1024xf32> to memref<?x1024x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>
+              %14 = memref.subview %2[%arg0, %arg1, %arg2] [%9, %10, %12] [1, 1, 1] : memref<4x1024x1024xf32> to memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>
+              linalg.fill(%14, %zero) : memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>, f32
+              linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"} ins(%11, %13 : memref<?x?x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>, memref<?x1024x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>) outs(%14 : memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 1048576 + s0 + d1 * 1024 + d2)>>)
+            }
+          }
+        }
         return
       }
-      func private @batch_matmul_fused_fillop__num_workgroups__
-        (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
-         !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
       hal.interface @io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -341,7 +357,8 @@ hal.executable @batch_matmul_fused_fillop attributes {sym_visibility = "private"
     }
   }
 }
-//    CHECK-LABEL: func @batch_matmul_fused_fillop
+
+//    CHECK-LABEL: func @fused_fill_batch_matmul
 //  CHECK-COUNT-8:   vector.transfer_write
 //  CHECK-COUNT-8:   vector.transfer_read
 //          CHECK:   %[[FOR_RES:.+]]:8 = scf.for
