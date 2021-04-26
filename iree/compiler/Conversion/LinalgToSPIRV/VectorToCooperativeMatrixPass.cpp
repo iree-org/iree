@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ bool isLegalVectorContract(vector::ContractionOp contract) {
 
   std::tuple<int, int, int> dim(lhsType.getDimSize(0), rhsType.getDimSize(1),
                                 lhsType.getDimSize(1));
-  // Check if the mattrix type can be supported as a cooperative matrix.
+  // Check if the matrix type can be supported as a cooperative matrix.
   // Currently we have hardcoded checks for what Turing hardware supports.
   // TODO(thomasraoux): Add device information to be able to query what the
   // device supports.
@@ -112,7 +112,7 @@ class CooperativeMatrixAnalysis {
     });
   }
 
-  // Return true if the operation should be lowered using operations on
+  // Returns true if the operation should be lowered using operations on
   // cooperative matrix type.
   bool usesCooperativeMatrixType(mlir::Operation *op) const {
     return usesCooperativeMatrix.count(op);
@@ -122,7 +122,7 @@ class CooperativeMatrixAnalysis {
   llvm::DenseSet<mlir::Operation *> usesCooperativeMatrix;
 };
 
-/// Convert subgroup level vector transfert to SPIR-V cooperative
+/// Convert subgroup level vector transfer to SPIR-V cooperative
 /// matrix load/store if those are supported.
 /// TODO(thomasraoux): Move to MLIR core once this is stable.
 template <typename OpTy>
@@ -160,7 +160,8 @@ class TransferToCoopMatLoadStore final : public OpConversionPattern<OpTy> {
 
     int64_t offset = 0;
     SmallVector<int64_t, 2> strides;
-    (void)getStridesAndOffset(memrefType, strides, offset);
+    if (failed(getStridesAndOffset(memrefType, strides, offset)))
+      return failure();
     auto stride = strides[0];
     if (BaseMemRefType::isDynamicStrideOrOffset(stride)) return failure();
 
