@@ -113,6 +113,18 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
                      "-iree-flow-inline-constants-max-byte-length=2048",
                      "-iree-flow-dispatch-formation-enable-operand-fusion"
                  ]),
+      TargetInfo(driver="dylib",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="f0",
+                 mako_tag="cpu3t",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "-iree-flow-inline-constants-max-byte-length=2048",
+                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                 ],
+                 runtime_flags=[
+                     "--worker_count=3",
+                 ]),
       TargetInfo(
           driver="vulkan",
           hal_target_backend="vulkan-spirv",
@@ -149,6 +161,18 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
                      "-iree-flow-inline-constants-max-byte-length=2048",
                      "-iree-flow-dispatch-formation-enable-operand-fusion"
+                 ]),
+      TargetInfo(driver="dylib",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="f0",
+                 mako_tag="cpu3t",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "-iree-flow-inline-constants-max-byte-length=2048",
+                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                 ],
+                 runtime_flags=[
+                     "--worker_count=3",
                  ]),
       TargetInfo(
           driver="vulkan",
