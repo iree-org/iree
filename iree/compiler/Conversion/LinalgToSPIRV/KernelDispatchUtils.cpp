@@ -268,11 +268,11 @@ static LogicalResult getConfigForCooperativeMatmul(
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix))
     return failure();
 
-  ShapedType lhsType = op.inputs().front().getType().cast<ShapedType>();
-  ArrayRef<int64_t> lhsShape = lhsType.getShape();
-  ShapedType rhsType = op.inputs().back().getType().cast<ShapedType>();
-  ArrayRef<int64_t> rhsShape = rhsType.getShape();
-  ShapedType outputType = op.outputs().front().getType().cast<ShapedType>();
+  SmallVector<ShapedType> inputTypes, outputTypes;
+  std::tie(inputTypes, outputTypes) = getInputOutputTypes(op);
+
+  ShapedType lhsType = inputTypes[0], rhsType = inputTypes[1];
+  ShapedType outputType = outputTypes[0];
 
   auto resourceLimits = targetEnv.getResourceLimits();
   Optional<SmallVector<int64_t, 4>> coopMatmulSize =
@@ -285,6 +285,9 @@ static LogicalResult getConfigForCooperativeMatmul(
   auto isMultipleOf = [](int64_t s, int64_t ts) {
     return !ShapedType::isDynamic(s) && (s % ts) == 0;
   };
+
+  ArrayRef<int64_t> lhsShape = lhsType.getShape();
+  ArrayRef<int64_t> rhsShape = rhsType.getShape();
   if (!isMultipleOf(lhsShape[0], (*coopMatmulSize)[0]) ||
       !isMultipleOf(rhsShape[1], (*coopMatmulSize)[1]) ||
       !isMultipleOf(lhsShape[1], (*coopMatmulSize)[2]) ||
@@ -458,10 +461,11 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                               config.numSubgroups))) {
     config.vectorize = true;
     return success();
-  } else if (options.enableVectorization &&
-             succeeded(getTargetSpecificConfig(op, targetEnv, options,
-                                               tileSizes, config.workgroupSize,
-                                               config.numSubgroups))) {
+  }
+  if (options.enableVectorization &&
+      succeeded(getTargetSpecificConfig(op, targetEnv, options, tileSizes,
+                                        config.workgroupSize,
+                                        config.numSubgroups))) {
     config.vectorize = true;
     return success();
   }

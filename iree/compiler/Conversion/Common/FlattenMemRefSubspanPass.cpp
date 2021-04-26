@@ -16,7 +16,7 @@
 //
 // This file implements a pass to flatten n-D MemRef subspan ops to 1-D MemRef
 // ones and folds the byte offsets on subspan ops to the consumer load/store
-// ops, in preparation for lowering to SPIR-V.
+// ops, in preparation for lowering to the final target.
 //
 // This pass is needed because of how MemRef is used by subspan ops:
 //
@@ -47,6 +47,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Matchers.h"
@@ -195,6 +196,27 @@ struct LinearizeStoreIndices final
   }
 };
 
+/// Adjusts unrealized_conversion_cast ops' inputs to flattened memref values.
+struct AdjustConversionCast final
+    : public OpConversionPattern<UnrealizedConversionCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      UnrealizedConversionCastOp castOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (castOp->getNumOperands() != 1) return failure();
+
+    Value input = operands.front();
+    if (!isRankZeroOrOneMemRef(input.getType())) {
+      return rewriter.notifyMatchFailure(
+          castOp, "expected converted memref of rank <= 1");
+    }
+    rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
+        castOp, castOp.getResultTypes(), input);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Folding Patterns
 //===----------------------------------------------------------------------===//
@@ -301,7 +323,8 @@ struct FlattenMemRefSubspanPass
     FlattenMemRefTypeConverter typeConverter;
     RewritePatternSet flattenPatterns(&context);
     flattenPatterns.add<FlattenBindingSubspan, LinearizeLoadIndices,
-                        LinearizeStoreIndices>(typeConverter, &context);
+                        LinearizeStoreIndices, AdjustConversionCast>(
+        typeConverter, &context);
 
     ConversionTarget target(context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
@@ -315,6 +338,11 @@ struct FlattenMemRefSubspanPass
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
       return isRankZeroOrOneMemRef(storeOp.getMemRefType());
     });
+    target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
+        [](UnrealizedConversionCastOp castOp) {
+          return castOp->getNumOperands() == 1 &&
+                 isRankZeroOrOneMemRef(castOp->getOperandTypes().front());
+        });
 
     // Use partial conversion here so that we can ignore allocations created by
     // promotion and their load/store ops.

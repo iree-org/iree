@@ -22,7 +22,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -211,159 +210,22 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   }
 };
 
-/// Base class for lowering to SPIR-V cooperative matrix ops.
-template <typename SourceOp>
-class CoopMatOpLowering : public OpConversionPattern<SourceOp> {
- public:
-  CoopMatOpLowering(MLIRContext *context, SPIRVTypeConverter &converter,
-                    // Dedicated extensions are typically faster; so give it a
-                    // higher benefit so it prevails by default.
-                    PatternBenefit benefit = 5)
-      : OpConversionPattern<SourceOp>(context, benefit), converter(converter) {}
-
- protected:
-  // TODO: We explicitly keep a reference of the type converter instead of
-  // passing it to OpConversionPattern during construction. This effectively
-  // bypasses the dialect conversion framework's automation over type
-  // conversion. This is needed for now because upstream SPIRVTypeConverter does
-  // not support cooperative matrix well yet so the framework won't know how to
-  // generate cooperative matrix. We are manually constructing the cooperative
-  // matrix in patterns. This should be fixed when we upstream all cooperative
-  // matrix related code.
-  SPIRVTypeConverter &converter;
-};
-
-/// Convert subgroup level vector transfert to SPIR-V cooperative
-/// matrix load/store if those are supported.
-/// TODO(thomasraoux): Move to MLIR core once this is stable.
-template <typename OpTy>
-class TransferToCoopMatLoadStore final : public CoopMatOpLowering<OpTy> {
- public:
-  TransferToCoopMatLoadStore(
-      MLIRContext *context, SPIRVTypeConverter &converter,
-      const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis)
-      : CoopMatOpLowering<OpTy>(context, converter),
-        cooperativeMatrixAnalysis(cooperativeMatrixAnalysis) {}
-
+/// Removes unrealized_conversion_cast ops introduced during progressive
+/// lowering when possible.
+struct RemoveIdentityConversionCast final
+    : public OpConversionPattern<UnrealizedConversionCastOp> {
+  using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      OpTy op, ArrayRef<Value> operands,
+      UnrealizedConversionCastOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (op.mask()) return failure();
-    if (!cooperativeMatrixAnalysis.usesCooperativeMatrixType(op))
-      return failure();
-    auto loc = op.getLoc();
-    auto memrefType = op.getShapedType().template dyn_cast<MemRefType>();
-    if (!memrefType) return failure();
-    auto vecType = op.getVectorType();
-    if (vecType.getRank() != 2) return failure();
-    // TODO(thomasraoux): use coloumn major operand when TransfertRead +
-    // TransposeOp.
-    if (!op.permutation_map().isMinorIdentity()) return failure();
-    if (op.in_bounds() &&
-        llvm::any_of(op.in_bounds()->template cast<ArrayAttr>(),
-                     [](mlir::Attribute dimInBounds) {
-                       return !dimInBounds.cast<BoolAttr>().getValue();
-                     }))
-      return failure();
-    auto matType = spirv::CooperativeMatrixNVType::get(
-        vecType.getElementType(), spirv::Scope::Subgroup, vecType.getDimSize(0),
-        vecType.getDimSize(1));
-    SmallVector<Value, 4> remappedIndices;
-    for (auto i : op.indices())
-      remappedIndices.push_back(rewriter.getRemappedValue(i));
-    Value ptr = spirv::getElementPtr(
-        CoopMatOpLowering<OpTy>::converter, memrefType,
-        rewriter.getRemappedValue(op.source()), remappedIndices, loc, rewriter);
-    int64_t offset = 0;
-    SmallVector<int64_t, 2> strides;
-    (void)getStridesAndOffset(memrefType, strides, offset);
-    auto stride = strides[0];
-    if (BaseMemRefType::isDynamicStrideOrOffset(stride)) return failure();
-    auto int32Type = rewriter.getI32Type();
-    auto strideValue = rewriter.create<spirv::ConstantOp>(
-        loc, int32Type, IntegerAttr::get(int32Type, stride));
-    auto coloumnMajor = rewriter.create<spirv::ConstantOp>(
-        loc, rewriter.getI1Type(), rewriter.getBoolAttr(false));
-    replaceTransferOp(op, loc, matType, ptr, strideValue, coloumnMajor,
-                      rewriter);
-    return success();
+    if (op->getNumOperands() == 1 && op->getNumResults() == 1 &&
+        operands.front().getType() == op->getResultTypes().front()) {
+      rewriter.replaceOp(op, operands);
+      return success();
+    }
+
+    return failure();
   }
-
- private:
-  /// Helper to generate the right load/store instruction and replace the
-  /// transfer op.
-  void replaceTransferOp(OpTy op, Location loc, Type matType, Value ptr,
-                         Value strideValue, Value coloumnMajor,
-                         ConversionPatternRewriter &rewriter) const;
-  const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis;
-};
-
-template <>
-void TransferToCoopMatLoadStore<vector::TransferReadOp>::replaceTransferOp(
-    vector::TransferReadOp op, Location loc, Type matType, Value ptr,
-    Value strideValue, Value coloumnMajor,
-    ConversionPatternRewriter &rewriter) const {
-  Value load = rewriter.create<spirv::CooperativeMatrixLoadNVOp>(
-      loc, matType, ptr, strideValue, coloumnMajor, spirv::MemoryAccessAttr());
-  rewriter.replaceOp(op, load);
-}
-
-template <>
-void TransferToCoopMatLoadStore<vector::TransferWriteOp>::replaceTransferOp(
-    vector::TransferWriteOp op, Location loc, Type matType, Value ptr,
-    Value strideValue, Value coloumnMajor,
-    ConversionPatternRewriter &rewriter) const {
-  rewriter.create<spirv::CooperativeMatrixStoreNVOp>(
-      loc, ptr, rewriter.getRemappedValue(op.vector()), strideValue,
-      coloumnMajor, spirv::MemoryAccessAttr());
-  rewriter.eraseOp(op);
-}
-
-/// Convert subgroup level vector contract to SPIR-V cooperative
-/// matrix matmuladd.
-class VectorContractToCoopMatmul final
-    : public CoopMatOpLowering<vector::ContractionOp> {
- public:
-  VectorContractToCoopMatmul(
-      MLIRContext *context, SPIRVTypeConverter &converter,
-      const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis)
-      : CoopMatOpLowering<vector::ContractionOp>(context, converter),
-        cooperativeMatrixAnalysis(cooperativeMatrixAnalysis) {}
-
-  LogicalResult matchAndRewrite(
-      vector::ContractionOp contractOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!cooperativeMatrixAnalysis.usesCooperativeMatrixType(contractOp))
-      return failure();
-    auto loc = contractOp.getLoc();
-    // Check that all the operands are cooperative matrix.
-    vector::ContractionOp::Adaptor adaptor(operands);
-    auto loadA = adaptor.lhs();
-    auto loadB = adaptor.rhs();
-    auto loadC = adaptor.acc();
-    if (!loadA.getType().isa<spirv::CooperativeMatrixNVType>() ||
-        !loadB.getType().isa<spirv::CooperativeMatrixNVType>() ||
-        !loadC.getType().isa<spirv::CooperativeMatrixNVType>())
-      return failure();
-    if (llvm::size(contractOp.masks()) != 0) return failure();
-    // Check that this is a matmul operation.
-    auto iteratorTypes = contractOp.iterator_types().getValue();
-    if (!isParallelIterator(iteratorTypes[0]) ||
-        !isParallelIterator(iteratorTypes[1]) ||
-        !isReductionIterator(iteratorTypes[2]))
-      return failure();
-    // Coloumn major matmul should have been lowered to Transpose+contract
-    // by this point. Transpose can be handled by load/stoore operations.
-    if (!isRowMajorMatmul(contractOp.indexing_maps())) return failure();
-
-    Value matmul = rewriter.create<spirv::CooperativeMatrixMulAddNVOp>(
-        loc, loadC.getType(), loadA, loadB, loadC);
-    rewriter.replaceOp(contractOp, matmul);
-    return success();
-  }
-
- private:
-  const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis;
 };
 
 /// A pass to perform the SPIR-V conversion.
@@ -411,16 +273,6 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
   return success();
 }
 
-static void populateVectorToSPIRVPatterns(
-    MLIRContext *context, SPIRVTypeConverter &converter,
-    OwningRewritePatternList &patterns,
-    const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis) {
-  patterns.insert<TransferToCoopMatLoadStore<vector::TransferReadOp>,
-                  TransferToCoopMatLoadStore<vector::TransferWriteOp>,
-                  VectorContractToCoopMatmul>(context, converter,
-                                              cooperativeMatrixAnalysis);
-}
-
 void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
@@ -458,9 +310,6 @@ void ConvertToSPIRVPass::runOnOperation() {
   mlir::populateVectorToSPIRVPatterns(typeConverter, patterns);
   // Pull in builtin func to spv.func conversion.
   populateBuiltinFuncToSPIRVPatterns(typeConverter, patterns);
-  auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
-  populateVectorToSPIRVPatterns(context, typeConverter, patterns,
-                                cooperativeMatrixAnalysis);
   patterns.insert<
       HALInterfaceLoadConstantConverter,
       HALInterfaceWorkgroupIdAndCountConverter<
@@ -474,12 +323,13 @@ void ConvertToSPIRVPass::runOnOperation() {
       typeConverter, context, aliasedResources);
   /// Fold operations as no-ops
   /// - linalg.reshape becomes a no-op since all memrefs are linearized in
-  ///   SPIR-V
+  ///   SPIR-V.
   /// - tensor_to_memref can become a no-op since tensors are lowered to
-  ///   !spv.array
+  ///   !spv.array.
+  /// - unrealized_conversion_cast with the same source and target type.
   patterns
-      .insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<memref::BufferCastOp>>(
-          typeConverter, context);
+      .insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<memref::BufferCastOp>,
+              RemoveIdentityConversionCast>(typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
       SPIRVConversionTarget::get(targetAttr);

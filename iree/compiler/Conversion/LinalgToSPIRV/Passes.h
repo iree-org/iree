@@ -59,6 +59,10 @@ createSplitDispatchFunctionPass();
 /// vector size equal to subgroup size are distributed across the subgroup.
 std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
 
+/// Pass to convert vector read/write/arithmetic operations to the corresponding
+/// cooperative matrix ops when possible.
+std::unique_ptr<FunctionPass> createConvertVectorToCooperativeMatrixPass();
+
 /// Pass to apply tiling and vectorization transformations on linagl::MatMulOp.
 std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
 
