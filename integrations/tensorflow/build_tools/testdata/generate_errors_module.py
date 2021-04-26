@@ -49,6 +49,7 @@ except IndexError:
   sys.exit(1)
 
 m = ErrorsModule()
-tf.saved_model.save(
-    m, file_name, options=tf.saved_model.SaveOptions(save_debug_info=True))
+tf.saved_model.save(m,
+                    file_name,
+                    options=tf.saved_model.SaveOptions(save_debug_info=True))
 print(f"Saved to {file_name}")

@@ -100,34 +100,31 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
   if batch_config is None:
     batch_config = []
   targets = [
-      TargetInfo(
-          driver="vmla",
-          hal_target_backend="vmla",
-          taskset="80",
-          mako_tag="vmla"),
-      TargetInfo(
-          driver="dylib-sync",
-          hal_target_backend="dylib-llvm-aot",
-          taskset="80",
-          mako_tag="cpu",
-          compilation_flags=[
-              "--iree-llvm-target-triple=aarch64-none-linux-android29",
-              "--iree-flow-inline-constants-max-byte-length=2048",
-              "--iree-flow-dispatch-formation-enable-operand-fusion"
-          ]),
-      TargetInfo(
-          driver="dylib",
-          hal_target_backend="dylib-llvm-aot",
-          taskset="f0",
-          mako_tag="cpu3t",
-          compilation_flags=[
-              "--iree-llvm-target-triple=aarch64-none-linux-android29",
-              "--iree-flow-inline-constants-max-byte-length=2048",
-              "--iree-flow-dispatch-formation-enable-operand-fusion"
-          ],
-          runtime_flags=[
-              "--dylib_worker_count=3",
-          ]),
+      TargetInfo(driver="vmla",
+                 hal_target_backend="vmla",
+                 taskset="80",
+                 mako_tag="vmla"),
+      TargetInfo(driver="dylib-sync",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="80",
+                 mako_tag="cpu",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion"
+                 ]),
+      TargetInfo(driver="dylib",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="f0",
+                 mako_tag="cpu3t",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion"
+                 ],
+                 runtime_flags=[
+                     "--dylib_worker_count=3",
+                 ]),
       TargetInfo(
           driver="vulkan",
           hal_target_backend="vulkan-spirv",
@@ -152,34 +149,31 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
   if batch_config is None:
     batch_config = []
   targets = [
-      TargetInfo(
-          driver="vmla",
-          hal_target_backend="vmla",
-          taskset="80",
-          mako_tag="vmla"),
-      TargetInfo(
-          driver="dylib-sync",
-          hal_target_backend="dylib-llvm-aot",
-          taskset="80",
-          mako_tag="cpu",
-          compilation_flags=[
-              "--iree-llvm-target-triple=aarch64-none-linux-android29",
-              "--iree-flow-inline-constants-max-byte-length=2048",
-              "--iree-flow-dispatch-formation-enable-operand-fusion"
-          ]),
-      TargetInfo(
-          driver="dylib",
-          hal_target_backend="dylib-llvm-aot",
-          taskset="f0",
-          mako_tag="cpu3t",
-          compilation_flags=[
-              "--iree-llvm-target-triple=aarch64-none-linux-android29",
-              "--iree-flow-inline-constants-max-byte-length=2048",
-              "--iree-flow-dispatch-formation-enable-operand-fusion"
-          ],
-          runtime_flags=[
-              "--dylib_worker_count=3",
-          ]),
+      TargetInfo(driver="vmla",
+                 hal_target_backend="vmla",
+                 taskset="80",
+                 mako_tag="vmla"),
+      TargetInfo(driver="dylib-sync",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="80",
+                 mako_tag="cpu",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion"
+                 ]),
+      TargetInfo(driver="dylib",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="f0",
+                 mako_tag="cpu3t",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion"
+                 ],
+                 runtime_flags=[
+                     "--dylib_worker_count=3",
+                 ]),
       TargetInfo(
           driver="vulkan",
           hal_target_backend="vulkan-spirv",
@@ -206,20 +200,20 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
 MODEL_BENCHMARKS = [
     ModelBenchmarkInfo(
         name="mobile-bert",
-        model_artifacts_name="iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz",
+        model_artifacts_name=
+        "iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz",
         model_path="tmp/iree/modules/MobileBertSquad/iree_input.mlir",
-        flagfile_path="tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile",
+        flagfile_path=
+        "tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile",
         phones=[
-            PhoneBenchmarkInfo(
-                name="Pixel4",
-                benchmark_key="5538704950034432",
-                targets=get_pixel4_default_target_list(
-                    skipped_target=["cpu2", "vlk2"],)),
-            PhoneBenchmarkInfo(
-                name="S20",
-                benchmark_key="4699630718681088",
-                targets=get_s20_default_target_list(
-                    skipped_target=["cpu2", "vlk2"],)),
+            PhoneBenchmarkInfo(name="Pixel4",
+                               benchmark_key="5538704950034432",
+                               targets=get_pixel4_default_target_list(
+                                   skipped_target=["cpu2", "vlk2"],)),
+            PhoneBenchmarkInfo(name="S20",
+                               benchmark_key="4699630718681088",
+                               targets=get_s20_default_target_list(
+                                   skipped_target=["cpu2", "vlk2"],)),
         ]),
     ModelBenchmarkInfo(
         name="mobilenet-v2",
@@ -227,15 +221,13 @@ MODEL_BENCHMARKS = [
         model_path="mobilenet-v2/iree_input.mlir",
         flagfile_path="mobilenet-v2/flagfile",
         phones=[
-            PhoneBenchmarkInfo(
-                name="Pixel4",
-                benchmark_key="6338759231537152",
-                targets=get_pixel4_default_target_list(
-                    skipped_target=["vlk2"])),
-            PhoneBenchmarkInfo(
-                name="S20",
-                benchmark_key="5618403088793600",
-                targets=get_s20_default_target_list()),
+            PhoneBenchmarkInfo(name="Pixel4",
+                               benchmark_key="6338759231537152",
+                               targets=get_pixel4_default_target_list(
+                                   skipped_target=["vlk2"])),
+            PhoneBenchmarkInfo(name="S20",
+                               benchmark_key="5618403088793600",
+                               targets=get_s20_default_target_list()),
         ]),
     ModelBenchmarkInfo(
         name="mobilebert-f16",
