@@ -84,7 +84,6 @@ iree_cc_library(
   DEPS
     ::core_headers
     ::tracing
-    absl::str_format
     iree::base::internal::flags
   PUBLIC
 )
