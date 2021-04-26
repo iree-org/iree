@@ -110,8 +110,8 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
                  mako_tag="cpu",
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
-                     "-iree-flow-inline-constants-max-byte-length=2048",
-                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ]),
       TargetInfo(driver="dylib",
                  hal_target_backend="dylib-llvm-aot",
@@ -119,11 +119,11 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
                  mako_tag="cpu3t",
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
-                     "-iree-flow-inline-constants-max-byte-length=2048",
-                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ],
                  runtime_flags=[
-                     "--worker_count=3",
+                     "--dylib_worker_count=3",
                  ]),
       TargetInfo(
           driver="vulkan",
@@ -132,8 +132,8 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
           mako_tag="vlk",
           compilation_flags=[
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10",
-              "-iree-flow-inline-constants-max-byte-length=2048",
-              "-iree-flow-dispatch-formation-enable-operand-fusion"
+              "--iree-flow-inline-constants-max-byte-length=2048",
+              "--iree-flow-dispatch-formation-enable-operand-fusion"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -159,8 +159,8 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
                  mako_tag="cpu",
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
-                     "-iree-flow-inline-constants-max-byte-length=2048",
-                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ]),
       TargetInfo(driver="dylib",
                  hal_target_backend="dylib-llvm-aot",
@@ -168,11 +168,11 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
                  mako_tag="cpu3t",
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
-                     "-iree-flow-inline-constants-max-byte-length=2048",
-                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ],
                  runtime_flags=[
-                     "--worker_count=3",
+                     "--dylib_worker_count=3",
                  ]),
       TargetInfo(
           driver="vulkan",
@@ -182,8 +182,8 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
           compilation_flags=[
               "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
               # TODO(GH-5330): Revisit the number or delete the flag.
-              "-iree-flow-inline-constants-max-byte-length=16",
-              "-iree-flow-dispatch-formation-enable-operand-fusion"
+              "--iree-flow-inline-constants-max-byte-length=16",
+              "--iree-flow-dispatch-formation-enable-operand-fusion"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
