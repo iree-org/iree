@@ -32,8 +32,8 @@ namespace IREE {
 namespace Flow {
 
 /// An operation that uses `offsets`, `sizes` and `strides` (i.e. implements the
-/// `OffsetSizeAndStrideInterface` can be mapped to flow operations that
-/// eventually map to DMA operations if)
+/// `OffsetSizeAndStrideInterface`) can be mapped to flow operations that
+/// eventually map to DMA operations if
 /// - all offsets apart from the first one are 0
 /// - all the sizes apart from the first match the sizes of the source
 /// - all strides are 1.
@@ -45,11 +45,11 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     // Unhanded rank-reducing case.
     return false;
   }
-  for (unsigned dim : llvm::seq<unsigned>(0, offsets.size())) {
-    auto matchVal = [](OpFoldResult valueOrAttr, int64_t val) -> bool {
-      auto attr = valueOrAttr.dyn_cast<Attribute>();
-      return attr && attr.cast<IntegerAttr>().getInt() == val;
-    };
+  auto matchVal = [](OpFoldResult valueOrAttr, int64_t val) -> bool {
+    auto attr = valueOrAttr.dyn_cast<Attribute>();
+    return attr && attr.cast<IntegerAttr>().getInt() == val;
+  };
+  for (auto dim : llvm::seq<unsigned>(0, offsets.size())) {
     if ((dim != 0 && (!matchVal(offsets[dim], 0) ||
                       !matchVal(sizes[dim], baseShape[dim]))) ||
         !matchVal(strides[dim], 1)) {
@@ -68,9 +68,9 @@ static SmallVector<Value, 4> getAsValues(
     if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
       values.push_back(
           b.create<ConstantIndexOp>(loc, attr.cast<IntegerAttr>().getInt()));
-      continue;
+    } else {
+      values.push_back(valueOrAttr.get<Value>());
     }
-    values.push_back(valueOrAttr.get<Value>());
   }
   return values;
 }
@@ -103,7 +103,7 @@ namespace {
 /// Converts linalg.tensor_reshape operations into flow.tensor.reshape
 /// operations.
 struct LinalgTensorReshapeToFlowTensorReshape
-    : OpRewritePattern<linalg::TensorReshapeOp> {
+    : public OpRewritePattern<linalg::TensorReshapeOp> {
   using OpRewritePattern<linalg::TensorReshapeOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::TensorReshapeOp reshapeOp,
@@ -131,7 +131,8 @@ struct LinalgTensorReshapeToFlowTensorReshape
 };
 
 /// Convert subtensor insert operation flow.tensor.update where possible.
-struct SubTensorInsertToTensorUpdate : OpRewritePattern<SubTensorInsertOp> {
+struct SubTensorInsertToTensorUpdate
+    : public OpRewritePattern<SubTensorInsertOp> {
   using OpRewritePattern<SubTensorInsertOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(SubTensorInsertOp insertOp,
@@ -179,7 +180,7 @@ struct SubTensorInsertToTensorUpdate : OpRewritePattern<SubTensorInsertOp> {
 };
 
 /// Convert subtensor operation to flow.tensor.slice where possible.
-struct SubTensorToTensorSlice : OpRewritePattern<SubTensorOp> {
+struct SubTensorToTensorSlice : public OpRewritePattern<SubTensorOp> {
   using OpRewritePattern<SubTensorOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(SubTensorOp subTensorOp,
@@ -245,7 +246,7 @@ struct ConvertToFlowTensorOpsPass
     FuncOp funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<LinalgTensorReshapeToFlowTensorReshape,
                     SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(
         context);
