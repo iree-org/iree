@@ -111,7 +111,6 @@ struct LinalgTensorReshapeToFlowTensorReshape
     if (reshapeOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
-    Location loc = reshapeOp.getLoc();
     SmallVector<SmallVector<Value>> outputShape;
     if (failed(reshapeOp.reifyReturnTypeShapesPerResultDim(rewriter,
                                                            outputShape))) {
@@ -198,7 +197,6 @@ struct SubTensorToTensorSlice : public OpRewritePattern<SubTensorOp> {
     }
     Location loc = subTensorOp.getLoc();
 
-    Value source = subTensorOp.source();
     ShapedType sourceType = subTensorOp.getSourceType();
     ShapedType resultType = subTensorOp.getType();
 
