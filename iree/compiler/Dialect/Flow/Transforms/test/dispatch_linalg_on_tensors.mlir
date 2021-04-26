@@ -271,8 +271,10 @@ func @tile_4d_generic_op_alone
 //  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = memref.dim %[[ARG0]], %[[C2]]
 //  CHECK-DAG:   %[[D3:.+]] = memref.dim %[[ARG0]], %[[C3]]
-//      CHECK:   %[[D4:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[D1]]]
-//      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D4]]]
+//  CHECK-DAG:   %[[WG_SISE_2:.+]] = flow.dispatch.workgroup.size[2] : index
+//  CHECK-DAG:   %[[WG_ID_2:.+]] = flow.dispatch.workgroup.id[2] : index
+//  CHECK-DAG:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D1]]]
+//  CHECK-DAG:   %[[D4:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_2]], %[[WG_SISE_2]]]
 
 // -----
 
@@ -582,16 +584,16 @@ func @inline_dag_1(
 //   CHECK-NOT:   linalg.
 //   CHECK-NOT:   subtensor
 //       CHECK:   flow.dispatch.workgroups
-//  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:i32>
-//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
-//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
+//  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
+//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:i32>
 //  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xf32>
 //       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
 //       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
-//       CHECK:     %[[OP1:.+]] = linalg.tensor_reshape %[[LEAF3]]
-//       CHECK:     %[[OP2:.+]] = linalg.tensor_reshape %[[LEAF2]]
+//       CHECK:     %[[OP1:.+]] = linalg.tensor_reshape %[[LEAF2]]
+//       CHECK:     %[[OP2:.+]] = linalg.tensor_reshape %[[LEAF1]]
 //       CHECK:     %[[OP3:.+]] = subtensor %[[OP1]][0, 0]
 //       CHECK:     %[[OP4:.+]] = subtensor %[[OP1]][0, 10]
 //       CHECK:     %[[OP5:.+]] = subtensor %[[OP1]][0, 20]
@@ -640,17 +642,17 @@ func @inline_dag_2(
 //       CHECK:   subtensor %[[OP1]]
 //       CHECK:   linalg.tensor_reshape %[[ARG1]]
 //       CHECK:   flow.dispatch.workgroups
-//  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:i32>
-//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
-//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
-//  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
+//  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
+//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
+//  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:i32>
 //  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG9:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xf32>
-//       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
+//       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
 //       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG7]], {{.*}}
-//       CHECK:     %[[OP1:.+]] = subtensor %[[LEAF3]][0, 0]
-//       CHECK:     %[[OP2:.+]] = subtensor %[[LEAF3]][0, 10]
+//       CHECK:     %[[OP1:.+]] = subtensor %[[LEAF2]][0, 0]
+//       CHECK:     %[[OP2:.+]] = subtensor %[[LEAF2]][0, 10]
 //       CHECK:     %[[OP3:.+]] = linalg.tensor_reshape %[[LEAF1]]
 //       CHECK:     %[[OP4:.+]] = linalg.tensor_reshape %[[OP1]]
 //       CHECK:     %[[OP5:.+]] = linalg.tensor_reshape %[[OP2]]

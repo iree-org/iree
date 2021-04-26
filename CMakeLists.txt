@@ -44,6 +44,7 @@ option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
+option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
 
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
@@ -470,6 +471,10 @@ endif()
 
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
+endif()
+
+if(${IREE_BUILD_EMBEDDING_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
+  add_subdirectory(iree/samples/simple_embedding)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
