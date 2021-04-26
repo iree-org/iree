@@ -178,7 +178,10 @@ Status Run(std::string module_file_path, int* out_exit_code) {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
+  // Pass through flags to gtest (allowing --help to fall through).
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
   ::testing::InitGoogleTest(&argc, argv);

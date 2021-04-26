@@ -16,25 +16,10 @@
 #include "iree/testing/benchmark.h"
 
 int main(int argc, char** argv) {
-  // Pass through flags to benchmark.
-  // Note that we handle --help so we have to include benchmark's flags here.
-  iree_flags_set_usage(
-      NULL,
-      "\n\n"
-      "  Optional flags from third_party/benchmark/src/benchmark.cc:\n"
-      "    [--benchmark_list_tests={true|false}]\n"
-      "    [--benchmark_filter=<regex>]\n"
-      "    [--benchmark_min_time=<min_time>]\n"
-      "    [--benchmark_repetitions=<num_repetitions>]\n"
-      "    [--benchmark_report_aggregates_only={true|false}]\n"
-      "    [--benchmark_display_aggregates_only={true|false}]\n"
-      "    [--benchmark_format=<console|json|csv>]\n"
-      "    [--benchmark_out=<filename>]\n"
-      "    [--benchmark_out_format=<json|console|csv>]\n"
-      "    [--benchmark_color={auto|true|false}]\n"
-      "    [--benchmark_counters_tabular={true|false}]\n"
-      "    [--v=<verbosity>]\n");
-  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
+  // Pass through flags to benchmark (allowing --help to fall through).
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
   iree_benchmark_initialize(&argc, argv);
   iree_benchmark_run_specified();
   return 0;

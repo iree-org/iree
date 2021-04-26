@@ -271,27 +271,12 @@ class IREEBenchmark {
 int main(int argc, char** argv) {
   IREE_TRACE_SCOPE0("main");
 
-  // We have to contend with two flag parsing libraries here: IREE's and
-  // benchmark's. We let flags go to IREE first and then it'll pass any it
-  // doesn't recognize on to benchmark. We let IREE handle the help, though, so
-  // we need to include the relevant benchmark flags for users.
-  iree_flags_set_usage(
-      "iree-benchmark-module",
-      "  Optional flags from third_party/benchmark/src/benchmark.cc:\n"
-      "    [--benchmark_list_tests={true|false}]\n"
-      "    [--benchmark_filter=<regex>]\n"
-      "    [--benchmark_min_time=<min_time>]\n"
-      "    [--benchmark_repetitions=<num_repetitions>]\n"
-      "    [--benchmark_report_aggregates_only={true|false}]\n"
-      "    [--benchmark_display_aggregates_only={true|false}]\n"
-      "    [--benchmark_format=<console|json|csv>]\n"
-      "    [--benchmark_out=<filename>]\n"
-      "    [--benchmark_out_format=<json|console|csv>]\n"
-      "    [--benchmark_color={auto|true|false}]\n"
-      "    [--benchmark_counters_tabular={true|false}]\n"
-      "    [--v=<verbosity>]\n");
-  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
+  // Pass through flags to benchmark (allowing --help to fall through).
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
   ::benchmark::Initialize(&argc, argv);
+
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
 

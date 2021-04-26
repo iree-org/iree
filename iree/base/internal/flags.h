@@ -223,12 +223,18 @@ int iree_flag_register(const char* file, int line, iree_flag_type_t type,
 //===----------------------------------------------------------------------===//
 
 // Controls how flag parsing is performed.
-typedef enum {
+enum iree_flags_parse_mode_e {
   IREE_FLAGS_PARSE_MODE_DEFAULT = 0,
   // Do not error out on undefined flags; leave them in the list.
   // Useful when needing to chain multiple flag parsers together.
   IREE_FLAGS_PARSE_MODE_UNDEFINED_OK = 1u << 0,
-} iree_flags_parse_mode_t;
+  // Continues parsing and returns success without exiting when `--help` is
+  // encountered. This allows for IREE flag parsing to happen before another
+  // external library parses its flags. `--help` will remain in the flag set
+  // such that the subsequent parsing can find it.
+  IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP = 1u << 1,
+};
+typedef uint32_t iree_flags_parse_mode_t;
 
 #if IREE_FLAGS_ENABLE_CLI == 1
 

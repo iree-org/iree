@@ -300,7 +300,6 @@ static iree_status_t iree_flags_parse_help(iree_string_view_t flag_name,
   }
   iree_flags_dump(IREE_FLAG_DUMP_MODE_VERBOSE, stdout);
   fprintf(stdout, "\n");
-  exit(0);
 
   return iree_ok_status();
 }
@@ -371,6 +370,16 @@ iree_status_t iree_flags_parse(iree_flags_parse_mode_t mode, int* argc_ptr,
 
     // Parse and store the flag value.
     IREE_RETURN_IF_ERROR(iree_flag_parse(flag, flag_value));
+
+    // --help gets special handling due to interop with external libraries that
+    // may also need to find it. If indicated we keep --help in the argument
+    // list and don't exit.
+    if (iree_string_view_equal(flag_name, iree_make_cstring_view("help"))) {
+      if (iree_all_bits_set(mode, IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP)) {
+        continue;  // don't remove the arg below
+      }
+      exit(0);  // --help exits by default.
+    }
 
     // Splice out the flag from the argv list.
     iree_flags_remove_arg(arg_ordinal, &argc, &argv);
