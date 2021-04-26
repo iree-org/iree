@@ -51,6 +51,14 @@ static bool iree_vm_bytecode_module_resolve_type(
                                        iree_make_cstring_view("i64")) == 0) {
     out_type->value_type = IREE_VM_VALUE_TYPE_I64;
     return true;
+  } else if (iree_vm_flatbuffer_strcmp(full_name,
+                                       iree_make_cstring_view("f32")) == 0) {
+    out_type->value_type = IREE_VM_VALUE_TYPE_F32;
+    return true;
+  } else if (iree_vm_flatbuffer_strcmp(full_name,
+                                       iree_make_cstring_view("f64")) == 0) {
+    out_type->value_type = IREE_VM_VALUE_TYPE_F64;
+    return true;
   } else if (iree_vm_flatbuffer_strcmp(
                  full_name, iree_make_cstring_view("!vm.opaque")) == 0) {
     out_type->value_type = IREE_VM_VALUE_TYPE_NONE;

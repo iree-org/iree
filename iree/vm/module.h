@@ -207,8 +207,10 @@ typedef struct {
 } iree_vm_function_call_t;
 
 #define IREE_VM_CCONV_TYPE_VOID 'v'
-#define IREE_VM_CCONV_TYPE_INT32 'i'
-#define IREE_VM_CCONV_TYPE_INT64 'I'
+#define IREE_VM_CCONV_TYPE_I32 'i'
+#define IREE_VM_CCONV_TYPE_I64 'I'
+#define IREE_VM_CCONV_TYPE_F32 'f'
+#define IREE_VM_CCONV_TYPE_F64 'F'
 #define IREE_VM_CCONV_TYPE_REF 'r'
 #define IREE_VM_CCONV_TYPE_SPAN_START 'C'
 #define IREE_VM_CCONV_TYPE_SPAN_END 'D'

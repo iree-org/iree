@@ -15,6 +15,7 @@
 #ifndef IREE_VM_OPS_H_
 #define IREE_VM_OPS_H_
 
+#include <math.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"
@@ -44,6 +45,11 @@ static inline int32_t vm_select_i32(int32_t condition, int32_t true_value,
   return condition ? true_value : false_value;
 }
 
+static inline float vm_select_f32(int32_t condition, float true_value,
+                                  float false_value) {
+  return condition ? true_value : false_value;
+}
+
 //===------------------------------------------------------------------===//
 // Native integer arithmetic
 //===------------------------------------------------------------------===//
@@ -69,6 +75,22 @@ static inline int32_t vm_not_i32(int32_t operand) {
 static inline int32_t vm_and_i32(int32_t lhs, int32_t rhs) { return lhs & rhs; }
 static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
 static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
+
+//===------------------------------------------------------------------===//
+// Native floating-point arithmetic
+//===------------------------------------------------------------------===//
+
+static inline float vm_add_f32(float lhs, float rhs) { return lhs + rhs; }
+static inline float vm_sub_f32(float lhs, float rhs) { return lhs - rhs; }
+static inline float vm_mul_f32(float lhs, float rhs) { return lhs * rhs; }
+static inline float vm_div_f32(float lhs, float rhs) { return lhs / rhs; }
+static inline float vm_rem_f32(float lhs, float rhs) {
+  return remainderf(lhs, rhs);
+}
+static inline float vm_abs_f32(float operand) { return fabsf(operand); }
+static inline float vm_neg_f32(float operand) { return -operand; }
+static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
+static inline float vm_floor_f32(float operand) { return floorf(operand); }
 
 //===------------------------------------------------------------------===//
 // Casting and type conversion/emulation
@@ -125,6 +147,17 @@ static inline int32_t vm_cmp_lt_i32u(int32_t lhs, int32_t rhs) {
 }
 static inline int32_t vm_cmp_nz_i32(int32_t operand) {
   return (operand != 0) ? 1 : 0;
+}
+
+static inline int32_t vm_cmp_eq_f32(float lhs, float rhs) {
+  return (lhs == rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_f32(float lhs, float rhs) {
+  return (lhs != rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_nz_f32(float lhs) { return (lhs != 0.0f) ? 1 : 0; }
+static inline int32_t vm_cmp_lt_f32(float lhs, float rhs) {
+  return (lhs < rhs) ? 1 : 0;
 }
 
 //===------------------------------------------------------------------===//

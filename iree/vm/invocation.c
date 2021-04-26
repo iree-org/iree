@@ -47,19 +47,33 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
     switch (cconv_arguments.data[cconv_i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32: {
+      case IREE_VM_CCONV_TYPE_I32: {
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             inputs, arg_i, IREE_VM_VALUE_TYPE_I32, &value));
         memcpy(p, &value.i32, sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
-      case IREE_VM_CCONV_TYPE_INT64: {
+      case IREE_VM_CCONV_TYPE_I64: {
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             inputs, arg_i, IREE_VM_VALUE_TYPE_I64, &value));
         memcpy(p, &value.i64, sizeof(int64_t));
         p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_F32: {
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            inputs, arg_i, IREE_VM_VALUE_TYPE_F32, &value));
+        memcpy(p, &value.f32, sizeof(float));
+        p += sizeof(float);
+      } break;
+      case IREE_VM_CCONV_TYPE_F64: {
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            inputs, arg_i, IREE_VM_VALUE_TYPE_F64, &value));
+        memcpy(p, &value.f64, sizeof(double));
+        p += sizeof(double);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         // TODO(benvanik): see if we can't remove this retain by instead relying
@@ -101,15 +115,25 @@ static iree_status_t iree_vm_invoke_marshal_outputs(
     switch (cconv_results.data[cconv_i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32: {
+      case IREE_VM_CCONV_TYPE_I32: {
         iree_vm_value_t value = iree_vm_value_make_i32(*(int32_t*)p);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
         p += sizeof(int32_t);
       } break;
-      case IREE_VM_CCONV_TYPE_INT64: {
+      case IREE_VM_CCONV_TYPE_I64: {
         iree_vm_value_t value = iree_vm_value_make_i64(*(int64_t*)p);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
         p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_F32: {
+        iree_vm_value_t value = iree_vm_value_make_f32(*(float*)p);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
+        p += sizeof(float);
+      } break;
+      case IREE_VM_CCONV_TYPE_F64: {
+        iree_vm_value_t value = iree_vm_value_make_f64(*(double*)p);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
+        p += sizeof(double);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         IREE_RETURN_IF_ERROR(

@@ -19,15 +19,20 @@ iree_cc_embed_data(
     all_bytecode_modules_cc
   GENERATED_SRCS
     "arithmetic_ops.vmfb"
+    "arithmetic_ops_f32.vmfb"
     "arithmetic_ops_i64.vmfb"
     "assignment_ops.vmfb"
+    "assignment_ops_f32.vmfb"
     "assignment_ops_i64.vmfb"
     "comparison_ops.vmfb"
+    "comparison_ops_f32.vmfb"
     "comparison_ops_i64.vmfb"
     "control_flow_ops.vmfb"
     "conversion_ops.vmfb"
     "conversion_ops_i64.vmfb"
     "global_ops.vmfb"
+    "global_ops_f32.vmfb"
+    "global_ops_i64.vmfb"
     "list_ops.vmfb"
     "list_variant_ops.vmfb"
     "shift_ops.vmfb"
@@ -47,6 +52,16 @@ iree_bytecode_module(
     arithmetic_ops
   SRC
     "arithmetic_ops.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    arithmetic_ops_f32
+  SRC
+    "arithmetic_ops_f32.mlir"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -74,6 +89,16 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    assignment_ops_f32
+  SRC
+    "assignment_ops_f32.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     assignment_ops_i64
   SRC
     "assignment_ops_i64.mlir"
@@ -87,6 +112,16 @@ iree_bytecode_module(
     comparison_ops
   SRC
     "comparison_ops.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    comparison_ops_f32
+  SRC
+    "comparison_ops_f32.mlir"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -139,6 +174,30 @@ iree_bytecode_module(
     global_ops
   SRC
     "global_ops.mlir"
+  CC_NAMESPACE
+    "iree::vm::test"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    global_ops_f32
+  SRC
+    "global_ops_f32.mlir"
+  CC_NAMESPACE
+    "iree::vm::test"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    global_ops_i64
+  SRC
+    "global_ops_i64.mlir"
   CC_NAMESPACE
     "iree::vm::test"
   FLAGS
