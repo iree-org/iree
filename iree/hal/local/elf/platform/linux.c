@@ -144,8 +144,10 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
 // IREE_ELF_CLEAR_CACHE can be defined externally to override this default
 // behavior.
 #if !defined(IREE_ELF_CLEAR_CACHE)
+// Explicitly enable for GCC, which has had this since 4.x but does not
+// seem to advertise it via __has_builtin.
 #if defined __has_builtin
-#if __has_builtin(__builtin___clear_cache)
+#if __has_builtin(__builtin___clear_cache) || defined(__GNUC__)
 #define IREE_ELF_CLEAR_CACHE(start, end) __builtin___clear_cache(start, end)
 #endif  // __builtin___clear_cache
 #endif  // __has_builtin

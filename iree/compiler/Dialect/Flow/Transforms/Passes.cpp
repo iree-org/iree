@@ -53,6 +53,11 @@ static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
                    "matmul ops pass."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableConvToImg2Col(
+    "iree-flow-enable-conv-img2col-transform",
+    llvm::cl::desc("Enable converting convolution ops to img2col form."),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -206,6 +211,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
     if (clEnable1x1ConvToMatmul) {
       passManager.addNestedPass<FuncOp>(
           mlir::iree_compiler::createConvert1x1ConvToMatmulPass());
+    }
+    if (clEnableConvToImg2Col) {
+      passManager.addNestedPass<FuncOp>(
+          mlir::iree_compiler::createConvertConv2DToImg2ColPass());
     }
 
     passManager.addNestedPass<FuncOp>(
