@@ -1,0 +1,154 @@
+IEEE 754r Half Precision floating point converter
+
+---
+
+Converts MATLAB or C variables to/from IEEE 754r Half Precision floating point
+bit pattern.
+
+Author: James Tursa
+Version: 1 Aug 2009 1.1.0.0
+Source:
+https://www.mathworks.com/matlabcentral/fileexchange/23173-ieee-754r-half-precision-floating-point-converter
+(subsequent versions grew into a much larger library with OpenMP support and
+a bunch of other things that complicate our usage)
+
+This version includes some tweaks made for C99 compatibility by K. Rogovin:
+https://ieeexplore.ieee.org/author/37332475100
+https://github.com/nomovok-opensource/wrath/blob/master/src/3rd_party/ieeehalfprecision/ieeehalfprecision.c
+
+---
+
+halfprecision converts the input argument to/from a half precision floating
+point bit pattern corresponding to IEEE 754r. The bit pattern is stored in a
+uint16 class variable. Please note that halfprecision is *not* a class. That is,
+you cannot do any arithmetic with the half precision bit patterns. halfprecision
+is simply a function that converts the IEEE 754r half precision bit pattern
+to/from other numeric MATLAB variables, and performs various tests on the bit
+patterns (isinf, isnan, eps, etc.).
+
+The half precision bit pattern is as follows:
+
+1 bit sign bit
+5 bits exponent, biased by 15
+10 bits mantissa, hidden leading bit, normalized to 1.0
+
+Special floating point bit patterns recognized and supported:
+
+All exponent bits zero:
+- If all mantissa bits are zero, then number is zero (possibly signed)
+- Otherwise, number is a denormalized bit pattern (leading bit is present)
+
+All exponent bits set to 1:
+- If all mantissa bits are zero, then number is +Infinity or -Infinity
+- Otherwise, number is NaN (Not a Number)
+
+More details of this floating point format can be found here:
+
+http://en.wikipedia.org/wiki/Half_precision
+
+Building:
+
+halfprecision requires that a mex routine be built (one time only). This process
+is typically self-building the first time you call the function as long as you
+have the files halfprecision.m and halfprecision.c in the same directory
+somewhere on the MATLAB path. If you need to manually build the mex function,
+see the documentation in halfprecision.m for instructions on building the mex
+routine.
+
+Syntax
+
+B = halfprecision(A)
+C = halfprecision(B,classname or function)
+L = halfprecision(directive)
+halfprecision(B,'disp')
+
+Description
+
+A = a MATLAB numeric array, char array, or logical array.
+
+B = the variable A converted into half precision floating point bit pattern.
+The bit pattern will be returned as a uint16 class variable. The values
+displayed are simply the bit pattern interpreted as if it were an unsigned
+16-bit integer. To see the halfprecision values, use the 'disp' option, which
+simply converts the bit patterns into a single class and then displays them.
+
+C = the half precision floating point bit pattern in B converted into class S.
+B must be a uint16 or int16 class variable.
+
+classname = char string naming the desired class (e.g., 'single', 'int32', etc.)
+
+function = char string giving one of the following functions:
+'isinf' = returns a logical variable, true where B is inf
+'isnan' = returns a logical variable, true where B is nan
+'isnormal' = returns a logical variable, true where B is normalized
+'isdenormal' = returns a logical variable, true where B is denormalized
+'eps' = returns eps of the half precision values
+
+directive = char string giving one of the following directives:
+'openmp' = returns a logical variable, true when compiled with OpenMP
+'realmax' = returns max half precision value
+'realmin' = returns min half precision normalized value
+'realmindenormal' = returns min half precision denormalized value
+'version' = returns a string with compilation memory model
+
+'disp' = The floating point bit values are simply displayed.
+
+Examples
+
+>> a = [-inf -1e30 -1.2 NaN 1.2 1e30 inf]
+a =
+1.0e+030 *
+-Inf -1.0000 -0.0000 NaN 0.0000 1.0000 Inf
+
+>> b = halfprecision(a)
+b =
+64512 64512 48333 65024 15565 31744 31744
+
+>> halfprecision(b,'disp')
+-Inf -Inf -1.2002 NaN 1.2002 Inf Inf
+
+>> halfprecision(b,'double')
+ans =
+-Inf -Inf -1.2002 NaN 1.2002 Inf Inf
+
+>> 2^(-24)
+ans =
+5.9605e-008
+
+>> halfprecision(ans)
+ans =
+1
+
+>> halfprecision(ans,'disp')
+5.9605e-008
+
+>> 2^(-25)
+ans =
+2.9802e-008
+
+>> halfprecision(ans)
+ans =
+1
+
+>> halfprecision(ans,'disp')
+5.9605e-008
+
+>> 2^(-26)
+ans =
+1.4901e-008
+
+>> halfprecision(ans)
+ans =
+0
+
+>> halfprecision(ans,'disp')
+0
+
+Note that the special cases of -Inf, +Inf, and NaN are handled correctly. Also,
+note that the -1e30 and 1e30 values overflow the half precision format and are
+converted into half precision -Inf and +Inf values, and stay that way when they
+are converted back into doubles.
+
+Caveat: I have only tested this code on a PC, which is Little Endian. I put in
+code to handle Big Endian machines, but I do not have a way to test it, so I
+can't say for sure that it will work properly. Let me know if you have problems.

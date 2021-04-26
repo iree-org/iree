@@ -119,6 +119,13 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.new_local_repository,
+        name = "ieeehalfprecision",
+        build_file = iree_repo_alias + "//:build_tools/third_party/ieeehalfprecision/BUILD.overlay",
+        path = paths.join(iree_path, "third_party/ieeehalfprecision"),
+    )
+
+    maybe(
+        native.new_local_repository,
         name = "spirv_cross",
         build_file = iree_repo_alias + "//:build_tools/third_party/spirv_cross/BUILD.overlay",
         path = paths.join(iree_path, "third_party/spirv_cross"),
