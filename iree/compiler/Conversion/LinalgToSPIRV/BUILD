@@ -72,6 +72,7 @@ cc_library(
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRV",
         "@llvm-project//mlir:GPUTransforms",
