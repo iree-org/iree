@@ -94,11 +94,15 @@ class ModelBenchmarkInfo:
     self.phones = phones
 
 
-def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
+def get_pixel4_default_target_list(skipped_target=None,
+                                   batch_config=None,
+                                   compilation_flags=None):
   if skipped_target is None:
     skipped_target = []
   if batch_config is None:
     batch_config = []
+  if compilation_flags is None:
+    compilation_flags = []
   targets = [
       TargetInfo(driver="vmla",
                  hal_target_backend="vmla",
@@ -111,7 +115,6 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
                      "--iree-flow-inline-constants-max-byte-length=2048",
-                     "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ]),
       TargetInfo(driver="dylib",
                  hal_target_backend="dylib-llvm-aot",
@@ -120,7 +123,6 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
                      "--iree-flow-inline-constants-max-byte-length=2048",
-                     "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ],
                  runtime_flags=[
                      "--dylib_worker_count=3",
@@ -140,14 +142,20 @@ def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
   for target in targets:
     if target.mako_tag in batch_config:
       target.add_batch_flag(batch_config[target.mako_tag])
+    if target.mako_tag in compilation_flags:
+      target.compilation_flags += compilation_flags[target.mako_tag]
   return targets
 
 
-def get_s20_default_target_list(skipped_target=None, batch_config=None):
+def get_s20_default_target_list(skipped_target=None,
+                                batch_config=None,
+                                compilation_flags=None):
   if skipped_target is None:
     skipped_target = []
   if batch_config is None:
     batch_config = []
+  if compilation_flags is None:
+    compilation_flags = []
   targets = [
       TargetInfo(driver="vmla",
                  hal_target_backend="vmla",
@@ -160,7 +168,6 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
                      "--iree-flow-inline-constants-max-byte-length=2048",
-                     "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ]),
       TargetInfo(driver="dylib",
                  hal_target_backend="dylib-llvm-aot",
@@ -169,7 +176,6 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
                      "--iree-flow-inline-constants-max-byte-length=2048",
-                     "--iree-flow-dispatch-formation-enable-operand-fusion"
                  ],
                  runtime_flags=[
                      "--dylib_worker_count=3",
@@ -190,6 +196,8 @@ def get_s20_default_target_list(skipped_target=None, batch_config=None):
   for target in targets:
     if target.mako_tag in batch_config:
       target.add_batch_flag(batch_config[target.mako_tag])
+    if target.mako_tag in compilation_flags:
+      target.compilation_flags += compilation_flags[target.mako_tag]
   return targets
 
 
@@ -221,13 +229,31 @@ MODEL_BENCHMARKS = [
         model_path="mobilenet-v2/iree_input.mlir",
         flagfile_path="mobilenet-v2/flagfile",
         phones=[
-            PhoneBenchmarkInfo(name="Pixel4",
-                               benchmark_key="6338759231537152",
-                               targets=get_pixel4_default_target_list(
-                                   skipped_target=["vlk2"])),
-            PhoneBenchmarkInfo(name="S20",
-                               benchmark_key="5618403088793600",
-                               targets=get_s20_default_target_list()),
+            PhoneBenchmarkInfo(
+                name="Pixel4",
+                benchmark_key="6338759231537152",
+                targets=get_pixel4_default_target_list(
+                    skipped_target=["vlk2"],
+                    compilation_flags={
+                        'cpu': [
+                            "--iree-flow-dispatch-formation-enable-operand-fusion"
+                        ],
+                        'cpu3t': [
+                            "--iree-flow-dispatch-formation-enable-operand-fusion"
+                        ]
+                    })),
+            PhoneBenchmarkInfo(
+                name="S20",
+                benchmark_key="5618403088793600",
+                targets=get_s20_default_target_list(
+                    compilation_flags={
+                        'cpu': [
+                            "--iree-flow-dispatch-formation-enable-operand-fusion"
+                        ],
+                        'cpu3t': [
+                            "--iree-flow-dispatch-formation-enable-operand-fusion"
+                        ]
+                    })),
         ]),
     ModelBenchmarkInfo(
         name="mobilebert-f16",

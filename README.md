@@ -58,9 +58,13 @@ you'd like to see!
 
 We also have some public talks that explain IREE's concepts and architecture:
 
+*   2020-08-20: IREE CodeGen: MLIR Open Design Meeting Presentation
+    ([recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing)
+    and
+    [slides](https://docs.google.com/presentation/d/1NetHjKAOYg49KixY5tELqFp6Zr2v8_ujGzWZ_3xvqC8/edit))
 *   2020-03-18: Interactive HAL IR Walkthrough (Ben Vanik and core team)
     ([recording](https://drive.google.com/file/d/1_sWDgAPDfrGQZdxAapSA90AD1jVfhp-f/view?usp=sharing))
-*   2020-01-31: End-to-end MLIR Workflow in IREE
+*   2020-01-31: End-to-end MLIR Workflow in IREE: MLIR Open Design Meeting Presentation
     ([recording](https://drive.google.com/open?id=1os9FaPodPI59uj7JJI3aXnTzkuttuVkR)
     and
     [slides](https://drive.google.com/open?id=1RCQ4ZPQFK9cVgu3IH1e5xbrBcqy7d_cEZ578j84OvYI))

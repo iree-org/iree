@@ -268,13 +268,11 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
     Value listOperand = op.getOperation()->getOperand(listArgumentIndex);
 
     // deref
-    auto refOp = rewriter.create<emitc::CallOp>(
+    auto refOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*callee=*/rewriter.getStringAttr("*"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{listOperand});
+        /*applicableOperator=*/rewriter.getStringAttr("*"),
+        /*operand=*/listOperand);
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -282,7 +280,7 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
         /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
+        /*operands=*/ArrayRef<Value>{refOp.getResult()});
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -386,9 +384,10 @@ class ListAllocOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    auto elementTypePtrOp = rewriter.create<emitc::GetAddressOfOp>(
+    auto elementTypePtrOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t*"),
+        /*applicableOperator=*/rewriter.getStringAttr("&"),
         /*operand=*/elementTypeOp.getResult(0));
 
     auto listOp = rewriter.create<emitc::ConstOp>(
@@ -396,9 +395,10 @@ class ListAllocOpConversion
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
         /*value=*/StringAttr::get(ctx, "NULL"));
 
-    auto listPtrOp = rewriter.create<emitc::GetAddressOfOp>(
+    auto listPtrOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t**"),
+        /*applicableOperator=*/rewriter.getStringAttr("&"),
         /*operand=*/listOp.getResult());
 
     failableCall(
@@ -497,18 +497,17 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t"),
         /*value=*/StringAttr::get(ctx, ""));
 
-    auto valuePtrOp = rewriter.create<emitc::GetAddressOfOp>(
+    auto valuePtrOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t*"),
+        /*applicableOperator=*/rewriter.getStringAttr("&"),
         /*operand=*/valueOp.getResult());
 
-    auto refOp = rewriter.create<emitc::CallOp>(
+    auto refOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*callee=*/rewriter.getStringAttr("*"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{getOp.list()});
+        /*applicableOperator=*/rewriter.getStringAttr("*"),
+        /*operand=*/getOp.list());
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -516,7 +515,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
+        /*operands=*/ArrayRef<Value>{refOp.getResult()});
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -584,18 +583,17 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{setOp.value()});
 
-    auto valuePtrOp = rewriter.create<emitc::GetAddressOfOp>(
+    auto valuePtrOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t*"),
+        /*applicableOperator=*/rewriter.getStringAttr("&"),
         /*operand=*/valueOp.getResult(0));
 
-    auto refOp = rewriter.create<emitc::CallOp>(
+    auto refOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*callee=*/rewriter.getStringAttr("*"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{setOp.list()});
+        /*applicableOperator=*/rewriter.getStringAttr("*"),
+        /*operand=*/setOp.list());
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -603,7 +601,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*callee=*/rewriter.getStringAttr("iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
+        /*operands=*/ArrayRef<Value>{refOp.getResult()});
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
