@@ -68,7 +68,6 @@ inline void registerLinalgToSPIRVPasses() {
     createFoldProcessorIDUsesPass();
     createTileAndVectorizeInOneWorkgroupPass(SPIRVCodegenOptions());
     createVectorToGPUPass();
-    createMatMulTileAndVectorizeGPUPass();
     createVectorizeMemrefLoadStorePass();
     return true;
   }();

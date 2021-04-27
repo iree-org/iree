@@ -39,7 +39,6 @@ cc_library(
         "ConvertToSPIRVPass.cpp",
         "FoldGPUProcessorIDUses.cpp",
         "KernelDispatchUtils.cpp",
-        "MatMulVectorizationTest.cpp",
         "Passes.cpp",
         "TileAndVectorizeInOneWorkgroupPass.cpp",
         "Utils.cpp",

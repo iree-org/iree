@@ -23,7 +23,6 @@ iree_lit_test_suite(
     "forop_canonicalization.mlir"
     "materialize_launch_configuration.mlir"
     "materialize_launch_configuration2.mlir"
-    "matmul_vectorization_licm.mlir"
     "pipeline_matmul_cooperative_matrix.mlir"
     "pipeline_matmul_vectorization.mlir"
     "promote_workgroup_memory.mlir"

@@ -6,12 +6,9 @@ func @tile_from_tensor_load() {
   %c2 = constant 2 : index
   %c4 = constant 4 : index
   %c1 = constant 1 : index
-  %0 = hal.interface.load.tensor @io::@TENSOR_LHS, offset = %c0
-    {operand_result_index = 0 : i32} : tensor<2x3xf32>
-  %1 = hal.interface.load.tensor @io::@TENSOR_RHS, offset = %c0
-    {operand_result_index = 1 : i32} : tensor<3x4xf32>
-  %2 = hal.interface.load.tensor @io::@TENSOR_INIT, offset = %c0
-    {operand_result_index = 2 : i32} : tensor<2x4xf32>
+  %0 = hal.interface.load.tensor @io::@TENSOR_LHS, offset = %c0 : tensor<2x3xf32>
+  %1 = hal.interface.load.tensor @io::@TENSOR_RHS, offset = %c0 : tensor<3x4xf32>
+  %2 = hal.interface.load.tensor @io::@TENSOR_INIT, offset = %c0 : tensor<2x4xf32>
 
   %3 = hal.interface.workgroup.id[0] : index
   %4 = hal.interface.workgroup.id[1] : index
@@ -50,8 +47,7 @@ func @tile_from_tensor_load() {
   //  CHECK-NOT: hal.interface.load.tensor %
   //  CHECK-NOT: hal.interface.store.tensor %
    // This is the store onto which the destructive update rewrites latches.
-  hal.interface.store.tensor %5, @io::@ret0, offset = %c0
-    {operand_result_index = 3 : i32} : tensor<2x4xf32>
+  hal.interface.store.tensor %5, @io::@ret0, offset = %c0 : tensor<2x4xf32>
 
   return
 }
@@ -73,15 +69,12 @@ func @tile_from_pointwise_lhs() {
   %c2 = constant 2 : index
   %c4 = constant 4 : index
   %c1 = constant 1 : index
-  %0 = hal.interface.load.tensor @io::@TENSOR_INIT, offset = %c0
-    {operand_result_index = 0 : i32} : tensor<2x4xf32>
+  %0 = hal.interface.load.tensor @io::@TENSOR_INIT, offset = %c0 : tensor<2x4xf32>
   // This is the `lhs` operand that gets through a pointwise generic and becomes
   // the first input operand of linalg.matmul. After tiling and fusion this is a
   // subtensor of the original `hal.interface.load.tensor`.
-  %1 = hal.interface.load.tensor @io::@TENSOR_LHS, offset = %c0
-    {operand_result_index = 1 : i32} : tensor<2x3xf32>
-  %2 = hal.interface.load.tensor @io::@TENSOR_RHS, offset = %c0
-    {operand_result_index = 2 : i32} : tensor<3x4xf32>
+  %1 = hal.interface.load.tensor @io::@TENSOR_LHS, offset = %c0 : tensor<2x3xf32>
+  %2 = hal.interface.load.tensor @io::@TENSOR_RHS, offset = %c0 : tensor<3x4xf32>
 
   %4 = hal.interface.workgroup.id[0] : index
   %5 = hal.interface.workgroup.id[1] : index
@@ -131,8 +124,7 @@ func @tile_from_pointwise_lhs() {
   //  CHECK-NOT: hal.interface.load.tensor %
   //  CHECK-NOT: hal.interface.store.tensor %
   // This is the store onto which the destructive update rewrites latches.
-  hal.interface.store.tensor %6, @io::@ret0, offset = %c0
-    {operand_result_index = 3 : i32} : tensor<2x4xf32>
+  hal.interface.store.tensor %6, @io::@ret0, offset = %c0 : tensor<2x4xf32>
 
   return
 }
@@ -158,12 +150,9 @@ func @tile_from_pointwise_outs() {
   // This is the `out` operand that gets through a pointwise generic and becomes
   // the outs operand of linalg.matmul. After tiling and fusion this is a
   // subtensor of the value produced by linalg.generic.
-  %0 = hal.interface.load.tensor @io::@TENSOR_INIT, offset = %c0
-    {operand_result_index = 0 : i32} : tensor<2x4xf32>
-  %1 = hal.interface.load.tensor @io::@TENSOR_LHS, offset = %c0
-    {operand_result_index = 1 : i32} : tensor<2x3xf32>
-  %2 = hal.interface.load.tensor @io::@TENSOR_RHS, offset = %c0
-    {operand_result_index = 2 : i32} : tensor<3x4xf32>
+  %0 = hal.interface.load.tensor @io::@TENSOR_INIT, offset = %c0 : tensor<2x4xf32>
+  %1 = hal.interface.load.tensor @io::@TENSOR_LHS, offset = %c0 : tensor<2x3xf32>
+  %2 = hal.interface.load.tensor @io::@TENSOR_RHS, offset = %c0 : tensor<3x4xf32>
 
   // This op is left over and should be DCE'ed but its result is currently used
   // for a destructive update.
@@ -217,8 +206,7 @@ func @tile_from_pointwise_outs() {
   //  CHECK-NOT: hal.interface.load.tensor %
   //  CHECK-NOT: hal.interface.store.tensor %
   // This is the store onto which the destructive update rewrites latches.
-  hal.interface.store.tensor %6, @io::@ret0, offset = %c0
-    {operand_result_index = 3 : i32} : tensor<2x4xf32>
+  hal.interface.store.tensor %6, @io::@ret0, offset = %c0 : tensor<2x4xf32>
 
   return
 }
