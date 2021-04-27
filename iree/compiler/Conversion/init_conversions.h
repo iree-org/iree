@@ -70,7 +70,6 @@ inline void registerLinalgToSPIRVPasses() {
     createTileAndVectorizeInOneWorkgroupPass(SPIRVCodegenOptions());
     createSplitDispatchFunctionPass();
     createVectorToGPUPass();
-    createMatMulTileAndVectorizeGPUPass();
     createVectorizeMemrefLoadStorePass();
     return true;
   }();
