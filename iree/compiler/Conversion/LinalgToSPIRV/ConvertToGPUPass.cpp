@@ -438,16 +438,10 @@ static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
 }
 
 /// Distributes scf.parallel to workitems using local invocation ID.
-static LogicalResult mapToLocalInvocationId(
-    ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
-    bool useCyclicDistribution = false) {
-  if (useCyclicDistribution) {
-    return distributeCyclicallyToProcessors<gpu::ThreadIdOp, gpu::BlockDimOp>(
-        rewriter, pLoopOp);
-  }
-  return distributeSingleIterationPerProcessor<gpu::ThreadIdOp,
-                                               gpu::BlockDimOp>(rewriter,
-                                                                pLoopOp);
+static LogicalResult mapToLocalInvocationId(ConversionPatternRewriter &rewriter,
+                                            scf::ParallelOp pLoopOp) {
+  return distributeCyclicallyToProcessors<gpu::ThreadIdOp, gpu::BlockDimOp>(
+      rewriter, pLoopOp);
 }
 
 /// Distributes scf.parallel to workitems using global invocation ID. The GPU
@@ -523,7 +517,7 @@ struct SerializeParallelLoopPattern
 template <typename LinalgOpTy>
 static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
     LinalgOpTy linalgOp, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter, bool optimizeControlFlow) {
+    ConversionPatternRewriter &rewriter) {
   // Check for marker that specifies that the linalg op is to be partitioned
   // across threads within a workgroup.
   if (!hasMarker(linalgOp)) return failure();
@@ -533,7 +527,7 @@ static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
   if (loops.getValue().empty()) return success();
 
   auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
-  return mapToLocalInvocationId(rewriter, pLoopOp, optimizeControlFlow);
+  return mapToLocalInvocationId(rewriter, pLoopOp);
 }
 
 static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
@@ -571,7 +565,7 @@ static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
 template <>
 LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
     linalg::CopyOp copyOp, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter, bool optimizeControlFlow) {
+    ConversionPatternRewriter &rewriter) {
   if (!hasMarker(copyOp,
                  {getCopyToWorkgroupMemoryMarker(), getWorkgroupMarker()}))
     return failure();
@@ -582,7 +576,7 @@ LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
 
   auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
   if (hasMarker(copyOp, getWorkgroupMarker())) {
-    return mapToLocalInvocationId(rewriter, pLoopOp, optimizeControlFlow);
+    return mapToLocalInvocationId(rewriter, pLoopOp);
   }
   return distributeCopyOp(copyOp, pLoopOp, rewriter);
 }
@@ -598,8 +592,8 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (failed(mapLinalgOpToLocalInvocationIdImpl(
-            linalgOp, operands, rewriter, /*optimizeControlFlow=*/true)))
+    if (failed(
+            mapLinalgOpToLocalInvocationIdImpl(linalgOp, operands, rewriter)))
       return failure();
 
     // If the `linalgOp` writes to workgroup memory insert barrier after the
