@@ -63,9 +63,6 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
 /// cooperative matrix ops when possible.
 std::unique_ptr<FunctionPass> createConvertVectorToCooperativeMatrixPass();
 
-/// Pass to apply tiling and vectorization transformations on linagl::MatMulOp.
-std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
-
 /// Converts memref of scalar to memref of vector of efficent size. This will
 /// allow to convert memory accesses to vector load/store in SPIR-V without
 /// having pointer bitcast.

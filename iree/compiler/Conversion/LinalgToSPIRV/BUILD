@@ -40,7 +40,6 @@ cc_library(
         "FoldGPUProcessorIDUses.cpp",
         "KernelDispatchUtils.cpp",
         "LinalgTileAndDistributePass.cpp",
-        "MatMulVectorizationTest.cpp",
         "Passes.cpp",
         "SplitDispatchFunctionPass.cpp",
         "TileAndVectorizeInOneWorkgroupPass.cpp",
