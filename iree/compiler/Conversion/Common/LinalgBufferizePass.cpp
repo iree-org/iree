@@ -109,6 +109,19 @@ static bool isFromReadOnlyTensor(Value v) {
       .Default([&](Operation *op) { return false; });
 }
 
+/// Check if all users of an op that lowers to a subview eventually can use the
+/// subview when converted to buffers. For example `linalg.reshape` (which is
+/// the buffer version of `linalg.tensor_reshape`) cannot handle subviews.
+static bool canUsersHandleSubviews(Operation *op) {
+  // TODO(ravishankarm): Maybe this is too aggressive, might have to switch this
+  // to have a white-list instead of blacklist.
+  for (Operation *user : op->getUsers()) {
+    if (isa<IREE::Flow::DispatchTensorStoreOp, linalg::TensorReshapeOp>(user))
+      return false;
+  }
+  return true;
+}
+
 /// Class that tracks the equivalence relationship between tensors. Its a
 /// light-weight wrapper around `llvm::EquivalenceClasses` to account for
 /// `Value` not directly supported as a value type by this class.
@@ -200,6 +213,13 @@ static LogicalResult analyseConstantOp(ConstantOp constantOp,
 /// equivalence class as the source.
 static LogicalResult analyseInterfaceLoadTensorOp(
     IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
+  if (!(loadOp.getMixedOffsets().empty() && loadOp.getMixedSizes().empty() &&
+        loadOp.getMixedStrides().empty()) &&
+      !canUsersHandleSubviews(loadOp)) {
+    plan.insert(loadOp.source());
+    plan.insert(loadOp.result());
+    return success();
+  }
   plan.unionSets(loadOp.result(), loadOp.source());
   return success();
 }
@@ -233,6 +253,14 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
 static bool canSetStoreValueAndTargetAsEquivalent(
     IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
   Value value = storeOp.value();
+  if (!(storeOp.getMixedOffsets().empty() && storeOp.getMixedSizes().empty() &&
+        storeOp.getMixedStrides().empty())) {
+    SmallVector<Value> mappedTensors = plan.getTensorsMappedToSameSet(value);
+    for (auto v : mappedTensors) {
+      if (v.getDefiningOp<linalg::TensorReshapeOp>()) return false;
+    }
+  }
+
   Value target = storeOp.target();
   auto targetInterfaceOp =
       getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target, plan);
@@ -289,6 +317,7 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
 
 static LogicalResult analysePadTensorOp(linalg::PadTensorOp padTensorOp,
                                         BufferizationPlan &plan) {
+  plan.insert(padTensorOp.source());
   plan.insert(padTensorOp.result());
   return success();
 }
@@ -365,6 +394,17 @@ static LogicalResult analyseSingleOperandResultOp(Value source, Value result,
   return success();
 }
 
+static LogicalResult analyseSubTensorOp(SubTensorOp subTensorOp,
+                                        BufferizationPlan &plan) {
+  if (!canUsersHandleSubviews(subTensorOp)) {
+    plan.insert(subTensorOp.source());
+    plan.insert(subTensorOp.result());
+    return success();
+  }
+  return analyseSingleOperandResultOp(subTensorOp.source(),
+                                      subTensorOp.result(), plan);
+}
+
 /// Adds the `dest` and `result` tensor of a subtensor insert operation into the
 /// same equivalence class. If `source` is not null also checks that the
 /// `source` and `dest` are not equivalent.
@@ -418,8 +458,7 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
                   tensorReshapeOp.src(), tensorReshapeOp.result(), plan);
             })
         .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
-          return analyseSingleOperandResultOp(subTensorOp.source(),
-                                              subTensorOp.result(), plan);
+          return analyseSubTensorOp(subTensorOp, plan);
         })
         .Case<SubTensorInsertOp>([&](SubTensorInsertOp subTensorInsertOp) {
           return analyseDestructiveUpdateOp(
@@ -491,6 +530,8 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
         dynamicDims.push_back(shape.value());
       }
     }
+  } else if (auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(op)) {
+    dynamicDims = llvm::to_vector<4>(loadOp.sizes());
   } else if (auto subTensorOp = dyn_cast<SubTensorOp>(op)) {
     dynamicDims = llvm::to_vector<4>(subTensorOp.sizes());
   } else if (auto subTensorInsertOp = dyn_cast<SubTensorInsertOp>(op)) {
@@ -706,6 +747,16 @@ static Value getAliasingBufferForCastResult(OpBuilder &b, tensor::CastOp castOp,
   return b.create<memref::CastOp>(castOp.getLoc(), outputType, inputBuffer);
 }
 
+/// Returns the subview that indexes into the source of the interface buffer.
+static Value getAliasingBufferForTensorLoadResult(
+    OpBuilder &b, IREE::Flow::DispatchTensorLoadOp loadOp,
+    BlockAndValueMapping &bvm) {
+  Location loc = loadOp.getLoc();
+  Value memref = bvm.lookup(loadOp.source());
+  return createSubviewOp(b, loc, memref, loadOp.getMixedOffsets(),
+                         loadOp.getMixedSizes(), loadOp.getMixedStrides());
+}
+
 /// Converts a `linalg.tensor_reshape` operation to a `linalg.reshape`
 /// operation with the result aliasing the buffer for the operand.
 static Value getAliasingBufferForReshapeResult(OpBuilder &b,
@@ -748,6 +799,70 @@ static Value getAliasingBufferForSubtensorResult(OpBuilder &b, SubTensorOp op,
                                      offsets, sizes, strides);
 }
 
+// static Value getAliasingBufferForPadTensorResult(
+//     OpBuilder &b, linalg::PadTensorOp padTensorOp, BlockAndValueMapping &bvm)
+//     {
+//   // Get padding value and fill the result buffer.
+//   linalg::YieldOp yeildOp =
+//       *padTensorOp.region().getOps<linalg::YieldOp>().begin();
+//   Value paddingValue = yeildOp.values()[0];
+
+//   auto constOp = paddingValue.getDefiningOp<ConstantOp>();
+//   if (!constOp || constOp.getValue().isa<DenseElementsAttr>()) {
+//     return nullptr;
+//   }
+
+//   Location loc = padTensorOp.getLoc();
+//   b.create<linalg::FillOp>(loc, resultPaddedBuffer, paddingValue);
+
+//   // Get the interior region.
+//   SmallVector<OpFoldResult> sizeMixedValues =
+//       getMemrefSizes(b, loc, inputMemref);
+//   SmallVector<OpFoldResult> strides(
+//       inputMemref.getType().cast<ShapedType>().getRank(),
+//       b.getI64IntegerAttr(1));
+
+//   return b.create<memref::SubViewOp>(loc, resultPaddedBuffer,
+//                                      padTensorOp.getMixedLowPad(),
+//                                      sizeMixedValues, strides);
+// }
+
+/// Returns a `memref` for every result that aliases the buffer for one of its
+/// operands. Returns the memref of the right shape/type based on the operation.
+static SmallVector<Value, 4> getAliasingBuffersForResults(
+    OpBuilder &b, Operation *op, BlockAndValueMapping &bvm) {
+  return TypeSwitch<Operation *, SmallVector<Value, 4>>(op)
+      .Case<IREE::Flow::DispatchTensorLoadOp>(
+          [&](IREE::Flow::DispatchTensorLoadOp loadOp)
+              -> SmallVector<Value, 4> {
+            return {getAliasingBufferForTensorLoadResult(b, loadOp, bvm)};
+          })
+      .Case<linalg::TensorReshapeOp>(
+          [&](linalg::TensorReshapeOp reshapeOp) -> SmallVector<Value, 4> {
+            return {getAliasingBufferForReshapeResult(b, reshapeOp, bvm)};
+          })
+      .Case<SubTensorInsertOp>(
+          [&](SubTensorInsertOp subTensorInsertOp) -> SmallVector<Value, 4> {
+            return {bvm.lookupOrNull(subTensorInsertOp.dest())};
+          })
+      .Case<SubTensorOp>([&](SubTensorOp subTensorOp) -> SmallVector<Value, 4> {
+        return {getAliasingBufferForSubtensorResult(b, subTensorOp, bvm)};
+      })
+      .Case<tensor::CastOp>(
+          [&](tensor::CastOp castOp) -> SmallVector<Value, 4> {
+            return {getAliasingBufferForCastResult(b, castOp, bvm)};
+          })
+      .Case<linalg::LinalgOp>(
+          [&](linalg::LinalgOp linalgOp) -> SmallVector<Value, 4> {
+            return llvm::to_vector<4>(
+                llvm::map_range(linalgOp.getOutputs(),
+                                [&](Value v) { return bvm.lookupOrNull(v); }));
+          })
+      .Default([&](Operation *op) -> SmallVector<Value, 4> {
+        return SmallVector<Value, 4>(op->getNumResults(), nullptr);
+      });
+}
+
 /// Computes the `memrefs` to use for the result of an operation based on
 /// - If the result has a tied operand reuse the buffer for the tied operand (or
 ///   an alias of it) as the buffer for the result. The `tiedOperands` vector is
@@ -764,31 +879,14 @@ static LogicalResult getOrAllocateResultBuffers(
     OpBuilder &b, Operation *op, ArrayRef<Value> tiedOperands,
     BlockAndValueMapping &bvm, BufferizationPlan &plan,
     WorkgroupMemoryAllocationFn allocationFn) {
+  auto aliasingBuffers = getAliasingBuffersForResults(b, op, bvm);
+  assert(aliasingBuffers.size() == op->getNumResults());
   for (auto result : llvm::enumerate(op->getResults())) {
     if (bvm.contains(result.value())) continue;
     Value buffer;
     if (tiedOperands[result.index()] &&
         plan.isEquivalent(tiedOperands[result.index()], result.value())) {
-      buffer =
-          TypeSwitch<Operation *, Value>(op)
-              .Case<linalg::TensorReshapeOp>(
-                  [&](linalg::TensorReshapeOp reshapeOp) {
-                    return getAliasingBufferForReshapeResult(b, reshapeOp, bvm);
-                  })
-              .Case<SubTensorInsertOp>(
-                  [&](SubTensorInsertOp subTensorInsertOp) {
-                    return bvm.lookupOrNull(subTensorInsertOp.dest());
-                  })
-              .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
-                return getAliasingBufferForSubtensorResult(b, subTensorOp, bvm);
-              })
-              .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
-                return getAliasingBufferForCastResult(b, castOp, bvm);
-              })
-              .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-                return bvm.lookupOrNull(linalgOp.getOutput(result.index()));
-              })
-              .Default([&](Operation *op) { return nullptr; });
+      buffer = aliasingBuffers[result.index()];
     }
     if (!buffer && plan.isInStoreSet(result.value())) {
       buffer = getInplaceResultBuffer(b, result.value(), bvm);
@@ -912,19 +1010,6 @@ static LogicalResult convertTensorExtractOp(OpBuilder &b, tensor::ExtractOp op,
   return success();
 }
 
-static LogicalResult convertInterfaceLoadTensorOp(
-    OpBuilder &b, IREE::Flow::DispatchTensorLoadOp loadOp,
-    BlockAndValueMapping &bvm) {
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(loadOp);
-  Location loc = loadOp.getLoc();
-  Value memref = bvm.lookup(loadOp.source());
-  Value res = createSubviewOp(b, loc, memref, loadOp.getMixedOffsets(),
-                              loadOp.getMixedSizes(), loadOp.getMixedStrides());
-  bvm.map(loadOp.result(), res);
-  return success();
-}
-
 /// Converts a `flow.dispatch.tensor.store` operation to memrefs. If the `value`
 /// and `target` are in the same equivalent set, then there is nothing to do. If
 /// no create a subview into the result buffer and copy the `value`.
@@ -1025,15 +1110,14 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
 /// If the alias of the buffer for an input oeprand cannot be used for the
 /// "tied" results, need to do an explicit copy of the memory pointed to by the
 /// aliased buffer into the buffer assigned to the result.
-static void copyFromAliasingBufferToResultBuffer(OpBuilder &b, Location loc,
-                                                 ArrayRef<Value> tiedOperands,
-                                                 ArrayRef<Value> tiedResults,
-                                                 BlockAndValueMapping &bvm,
-                                                 BufferizationPlan &plan) {
+static void copyFromAliasingBufferToResultBuffer(
+    OpBuilder &b, Location loc, ArrayRef<Value> tiedOperands,
+    ArrayRef<Value> tiedResults, ArrayRef<Value> aliasingBuffers,
+    BlockAndValueMapping &bvm, BufferizationPlan &plan) {
   for (auto result : enumerate(tiedResults)) {
     Value operand = tiedOperands[result.index()];
     if (!plan.isEquivalent(result.value(), operand)) {
-      b.create<linalg::CopyOp>(loc, bvm.lookup(operand),
+      b.create<linalg::CopyOp>(loc, aliasingBuffers[result.index()],
                                bvm.lookup(result.value()));
     }
   }
@@ -1160,10 +1244,6 @@ void LinalgBufferizePass::runOnFunction() {
         })
         .Case<memref::DimOp>(
             [&](memref::DimOp dimOp) { return convertDimOp(b, dimOp, bvm); })
-        .Case<IREE::Flow::DispatchTensorLoadOp>(
-            [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-              return convertInterfaceLoadTensorOp(b, loadOp, bvm);
-            })
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return convertInterfaceStoreTensorOp(b, storeOp, bvm, plan);
@@ -1172,18 +1252,20 @@ void LinalgBufferizePass::runOnFunction() {
             [&](IREE::Flow::DispatchTieShapeOp shapeOp) {
               return convertDispatchTieShapeOp(b, shapeOp, bvm);
             })
-        .Case<linalg::TensorReshapeOp, tensor::CastOp, SubTensorOp>(
-            [&](auto aliasingOp) {
-              if (failed(getOrAllocateResultBuffers(b, aliasingOp,
-                                                    aliasingOp->getOperand(0),
-                                                    bvm, plan, allocationFn))) {
-                return failure();
-              }
-              copyFromAliasingBufferToResultBuffer(
-                  b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
-                  aliasingOp->getResult(0), bvm, plan);
-              return success();
-            })
+        .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorReshapeOp,
+              SubTensorOp, tensor::CastOp>([&](auto aliasingOp) {
+          if (failed(getOrAllocateResultBuffers(b, aliasingOp,
+                                                aliasingOp->getOperand(0), bvm,
+                                                plan, allocationFn))) {
+            return failure();
+          }
+          auto aliasingBuffers =
+              getAliasingBuffersForResults(b, aliasingOp, bvm);
+          copyFromAliasingBufferToResultBuffer(
+              b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
+              aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
+          return success();
+        })
         .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
           if (failed(getOrAllocateResultBuffers(b, padTensorOp,
                                                 padTensorOp.result(), bvm, plan,
