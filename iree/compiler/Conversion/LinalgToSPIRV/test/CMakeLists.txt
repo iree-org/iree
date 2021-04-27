@@ -14,27 +14,27 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "batch_matmul_vectorization.mlir"
     "concretize_tile_among_workgroups.mlir"
     "concretize_tile_among_workgroups_dynamic.mlir"
     "convert_to_gpu.mlir"
     "convert_to_spirv.mlir"
     "dead_alloc.mlir"
-    "elementwise_vectorization.mlir"
     "fold-gpu-procid-uses.mlir"
     "forop_canonicalization.mlir"
     "materialize_launch_configuration.mlir"
     "materialize_launch_configuration2.mlir"
-    "matmul_fused_vectorization.mlir"
-    "matmul_vectorization.mlir"
     "matmul_vectorization_licm.mlir"
+    "pipeline_matmul_cooperative_matrix.mlir"
     "pipeline_matmul_vectorization.mlir"
-    "pipeline_test_cooperative_mat.mlir"
     "promote_workgroup_memory.mlir"
     "split_dispatch_function.mlir"
+    "tile_and_vectorize_batch_matmul.mlir"
     "tile_and_vectorize_conv.mlir"
     "tile_and_vectorize_matmul.mlir"
+    "vector_to_cooperative_matrix.mlir"
     "vector_to_gpu.mlir"
+    "vectorize_elementwise_ops.mlir"
+    "vectorize_matmul.mlir"
     "vectorize_memref_load_store.mlir"
   DATA
     iree::tools::IreeFileCheck
