@@ -124,9 +124,18 @@ class _JittedFunction:
 
     _, module, out_tree = self._get_compiled_artifacts(args, kwargs)
     results = module.main(*args_flat)
-    if not isinstance(results, tuple):
-      results = (results,)
-    return jax.tree_unflatten(out_tree, results)
+    if results is not None:
+      if not isinstance(results, tuple):
+        results = (results,)
+      return jax.tree_unflatten(out_tree, results)
+    else:
+      # Address IREE returning None instead of empty sequences.
+      if out_tree == jax.tree_flatten([])[-1]:
+        return []
+      elif out_tree == jax.tree_flatten(())[-1]:
+        return ()
+      else:
+        return results
 
   def get_binary(self, *args, **kwargs):
     """Gets the IREE-compiled binary for the given inputs."""
