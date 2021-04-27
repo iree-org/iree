@@ -268,11 +268,11 @@ static LogicalResult getConfigForCooperativeMatmul(
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix))
     return failure();
 
-  ShapedType lhsType = op.inputs().front().getType().cast<ShapedType>();
-  ArrayRef<int64_t> lhsShape = lhsType.getShape();
-  ShapedType rhsType = op.inputs().back().getType().cast<ShapedType>();
-  ArrayRef<int64_t> rhsShape = rhsType.getShape();
-  ShapedType outputType = op.outputs().front().getType().cast<ShapedType>();
+  SmallVector<ShapedType> inputTypes, outputTypes;
+  std::tie(inputTypes, outputTypes) = getInputOutputTypes(op);
+
+  ShapedType lhsType = inputTypes[0], rhsType = inputTypes[1];
+  ShapedType outputType = outputTypes[0];
 
   auto resourceLimits = targetEnv.getResourceLimits();
   Optional<SmallVector<int64_t, 4>> coopMatmulSize =
@@ -285,6 +285,9 @@ static LogicalResult getConfigForCooperativeMatmul(
   auto isMultipleOf = [](int64_t s, int64_t ts) {
     return !ShapedType::isDynamic(s) && (s % ts) == 0;
   };
+
+  ArrayRef<int64_t> lhsShape = lhsType.getShape();
+  ArrayRef<int64_t> rhsShape = rhsType.getShape();
   if (!isMultipleOf(lhsShape[0], (*coopMatmulSize)[0]) ||
       !isMultipleOf(rhsShape[1], (*coopMatmulSize)[1]) ||
       !isMultipleOf(lhsShape[1], (*coopMatmulSize)[2]) ||
@@ -458,10 +461,11 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                               config.numSubgroups))) {
     config.vectorize = true;
     return success();
-  } else if (options.enableVectorization &&
-             succeeded(getTargetSpecificConfig(op, targetEnv, options,
-                                               tileSizes, config.workgroupSize,
-                                               config.numSubgroups))) {
+  }
+  if (options.enableVectorization &&
+      succeeded(getTargetSpecificConfig(op, targetEnv, options, tileSizes,
+                                        config.workgroupSize,
+                                        config.numSubgroups))) {
     config.vectorize = true;
     return success();
   }
@@ -480,14 +484,18 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
     // memory available (maybe). For now, just hard-wire it.
     tileSizeK = 32;
   }
-  assert(tileSizes.empty());
-  int64_t M = op.inputs()[0].getType().cast<ShapedType>().getShape()[0];
-  int64_t N = op.inputs()[1].getType().cast<ShapedType>().getShape()[1];
-  int64_t K = op.inputs()[0].getType().cast<ShapedType>().getShape()[1];
+
+  SmallVector<ShapedType> inputTypes;
+  std::tie(inputTypes, std::ignore) = getInputOutputTypes(op);
+  int64_t M = inputTypes[0].getShape()[0];
+  int64_t N = inputTypes[1].getShape()[1];
+  int64_t K = inputTypes[0].getShape()[1];
+
   SmallVector<int64_t, 4> ts = {
       getMinIfShapeStatic(M, nRowsPerWorkitem * config.workgroupSize[1]),
       getMinIfShapeStatic(N, nColsPerWorkitem * config.workgroupSize[0]),
       getMinIfShapeStatic(K, tileSizeK)};
+  assert(tileSizes.empty());
   tileSizes.emplace_back(std::move(ts));
   return success();
 }
