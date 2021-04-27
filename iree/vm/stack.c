@@ -216,7 +216,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
   stack->allocator = allocator;
 
   iree_host_size_t storage_offset =
-      iree_math_align(sizeof(iree_vm_stack_t), 16);
+      iree_host_align(sizeof(iree_vm_stack_t), 16);
   stack->frame_storage_capacity = storage.data_length - storage_offset;
   stack->frame_storage_size = 0;
   stack->frame_storage = storage.data + storage_offset;

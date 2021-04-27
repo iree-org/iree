@@ -150,11 +150,11 @@ static iree_status_t iree_vm_bytecode_function_enter(
   // alignment in case the compiler is expecting that (it makes it easier to
   // debug too).
   iree_host_size_t header_size =
-      iree_math_align(sizeof(iree_vm_bytecode_frame_storage_t), 16);
+      iree_host_align(sizeof(iree_vm_bytecode_frame_storage_t), 16);
   iree_host_size_t i32_register_size =
-      iree_math_align(i32_register_count * sizeof(int32_t), 16);
+      iree_host_align(i32_register_count * sizeof(int32_t), 16);
   iree_host_size_t ref_register_size =
-      iree_math_align(ref_register_count * sizeof(iree_vm_ref_t), 16);
+      iree_host_align(ref_register_count * sizeof(iree_vm_ref_t), 16);
   iree_host_size_t frame_size =
       header_size + i32_register_size + ref_register_size;
 

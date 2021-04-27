@@ -53,6 +53,7 @@ cc_library(
     hdrs = [
         "alignment.h",
         "attributes.h",
+        "config.h",
         "target_platform.h",
     ],
 )

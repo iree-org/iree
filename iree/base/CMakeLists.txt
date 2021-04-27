@@ -37,7 +37,7 @@ iree_cc_library(
   HDRS
     "alignment.h"
     "attributes.h"
-    "math.h"
+    "config.h"
     "target_platform.h"
   PUBLIC
 )

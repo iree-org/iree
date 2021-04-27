@@ -18,6 +18,25 @@
 #include "iree/base/target_platform.h"
 
 //===----------------------------------------------------------------------===//
+// API/ABI interop
+//===----------------------------------------------------------------------===//
+
+#ifdef __cplusplus
+#define IREE_API_EXPORT extern "C"
+#else
+#define IREE_API_EXPORT
+#endif  // __cplusplus
+
+#if defined(_WIN32)
+// TODO(benvanik): __stdcall, if exporting as a shared library/DLL.
+#define IREE_API_CALL
+#define IREE_API_PTR
+#else
+#define IREE_API_CALL
+#define IREE_API_PTR
+#endif  // _WIN32
+
+//===----------------------------------------------------------------------===//
 // IREE_HAVE_ATTRIBUTE
 //===----------------------------------------------------------------------===//
 

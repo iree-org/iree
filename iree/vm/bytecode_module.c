@@ -515,32 +515,33 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
 
   uint8_t* base_ptr = (uint8_t*)state;
   iree_host_size_t offset =
-      iree_align(sizeof(iree_vm_bytecode_module_state_t), 16);
+      iree_host_align(sizeof(iree_vm_bytecode_module_state_t), 16);
 
   if (state) {
     state->rwdata_storage =
         iree_make_byte_span(base_ptr + offset, rwdata_storage_capacity);
   }
-  offset += iree_align(rwdata_storage_capacity, 16);
+  offset += iree_host_align(rwdata_storage_capacity, 16);
 
   if (state) {
     state->global_ref_count = global_ref_count;
     state->global_ref_table = (iree_vm_ref_t*)(base_ptr + offset);
   }
-  offset += iree_align(global_ref_count * sizeof(iree_vm_ref_t), 16);
+  offset += iree_host_align(global_ref_count * sizeof(iree_vm_ref_t), 16);
 
   if (state) {
     state->rodata_ref_count = rodata_ref_count;
     state->rodata_ref_table = (iree_vm_ro_byte_buffer_t*)(base_ptr + offset);
   }
-  offset += iree_align(rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_t), 16);
+  offset +=
+      iree_host_align(rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_t), 16);
 
   if (state) {
     state->import_count = import_function_count;
     state->import_table = (iree_vm_bytecode_import_t*)(base_ptr + offset);
   }
   offset +=
-      iree_align(import_function_count * sizeof(*state->import_table), 16);
+      iree_host_align(import_function_count * sizeof(*state->import_table), 16);
 
   return offset;
 }

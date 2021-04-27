@@ -47,7 +47,7 @@ static inline void* iree_aligned_alloc(size_t alignment, size_t size) {
 static inline void* iree_aligned_alloc(size_t alignment, size_t size) {
   void* base_ptr = malloc(size + alignment + sizeof(uintptr_t));
   if (!base_ptr) return NULL;
-  uintptr_t* aligned_ptr = (uintptr_t*)iree_math_align(
+  uintptr_t* aligned_ptr = (uintptr_t*)iree_host_align(
       (uintptr_t)base_ptr + sizeof(uintptr_t), alignment);
   aligned_ptr[-1] = (uintptr_t)base_ptr;
   return aligned_ptr;
@@ -424,7 +424,7 @@ iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
   // allocating this error from a failed allocation!).
   size_t storage_alignment = (IREE_STATUS_CODE_MASK + 1);
   size_t storage_size =
-      iree_math_align(sizeof(iree_status_storage_t), storage_alignment);
+      iree_host_align(sizeof(iree_status_storage_t), storage_alignment);
   iree_status_storage_t* storage = (iree_status_storage_t*)iree_aligned_alloc(
       storage_alignment, storage_size);
   if (IREE_UNLIKELY(!storage)) return iree_status_from_code(code);
@@ -481,7 +481,7 @@ iree_status_allocate_vf(iree_status_code_t code, const char* file,
   // This avoids additional allocations for the common case of a message coming
   // only from the original status error site.
   size_t storage_alignment = (IREE_STATUS_CODE_MASK + 1);
-  size_t storage_size = iree_math_align(
+  size_t storage_size = iree_host_align(
       sizeof(iree_status_storage_t) + message_size, storage_alignment);
   iree_status_storage_t* storage = (iree_status_storage_t*)iree_aligned_alloc(
       storage_alignment, storage_size);

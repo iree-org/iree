@@ -20,11 +20,16 @@
 
 #include <stddef.h>
 
+#include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+//===----------------------------------------------------------------------===//
+// Alignment utilities
+//===----------------------------------------------------------------------===//
 
 // https://en.cppreference.com/w/c/types/max_align_t
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -44,9 +49,19 @@ extern "C" {
 #define iree_alignof(x) __alignof__(x)
 #endif  // IREE_COMPILER_*
 
-// Rounds up to the next alignment value, if it is not already aligned.
-#define iree_align(value, alignment) \
-  (((value) + (alignment)-1) / (alignment)) * (alignment)
+// Aligns |value| up to the given power-of-two |alignment| if required.
+// https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
+static inline iree_host_size_t iree_host_align(iree_host_size_t value,
+                                               iree_host_size_t alignment) {
+  return (value + (alignment - 1)) & ~(alignment - 1);
+}
+
+// Aligns |value| up to the given power-of-two |alignment| if required.
+// https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
+static inline iree_device_size_t iree_device_align(
+    iree_device_size_t value, iree_device_size_t alignment) {
+  return (value + (alignment - 1)) & ~(alignment - 1);
+}
 
 #ifdef __cplusplus
 }  // extern "C"

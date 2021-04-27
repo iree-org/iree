@@ -108,6 +108,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "iree/base/alignment.h"
+#include "iree/base/attributes.h"
+#include "iree/base/config.h"
+
 #if defined(_WIN32)
 // The safe malloca that may fall back to heap in the case of stack overflows:
 // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/malloca?view=vs-2019
@@ -128,92 +132,6 @@ extern "C" {
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
-#ifdef __cplusplus
-#define IREE_API_EXPORT extern "C"
-#else
-#define IREE_API_EXPORT
-#endif  // __cplusplus
-
-#if defined(_WIN32)
-// TODO(benvanik): __stdcall, if exporting as a shared library/DLL.
-#define IREE_API_CALL
-#define IREE_API_PTR
-#else
-#define IREE_API_CALL
-#define IREE_API_PTR
-#endif  // _WIN32
-
-// TODO(benvanik): remove the following and use attributes.h instead.
-
-// Queries for [[attribute]] identifiers in modern compilers.
-#ifdef __has_attribute
-#define IREE_HAVE_ATTRIBUTE(x) __has_attribute(x)
-#else
-#define IREE_HAVE_ATTRIBUTE(x) 0
-#endif  // __has_attribute
-
-// Tells the compiler to perform `printf` format string checking if the
-// compiler supports it; see the 'format' attribute in
-// <https://gcc.gnu.org/onlinedocs/gcc-4.7.0/gcc/Function-Attributes.html>.
-#if IREE_HAVE_ATTRIBUTE(format) || (defined(__GNUC__) && !defined(__clang__))
-#define IREE_PRINTF_ATTRIBUTE(string_index, first_to_check) \
-  __attribute__((__format__(__printf__, string_index, first_to_check)))
-#else
-// TODO(benvanik): use _Printf_format_string_ in SAL for MSVC.
-#define IREE_PRINTF_ATTRIBUTE(string_index, first_to_check)
-#endif  // IREE_HAVE_ATTRIBUTE
-
-// Annotation for function return values that ensures that they are used by the
-// caller.
-#if IREE_HAVE_ATTRIBUTE(nodiscard)
-#define IREE_MUST_USE_RESULT [[nodiscard]]
-#elif (defined(__clang__) && IREE_HAVE_ATTRIBUTE(warn_unused_result)) || \
-    (defined(__GNUC__) && (__GNUC__ >= 4))
-#define IREE_MUST_USE_RESULT __attribute__((warn_unused_result))
-#elif defined(_MSC_VER) && (_MSC_VER >= 1700)
-#define IREE_MUST_USE_RESULT _Check_return_
-#else
-#define IREE_MUST_USE_RESULT
-#endif  // IREE_HAVE_ATTRIBUTE(nodiscard)
-
-// `restrict` keyword, not supported by some older compilers.
-// We define our own macro in case dependencies use `restrict` differently.
-#if defined(_MSC_VER) && _MSC_VER >= 1900
-#define IREE_RESTRICT __restrict
-#elif defined(_MSC_VER)
-#define IREE_RESTRICT
-#elif defined(__cplusplus)
-#define IREE_RESTRICT __restrict__
-#else
-#define IREE_RESTRICT restrict
-#endif  // _MSC_VER
-
-// Compiler hint that can be used to indicate conditions that are very very very
-// likely or unlikely. This is most useful for ensuring that unlikely cases such
-// as error handling are moved off the mainline code path such that the code is
-// only paged in when an error occurs.
-//
-// Example:
-//   if (IREE_UNLIKELY(something_failed)) {
-//     return do_expensive_error_logging();
-//   }
-#if defined(__GNUC__) || defined(__clang__)
-#define IREE_LIKELY(x) (__builtin_expect(!!(x), 1))
-#define IREE_UNLIKELY(x) (__builtin_expect(!!(x), 0))
-#else
-#define IREE_LIKELY(x) (x)
-#define IREE_UNLIKELY(x) (x)
-#endif  // IREE_HAVE_ATTRIBUTE(likely)
-
-// Size, in bytes, of a buffer on the host.
-typedef size_t iree_host_size_t;
-#define IREE_MAX_HOST_SIZE SIZE_MAX
-
-// Size, in bytes, of a buffer on devices.
-typedef uint64_t iree_device_size_t;
-// Whole length of the underlying buffer.
-#define IREE_WHOLE_BUFFER ((iree_device_size_t)(-1))
-
 // TODO(benvanik): switch to static_cast/reinterpret_cast when in C++.
 // TODO(benvanik): see if we can shove in static_asserts somehow?
 #define iree_static_cast(type, value) (type)(value)
@@ -227,13 +145,6 @@ typedef uint64_t iree_device_size_t;
 //  uint8_t kConstantArray[512];
 //  assert(IREE_ARRAYSIZE(kConstantArray) == 512);
 #define IREE_ARRAYSIZE(arr) (sizeof(arr) / sizeof(arr[0]))
-
-// Aligns |value| up to the given power-of-two |alignment| if required.
-// https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
-static inline iree_host_size_t iree_math_align(iree_host_size_t value,
-                                               iree_host_size_t alignment) {
-  return (value + (alignment - 1)) & ~(alignment - 1);
-}
 
 #define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
 #define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
