@@ -71,7 +71,8 @@ class SlimVisionModule(tf.Module):
   def __init__(self):
     super().__init__()
     tf_utils.set_random_seed()
-    model_path = posixpath.join(FLAGS.tf_hub_url, FLAGS.model, get_mode(FLAGS.model))
+    model_path = posixpath.join(FLAGS.tf_hub_url, FLAGS.model,
+                                get_mode(FLAGS.model))
     hub_layer = hub.KerasLayer(model_path)
     self.m = tf.keras.Sequential([hub_layer])
     input_shape = get_input_shape()
