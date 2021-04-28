@@ -52,6 +52,9 @@ def get_input_shape():
     # from their TFHub name.
     size = int(FLAGS.model.split('_')[-1])
     return (1, size, size, 3)
+  elif FLAGS.model.startswith('mobilenet_v3_large'):
+    size = int(FLAGS.model.split('_')[-1])
+    return (1, size, size, 3)
   else:
     # Default input shape.
     return (1, 224, 224, 3)
@@ -61,6 +64,7 @@ def get_mode(model_name):
     return 'classification/5'
   # Classification mode; 4 - is a format of the model (SavedModel TF v2).
   return 'classification/4'
+
 
 class SlimVisionModule(tf.Module):
 
