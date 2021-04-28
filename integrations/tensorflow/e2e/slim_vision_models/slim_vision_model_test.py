@@ -59,6 +59,7 @@ def get_input_shape():
     # Default input shape.
     return (1, 224, 224, 3)
 
+
 def get_mode(model_name):
   if model_name.startswith('mobilenet_v3'):
     return 'classification/5'
