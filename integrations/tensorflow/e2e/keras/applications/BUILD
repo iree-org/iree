@@ -234,6 +234,22 @@ iree_e2e_cartesian_product_test_suite(
 iree_e2e_cartesian_product_test_suite(
     name = "imagenet_non_hermetic_tests",
     size = "enormous",
+    failing_configurations = [
+        # TODO(b/186579218): Fix linalg-on-tensors failures in these.
+        {
+            "target_backends": [
+                "iree_llvmaot",
+                "iree_vulkan",
+            ],
+            "model": [
+                "InceptionResNetV2",
+                "InceptionV3",
+                "NASNetLarge",
+                "NASNetMobile",
+                "ResNet152V2",
+            ],
+        },
+    ],
     matrix = {
         "src": "applications_test.py",
         "reference_backend": "tf",
