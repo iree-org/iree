@@ -126,7 +126,7 @@ typedef struct iree_benchmark_def_s {
 
 // Registers a benchmark with the given definition.
 void iree_benchmark_register(iree_string_view_t name,
-                             iree_benchmark_def_t* benchmark_def);
+                             const iree_benchmark_def_t* benchmark_def);
 
 //===----------------------------------------------------------------------===//
 // Benchmark infra management

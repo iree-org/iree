@@ -25,7 +25,7 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::elf::elf_module
   DEFINES
-    "IREE_HAL_HAVE_ELF_LIBRARY_LOADER=1"
+    "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1"
   PUBLIC
 )
 
