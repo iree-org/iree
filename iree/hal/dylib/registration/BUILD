@@ -31,7 +31,7 @@ endif()
 
 cc_library(
     name = "registration",
-    srcs = ["driver_module.cc"],
+    srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
     defines = [
         "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1",
@@ -42,6 +42,7 @@ cc_library(
         "//iree/hal/local:task_driver",
         "//iree/hal/local/loaders:embedded_library_loader",
         "//iree/hal/local/loaders:legacy_library_loader",
+        "//iree/task:api",
     ],
 )
 

@@ -19,6 +19,17 @@ package(
 )
 
 cc_library(
+    name = "api",
+    srcs = ["api.c"],
+    hdrs = ["api.h"],
+    deps = [
+        ":task",
+        "//iree/base:tracing",
+        "//iree/base/internal:flags",
+    ],
+)
+
+cc_library(
     name = "task",
     srcs = [
         "executor.c",
