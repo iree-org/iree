@@ -71,6 +71,11 @@ function(iree_cc_binary)
 
   add_executable(${_NAME} "")
   add_executable(${_RULE_NAME} ALIAS ${_NAME})
+  if(_RULE_OUT)
+    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_OUT}")
+  else()
+    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
+  endif()
   if(_RULE_SRCS)
     target_sources(${_NAME}
       PRIVATE
@@ -83,11 +88,6 @@ function(iree_cc_binary)
       PRIVATE
         ${_DUMMY_SRC}
     )
-  endif()
-  if(_RULE_OUT)
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_OUT}")
-  else()
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   endif()
   target_include_directories(${_NAME} SYSTEM
     PUBLIC

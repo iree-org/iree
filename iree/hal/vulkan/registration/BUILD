@@ -41,7 +41,6 @@ cc_library(
         "//iree/base/internal:flags",
         "//iree/hal:api",
         "//iree/hal/vulkan",
-        "@com_google_absl//absl/flags:flag",
     ],
 )
 

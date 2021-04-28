@@ -104,10 +104,11 @@ Then run on the RISC-V QEMU:
 $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
-  ../iree-build-riscv/iree/tools/iree-run-module -driver=vmla \
-  -module_file=/tmp/iree-run-module-vmla.vmfb \
-  -entry_function=abs \
-  -function_inputs="i32=-5"
+  ../iree-build-riscv/iree/tools/iree-run-module \
+  --driver=vmla \
+  --module_file=/tmp/iree-run-module-vmla.vmfb \
+  --entry_function=abs \
+  --function_input=i32=-5
 ```
 
 Output:
@@ -147,10 +148,11 @@ Then run on the RISC-V QEMU:
 $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64 \
   -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
-  ../iree-build-riscv/iree/tools/iree-run-module -driver=dylib \
-  -module_file=/tmp/iree-run-module-llvm_aot.vmfb \
-  -entry_function=abs \
-  -function_inputs="i32=-5"
+  ../iree-build-riscv/iree/tools/iree-run-module \
+  --driver=dylib \
+  --module_file=/tmp/iree-run-module-llvm_aot.vmfb \
+  --entry_function=abs \
+  --function_input=i32=-5
 ```
 
 Output:

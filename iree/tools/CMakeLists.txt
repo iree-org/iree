@@ -63,9 +63,6 @@ iree_cc_binary(
   SRCS
     "iree-benchmark-module-main.cc"
   DEPS
-    absl::flags
-    absl::flags_parse
-    absl::flags_usage
     absl::strings
     benchmark
     iree::base::internal::file_io
@@ -89,7 +86,6 @@ iree_cc_binary(
     "iree-check-module-main.cc"
   DEPS
     iree::modules::check::native_module
-    absl::flags
     absl::strings
     iree::base::api
     iree::base::core_headers
@@ -127,7 +123,6 @@ iree_cc_binary(
   SRCS
     "iree-run-module-main.cc"
   DEPS
-    absl::flags
     absl::strings
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -365,7 +360,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRSupport
       MLIRTargetLLVMIRExport
-      absl::flags
       absl::span
       absl::strings
       iree::base::api

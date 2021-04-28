@@ -29,7 +29,13 @@ package(
 
 cc_library(
     name = "api",
-    srcs = ["api.c"],
+    srcs = [
+        "allocator.c",
+        "api.c",
+        "status.c",
+        "string_view.c",
+        "time.c",
+    ],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],
     deps = [
@@ -93,7 +99,7 @@ cc_library(
     deps = [
         ":core_headers",
         ":tracing",
-        "@com_google_absl//absl/flags:flag",
+        "//iree/base/internal:flags",
         "@com_google_absl//absl/strings:str_format",
     ],
 )
@@ -132,6 +138,16 @@ cc_test(
     srcs = ["status_test.cc"],
     deps = [
         ":status",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "string_view_test",
+    srcs = ["string_view_test.cc"],
+    deps = [
+        ":api",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

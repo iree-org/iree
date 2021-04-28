@@ -14,7 +14,6 @@
 
 #include <iostream>
 
-#include "absl/flags/flag.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
@@ -41,9 +40,9 @@
 #define IREE_FORCE_BINARY_STDIN()
 #endif  // IREE_PLATFORM_WINDOWS
 
-ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
+IREE_FLAG(string, driver, "vmla", "Backend driver to use.");
 
-ABSL_FLAG(
+IREE_FLAG(
     bool, expect_failure, false,
     "Whether running module is expected to fail. If set, failing "
     "statuses from function evaluation are logged and ignored and all "
@@ -104,7 +103,7 @@ Status Run(std::string module_file_path, int* out_exit_code) {
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(std::string(FLAG_driver), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
   iree_vm_module_t* check_module = nullptr;
@@ -179,7 +178,10 @@ Status Run(std::string module_file_path, int* out_exit_code) {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  iree_flags_parse_checked(&argc, &argv);
+  // Pass through flags to gtest (allowing --help to fall through).
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
   ::testing::InitGoogleTest(&argc, argv);
@@ -195,7 +197,7 @@ extern "C" int main(int argc, char** argv) {
   int exit_code = 1;
   auto status = Run(std::move(module_file_path), &exit_code);
   int ret = status.ok() ? exit_code : 1;
-  if (absl::GetFlag(FLAGS_expect_failure)) {
+  if (FLAG_expect_failure) {
     if (ret == 0) {
       std::cout << "Test passed but expected failure\n";
       std::cout << status;

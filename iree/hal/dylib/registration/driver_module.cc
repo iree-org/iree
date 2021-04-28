@@ -16,7 +16,7 @@
 
 #include <inttypes.h>
 
-#include "absl/flags/flag.h"
+#include "iree/base/internal/flags.h"
 #include "iree/hal/local/loaders/embedded_library_loader.h"
 #include "iree/hal/local/loaders/legacy_library_loader.h"
 #include "iree/hal/local/task_driver.h"
@@ -28,9 +28,9 @@
 // using an existing executor so that we can entirely externalize the task
 // system configuration from the HAL.
 
-ABSL_FLAG(int, dylib_worker_count, 0,
+IREE_FLAG(int32_t, dylib_worker_count, 0,
           "Specified number of workers to use or 0 for automatic.");
-ABSL_FLAG(int, dylib_max_worker_count, 16,
+IREE_FLAG(int32_t, dylib_max_worker_count, 16,
           "Maximum number of task system workers to use.");
 
 #define IREE_HAL_DYLIB_DRIVER_ID 0x58444C4Cu  // XDLL
@@ -66,13 +66,12 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
 
   iree_task_topology_t topology;
   iree_task_topology_initialize(&topology);
-  if (absl::GetFlag(FLAGS_dylib_worker_count) > 0) {
-    iree_task_topology_initialize_from_group_count(
-        absl::GetFlag(FLAGS_dylib_worker_count), &topology);
+  if (FLAG_dylib_worker_count > 0) {
+    iree_task_topology_initialize_from_group_count(FLAG_dylib_worker_count,
+                                                   &topology);
   } else {
     iree_task_topology_initialize_from_unique_l2_cache_groups(
-        /*max_group_count=*/absl::GetFlag(FLAGS_dylib_max_worker_count),
-        &topology);
+        /*max_group_count=*/FLAG_dylib_max_worker_count, &topology);
   }
 
   iree_status_t status = iree_ok_status();

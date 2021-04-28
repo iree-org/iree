@@ -62,14 +62,6 @@ Status ParseToVariantList(
     iree_hal_allocator_t* allocator,
     absl::Span<const std::string> input_strings, iree_vm_list_t** out_list);
 
-// Parses the content in |filename| into a variant list of VM scalars and
-// buffers. See ParseToVariantList for the format of scalars and buffers. The
-// inputs are expected to be newline-separated.
-Status ParseToVariantListFromFile(
-    absl::Span<const RawSignatureParser::Description> descs,
-    iree_hal_allocator_t* allocator, const std::string& filename,
-    iree_vm_list_t** out_list);
-
 // Prints a variant list of VM scalars and buffers to |os|.
 // Prints scalars in the format:
 //   type=value

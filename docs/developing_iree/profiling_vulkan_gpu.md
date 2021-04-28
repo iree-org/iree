@@ -45,10 +45,10 @@ $ /path/to/iree/build/iree/tools/iree-translate -- \
 # Then package the Android app
 $ /path/to/iree/source/iree/tools/android/run_module_app/build_apk.sh \
   ./build-apk \
+  --driver vulkan \
   --module_file /tmp/mhlo-dot.vmfb \
   --entry_function dot \
-  --function_inputs_file /path/to/inputs/file \
-  --driver vulkan
+  --function_input=...
 ```
 
 Where `/path/to/input/file` is a file containing inputs to `dot`, for example:
