@@ -32,7 +32,6 @@ cc_library(
         "VectorTransferOptimization.cpp",
     ],
     hdrs = [
-        "Attributes.h",
         "LaunchConfig.h",
         "Passes.h",
         "Transforms.h",

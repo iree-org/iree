@@ -418,8 +418,9 @@ struct ScalarizeVectorTransferRead final
   }
 };
 
-class VectorizeMemRefPass final
-    : public PassWrapper<VectorizeMemRefPass, OperationPass<ModuleOp>> {
+class VectorizeMemRefLoadStorePass final
+    : public PassWrapper<VectorizeMemRefLoadStorePass,
+                         OperationPass<ModuleOp>> {
   void runOnOperation() override;
 
  private:
@@ -455,7 +456,7 @@ LogicalResult ProcessFuncArg::matchAndRewrite(
   return success();
 }
 
-void VectorizeMemRefPass::runOnOperation() {
+void VectorizeMemRefLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
   ModuleOp module = getOperation();
@@ -504,10 +505,10 @@ void VectorizeMemRefPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemrefLoadStorePass() {
-  return std::make_unique<VectorizeMemRefPass>();
+  return std::make_unique<VectorizeMemRefLoadStorePass>();
 }
 
-static PassRegistration<VectorizeMemRefPass> pass(
+static PassRegistration<VectorizeMemRefLoadStorePass> pass(
     "iree-spirv-vectorize-memref-load-store",
     "Vectorize interface memrefs and their load/store for better memory "
     "access");

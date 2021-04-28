@@ -157,20 +157,6 @@ static LogicalResult getTileSizeAndWorkgroupSize(
   linalgOps.assign(ops.begin(), ops.end());
   linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
 
-  // NOTE: Launch configuration expects the original input/output type to decide
-  // the configuration. But we have already tiled the Linalg ops here. Use an
-  // attribute to send it over for now.
-  const char inputTypeAttrName[] = "iree.codegen.original_input_types";
-  const char outputTypeAttrName[] = "iree.codegen.original_output_types";
-  if (!inputTypes.empty()) {
-    rootOp->setAttr(inputTypeAttrName,
-                    Builder(rootOp).getTypeArrayAttr(inputTypes));
-  }
-  if (!outputTypes.empty()) {
-    rootOp->setAttr(outputTypeAttrName,
-                    Builder(rootOp).getTypeArrayAttr(outputTypes));
-  }
-
   Optional<LaunchConfig> launchConfig = initGPULaunchConfig(
       rootOp->getContext(), dependenceGraph, options, linalgOps);
   if (!launchConfig) {

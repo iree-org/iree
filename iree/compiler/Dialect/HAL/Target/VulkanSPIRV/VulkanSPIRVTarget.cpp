@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 
-#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
@@ -144,19 +143,9 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     // list of entry point names here that are then passed in
     // VkShaderModuleCreateInfo.
     SmallVector<StringRef, 8> entryPointNames;
-    if (auto scheduleAttr = innerModuleOp->getAttrOfType<ArrayAttr>(
-            iree_compiler::getEntryPointScheduleAttrName())) {
-      // We have multiple entry points in this module. Make sure the order
-      // specified in the schedule attribute is respected.
-      for (Attribute entryPoint : scheduleAttr) {
-        entryPointNames.push_back(
-            entryPoint.cast<FlatSymbolRefAttr>().getValue());
-      }
-    } else {
-      spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
-        entryPointNames.push_back(entryPointOp.fn());
-      });
-    }
+    spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
+      entryPointNames.push_back(entryPointOp.fn());
+    });
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
     iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
