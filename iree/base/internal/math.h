@@ -272,4 +272,46 @@ static inline uint64_t iree_math_round_up_to_pow2_u64(uint64_t n) {
 #endif  // 1
 }
 
+//==============================================================================
+// FP16 support
+//==============================================================================
+
+// Converts a 16-bit floating-point value to a 32-bit C `float`.
+//
+// NOTE: this implementation does not handle corner cases around NaN and such;
+// we can improve this implementation over time if it is used for such cases.
+static inline float iree_math_f16_to_f32(const uint16_t f16_value) {
+  const uint32_t sign = ((uint32_t)((f16_value & 0x8000u) >> 15)) << 31;
+  uint32_t exp = ((f16_value & 0x7C00u) >> 10);
+  uint32_t mantissa = 0;
+  if (exp > 0) {
+    exp = (exp + 127 - 15) << 23;
+    mantissa = ((uint32_t)(f16_value & 0x3FFu)) << (23 - 10);
+  }
+  const uint32_t u32_value = sign | exp | mantissa;
+  float f32_value;
+  memcpy(&f32_value, &u32_value, sizeof(f32_value));
+  return f32_value;
+}
+
+// Converts a 32-bit C `float` value to a 16-bit floating-point value.
+//
+// NOTE: this implementation does not handle corner cases around NaN and such;
+// we can improve this implementation over time if it is used for such cases.
+static inline uint16_t iree_math_f32_to_f16(const float f32_value) {
+  uint32_t u32_value;
+  memcpy(&u32_value, &f32_value, sizeof(u32_value));
+  const uint32_t sign = ((u32_value & 0x80000000u) >> 31) << 15;
+  const uint32_t mantissa = (u32_value & 0x007FFFFFu) >> (23 - 10);
+  uint32_t exp = ((u32_value & 0x7F800000u) >> 23) - 127 + 15;
+  if (exp > 31) {
+    exp = 31;
+  } else if (exp < 0) {
+    exp = 0;
+  } else {
+    exp = exp << 10;
+  }
+  return (uint16_t)(sign | exp | mantissa);
+}
+
 #endif  // IREE_BASE_INTERNAL_MATH_H_
