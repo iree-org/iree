@@ -99,6 +99,17 @@ iree_e2e_cartesian_product_test_suite(
     "True"
     "DenseNet121;DenseNet169;DenseNet201;EfficientNetB0;EfficientNetB1;EfficientNetB2;EfficientNetB3;EfficientNetB4;EfficientNetB5;EfficientNetB6;EfficientNetB7;InceptionResNetV2;InceptionV3;MobileNet;MobileNetV2;MobileNetV3Large;MobileNetV3Small;NASNetLarge;NASNetMobile;ResNet101;ResNet101V2;ResNet152;ResNet152V2;ResNet50;ResNet50V2;VGG16;VGG19;Xception"
     "tf;tflite;iree_vmla;iree_llvmaot;iree_vulkan"
+  FAILING_CONFIGURATIONS
+    ",,,,InceptionResNetV2,iree_llvmaot"
+    ",,,,InceptionV3,iree_llvmaot"
+    ",,,,NASNetLarge,iree_llvmaot"
+    ",,,,NASNetMobile,iree_llvmaot"
+    ",,,,ResNet152V2,iree_llvmaot"
+    ",,,,InceptionResNetV2,iree_vulkan"
+    ",,,,InceptionV3,iree_vulkan"
+    ",,,,NASNetLarge,iree_vulkan"
+    ",,,,NASNetMobile,iree_vulkan"
+    ",,,,ResNet152V2,iree_vulkan"
   LABELS
     "external"
     "guitar"
