@@ -9,19 +9,24 @@ theme:
   custom_dir: overrides
 
   features:
-    - navigation.instant
-    - navigation.tracking  # TODO(scotttodd): join mkdocs-material insiders for this
+    - navigation.instant  # Faster loading
+
+    # TODO(scotttodd): join mkdocs-material insiders for this
+    - navigation.tracking # Update URL in address bar with the active anchor
 
     # TODO(scotttodd): decide if we want this
+    #     these move sections from the left nav to tabs below the header
     # - navigation.tabs
     # - navigation.tabs.sticky  # insiders only
 
-    - navigation.sections
-    - navigation.top
+    # TODO(scotttodd): remove this if the number of pages grows too much
+    - navigation.sections  # Group sections without collapsible buttons
+
+    - navigation.top  # Back to top button
 
     # Insiders only: navigation indices
-    #     supply index.md page under each section
-    #     list each index.md page in the `nav:` section below
+    #     1) supply index.md page under each section
+    #     2) list each index.md page in the `nav:` section below
     # - navigation.indexes
 
   palette:
