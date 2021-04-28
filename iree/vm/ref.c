@@ -151,6 +151,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain(iree_vm_ref_t* ref,
                                                       iree_vm_ref_t* out_ref) {
+  // NOTE: ref and out_ref may alias.
+  iree_vm_ref_t temp_ref = *ref;
   if (ref != out_ref && ref->ptr != out_ref->ptr) {
     // Output ref contains a value that should be released first.
     // Note that we check for it being the same as the new value so we don't
@@ -159,7 +161,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain(iree_vm_ref_t* ref,
   }
 
   // Assign ref to out_ref and increment the counter.
-  memmove(out_ref, ref, sizeof(*out_ref));
+  *out_ref = temp_ref;
   if (out_ref->ptr) {
     volatile iree_atomic_ref_count_t* counter =
         iree_vm_get_ref_counter_ptr(out_ref);
@@ -179,13 +181,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_checked(
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain_or_move(
     int is_move, iree_vm_ref_t* ref, iree_vm_ref_t* out_ref) {
+  // NOTE: ref and out_ref may alias.
+  iree_vm_ref_t temp_ref = *ref;
   if (ref != out_ref) {
     // Output ref contains a value that should be released first.
     iree_vm_ref_release(out_ref);
   }
 
   // Assign ref to out_ref and increment the counter if not moving.
-  memmove(out_ref, ref, sizeof(*out_ref));
+  *out_ref = temp_ref;
   if (out_ref->ptr && !is_move) {
     // Retain by incrementing counter and preserving the source ref.
     volatile iree_atomic_ref_count_t* counter =
@@ -228,6 +232,8 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_release(iree_vm_ref_t* ref) {
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_assign(iree_vm_ref_t* ref,
                                                       iree_vm_ref_t* out_ref) {
+  // NOTE: ref and out_ref may alias.
+  iree_vm_ref_t temp_ref = *ref;
   if (ref == out_ref) {
     // Source == target; ignore.
     return;
@@ -237,11 +243,13 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_assign(iree_vm_ref_t* ref,
   }
 
   // Assign ref to out_ref (without incrementing counter).
-  memcpy(out_ref, ref, sizeof(*out_ref));
+  *out_ref = temp_ref;
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
                                                     iree_vm_ref_t* out_ref) {
+  // NOTE: ref and out_ref may alias.
+  iree_vm_ref_t temp_ref = *ref;
   if (ref == out_ref) {
     // Source == target; ignore.
     return;
@@ -251,7 +259,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
   }
 
   // Assign ref to out_ref (without incrementing counter).
-  memcpy(out_ref, ref, sizeof(*out_ref));
+  *out_ref = temp_ref;
 
   // Reset input ref so it points at nothing.
   memset(ref, 0, sizeof(*ref));

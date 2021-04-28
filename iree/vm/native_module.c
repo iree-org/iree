@@ -74,19 +74,14 @@ static iree_status_t iree_vm_native_module_verify_descriptor(
 
 static void IREE_API_PTR iree_vm_native_module_destroy(void* self) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
+  iree_allocator_t allocator = module->allocator;
 
   // Destroy the optional user-provided self.
-  if (module->self == module) {
-    iree_allocator_t allocator = module->allocator;
-    if (module->user_interface.destroy) {
-      module->user_interface.destroy(module->self);
-    }
-    iree_allocator_free(allocator, module);
-  } else {
-    if (module->user_interface.destroy) {
-      module->user_interface.destroy(module->self);
-    }
+  if (module->user_interface.destroy) {
+    module->user_interface.destroy(module->self);
   }
+
+  iree_allocator_free(allocator, module);
 }
 
 static iree_string_view_t IREE_API_PTR iree_vm_native_module_name(void* self) {

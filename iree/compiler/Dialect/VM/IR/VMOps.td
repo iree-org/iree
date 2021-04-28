@@ -855,6 +855,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
 def VM_ListAllocOp :
     VM_PureOp<"list.alloc", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemAlloc]>,
     ]> {
   let summary = [{allocates a new empty list}];
   let description = [{
@@ -905,6 +906,7 @@ def VM_ListReserveOp :
 def VM_ListSizeOp :
     VM_Op<"list.size", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemRead]>,
     ]> {
   let summary = [{the size of the list in elements}];
   let description = [{
@@ -930,6 +932,7 @@ def VM_ListSizeOp :
 def VM_ListResizeOp :
     VM_Op<"list.resize", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemWrite]>,
     ]> {
   let summary = [{resizes the list to a new count in elements}];
   let description = [{
@@ -956,6 +959,7 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
                             list<OpTrait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemRead]>,
     ])> {
   let summary = [{primitive type element accessor}];
   let description = [{
@@ -984,6 +988,7 @@ class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
                             list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemWrite]>,
     ])> {
   let summary = [{primitive type element mutator}];
   let description = [{
@@ -1021,6 +1026,7 @@ def VM_ListSetI64Op :
 def VM_ListGetRefOp :
     VM_PureOp<"list.get.ref", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemRead]>,
     ]> {
   let summary = [{ref type element accessor}];
   let description = [{
@@ -1052,6 +1058,7 @@ def VM_ListGetRefOp :
 def VM_ListSetRefOp :
     VM_Op<"list.set.ref", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemWrite]>,
     ]> {
   let summary = [{ref type element mutator}];
   let description = [{
