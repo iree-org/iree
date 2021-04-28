@@ -257,6 +257,8 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
         .insert<ContractionOpToOuterProductOpLowering,
                 ContractionOpToMatmulOpLowering, ContractionOpLowering>(
             vectorTransformsOptions, context);
+    vector::populateVectorTransferLoweringPatterns(
+        vectorContractLoweringPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorContractLoweringPatterns)))) {
       return signalPassFailure();
