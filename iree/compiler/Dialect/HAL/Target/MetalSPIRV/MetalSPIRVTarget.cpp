@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
 
-#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/SPIRVToMSL.h"
 #include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -79,18 +78,9 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     // names for constructing pipeline states. Get an ordered list of the entry
     // point names.
     SmallVector<StringRef, 8> entryPointNames;
-    if (auto scheduleAttr = innerModuleOp->getAttrOfType<ArrayAttr>(
-            iree_compiler::getEntryPointScheduleAttrName())) {
-      // We have multiple entry points in this module. Make sure the order
-      // specified in the schedule attribute is respected.
-      for (Attribute entryPoint : scheduleAttr) {
-        entryPointNames.push_back(entryPoint.cast<StringAttr>().getValue());
-      }
-    } else {
-      spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
-        entryPointNames.push_back(entryPointOp.fn());
-      });
-    }
+    spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
+      entryPointNames.push_back(entryPointOp.fn());
+    });
 
     // 1. Serialize the spirv::ModuleOp into binary format.
     SmallVector<uint32_t, 0> spvBinary;

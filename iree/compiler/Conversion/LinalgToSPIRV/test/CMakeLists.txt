@@ -26,7 +26,6 @@ iree_lit_test_suite(
     "pipeline_matmul_cooperative_matrix.mlir"
     "pipeline_matmul_vectorization.mlir"
     "promote_workgroup_memory.mlir"
-    "split_dispatch_function.mlir"
     "tile_and_vectorize_batch_matmul.mlir"
     "tile_and_vectorize_conv.mlir"
     "tile_and_vectorize_matmul.mlir"

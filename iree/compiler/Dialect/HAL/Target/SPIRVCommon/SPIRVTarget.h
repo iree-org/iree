@@ -38,20 +38,6 @@ class SPIRVTargetBackend : public TargetBackend {
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override;
 
-  LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
-                               DeviceSwitchRewriter &switchRewriter) override;
-
-  // Finds the spv.ExecutionMode operation to get the workgroup size from.
-  std::array<Value, 3> calculateDispatchWorkgroupSize(
-      Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
-      OpBuilder &builder) override;
-
- private:
-  std::array<Value, 3> calculateDispatchWorkgroupSize(
-      Location loc, spirv::ModuleOp spvModuleOp, StringRef entryPointName,
-      ValueRange workload, OpBuilder &builder);
-
   SPIRVCodegenOptions spvCodeGenOptions_;
 };
 

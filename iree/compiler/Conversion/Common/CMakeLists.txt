@@ -14,7 +14,6 @@ iree_cc_library(
   NAME
     Common
   HDRS
-    "Attributes.h"
     "LaunchConfig.h"
     "Passes.h"
     "Transforms.h"

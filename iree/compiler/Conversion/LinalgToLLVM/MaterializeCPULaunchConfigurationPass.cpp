@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
