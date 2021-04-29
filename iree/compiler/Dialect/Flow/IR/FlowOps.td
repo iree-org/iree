@@ -555,6 +555,10 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     // This is used to load an entire tensor.
     OpBuilder<(ins "RankedTensorType":$resultType, "Value":$source,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    OpBuilder<(ins "RankedTensorType":$resultType, "Value":$source,
+      "ArrayRef<OpFoldResult>":$offsets, "ArrayRef<OpFoldResult>":$sizes,
+      "ArrayRef<OpFoldResult>":$strides,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
     // Builder for tensor.load with mixed static/dynamic opperands.
     OpBuilder<(ins "Value":$source, "ArrayRef<OpFoldResult>":$offsets,
       "ArrayRef<OpFoldResult>":$sizes, "ArrayRef<OpFoldResult>":$strides,
@@ -572,6 +576,11 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     /// Return the number of leading operands before the `offsets`, `sizes` and
     /// and `strides` operands.
     static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 1; }
+
+    /// Returns the type of the result based on the sizes.
+    static RankedTensorType inferResultType
+        (IREE::Flow::DispatchTensorType sourceType,
+         ArrayRef<OpFoldResult> mixedSizes);
   }];
 
   let hasCanonicalizer = 1;
