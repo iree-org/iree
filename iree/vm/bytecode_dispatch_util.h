@@ -19,14 +19,10 @@
 #include <string.h>
 
 #include "iree/base/alignment.h"
+#include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 #include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/generated/bytecode_op_table.h"
-
-// TODO(benvanik): make a compiler setting.
-#define IREE_VM_EXT_I64_ENABLE 1
-#define IREE_VM_EXT_F32_ENABLE 0
-#define IREE_VM_EXT_F64_ENABLE 0
 
 //===----------------------------------------------------------------------===//
 // Shared data structures
