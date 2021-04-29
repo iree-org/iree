@@ -20,13 +20,13 @@
 #include <android/log.h>
 #endif
 
-#include "absl/flags/flag.h"
 #include "absl/strings/str_format.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 
-ABSL_FLAG(int, iree_minloglevel, 0,
+IREE_FLAG(int32_t, iree_minloglevel, 0,
           "Minimum logging level. 0 = INFO and above.");
-ABSL_FLAG(int, iree_v, 0,
+IREE_FLAG(int32_t, iree_v, 0,
           "Verbosity level maximum. 1 = IREE_VLOG(0-1), 2 = IREE_VLOG(0-2).");
 
 namespace iree {
@@ -60,7 +60,7 @@ int64_t MinLogLevelFromEnv() {
   if (LogLevelStrToInt(iree_env_var_val, &level)) {
     return level;
   }
-  return absl::GetFlag(FLAGS_iree_minloglevel);
+  return FLAG_iree_minloglevel;
 }
 
 int64_t MinVLogLevelFromEnv() {
@@ -69,7 +69,7 @@ int64_t MinVLogLevelFromEnv() {
   if (LogLevelStrToInt(iree_env_var_val, &level)) {
     return level;
   }
-  return absl::GetFlag(FLAGS_iree_v);
+  return FLAG_iree_v;
 }
 
 }  // namespace

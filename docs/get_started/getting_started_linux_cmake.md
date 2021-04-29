@@ -131,10 +131,11 @@ $ ../iree-build/iree/tools/iree-translate \
 Then run the compiled module using the `dylib` HAL driver:
 
 ```shell
-$ ../iree-build/iree/tools/iree-run-module -driver=dylib \
-    -module_file=/tmp/simple-llvm_aot.vmfb \
-    -entry_function=abs \
-    -function_inputs="i32=-5"
+$ ../iree-build/iree/tools/iree-run-module \
+    --driver=dylib \
+    --module_file=/tmp/simple-llvm_aot.vmfb \
+    --entry_function=abs \
+    --function_input=i32=-5
 
 EXEC @abs
 i32=5

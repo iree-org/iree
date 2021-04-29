@@ -164,10 +164,11 @@ Log into Android:
 $ adb shell
 
 android $ cd /data/local/tmp/
-android $ ./iree-run-module -driver=vmla \
-          -module_file=simple-vmla.vmfb \
-          -entry_function=abs \
-          -function_inputs="i32=-5"
+android $ ./iree-run-module \
+          --driver=vmla \
+          --module_file=simple-vmla.vmfb \
+          --entry_function=abs \
+          --function_input=i32=-5
 
 EXEC @abs
 i32=5
@@ -202,10 +203,11 @@ Log into Android:
 $ adb shell
 
 android $ cd /data/local/tmp/
-android $ ./iree-run-module -driver=vulkan \
-          -module_file=simple-vulkan.vmfb \
-          -entry_function=abs \
-          -function_inputs="i32=-5"
+android $ ./iree-run-module \
+          --driver=vulkan \
+          --module_file=simple-vulkan.vmfb \
+          --entry_function=abs \
+          --function_input=i32=-5
 
 EXEC @abs
 i32=5
@@ -279,10 +281,11 @@ Log into Android:
 $ adb shell
 
 android $ cd /data/local/tmp/
-android $ ./iree-run-module -driver=dylib \
-          -module_file=simple-llvm_aot.vmfb \
-          -entry_function=abs \
-          -function_inputs="i32=-5"
+android $ ./iree-run-module \
+          --driver=dylib \
+          --module_file=simple-llvm_aot.vmfb \
+          --entry_function=abs \
+          --function_input=i32=-5
 
 EXEC @abs
 i32=5

@@ -125,7 +125,7 @@ def get_pixel4_default_target_list(skipped_target=None,
                      "--iree-flow-inline-constants-max-byte-length=2048",
                  ],
                  runtime_flags=[
-                     "--dylib_worker_count=3",
+                     "--task_topology_group_count=3",
                  ]),
       TargetInfo(
           driver="vulkan",
@@ -178,7 +178,7 @@ def get_s20_default_target_list(skipped_target=None,
                      "--iree-flow-inline-constants-max-byte-length=2048",
                  ],
                  runtime_flags=[
-                     "--dylib_worker_count=3",
+                     "--task_topology_group_count=3",
                  ]),
       TargetInfo(
           driver="vulkan",

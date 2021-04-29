@@ -199,8 +199,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeResult(Value value) override {
-    uint16_t reg =
-        registerAllocation_->mapUseToRegister(value, currentOp_, 0).encode();
+    uint16_t reg = registerAllocation_->mapToRegister(value).encode();
     return writeUint16(reg);
   }
 

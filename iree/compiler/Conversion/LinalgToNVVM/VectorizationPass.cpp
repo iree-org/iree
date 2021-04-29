@@ -98,6 +98,18 @@ struct VectorizationPass
     });
 
     {
+      // Lower transfer op to canonical form.
+      OwningRewritePatternList lowerTransferOpPatterns(funcOp.getContext());
+      vector::populateVectorToVectorCanonicalizationPatterns(
+          lowerTransferOpPatterns);
+      vector::populateVectorToVectorTransformationPatterns(
+          lowerTransferOpPatterns);
+      vector::populateVectorTransferLoweringPatterns(lowerTransferOpPatterns);
+      (void)applyPatternsAndFoldGreedily(funcOp,
+                                         std::move(lowerTransferOpPatterns));
+    }
+
+    {
       // Step 2. Unroll the vetors to native size and canonicalize.
       OwningRewritePatternList vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns);

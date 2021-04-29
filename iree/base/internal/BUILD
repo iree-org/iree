@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Implementations for iree/base/
+# Implementations for iree/base/.
+# These are not part of the IREE API. Though they may be used by external
+# projects their API may change at any time.
+
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -151,12 +155,32 @@ cc_test(
 
 cc_library(
     name = "flags",
-    srcs = ["flags.cc"],
+    srcs = ["flags.c"],
     hdrs = ["flags.h"],
     deps = [
+        ":internal",
         "//iree/base:api",
-        "@com_google_absl//absl/flags:parse",
+        "//iree/base:tracing",
     ],
+)
+
+cc_binary(
+    name = "flags_demo",
+    srcs = ["flags_demo.c"],
+    deps = [
+        ":flags",
+        "//iree/base:core_headers",
+    ],
+)
+
+iree_lit_test_suite(
+    name = "flags_test",
+    srcs = ["flags_test.txt"],
+    data = [
+        ":flags_demo",
+        "//iree/tools:IreeFileCheck",
+    ],
+    tags = ["hostonly"],
 )
 
 cc_library(

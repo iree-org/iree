@@ -20,7 +20,11 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
+    "allocator.c"
     "api.c"
+    "status.c"
+    "string_view.c"
+    "time.c"
   DEPS
     ::core_headers
     ::tracing
@@ -80,8 +84,8 @@ iree_cc_library(
   DEPS
     ::core_headers
     ::tracing
-    absl::flags
     absl::str_format
+    iree::base::internal::flags
   PUBLIC
 )
 
@@ -127,6 +131,17 @@ iree_cc_test(
     "status_test.cc"
   DEPS
     ::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    string_view_test
+  SRCS
+    "string_view_test.cc"
+  DEPS
+    ::api
     iree::testing::gtest
     iree::testing::gtest_main
 )

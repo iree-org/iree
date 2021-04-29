@@ -63,7 +63,6 @@ iree_cc_binary(
     "iree-run-module-vulkan-gui-main.cc"
   DEPS
     ::vulkan_gui_util
-    absl::flags
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::main

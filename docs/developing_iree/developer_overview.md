@@ -141,7 +141,7 @@ $ ../iree-build/iree/tools/iree-run-module \
   --module_file=/tmp/simple.vmfb \
   --driver=vmla \
   --entry_function=abs \
-  --function_inputs="i32=-2"
+  --function_input=i32=-2
 ```
 
 ### iree-check-module

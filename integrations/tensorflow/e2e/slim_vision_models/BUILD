@@ -141,6 +141,8 @@ iree_e2e_cartesian_product_test_suite(
             "mobilenet_v2_100_224",
             "mobilenet_v2_130_224",
             "mobilenet_v2_140_224",
+            # MobileNetV3
+            "mobilenet_v3_large_100_224",
             "nasnet_mobile",
             "nasnet_large",
             "pnasnet_large",

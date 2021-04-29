@@ -14,7 +14,6 @@
 
 #include <iostream>
 
-#include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
@@ -26,38 +25,53 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
-ABSL_FLAG(std::string, module_file, "-",
+IREE_FLAG(string, module_file, "-",
           "File containing the module to load that contains the entry "
           "function. Defaults to stdin.");
 
-ABSL_FLAG(std::string, entry_function, "",
+IREE_FLAG(string, entry_function, "",
           "Name of a function contained in the module specified by module_file "
           "to run.");
 
-ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
+IREE_FLAG(string, driver, "vmla", "Backend driver to use.");
 
-ABSL_FLAG(std::vector<std::string>, function_inputs, {},
-          "A comma-separated list of of input buffers of the format:"
-          "[shape]xtype=[value]\n"
-          "2x2xi32=1 2 3 4\n"
-          "Optionally, brackets may be used to separate the element values. "
-          "They are ignored by the parser.\n"
-          "2x2xi32=[[1 2][3 4]]\n"
-          "Due to the absence of repeated flags in absl, commas should not be "
-          "used to separate elements. They are reserved for separating input "
-          "values:\n"
-          "2x2xi32=[[1 2][3 4]], 1x2xf32=[[1 2]]");
-
-ABSL_FLAG(std::string, function_inputs_file, "",
-          "Provides a file for input shapes and optional values (see "
-          "ParseToVariantListFromFile in vm_util.h for details)");
+static iree_status_t parse_function_input(iree_string_view_t flag_name,
+                                          void* storage,
+                                          iree_string_view_t value) {
+  auto* list = (std::vector<std::string>*)storage;
+  list->push_back(std::string(value.data, value.size));
+  return iree_ok_status();
+}
+static void print_function_input(iree_string_view_t flag_name, void* storage,
+                                 FILE* file) {
+  auto* list = (std::vector<std::string>*)storage;
+  if (list->empty()) {
+    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
+  } else {
+    for (size_t i = 0; i < list->size(); ++i) {
+      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
+              list->at(i).c_str());
+    }
+  }
+}
+static std::vector<std::string> FLAG_function_inputs;
+IREE_FLAG_CALLBACK(
+    parse_function_input, print_function_input, &FLAG_function_inputs,
+    function_input,
+    "An input value or buffer of the format:\n"
+    "  [shape]xtype=[value]\n"
+    "  2x2xi32=1 2 3 4\n"
+    "Optionally, brackets may be used to separate the element values:\n"
+    "  2x2xi32=[[1 2][3 4]]\n"
+    "Each occurrence of the flag indicates an input in the order they were\n"
+    "specified on the command line.");
 
 namespace iree {
 namespace {
 
 Status GetModuleContentsFromFlags(std::string* out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
-  auto module_file = absl::GetFlag(FLAGS_module_file);
+  auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
     *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
                                 std::istreambuf_iterator<char>()};
@@ -84,7 +98,7 @@ Status Run() {
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(std::string(FLAG_driver), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
@@ -96,7 +110,7 @@ Status Run() {
                            iree_allocator_system(), &context),
                        "creating context");
 
-  std::string function_name = absl::GetFlag(FLAGS_entry_function);
+  std::string function_name = std::string(FLAG_entry_function);
   iree_vm_function_t function;
   if (function_name.empty()) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -115,20 +129,9 @@ Status Run() {
   IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
 
   vm::ref<iree_vm_list_t> inputs;
-  if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
-    if (!absl::GetFlag(FLAGS_function_inputs).empty()) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "expected only one of function_inputs and "
-                              "function_inputs_file to be set");
-    }
-    IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
-        input_descs, iree_hal_device_allocator(device),
-        absl::GetFlag(FLAGS_function_inputs_file), &inputs));
-  } else {
-    IREE_RETURN_IF_ERROR(ParseToVariantList(
-        input_descs, iree_hal_device_allocator(device),
-        absl::MakeConstSpan(absl::GetFlag(FLAGS_function_inputs)), &inputs));
-  }
+  IREE_CHECK_OK(ParseToVariantList(input_descs,
+                                   iree_hal_device_allocator(device),
+                                   FLAG_function_inputs, &inputs));
 
   std::vector<RawSignatureParser::Description> output_descs;
   IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
@@ -159,7 +162,7 @@ Status Run() {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  iree_flags_parse_checked(&argc, &argv);
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
   IREE_CHECK_OK(Run());

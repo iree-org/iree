@@ -16,8 +16,11 @@
 #include "iree/testing/gtest.h"
 
 extern "C" int main(int argc, char** argv) {
+  // Pass through flags to gtest (allowing --help to fall through).
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
   ::testing::InitGoogleTest(&argc, argv);
-  iree_flags_parse_checked(&argc, &argv);
 
   return RUN_ALL_TESTS();
 }

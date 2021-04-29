@@ -889,9 +889,18 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
       uint32_t index = VM_DecOperandRegI32("index");
+      const iree_vm_type_def_t* type_def = VM_DecTypeOf("result");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
-      return iree_vm_list_get_ref_retain(list, index, result);
+      // TODO(benvanik): use result_is_move with a _retain_or_move.
+      IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_retain(list, index, result));
+      if (result->type != IREE_VM_REF_TYPE_NULL &&
+          (iree_vm_type_def_is_value(type_def) ||
+           result->type != type_def->ref_type)) {
+        // Type mismatch; put null in the register instead.
+        // TODO(benvanik): return an error here and make a query type method?
+        iree_vm_ref_release(result);
+      }
     });
 
     DISPATCH_OP(CORE, ListSetRef, {
@@ -905,9 +914,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool operand_is_move;
       iree_vm_ref_t* operand = VM_DecOperandRegRef("value", &operand_is_move);
       if (operand_is_move) {
-        return iree_vm_list_set_ref_move(list, index, operand);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_move(list, index, operand));
       } else {
-        return iree_vm_list_set_ref_retain(list, index, operand);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_retain(list, index, operand));
       }
     });
 

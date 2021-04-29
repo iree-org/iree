@@ -72,6 +72,12 @@ function(iree_cc_test)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_executable(${_NAME} "")
+  add_executable(${_RULE_NAME} ALIAS ${_NAME})
+  if(_RULE_OUT)
+    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_OUT}")
+  else()
+    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
+  endif()
   target_sources(${_NAME}
     PRIVATE
       ${_RULE_SRCS}
@@ -131,7 +137,7 @@ function(iree_cc_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_REL_DIR}/${_NAME}"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_NAME}>"
     )
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match

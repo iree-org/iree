@@ -31,17 +31,18 @@ endif()
 
 cc_library(
     name = "registration",
-    srcs = ["driver_module.cc"],
+    srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
     defines = [
         "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1",
     ],
     deps = [
+        "//iree/base/internal:flags",
         "//iree/hal:api",
         "//iree/hal/local:task_driver",
         "//iree/hal/local/loaders:embedded_library_loader",
         "//iree/hal/local/loaders:legacy_library_loader",
-        "@com_google_absl//absl/flags:flag",
+        "//iree/task:api",
     ],
 )
 
