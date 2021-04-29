@@ -95,9 +95,6 @@ static_assert(
 
 typedef void(IREE_API_PTR* iree_vm_ref_destroy_t)(void* ptr);
 
-#define IREE_VM_REF_DESTROY_FREE free
-#define IREE_VM_REF_DESTROY_CC_DELETE +[](void* ptr) { delete ptr; }
-
 // Describes a type for the VM.
 typedef struct {
   // Function called when references of this type reach 0 and should be
