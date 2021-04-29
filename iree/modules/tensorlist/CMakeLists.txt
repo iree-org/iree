@@ -55,7 +55,6 @@ iree_cc_test(
     ::native_module
     ::tensorlist_test_module_cc
     absl::span
-    absl::strings
     iree::base::api
     iree::base::logging
     iree::hal::api

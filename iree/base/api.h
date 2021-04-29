@@ -219,6 +219,9 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
 #define iree_string_view_literal(str) \
   { .data = (str), .size = IREE_ARRAYSIZE(str) - 1 }
 
+// Returns a string view initialized with the given cstring.
+#define IREE_SV(cstr) iree_make_cstring_view(cstr)
+
 // Returns true if the two strings are equal (compare == 0).
 IREE_API_EXPORT bool IREE_API_CALL
 iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs);
@@ -226,10 +229,6 @@ iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs);
 // Like std::string::compare but with iree_string_view_t values.
 IREE_API_EXPORT int IREE_API_CALL
 iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
-
-// Returns true if the string starts with the given prefix.
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
-    iree_string_view_t value, iree_string_view_t prefix);
 
 // Finds the first occurrence of |c| in |value| starting at |pos|.
 // Returns the found character position or IREE_STRING_VIEW_NPOS if not found.
@@ -246,9 +245,39 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos);
 
+// Returns true if the string starts with the given prefix.
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
+    iree_string_view_t value, iree_string_view_t prefix);
+
+// Returns true if the string starts with the given suffix.
+IREE_API_EXPORT bool IREE_API_CALL
+iree_string_view_ends_with(iree_string_view_t value, iree_string_view_t suffix);
+
 // Removes the first |n| characters from the string view (not the data).
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n);
+
+// Removes the last |n| characters from the string view (not the data).
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_string_view_remove_suffix(iree_string_view_t value, iree_host_size_t n);
+
+// Removes the given substring prefix from the string view if present.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_prefix(
+    iree_string_view_t value, iree_string_view_t prefix);
+
+// Removes the given substring suffix from the string view if present.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_suffix(
+    iree_string_view_t value, iree_string_view_t suffix);
+
+// Removes the given substring prefix from the string view if present in-place.
+// Returns true if the strip succeeded.
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_prefix(
+    iree_string_view_t* value, iree_string_view_t prefix);
+
+// Removes the given substring suffix from the string view if present in-place.
+// Returns true if the strip succeeded.
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_suffix(
+    iree_string_view_t* value, iree_string_view_t suffix);
 
 // Removes leading and trailing whitespace.
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
@@ -266,6 +295,10 @@ IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_substr(
 IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
     iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
     iree_string_view_t* out_rhs);
+
+// Replaces all occurrences of |old_char| with |new_char|.
+IREE_API_EXPORT void IREE_API_CALL iree_string_view_replace_char(
+    iree_string_view_t value, char old_char, char new_char);
 
 // Returns true if the given |value| matches |pattern| (normal * and ? rules).
 // This accepts wildcards in the form of '*' and '?' for any delimited value.

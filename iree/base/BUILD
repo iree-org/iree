@@ -101,7 +101,6 @@ cc_library(
         ":core_headers",
         ":tracing",
         "//iree/base/internal:flags",
-        "@com_google_absl//absl/strings:str_format",
     ],
 )
 

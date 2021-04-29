@@ -253,8 +253,6 @@ cc_binary(
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/testing:benchmark_main",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
         "@com_google_benchmark//:benchmark",
     ],
 )

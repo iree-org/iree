@@ -24,7 +24,6 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/strip.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
@@ -37,11 +36,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
   IREE_ASSERT_ARGUMENT(buffer_allocator);
 
   // Strip whitespace that may come along (linefeeds/etc).
-  auto string_view =
-      absl::StripAsciiWhitespace(absl::string_view(value.data, value.size));
-  string_view = absl::StripPrefix(string_view, "\"");
-  string_view = absl::StripSuffix(string_view, "\"");
-  if (string_view.empty()) {
+  value = iree_string_view_trim(value);
+  value = iree_string_view_strip_prefix(value, IREE_SV("\""));
+  value = iree_string_view_strip_suffix(value, IREE_SV("\""));
+  if (iree_string_view_is_empty(value)) {
     // Empty lines are invalid; need at least the shape/type information.
     *out_buffer_view = nullptr;
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "empty string input");
@@ -54,6 +52,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
   // The part of the string corresponding to the buffer data, e.g. 1 2 3 4 5 6
   absl::string_view data_str;
 
+  // TODO(#3848): replace with iree_string_view_split, which does all of this.
+  auto string_view = absl::string_view(value.data, value.size);
   absl::string_view shape_and_type_str;
   auto equal_index = string_view.find('=');
   if (equal_index == std::string::npos) {

@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
@@ -94,12 +93,11 @@ class StringsModuleTest : public ::testing::Test {
     iree_vm_instance_release(instance_);
   }
 
-  iree_vm_function_t LookupFunction(absl::string_view function_name) {
+  iree_vm_function_t LookupFunction(const char* function_name) {
     iree_vm_function_t function;
     IREE_CHECK_OK(bytecode_module_->lookup_function(
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
-        &function))
+        iree_make_cstring_view(function_name), &function))
         << "Exported function '" << function_name << "' not found";
     return function;
   }
@@ -129,7 +127,7 @@ class StringsModuleTest : public ::testing::Test {
 
   void TestStringTensorToString(
       absl::Span<const iree_string_view_t> string_views,
-      absl::Span<const int32_t> shape, absl::string_view expected_output) {
+      absl::Span<const int32_t> shape, const std::string& expected_output) {
     vm::ref<strings_string_tensor_t> input_string_tensor;
     IREE_ASSERT_OK(strings_string_tensor_create(
         iree_allocator_system(), string_views.data(), string_views.size(),
@@ -159,10 +157,9 @@ class StringsModuleTest : public ::testing::Test {
     auto* output_string =
         reinterpret_cast<strings_string_t*>(iree_vm_list_get_ref_deref(
             outputs.get(), 0, strings_string_get_descriptor()));
-    ASSERT_EQ(output_string->value.size, expected_output.length());
-    EXPECT_EQ(
-        absl::string_view(output_string->value.data, output_string->value.size),
-        expected_output);
+    ASSERT_EQ(output_string->value.size, expected_output.size());
+    EXPECT_EQ(std::string(output_string->value.data, output_string->value.size),
+              expected_output);
   }
 
   template <typename T, iree_hal_element_type_t E>

@@ -18,7 +18,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"

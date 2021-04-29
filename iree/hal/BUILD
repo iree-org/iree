@@ -80,7 +80,6 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
         "@half//:includes",
     ],
 )

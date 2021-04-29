@@ -44,14 +44,6 @@ iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
   return lhs.size < rhs.size ? -1 : 1;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
-    iree_string_view_t value, iree_string_view_t prefix) {
-  if (!value.data || !prefix.data || prefix.size > value.size) {
-    return false;
-  }
-  return strncmp(value.data, prefix.data, prefix.size) == 0;
-}
-
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
     iree_string_view_t value, char c, iree_host_size_t pos) {
   if (iree_string_view_is_empty(value) || pos >= value.size) {
@@ -103,12 +95,71 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
   return IREE_STRING_VIEW_NPOS;
 }
 
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
+    iree_string_view_t value, iree_string_view_t prefix) {
+  if (!value.data || !prefix.data || !prefix.size || prefix.size > value.size) {
+    return false;
+  }
+  return strncmp(value.data, prefix.data, prefix.size) == 0;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_ends_with(
+    iree_string_view_t value, iree_string_view_t suffix) {
+  if (!value.data || !suffix.data || !suffix.size || suffix.size > value.size) {
+    return false;
+  }
+  return strncmp(value.data + value.size - suffix.size, suffix.data,
+                 suffix.size) == 0;
+}
+
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n) {
   if (n >= value.size) {
     return iree_string_view_empty();
   }
   return iree_make_string_view(value.data + n, value.size - n);
+}
+
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_string_view_remove_suffix(iree_string_view_t value, iree_host_size_t n) {
+  if (n >= value.size) {
+    return iree_string_view_empty();
+  }
+  return iree_make_string_view(value.data, value.size - n);
+}
+
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_prefix(
+    iree_string_view_t value, iree_string_view_t prefix) {
+  if (iree_string_view_starts_with(value, prefix)) {
+    return iree_string_view_remove_prefix(value, prefix.size);
+  }
+  return value;
+}
+
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_suffix(
+    iree_string_view_t value, iree_string_view_t suffix) {
+  if (iree_string_view_ends_with(value, suffix)) {
+    return iree_string_view_remove_suffix(value, suffix.size);
+  }
+  return value;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_prefix(
+    iree_string_view_t* value, iree_string_view_t prefix) {
+  if (iree_string_view_starts_with(*value, prefix)) {
+    *value = iree_string_view_remove_prefix(*value, prefix.size);
+    return true;
+  }
+  return false;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_suffix(
+    iree_string_view_t* value, iree_string_view_t suffix) {
+  if (iree_string_view_ends_with(*value, suffix)) {
+    *value = iree_string_view_remove_suffix(*value, suffix.size);
+    return true;
+  }
+  return false;
 }
 
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
