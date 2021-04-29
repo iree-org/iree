@@ -116,7 +116,7 @@ static Value createStringTableValue(Location loc, StringAttr attrValue,
   // Embed the UTF-8 bytes as a vm.rodata blob.
   return rewriter.create<IREE::VM::RodataInlineOp>(
       loc,
-      IREE::VM::RefType::get(IREE::ByteBufferType::get(rewriter.getContext())),
+      IREE::VM::RefType::get(IREE::VM::BufferType::get(rewriter.getContext())),
       rewriter.getStringAttr(safeIdentifier), utf8Bytes,
       /*alignment=*/rewriter.getI64IntegerAttr(1));
 }

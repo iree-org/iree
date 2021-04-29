@@ -196,7 +196,8 @@ void VMDialect::registerAttributes() {
   addAttributes<IREE::VM::OrdinalCountsAttr>();
 }
 void VMDialect::registerTypes() {
-  addTypes<IREE::VM::ListType, IREE::VM::OpaqueType, IREE::VM::RefType>();
+  addTypes<IREE::VM::BufferType, IREE::VM::ListType, IREE::VM::OpaqueType,
+           IREE::VM::RefType>();
 }
 
 }  // namespace VM

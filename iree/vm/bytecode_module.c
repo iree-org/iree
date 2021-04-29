@@ -539,10 +539,9 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
 
   if (state) {
     state->rodata_ref_count = rodata_ref_count;
-    state->rodata_ref_table = (iree_vm_ro_byte_buffer_t*)(base_ptr + offset);
+    state->rodata_ref_table = (iree_vm_buffer_t*)(base_ptr + offset);
   }
-  offset +=
-      iree_host_align(rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_t), 16);
+  offset += iree_host_align(rodata_ref_count * sizeof(iree_vm_buffer_t), 16);
 
   if (state) {
     state->import_count = import_function_count;
@@ -584,10 +583,10 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   for (int i = 0; i < state->rodata_ref_count; ++i) {
     iree_vm_RodataSegmentDef_table_t segment =
         iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
-    iree_vm_ro_byte_buffer_t* ref = &state->rodata_ref_table[i];
+    iree_vm_buffer_t* ref = &state->rodata_ref_table[i];
     iree_atomic_ref_count_init(&ref->ref_object.counter);
-    ref->origin = IREE_VM_BYTE_BUFFER_ORIGIN_MODULE;
-    ref->data.data = iree_vm_RodataSegmentDef_data(segment);
+    ref->access = IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE;
+    ref->data.data = (uint8_t*)iree_vm_RodataSegmentDef_data(segment);
     ref->data.data_length =
         flatbuffers_uint8_vec_len(iree_vm_RodataSegmentDef_data(segment));
   }

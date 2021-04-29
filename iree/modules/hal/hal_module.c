@@ -286,8 +286,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
   IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
   iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
   iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i2;
-  iree_vm_ro_byte_buffer_t* source = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_ro_byte_buffer_check_deref(args->r3, &source));
+  iree_vm_buffer_t* source = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &source));
   iree_vm_size_t offset = (iree_vm_size_t)args->i4;
   iree_vm_size_t length = (iree_vm_size_t)args->i5;
 
@@ -475,9 +475,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_dim,  //
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace,  //
                    iree_hal_module_state_t,            //
                    rCrD, v) {
-  iree_vm_ro_byte_buffer_t* key = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_ro_byte_buffer_check_deref(args->r0, &key));
-  iree_string_view_t key_str = iree_vm_ro_byte_buffer_as_string(key);
+  iree_vm_buffer_t* key = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r0, &key));
+  iree_string_view_t key_str = iree_vm_buffer_as_string(key);
 
   fprintf(stderr, "=== %.*s ===\n", (int)key_str.size, key_str.data);
   for (iree_host_size_t i = 0; i < args->a1_count; ++i) {
@@ -831,9 +831,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32,  //
                    rr, ii) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_vm_ro_byte_buffer_t* key = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_ro_byte_buffer_check_deref(args->r1, &key));
-  iree_string_view_t key_str = iree_vm_ro_byte_buffer_as_string(key);
+  iree_vm_buffer_t* key = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &key));
+  iree_string_view_t key_str = iree_vm_buffer_as_string(key);
 
   int32_t value = 0;
   iree_status_t query_status =
@@ -848,9 +848,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_match_id,  //
                    rr, i) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_vm_ro_byte_buffer_t* pattern = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_ro_byte_buffer_check_deref(args->r1, &pattern));
-  iree_string_view_t pattern_str = iree_vm_ro_byte_buffer_as_string(pattern);
+  iree_vm_buffer_t* pattern = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &pattern));
+  iree_string_view_t pattern_str = iree_vm_buffer_as_string(pattern);
 
   iree_string_view_t device_id = iree_hal_device_id(device);
   rets->i0 = iree_string_view_match_pattern(device_id, pattern_str) ? 1 : 0;
@@ -866,14 +866,13 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
                    rrrCrD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_vm_ro_byte_buffer_t* executable_format = NULL;
+  iree_vm_buffer_t* executable_format = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_vm_ro_byte_buffer_check_deref(args->r1, &executable_format));
+      iree_vm_buffer_check_deref(args->r1, &executable_format));
   iree_string_view_t executable_format_str =
-      iree_vm_ro_byte_buffer_as_string(executable_format);
-  iree_vm_ro_byte_buffer_t* executable_data = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_vm_ro_byte_buffer_check_deref(args->r2, &executable_data));
+      iree_vm_buffer_as_string(executable_format);
+  iree_vm_buffer_t* executable_data = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r2, &executable_data));
   iree_host_size_t executable_layout_count = args->a3_count;
   iree_hal_executable_layout_t** executable_layouts = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
@@ -892,11 +891,12 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
     iree_hal_executable_spec_t spec;
     iree_hal_executable_spec_initialize(&spec);
     spec.caching_mode |=
-        executable_data->origin == IREE_VM_BYTE_BUFFER_ORIGIN_MODULE
+        executable_data->access == IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE
             ? IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA
             : 0;
     spec.executable_format = executable_format_str;
-    spec.executable_data = executable_data->data;
+    spec.executable_data = iree_make_const_byte_span(
+        executable_data->data.data, executable_data->data.data_length);
     spec.executable_layout_count = executable_layout_count;
     spec.executable_layouts = executable_layouts;
     status = iree_hal_executable_cache_prepare_executable(

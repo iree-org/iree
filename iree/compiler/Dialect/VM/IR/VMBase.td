@@ -295,6 +295,20 @@ class VM_RefOf<Type type> :
 }
 
 //===----------------------------------------------------------------------===//
+// Buffer types
+//===----------------------------------------------------------------------===//
+
+def VM_BufferType : DialectType<
+    IREE_Dialect,
+    CPred<"$_self.isa<IREE::VM::BufferType>()">,
+    "buffer"> {
+  let description = [{
+    A byte buffer.
+  }];
+  let builderCall = "$_builder.getType<IREE::VM::BufferType>()";
+}
+
+//===----------------------------------------------------------------------===//
 // List types
 //===----------------------------------------------------------------------===//
 
