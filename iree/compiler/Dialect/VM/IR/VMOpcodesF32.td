@@ -47,6 +47,10 @@ def VM_OPC_CmpNEF32              : VM_OPC<0x41, "CmpNEF32">;
 def VM_OPC_CmpNZF32              : VM_OPC<0x42, "CmpNZF32">;
 def VM_OPC_CmpLTF32              : VM_OPC<0x43, "CmpLTF32">;
 
+def VM_OPC_BufferLoadF32         : VM_OPC<0xB0, "BufferLoadF32">;
+def VM_OPC_BufferStoreF32        : VM_OPC<0xB1, "BufferStoreF32">;
+def VM_OPC_BufferFillF32         : VM_OPC<0xC0, "BufferFillF32">;
+
 // Runtime enum iree_vm_ext_f32_op_t:
 def VM_ExtF32OpcodeAttr :
     VM_OPC_EnumAttr<"ExtF32Opcode",
@@ -77,6 +81,10 @@ def VM_ExtF32OpcodeAttr :
     VM_OPC_CmpNEF32,
     VM_OPC_CmpNZF32,
     VM_OPC_CmpLTF32,
+
+    VM_OPC_BufferLoadF32,
+    VM_OPC_BufferStoreF32,
+    VM_OPC_BufferFillF32,
   ]>;
 
 #endif  // IREE_DIALECT_VM_OPCODES_F32

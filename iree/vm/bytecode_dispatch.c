@@ -814,6 +814,283 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     //===------------------------------------------------------------------===//
+    // Buffers
+    //===------------------------------------------------------------------===//
+
+    DISPATCH_OP(CORE, BufferAlloc, {
+      uint32_t length = VM_DecOperandRegI32("length");
+      bool result_is_move;
+      iree_vm_ref_t* result_ref = VM_DecResultRegRef("result", &result_is_move);
+      iree_vm_buffer_t* buffer = NULL;
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_create(
+          IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST,
+          length, module_state->allocator, &buffer));
+      IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
+          buffer, iree_vm_buffer_type_id(), result_ref));
+    });
+
+    DISPATCH_OP(CORE, BufferClone, {
+      bool source_is_move;
+      iree_vm_ref_t* source_ref =
+          VM_DecOperandRegRef("source", &source_is_move);
+      iree_vm_buffer_t* source = iree_vm_buffer_deref(*source_ref);
+      if (IREE_UNLIKELY(!source)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "source is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("offset");
+      uint32_t length = VM_DecOperandRegI32("length");
+      bool result_is_move;
+      iree_vm_ref_t* result_ref = VM_DecResultRegRef("result", &result_is_move);
+      iree_vm_buffer_t* result = NULL;
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_clone(
+          IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST,
+          source, offset, length, module_state->allocator, &result));
+      IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
+          result, iree_vm_buffer_type_id(), result_ref));
+    });
+
+    DISPATCH_OP(CORE, BufferLength, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
+      }
+      uint32_t* result = VM_DecResultRegI32("result");
+      *result = (uint32_t)iree_vm_buffer_length(buffer);
+    });
+
+    DISPATCH_OP(CORE, BufferCopy, {
+      bool source_buffer_is_move;
+      iree_vm_ref_t* source_buffer_ref =
+          VM_DecOperandRegRef("source_buffer", &source_buffer_is_move);
+      iree_vm_buffer_t* source_buffer =
+          iree_vm_buffer_deref(*source_buffer_ref);
+      if (IREE_UNLIKELY(!source_buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "source_buffer is null");
+      }
+      uint32_t source_offset = VM_DecOperandRegI32("source_offset");
+      bool target_buffer_is_move;
+      iree_vm_ref_t* target_buffer_ref =
+          VM_DecOperandRegRef("target_buffer", &target_buffer_is_move);
+      iree_vm_buffer_t* target_buffer =
+          iree_vm_buffer_deref(*target_buffer_ref);
+      if (IREE_UNLIKELY(!target_buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "target_buffer is null");
+      }
+      uint32_t target_offset = VM_DecOperandRegI32("target_offset");
+      uint32_t length = VM_DecOperandRegI32("length");
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_copy_bytes(
+          source_buffer, source_offset, target_buffer, target_offset, length));
+    });
+
+    DISPATCH_OP(CORE, BufferCompare, {
+      bool lhs_buffer_is_move;
+      iree_vm_ref_t* lhs_buffer_ref =
+          VM_DecOperandRegRef("lhs_buffer", &lhs_buffer_is_move);
+      iree_vm_buffer_t* lhs_buffer = iree_vm_buffer_deref(*lhs_buffer_ref);
+      if (IREE_UNLIKELY(!lhs_buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "lhs_buffer is null");
+      }
+      uint32_t lhs_offset = VM_DecOperandRegI32("lhs_offset");
+      bool rhs_buffer_is_move;
+      iree_vm_ref_t* rhs_buffer_ref =
+          VM_DecOperandRegRef("rhs_buffer", &rhs_buffer_is_move);
+      iree_vm_buffer_t* rhs_buffer = iree_vm_buffer_deref(*rhs_buffer_ref);
+      if (IREE_UNLIKELY(!rhs_buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "rhs_buffer is null");
+      }
+      uint32_t rhs_offset = VM_DecOperandRegI32("rhs_offset");
+      uint32_t length = VM_DecOperandRegI32("length");
+      uint32_t* result_ptr = VM_DecResultRegI32("result");
+      bool result = false;
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_compare_bytes(
+          lhs_buffer, lhs_offset, rhs_buffer, rhs_offset, length, &result));
+      *result_ptr = result ? 1 : 0;
+    });
+
+    // TODO(benvanik): rework dispatch so that the FillI* ops can share the same
+    // body - they all only vary by the length passed to fill_elements. The
+    // gotcha is that on big-endian machines we'd have to flip around the bytes.
+    // See VMOpcodesCore.td for more information on the encoding.
+    DISPATCH_OP(CORE, BufferFillI8, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      uint32_t length = VM_DecOperandRegI32("length");
+      uint8_t value = (uint8_t)VM_DecOperandRegI32("value");
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
+          buffer, offset, length / sizeof(uint8_t), sizeof(uint8_t), &value));
+    });
+    DISPATCH_OP(CORE, BufferFillI16, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      uint32_t length = VM_DecOperandRegI32("length");
+      uint16_t value = (uint16_t)VM_DecOperandRegI32("value");
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
+          buffer, offset, length / sizeof(uint16_t), sizeof(uint16_t), &value));
+    });
+    DISPATCH_OP(CORE, BufferFillI32, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      uint32_t length = VM_DecOperandRegI32("length");
+      uint32_t value = VM_DecOperandRegI32("value");
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
+          buffer, offset, length / sizeof(uint32_t), sizeof(uint32_t), &value));
+    });
+
+    // TODO(benvanik): rework dispatch so that the LoadI* ops can share the same
+    // body - they only vary on the length and sign/zero extension mode but
+    // can be packed into a single handler to reduce code-size.
+    // See VMOpcodesCore.td for more information on the encoding.
+    DISPATCH_OP(CORE, BufferLoadI8U, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "source_buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      uint32_t* result_ptr = VM_DecResultRegI32("result");
+      uint8_t result_x8 = 0;
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
+          buffer, offset, &result_x8, 1, sizeof(result_x8)));
+      *result_ptr = vm_ext_i8i32u(result_x8);
+    });
+    DISPATCH_OP(CORE, BufferLoadI8S, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "source_buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      uint32_t* result_ptr = VM_DecResultRegI32("result");
+      int8_t result_x8 = 0;
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
+          buffer, offset, &result_x8, 1, sizeof(result_x8)));
+      *result_ptr = vm_ext_i8i32s(result_x8);
+    });
+    DISPATCH_OP(CORE, BufferLoadI16U, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "source_buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      uint32_t* result_ptr = VM_DecResultRegI32("result");
+      uint16_t result_x16 = 0;
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
+          buffer, offset, &result_x16, 1, sizeof(result_x16)));
+      *result_ptr = vm_ext_i16i32u(result_x16);
+    });
+    DISPATCH_OP(CORE, BufferLoadI16S, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "source_buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      uint32_t* result_ptr = VM_DecResultRegI32("result");
+      int16_t result_x16 = 0;
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
+          buffer, offset, &result_x16, 1, sizeof(result_x16)));
+      *result_ptr = vm_ext_i16i32s(result_x16);
+    });
+    DISPATCH_OP(CORE, BufferLoadI32, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "source_buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      uint32_t* result = VM_DecResultRegI32("result");
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(buffer, offset, result,
+                                                        1, sizeof(*result)));
+    });
+
+    // TODO(benvanik): rework dispatch so that the StoreI* ops can share the
+    // same body - they only vary on the length.
+    // See VMOpcodesCore.td for more information on the encoding.
+    DISPATCH_OP(CORE, BufferStoreI8, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "target_buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      uint8_t value = (uint8_t)VM_DecOperandRegI32("value");
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(&value, buffer, offset,
+                                                         1, sizeof(uint8_t)));
+    });
+    DISPATCH_OP(CORE, BufferStoreI16, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "target_buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      uint16_t value = (uint16_t)VM_DecOperandRegI32("value");
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(&value, buffer, offset,
+                                                         1, sizeof(uint16_t)));
+    });
+    DISPATCH_OP(CORE, BufferStoreI32, {
+      bool buffer_is_move;
+      iree_vm_ref_t* buffer_ref =
+          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+      if (IREE_UNLIKELY(!buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "target_buffer is null");
+      }
+      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      uint32_t value = VM_DecOperandRegI32("value");
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(&value, buffer, offset,
+                                                         1, sizeof(uint32_t)));
+    });
+
+    //===------------------------------------------------------------------===//
     // Lists
     //===------------------------------------------------------------------===//
 
@@ -1473,6 +1750,58 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t* result = VM_DecResultRegI32("result");
         *result = vm_cmp_nz_i64(operand);
       });
+
+      //===----------------------------------------------------------------===//
+      // ExtI64: Buffers
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_I64, BufferFillI64, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "buffer is null");
+        }
+        uint32_t offset = VM_DecOperandRegI32("target_offset");
+        uint32_t length = VM_DecOperandRegI32("length");
+        uint64_t value = VM_DecOperandRegI64("value");
+        IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
+            buffer, offset, length / sizeof(uint64_t), sizeof(uint64_t),
+            &value));
+      });
+
+      DISPATCH_OP(EXT_I64, BufferLoadI64, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "source_buffer is null");
+        }
+        uint32_t offset = VM_DecOperandRegI32("source_offset");
+        uint64_t* result = VM_DecResultRegI64("result");
+        IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
+            buffer, offset, result, 1, sizeof(*result)));
+      });
+
+      DISPATCH_OP(EXT_I64, BufferStoreI64, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "target_buffer is null");
+        }
+        uint32_t offset = VM_DecOperandRegI32("target_offset");
+        uint64_t value = (uint64_t)VM_DecOperandRegI64("value");
+        IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
+            &value, buffer, offset, 1, sizeof(uint64_t)));
+      });
+
 #else
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 #endif  // IREE_VM_EXT_I64_ENABLE
@@ -1656,6 +1985,57 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t* result = VM_DecResultRegI32("result");
         *result = vm_cmp_nz_f32(operand);
       });
+
+      //===----------------------------------------------------------------===//
+      // ExtF32: Buffers
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F32, BufferFillF32, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "buffer is null");
+        }
+        uint32_t offset = VM_DecOperandRegI32("target_offset");
+        uint32_t length = VM_DecOperandRegI32("length");
+        float value = VM_DecOperandRegF32("value");
+        IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
+            buffer, offset, length / sizeof(float), sizeof(float), &value));
+      });
+
+      DISPATCH_OP(EXT_F32, BufferLoadF32, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "source_buffer is null");
+        }
+        uint32_t offset = VM_DecOperandRegI32("source_offset");
+        float* result = VM_DecResultRegF32("result");
+        IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
+            buffer, offset, result, 1, sizeof(*result)));
+      });
+
+      DISPATCH_OP(EXT_F32, BufferStoreF32, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "target_buffer is null");
+        }
+        uint32_t offset = VM_DecOperandRegI32("target_offset");
+        float value = VM_DecOperandRegF32("value");
+        IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
+            &value, buffer, offset, 1, sizeof(float)));
+      });
+
 #else
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 #endif  // IREE_VM_EXT_F32_ENABLE

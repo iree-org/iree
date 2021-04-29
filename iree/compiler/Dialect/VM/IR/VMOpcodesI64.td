@@ -56,6 +56,11 @@ def VM_OPC_CmpLTI64S             : VM_OPC<0x42, "CmpLTI64S">;
 def VM_OPC_CmpLTI64U             : VM_OPC<0x43, "CmpLTI64U">;
 def VM_OPC_CmpNZI64              : VM_OPC<0x4D, "CmpNZI64">;
 
+// Buffer load/store:
+def VM_OPC_BufferLoadI64         : VM_OPC<0xB0, "BufferLoadI64">;
+def VM_OPC_BufferStoreI64        : VM_OPC<0xB1, "BufferStoreI64">;
+def VM_OPC_BufferFillI64         : VM_OPC<0xC0, "BufferFillI64">;
+
 // Runtime enum iree_vm_ext_i64_op_t:
 def VM_ExtI64OpcodeAttr :
     VM_OPC_EnumAttr<"ExtI64Opcode",
@@ -95,6 +100,10 @@ def VM_ExtI64OpcodeAttr :
     VM_OPC_CmpLTI64S,
     VM_OPC_CmpLTI64U,
     VM_OPC_CmpNZI64,
+
+    VM_OPC_BufferLoadI64,
+    VM_OPC_BufferStoreI64,
+    VM_OPC_BufferFillI64,
   ]>;
 
 #endif  // IREE_DIALECT_VM_OPCODES_I64
