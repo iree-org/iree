@@ -160,6 +160,8 @@ IREE_API_EXPORT iree_status_t iree_vm_list_initialize(
 }
 
 IREE_API_EXPORT void iree_vm_list_deinitialize(iree_vm_list_t* list) {
+  IREE_ASSERT_ARGUMENT(list);
+  iree_atomic_ref_count_abort_if_uses(&list->ref_object.counter);
   iree_vm_list_reset_range(list, 0, list->count);
   list->count = 0;
 }
@@ -667,6 +669,11 @@ IREE_API_EXPORT iree_status_t iree_vm_list_push_variant(
 }
 
 iree_status_t iree_vm_list_register_types() {
+  if (iree_vm_list_descriptor.type != IREE_VM_REF_TYPE_NULL) {
+    // Already registered.
+    return iree_ok_status();
+  }
+
   iree_vm_list_descriptor.destroy = iree_vm_list_destroy;
   iree_vm_list_descriptor.offsetof_counter =
       offsetof(iree_vm_list_t, ref_object.counter);

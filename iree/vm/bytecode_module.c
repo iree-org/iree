@@ -584,11 +584,12 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
     iree_vm_RodataSegmentDef_table_t segment =
         iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
     iree_vm_buffer_t* ref = &state->rodata_ref_table[i];
-    iree_atomic_ref_count_init(&ref->ref_object.counter);
-    ref->access = IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE;
-    ref->data.data = (uint8_t*)iree_vm_RodataSegmentDef_data(segment);
-    ref->data.data_length =
-        flatbuffers_uint8_vec_len(iree_vm_RodataSegmentDef_data(segment));
+    iree_vm_buffer_initialize(
+        IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE,
+        iree_make_byte_span(
+            (uint8_t*)iree_vm_RodataSegmentDef_data(segment),
+            flatbuffers_uint8_vec_len(iree_vm_RodataSegmentDef_data(segment))),
+        iree_allocator_null(), ref);
   }
 
   *out_module_state = (iree_vm_module_state_t*)state;
@@ -607,6 +608,12 @@ static void iree_vm_bytecode_module_free_state(
   // Release remaining global references.
   for (int i = 0; i < state->global_ref_count; ++i) {
     iree_vm_ref_release(&state->global_ref_table[i]);
+  }
+
+  // Ensure all rodata references are unused and deinitialized.
+  for (int i = 0; i < state->rodata_ref_count; ++i) {
+    iree_vm_buffer_t* ref = &state->rodata_ref_table[i];
+    iree_vm_buffer_deinitialize(ref);
   }
 
   iree_allocator_free(state->allocator, module_state);

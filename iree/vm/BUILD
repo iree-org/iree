@@ -63,6 +63,7 @@ cc_library(
 cc_library(
     name = "impl",
     srcs = [
+        "buffer.c",
         "builtin_types.c",
         "context.c",
         "instance.c",
@@ -75,6 +76,7 @@ cc_library(
         "stack.c",
     ],
     hdrs = [
+        "buffer.h",
         "builtin_types.h",
         "context.h",
         "instance.h",
@@ -93,6 +95,18 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
+    ],
+)
+
+cc_test(
+    name = "buffer_test",
+    srcs = ["buffer_test.cc"],
+    deps = [
+        ":cc",
+        ":impl",
+        "//iree/base",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
