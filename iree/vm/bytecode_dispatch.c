@@ -811,7 +811,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_retain(
           &module_state->rodata_ref_table[rodata_ordinal],
-          iree_vm_ro_byte_buffer_type_id(), result));
+          iree_vm_buffer_type_id(), result));
     });
 
     //===------------------------------------------------------------------===//
