@@ -45,6 +45,7 @@ struct HALInlinerInterface : public DialectInlinerInterface {
     // Sure!
     return true;
   }
+
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
                        BlockAndValueMapping &valueMapping) const final {
     // Sure!

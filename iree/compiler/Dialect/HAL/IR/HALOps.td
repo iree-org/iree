@@ -17,6 +17,8 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
+include "iree/compiler/Dialect/IREE/IR/IREEInterfaces.td"
+include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -58,6 +60,59 @@ def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
   );
 
   let assemblyFormat = "$device `,` $command_buffer attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// Pseudo ops for conversion support
+//===----------------------------------------------------------------------===//
+
+def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+        "getTiedResult",
+        "getTiedResultOperandIndex",
+        "getTiedResultOperandIndices",
+    ]>,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  ]> {
+  let summary = [{conversion placeholder for HAL<->tensor type conversion}];
+  let description = [{
+    Defines a conversion from a higher-level dialect type such as `tensor` that
+    is resolved during lowering into the HAL. This can be used to interoperate
+    between levels of the stack that require specifying HAL types and those that
+    prior to lowering do not handle them.
+  }];
+
+  let arguments = (ins
+    AnyType:$source,
+    HAL_ShapeDynamicDims:$source_dims,
+    HAL_ShapeDynamicDims:$target_dims
+  );
+  let results = (outs
+    AnyType:$target
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($target) (`{` $target_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "Type":$resultType,
+      "Value":$source,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+    OpBuilder<(ins
+      "Type":$resultType,
+      "Value":$source,
+      "ValueRange":$dynamicDims,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+  ];
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//

@@ -52,6 +52,11 @@ Value calculateWorkload(Operation *op, Value baseOperand) {
         builder.getIntegerAttr(builder.getIndexType(), numElements));
   } else if (baseOperandType.hasRank()) {
     // Materialize a ranked shape and compute.
+    if (baseOperand.getDefiningOp()) {
+      builder.setInsertionPoint(baseOperand.getDefiningOp());
+    } else {
+      builder.setInsertionPointToStart(op->getBlock());
+    }
     auto rankedShape = buildOrFindRankedShapeForValue(
         op->getLoc(), baseOperand, builder.getIndexType(), builder);
     if (!rankedShape) return nullptr;

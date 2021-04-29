@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,30 +19,34 @@ package(
 )
 
 cc_library(
-    name = "IREEVM",
+    name = "Transforms",
     srcs = [
-        "IREEVM.cpp",
+        "Passes.cpp",
+        "WrapEntryPoints.cpp",
     ],
-    hdrs = ["IREEVM.h"],
+    hdrs = [
+        "Passes.h",
+    ],
     deps = [
-        "//iree/compiler/Bindings/Native/Transforms",
-        "//iree/compiler/Bindings/SIP/Transforms",
-        "//iree/compiler/Bindings/TFLite/Transforms",
         "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/Flow/Transforms",
-        "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
-        "//iree/compiler/Dialect/HAL/Target",
-        "//iree/compiler/Dialect/HAL/Transforms",
-        "//iree/compiler/Dialect/IREE/Transforms",
-        "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
-        "//iree/compiler/Dialect/VM/Target/Bytecode",
-        "//iree/compiler/Dialect/VM/Transforms",
+        "//iree/compiler/Dialect/Flow/Utils",
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Shape/Conversion",
+        "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Shape/Transforms",
+        "//iree/compiler/Dialect/Shape/Utils:TypeConversion",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Shape",
+        "@llvm-project//mlir:ShapeTransforms",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Translation",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
     ],
 )
