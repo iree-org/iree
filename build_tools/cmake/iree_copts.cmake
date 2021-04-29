@@ -141,6 +141,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wformat-security"
     "-Wgnu-redeclared-enum"
     "-Wimplicit-fallthrough"
+    "-Wincompatible-pointer-types"
     "-Winfinite-recursion"
     "-Wliteral-conversion"
     "-Wnon-virtual-dtor"
