@@ -37,14 +37,24 @@ LogicalResult encodeCallingConventionType(Operation *op, Type type,
   if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
     s.push_back('r');
     return success();
-  } else if (auto intType = type.dyn_cast<IntegerType>()) {
-    switch (intType.getIntOrFloatBitWidth()) {
+  } else if (auto integerType = type.dyn_cast<IntegerType>()) {
+    switch (integerType.getIntOrFloatBitWidth()) {
       default:
       case 32:
         s.push_back('i');
         return success();
       case 64:
         s.push_back('I');
+        return success();
+    }
+  } else if (auto floatType = type.dyn_cast<FloatType>()) {
+    switch (floatType.getIntOrFloatBitWidth()) {
+      default:
+      case 32:
+        s.push_back('f');
+        return success();
+      case 64:
+        s.push_back('F');
         return success();
     }
   } else if (auto tupleType = type.dyn_cast<TupleType>()) {

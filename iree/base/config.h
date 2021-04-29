@@ -121,7 +121,7 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #if !defined(IREE_VM_EXT_F32_ENABLE)
 // Enables the 32-bit floating-point instruction extension.
 // Targeted from the compiler with `-iree-vm-target-extensions=f32`.
-#define IREE_VM_EXT_F32_ENABLE 0
+#define IREE_VM_EXT_F32_ENABLE 1
 #endif  // !IREE_VM_EXT_F32_ENABLE
 
 #if !defined(IREE_VM_EXT_F64_ENABLE)

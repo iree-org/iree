@@ -26,6 +26,10 @@ namespace VM {
 enum class OpcodeExtension {
   // Adds ops for manipulating i64 types.
   kI64,
+  // Adds ops for manipulating f32 types.
+  kF32,
+  // Adds ops for manipulating f64 types.
+  kF64,
 };
 
 // Controls VM translation targets.
@@ -35,10 +39,20 @@ struct TargetOptions {
 
   // Whether the i64 extension is enabled in the target VM.
   bool i64Extension = false;
+  // Whether the f32 extension is enabled in the target VM.
+  bool f32Extension = false;
+  // Whether the f64 extension is enabled in the target VM.
+  bool f64Extension = false;
 
   // Whether to truncate i64 types to i32 when the i64 extension is not
   // enabled.
   bool truncateUnsupportedIntegers = true;
+  // Whether to truncate f64 types to f32 when the f64 extension is not
+  // enabled.
+  bool truncateUnsupportedFloats = true;
+
+  // Prefer optimizations that reduce VM stack usage over performance.
+  bool optimizeForStackSize = true;
 };
 
 // Returns a TargetOptions struct initialized with the

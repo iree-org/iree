@@ -37,12 +37,20 @@ TargetOptions getTargetOptionsFromFlags() {
       llvm::cl::desc("Supported target opcode extensions"),
       llvm::cl::cat(vmTargetOptionsCategory),
       llvm::cl::values(
-          clEnumValN(OpcodeExtension::kI64, "i64", "i64 type support")),
+          clEnumValN(OpcodeExtension::kI64, "i64", "i64 type support"),
+          clEnumValN(OpcodeExtension::kF32, "f32", "f32 type support"),
+          clEnumValN(OpcodeExtension::kF64, "f64", "f64 type support")),
   };
   static auto *truncateUnsupportedIntegersFlag = new llvm::cl::opt<bool>{
       "iree-vm-target-truncate-unsupported-integers",
       llvm::cl::init(true),
       llvm::cl::desc("Truncate i64 to i32 when unsupported"),
+      llvm::cl::cat(vmTargetOptionsCategory),
+  };
+  static auto *truncateUnsupportedFloatsFlag = new llvm::cl::opt<bool>{
+      "iree-vm-target-truncate-unsupported-floats",
+      llvm::cl::init(true),
+      llvm::cl::desc("Truncate f64 to f32 when unsupported"),
       llvm::cl::cat(vmTargetOptionsCategory),
   };
 
@@ -53,9 +61,16 @@ TargetOptions getTargetOptionsFromFlags() {
       case OpcodeExtension::kI64:
         targetOptions.i64Extension = true;
         break;
+      case OpcodeExtension::kF32:
+        targetOptions.f32Extension = true;
+        break;
+      case OpcodeExtension::kF64:
+        targetOptions.f64Extension = true;
+        break;
     }
   }
   targetOptions.truncateUnsupportedIntegers = *truncateUnsupportedIntegersFlag;
+  targetOptions.truncateUnsupportedFloats = *truncateUnsupportedFloatsFlag;
   return targetOptions;
 }
 

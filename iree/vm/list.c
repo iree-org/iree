@@ -17,12 +17,14 @@
 #include "iree/base/alignment.h"
 
 // Size of each iree_vm_value_type_t in bytes.
-static const iree_host_size_t kValueTypeSizes[5] = {
+static const iree_host_size_t kValueTypeSizes[7] = {
     0,  // IREE_VM_VALUE_TYPE_NONE
     1,  // IREE_VM_VALUE_TYPE_I8
     2,  // IREE_VM_VALUE_TYPE_I16
     4,  // IREE_VM_VALUE_TYPE_I32
     8,  // IREE_VM_VALUE_TYPE_I64
+    4,  // IREE_VM_VALUE_TYPE_F32
+    8,  // IREE_VM_VALUE_TYPE_F64
 };
 static_assert(IREE_VM_VALUE_TYPE_COUNT ==
                   (sizeof(kValueTypeSizes) / sizeof(kValueTypeSizes[0])),

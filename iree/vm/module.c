@@ -59,10 +59,12 @@ iree_vm_function_call_compute_cconv_fragment_size(
     switch (cconv_fragment.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32:
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
         required_size += sizeof(int32_t);
         break;
-      case IREE_VM_CCONV_TYPE_INT64:
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
         required_size += sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:
@@ -84,10 +86,12 @@ iree_vm_function_call_compute_cconv_fragment_size(
           switch (cconv_fragment.data[i]) {
             case IREE_VM_CCONV_TYPE_VOID:
               break;
-            case IREE_VM_CCONV_TYPE_INT32:
+            case IREE_VM_CCONV_TYPE_I32:
+            case IREE_VM_CCONV_TYPE_F32:
               span_size += sizeof(int32_t);
               break;
-            case IREE_VM_CCONV_TYPE_INT64:
+            case IREE_VM_CCONV_TYPE_I64:
+            case IREE_VM_CCONV_TYPE_F64:
               span_size += sizeof(int64_t);
               break;
             case IREE_VM_CCONV_TYPE_REF:
@@ -129,10 +133,12 @@ iree_vm_function_call_release(iree_vm_function_call_t* call,
     switch (c) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32:
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
         p += sizeof(int32_t);
         break;
-      case IREE_VM_CCONV_TYPE_INT64:
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
         p += sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:

@@ -75,9 +75,8 @@ class UnreachableOpConversion
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(
         srcOp,
-        rewriter.createOrFold<mlir::ConstantIntOp>(
-            srcOp.getLoc(), static_cast<int32_t>(IREE::StatusCode::Unknown),
-            32),
+        rewriter.createOrFold<IREE::VM::ConstI32Op>(
+            srcOp.getLoc(), static_cast<int32_t>(IREE::StatusCode::Unknown)),
         srcOp.message());
     return success();
   }
@@ -138,6 +137,12 @@ class ListGetOpConversion : public OpConversionPattern<IREE::ListGetOp> {
     } else if (resultType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetI64Op>(
           srcOp, resultType, srcOperands.list(), srcOperands.index());
+    } else if (resultType.isF32()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ListGetF32Op>(
+          srcOp, resultType, srcOperands.list(), srcOperands.index());
+    } else if (resultType.isF64()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ListGetF64Op>(
+          srcOp, resultType, srcOperands.list(), srcOperands.index());
     } else if (!resultType.isIntOrIndexOrFloat()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetRefOp>(
           srcOp, resultType, srcOperands.list(), srcOperands.index());
@@ -160,6 +165,12 @@ class ListSetOpConversion : public OpConversionPattern<IREE::ListSetOp> {
           srcOp, srcOperands.list(), srcOperands.index(), srcOperands.value());
     } else if (valueType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetI64Op>(
+          srcOp, srcOperands.list(), srcOperands.index(), srcOperands.value());
+    } else if (valueType.isF32()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ListSetF32Op>(
+          srcOp, srcOperands.list(), srcOperands.index(), srcOperands.value());
+    } else if (valueType.isF64()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ListSetF64Op>(
           srcOp, srcOperands.list(), srcOperands.index(), srcOperands.value());
     } else if (!valueType.isIntOrIndexOrFloat()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetRefOp>(
