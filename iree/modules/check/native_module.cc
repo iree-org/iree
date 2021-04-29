@@ -21,14 +21,13 @@
 #include <sstream>
 #include <vector>
 
-#include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/native_module_cc.h"
-#include "third_party/half/half.hpp"
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation
@@ -71,7 +70,7 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   return AbslSpan<uint8_t>(lhs_bytes) == AbslSpan<uint8_t>(rhs_bytes);
 }
 
-static constexpr float floatPrecisionThreshold = 0.0001f;
+static constexpr float kF32PrecisionThreshold = 0.0001f;
 
 template <typename T>
 bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
@@ -79,12 +78,14 @@ bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   auto rhs_span = AbslSpan<T>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (fabs(lhs_span[i] - rhs_span[i]) > floatPrecisionThreshold) {
+    if (fabs(lhs_span[i] - rhs_span[i]) > kF32PrecisionThreshold) {
       return false;
     }
   }
   return true;
 }
+
+static constexpr float kF16PrecisionThreshold = 0.001f;
 
 bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
                          iree_byte_span_t rhs_bytes) {
@@ -92,9 +93,8 @@ bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
   auto rhs_span = AbslSpan<uint16_t>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (fabs(half_float::detail::half2float<float>(lhs_span[i]) -
-             half_float::detail::half2float<float>(rhs_span[i])) >
-        floatPrecisionThreshold) {
+    if (fabs(iree_math_f16_to_f32(lhs_span[i]) -
+             iree_math_f16_to_f32(rhs_span[i])) > kF16PrecisionThreshold) {
       return false;
     }
   }

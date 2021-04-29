@@ -55,7 +55,6 @@ iree_cc_library(
     "string_util.h"
   DEPS
     absl::strings
-    half::includes
     iree::base::api
     iree::base::core_headers
     iree::base::internal

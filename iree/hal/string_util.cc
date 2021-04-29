@@ -22,10 +22,10 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"
-#include "third_party/half/half.hpp"
 
 // TODO(benvanik): implement these ato* helpers and move to iree/base/.
 
@@ -293,8 +293,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
       if (!iree_string_view_atof(data_str, &temp)) {
         return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
-      *(uint16_t*)out_data =
-          half_float::detail::float2half<std::round_to_nearest>(temp);
+      *(uint16_t*)out_data = iree_math_f32_to_f16(temp);
       return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
@@ -405,9 +404,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
                    *(const uint64_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      n = snprintf(
-          buffer, buffer ? buffer_capacity : 0, "%G",
-          half_float::detail::half2float<float>(*(const uint16_t*)data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f16_to_f32(*(const uint16_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
