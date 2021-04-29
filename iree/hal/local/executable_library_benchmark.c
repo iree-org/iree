@@ -251,7 +251,7 @@ static iree_status_t iree_hal_executable_library_run(
       iree_make_cstring_view("benchmark"), host_allocator, &heap_allocator));
   iree_hal_buffer_view_t* buffer_views[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
   void* binding_ptrs[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
-  iree_device_size_t binding_lengths[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
+  size_t binding_lengths[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
   for (iree_host_size_t i = 0; i < dispatch_params.binding_count; ++i) {
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_parse(dispatch_params.bindings[i], heap_allocator,
@@ -263,8 +263,7 @@ static iree_status_t iree_hal_executable_library_run(
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         buffer, IREE_HAL_MEMORY_ACCESS_ALL, 0, buffer_length, &buffer_mapping));
     binding_ptrs[i] = buffer_mapping.contents.data;
-    binding_lengths[i] =
-        (iree_device_size_t)buffer_mapping.contents.data_length;
+    binding_lengths[i] = (size_t)buffer_mapping.contents.data_length;
   }
 
   // Setup dispatch state.
