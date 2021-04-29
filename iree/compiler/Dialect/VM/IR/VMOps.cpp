@@ -787,7 +787,8 @@ void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
                              StringRef rodataName,
                              ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("rodata", builder.getSymbolRefAttr(rodataName));
-  auto type = IREE::VM::RefType::get(ByteBufferType::get(builder.getContext()));
+  auto type =
+      IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
   result.addTypes({type});
   result.addAttributes(attrs);
 }

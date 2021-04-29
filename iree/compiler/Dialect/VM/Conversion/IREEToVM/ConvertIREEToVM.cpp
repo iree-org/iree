@@ -57,7 +57,10 @@ class ByteBufferConstantOpConversion
       IREE::ByteBufferConstantOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::RodataInlineOp>(
-        op, IREE::VM::RefType::get(op.getType()), op.value());
+        op,
+        IREE::VM::RefType::get(
+            IREE::VM::BufferType::get(rewriter.getContext())),
+        op.value());
     return success();
   }
 };
@@ -190,6 +193,15 @@ void populateIREEToVMPatterns(MLIRContext *context,
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<ByteBufferConstantOpConversion>(typeConverter, context);
   patterns.insert<UnreachableOpConversion>(typeConverter, context);
+
+  typeConverter.addConversion([](IREE::ByteBufferType type) -> Optional<Type> {
+    return IREE::VM::RefType::get(IREE::VM::BufferType::get(type.getContext()));
+  });
+  typeConverter.addConversion(
+      [](IREE::MutableByteBufferType type) -> Optional<Type> {
+        return IREE::VM::RefType::get(
+            IREE::VM::BufferType::get(type.getContext()));
+      });
 
   typeConverter.addConversion(
       [&typeConverter](IREE::ListType type) -> Optional<Type> {

@@ -38,6 +38,12 @@ struct ListTypeStorage;
 struct RefTypeStorage;
 }  // namespace detail
 
+/// A byte buffer.
+class BufferType : public Type::TypeBase<BufferType, Type, TypeStorage> {
+ public:
+  using Base::Base;
+};
+
 /// A list containing an optional element type.
 class ListType
     : public Type::TypeBase<ListType, Type, detail::ListTypeStorage> {

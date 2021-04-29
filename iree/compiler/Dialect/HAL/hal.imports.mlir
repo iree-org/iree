@@ -34,7 +34,7 @@ vm.import @allocator.wrap.byte_buffer(
   %allocator : !vm.ref<!hal.allocator>,
   %memory_types : i32,
   %buffer_usage : i32,
-  %source : !vm.ref<!iree.byte_buffer>,
+  %source : !vm.buffer,
   %offset : i32,
   %length : i32
 ) -> !vm.ref<!hal.buffer>
@@ -115,7 +115,7 @@ attributes {nosideeffects}
 
 // Prints out the content of buffer views.
 vm.import @buffer_view.trace(
-  %key : !vm.ref<!iree.byte_buffer>,
+  %key : !vm.buffer,
   %operands : !vm.ref<!hal.buffer_view> ...
 )
 
@@ -255,14 +255,14 @@ attributes {nosideeffects}
 // Returns a tuple of (ok, value) for the given configuration key.
 vm.import @device.query.i32(
   %device : !vm.ref<!hal.device>,
-  %key : !vm.ref<!iree.byte_buffer>
+  %key : !vm.buffer
 ) -> (i32, i32)
 attributes {nosideeffects}
 
 // Returns true if the device ID matches the pattern.
 vm.import @device.match.id(
   %device : !vm.ref<!hal.device>,
-  %pattern : !vm.ref<!iree.byte_buffer>
+  %pattern : !vm.buffer
 ) -> i32
 attributes {nosideeffects}
 
@@ -273,8 +273,8 @@ attributes {nosideeffects}
 // Creates an executable for use with the specified device.
 vm.import @executable.create(
   %device : !vm.ref<!hal.device>,
-  %executable_format : !vm.ref<!iree.byte_buffer>,
-  %executable_data : !vm.ref<!iree.byte_buffer>,
+  %executable_format : !vm.buffer,
+  %executable_data : !vm.buffer,
   %executable_layouts : !vm.ref<!hal.executable_layout>...
 ) -> !vm.ref<!hal.executable>
 attributes {nosideeffects}

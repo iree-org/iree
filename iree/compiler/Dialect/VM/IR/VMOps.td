@@ -912,11 +912,11 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
   }];
 
   let arguments = (ins
-    ByteBufferRefAttr:$rodata
+    FlatSymbolRefAttr:$rodata
   );
 
   let results = (outs
-    VM_RefOf<ByteBufferType>:$value
+    VM_RefOf<VM_BufferType>:$value
   );
 
   let assemblyFormat = "$rodata attr-dict `:` type($value)";
@@ -955,7 +955,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   );
 
   let results = (outs
-    VM_RefOf<ByteBufferType>:$result
+    VM_RefOf<VM_BufferType>:$result
   );
 
   let assemblyFormat = "($name^)? attr-dict `:` type($result) `=` $value";

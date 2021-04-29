@@ -83,7 +83,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     for (unsigned i = 0, e = srcFuncType.getNumInputs(); i < e; ++i) {
       if (failed(getTypeConverter()->convertSignatureArg(
               i, srcFuncType.getInput(i), signatureConversion))) {
-        return failure();
+        return rewriter.notifyMatchFailure(srcOp, "argument failed to convert");
       }
     }
 
@@ -91,7 +91,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     SmallVector<Type, 1> convertedResultTypes;
     if (failed(getTypeConverter()->convertTypes(srcFuncType.getResults(),
                                                 convertedResultTypes))) {
-      return failure();
+      return rewriter.notifyMatchFailure(srcOp, "results failed to convert");
     }
 
     // Create new function with converted argument and result types.

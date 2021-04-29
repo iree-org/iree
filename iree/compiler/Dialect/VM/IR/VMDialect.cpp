@@ -82,7 +82,9 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       os << rodataOp.rodata();
     } else if (auto refType =
                    op->getResult(0).getType().dyn_cast<IREE::VM::RefType>()) {
-      if (refType.getObjectType().isa<ListType>()) {
+      if (refType.getObjectType().isa<BufferType>()) {
+        os << "buffer";
+      } else if (refType.getObjectType().isa<ListType>()) {
         os << "list";
       } else {
         os << "ref";
@@ -237,7 +239,10 @@ void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
 Type VMDialect::parseType(DialectAsmParser &parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (spec.consume_front("list")) {
+  if (spec.consume_front("buffer")) {
+    return IREE::VM::RefType::getChecked(
+        IREE::VM::BufferType::get(loc.getContext()), loc);
+  } else if (spec.consume_front("list")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
           << "malformed list type '" << parser.getFullSymbolSpec() << "'";
@@ -286,7 +291,9 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
 void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
   if (auto refType = type.dyn_cast<IREE::VM::RefType>()) {
     auto objectType = refType.getObjectType();
-    if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
+    if (auto bufferType = objectType.dyn_cast<IREE::VM::BufferType>()) {
+      printType(bufferType, os);
+    } else if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
       printType(listType, os);
     } else if (objectType.isa<IREE::VM::OpaqueType>()) {
       os << "ref<?>";
@@ -295,6 +302,8 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
     }
   } else if (type.isa<IREE::VM::OpaqueType>()) {
     os << "opaque";
+  } else if (type.isa<IREE::VM::BufferType>()) {
+    os << "buffer";
   } else if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
     os << "list<";
     if (listType.getElementType().isa<OpaqueType>()) {

@@ -75,10 +75,10 @@ vm.module @list_variant_ops {
 
     // Access element 11 as a ref object.
     %c11 = vm.const.i32 11 : i32
-    %v11_buf = vm.const.ref.rodata @byte_buffer : !vm.ref<!iree.byte_buffer>
-    vm.list.set.ref %list, %c11, %v11_buf : (!vm.list<?>, i32, !vm.ref<!iree.byte_buffer>)
-    %e11_buf = vm.list.get.ref %list, %c11 : (!vm.list<?>, i32) -> !vm.ref<!iree.byte_buffer>
-    vm.check.eq %e11_buf, %v11_buf : !vm.ref<!iree.byte_buffer>
+    %v11_buf = vm.const.ref.rodata @byte_buffer : !vm.buffer
+    vm.list.set.ref %list, %c11, %v11_buf : (!vm.list<?>, i32, !vm.buffer)
+    %e11_buf = vm.list.get.ref %list, %c11 : (!vm.list<?>, i32) -> !vm.buffer
+    vm.check.eq %e11_buf, %v11_buf : !vm.buffer
 
     // Access element 11 as a different kind of ref object (incompatible).
     // Should return null.
@@ -104,10 +104,10 @@ vm.module @list_variant_ops {
     vm.check.eq %e10_i32, %v10_i32 : i32
 
     // Access element 10 as a ref object.
-    %v10_buf = vm.const.ref.rodata @byte_buffer : !vm.ref<!iree.byte_buffer>
-    vm.list.set.ref %list, %c10, %v10_buf : (!vm.list<?>, i32, !vm.ref<!iree.byte_buffer>)
-    %e10_buf = vm.list.get.ref %list, %c10 : (!vm.list<?>, i32) -> !vm.ref<!iree.byte_buffer>
-    vm.check.eq %e10_buf, %v10_buf : !vm.ref<!iree.byte_buffer>
+    %v10_buf = vm.const.ref.rodata @byte_buffer : !vm.buffer
+    vm.list.set.ref %list, %c10, %v10_buf : (!vm.list<?>, i32, !vm.buffer)
+    %e10_buf = vm.list.get.ref %list, %c10 : (!vm.list<?>, i32) -> !vm.buffer
+    vm.check.eq %e10_buf, %v10_buf : !vm.buffer
 
     // Accessing it as an i32 now that it stores the ref should fail at runtime.
     // TODO(benvanik): support type queries and/or make this silently return 0.
