@@ -248,9 +248,10 @@ static void iree_task_topology_fixup_constructive_sharing_masks(
     for (iree_host_size_t j = 0; j < topology->group_count; ++j) {
       if (i == j) continue;
       const iree_task_topology_group_t* other_group = &topology->groups[j];
-      uint64_t group_processor_bits = 1ull << other_group->processor_index;
+      uint64_t group_processor_bits =
+          iree_math_rotl_u64(1ull, other_group->processor_index);
       if (constructive_sharing_mask & group_processor_bits) {
-        group_mask |= 1ull << other_group->group_index;
+        group_mask |= iree_math_rotl_u64(1ull, other_group->group_index);
       }
     }
 
