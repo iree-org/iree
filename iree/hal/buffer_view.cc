@@ -103,7 +103,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
       buffer_allocator,
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING |
+          IREE_HAL_BUFFER_USAGE_DISPATCH,
       buffer_length, &buffer));
 
   iree_status_t status;
