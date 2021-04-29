@@ -132,6 +132,7 @@ build:generic_clang --copt=-Wfor-loop-analysis
 build:generic_clang --copt=-Wformat-security
 build:generic_clang --copt=-Wgnu-redeclared-enum
 build:generic_clang --copt=-Wimplicit-fallthrough
+build:generic_clang --copt=-Wincompatible-pointer-types
 build:generic_clang --copt=-Winfinite-recursion
 build:generic_clang --copt=-Wliteral-conversion
 build:generic_clang --copt=-Wnon-virtual-dtor
