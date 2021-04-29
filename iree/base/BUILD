@@ -53,6 +53,7 @@ cc_library(
     hdrs = [
         "alignment.h",
         "attributes.h",
+        "config.h",
         "target_platform.h",
     ],
 )
@@ -100,7 +101,6 @@ cc_library(
         ":core_headers",
         ":tracing",
         "//iree/base/internal:flags",
-        "@com_google_absl//absl/strings:str_format",
     ],
 )
 

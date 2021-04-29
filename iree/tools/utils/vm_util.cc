@@ -17,9 +17,7 @@
 #include <ostream>
 
 #include "absl/strings/numbers.h"
-#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/signature_parser.h"
@@ -34,14 +32,13 @@ Status ValidateFunctionAbi(const iree_vm_function_t& function) {
   // Benchmark functions are always allowed through as they are () -> ().
   // That we are requiring SIP for everything in this util file is bad, and this
   // workaround at least allows us to benchmark non-SIP functions.
-  if (iree_vm_function_reflection_attr(&function,
-                                       iree_make_cstring_view("benchmark"))
-          .size != 0) {
+  if (iree_vm_function_reflection_attr(&function, IREE_SV("benchmark")).size !=
+      0) {
     return OkStatus();
   }
 
   iree_string_view_t sig_fv =
-      iree_vm_function_reflection_attr(&function, iree_make_cstring_view("fv"));
+      iree_vm_function_reflection_attr(&function, IREE_SV("fv"));
   if (absl::string_view{sig_fv.data, sig_fv.size} != "1") {
     auto function_name = iree_vm_function_name(&function);
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -57,7 +54,7 @@ Status ParseInputSignature(
     std::vector<RawSignatureParser::Description>* out_input_descs) {
   out_input_descs->clear();
   iree_string_view_t sig_f =
-      iree_vm_function_reflection_attr(&function, iree_make_cstring_view("f"));
+      iree_vm_function_reflection_attr(&function, IREE_SV("f"));
   if (sig_f.size == 0) return OkStatus();
   RawSignatureParser sig_parser;
   sig_parser.VisitInputs(absl::string_view{sig_f.data, sig_f.size},
@@ -78,7 +75,7 @@ Status ParseOutputSignature(
     std::vector<RawSignatureParser::Description>* out_output_descs) {
   out_output_descs->clear();
   iree_string_view_t sig_f =
-      iree_vm_function_reflection_attr(&function, iree_make_cstring_view("f"));
+      iree_vm_function_reflection_attr(&function, IREE_SV("f"));
   if (sig_f.size == 0) return OkStatus();
   RawSignatureParser sig_parser;
   sig_parser.VisitResults(absl::string_view{sig_f.data, sig_f.size},
@@ -122,10 +119,11 @@ Status ParseToVariantList(
                                   "unsupported signature scalar type: %s",
                                   desc_str.c_str());
         }
-        absl::string_view input_view = absl::StripAsciiWhitespace(input_string);
-        input_view = absl::StripPrefix(input_view, "\"");
-        input_view = absl::StripSuffix(input_view, "\"");
-        if (!absl::ConsumePrefix(&input_view, "i32=")) {
+        iree_string_view_t input_view = iree_string_view_trim(
+            iree_make_string_view(input_string.data(), input_string.size()));
+        input_view = iree_string_view_strip_prefix(input_view, IREE_SV("\""));
+        input_view = iree_string_view_strip_suffix(input_view, IREE_SV("\""));
+        if (!iree_string_view_consume_prefix(&input_view, IREE_SV("i32="))) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "parsing '%.*s'; has i32 descriptor but does "
                                   "not start with 'i32='",
@@ -133,12 +131,14 @@ Status ParseToVariantList(
                                   input_string.data());
         }
         iree_vm_value_t val = iree_vm_value_make_i32(0);
-        if (!absl::SimpleAtoi(input_view, &val.i32)) {
+        if (!absl::SimpleAtoi(
+                absl::string_view(input_view.data, input_view.size),
+                &val.i32)) {
           return iree_make_status(
               IREE_STATUS_INVALID_ARGUMENT,
               "converting '%.*s' to i32 when parsing '%.*s'",
-              (int)input_view.size(), input_view.data(),
-              (int)input_string.size(), input_string.data());
+              (int)input_view.size, input_view.data, (int)input_string.size(),
+              input_string.data());
         }
         IREE_RETURN_IF_ERROR(iree_vm_list_push_value(variant_list.get(), &val));
         break;

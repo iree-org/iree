@@ -22,7 +22,6 @@ iree_cc_library(
     "strings_module.cc"
   DEPS
     absl::span
-    absl::strings
     benchmark
     iree::base::api
     iree::base::logging
@@ -46,7 +45,6 @@ iree_cc_test(
     ::strings_module
     ::strings_module_test_module_cc
     absl::span
-    absl::strings
     benchmark
     iree::base::api
     iree::base::logging

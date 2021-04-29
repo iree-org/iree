@@ -35,6 +35,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRStandard
@@ -42,6 +43,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRViewLikeInterface
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )
 
@@ -56,6 +58,7 @@ iree_cc_library(
     ::IR
     LLVMSupport
     MLIRIR
+    MLIRMemRef
     MLIRParser
     MLIRStandard
     MLIRTransformUtils
@@ -63,6 +66,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::VM::Conversion
   PUBLIC
 )

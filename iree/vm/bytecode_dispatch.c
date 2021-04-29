@@ -150,11 +150,11 @@ static iree_status_t iree_vm_bytecode_function_enter(
   // alignment in case the compiler is expecting that (it makes it easier to
   // debug too).
   iree_host_size_t header_size =
-      iree_math_align(sizeof(iree_vm_bytecode_frame_storage_t), 16);
+      iree_host_align(sizeof(iree_vm_bytecode_frame_storage_t), 16);
   iree_host_size_t i32_register_size =
-      iree_math_align(i32_register_count * sizeof(int32_t), 16);
+      iree_host_align(i32_register_count * sizeof(int32_t), 16);
   iree_host_size_t ref_register_size =
-      iree_math_align(ref_register_count * sizeof(iree_vm_ref_t), 16);
+      iree_host_align(ref_register_count * sizeof(iree_vm_ref_t), 16);
   iree_host_size_t frame_size =
       header_size + i32_register_size + ref_register_size;
 
@@ -202,13 +202,15 @@ static iree_status_t iree_vm_bytecode_external_enter(
     switch (cconv_arguments.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32: {
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32: {
         uint16_t dst_reg = i32_reg++;
         memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
                sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
-      case IREE_VM_CCONV_TYPE_INT64: {
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64: {
         uint16_t dst_reg = i32_reg;
         i32_reg += 2;
         memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
@@ -245,12 +247,14 @@ static iree_status_t iree_vm_bytecode_external_leave(
     switch (cconv_results.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32: {
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32: {
         memcpy(p, &callee_registers->i32[src_reg & callee_registers->i32_mask],
                sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
-      case IREE_VM_CCONV_TYPE_INT64: {
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64: {
         memcpy(
             p,
             &callee_registers->i32[src_reg & (callee_registers->i32_mask & ~1)],
@@ -386,14 +390,16 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
     switch (cconv_arguments.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32: {
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32: {
         memcpy(p,
                &caller_registers.i32[src_reg_list->registers[reg_i++] &
                                      caller_registers.i32_mask],
                sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
-      case IREE_VM_CCONV_TYPE_INT64: {
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64: {
         memcpy(p,
                &caller_registers.i32[src_reg_list->registers[reg_i++] &
                                      (caller_registers.i32_mask & ~1)],
@@ -430,14 +436,16 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
             switch (cconv_arguments.data[i]) {
               case IREE_VM_CCONV_TYPE_VOID:
                 break;
-              case IREE_VM_CCONV_TYPE_INT32: {
+              case IREE_VM_CCONV_TYPE_I32:
+              case IREE_VM_CCONV_TYPE_F32: {
                 memcpy(p,
                        &caller_registers.i32[src_reg_list->registers[reg_i++] &
                                              caller_registers.i32_mask],
                        sizeof(int32_t));
                 p += sizeof(int32_t);
               } break;
-              case IREE_VM_CCONV_TYPE_INT64: {
+              case IREE_VM_CCONV_TYPE_I64:
+              case IREE_VM_CCONV_TYPE_F64: {
                 memcpy(p,
                        &caller_registers.i32[src_reg_list->registers[reg_i++] &
                                              (caller_registers.i32_mask & ~1)],
@@ -492,12 +500,14 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
     switch (cconv_results.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32:
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
         memcpy(&caller_registers.i32[dst_reg & caller_registers.i32_mask], p,
                sizeof(int32_t));
         p += sizeof(int32_t);
         break;
-      case IREE_VM_CCONV_TYPE_INT64:
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
         memcpy(
             &caller_registers.i32[dst_reg & (caller_registers.i32_mask & ~1)],
             p, sizeof(int64_t));
@@ -801,7 +811,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_retain(
           &module_state->rodata_ref_table[rodata_ordinal],
-          iree_vm_ro_byte_buffer_type_id(), result));
+          iree_vm_buffer_type_id(), result));
     });
 
     //===------------------------------------------------------------------===//
@@ -1470,8 +1480,188 @@ iree_status_t iree_vm_bytecode_dispatch(
     }
     END_DISPATCH_PREFIX();
 
-    DISPATCH_OP(CORE, PrefixExtF32,
-                { return iree_make_status(IREE_STATUS_UNIMPLEMENTED); });
+    BEGIN_DISPATCH_PREFIX(PrefixExtF32, EXT_F32) {
+#if IREE_VM_EXT_F32_ENABLE
+      //===----------------------------------------------------------------===//
+      // ExtF32: Globals
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F32, GlobalLoadF32, {
+        uint32_t byte_offset = VM_DecGlobalAttr("global");
+        if (IREE_UNLIKELY(byte_offset >=
+                          module_state->rwdata_storage.data_length)) {
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+              module_state->rwdata_storage.data_length);
+        }
+        float* value = VM_DecResultRegF32("value");
+        const float* global_ptr =
+            (const float*)(module_state->rwdata_storage.data + byte_offset);
+        *value = *global_ptr;
+      });
+
+      DISPATCH_OP(EXT_F32, GlobalStoreF32, {
+        uint32_t byte_offset = VM_DecGlobalAttr("global");
+        if (IREE_UNLIKELY(byte_offset >=
+                          module_state->rwdata_storage.data_length)) {
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+              module_state->rwdata_storage.data_length);
+        }
+        float value = VM_DecOperandRegF32("value");
+        float* global_ptr =
+            (float*)(module_state->rwdata_storage.data + byte_offset);
+        *global_ptr = value;
+      });
+
+      DISPATCH_OP(EXT_F32, GlobalLoadIndirectF32, {
+        uint32_t byte_offset = VM_DecOperandRegI32("global");
+        if (IREE_UNLIKELY(byte_offset >=
+                          module_state->rwdata_storage.data_length)) {
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+              module_state->rwdata_storage.data_length);
+        }
+        float* value = VM_DecResultRegF32("value");
+        const float* global_ptr =
+            (const float*)(module_state->rwdata_storage.data + byte_offset);
+        *value = *global_ptr;
+      });
+
+      DISPATCH_OP(EXT_F32, GlobalStoreIndirectF32, {
+        uint32_t byte_offset = VM_DecOperandRegI32("global");
+        if (IREE_UNLIKELY(byte_offset >=
+                          module_state->rwdata_storage.data_length)) {
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+              module_state->rwdata_storage.data_length);
+        }
+        float value = VM_DecOperandRegF32("value");
+        float* global_ptr =
+            (float*)(module_state->rwdata_storage.data + byte_offset);
+        *global_ptr = value;
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF32: Constants
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F32, ConstF32, {
+        float value = VM_DecFloatAttr32("value");
+        float* result = VM_DecResultRegF32("result");
+        *result = value;
+      });
+
+      DISPATCH_OP(EXT_F32, ConstF32Zero, {
+        float* result = VM_DecResultRegF32("result");
+        *result = 0;
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF32: Lists
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F32, ListGetF32, {
+        bool list_is_move;
+        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
+        if (IREE_UNLIKELY(!list)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+        }
+        uint32_t index = VM_DecOperandRegI32("index");
+        float* result = VM_DecResultRegF32("result");
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            list, index, IREE_VM_VALUE_TYPE_F32, &value));
+        *result = value.f32;
+      });
+
+      DISPATCH_OP(EXT_F32, ListSetF32, {
+        bool list_is_move;
+        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
+        if (IREE_UNLIKELY(!list)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+        }
+        uint32_t index = VM_DecOperandRegI32("index");
+        float raw_value = VM_DecOperandRegF32("value");
+        iree_vm_value_t value = iree_vm_value_make_f32(raw_value);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF32: Conditional assignment
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F32, SelectF32, {
+        int32_t condition = VM_DecOperandRegI32("condition");
+        float true_value = VM_DecOperandRegF32("true_value");
+        float false_value = VM_DecOperandRegF32("false_value");
+        float* result = VM_DecResultRegF32("result");
+        *result = vm_select_f32(condition, true_value, false_value);
+      });
+
+      DISPATCH_OP(EXT_F32, SwitchF32, {
+        int32_t index = VM_DecOperandRegI32("index");
+        float default_value = VM_DecFloatAttr32("default_value");
+        const iree_vm_register_list_t* value_reg_list =
+            VM_DecVariadicOperands("values");
+        float* result = VM_DecResultRegF32("result");
+        if (index >= 0 && index < value_reg_list->size) {
+          *result = *((float*)&regs.i32[value_reg_list->registers[index] &
+                                        (regs.i32_mask & ~1)]);
+        } else {
+          *result = default_value;
+        }
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF32: Native floating-point arithmetic
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP_EXT_F32_BINARY_F32(AddF32, vm_add_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(SubF32, vm_sub_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(MulF32, vm_mul_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(DivF32, vm_div_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(RemF32, vm_rem_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(AbsF32, vm_abs_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(NegF32, vm_neg_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
+
+      //===----------------------------------------------------------------===//
+      // ExtF32: Casting and type conversion/emulation
+      //===----------------------------------------------------------------===//
+
+      //===----------------------------------------------------------------===//
+      // ExtF32: Comparison ops
+      //===----------------------------------------------------------------===//
+
+#define DISPATCH_OP_EXT_F32_CMP_F32(op_name, op_func) \
+  DISPATCH_OP(EXT_F32, op_name, {                     \
+    float lhs = VM_DecOperandRegF32("lhs");           \
+    float rhs = VM_DecOperandRegF32("rhs");           \
+    int32_t* result = VM_DecResultRegI32("result");   \
+    *result = op_func(lhs, rhs);                      \
+  });
+
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpEQF32, vm_cmp_eq_f32);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpNEF32, vm_cmp_ne_f32);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTF32, vm_cmp_lt_f32);
+      DISPATCH_OP(EXT_F32, CmpNZF32, {
+        float operand = VM_DecOperandRegF32("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = vm_cmp_nz_f32(operand);
+      });
+#else
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
+#endif  // IREE_VM_EXT_F32_ENABLE
+    }
+    END_DISPATCH_PREFIX();
 
     DISPATCH_OP(CORE, PrefixExtF64,
                 { return iree_make_status(IREE_STATUS_UNIMPLEMENTED); });

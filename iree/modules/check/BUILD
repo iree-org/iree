@@ -26,6 +26,7 @@ cc_test(
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/base:status",
+        "//iree/base/internal",
         "//iree/hal:api",
         "//iree/hal/vmla/registration",
         "//iree/modules/hal",
@@ -34,9 +35,7 @@ cc_test(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-        "@half//:includes",
     ],
 )
 
@@ -48,12 +47,11 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:status",
+        "//iree/base/internal",
         "//iree/hal:api",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/vm",
         "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
-        "@half//:includes",
     ],
 )

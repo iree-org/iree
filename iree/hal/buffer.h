@@ -31,6 +31,9 @@ typedef struct iree_hal_allocator_s iree_hal_allocator_t;
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
+// Whole length of the underlying buffer.
+#define IREE_WHOLE_BUFFER ((iree_device_size_t)(-1))
+
 // A bitfield specifying properties for a memory type.
 enum iree_hal_memory_type_e {
   IREE_HAL_MEMORY_TYPE_NONE = 0u,

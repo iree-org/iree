@@ -14,24 +14,50 @@
 
 #include "iree/hal/string_util.h"
 
-#include <cctype>
-#include <cinttypes>
-#include <cstdio>
-#include <vector>
+#include <ctype.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
 
-#include "absl/strings/ascii.h"
-#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
-#include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/strip.h"
-#include "absl/types/span.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"
-#include "third_party/half/half.hpp"
+
+// TODO(benvanik): implement these ato* helpers and move to iree/base/.
+
+IREE_API_EXPORT bool iree_string_view_atoi_int32(iree_string_view_t value,
+                                                 int32_t* out_value) {
+  return absl::SimpleAtoi(absl::string_view(value.data, value.size), out_value);
+}
+
+IREE_API_EXPORT bool iree_string_view_atoi_uint32(iree_string_view_t value,
+                                                  uint32_t* out_value) {
+  return absl::SimpleAtoi(absl::string_view(value.data, value.size), out_value);
+}
+
+IREE_API_EXPORT bool iree_string_view_atoi_int64(iree_string_view_t value,
+                                                 int64_t* out_value) {
+  return absl::SimpleAtoi(absl::string_view(value.data, value.size), out_value);
+}
+
+IREE_API_EXPORT bool iree_string_view_atoi_uint64(iree_string_view_t value,
+                                                  uint64_t* out_value) {
+  return absl::SimpleAtoi(absl::string_view(value.data, value.size), out_value);
+}
+
+IREE_API_EXPORT bool iree_string_view_atof(iree_string_view_t value,
+                                           float* out_value) {
+  return absl::SimpleAtof(absl::string_view(value.data, value.size), out_value);
+}
+
+IREE_API_EXPORT bool iree_string_view_atod(iree_string_view_t value,
+                                           double* out_value) {
+  return absl::SimpleAtod(absl::string_view(value.data, value.size), out_value);
+}
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
     iree_string_view_t value, iree_host_size_t shape_capacity,
@@ -39,36 +65,47 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
   IREE_ASSERT_ARGUMENT(out_shape_rank);
   *out_shape_rank = 0;
 
-  auto str_value = absl::string_view(value.data, value.size);
-  if (str_value.empty()) {
+  if (iree_string_view_is_empty(value)) {
     return iree_ok_status();  // empty shape
   }
 
-  std::vector<iree_hal_dim_t> dims;
-  for (auto dim_str : absl::StrSplit(str_value, 'x')) {
-    int dim_value = 0;
-    if (!absl::SimpleAtoi(dim_str, &dim_value)) {
+  // Count the number of dimensions to see if we have capacity.
+  iree_host_size_t shape_rank = 1;  // always at least one if we are not empty
+  for (iree_host_size_t i = 0; i < value.size; ++i) {
+    if (value.data[i] == 'x') ++shape_rank;
+  }
+  if (out_shape_rank) {
+    *out_shape_rank = shape_rank;
+  }
+  if (shape_rank > shape_capacity) {
+    // NOTE: fast return for capacity queries.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+
+  iree_host_size_t dim_index = 0;
+  iree_string_view_t lhs;
+  iree_string_view_t rhs = value;
+  while (iree_string_view_split(rhs, 'x', &lhs, &rhs) &&
+         !iree_string_view_is_empty(lhs)) {
+    int32_t dim_value = 0;
+    if (!iree_string_view_atoi_int32(lhs, &dim_value)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "shape[%zu] invalid value '%.*s' of '%.*s'",
-                              dims.size(), (int)dim_str.size(), dim_str.data(),
+                              dim_index, (int)lhs.size, lhs.data,
                               (int)value.size, value.data);
     }
     if (dim_value < 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "shape[%zu] unsupported value %d of '%.*s'",
-                              dims.size(), dim_value, (int)value.size,
+                              dim_index, dim_value, (int)value.size,
                               value.data);
     }
-    dims.push_back(dim_value);
+    out_shape[dim_index++] = dim_value;
   }
-  if (out_shape_rank) {
-    *out_shape_rank = dims.size();
-  }
-  if (dims.size() > shape_capacity) {
-    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
-  }
-  if (out_shape) {
-    std::memcpy(out_shape, dims.data(), dims.size() * sizeof(*out_shape));
+  if (dim_index != shape_rank) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid shape specification: '%.*s'",
+                            (int)value.size, value.data);
   }
   return iree_ok_status();
 }
@@ -82,9 +119,9 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
   }
   iree_host_size_t buffer_length = 0;
   for (iree_host_size_t i = 0; i < shape_rank; ++i) {
-    int n = std::snprintf(buffer ? buffer + buffer_length : nullptr,
-                          buffer ? buffer_capacity - buffer_length : 0,
-                          (i < shape_rank - 1) ? "%dx" : "%d", shape[i]);
+    int n = snprintf(buffer ? buffer + buffer_length : nullptr,
+                     buffer ? buffer_capacity - buffer_length : 0,
+                     (i < shape_rank - 1) ? "%dx" : "%d", shape[i]);
     if (n < 0) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "snprintf failed to write dimension %zu", i);
@@ -105,22 +142,17 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
   IREE_ASSERT_ARGUMENT(out_element_type);
   *out_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
 
-  auto str_value = absl::string_view(value.data, value.size);
-
+  iree_string_view_t str_value = value;
   iree_hal_numerical_type_t numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
-  if (absl::StartsWith(str_value, "i")) {
+  if (iree_string_view_consume_prefix(&str_value, IREE_SV("i"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED;
-    str_value.remove_prefix(1);
-  } else if (absl::StartsWith(str_value, "u")) {
+  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("u"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED;
-    str_value.remove_prefix(1);
-  } else if (absl::StartsWith(str_value, "f")) {
+  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("f"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
-    str_value.remove_prefix(1);
-  } else if (absl::StartsWith(str_value, "x") ||
-             absl::StartsWith(str_value, "*")) {
+  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("x")) ||
+             iree_string_view_consume_prefix(&str_value, IREE_SV("*"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
-    str_value.remove_prefix(1);
   } else {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unhandled element type prefix in '%.*s'",
@@ -128,7 +160,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
   }
 
   uint32_t bit_count = 0;
-  if (!absl::SimpleAtoi(str_value, &bit_count) || bit_count > 0xFFu) {
+  if (!iree_string_view_atoi_uint32(str_value, &bit_count) ||
+      bit_count > 0xFFu) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "out of range bit count in '%.*s'", (int)value.size,
                             value.data);
@@ -159,9 +192,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
       prefix = "*";
       break;
   }
-  int n = std::snprintf(
-      buffer, buffer_capacity, "%s%d", prefix,
-      static_cast<int32_t>(iree_hal_element_bit_count(element_type)));
+  int n =
+      snprintf(buffer, buffer_capacity, "%s%d", prefix,
+               static_cast<int32_t>(iree_hal_element_bit_count(element_type)));
   if (n < 0) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "snprintf failed");
   }
@@ -209,82 +242,66 @@ static iree_status_t iree_hal_parse_element_unsafe(
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_SINT_8: {
       int32_t temp = 0;
-      if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                            &temp) ||
-          temp > INT8_MAX) {
+      if (!iree_string_view_atoi_int32(data_str, &temp) || temp > INT8_MAX) {
         return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
-      *reinterpret_cast<int8_t*>(out_data) = static_cast<int8_t>(temp);
+      *(int8_t*)out_data = (int8_t)temp;
       return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_UINT_8: {
       uint32_t temp = 0;
-      if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                            &temp) ||
-          temp > UINT8_MAX) {
+      if (!iree_string_view_atoi_uint32(data_str, &temp) || temp > UINT8_MAX) {
         return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
-      *reinterpret_cast<uint8_t*>(out_data) = static_cast<uint8_t>(temp);
+      *(uint8_t*)out_data = (uint8_t)temp;
       return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_SINT_16: {
       int32_t temp = 0;
-      if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                            &temp) ||
-          temp > INT16_MAX) {
+      if (!iree_string_view_atoi_int32(data_str, &temp) || temp > INT16_MAX) {
         return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
-      *reinterpret_cast<int16_t*>(out_data) = static_cast<int16_t>(temp);
+      *(int16_t*)out_data = (int16_t)temp;
       return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_UINT_16: {
       uint32_t temp = 0;
-      if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                            &temp) ||
-          temp > UINT16_MAX) {
+      if (!iree_string_view_atoi_uint32(data_str, &temp) || temp > UINT16_MAX) {
         return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
-      *reinterpret_cast<uint16_t*>(out_data) = static_cast<uint16_t>(temp);
+      *(uint16_t*)out_data = (uint16_t)temp;
       return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<int32_t*>(out_data))
+      return iree_string_view_atoi_int32(data_str, (int32_t*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<uint32_t*>(out_data))
+      return iree_string_view_atoi_uint32(data_str, (uint32_t*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<int64_t*>(out_data))
+      return iree_string_view_atoi_int64(data_str, (int64_t*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<uint64_t*>(out_data))
+      return iree_string_view_atoi_uint64(data_str, (uint64_t*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
       float temp = 0;
-      if (!absl::SimpleAtof(absl::string_view(data_str.data, data_str.size),
-                            &temp)) {
+      if (!iree_string_view_atof(data_str, &temp)) {
         return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
-      *reinterpret_cast<uint16_t*>(out_data) =
-          half_float::detail::float2half<std::round_to_nearest>(temp);
+      *(uint16_t*)out_data = iree_math_f32_to_f16(temp);
       return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      return absl::SimpleAtof(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<float*>(out_data))
+      return iree_string_view_atof(data_str, (float*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      return absl::SimpleAtod(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<double*>(out_data))
+      return iree_string_view_atod(data_str, (double*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     default: {
@@ -337,7 +354,7 @@ static void iree_hal_bytes_to_hex_string(const uint8_t* src, char* dest,
       "F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF";
   for (auto src_ptr = src; src_ptr != (src + num); ++src_ptr, dest += 2) {
     const char* hex_p = &kHexTable[*src_ptr * 2];
-    std::copy(hex_p, hex_p + 2, dest);
+    memcpy(dest, hex_p, 2);
   }
 }
 
@@ -355,49 +372,48 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
   int n = 0;
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi8,
-                        *reinterpret_cast<const int8_t*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi8,
+                   *(const int8_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu8,
-                        *reinterpret_cast<const uint8_t*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu8,
+                   *(const uint8_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi16,
-                        *reinterpret_cast<const int16_t*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi16,
+                   *(const int16_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu16,
-                        *reinterpret_cast<const uint16_t*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu16,
+                   *(const uint16_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi32,
-                        *reinterpret_cast<const int32_t*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi32,
+                   *(const int32_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu32,
-                        *reinterpret_cast<const uint32_t*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu32,
+                   *(const uint32_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi64,
-                        *reinterpret_cast<const int64_t*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi64,
+                   *(const int64_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu64,
-                        *reinterpret_cast<const uint64_t*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu64,
+                   *(const uint64_t*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                        half_float::detail::half2float<float>(
-                            *reinterpret_cast<const uint16_t*>(data.data)));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f16_to_f32(*(const uint16_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                        *reinterpret_cast<const float*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   *(const float*)data.data);
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
-                        *reinterpret_cast<const double*>(data.data));
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   *(const double*)data.data);
       break;
     default: {
       // Treat any unknown format as binary.
@@ -432,17 +448,16 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
   }
   size_t src_i = 0;
   size_t dst_i = 0;
-  size_t token_start = std::string::npos;
+  size_t token_start = IREE_STRING_VIEW_NPOS;
   while (src_i < data_str.size) {
     char c = data_str.data[src_i++];
-    bool is_separator =
-        absl::ascii_isspace(c) || c == ',' || c == '[' || c == ']';
-    if (token_start == std::string::npos) {
+    bool is_separator = isspace(c) || c == ',' || c == '[' || c == ']';
+    if (token_start == IREE_STRING_VIEW_NPOS) {
       if (!is_separator) {
         token_start = src_i - 1;
       }
       continue;
-    } else if (token_start != std::string::npos && !is_separator) {
+    } else if (token_start != IREE_STRING_VIEW_NPOS && !is_separator) {
       continue;
     }
     if (dst_i >= element_capacity) {
@@ -456,9 +471,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
                            src_i - 2 - token_start + 1},
         element_type, data_ptr.data + dst_i * element_size));
     ++dst_i;
-    token_start = std::string::npos;
+    token_start = IREE_STRING_VIEW_NPOS;
   }
-  if (token_start != std::string::npos) {
+  if (token_start != IREE_STRING_VIEW_NPOS) {
     if (dst_i >= element_capacity) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
@@ -547,7 +562,7 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
   } else {
     // Leaf dimension; output data.
     iree_host_size_t max_count =
-        std::min(*max_element_count, static_cast<iree_host_size_t>(shape[0]));
+        iree_min(*max_element_count, (iree_host_size_t)shape[0]);
     iree_device_size_t element_stride =
         iree_hal_element_byte_count(element_type);
     if (data.data_length < max_count * element_stride) {

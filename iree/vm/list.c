@@ -17,12 +17,14 @@
 #include "iree/base/alignment.h"
 
 // Size of each iree_vm_value_type_t in bytes.
-static const iree_host_size_t kValueTypeSizes[5] = {
+static const iree_host_size_t kValueTypeSizes[7] = {
     0,  // IREE_VM_VALUE_TYPE_NONE
     1,  // IREE_VM_VALUE_TYPE_I8
     2,  // IREE_VM_VALUE_TYPE_I16
     4,  // IREE_VM_VALUE_TYPE_I32
     8,  // IREE_VM_VALUE_TYPE_I64
+    4,  // IREE_VM_VALUE_TYPE_F32
+    8,  // IREE_VM_VALUE_TYPE_F64
 };
 static_assert(IREE_VM_VALUE_TYPE_COUNT ==
                   (sizeof(kValueTypeSizes) / sizeof(kValueTypeSizes[0])),
@@ -110,8 +112,8 @@ IREE_API_EXPORT iree_host_size_t iree_vm_list_storage_size(
       element_size = sizeof(iree_vm_variant_t);
     }
   }
-  return iree_align(sizeof(iree_vm_list_t), 8) +
-         iree_align(capacity * element_size, 8);
+  return iree_host_align(sizeof(iree_vm_list_t), 8) +
+         iree_host_align(capacity * element_size, 8);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_initialize(
@@ -132,9 +134,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_initialize(
     }
   }
 
-  iree_host_size_t storage_offset = iree_align(sizeof(iree_vm_list_t), 8);
+  iree_host_size_t storage_offset = iree_host_align(sizeof(iree_vm_list_t), 8);
   iree_host_size_t required_storage_size =
-      storage_offset + iree_align(capacity * element_size, 8);
+      storage_offset + iree_host_align(capacity * element_size, 8);
   if (storage.data_length < required_storage_size) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
@@ -229,7 +231,7 @@ iree_vm_list_reserve(iree_vm_list_t* list, iree_host_size_t minimum_capacity) {
     return iree_ok_status();
   }
   iree_host_size_t old_capacity = list->capacity;
-  iree_host_size_t new_capacity = iree_align(minimum_capacity, 64);
+  iree_host_size_t new_capacity = iree_host_align(minimum_capacity, 64);
   IREE_RETURN_IF_ERROR(iree_allocator_realloc(
       list->allocator, new_capacity * list->element_size, &list->storage));
   memset((void*)((uintptr_t)list->storage + old_capacity * list->element_size),
@@ -254,7 +256,7 @@ iree_vm_list_resize(iree_vm_list_t* list, iree_host_size_t new_size) {
   } else if (new_size > list->capacity) {
     // Extending beyond capacity.
     IREE_RETURN_IF_ERROR(iree_vm_list_reserve(
-        list, iree_max(list->capacity * 2, iree_align(new_size, 64))));
+        list, iree_max(list->capacity * 2, iree_host_align(new_size, 64))));
   }
   list->count = new_size;
   return iree_ok_status();

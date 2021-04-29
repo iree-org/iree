@@ -286,13 +286,13 @@ static iree_status_t module_b_create(iree_allocator_t allocator,
 
   // Resolve types used by the module once so that we can share it across all
   // instances of the module.
-  module->types[0] = iree_vm_ref_lookup_registered_type(
-      iree_make_cstring_view("iree.byte_buffer"));
+  module->types[0] =
+      iree_vm_ref_lookup_registered_type(iree_make_cstring_view("vm.buffer"));
   if (!module->types[0]) {
     iree_allocator_free(allocator, module);
     return iree_make_status(
         IREE_STATUS_NOT_FOUND,
-        "required type iree.byte_buffer not registered with the type system");
+        "required type vm.buffer not registered with the type system");
   }
 
   // Setup the interface with the functions we implement ourselves. Any function

@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -239,6 +240,78 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
 void ExSharedDeviceOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "device");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.tensor.cast
+//===----------------------------------------------------------------------===//
+
+void TensorCastOp::build(OpBuilder &builder, OperationState &result,
+                         Type resultType, Value source,
+                         ArrayRef<NamedAttribute> attrs) {
+  SmallVector<Value> dynamicDims;
+  if (source.getType().isa<IREE::HAL::BufferViewType>()) {
+    auto shapedType = resultType.cast<ShapedType>();
+    for (int64_t i = 0; i < shapedType.getRank(); ++i) {
+      if (!shapedType.isDynamicDim(i)) continue;
+      dynamicDims.push_back(builder.createOrFold<IREE::HAL::BufferViewDimOp>(
+          result.location, builder.getIndexType(), source,
+          builder.getIndexAttr(i)));
+    }
+  } else {
+    dynamicDims =
+        Shape::buildOrFindDynamicDimsForValue(result.location, source, builder);
+  }
+  build(builder, result, resultType, source, dynamicDims, attrs);
+}
+
+void TensorCastOp::build(OpBuilder &builder, OperationState &result,
+                         Type resultType, Value source, ValueRange dynamicDims,
+                         ArrayRef<NamedAttribute> attrs) {
+  result.addTypes({resultType});
+  result.addOperands({source});
+  result.addOperands({dynamicDims});
+  result.addAttributes(attrs);
+  result.addAttribute(
+      "operand_segment_sizes",
+      builder.getI32VectorAttr({
+          static_cast<int32_t>(1),
+          static_cast<int32_t>(
+              source.getType().isa<TensorType>() ? dynamicDims.size() : 0),
+          static_cast<int32_t>(resultType.isa<TensorType>() ? dynamicDims.size()
+                                                            : 0),
+      }));
+}
+
+Value TensorCastOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
+  if (source().getType().isa<TensorType>()) {
+    return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
+                                           builder);
+  } else {
+    return buildResultRankedShape(idx, builder);
+  }
+}
+
+Value TensorCastOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
+  if (target().getType().isa<TensorType>()) {
+    return Shape::buildRankedShapeForValue(getLoc(), target(), target_dims(),
+                                           builder);
+  } else {
+    return buildOperandRankedShape(idx, builder);
+  }
+}
+
+Value TensorCastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::TiedOpInterface::findTiedBaseValue(source());
+}
+
+::llvm::Optional<unsigned> TensorCastOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // source
+}
+
+SmallVector<int64_t, 4> TensorCastOp::getTiedResultOperandIndices() {
+  return {0};  // source
 }
 
 //===----------------------------------------------------------------------===//

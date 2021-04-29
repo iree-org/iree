@@ -204,8 +204,6 @@ iree_cc_binary(
     ::bytecode_module
     ::bytecode_module_benchmark_module_cc
     ::vm
-    absl::span
-    absl::strings
     benchmark
     iree::base::api
     iree::base::logging

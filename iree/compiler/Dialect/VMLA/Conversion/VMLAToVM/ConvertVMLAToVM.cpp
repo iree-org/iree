@@ -187,7 +187,7 @@ class VMLAConstantOpConversion
       // Encode just a single splat element and use a buffer fill.
       auto rodataValue = rewriter.createOrFold<IREE::VM::RodataInlineOp>(
           op.getLoc(),
-          IREE::VM::RefType::get(IREE::ByteBufferType::get(op.getContext())),
+          IREE::VM::RefType::get(IREE::VM::BufferType::get(op.getContext())),
           DenseElementsAttr::get(
               RankedTensorType::get({1}, splatAttr.getSplatValue().getType()),
               splatAttr.getSplatValue()));
@@ -209,7 +209,7 @@ class VMLAConstantOpConversion
       // deduped and combined.
       auto rodataValue = rewriter.createOrFold<IREE::VM::RodataInlineOp>(
           op.getLoc(),
-          IREE::VM::RefType::get(IREE::ByteBufferType::get(op.getContext())),
+          IREE::VM::RefType::get(IREE::VM::BufferType::get(op.getContext())),
           op.value());
       rewriter.replaceOpWithNewOp<IREE::VMLA::BufferConstOp>(
           op, IREE::VMLA::BufferType::get(op.getContext()), rodataValue);

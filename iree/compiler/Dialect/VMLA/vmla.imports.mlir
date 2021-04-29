@@ -39,7 +39,7 @@ attributes {nosideeffects}
 //===----------------------------------------------------------------------===//
 
 vm.import @buffer.const(
-  %value : !vm.ref<!iree.byte_buffer>
+  %value : !vm.buffer
 ) -> !vm.ref<!vmla.buffer>
 attributes {nosideeffects}
 

@@ -36,7 +36,7 @@ iree_status_t iree_hal_heap_buffer_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_heap_buffer_t* buffer = NULL;
-  iree_host_size_t header_size = iree_math_align(sizeof(*buffer), 16);
+  iree_host_size_t header_size = iree_host_align(sizeof(*buffer), 16);
   iree_host_size_t total_size = header_size + allocation_size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&buffer);

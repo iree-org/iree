@@ -37,7 +37,7 @@ iree_cc_library(
   HDRS
     "alignment.h"
     "attributes.h"
-    "math.h"
+    "config.h"
     "target_platform.h"
   PUBLIC
 )
@@ -84,7 +84,6 @@ iree_cc_library(
   DEPS
     ::core_headers
     ::tracing
-    absl::str_format
     iree::base::internal::flags
   PUBLIC
 )

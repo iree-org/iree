@@ -426,10 +426,8 @@ struct ParamUnpack<absl::string_view> {
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
-    if (reg_ptr->type ==
-        ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()->type) {
-      auto byte_span =
-          reinterpret_cast<iree_vm_ro_byte_buffer_t*>(reg_ptr->ptr)->data;
+    if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::get()->type) {
+      auto byte_span = reinterpret_cast<iree_vm_buffer_t*>(reg_ptr->ptr)->data;
       out_param = absl::string_view{
           reinterpret_cast<const char*>(byte_span.data), byte_span.data_length};
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
@@ -439,9 +437,8 @@ struct ParamUnpack<absl::string_view> {
           "have %.*s but expected %.*s",
           (int)iree_vm_ref_type_name(reg_ptr->type).size,
           iree_vm_ref_type_name(reg_ptr->type).data,
-          (int)ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()
-              ->type_name.size,
-          ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()->type_name.data);
+          (int)ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.size,
+          ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.data);
     } else {
       // NOTE: empty string is allowed here!
       out_param = {};

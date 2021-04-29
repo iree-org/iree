@@ -63,7 +63,7 @@ PopulateDescriptorSetWriteInfos(
     // the shader is considered as out of bounds per the Vulkan spec.
     // See https://github.com/google/iree/issues/2022#issuecomment-640617234
     // for more details.
-    buffer_info.range = iree_align(
+    buffer_info.range = iree_device_align(
         std::min(binding.length,
                  iree_hal_buffer_byte_length(binding.buffer) - binding.offset),
         4);

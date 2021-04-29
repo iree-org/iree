@@ -1047,8 +1047,6 @@ static unsigned decideFusableLinalgOps(FuncOp funcOp) {
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
   FuncOp funcOp = getOperation();
-  // `isEntryPoint` functions are the ones that are marked public.
-  if (!funcOp.isPublic()) return;
 
   MLIRContext *context = funcOp->getContext();
   context->allowUnregisteredDialects(true);

@@ -27,18 +27,18 @@ func @executableCreate(
     %layout1 : !hal.executable_layout
   ) -> (!hal.executable, !hal.executable) {
 
-  // CHECK-DAG: %[[BINARY1:.+]] = vm.const.ref.rodata @_exe_binary1_binary_format1 : !vm.ref<!iree.byte_buffer>
+  // CHECK-DAG: %[[BINARY1:.+]] = vm.const.ref.rodata @_exe_binary1_binary_format1 : !vm.buffer
   // CHECK-DAG: %[[FORMAT1:.+]] = vm.rodata.inline "_utf8_format1_
   // CHECK: %[[EXE1:.+]] = vm.call.variadic @hal.executable.create(
   // CHECK-SAME: %[[DEV]], %[[FORMAT1]], %[[BINARY1]], [%[[LAYOUT0]], %[[LAYOUT1]]]
-  // CHECK-SAME: ) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  // CHECK-SAME: ) : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
   %0 = hal.executable.create device(%device : !hal.device) target(@exe::@binary1) layouts([%layout0, %layout1]) : !hal.executable
 
-  // CHECK-DAG: %[[BINARY2:.+]] = vm.const.ref.rodata @_exe_binary2_binary_format2 : !vm.ref<!iree.byte_buffer>
+  // CHECK-DAG: %[[BINARY2:.+]] = vm.const.ref.rodata @_exe_binary2_binary_format2 : !vm.buffer
   // CHECK-DAG: %[[FORMAT2:.+]] = vm.rodata.inline "_utf8_format2_
   // CHECK: %[[EXE2:.+]] = vm.call.variadic @hal.executable.create(
   // CHECK-SAME: %[[DEV]], %[[FORMAT2]], %[[BINARY2]], [%[[LAYOUT1]], %[[LAYOUT0]]]
-  // CHECK-SAME: ) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  // CHECK-SAME: ) : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
   %1 = hal.executable.create device(%device : !hal.device) target(@exe::@binary2) layouts([%layout1, %layout0]) : !hal.executable
 
   // CHECK: vm.return %[[EXE1]], %[[EXE2]]
@@ -76,10 +76,10 @@ func @multipleExecutables(
     %layout0 : !hal.executable_layout,
     %layout1 : !hal.executable_layout
   ) -> (!hal.executable, !hal.executable) {
-  // CHECK-DAG: %[[BINARY1:.+]] = vm.const.ref.rodata @_exe1_binary1_binary_format : !vm.ref<!iree.byte_buffer>
+  // CHECK-DAG: %[[BINARY1:.+]] = vm.const.ref.rodata @_exe1_binary1_binary_format : !vm.buffer
   // CHECK-DAG: %[[FORMAT1:.+]] = vm.rodata.inline "_utf8_format_
   %0 = hal.executable.create device(%device : !hal.device) target(@exe1::@binary1) layouts([%layout0, %layout1]) : !hal.executable
-  // CHECK-DAG: %[[BINARY2:.+]] = vm.const.ref.rodata @_exe2_binary2_binary_format : !vm.ref<!iree.byte_buffer>
+  // CHECK-DAG: %[[BINARY2:.+]] = vm.const.ref.rodata @_exe2_binary2_binary_format : !vm.buffer
   // CHECK-DAG: %[[FORMAT2:.+]] = vm.rodata.inline "_utf8_format_
   %1 = hal.executable.create device(%device : !hal.device) target(@exe2::@binary2) layouts([%layout1, %layout0]) : !hal.executable
   return %0, %1 : !hal.executable, !hal.executable

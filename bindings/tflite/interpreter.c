@@ -236,7 +236,7 @@ static iree_status_t _TfLiteInterpreterRefreshIOShapes(
 static iree_host_size_t _TfLiteInterpreterCalculateSize(
     const TfLiteModel* model) {
   iree_host_size_t total_size =
-      iree_math_align(sizeof(TfLiteInterpreter), iree_max_align_t);
+      iree_host_align(sizeof(TfLiteInterpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
       iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());
@@ -267,7 +267,7 @@ static iree_status_t _TfLiteInterpreterAllocate(
   _TfLiteModelRetain(interpreter->model);
 
   uint8_t* p = (uint8_t*)interpreter +
-               iree_math_align(sizeof(*interpreter), iree_max_align_t);
+               iree_host_align(sizeof(*interpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
       iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());

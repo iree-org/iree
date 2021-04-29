@@ -19,14 +19,10 @@
 #include <string.h>
 
 #include "iree/base/alignment.h"
+#include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 #include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/generated/bytecode_op_table.h"
-
-// TODO(benvanik): make a compiler setting.
-#define IREE_VM_EXT_I64_ENABLE 1
-#define IREE_VM_EXT_F32_ENABLE 0
-#define IREE_VM_EXT_F64_ENABLE 0
 
 //===----------------------------------------------------------------------===//
 // Shared data structures
@@ -170,6 +166,8 @@ static const int kRegSize = sizeof(uint16_t);
 #define OP_I16(i) *((uint16_t*)&bytecode_data[pc + (i)])
 #define OP_I32(i) *((uint32_t*)&bytecode_data[pc + (i)])
 #define OP_I64(i) *((uint64_t*)&bytecode_data[pc + (i)])
+#define OP_F32(i) *((float*)&bytecode_data[pc + (i)])
+#define OP_F64(i) *((double*)&bytecode_data[pc + (i)])
 #else
 #define OP_I8(i) bytecode_data[pc + (i)]
 #define OP_I16(i)                           \
@@ -189,6 +187,7 @@ static const int kRegSize = sizeof(uint16_t);
       ((uint64_t)bytecode_data[pc + 5 + (i)] << 40) | \
       ((uint64_t)bytecode_data[pc + 6 + (i)] << 48) | \
       ((uint64_t)bytecode_data[pc + 7 + (i)] << 56)
+#error "TODO: OP_F32 and OP_F64 for big endian systems"
 #endif  // IREE_ENDIANNESS_LITTLE
 
 //===----------------------------------------------------------------------===//
@@ -209,6 +208,12 @@ static const int kRegSize = sizeof(uint16_t);
 #define VM_DecConstI64(name) \
   OP_I64(0);                 \
   pc += 8;
+#define VM_DecConstF32(name) \
+  OP_F32(0);                 \
+  pc += 4;
+#define VM_DecConstF64(name) \
+  OP_F64(0);                 \
+  pc += 8;
 #define VM_DecOpcode(opcode) VM_DecConstI8(#opcode)
 #define VM_DecFuncAttr(name) VM_DecConstI32(name)
 #define VM_DecGlobalAttr(name) VM_DecConstI32(name)
@@ -219,6 +224,8 @@ static const int kRegSize = sizeof(uint16_t);
 #define VM_DecTypeOf(name) VM_DecType(name)
 #define VM_DecIntAttr32(name) VM_DecConstI32(name)
 #define VM_DecIntAttr64(name) VM_DecConstI64(name)
+#define VM_DecFloatAttr32(name) VM_DecConstF32(name)
+#define VM_DecFloatAttr64(name) VM_DecConstF64(name)
 #define VM_DecStrAttr(name, out_str)                     \
   (out_str)->size = (iree_host_size_t)OP_I16(0);         \
   (out_str)->data = (const char*)&bytecode_data[pc + 2]; \
@@ -235,6 +242,12 @@ static const int kRegSize = sizeof(uint16_t);
 #define VM_DecOperandRegI64(name)                           \
   *((int64_t*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
   pc += kRegSize;
+#define VM_DecOperandRegF32(name)                  \
+  *((float*)&regs.i32[OP_I16(0) & regs.i32_mask]); \
+  pc += kRegSize;
+#define VM_DecOperandRegF64(name)                          \
+  *((double*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
+  pc += kRegSize;
 #define VM_DecOperandRegRef(name, out_is_move)             \
   &regs.ref[OP_I16(0) & regs.ref_mask];                    \
   *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
@@ -248,6 +261,12 @@ static const int kRegSize = sizeof(uint16_t);
   pc += kRegSize;
 #define VM_DecResultRegI64(name)                           \
   ((int64_t*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
+  pc += kRegSize;
+#define VM_DecResultRegF32(name)                  \
+  ((float*)&regs.i32[OP_I16(0) & regs.i32_mask]); \
+  pc += kRegSize;
+#define VM_DecResultRegF64(name)                          \
+  ((double*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
   pc += kRegSize;
 #define VM_DecResultRegRef(name, out_is_move)              \
   &regs.ref[OP_I16(0) & regs.ref_mask];                    \
@@ -298,10 +317,28 @@ static const int kRegSize = sizeof(uint16_t);
 #else
 #define DEFINE_DISPATCH_TABLE_EXT_I64()
 #endif  // IREE_VM_EXT_I64_ENABLE
+#if IREE_VM_EXT_F32_ENABLE
+#define DECLARE_DISPATCH_EXT_F32_OPC(ordinal, name) &&_dispatch_EXT_F32_##name,
+#define DEFINE_DISPATCH_TABLE_EXT_F32()                                       \
+  static const void* kDispatchTable_EXT_F32[256] = {IREE_VM_OP_EXT_F32_TABLE( \
+      DECLARE_DISPATCH_EXT_F32_OPC, DECLARE_DISPATCH_EXT_RSV)};
+#else
+#define DEFINE_DISPATCH_TABLE_EXT_F32()
+#endif  // IREE_VM_EXT_I64_ENABLE
+#if IREE_VM_EXT_F64_ENABLE
+#define DECLARE_DISPATCH_EXT_F64_OPC(ordinal, name) &&_dispatch_EXT_F64_##name,
+#define DEFINE_DISPATCH_TABLE_EXT_F64()                                       \
+  static const void* kDispatchTable_EXT_F64[256] = {IREE_VM_OP_EXT_F64_TABLE( \
+      DECLARE_DISPATCH_EXT_F64_OPC, DECLARE_DISPATCH_EXT_RSV)};
+#else
+#define DEFINE_DISPATCH_TABLE_EXT_F64()
+#endif  // IREE_VM_EXT_I64_ENABLE
 
-#define DEFINE_DISPATCH_TABLES() \
-  DEFINE_DISPATCH_TABLE_CORE();  \
-  DEFINE_DISPATCH_TABLE_EXT_I64();
+#define DEFINE_DISPATCH_TABLES()   \
+  DEFINE_DISPATCH_TABLE_CORE();    \
+  DEFINE_DISPATCH_TABLE_EXT_I64(); \
+  DEFINE_DISPATCH_TABLE_EXT_F32(); \
+  DEFINE_DISPATCH_TABLE_EXT_F64();
 
 #define DISPATCH_UNHANDLED_CORE()                                           \
   _dispatch_unhandled : {                                                   \
@@ -389,6 +426,36 @@ static const int kRegSize = sizeof(uint16_t);
     int64_t lhs = VM_DecOperandRegI64("lhs");            \
     int64_t rhs = VM_DecOperandRegI64("rhs");            \
     int64_t* result = VM_DecResultRegI64("result");      \
+    *result = op_func(lhs, rhs);                         \
+  });
+
+#define DISPATCH_OP_EXT_F32_UNARY_F32(op_name, op_func) \
+  DISPATCH_OP(EXT_F32, op_name, {                       \
+    float operand = VM_DecOperandRegF32("operand");     \
+    float* result = VM_DecResultRegF32("result");       \
+    *result = op_func(operand);                         \
+  });
+
+#define DISPATCH_OP_EXT_F32_BINARY_F32(op_name, op_func) \
+  DISPATCH_OP(EXT_F32, op_name, {                        \
+    float lhs = VM_DecOperandRegF32("lhs");              \
+    float rhs = VM_DecOperandRegF32("rhs");              \
+    float* result = VM_DecResultRegF32("result");        \
+    *result = op_func(lhs, rhs);                         \
+  });
+
+#define DISPATCH_OP_EXT_F64_UNARY_F64(op_name, op_func) \
+  DISPATCH_OP(EXT_F64, op_name, {                       \
+    double operand = VM_DecOperandRegF64("operand");    \
+    double* result = VM_DecResultRegF64("result");      \
+    *result = op_func(operand);                         \
+  });
+
+#define DISPATCH_OP_EXT_F64_BINARY_F64(op_name, op_func) \
+  DISPATCH_OP(EXT_F64, op_name, {                        \
+    double lhs = VM_DecOperandRegF64("lhs");             \
+    double rhs = VM_DecOperandRegF64("rhs");             \
+    double* result = VM_DecResultRegF64("result");       \
     *result = op_func(lhs, rhs);                         \
   });
 

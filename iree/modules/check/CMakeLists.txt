@@ -23,9 +23,9 @@ if(${IREE_HAL_DRIVER_VMLA})
       "check_test.cc"
     DEPS
       ::native_module
-      absl::strings
-      half::includes
+      absl::span
       iree::base::api
+      iree::base::internal
       iree::base::logging
       iree::base::status
       iree::hal::api
@@ -48,9 +48,8 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
-    absl::strings
-    half::includes
     iree::base::api
+    iree::base::internal
     iree::base::status
     iree::hal::api
     iree::modules::hal
