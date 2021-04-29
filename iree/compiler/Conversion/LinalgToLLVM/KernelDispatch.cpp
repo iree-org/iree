@@ -89,6 +89,9 @@ llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) {
         if (auto operandParent = operand.getDefiningOp<SubTensorOp>()) {
           return operandParent.source().getType().cast<ShapedType>().getShape();
         }
+        if (auto operandParent = operand.getDefiningOp<memref::AllocaOp>()) {
+          return operandParent.getType().cast<ShapedType>().getShape();
+        }
         return ArrayRef<int64_t>{};
       };
 
@@ -103,8 +106,8 @@ llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) {
       if (!lhsShape.empty() && !rhsShape.empty()) {
         // Find largest tile size that is a multiple of the vector size.
         auto getTileSize = [](int dim, int maxSize) {
-          for (int i = std::min(maxSize, dim); i > 0; i -= matmulVectorSize) {
-            if (dim % i == 0) {
+          for (int i = std::min(maxSize, dim); i > 0; --i) {
+            if (dim % i == 0 && i % matmulVectorSize == 0) {
               return i;
             }
           }
