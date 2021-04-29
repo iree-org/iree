@@ -874,6 +874,36 @@ DispatchRegionOp::cloneReplacementExcludingOperandsAndResults(
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
 
+/// Extracts static and dynamic values from list of `OpFoldResult`.
+static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
+                                 SmallVectorImpl<Value> &dynamicValues,
+                                 SmallVectorImpl<int64_t> &staticValues,
+                                 int64_t dynamicIndexValue) {
+  for (OpFoldResult valueOrAttr : valueOrAttrs) {
+    if (auto value = valueOrAttr.dyn_cast<Value>()) {
+      dynamicValues.push_back(value);
+      staticValues.push_back(dynamicIndexValue);
+    } else {
+      auto operandValue =
+          valueOrAttr.dyn_cast<Attribute>().cast<IntegerAttr>().getInt();
+      staticValues.push_back(operandValue);
+    }
+  }
+}
+
+RankedTensorType DispatchTensorLoadOp::inferResultType(
+    IREE::Flow::DispatchTensorType sourceType,
+    ArrayRef<OpFoldResult> mixedSizes) {
+  auto shape = llvm::to_vector<4>(
+      llvm::map_range(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
+        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+          return attr.cast<IntegerAttr>().getInt();
+        }
+        return DispatchTensorType::kDynamicSize;
+      }));
+  return RankedTensorType::get(shape, sourceType.getElementType());
+}
+
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  RankedTensorType returnType, Value source,
                                  ArrayRef<NamedAttribute> attributes) {
@@ -883,7 +913,7 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
 }
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
-                                 Value source,
+                                 RankedTensorType returnType, Value source,
                                  ArrayRef<OpFoldResult> mixedOffsets,
                                  ArrayRef<OpFoldResult> mixedSizes,
                                  ArrayRef<OpFoldResult> mixedStrides,
@@ -895,35 +925,29 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
   SmallVector<int64_t> staticSizes;
   SmallVector<int64_t> staticStrides;
 
-  auto processOperands =
-      [](ArrayRef<OpFoldResult> operands, SmallVector<Value> &dynamicOperands,
-         SmallVector<int64_t> &staticOperands, int64_t dynamicIndexValue) {
-        for (OpFoldResult operand : operands) {
-          if (auto value = operand.dyn_cast<Value>()) {
-            dynamicOperands.push_back(value);
-            staticOperands.push_back(dynamicIndexValue);
-          } else {
-            auto operandValue =
-                operand.dyn_cast<Attribute>().cast<IntegerAttr>().getValue();
-            staticOperands.push_back(operandValue.getSExtValue());
-          }
-        }
-      };
-
-  processOperands(mixedOffsets, offsets, staticOffsets,
-                  ShapedType::kDynamicStrideOrOffset);
-  processOperands(mixedSizes, sizes, staticSizes, ShapedType::kDynamicSize);
-  processOperands(mixedStrides, strides, staticStrides,
-                  ShapedType::kDynamicStrideOrOffset);
-
-  auto returnType = RankedTensorType::get(
-      staticSizes,
-      source.getType().cast<DispatchTensorType>().getElementType());
+  processMixedOperands(mixedOffsets, offsets, staticOffsets,
+                       ShapedType::kDynamicStrideOrOffset);
+  processMixedOperands(mixedSizes, sizes, staticSizes,
+                       ShapedType::kDynamicSize);
+  processMixedOperands(mixedStrides, strides, staticStrides,
+                       ShapedType::kDynamicStrideOrOffset);
 
   build(builder, state, returnType, source, offsets, sizes, strides,
         builder.getI64ArrayAttr(staticOffsets),
         builder.getI64ArrayAttr(staticSizes),
         builder.getI64ArrayAttr(staticStrides));
+}
+
+void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
+                                 Value source,
+                                 ArrayRef<OpFoldResult> mixedOffsets,
+                                 ArrayRef<OpFoldResult> mixedSizes,
+                                 ArrayRef<OpFoldResult> mixedStrides,
+                                 ArrayRef<NamedAttribute> attributes) {
+  auto returnType =
+      inferResultType(source.getType().cast<DispatchTensorType>(), mixedSizes);
+  build(builder, state, returnType, source, mixedOffsets, mixedSizes,
+        mixedStrides);
 }
 
 //===----------------------------------------------------------------------===//
