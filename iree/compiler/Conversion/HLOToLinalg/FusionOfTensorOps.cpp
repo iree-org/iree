@@ -127,6 +127,13 @@ struct FusionOfTensorOpsPass
 
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        frozenInterfacePatterns);
+
+    // Push the remaining reshapes down the graphs to expose more fusion
+    // opportunities.
+    OwningRewritePatternList pushReshapePatterns(&getContext());
+    linalg::populatePushReshapeOpsPatterns(pushReshapePatterns);
+    (void)applyPatternsAndFoldGreedily(op->getRegions(),
+                                       std::move(pushReshapePatterns));
   }
 };
 }  // namespace
