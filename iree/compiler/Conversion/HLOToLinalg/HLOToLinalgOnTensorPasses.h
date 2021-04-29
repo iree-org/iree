@@ -23,6 +23,7 @@
 
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -37,7 +38,8 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass(
 /// Populates the patterns that convert from MHLO to Linalg on tensors. Imports
 /// patterns from XLA, as well as some IREE specific modifications.
 void populateHLOToLinalgOnTensorsConversionPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
+    MLIRContext *context, TypeConverter &typeConverter,
+    OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

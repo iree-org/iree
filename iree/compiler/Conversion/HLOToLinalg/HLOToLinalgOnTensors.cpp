@@ -302,7 +302,10 @@ struct ConvertHLOToLinalgOnTensorsPass
   void runOnFunction() override {
     OwningRewritePatternList patterns(&getContext());
     MLIRContext *context = &getContext();
-    populateHLOToLinalgOnTensorsConversionPatterns(context, patterns);
+
+    auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
+    populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
+                                                   patterns);
     if (useLinalgOnTensorsPath) {
       patterns.insert<PadTensorOpConversion>(context);
     }
@@ -359,8 +362,9 @@ struct ConstOpConversion : public OpRewritePattern<mhlo::ConstOp> {
 }  // namespace
 
 void populateHLOToLinalgOnTensorsConversionPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns) {
-  mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
+    MLIRContext *context, TypeConverter &typeConverter,
+    OwningRewritePatternList &patterns) {
+  mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
   patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion>(
       context);
 }
