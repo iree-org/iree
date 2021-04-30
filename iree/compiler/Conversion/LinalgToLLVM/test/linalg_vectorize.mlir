@@ -16,14 +16,21 @@
 //       CHECK:   %[[V6:.*]] = vector.transfer_read %[[I1]][%[[C0]], %[[C0]]], {{.*}} : tensor<3x1xf32>, vector<1x1xf32>
 //       CHECK:   %[[V7:.*]] = vector.transfer_read %[[I1]][%[[C1]], %[[C0]]], {{.*}} : tensor<3x1xf32>, vector<1x1xf32>
 //       CHECK:   %[[V8:.*]] = vector.transfer_read %[[I1]][%[[C2]], %[[C0]]], {{.*}} : tensor<3x1xf32>, vector<1x1xf32>
+//       CHECK:   %[[VI0:.*]] = vector.insert_strided_slice %[[V6]], %{{.*}} {offsets = [0, 0], strides = [1, 1]} : vector<1x1xf32> into vector<3x1xf32>
+//       CHECK:   %[[VI1:.*]] = vector.insert_strided_slice %[[V7]], %[[VI0]] {offsets = [1, 0], strides = [1, 1]} : vector<1x1xf32> into vector<3x1xf32>
+//       CHECK:   %[[VI2:.*]] = vector.insert_strided_slice %[[V8]], %[[VI1]] {offsets = [2, 0], strides = [1, 1]} : vector<1x1xf32> into vector<3x1xf32>
+//       CHECK:   %[[T:.*]] = vector.transpose %[[VI2]], [1, 0] : vector<3x1xf32> to vector<1x3xf32>
 //       CHECK:   %[[V9:.*]] = vector.transfer_read %[[I2]][%[[C0]], %[[C0]]], {{.*}} : tensor<2x1xf32>, vector<1x1xf32>
 //       CHECK:   %[[VA:.*]] = vector.transfer_read %[[I2]][%[[C1]], %[[C0]]], {{.*}} : tensor<2x1xf32>, vector<1x1xf32>
-//       CHECK:   %[[D0:.*]] = vector.contract {{.*}} %[[V0]], %[[V6]], %[[V9]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
-//       CHECK:   %[[D1:.*]] = vector.contract {{.*}} %[[V1]], %[[V7]], %[[D0]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
-//       CHECK:   %[[D2:.*]] = vector.contract {{.*}} %[[V2]], %[[V8]], %[[D1]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
-//       CHECK:   %[[D3:.*]] = vector.contract {{.*}} %[[V3]], %[[V6]], %[[VA]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
-//       CHECK:   %[[D4:.*]] = vector.contract {{.*}} %[[V4]], %[[V7]], %[[D3]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
-//       CHECK:   %[[D5:.*]] = vector.contract {{.*}} %[[V5]], %[[V8]], %[[D4]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
+//       CHECK:   %[[VE0:.*]] = vector.extract_strided_slice %[[T]] {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
+//       CHECK:   %[[VE1:.*]] = vector.extract_strided_slice %[[T]] {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
+//       CHECK:   %[[VE2:.*]] = vector.extract_strided_slice %[[T]] {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
+//       CHECK:   %[[D0:.*]] = vector.contract {{.*}} %[[V0]], %[[VE0]], %[[V9]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
+//       CHECK:   %[[D1:.*]] = vector.contract {{.*}} %[[V1]], %[[VE1]], %[[D0]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
+//       CHECK:   %[[D2:.*]] = vector.contract {{.*}} %[[V2]], %[[VE2]], %[[D1]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
+//       CHECK:   %[[D3:.*]] = vector.contract {{.*}} %[[V3]], %[[VE0]], %[[VA]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
+//       CHECK:   %[[D4:.*]] = vector.contract {{.*}} %[[V4]], %[[VE1]], %[[D3]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
+//       CHECK:   %[[D5:.*]] = vector.contract {{.*}} %[[V5]], %[[VE2]], %[[D4]] : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
 //       CHECK:   %[[W0:.*]] = vector.transfer_write %[[D2]], %[[I2]][%[[C0]], %[[C0]]] {in_bounds = [true, true]} : vector<1x1xf32>, tensor<2x1xf32>
 //       CHECK:   %[[W1:.*]] = vector.transfer_write %[[D5]], %[[W0]][%[[C1]], %[[C0]]] {in_bounds = [true, true]} : vector<1x1xf32>, tensor<2x1xf32>
 //       CHECK:   flow.dispatch.tensor.store %[[W1]]
