@@ -78,8 +78,8 @@ cc_library(
     hdrs = ["atomic_slist.h"],
     deps = [
         ":internal",
+        ":synchronization",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
     ],
 )
 
@@ -103,8 +103,8 @@ cc_library(
     deps = [
         ":file_path",
         ":internal",
+        ":threading",
         "//iree/base:core_headers",
-        "//iree/base:threading",
         "//iree/base:tracing",
     ],
 )
@@ -232,6 +232,89 @@ cc_library(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/utility",
+    ],
+)
+
+cc_library(
+    name = "synchronization",
+    srcs = ["synchronization.c"],
+    hdrs = ["synchronization.h"],
+    deps = [
+        ":internal",
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_binary(
+    name = "synchronization_benchmark",
+    testonly = True,
+    srcs = ["synchronization_benchmark.cc"],
+    deps = [
+        ":synchronization",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+run_binary_test(
+    name = "synchronization_benchmark_test",
+    args = ["--benchmark_min_time=0"],
+    test_binary = ":synchronization_benchmark",
+)
+
+cc_test(
+    name = "synchronization_test",
+    srcs = ["synchronization_test.cc"],
+    deps = [
+        ":synchronization",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "threading",
+    srcs = [
+        "threading.c",
+        "threading_darwin.c",
+        "threading_impl.h",
+        "threading_pthreads.c",
+        "threading_win32.c",
+    ],
+    hdrs = ["threading.h"],
+    deps = [
+        ":internal",
+        ":synchronization",
+        "//build_tools:default_linkopts",
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_test(
+    name = "threading_benchmark",
+    srcs = ["threading_benchmark.cc"],
+    deps = [
+        ":threading",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_test(
+    name = "threading_test",
+    srcs = [
+        "threading_impl.h",
+        "threading_test.cc",
+    ],
+    deps = [
+        ":synchronization",
+        ":threading",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 

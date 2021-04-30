@@ -34,8 +34,8 @@ cc_library(
     deps = [
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
         "//iree/base/internal:atomic_slist",
+        "//iree/base/internal:synchronization",
     ],
 )
 
@@ -48,9 +48,9 @@ cc_library(
     deps = [
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:synchronization",
         "//iree/base/internal:wait_handle",
     ],
 )
@@ -137,9 +137,9 @@ cc_library(
         ":local",
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:synchronization",
         "//iree/base/internal:wait_handle",
         "//iree/hal",
         "//iree/task",
@@ -172,9 +172,9 @@ cc_library(
         ":local",
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:synchronization",
         "//iree/base/internal:wait_handle",
         "//iree/hal",
         "//iree/task",

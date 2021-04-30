@@ -51,9 +51,9 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::flatcc
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::logging
     iree::base::status
-    iree::base::synchronization
     iree::base::tracing
     iree::hal
     iree::schemas::cuda_executable_def_c_fbs

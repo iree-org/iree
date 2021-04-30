@@ -21,7 +21,7 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal::atomic_slist
-    iree::base::synchronization
+    iree::base::internal::synchronization
   PUBLIC
 )
 
@@ -36,8 +36,8 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::internal::wait_handle
-    iree::base::synchronization
     iree::base::tracing
   PUBLIC
 )
@@ -126,8 +126,8 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::internal::wait_handle
-    iree::base::synchronization
     iree::base::tracing
     iree::hal
     iree::task
@@ -160,8 +160,8 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::internal::wait_handle
-    iree::base::synchronization
     iree::base::tracing
     iree::hal
     iree::task

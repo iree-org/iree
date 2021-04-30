@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/threading.h"
+#include "iree/base/internal/threading.h"
 
 #include <chrono>
 #include <thread>
 
-#include "iree/base/synchronization.h"
-#include "iree/base/threading_impl.h"  // to test the override list
+#include "iree/base/internal/synchronization.h"
+#include "iree/base/internal/threading_impl.h"  // to test the override list
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 

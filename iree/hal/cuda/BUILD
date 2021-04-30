@@ -68,7 +68,7 @@ cc_library(
         "//iree/base:flatcc",
         "//iree/base:logging",
         "//iree/base:status",
-        "//iree/base:synchronization",
+        "//iree/base/internal:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/hal",

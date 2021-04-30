@@ -14,8 +14,8 @@
 
 #include "iree/hal/driver_registry.h"
 
-#include "iree/base/synchronization.h"
-#include "iree/base/threading.h"
+#include "iree/base/internal/synchronization.h"
+#include "iree/base/internal/threading.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 

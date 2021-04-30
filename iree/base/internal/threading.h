@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_THREADING_H_
-#define IREE_BASE_THREADING_H_
+#ifndef IREE_BASE_INTERNAL_THREADING_H_
+#define IREE_BASE_INTERNAL_THREADING_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -298,4 +298,4 @@ static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_THREADING_H_
+#endif  // IREE_BASE_INTERNAL_THREADING_H_

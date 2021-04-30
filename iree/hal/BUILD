@@ -74,10 +74,10 @@ cc_library(
     deps = [
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
-        "//iree/base:threading",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:synchronization",
+        "//iree/base/internal:threading",
         "@com_google_absl//absl/strings",
     ],
 )

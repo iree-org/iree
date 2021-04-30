@@ -60,9 +60,9 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::atomic_slist
     iree::base::internal::prng
+    iree::base::internal::synchronization
+    iree::base::internal::threading
     iree::base::internal::wait_handle
-    iree::base::synchronization
-    iree::base::threading
     iree::base::tracing
   PUBLIC
 )

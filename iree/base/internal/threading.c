@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/threading.h"
+#include "iree/base/internal/threading.h"
 
-#include "iree/base/threading_impl.h"
+#include "iree/base/internal/threading_impl.h"
 
 #if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
 #include <xmmintrin.h>
