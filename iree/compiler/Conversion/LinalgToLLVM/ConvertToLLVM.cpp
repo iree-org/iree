@@ -515,33 +515,6 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
   }
 };
 
-/// DEPRECATED: delete this as soon as linalg on buffers and iree.placeholder
-/// are gone.
-class ConvertLegacyPlaceholderOp : public ConvertToLLVMPattern {
- public:
-  explicit ConvertLegacyPlaceholderOp(MLIRContext *context,
-                                      LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(IREE::PlaceholderOp::getOperationName(), context,
-                             converter) {}
-
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
-    if (!llvmFuncOp) return failure();
-    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
-    auto interfaceBindingOp = cast<IREE::HAL::InterfaceBindingOp>(
-        SymbolTable::lookupNearestSymbolFrom(
-            op, op->getAttrOfType<SymbolRefAttr>("binding")));
-    MemRefType memRefType = op->getResult(0).getType().cast<MemRefType>();
-    auto memRefDesc = abi.loadBinding(
-        op->getLoc(), interfaceBindingOp.binding().getZExtValue(),
-        /*baseOffset=*/{}, memRefType, rewriter);
-    rewriter.replaceOp(op, {memRefDesc});
-    return success();
-  }
-};
-
 class RemoveHALInterfaceOpPattern : public ConvertToLLVMPattern {
  public:
   explicit RemoveHALInterfaceOpPattern(MLIRContext *context,
@@ -703,7 +676,6 @@ void ConvertToLLVMPass::runOnOperation() {
     ConvertHALInterfaceWorkgroupCountOp,
     ConvertHALInterfaceLoadConstant,
     ConvertHALInterfaceBindingSubspanOp,
-    ConvertLegacyPlaceholderOp,
     RemoveHALInterfaceOpPattern,
     ConvertTieShapePattern,
     RemoveMakeRankedShape
