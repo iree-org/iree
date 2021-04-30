@@ -25,10 +25,9 @@ package(
 #===------------------------------------------------------------------------===#
 # Public API
 #===------------------------------------------------------------------------===#
-# TODO(benvanik): rename to :hal
 
 cc_library(
-    name = "api",
+    name = "hal",
     srcs = [
         "allocator.c",
         "allocator.h",
@@ -73,12 +72,12 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
-        "//iree/base:threading",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:synchronization",
+        "//iree/base/internal:threading",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -87,7 +86,7 @@ cc_test(
     name = "string_util_test",
     srcs = ["string_util_test.cc"],
     deps = [
-        ":api",
+        ":hal",
         "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/testing:gtest",

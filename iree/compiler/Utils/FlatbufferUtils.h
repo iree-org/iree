@@ -25,7 +25,7 @@
 #include "mlir/Support/LogicalResult.h"
 
 // NOTE: order matters here as some of the LLVM includes conflict.
-#include "iree/base/flatcc.h"
+#include "iree/base/internal/flatcc.h"
 
 namespace mlir {
 namespace iree_compiler {

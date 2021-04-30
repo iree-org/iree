@@ -15,7 +15,7 @@
 #include <mutex>
 
 #include "benchmark/benchmark.h"
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
 
 namespace {
 

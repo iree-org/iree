@@ -19,8 +19,8 @@
 
 #include <vector>
 
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/status.h"
-#include "iree/base/synchronization.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"

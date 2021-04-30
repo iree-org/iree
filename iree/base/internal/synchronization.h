@@ -16,8 +16,8 @@
 // design your algorithm so that you don't need anything from this file :)
 // See https://travisdowns.github.io/blog/2020/07/06/concurrency-costs.html
 
-#ifndef IREE_BASE_SYNCHRONIZATION_H_
-#define IREE_BASE_SYNCHRONIZATION_H_
+#ifndef IREE_BASE_INTERNAL_SYNCHRONIZATION_H_
+#define IREE_BASE_INTERNAL_SYNCHRONIZATION_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -368,4 +368,4 @@ void iree_notification_await(iree_notification_t* notification,
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_SYNCHRONIZATION_H_
+#endif  // IREE_BASE_INTERNAL_SYNCHRONIZATION_H_

@@ -55,7 +55,7 @@ iree_cc_library(
   DEPS
     ::op_kernels
     absl::span
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::status
     iree::base::tracing

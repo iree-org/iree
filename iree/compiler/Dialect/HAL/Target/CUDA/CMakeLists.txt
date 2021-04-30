@@ -33,7 +33,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport
-    iree::base::flatcc
+    iree::base::internal::flatcc
     iree::compiler::Conversion::LinalgToNVVM
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Utils

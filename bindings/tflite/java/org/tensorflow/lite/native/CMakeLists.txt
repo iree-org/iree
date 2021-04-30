@@ -23,7 +23,7 @@ iree_cc_library(
     "tensorflow_lite_jni.cc"
   HDRS
   DEPS
-    iree::base::api
+    iree::base
     bindings::tflite::shim
   LINKOPTS
     "-landroid"

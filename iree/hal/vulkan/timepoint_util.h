@@ -21,8 +21,8 @@
 
 #include <array>
 
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/status.h"
-#include "iree/base/synchronization.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/util/intrusive_list.h"
 #include "iree/hal/vulkan/util/ref_ptr.h"

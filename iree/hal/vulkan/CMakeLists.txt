@@ -75,15 +75,15 @@ iree_cc_library(
     Vulkan::Headers
     absl::span
     absl::strings
-    iree::base::api
+    iree::base
     iree::base::core_headers
-    iree::base::flatcc
     iree::base::internal
+    iree::base::internal::flatcc
+    iree::base::internal::synchronization
     iree::base::logging
     iree::base::status
-    iree::base::synchronization
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::vulkan::util::arena
     iree::hal::vulkan::util::intrusive_list
     iree::hal::vulkan::util::ref_ptr

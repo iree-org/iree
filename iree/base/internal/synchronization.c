@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
 
 #include <assert.h>
 

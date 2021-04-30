@@ -23,7 +23,7 @@ iree_cc_library(
     iree::base::internal::file_io
     iree::base::signature_parser
     iree::base::status
-    iree::hal::api
+    iree::hal
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
@@ -39,8 +39,8 @@ iree_cc_test(
   DEPS
     ::vm_util
     absl::strings
-    iree::base::api
-    iree::hal::api
+    iree::base
+    iree::hal
     iree::hal::vmla::registration
     iree::modules::hal
     iree::testing::gtest

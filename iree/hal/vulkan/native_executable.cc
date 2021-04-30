@@ -20,7 +20,7 @@
 #include "iree/hal/vulkan/status_util.h"
 
 // flatcc schemas:
-#include "iree/base/flatcc.h"
+#include "iree/base/internal/flatcc.h"
 #include "iree/schemas/spirv_executable_def_reader.h"
 #include "iree/schemas/spirv_executable_def_verifier.h"
 

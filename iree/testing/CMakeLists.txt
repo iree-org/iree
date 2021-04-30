@@ -19,7 +19,7 @@ iree_cc_library(
     "benchmark_full.cc"
   DEPS
     benchmark
-    iree::base::api
+    iree::base
     iree::base::tracing
   TESTONLY
   PUBLIC

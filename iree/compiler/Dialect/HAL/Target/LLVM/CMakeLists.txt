@@ -42,7 +42,7 @@ iree_cc_library(
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
     MLIRTargetLLVMIRExport
-    iree::base::flatcc
+    iree::base::internal::flatcc
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToLLVM

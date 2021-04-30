@@ -50,8 +50,8 @@ cc_binary(
     deps = [
         ":simple_embedding_test_bytecode_module_c",
         ":simple_embedding_test_llvm_aot_rv64",
-        "//iree/base:api",
-        "//iree/hal:api",
+        "//iree/base",
+        "//iree/hal",
         "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/vm",
@@ -65,8 +65,8 @@ cc_binary(
     deps = [
         ":simple_embedding_test_bytecode_module_c",
         ":simple_embedding_test_llvm_aot_rv64",
-        "//iree/base:api",
-        "//iree/hal:api",
+        "//iree/base",
+        "//iree/hal",
         "//iree/hal/local",
         "//iree/hal/local:sync_driver",
         "//iree/hal/local/loaders:legacy_library_loader",

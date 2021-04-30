@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "benchmark/benchmark.h"
-#include "iree/base/threading.h"
+#include "iree/base/internal/threading.h"
 
 namespace {
 

@@ -38,7 +38,7 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/cuda",
     ],
 )
