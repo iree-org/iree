@@ -110,9 +110,11 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
           op.getShapedOperand(*producerIdx).getDefiningOp<memref::SubViewOp>();
       assert(promotedViewProducer &&
              "expected producer to be a subview op as well");
+      auto layout = DataLayout::closest(op);
       Optional<linalg::PromotionInfo> promotionInfo =
-          linalg::promoteSubviewAsNewBuffer(
-              builder, op.getLoc(), promotedViewProducer, options.allocationFn);
+          linalg::promoteSubviewAsNewBuffer(builder, op.getLoc(),
+                                            promotedViewProducer,
+                                            options.allocationFn, layout);
       if (!promotionInfo) {
         return op.emitError("unable to promote RAW dependence");
       }

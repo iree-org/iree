@@ -52,6 +52,7 @@ class LinalgTileAndDistributePass
 Optional<Value> allocateThreadLocalMemory(OpBuilder &b,
                                           memref::SubViewOp subview,
                                           ArrayRef<Value> boundingSubViewSize,
+                                          mlir::DataLayout &layout,
                                           OperationFolder *folder) {
   // Allocate the memory into the entry block of the parent FuncOp. This better
   // aligns with the semantics of this memory which is available at the entry of

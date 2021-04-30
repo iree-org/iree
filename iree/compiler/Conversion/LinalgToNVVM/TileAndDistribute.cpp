@@ -222,7 +222,8 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
 
 static Optional<Value> allocateWorkgroupMemory(
     OpBuilder &b, memref::SubViewOp subview,
-    ArrayRef<Value> boundingSubViewSize, OperationFolder *folder) {
+    ArrayRef<Value> boundingSubViewSize, DataLayout &layout,
+    OperationFolder *folder) {
   // In CUDA workgroup memory is represented by a global variable. Create a
   // global variable and a memref.GetGlobalOp at the beginning of the funtion to
   // get the memref.

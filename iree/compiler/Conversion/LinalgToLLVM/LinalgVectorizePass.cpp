@@ -82,6 +82,12 @@ void LinalgVectorizationPass::runOnFunction() {
       op->replaceAllUsesWith(contract);
   });
 
+  // Lowering transfer ops before unrolling as unrolling doesn't support
+  // transpose.
+  OwningRewritePatternList transferOpLowering(&getContext());
+  vector::populateVectorTransferLoweringPatterns(transferOpLowering);
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(transferOpLowering));
+
   // Apply unrolling patterns.
   {
     OwningRewritePatternList vectorUnrollPatterns(&getContext());

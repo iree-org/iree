@@ -108,8 +108,8 @@ void LogMessage::EmitLogMessage() {
   {
     // NOTE: this truncates. That's fine for now and stderr is still usable.
     char str_buffer[512];
-    int str_length = snprintf(str_buffer, sizeof(str_buffer), "%s:%d] %s\n",
-                              file_name_, line_, str().c_str());
+    snprintf(str_buffer, sizeof(str_buffer), "%s:%d] %s\n", file_name_, line_,
+             str().c_str());
     __android_log_write(android_severity, "native", str_buffer);
   }
 #endif  // !defined(__ANDROID__)
