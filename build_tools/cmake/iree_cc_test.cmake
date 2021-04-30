@@ -32,7 +32,7 @@ include(iree_installed_test)
 #
 # Note:
 # iree_cc_test will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
-# iree_base_foo_test with an alias (readonly) target called ${NAME}.
+# iree_base_foo_test.
 #
 #
 # Usage:
@@ -73,7 +73,6 @@ function(iree_cc_test)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_executable(${_NAME} "")
-  add_executable(${_RULE_NAME} ALIAS ${_NAME})
   set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   target_sources(${_NAME}
     PRIVATE

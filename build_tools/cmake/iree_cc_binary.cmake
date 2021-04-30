@@ -31,7 +31,7 @@ include(CMakeParseArguments)
 #
 # Note:
 # iree_cc_binary will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
-# iree_base_foo with an alias (readonly) target called ${NAME}.
+# iree_base_foo.
 #
 # Usage:
 # iree_cc_library(
@@ -70,7 +70,6 @@ function(iree_cc_binary)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_executable(${_NAME} "")
-  add_executable(${_RULE_NAME} ALIAS ${_NAME})
   set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   if(_RULE_SRCS)
     target_sources(${_NAME}
