@@ -32,17 +32,12 @@ __all__ = [
     "jit",
 ]
 
-_BACKENDS = ["vmla", "llvmaot", "vulkan"]
-_BACKEND_TO_DRIVER = {
-    "vmla": "vmla",
-    "llvmaot": "dylib",
-    "vulkan": "vulkan",
-}
 _BACKEND_TO_TARGETS = {
-    "vmla": ("vmla",),
-    "llvmaot": ("dylib-llvm-aot",),
-    "vulkan": ("vulkan-*",),
+    "vmla": "vmla",
+    "llvmaot": "dylib-llvm-aot",
+    "vulkan": "vulkan-*",
 }
+_BACKENDS = tuple(_BACKEND_TO_TARGETS.keys())
 
 
 def is_available():
@@ -64,8 +59,7 @@ def aot(function, *args, **options):
   """
   xla_comp = jax.xla_computation(function)(*args)
   hlo_proto = xla_comp.as_serialized_hlo_module_proto()
-  binary = iree.compiler.xla.compile_str(hlo_proto, **options)
-  return binary
+  return iree.compiler.xla.compile_str(hlo_proto, **options)
 
 
 # A more JAX-native approach to jitting would be desireable here, however
@@ -94,9 +88,9 @@ class _JittedFunction:
       return self._function(*args, **kwargs)
 
     # Compile the wrapped_function to IREE.
-    binary = aot(wrapped_function, *args_flat, **self._options)
-    cpp_vm_module = iree.runtime.VmModule.from_flatbuffer(binary)
-    module = iree.runtime.load_module(cpp_vm_module, config=self._driver_config)
+    vm_flatbuffer = aot(wrapped_function, *args_flat, **self._options)
+    vm_module = iree.runtime.VmModule.from_flatbuffer(vm_flatbuffer)
+    module = iree.runtime.load_vm_module(vm_module, config=self._driver_config)
 
     # Get the output tree so it can be reconstructed from the outputs of the
     # compiled module. Duplicating execution here isn't ideal, and could
@@ -104,7 +98,7 @@ class _JittedFunction:
     args, kwargs = jax.tree_unflatten(in_tree, args_flat)
     _, out_tree = jax.tree_flatten(self._function(*args, **kwargs))
 
-    self._memoized_signatures[signature] = (binary, module, out_tree)
+    self._memoized_signatures[signature] = (module, out_tree)
 
   def _get_compiled_artifacts(self, args, kwargs):
     """Returns the binary, loaded runtime module and out_tree."""
@@ -122,7 +116,7 @@ class _JittedFunction:
     if any(issubclass(type(arg), jax.core.Tracer) for arg in args_flat):
       return self._function(*args, **kwargs)
 
-    _, module, out_tree = self._get_compiled_artifacts(args, kwargs)
+    module, out_tree = self._get_compiled_artifacts(args, kwargs)
     results = module.main(*args_flat)
     if results is not None:
       if not isinstance(results, tuple):
@@ -136,11 +130,6 @@ class _JittedFunction:
         return ()
       else:
         return results
-
-  def get_binary(self, *args, **kwargs):
-    """Gets the IREE-compiled binary for the given inputs."""
-    binary, _, _ = self._get_compiled_artifacts(args, kwargs)
-    return binary
 
 
 def jit(function=None, *, backend: str = "llvmaot", **options):
@@ -156,8 +145,9 @@ def jit(function=None, *, backend: str = "llvmaot", **options):
   if backend not in _BACKENDS:
     raise ValueError(
         f"Expected backend to be one of {_BACKENDS}, but got '{backend}'")
-  driver = _BACKEND_TO_DRIVER[backend]
+  target_backend = _BACKEND_TO_TARGETS[backend]
+  driver = iree.runtime.TARGET_BACKEND_TO_DRIVER[target_backend]
   if "target_backends" not in options:
-    options["target_backends"] = _BACKEND_TO_TARGETS[backend]
+    options["target_backends"] = (target_backend,)
 
   return functools.wraps(function)(_JittedFunction(function, driver, **options))
