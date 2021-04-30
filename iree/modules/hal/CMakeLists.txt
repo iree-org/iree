@@ -20,7 +20,7 @@ iree_cc_library(
   SRCS
     "hal_module.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::tracing
     iree::hal
     iree::vm

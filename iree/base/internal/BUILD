@@ -114,7 +114,7 @@ cc_library(
     srcs = ["file_io.cc"],
     hdrs = ["file_io.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -135,7 +135,7 @@ cc_library(
     srcs = ["file_path.c"],
     hdrs = ["file_path.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
     ],
 )
@@ -159,7 +159,7 @@ cc_library(
     hdrs = ["flags.h"],
     deps = [
         ":internal",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:tracing",
     ],
 )
@@ -226,7 +226,7 @@ cc_library(
         "statusor.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:logging",
         "@com_google_absl//absl/base:core_headers",
@@ -249,7 +249,7 @@ cc_library(
     ],
     hdrs = ["wait_handle.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],

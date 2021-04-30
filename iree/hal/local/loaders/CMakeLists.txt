@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "embedded_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
     iree::hal
@@ -37,7 +37,7 @@ iree_cc_library(
   SRCS
     "legacy_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::flatcc
     iree::base::internal::dynamic_library
@@ -58,7 +58,7 @@ iree_cc_library(
   SRCS
     "static_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::tracing
     iree::hal
     iree::hal::local
@@ -75,7 +75,7 @@ iree_cc_library(
   SRCS
     "system_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::flatcc
     iree::base::internal::file_io
     iree::base::tracing
@@ -96,7 +96,7 @@ iree_cc_library(
   SRCS
     "vmla_module_loader.cc"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::flatcc
     iree::base::tracing
     iree::hal

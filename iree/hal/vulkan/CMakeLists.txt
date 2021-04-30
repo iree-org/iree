@@ -75,7 +75,7 @@ iree_cc_library(
     Vulkan::Headers
     absl::span
     absl::strings
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::flatcc
     iree::base::internal

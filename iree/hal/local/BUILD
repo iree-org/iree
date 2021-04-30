@@ -32,7 +32,7 @@ cc_library(
     srcs = ["arena.c"],
     hdrs = ["arena.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:synchronization",
         "//iree/base/internal:atomic_slist",
@@ -46,7 +46,7 @@ cc_library(
     srcs = ["event_pool.c"],
     hdrs = ["event_pool.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:synchronization",
         "//iree/base:tracing",
@@ -66,7 +66,7 @@ cc_test(
     deps = [
         ":executable_library",
         ":local",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:tracing",
         "//iree/base/internal:flags",
         "//iree/hal/local/loaders:embedded_library_loader",
@@ -82,7 +82,7 @@ cc_test(
         "executable_library_test.c",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/hal/local:executable_library",
     ],
@@ -110,7 +110,7 @@ cc_library(
     ],
     deps = [
         ":executable_library",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
@@ -135,7 +135,7 @@ cc_library(
     deps = [
         ":arena",
         ":local",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:synchronization",
         "//iree/base:tracing",
@@ -170,7 +170,7 @@ cc_library(
         ":arena",
         ":event_pool",
         ":local",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:synchronization",
         "//iree/base:tracing",

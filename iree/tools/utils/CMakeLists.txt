@@ -39,7 +39,7 @@ iree_cc_test(
   DEPS
     ::vm_util
     absl::strings
-    iree::base::api
+    iree::base
     iree::hal
     iree::hal::vmla::registration
     iree::modules::hal

@@ -42,7 +42,7 @@ cc_test(
     srcs = ["vm_util_test.cc"],
     deps = [
         ":vm_util",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/hal",
         "//iree/hal/vmla/registration",
         "//iree/modules/hal",

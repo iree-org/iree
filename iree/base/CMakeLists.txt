@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    api
+    base
   HDRS
     "api.h"
   SRCS
@@ -140,6 +140,7 @@ iree_cc_test(
   SRCS
     "string_view_test.cc"
   DEPS
+    ::base
     ::api
     iree::testing::gtest
     iree::testing::gtest_main

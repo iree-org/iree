@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "arena.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal::atomic_slist
     iree::base::synchronization
@@ -33,7 +33,7 @@ iree_cc_library(
   SRCS
     "event_pool.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::wait_handle
@@ -58,7 +58,7 @@ iree_cc_test(
   DEPS
     ::executable_library
     ::local
-    iree::base::api
+    iree::base
     iree::base::internal::flags
     iree::base::tracing
     iree::hal::local::loaders::embedded_library_loader
@@ -73,7 +73,7 @@ iree_cc_test(
     "executable_library_demo.h"
     "executable_library_test.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::hal::local::executable_library
 )
@@ -99,7 +99,7 @@ iree_cc_library(
     "local_executable_layout.c"
   DEPS
     ::executable_library
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::tracing
@@ -123,7 +123,7 @@ iree_cc_library(
   DEPS
     ::arena
     ::local
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::wait_handle
@@ -157,7 +157,7 @@ iree_cc_library(
     ::arena
     ::event_pool
     ::local
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::wait_handle

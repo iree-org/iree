@@ -23,7 +23,7 @@ cc_test(
     srcs = ["check_test.cc"],
     deps = [
         ":native_module",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:logging",
         "//iree/base:status",
         "//iree/base/internal",
@@ -45,7 +45,7 @@ cc_library(
     srcs = ["native_module.cc"],
     hdrs = ["native_module.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:status",
         "//iree/base/internal",
         "//iree/hal",

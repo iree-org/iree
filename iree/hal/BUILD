@@ -72,7 +72,7 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:synchronization",
         "//iree/base:threading",

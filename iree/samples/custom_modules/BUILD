@@ -47,7 +47,7 @@ cc_test(
     deps = [
         ":custom_modules_test_module_cc",
         ":native_module",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:logging",
         "//iree/hal",
         "//iree/hal/vmla/registration",
@@ -66,7 +66,7 @@ cc_library(
     srcs = ["native_module.cc"],
     hdrs = ["native_module.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",

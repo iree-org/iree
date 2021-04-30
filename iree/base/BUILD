@@ -28,7 +28,7 @@ package(
 #===------------------------------------------------------------------------===#
 
 cc_library(
-    name = "api",
+    name = "base",
     srcs = [
         "allocator.c",
         "api.c",
@@ -147,6 +147,7 @@ cc_test(
     name = "string_view_test",
     srcs = ["string_view_test.cc"],
     deps = [
+        ":base",
         ":api",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",

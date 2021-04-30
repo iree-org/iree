@@ -19,7 +19,7 @@ cc_library(
         "strings_module.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:logging",
         "//iree/hal",
         "//iree/modules/hal",
@@ -45,7 +45,7 @@ cc_test(
     deps = [
         ":strings_module",
         ":strings_module_test_module_cc",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:logging",
         "//iree/hal",
         "//iree/hal/vmla/registration",

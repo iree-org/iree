@@ -99,7 +99,7 @@ iree_cc_library(
   SRCS
     "file_io.cc"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
@@ -124,7 +124,7 @@ iree_cc_library(
   SRCS
     "file_path.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
   PUBLIC
 )
@@ -150,7 +150,7 @@ iree_cc_library(
     "flags.c"
   DEPS
     ::internal
-    iree::base::api
+    iree::base
     iree::base::tracing
   PUBLIC
 )
@@ -226,7 +226,7 @@ iree_cc_library(
     absl::core_headers
     absl::strings
     absl::utility
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::logging
   PUBLIC
@@ -247,7 +247,7 @@ iree_cc_library(
     "wait_handle_posix.h"
     "wait_handle_win32.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
   PUBLIC

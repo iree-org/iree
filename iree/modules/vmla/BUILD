@@ -65,7 +65,7 @@ cc_library(
     hdrs = ["op_module.h"],
     deps = [
         ":op_kernels",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",

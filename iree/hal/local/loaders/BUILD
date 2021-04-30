@@ -31,7 +31,7 @@ cc_library(
         "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/hal",
@@ -48,7 +48,7 @@ cc_library(
         "IREE_HAL_HAVE_LEGACY_LIBRARY_LOADER=1",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:flatcc",
         "//iree/base:tracing",
@@ -67,7 +67,7 @@ cc_library(
         "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:tracing",
         "//iree/hal",
         "//iree/hal/local",
@@ -82,7 +82,7 @@ cc_library(
         "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:flatcc",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
@@ -106,7 +106,7 @@ cc_library(
         "IREE_HAL_HAVE_VMLA_MODULE_LOADER=1",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:flatcc",
         "//iree/base:tracing",
         "//iree/hal",

@@ -87,7 +87,7 @@ iree_cc_binary(
   DEPS
     iree::modules::check::native_module
     absl::strings
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -363,7 +363,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRTargetLLVMIRExport
       absl::span
       absl::strings
-      iree::base::api
+      iree::base
       iree::base::internal::flags
       iree::base::status
       iree::base::tracing

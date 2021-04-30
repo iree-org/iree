@@ -37,7 +37,7 @@ iree_cc_library(
     "tensor.c"
     "tensor.h"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::tracing

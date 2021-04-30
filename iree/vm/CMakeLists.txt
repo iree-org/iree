@@ -17,7 +17,7 @@ iree_cc_library(
     "api.h"
   DEPS
     ::impl
-    iree::base::api
+    iree::base
   PUBLIC
 )
 
@@ -33,7 +33,7 @@ iree_cc_library(
     absl::optional
     absl::span
     absl::strings
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::status
   PUBLIC
@@ -67,7 +67,7 @@ iree_cc_library(
     "shims.c"
     "stack.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::tracing
@@ -82,7 +82,7 @@ iree_cc_test(
   DEPS
     ::cc
     ::impl
-    iree::base::api
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -96,7 +96,7 @@ iree_cc_test(
     ::cc
     ::impl
     ::native_module_test_hdrs
-    iree::base::api
+    iree::base
     iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
@@ -109,7 +109,7 @@ iree_cc_library(
     "native_module_test.h"
   DEPS
     ::impl
-    iree::base::api
+    iree::base
   PUBLIC
 )
 
@@ -122,7 +122,7 @@ iree_cc_test(
     ::impl
     ::native_module_test_hdrs
     benchmark
-    iree::base::api
+    iree::base
     iree::base::logging
     iree::testing::benchmark_main
 )
@@ -135,7 +135,7 @@ iree_cc_test(
   DEPS
     ::cc
     ::impl
-    iree::base::api
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -147,7 +147,7 @@ iree_cc_test(
     "stack_test.cc"
   DEPS
     ::impl
-    iree::base::api
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -166,7 +166,7 @@ iree_cc_library(
   DEPS
     ::ops
     ::vm
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::flatcc
     iree::base::internal
@@ -205,7 +205,7 @@ iree_cc_binary(
     ::bytecode_module_benchmark_module_cc
     ::vm
     benchmark
-    iree::base::api
+    iree::base
     iree::base::logging
     iree::testing::benchmark_main
   TESTONLY
@@ -242,7 +242,7 @@ iree_cc_test(
     ::bytecode_module
     ::bytecode_module_size_benchmark_module_cc
     ::vm
-    iree::base::api
+    iree::base
 )
 
 iree_bytecode_module(
@@ -266,7 +266,7 @@ iree_cc_library(
   HDRS
     "ops.h"
   DEPS
-    iree::base::api
+    iree::base
   PUBLIC
 )
 

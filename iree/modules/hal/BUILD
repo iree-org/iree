@@ -30,7 +30,7 @@ cc_library(
         "exports.inl",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:tracing",
         "//iree/hal",
         "//iree/vm",

@@ -55,7 +55,7 @@ iree_cc_library(
     "string_util.h"
   DEPS
     absl::strings
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::synchronization

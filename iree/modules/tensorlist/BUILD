@@ -26,7 +26,7 @@ cc_library(
     srcs = ["native_module.cc"],
     hdrs = ["native_module.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:status",
         "//iree/hal",
         "//iree/modules/hal",
@@ -62,7 +62,7 @@ cc_test(
     deps = [
         ":native_module",
         ":tensorlist_test_module_cc",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:logging",
         "//iree/hal",
         "//iree/hal/vmla/registration",

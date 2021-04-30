@@ -63,7 +63,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":dynamic_symbols",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:flatcc",
         "//iree/base:logging",
