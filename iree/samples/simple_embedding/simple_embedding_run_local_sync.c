@@ -49,18 +49,16 @@ iree_status_t Run() {
   IREE_RETURN_IF_ERROR(iree_hal_legacy_library_loader_create(
       iree_allocator_system(), &dylib_loader));
   iree_hal_executable_loader_t* loaders[1] = {dylib_loader};
-  iree_hal_executable_loader_retain(loaders[0]);
-
-  iree_host_size_t loader_count = IREE_ARRAYSIZE(loaders);
 
   iree_string_view_t identifier = iree_make_cstring_view("dylib");
 
-  // Create the synchronous device.
+  // Create the synchronous device and release the loader afterwards.
   iree_hal_device_t* device = NULL;
 
   IREE_RETURN_IF_ERROR(
-      iree_hal_sync_device_create(identifier, &params, loader_count, loaders,
-                                  iree_allocator_system(), &device));
+      iree_hal_sync_device_create(identifier, &params, IREE_ARRAYSIZE(loaders),
+                                  loaders, iree_allocator_system(), &device));
+  iree_hal_executable_loader_release(dylib_loader);
 
   // Create the corresponding HAL module.
   iree_vm_module_t* hal_module = NULL;
@@ -80,18 +78,18 @@ iree_status_t Run() {
 #endif
 
   iree_vm_module_t* bytecode_module = NULL;
-  iree_const_byte_span_t module_data = {(const uint8_t*)module_file_toc->data,
-                                        module_file_toc->size};
+  iree_const_byte_span_t module_data =
+      iree_make_const_byte_span(module_file_toc->data, module_file_toc->size);
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
       module_data, iree_allocator_null(), iree_allocator_system(),
       &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
-  const int kVmModuleNum = 2;
   iree_vm_context_t* context = NULL;
   iree_vm_module_t* modules[] = {hal_module, bytecode_module};
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-      instance, &modules[0], kVmModuleNum, iree_allocator_system(), &context));
+      instance, &modules[0], IREE_ARRAYSIZE(modules), iree_allocator_system(),
+      &context));
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
 
@@ -202,7 +200,7 @@ int main(int argc, char** argv) {
     char* message;
     size_t message_length;
     iree_status_to_string(result, &message, &message_length);
-    printf("simple_embedding_run failed: %s\n", message);
+    fprintf(stderr, "simple_embedding_run failed: %s\n", message);
     iree_allocator_free(iree_allocator_system(), message);
     return -1;
   }
