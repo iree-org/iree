@@ -14,9 +14,6 @@
 
 # Common types and utilities used in the IREE codebase.
 
-load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -66,26 +63,6 @@ cc_library(
 #===------------------------------------------------------------------------===#
 # Internal IREE C++ wrappers and utilities
 #===------------------------------------------------------------------------===#
-
-cc_library(
-    name = "flatcc",
-    hdrs = ["flatcc.h"],
-    deps = [
-        ":flatcc_dummy",
-        "@com_github_dvidelabs_flatcc//:runtime",
-    ],
-)
-
-iree_flatbuffer_c_library(
-    name = "flatcc_dummy",
-    srcs = ["flatcc.fbs"],
-    flatcc_args = [
-        "--reader",
-        "--builder",
-        "--verifier",
-        "--json",
-    ],
-)
 
 cc_library(
     name = "logging",

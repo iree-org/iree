@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_FLATCC_H_
-#define IREE_BASE_FLATCC_H_
+#ifndef IREE_BASE_INTERNAL_FLATCC_H_
+#define IREE_BASE_INTERNAL_FLATCC_H_
 
 //===----------------------------------------------------------------------===//
 // flatcc include order fixes
@@ -30,21 +30,21 @@
 // clang-format off
 
 #include "flatcc/reflection/flatbuffers_common_reader.h"
-#include "iree/base/flatcc_reader.h"
+#include "iree/base/internal/flatcc_reader.h"
 
 #include "flatcc/flatcc_verifier.h"
-#include "iree/base/flatcc_verifier.h"
+#include "iree/base/internal/flatcc_verifier.h"
 
 #include "flatcc/flatcc_builder.h"
 #include "flatcc/reflection/flatbuffers_common_builder.h"
-#include "iree/base/flatcc_builder.h"
+#include "iree/base/internal/flatcc_builder.h"
 
 #include "flatcc/flatcc_json_parser.h"
-#include "iree/base/flatcc_json_parser.h"
+#include "iree/base/internal/flatcc_json_parser.h"
 
 #include "flatcc/flatcc_json_printer.h"
-#include "iree/base/flatcc_json_printer.h"
+#include "iree/base/internal/flatcc_json_printer.h"
 
 // clang-format on
 
-#endif  // IREE_BASE_FLATCC_H_
+#endif  // IREE_BASE_INTERNAL_FLATCC_H_

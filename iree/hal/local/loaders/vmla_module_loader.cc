@@ -21,7 +21,7 @@
 #include "iree/vm/bytecode_module.h"
 
 // flatcc schemas:
-#include "iree/base/flatcc.h"
+#include "iree/base/internal/flatcc.h"
 #include "iree/schemas/vmla_executable_def_reader.h"
 #include "iree/schemas/vmla_executable_def_verifier.h"
 

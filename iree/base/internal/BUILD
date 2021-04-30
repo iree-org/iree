@@ -16,6 +16,8 @@
 # These are not part of the IREE API. Though they may be used by external
 # projects their API may change at any time.
 
+load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
+load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -181,6 +183,26 @@ iree_lit_test_suite(
         "//iree/tools:IreeFileCheck",
     ],
     tags = ["hostonly"],
+)
+
+cc_library(
+    name = "flatcc",
+    hdrs = ["flatcc.h"],
+    deps = [
+        ":flatcc_dummy",
+        "@com_github_dvidelabs_flatcc//:runtime",
+    ],
+)
+
+iree_flatbuffer_c_library(
+    name = "flatcc_dummy",
+    srcs = ["flatcc.fbs"],
+    flatcc_args = [
+        "--reader",
+        "--builder",
+        "--verifier",
+        "--json",
+    ],
 )
 
 cc_library(

@@ -77,8 +77,8 @@ iree_cc_library(
     absl::strings
     iree::base
     iree::base::core_headers
-    iree::base::flatcc
     iree::base::internal
+    iree::base::internal::flatcc
     iree::base::internal::synchronization
     iree::base::logging
     iree::base::status

@@ -50,9 +50,9 @@ cc_library(
     deps = [
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:flatcc",
         "//iree/base:tracing",
         "//iree/base/internal:dynamic_library",
+        "//iree/base/internal:flatcc",
         "//iree/hal",
         "//iree/hal/local",
         "//iree/schemas:dylib_executable_def_c_fbs",
@@ -83,9 +83,9 @@ cc_library(
     ],
     deps = [
         "//iree/base",
-        "//iree/base:flatcc",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
+        "//iree/base/internal:flatcc",
         "//iree/hal",
         "//iree/hal/local",
     ],
@@ -107,8 +107,8 @@ cc_library(
     ],
     deps = [
         "//iree/base",
-        "//iree/base:flatcc",
         "//iree/base:tracing",
+        "//iree/base/internal:flatcc",
         "//iree/hal",
         "//iree/hal/local",
         "//iree/modules/vmla:op_module",

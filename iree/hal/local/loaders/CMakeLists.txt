@@ -39,8 +39,8 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::core_headers
-    iree::base::flatcc
     iree::base::internal::dynamic_library
+    iree::base::internal::flatcc
     iree::base::tracing
     iree::hal
     iree::hal::local
@@ -76,8 +76,8 @@ iree_cc_library(
     "system_library_loader.c"
   DEPS
     iree::base
-    iree::base::flatcc
     iree::base::internal::file_io
+    iree::base::internal::flatcc
     iree::base::tracing
     iree::hal
     iree::hal::local
@@ -97,7 +97,7 @@ iree_cc_library(
     "vmla_module_loader.cc"
   DEPS
     iree::base
-    iree::base::flatcc
+    iree::base::internal::flatcc
     iree::base::tracing
     iree::hal
     iree::hal::local

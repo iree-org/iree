@@ -190,9 +190,9 @@ cc_library(
         ":vm",
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:flatcc",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:flatcc",
         "//iree/schemas:bytecode_module_def_c_fbs",
     ],
 )

@@ -42,7 +42,7 @@ cc_library(
         ":LLVMIRPasses",
         ":LLVMTargetOptions",
         ":LinkerTool",
-        "//iree/base:flatcc",
+        "//iree/base/internal:flatcc",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToLLVM",
