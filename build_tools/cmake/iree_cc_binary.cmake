@@ -30,7 +30,8 @@ include(CMakeParseArguments)
 # HOSTONLY: host only; compile using host toolchain when cross-compiling
 #
 # Note:
-# By default, iree_cc_binary will always create a binary named iree_${NAME}.
+# iree_cc_binary will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
+# iree_base_foo with an alias (readonly) target called ${NAME}.
 #
 # Usage:
 # iree_cc_library(
