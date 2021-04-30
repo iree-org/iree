@@ -27,7 +27,7 @@ cc_library(
         "//iree/base:signature_parser",
         "//iree/base:status",
         "//iree/base/internal:file_io",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:bytecode_module",
@@ -43,7 +43,7 @@ cc_test(
     deps = [
         ":vm_util",
         "//iree/base:api",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/vmla/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",

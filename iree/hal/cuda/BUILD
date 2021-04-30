@@ -71,7 +71,7 @@ cc_library(
         "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/schemas:cuda_executable_def_c_fbs",
     ],
 )

@@ -25,10 +25,9 @@ package(
 #===------------------------------------------------------------------------===#
 # Public API
 #===------------------------------------------------------------------------===#
-# TODO(benvanik): rename to :hal
 
 cc_library(
-    name = "api",
+    name = "hal",
     srcs = [
         "allocator.c",
         "allocator.h",
@@ -87,7 +86,7 @@ cc_test(
     name = "string_util_test",
     srcs = ["string_util_test.cc"],
     deps = [
-        ":api",
+        ":hal",
         "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/testing:gtest",

@@ -35,7 +35,7 @@ iree_pyext_module(
     iree::base::api
     iree::base::signature_parser
     iree::base::status
-    iree::hal::api
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::modules::strings::strings_module

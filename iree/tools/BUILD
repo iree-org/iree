@@ -245,7 +245,7 @@ cc_binary(
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",

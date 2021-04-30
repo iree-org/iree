@@ -103,7 +103,7 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal
     iree::base::tracing
-    iree::hal::api
+    iree::hal
   PUBLIC
 )
 
@@ -129,7 +129,7 @@ iree_cc_library(
     iree::base::internal::wait_handle
     iree::base::synchronization
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::task
   PUBLIC
 )
@@ -163,7 +163,7 @@ iree_cc_library(
     iree::base::internal::wait_handle
     iree::base::synchronization
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::task
   PUBLIC
 )

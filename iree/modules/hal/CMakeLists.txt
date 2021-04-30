@@ -22,7 +22,7 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::vm
   PUBLIC
 )

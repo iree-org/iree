@@ -21,7 +21,7 @@ iree_cc_library(
     iree::base::api
     iree::base::core_headers
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
     iree::hal::local::elf::elf_module
   DEFINES
@@ -42,7 +42,7 @@ iree_cc_library(
     iree::base::flatcc
     iree::base::internal::dynamic_library
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
     iree::schemas::dylib_executable_def_c_fbs
   DEFINES
@@ -60,7 +60,7 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
   DEFINES
     "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
@@ -79,7 +79,7 @@ iree_cc_library(
     iree::base::flatcc
     iree::base::internal::file_io
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
   DEFINES
     "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
@@ -99,7 +99,7 @@ iree_cc_library(
     iree::base::api
     iree::base::flatcc
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
     iree::modules::vmla::op_module
     iree::schemas::vmla_executable_def_c_fbs

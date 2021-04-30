@@ -370,7 +370,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
-      iree::hal::api
+      iree::hal
       iree::hal::drivers
       iree::modules::hal
       iree::tools::utils::vm_util

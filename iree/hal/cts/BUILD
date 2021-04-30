@@ -24,7 +24,7 @@ cc_library(
     hdrs = ["cts_test_base.h"],
     deps = [
         "//iree/base:api",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/testing:gtest",
     ],
 )

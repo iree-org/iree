@@ -21,7 +21,7 @@ iree_cc_library(
     absl::span
     iree::base::api
     iree::base::status
-    iree::hal::api
+    iree::hal
     iree::modules::hal
     iree::vm
     iree::vm::cc
@@ -57,7 +57,7 @@ iree_cc_test(
     absl::span
     iree::base::api
     iree::base::logging
-    iree::hal::api
+    iree::hal
     iree::hal::vmla::registration
     iree::modules::hal
     iree::testing::gtest

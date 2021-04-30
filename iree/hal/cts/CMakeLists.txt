@@ -17,7 +17,7 @@ iree_cc_library(
     "cts_test_base.h"
   DEPS
     iree::base::api
-    iree::hal::api
+    iree::hal
     iree::testing::gtest
   TESTONLY
   PUBLIC

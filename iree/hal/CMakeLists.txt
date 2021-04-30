@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    api
+    hal
   HDRS
     "api.h"
   SRCS
@@ -70,7 +70,7 @@ iree_cc_test(
   SRCS
     "string_util_test.cc"
   DEPS
-    ::api
+    ::hal
     absl::span
     absl::strings
     iree::base::core_headers

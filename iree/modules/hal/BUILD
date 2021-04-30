@@ -32,7 +32,7 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:tracing",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/vm",
     ],
 )

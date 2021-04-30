@@ -28,7 +28,7 @@ if(${IREE_HAL_DRIVER_VMLA})
       iree::base::internal
       iree::base::logging
       iree::base::status
-      iree::hal::api
+      iree::hal
       iree::hal::vmla::registration
       iree::modules::hal
       iree::testing::gtest
@@ -51,7 +51,7 @@ iree_cc_library(
     iree::base::api
     iree::base::internal
     iree::base::status
-    iree::hal::api
+    iree::hal
     iree::modules::hal
     iree::testing::gtest
     iree::vm

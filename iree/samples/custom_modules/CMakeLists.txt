@@ -41,7 +41,7 @@ iree_cc_test(
     absl::strings
     iree::base::api
     iree::base::logging
-    iree::hal::api
+    iree::hal
     iree::hal::vmla::registration
     iree::modules::hal
     iree::testing::gtest
@@ -60,7 +60,7 @@ iree_cc_library(
     "native_module.cc"
   DEPS
     iree::base::api
-    iree::hal::api
+    iree::hal
     iree::modules::hal
     iree::vm
     iree::vm::cc

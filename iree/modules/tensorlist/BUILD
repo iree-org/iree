@@ -28,7 +28,7 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:status",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:cc",
@@ -64,7 +64,7 @@ cc_test(
         ":tensorlist_test_module_cc",
         "//iree/base:api",
         "//iree/base:logging",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/vmla/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",

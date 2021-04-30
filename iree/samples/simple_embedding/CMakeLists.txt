@@ -32,7 +32,7 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_c
     ::simple_embedding_test_llvm_aot_rv64
     iree::base::api
-    iree::hal::api
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::vm
@@ -48,7 +48,7 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_c
     ::simple_embedding_test_llvm_aot_rv64
     iree::base::api
-    iree::hal::api
+    iree::hal
     iree::hal::local
     iree::hal::local::loaders::legacy_library_loader
     iree::hal::local::sync_driver

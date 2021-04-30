@@ -35,7 +35,7 @@ cc_library(
         "IREE_HAL_HAVE_VMLA_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/local:task_driver",
         "//iree/hal/local/loaders:vmla_module_loader",
     ],

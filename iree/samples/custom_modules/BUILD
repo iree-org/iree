@@ -49,7 +49,7 @@ cc_test(
         ":native_module",
         "//iree/base:api",
         "//iree/base:logging",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/vmla/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",
@@ -67,7 +67,7 @@ cc_library(
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base:api",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:cc",
