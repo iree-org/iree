@@ -132,8 +132,8 @@ void MaterializeCPULaunchConfigurationPass::runOnOperation() {
       OwningRewritePatternList canonicalization(&getContext());
       AffineMinOp::getCanonicalizationPatterns(canonicalization, context);
       populateAffineMinSCFCanonicalizationPattern(canonicalization);
-      IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(
-          canonicalization, context);
+      IREE::Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,
+                                                               context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalization));
     }
   }
