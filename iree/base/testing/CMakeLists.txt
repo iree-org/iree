@@ -18,8 +18,6 @@
 iree_cc_library(
   NAME
     dynamic_library_test_library.so
-  OUT
-    dynamic_library_test_library.so
   SRCS
     "dynamic_library_test_library.cc"
   TESTONLY

@@ -20,7 +20,6 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: name of target (see Usage below)
-# OUT: OUTPUT_NAME for the target. Defaults to NAME.
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
@@ -56,7 +55,7 @@ function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
     "HOSTONLY;TESTONLY"
-    "NAME;OUT"
+    "NAME"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
   )
@@ -71,11 +70,7 @@ function(iree_cc_binary)
 
   add_executable(${_NAME} "")
   add_executable(${_RULE_NAME} ALIAS ${_NAME})
-  if(_RULE_OUT)
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_OUT}")
-  else()
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
-  endif()
+  set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   if(_RULE_SRCS)
     target_sources(${_NAME}
       PRIVATE
