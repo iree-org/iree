@@ -39,6 +39,24 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
+iree_cc_binary(
+  NAME
+    simple_embedding_run_local_sync
+  SRCS
+    "simple_embedding_run_local_sync.c"
+  DEPS
+    ::simple_embedding_test_bytecode_module_c
+    ::simple_embedding_test_llvm_aot_rv64
+    iree::base::api
+    iree::hal::api
+    iree::hal::local
+    iree::hal::local::loaders::legacy_library_loader
+    iree::hal::local::sync_driver
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+)
+
 if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
    OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
   return()
@@ -73,6 +91,13 @@ iree_run_binary_test(
     "dylib"
   TEST_BINARY
     ::simple_embedding_run
+)
+
+iree_run_binary_test(
+  NAME
+    "simple_embedding_run_local_sync_test"
+  TEST_BINARY
+    ::simple_embedding_run_local_sync
 )
 
 iree_run_binary_test(

@@ -59,6 +59,23 @@ cc_binary(
     ],
 )
 
+cc_binary(
+    name = "simple_embedding_run_local_sync",
+    srcs = ["simple_embedding_run_local_sync.c"],
+    deps = [
+        ":simple_embedding_test_bytecode_module_c",
+        ":simple_embedding_test_llvm_aot_rv64",
+        "//iree/base:api",
+        "//iree/hal:api",
+        "//iree/hal/local",
+        "//iree/hal/local:sync_driver",
+        "//iree/hal/local/loaders:legacy_library_loader",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+    ],
+)
+
 iree_cmake_extra_content(
     content = """
 if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
@@ -100,6 +117,11 @@ run_binary_test(
     name = "simple_embedding_dylib_test",
     args = ["dylib"],
     test_binary = ":simple_embedding_run",
+)
+
+run_binary_test(
+    name = "simple_embedding_run_local_sync_test",
+    test_binary = ":simple_embedding_run_local_sync",
 )
 
 run_binary_test(
