@@ -48,8 +48,7 @@ using namespace iree::hal::vulkan;
 // iree_hal_vulkan_device_t extensibility util
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_query_extensibility_set(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     iree_hal_vulkan_features_t requested_features,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
     const char** out_string_values, iree_host_size_t* out_string_count) {
@@ -380,7 +379,7 @@ static iree_hal_vulkan_device_t* iree_hal_vulkan_device_cast(
   return (iree_hal_vulkan_device_t*)base_value;
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_device_options_initialize(
+IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->flags = 0;
@@ -838,7 +837,7 @@ iree_status_t iree_hal_vulkan_device_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_wrap_device(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     iree_string_view_t identifier,
     const iree_hal_vulkan_device_options_t* options,
     const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,

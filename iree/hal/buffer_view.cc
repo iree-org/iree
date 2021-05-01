@@ -29,7 +29,7 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/string_util.h"
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_parse(
     iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_view_parse");
@@ -134,7 +134,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_format(
     const iree_hal_buffer_view_t* buffer_view,
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {

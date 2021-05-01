@@ -196,14 +196,14 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_context_create(iree_vm_instance_t* instance, iree_allocator_t allocator,
                        iree_vm_context_t** out_context) {
   return iree_vm_context_create_with_modules(instance, NULL, 0, allocator,
                                              out_context);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
+IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
     iree_vm_instance_t* instance, iree_vm_module_t** modules,
     iree_host_size_t module_count, iree_allocator_t allocator,
     iree_vm_context_t** out_context) {
@@ -275,29 +275,26 @@ static void iree_vm_context_destroy(iree_vm_context_t* context) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_context_retain(iree_vm_context_t* context) {
+IREE_API_EXPORT void iree_vm_context_retain(iree_vm_context_t* context) {
   if (context) {
     iree_atomic_ref_count_inc(&context->ref_count);
   }
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_context_release(iree_vm_context_t* context) {
+IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context) {
   if (context && iree_atomic_ref_count_dec(&context->ref_count) == 1) {
     iree_vm_context_destroy(context);
   }
 }
 
-IREE_API_EXPORT intptr_t IREE_API_CALL
-iree_vm_context_id(const iree_vm_context_t* context) {
+IREE_API_EXPORT intptr_t iree_vm_context_id(const iree_vm_context_t* context) {
   if (!context) {
     return -1;
   }
   return context->context_id;
 }
 
-IREE_API_EXPORT iree_vm_state_resolver_t IREE_API_CALL
+IREE_API_EXPORT iree_vm_state_resolver_t
 iree_vm_context_state_resolver(const iree_vm_context_t* context) {
   iree_vm_state_resolver_t state_resolver = {0};
   state_resolver.self = (void*)context;
@@ -305,15 +302,14 @@ iree_vm_context_state_resolver(const iree_vm_context_t* context) {
   return state_resolver;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_context_resolve_module_state(
+IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
     const iree_vm_context_t* context, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state) {
   return iree_vm_context_query_module_state((void*)context, module,
                                             out_module_state);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
+IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
     iree_vm_context_t* context, iree_vm_module_t** modules,
     iree_host_size_t module_count) {
   IREE_ASSERT_ARGUMENT(context);
@@ -430,7 +426,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
+IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
     const iree_vm_context_t* context, iree_string_view_t full_name,
     iree_vm_function_t* out_function) {
   IREE_TRACE_ZONE_BEGIN(z0);

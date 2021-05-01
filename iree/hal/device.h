@@ -132,27 +132,25 @@ typedef uint8_t iree_hal_wait_mode_t;
 typedef struct iree_hal_device_s iree_hal_device_t;
 
 // Retains the given |device| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_device_retain(iree_hal_device_t* device);
+IREE_API_EXPORT void iree_hal_device_retain(iree_hal_device_t* device);
 
 // Releases the given |device| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_device_release(iree_hal_device_t* device);
+IREE_API_EXPORT void iree_hal_device_release(iree_hal_device_t* device);
 
 // Returns the device identifier.
 // This identifier may vary based on the runtime device type; for example, a
 // Vulkan device may return `vulkan-v1.1` or `vulkan-v1.2-spec1`.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_hal_device_id(iree_hal_device_t* device);
 
 // Returns the host allocator used for objects.
-IREE_API_EXPORT iree_allocator_t IREE_API_CALL
+IREE_API_EXPORT iree_allocator_t
 iree_hal_device_host_allocator(iree_hal_device_t* device);
 
 // Returns a reference to the allocator of the device that can be used for
 // allocating buffers.
-IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
-iree_hal_device_allocator(iree_hal_device_t* device);
+IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
+    iree_hal_device_t* device);
 
 // Queries a configuration value as an int32_t.
 // The |key| will be provided to the device driver to interpret in a
@@ -166,7 +164,7 @@ iree_hal_device_allocator(iree_hal_device_t* device);
 //
 // Returned values must remain the same for the lifetime of the device as
 // callers may cache them to avoid redundant calls.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_query_i32(
+IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     iree_hal_device_t* device, iree_string_view_t key, int32_t* out_value);
 
 // Submits one or more batches of work to a device queue.
@@ -184,7 +182,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_query_i32(
 // executing its command buffers in the order they are defined but allowing the
 // command buffers to complete out-of-order. See:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkQueueSubmit.html
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
@@ -199,7 +197,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
 //
 // See iree_hal_device_queue_submit for more information about the queuing
 // behavior and iree_hal_semaphore_wait for the waiting  behavior.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
+IREE_API_EXPORT iree_status_t iree_hal_device_submit_and_wait(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches,
@@ -224,7 +222,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
 // Returns IREE_STATUS_ABORTED if one or more semaphores has failed. Callers can
 // use iree_hal_semaphore_query on the semaphores to find the ones that have
 // failed and get the status.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_wait_semaphores(
+IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
 
@@ -317,8 +315,7 @@ typedef struct {
                                          iree_timeout_t timeout);
 } iree_hal_device_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_device_destroy(iree_hal_device_t* device);
+IREE_API_EXPORT void iree_hal_device_destroy(iree_hal_device_t* device);
 
 #ifdef __cplusplus
 }  // extern "C"

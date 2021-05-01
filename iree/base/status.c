@@ -240,8 +240,7 @@ iree_status_code_from_win32_error(uint32_t error) {
 // iree_status_t
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT const char* IREE_API_CALL
-iree_status_code_string(iree_status_code_t code) {
+IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
   switch (code) {
     case IREE_STATUS_OK:
       return "OK";
@@ -373,7 +372,7 @@ static iree_status_t iree_status_append_payload(
 // NUL. If |buffer| is omitted then |out_buffer_length| will be set to the
 // total number of characters in |buffer_capacity| required to contain the
 // entire message.
-static void IREE_API_CALL iree_status_payload_message_formatter(
+static void iree_status_payload_message_formatter(
     const iree_status_payload_t* payload, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
   iree_status_payload_message_t* message_payload =
@@ -401,7 +400,7 @@ static void iree_status_attach_stack_trace(iree_status_storage_t* storage,
 #endif  // has IREE_STATUS_FEATURE_STACK_TRACE
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
                      iree_string_view_t message) {
 #if IREE_STATUS_FEATURES == 0
@@ -445,7 +444,7 @@ iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
 #endif  // has any IREE_STATUS_FEATURES
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_allocate_f(iree_status_code_t code, const char* file, uint32_t line,
                        const char* format, ...) {
   va_list varargs_0, varargs_1;
@@ -458,10 +457,9 @@ iree_status_allocate_f(iree_status_code_t code, const char* file, uint32_t line,
   return ret;
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_allocate_vf(iree_status_code_t code, const char* file,
-                        uint32_t line, const char* format, va_list varargs_0,
-                        va_list varargs_1) {
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t iree_status_allocate_vf(
+    iree_status_code_t code, const char* file, uint32_t line,
+    const char* format, va_list varargs_0, va_list varargs_1) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
   // Annotations disabled; ignore the format string/args.
   return iree_status_allocate(code, file, line, iree_string_view_empty());
@@ -508,7 +506,7 @@ iree_status_allocate_vf(iree_status_code_t code, const char* file,
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_clone(iree_status_t status) {
 #if IREE_STATUS_FEATURES == 0
   // Statuses are just codes; nothing to do.
@@ -538,7 +536,7 @@ iree_status_clone(iree_status_t status) {
 #endif  // has no IREE_STATUS_FEATURES
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
+IREE_API_EXPORT void iree_status_free(iree_status_t status) {
 #if IREE_STATUS_FEATURES != 0
   iree_status_storage_t* storage = iree_status_storage(status);
   if (!storage) return;
@@ -552,8 +550,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
 #endif  // has any IREE_STATUS_FEATURES
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_status_ignore(iree_status_t status) {
+IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
   // We can set an 'ignored' flag on the status so that we can otherwise assert
   // in iree_status_free when statuses are freed without this being called.
   // Hoping with the C++ Status wrapper we won't hit that often so that
@@ -562,14 +559,14 @@ iree_status_ignore(iree_status_t status) {
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_code_t IREE_API_CALL
+IREE_API_EXPORT iree_status_code_t
 iree_status_consume_code(iree_status_t status) {
   iree_status_code_t code = iree_status_code(status);
   iree_status_free(status);
   return code;
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
   // Annotations are disabled so we ignore this entirely.
@@ -605,8 +602,7 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-IREE_PRINTF_ATTRIBUTE(2, 3)
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
     iree_status_annotate_f(iree_status_t base_status, const char* format, ...) {
   va_list varargs_0, varargs_1;
   va_start(varargs_0, format);
@@ -618,7 +614,7 @@ IREE_PRINTF_ATTRIBUTE(2, 3)
   return ret;
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_annotate_vf(iree_status_t base_status, const char* format,
                         va_list varargs_0, va_list varargs_1) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
@@ -670,9 +666,10 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
 
-IREE_API_EXPORT bool IREE_API_CALL
-iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
-                   char* buffer, iree_host_size_t* out_buffer_length) {
+IREE_API_EXPORT bool iree_status_format(iree_status_t status,
+                                        iree_host_size_t buffer_capacity,
+                                        char* buffer,
+                                        iree_host_size_t* out_buffer_length) {
   *out_buffer_length = 0;
 
   // Grab storage which may have a message and zero or more payloads.
@@ -760,9 +757,9 @@ iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
   return true;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL
-iree_status_to_string(iree_status_t status, char** out_buffer,
-                      iree_host_size_t* out_buffer_length) {
+IREE_API_EXPORT bool iree_status_to_string(
+    iree_status_t status, char** out_buffer,
+    iree_host_size_t* out_buffer_length) {
   *out_buffer_length = 0;
   iree_host_size_t buffer_length = 0;
   if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,

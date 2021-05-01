@@ -22,7 +22,7 @@
 
 IREE_HAL_API_RETAIN_RELEASE(allocator);
 
-IREE_API_EXPORT iree_allocator_t IREE_API_CALL
+IREE_API_EXPORT iree_allocator_t
 iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator) {
   IREE_ASSERT_ARGUMENT(allocator);
   return _VTABLE_DISPATCH(allocator, host_allocator)(allocator);
@@ -39,7 +39,7 @@ iree_hal_allocator_query_buffer_compatibility(
       allocator, memory_type, allowed_usage, intended_usage, allocation_size);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
     iree_hal_buffer_t** out_buffer) {
@@ -53,7 +53,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,

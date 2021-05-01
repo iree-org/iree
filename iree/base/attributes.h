@@ -21,20 +21,20 @@
 // API/ABI interop
 //===----------------------------------------------------------------------===//
 
+// Denotes a method exported by the IREE API.
+// Any call annotated with this will be relatively stable.
+// Calls without this are considered private to the IREE implementation and
+// should not be relied upon.
 #ifdef __cplusplus
 #define IREE_API_EXPORT extern "C"
 #else
 #define IREE_API_EXPORT
 #endif  // __cplusplus
 
-#if defined(_WIN32)
-// TODO(benvanik): __stdcall, if exporting as a shared library/DLL.
-#define IREE_API_CALL
+// Denotes a function pointer that is exposed as part of the IREE API.
+// Example:
+//   iree_status_t(IREE_API_PTR* some_callback)(int value);
 #define IREE_API_PTR
-#else
-#define IREE_API_CALL
-#define IREE_API_PTR
-#endif  // _WIN32
 
 //===----------------------------------------------------------------------===//
 // IREE_HAVE_ATTRIBUTE
