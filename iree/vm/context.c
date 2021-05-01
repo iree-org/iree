@@ -27,7 +27,11 @@ struct iree_vm_context {
   iree_allocator_t allocator;
   intptr_t context_id;
 
-  bool is_static;
+  // Context has been frozen and can no longer be modified.
+  uint32_t is_frozen : 1;
+  // Context storage is statically allocated and need not be freed.
+  uint32_t is_static : 1;
+
   struct {
     iree_host_size_t count;
     iree_host_size_t capacity;
@@ -208,7 +212,6 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
     iree_host_size_t module_count, iree_allocator_t allocator,
     iree_vm_context_t** out_context) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(out_context);
   *out_context = NULL;
 
@@ -234,6 +237,8 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
   p += sizeof(iree_vm_module_state_t*) * module_count;
   context->list.count = 0;
   context->list.capacity = module_count;
+  // TODO(benvanik): allow for non-frozen but static contexts.
+  context->is_frozen = module_count > 0;
   context->is_static = module_count > 0;
 
   iree_status_t register_status =
@@ -294,21 +299,6 @@ IREE_API_EXPORT intptr_t iree_vm_context_id(const iree_vm_context_t* context) {
   return context->context_id;
 }
 
-IREE_API_EXPORT iree_vm_state_resolver_t
-iree_vm_context_state_resolver(const iree_vm_context_t* context) {
-  iree_vm_state_resolver_t state_resolver = {0};
-  state_resolver.self = (void*)context;
-  state_resolver.query_module_state = iree_vm_context_query_module_state;
-  return state_resolver;
-}
-
-IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
-    const iree_vm_context_t* context, iree_vm_module_t* module,
-    iree_vm_module_state_t** out_module_state) {
-  return iree_vm_context_query_module_state((void*)context, module,
-                                            out_module_state);
-}
-
 IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
     iree_vm_context_t* context, iree_vm_module_t** modules,
     iree_host_size_t module_count) {
@@ -328,7 +318,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
 
   // Try growing both our storage lists first, if needed.
   if (context->list.count + module_count > context->list.capacity) {
-    if (context->is_static) {
+    if (context->is_frozen) {
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "context was allocated as static and cannot "
@@ -424,6 +414,28 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
 
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_vm_context_freeze(iree_vm_context_t* context) {
+  IREE_ASSERT_ARGUMENT(context);
+  context->is_frozen = 1;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_vm_state_resolver_t
+iree_vm_context_state_resolver(const iree_vm_context_t* context) {
+  iree_vm_state_resolver_t state_resolver = {0};
+  state_resolver.self = (void*)context;
+  state_resolver.query_module_state = iree_vm_context_query_module_state;
+  return state_resolver;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
+    const iree_vm_context_t* context, iree_vm_module_t* module,
+    iree_vm_module_state_t** out_module_state) {
+  return iree_vm_context_query_module_state((void*)context, module,
+                                            out_module_state);
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(

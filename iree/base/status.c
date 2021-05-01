@@ -559,6 +559,15 @@ IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
   return iree_ok_status();
 }
 
+IREE_API_EXPORT IREE_ATTRIBUTE_NORETURN void iree_status_abort(
+    iree_status_t status) {
+  IREE_ASSERT(!iree_status_is_ok(status),
+              "only valid to call with failing status codes");
+  iree_status_fprint(stderr, status);
+  iree_status_free(status);
+  abort();
+}
+
 IREE_API_EXPORT iree_status_code_t
 iree_status_consume_code(iree_status_t status) {
   iree_status_code_t code = iree_status_code(status);
@@ -599,19 +608,7 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
                                     (iree_status_payload_t*)payload);
 }
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
-    iree_status_annotate_f(iree_status_t base_status, const char* format, ...) {
-  va_list varargs_0, varargs_1;
-  va_start(varargs_0, format);
-  va_start(varargs_1, format);
-  iree_status_t ret =
-      iree_status_annotate_vf(base_status, format, varargs_0, varargs_1);
-  va_end(varargs_0);
-  va_end(varargs_1);
-  return ret;
-}
-
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+static IREE_MUST_USE_RESULT iree_status_t
 iree_status_annotate_vf(iree_status_t base_status, const char* format,
                         va_list varargs_0, va_list varargs_1) {
   if (iree_status_is_ok(base_status)) return base_status;
@@ -628,7 +625,6 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
   // message.
   size_t message_size =
       vsnprintf(/*buffer=*/NULL, /*buffer_count=*/0, format, varargs_0);
-  va_end(varargs_0);
   if (message_size < 0) return base_status;
   ++message_size;  // NUL byte
 
@@ -657,6 +653,21 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
   }
   return iree_status_append_payload(base_status, storage,
                                     (iree_status_payload_t*)payload);
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
+    iree_status_annotate_f(iree_status_t base_status, const char* format, ...) {
+  // We walk the lists twice as each va_list can only be walked once we need to
+  // double-up. iree_status_annotate_vf could use va_copy to clone the single
+  // list however the proper management of va_end is trickier and this works.
+  va_list varargs_0, varargs_1;
+  va_start(varargs_0, format);
+  va_start(varargs_1, format);
+  iree_status_t ret =
+      iree_status_annotate_vf(base_status, format, varargs_0, varargs_1);
+  va_end(varargs_0);
+  va_end(varargs_1);
+  return ret;
 }
 
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
@@ -775,4 +786,15 @@ IREE_API_EXPORT bool iree_status_to_string(
     free(buffer);
     return false;
   }
+}
+
+IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status) {
+  // TODO(benvanik): better support for colors/etc - possibly move to logging.
+  // TODO(benvanik): do this without allocation by streaming the status.
+  char* status_buffer = NULL;
+  iree_host_size_t status_buffer_length = 0;
+  iree_status_to_string(status, &status_buffer, &status_buffer_length);
+  fprintf(file, "%.*s\n", (int)status_buffer_length, status_buffer);
+  free(status_buffer);
+  fflush(file);
 }

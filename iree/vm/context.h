@@ -62,6 +62,20 @@ IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context);
 // Returns a process-unique ID for the |context|.
 IREE_API_EXPORT intptr_t iree_vm_context_id(const iree_vm_context_t* context);
 
+// Registers a list of modules with the context and resolves imports in the
+// order provided.
+// The modules will be retained by the context until destruction.
+IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
+    iree_vm_context_t* context, iree_vm_module_t** modules,
+    iree_host_size_t module_count);
+
+// Freezes a context such that no more modules can be registered.
+// This can be used to ensure that context contents cannot be modified by other
+// code as the context is made available to other parts of the program.
+// No-op if already frozen.
+IREE_API_EXPORT iree_status_t
+iree_vm_context_freeze(iree_vm_context_t* context);
+
 // Returns a state resolver setup to use the |context| for resolving module
 // state.
 IREE_API_EXPORT iree_vm_state_resolver_t
@@ -73,13 +87,6 @@ iree_vm_context_state_resolver(const iree_vm_context_t* context);
 IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
     const iree_vm_context_t* context, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state);
-
-// Registers a list of modules with the context and resolves imports in the
-// order provided.
-// The modules will be retained by the context until destruction.
-IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
-    iree_vm_context_t* context, iree_vm_module_t** modules,
-    iree_host_size_t module_count);
 
 // Sets |out_function| to to an exported function with the fully-qualified name
 // of |full_name| or returns IREE_STATUS_NOT_FOUND. The function reference is

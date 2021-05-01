@@ -684,8 +684,8 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
                 desc.scalar.type)]);
         iree_hal_buffer_view_t* buffer_view;
         CheckApiStatus(
-            iree_hal_buffer_view_create(raw_buffer, element_type, dims.data(),
-                                        dims.size(), &buffer_view),
+            iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
+                                        element_type, &buffer_view),
             "Error allocating buffer_view");
         iree_hal_buffer_release(raw_buffer);
         iree_vm_ref_t buffer_view_ref =
@@ -772,8 +772,8 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* buffer_view;
   CheckApiStatus(
-      iree_hal_buffer_view_create(raw_buffer, element_type, dims.data(),
-                                  dims.size(), &buffer_view),
+      iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
+                                  element_type, &buffer_view),
       "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
