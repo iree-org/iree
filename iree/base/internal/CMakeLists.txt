@@ -97,7 +97,7 @@ iree_cc_library(
   HDRS
     "file_io.h"
   SRCS
-    "file_io.cc"
+    "file_io.c"
   DEPS
     iree::base
     iree::base::core_headers
@@ -149,6 +149,7 @@ iree_cc_library(
   SRCS
     "flags.c"
   DEPS
+    ::file_io
     ::internal
     iree::base
     iree::base::tracing

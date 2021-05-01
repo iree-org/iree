@@ -28,6 +28,50 @@
 
 namespace iree {
 
+Status GetFileContents(const char* path, std::string* out_contents) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  *out_contents = std::string();
+  FILE* file = fopen(path, "rb");
+  if (file == NULL) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to open file '%s'", path);
+  }
+  iree_status_t status = iree_ok_status();
+  if (fseek(file, 0, SEEK_END) == -1) {
+    status = iree_make_status(iree_status_code_from_errno(errno), "seek (end)");
+  }
+  size_t file_size = 0;
+  if (iree_status_is_ok(status)) {
+    file_size = ftell(file);
+    if (file_size == -1L) {
+      status =
+          iree_make_status(iree_status_code_from_errno(errno), "size query");
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    if (fseek(file, 0, SEEK_SET) == -1) {
+      status =
+          iree_make_status(iree_status_code_from_errno(errno), "seek (beg)");
+    }
+  }
+  std::string contents;
+  if (iree_status_is_ok(status)) {
+    contents.resize(file_size);
+    if (fread((char*)contents.data(), file_size, 1, file) != 1) {
+      status =
+          iree_make_status(iree_status_code_from_errno(errno),
+                           "unable to read entire file contents of '%s'", path);
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    *out_contents = std::move(contents);
+  }
+  fclose(file);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 Status ValidateFunctionAbi(const iree_vm_function_t& function) {
   // Benchmark functions are always allowed through as they are () -> ().
   // That we are requiring SIP for everything in this util file is bad, and this

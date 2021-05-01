@@ -113,6 +113,7 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::status
     iree::schemas::bytecode_module_def_c_fbs
+    iree::tools::utils::vm_util
 )
 
 iree_cc_binary(

@@ -96,7 +96,7 @@ Status Run(std::string module_file_path, int* out_exit_code) {
                               std::istreambuf_iterator<char>()};
   } else {
     IREE_RETURN_IF_ERROR(
-        file_io::GetFileContents(module_file_path.c_str(), &module_data));
+        GetFileContents(module_file_path.c_str(), &module_data));
   }
 
   iree_vm_module_t* input_module = nullptr;

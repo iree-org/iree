@@ -72,6 +72,7 @@ cc_binary(
         "//iree/base:status",
         "//iree/base/internal:file_io",
         "//iree/schemas:bytecode_module_def_c_fbs",
+        "//iree/tools/utils:vm_util",
     ],
 )
 
