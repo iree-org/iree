@@ -59,7 +59,7 @@ class DescriptorSetGroup final {
   }
   ~DescriptorSetGroup();
 
-  Status Reset();
+  iree_status_t Reset();
 
  private:
   DescriptorPoolCache* descriptor_pool_cache_;
@@ -83,12 +83,14 @@ class DescriptorPoolCache final {
   // The pool will have been reset and have all descriptor sets available.
   // When all sets allocated from the pool are no longer in use it must be
   // returned to the cache with ReleaseDescriptorPool.
-  StatusOr<DescriptorPool> AcquireDescriptorPool(
-      VkDescriptorType descriptor_type, int max_descriptor_count);
+  iree_status_t AcquireDescriptorPool(VkDescriptorType descriptor_type,
+                                      int max_descriptor_count,
+                                      DescriptorPool* out_descriptor_pool);
 
   // Releases descriptor pools back to the cache. The pools will be reset
   // immediately and must no longer be in use by any in-flight command.
-  Status ReleaseDescriptorPools(absl::Span<DescriptorPool> descriptor_pools);
+  iree_status_t ReleaseDescriptorPools(
+      absl::Span<DescriptorPool> descriptor_pools);
 
  private:
   VkDeviceHandle* logical_device_;

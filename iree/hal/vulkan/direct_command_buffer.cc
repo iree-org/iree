@@ -198,8 +198,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_end(
       "vkEndCommandBuffer");
 
   // Flush all pending descriptor set writes (if any).
-  IREE_ASSIGN_OR_RETURN(command_buffer->descriptor_set_group,
-                        command_buffer->descriptor_set_arena.Flush());
+  command_buffer->descriptor_set_group =
+      command_buffer->descriptor_set_arena.Flush();
 
   return iree_ok_status();
 }

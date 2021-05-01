@@ -280,10 +280,11 @@ int main(int argc, char** argv) {
       iree_hal_driver_registry_default()));
 
   iree::IREEBenchmark iree_benchmark;
-  auto status = iree_benchmark.Register();
-  if (!status.ok()) {
-    std::cout << status << std::endl;
-    return static_cast<int>(status.code());
+  iree_status_t status = iree_benchmark.Register();
+  if (!iree_status_is_ok(status)) {
+    int ret = static_cast<int>(iree_status_code(status));
+    std::cout << iree::Status(std::move(status)) << std::endl;
+    return ret;
   }
   ::benchmark::RunSpecifiedBenchmarks();
   return 0;

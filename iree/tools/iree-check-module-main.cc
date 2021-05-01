@@ -195,12 +195,11 @@ extern "C" int main(int argc, char** argv) {
   auto module_file_path = std::string(argv[1]);
 
   int exit_code = 1;
-  auto status = Run(std::move(module_file_path), &exit_code);
-  int ret = status.ok() ? exit_code : 1;
+  iree_status_t status = Run(std::move(module_file_path), &exit_code);
+  int ret = iree_status_is_ok(status) ? exit_code : 1;
   if (FLAG_expect_failure) {
     if (ret == 0) {
       std::cout << "Test passed but expected failure\n";
-      std::cout << status;
       return 1;
     }
     std::cout << "Test failed as expected\n";
@@ -209,7 +208,7 @@ extern "C" int main(int argc, char** argv) {
 
   if (ret != 0) {
     std::cout << "Test failed\n";
-    std::cout << status;
+    std::cout << Status(std::move(status));
   }
 
   return ret;
