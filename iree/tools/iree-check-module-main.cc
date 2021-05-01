@@ -79,7 +79,7 @@ class CheckModuleTest : public ::testing::Test {
   iree_vm_context_t* context_ = nullptr;
 };
 
-Status Run(std::string module_file_path, int* out_exit_code) {
+iree_status_t Run(std::string module_file_path, int* out_exit_code) {
   IREE_TRACE_SCOPE0("iree-check-module");
   *out_exit_code = 1;
 
@@ -172,7 +172,7 @@ Status Run(std::string module_file_path, int* out_exit_code) {
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace

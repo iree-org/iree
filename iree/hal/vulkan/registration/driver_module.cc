@@ -17,7 +17,6 @@
 #include <inttypes.h>
 
 #include "iree/base/internal/flags.h"
-#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"

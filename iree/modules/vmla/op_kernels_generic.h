@@ -33,63 +33,63 @@ namespace vmla {
 namespace kernels {
 
 template <typename T>
-Status CompareEQ::Execute(absl::Span<const T> lhs_buffer,
-                          absl::Span<const T> rhs_buffer,
-                          absl::Span<uint8_t> dst_buffer) {
+iree_status_t CompareEQ::Execute(absl::Span<const T> lhs_buffer,
+                                 absl::Span<const T> rhs_buffer,
+                                 absl::Span<uint8_t> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] == rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status CompareNE::Execute(absl::Span<const T> lhs_buffer,
-                          absl::Span<const T> rhs_buffer,
-                          absl::Span<uint8_t> dst_buffer) {
+iree_status_t CompareNE::Execute(absl::Span<const T> lhs_buffer,
+                                 absl::Span<const T> rhs_buffer,
+                                 absl::Span<uint8_t> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] != rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status CompareLT::Execute(absl::Span<const T> lhs_buffer,
-                          absl::Span<const T> rhs_buffer,
-                          absl::Span<uint8_t> dst_buffer) {
+iree_status_t CompareLT::Execute(absl::Span<const T> lhs_buffer,
+                                 absl::Span<const T> rhs_buffer,
+                                 absl::Span<uint8_t> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] < rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status CompareLE::Execute(absl::Span<const T> lhs_buffer,
-                          absl::Span<const T> rhs_buffer,
-                          absl::Span<uint8_t> dst_buffer) {
+iree_status_t CompareLE::Execute(absl::Span<const T> lhs_buffer,
+                                 absl::Span<const T> rhs_buffer,
+                                 absl::Span<uint8_t> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] <= rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status CompareGT::Execute(absl::Span<const T> lhs_buffer,
-                          absl::Span<const T> rhs_buffer,
-                          absl::Span<uint8_t> dst_buffer) {
+iree_status_t CompareGT::Execute(absl::Span<const T> lhs_buffer,
+                                 absl::Span<const T> rhs_buffer,
+                                 absl::Span<uint8_t> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] > rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status CompareGE::Execute(absl::Span<const T> lhs_buffer,
-                          absl::Span<const T> rhs_buffer,
-                          absl::Span<uint8_t> dst_buffer) {
+iree_status_t CompareGE::Execute(absl::Span<const T> lhs_buffer,
+                                 absl::Span<const T> rhs_buffer,
+                                 absl::Span<uint8_t> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] >= rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 namespace impl {
@@ -137,18 +137,19 @@ inline void CopyRegion(absl::Span<const uint8_t> src_buffer,
 // TODO(benvanik): replace with a real implementation once copy is defined.
 // TODO(gcmn): More consistent/principled handling for scalars.
 template <int element_size>
-Status Copy::Execute(absl::Span<const uint8_t> src_buffer, ShapeSpan src_shape,
-                     absl::Span<const int32_t> src_indices,
-                     absl::Span<uint8_t> dst_buffer, ShapeSpan dst_shape,
-                     absl::Span<const int32_t> dst_indices,
-                     absl::Span<const int32_t> lengths) {
+iree_status_t Copy::Execute(absl::Span<const uint8_t> src_buffer,
+                            ShapeSpan src_shape,
+                            absl::Span<const int32_t> src_indices,
+                            absl::Span<uint8_t> dst_buffer, ShapeSpan dst_shape,
+                            absl::Span<const int32_t> dst_indices,
+                            absl::Span<const int32_t> lengths) {
   IREE_DCHECK_EQ(src_indices.size(), lengths.size());
   IREE_DCHECK_EQ(dst_indices.size(), lengths.size());
   IREE_DCHECK_EQ(src_shape.size(), lengths.size());
   IREE_DCHECK_EQ(dst_shape.size(), lengths.size());
   if (lengths.empty()) {
     std::memcpy(dst_buffer.data(), src_buffer.data(), element_size);
-    return OkStatus();
+    return iree_ok_status();
   }
 
   // TODO(gcmn) Maybe we can fast-path earlier if we detect contiguous memory
@@ -159,16 +160,18 @@ Status Copy::Execute(absl::Span<const uint8_t> src_buffer, ShapeSpan src_shape,
   IREE_DCHECK_EQ(dst_strides.size(), lengths.size());
   impl::CopyRegion(src_buffer, src_strides, src_indices, dst_buffer,
                    dst_strides, dst_indices, lengths);
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
-                       absl::Span<const T> filter_buffer,
-                       ShapeSpan filter_shape, absl::Span<T> dst_buffer,
-                       ShapeSpan dst_shape, ShapeSpan window_strides,
-                       ShapeSpan pad_h, ShapeSpan pad_w, ShapeSpan lhs_dilation,
-                       ShapeSpan rhs_dilation, const int32_t groups) {
+iree_status_t Conv2D::Execute(absl::Span<const T> input_buffer,
+                              ShapeSpan input_shape,
+                              absl::Span<const T> filter_buffer,
+                              ShapeSpan filter_shape, absl::Span<T> dst_buffer,
+                              ShapeSpan dst_shape, ShapeSpan window_strides,
+                              ShapeSpan pad_h, ShapeSpan pad_w,
+                              ShapeSpan lhs_dilation, ShapeSpan rhs_dilation,
+                              const int32_t groups) {
   const std::array<int32_t, 3> input_strides = {input_shape[1] * input_shape[2],
                                                 input_shape[2], 1};
   const std::array<int32_t, 4> filter_strides = {
@@ -216,27 +219,27 @@ Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
       }
     }
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Select::Execute(absl::Span<const uint8_t> cond_buffer,
-                       absl::Span<const T> lhs_buffer,
-                       absl::Span<const T> rhs_buffer,
-                       absl::Span<T> dst_buffer) {
+iree_status_t Select::Execute(absl::Span<const uint8_t> cond_buffer,
+                              absl::Span<const T> lhs_buffer,
+                              absl::Span<const T> rhs_buffer,
+                              absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = cond_buffer[i] ? lhs_buffer[i] : rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Finite::Execute(absl::Span<const T> src_buffer,
-                       absl::Span<bool> dst_buffer) {
+iree_status_t Finite::Execute(absl::Span<const T> src_buffer,
+                              absl::Span<bool> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::isfinite(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
@@ -272,9 +275,9 @@ void TransposeRecurse(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
 }
 
 template <typename T>
-Status Transpose::Execute(absl::Span<const T> src_buffer,
-                          absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                          absl::Span<const int32_t> perm) {
+iree_status_t Transpose::Execute(absl::Span<const T> src_buffer,
+                                 absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                                 absl::Span<const int32_t> perm) {
   int rank = src_shape.size();
 
   std::vector<int> src_strides(rank);
@@ -297,7 +300,7 @@ Status Transpose::Execute(absl::Span<const T> src_buffer,
   TransposeRecurse(src_buffer, dst_buffer, src_shape, dst_shape, src_strides,
                    dst_strides, perm, rank, dim_i, src_base_offset,
                    dst_base_offset);
-  return OkStatus();
+  return iree_ok_status();
 }
 
 namespace impl {
@@ -326,13 +329,13 @@ inline bool IsPadding(absl::Span<const int32_t> indices, ShapeSpan shape,
 }  // namespace impl
 
 template <typename T>
-Status Pad::Execute(absl::Span<const T> src_buffer,
-                    absl::Span<const T> padding_value_buffer,
-                    absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                    ShapeSpan dst_shape,
-                    absl::Span<const int32_t> edge_padding_low,
-                    absl::Span<const int32_t> edge_padding_high,
-                    absl::Span<const int32_t> interior_padding) {
+iree_status_t Pad::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<const T> padding_value_buffer,
+                           absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                           ShapeSpan dst_shape,
+                           absl::Span<const int32_t> edge_padding_low,
+                           absl::Span<const int32_t> edge_padding_high,
+                           absl::Span<const int32_t> interior_padding) {
   // This implementation is not at all fast, as it iterates every index in the
   // destination buffer individually. Potential improvements:
   // 1. Fill the dst buffer with padded value initially. Only need to iterate
@@ -364,15 +367,15 @@ Status Pad::Execute(absl::Span<const T> src_buffer,
     impl::IncrementShapeIndex(absl::MakeSpan(dst_indices), dst_shape);
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Gather::Execute(absl::Span<const T> src_buffer,
-                       absl::Span<const int32_t> indices_buffer,
-                       absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                       ShapeSpan indices_shape, ShapeSpan dst_shape,
-                       const int32_t dim, const int32_t batch_dims) {
+iree_status_t Gather::Execute(absl::Span<const T> src_buffer,
+                              absl::Span<const int32_t> indices_buffer,
+                              absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                              ShapeSpan indices_shape, ShapeSpan dst_shape,
+                              const int32_t dim, const int32_t batch_dims) {
   std::vector<int32_t> output_strides(dst_shape.size(), 1);
   std::vector<int32_t> input_strides(src_shape.size(), 1);
   std::vector<int32_t> indices_strides(indices_shape.size(), 1);
@@ -428,23 +431,24 @@ Status Gather::Execute(absl::Span<const T> src_buffer,
       }
     }
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 namespace impl {
 template <typename T>
-Status ScatterCopy(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
-                   ShapeSpan src_shape, ShapeSpan dst_shape) {
+iree_status_t ScatterCopy(absl::Span<const T> src_buffer,
+                          absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                          ShapeSpan dst_shape) {
   if (src_shape.empty()) {
     dst_buffer[0] = src_buffer[0];
-    return OkStatus();
+    return iree_ok_status();
   }
 
   // Scatter cannot subscatter, it must be legal across he entire shape.
   // Therefore if the src and dst shape match we can copy the full bytes over.
   if (src_shape == dst_shape) {
     memcpy(dst_buffer.data(), src_buffer.data(), src_buffer.size() * sizeof(T));
-    return OkStatus();
+    return iree_ok_status();
   }
 
   auto src_stride = 1;
@@ -464,16 +468,16 @@ Status ScatterCopy(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
                     src_shape.subspan(1), dst_shape.subspan(1)));
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 // Scatter helper compute the offset into src buffer, removing the dependency
 // on the indices buffer.
 template <typename T>
-Status ScatterHelper(absl::Span<const T> src_buffer,
-                     absl::Span<const int32_t> indices_buffer,
-                     absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                     ShapeSpan dst_shape) {
+iree_status_t ScatterHelper(absl::Span<const T> src_buffer,
+                            absl::Span<const int32_t> indices_buffer,
+                            absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                            ShapeSpan dst_shape) {
   size_t offset = 0;
   for (int i = 0; i < indices_buffer.size(); i++) {
     offset = offset * dst_shape[i] + indices_buffer[i];
@@ -492,15 +496,15 @@ Status ScatterHelper(absl::Span<const T> src_buffer,
                                    src_shape,
                                    dst_shape.subspan(indices_buffer.size())));
 
-  return OkStatus();
+  return iree_ok_status();
 }
 }  // namespace impl
 
 template <typename T>
-Status Scatter::Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const int32_t> indices_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        ShapeSpan indices_shape, ShapeSpan dst_shape) {
+iree_status_t Scatter::Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const int32_t> indices_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               ShapeSpan indices_shape, ShapeSpan dst_shape) {
   int indices_rank = indices_shape.size();
 
   // First dimension of indices is the batch update.
@@ -528,13 +532,13 @@ Status Scatter::Execute(absl::Span<const T> src_buffer,
         src_shape.subspan(1), dst_shape));
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Reverse::Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        absl::Span<const int32_t> dimensions) {
+iree_status_t Reverse::Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               absl::Span<const int32_t> dimensions) {
   // This implementation is not fast either.
   int rank = src_shape.size();
   std::vector<int> strides(rank);
@@ -556,12 +560,13 @@ Status Reverse::Execute(absl::Span<const T> src_buffer,
     }
     dst_buffer[dst_i] = src_buffer[src_i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Sort::Execute(absl::Span<const T> src_buffer,
-                     absl::Span<int32_t> dst_buffer, ShapeSpan src_shape) {
+iree_status_t Sort::Execute(absl::Span<const T> src_buffer,
+                            absl::Span<int32_t> dst_buffer,
+                            ShapeSpan src_shape) {
   int elements = src_buffer.size();
   const int sort_size = src_shape.back();
 
@@ -575,31 +580,32 @@ Status Sort::Execute(absl::Span<const T> src_buffer,
                      });
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Broadcast::Execute(absl::Span<const T> src_buffer,
-                          absl::Span<T> dst_buffer) {
+iree_status_t Broadcast::Execute(absl::Span<const T> src_buffer,
+                                 absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = src_buffer[0];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Iota::Execute(absl::Span<T> dst_buffer) {
+iree_status_t Iota::Execute(absl::Span<T> dst_buffer) {
   T value = 0;
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = value;
     value += 1;
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Tile::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
-                     ShapeSpan src_shape, ShapeSpan dst_shape) {
+iree_status_t Tile::Execute(absl::Span<const T> src_buffer,
+                            absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                            ShapeSpan dst_shape) {
   // This implementation is .... not fast.
   int rank = dst_shape.size();
   std::vector<int> src_strides(rank);
@@ -621,285 +627,306 @@ Status Tile::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
     }
     dst_buffer[dst_i] = src_buffer[src_i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Not::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Not::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = ~src_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status And::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
-  for (size_t i = 0; i < dst_buffer.size(); ++i) {
-    dst_buffer[i] = lhs_buffer[i] & rhs_buffer[i];
-  }
-  return OkStatus();
-}
-
-template <typename T>
-Status And::Execute(absl::Span<const T> lhs_buffer, T rhs,
-                    absl::Span<T> dst_buffer) {
-  for (size_t i = 0; i < dst_buffer.size(); ++i) {
-    dst_buffer[i] = lhs_buffer[i] & rhs;
-  }
-  return OkStatus();
-}
-
-template <typename T>
-Status Or::Execute(absl::Span<const T> lhs_buffer,
-                   absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
-  for (size_t i = 0; i < dst_buffer.size(); ++i) {
-    dst_buffer[i] = lhs_buffer[i] | rhs_buffer[i];
-  }
-  return OkStatus();
-}
-
-template <typename T>
-Status Xor::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
-  for (size_t i = 0; i < dst_buffer.size(); ++i) {
-    dst_buffer[i] = lhs_buffer[i] ^ rhs_buffer[i];
-  }
-  return OkStatus();
-}
-
-template <typename T>
-Status Xor::Execute(absl::Span<const T> lhs_buffer, T rhs,
-                    absl::Span<T> dst_buffer) {
-  for (size_t i = 0; i < dst_buffer.size(); ++i) {
-    dst_buffer[i] = lhs_buffer[i] ^ rhs;
-  }
-  return OkStatus();
-}
-
-template <typename T>
-Status ShiftLeft::Execute(absl::Span<const T> lhs_buffer,
-                          absl::Span<const T> rhs_buffer,
-                          absl::Span<T> dst_buffer) {
-  for (size_t i = 0; i < dst_buffer.size(); ++i) {
-    dst_buffer[i] = lhs_buffer[i] << rhs_buffer[i];
-  }
-  return OkStatus();
-}
-
-template <typename T>
-Status ShiftRight::Execute(absl::Span<const T> lhs_buffer,
+iree_status_t And::Execute(absl::Span<const T> lhs_buffer,
                            absl::Span<const T> rhs_buffer,
                            absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
-    dst_buffer[i] = lhs_buffer[i] >> rhs_buffer[i];
+    dst_buffer[i] = lhs_buffer[i] & rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Add::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+iree_status_t And::Execute(absl::Span<const T> lhs_buffer, T rhs,
+                           absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] & rhs;
+  }
+  return iree_ok_status();
+}
+
+template <typename T>
+iree_status_t Or::Execute(absl::Span<const T> lhs_buffer,
+                          absl::Span<const T> rhs_buffer,
+                          absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] | rhs_buffer[i];
+  }
+  return iree_ok_status();
+}
+
+template <typename T>
+iree_status_t Xor::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] ^ rhs_buffer[i];
+  }
+  return iree_ok_status();
+}
+
+template <typename T>
+iree_status_t Xor::Execute(absl::Span<const T> lhs_buffer, T rhs,
+                           absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] ^ rhs;
+  }
+  return iree_ok_status();
+}
+
+template <typename T>
+iree_status_t ShiftLeft::Execute(absl::Span<const T> lhs_buffer,
+                                 absl::Span<const T> rhs_buffer,
+                                 absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] << rhs_buffer[i];
+  }
+  return iree_ok_status();
+}
+
+template <typename T>
+iree_status_t ShiftRight::Execute(absl::Span<const T> lhs_buffer,
+                                  absl::Span<const T> rhs_buffer,
+                                  absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] >> rhs_buffer[i];
+  }
+  return iree_ok_status();
+}
+
+template <typename T>
+iree_status_t Add::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] + rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Sub::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Sub::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] - rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Abs::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Abs::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::abs(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Neg::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Neg::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = -src_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Mul::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Mul::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] * rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Div::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Div::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] / rhs_buffer[i];
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Rem::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Rem::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = remainder(lhs_buffer[i], rhs_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Pow::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Pow::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::pow(lhs_buffer[i], rhs_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Exp::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Exp::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::exp(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Rsqrt::Execute(absl::Span<const T> src_buffer,
-                      absl::Span<T> dst_buffer) {
+iree_status_t Rsqrt::Execute(absl::Span<const T> src_buffer,
+                             absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = 1.0 / std::sqrt(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Sqrt::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Sqrt::Execute(absl::Span<const T> src_buffer,
+                            absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::sqrt(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Log::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Log::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::log(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Cos::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Cos::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::cos(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Sin::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Sin::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::sin(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Tanh::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Tanh::Execute(absl::Span<const T> src_buffer,
+                            absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::tanh(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Atan2::Execute(absl::Span<const T> lhs_buffer,
-                      absl::Span<const T> rhs_buffer,
-                      absl::Span<T> dst_buffer) {
+iree_status_t Atan2::Execute(absl::Span<const T> lhs_buffer,
+                             absl::Span<const T> rhs_buffer,
+                             absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::atan2(lhs_buffer[i], rhs_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Min::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Min::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::min(lhs_buffer[i], rhs_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Max::Execute(absl::Span<const T> lhs_buffer,
-                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Max::Execute(absl::Span<const T> lhs_buffer,
+                           absl::Span<const T> rhs_buffer,
+                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::max(lhs_buffer[i], rhs_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Clamp::Execute(absl::Span<const T> min_buffer,
-                      absl::Span<const T> src_buffer,
-                      absl::Span<const T> max_buffer,
-                      absl::Span<T> dst_buffer) {
+iree_status_t Clamp::Execute(absl::Span<const T> min_buffer,
+                             absl::Span<const T> src_buffer,
+                             absl::Span<const T> max_buffer,
+                             absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     T src = src_buffer[i];
     T min = min_buffer[i];
     T max = max_buffer[i];
     dst_buffer[i] = src <= min ? min : src >= max ? max : src;
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Floor::Execute(absl::Span<const T> src_buffer,
-                      absl::Span<T> dst_buffer) {
+iree_status_t Floor::Execute(absl::Span<const T> src_buffer,
+                             absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::floor(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Ceil::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+iree_status_t Ceil::Execute(absl::Span<const T> src_buffer,
+                            absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::ceil(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename T>
-Status Round::Execute(absl::Span<const T> src_buffer,
-                      absl::Span<T> dst_buffer) {
+iree_status_t Round::Execute(absl::Span<const T> src_buffer,
+                             absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::round(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 template <typename SRC, typename DST>
-Status Convert::Execute(absl::Span<const SRC> src_buffer,
-                        absl::Span<DST> dst_buffer) {
+iree_status_t Convert::Execute(absl::Span<const SRC> src_buffer,
+                               absl::Span<DST> dst_buffer) {
   IREE_DCHECK_EQ(src_buffer.size(), dst_buffer.size());
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = static_cast<DST>(src_buffer[i]);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 namespace impl {
@@ -1005,10 +1032,10 @@ inline void ReduceDimension(absl::Span<const T> src_buffer,
 }
 
 template <typename T, typename KernelImpl>
-Status GenericReduce(absl::Span<const T> src_buffer,
-                     absl::Span<const T> init_buffer, absl::Span<T> dst_buffer,
-                     int32_t dimension, ShapeSpan src_shape,
-                     ShapeSpan dst_shape) {
+iree_status_t GenericReduce(absl::Span<const T> src_buffer,
+                            absl::Span<const T> init_buffer,
+                            absl::Span<T> dst_buffer, int32_t dimension,
+                            ShapeSpan src_shape, ShapeSpan dst_shape) {
   // Initialize using init_buffer, which is expected to be a scalar.
   std::fill_n(dst_buffer.data(), dst_buffer.size(), init_buffer[0]);
 
@@ -1032,52 +1059,52 @@ Status GenericReduce(absl::Span<const T> src_buffer,
                                  src_shape.size() - 1,
                                  absl::MakeSpan(src_indices), 0, 1);
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace impl
 
 template <typename T>
-Status ReduceSum::Execute(absl::Span<const T> src_buffer,
-                          absl::Span<const T> init_buffer,
-                          absl::Span<T> dst_buffer, int32_t dimension,
-                          ShapeSpan src_shape, ShapeSpan dst_shape) {
+iree_status_t ReduceSum::Execute(absl::Span<const T> src_buffer,
+                                 absl::Span<const T> init_buffer,
+                                 absl::Span<T> dst_buffer, int32_t dimension,
+                                 ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::SumKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
 
 template <typename T>
-Status ReduceMin::Execute(absl::Span<const T> src_buffer,
-                          absl::Span<const T> init_buffer,
-                          absl::Span<T> dst_buffer, int32_t dimension,
-                          ShapeSpan src_shape, ShapeSpan dst_shape) {
+iree_status_t ReduceMin::Execute(absl::Span<const T> src_buffer,
+                                 absl::Span<const T> init_buffer,
+                                 absl::Span<T> dst_buffer, int32_t dimension,
+                                 ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::MinKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
 
 template <typename T>
-Status ReduceMax::Execute(absl::Span<const T> src_buffer,
-                          absl::Span<const T> init_buffer,
-                          absl::Span<T> dst_buffer, int32_t dimension,
-                          ShapeSpan src_shape, ShapeSpan dst_shape) {
+iree_status_t ReduceMax::Execute(absl::Span<const T> src_buffer,
+                                 absl::Span<const T> init_buffer,
+                                 absl::Span<T> dst_buffer, int32_t dimension,
+                                 ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::MaxKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
 
 template <typename T>
-Status ReduceAnd::Execute(absl::Span<const T> src_buffer,
-                          absl::Span<const T> init_buffer,
-                          absl::Span<T> dst_buffer, int32_t dimension,
-                          ShapeSpan src_shape, ShapeSpan dst_shape) {
+iree_status_t ReduceAnd::Execute(absl::Span<const T> src_buffer,
+                                 absl::Span<const T> init_buffer,
+                                 absl::Span<T> dst_buffer, int32_t dimension,
+                                 ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::AndKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
 
 template <typename T>
-Status ReduceOr::Execute(absl::Span<const T> src_buffer,
-                         absl::Span<const T> init_buffer,
-                         absl::Span<T> dst_buffer, int32_t dimension,
-                         ShapeSpan src_shape, ShapeSpan dst_shape) {
+iree_status_t ReduceOr::Execute(absl::Span<const T> src_buffer,
+                                absl::Span<const T> init_buffer,
+                                absl::Span<T> dst_buffer, int32_t dimension,
+                                ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::OrKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
@@ -1109,11 +1136,11 @@ void ComputePoolingWindow(absl::Span<const T> src_buffer,
 }
 
 template <typename T, typename KernelImpl>
-Status GenericPooling(absl::Span<const T> src_buffer,
-                      absl::Span<const T> init_buffer, absl::Span<T> dst_buffer,
-                      ShapeSpan src_shape, ShapeSpan dst_shape,
-                      ShapeSpan window_dimensions, ShapeSpan strides,
-                      ShapeSpan pad_low) {
+iree_status_t GenericPooling(absl::Span<const T> src_buffer,
+                             absl::Span<const T> init_buffer,
+                             absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                             ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                             ShapeSpan strides, ShapeSpan pad_low) {
   size_t rank = src_shape.size();
   std::vector<int> src_indices(rank, 0);
   std::vector<int> dst_indices(rank, 0);
@@ -1126,39 +1153,42 @@ Status GenericPooling(absl::Span<const T> src_buffer,
                                         &dst_buffer[i]);
     IncrementShapeIndex(absl::MakeSpan(dst_indices), dst_shape);
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace impl
 
 template <typename T>
-Status PoolingSum::Execute(absl::Span<const T> src_buffer,
-                           absl::Span<const T> init_buffer,
-                           absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                           ShapeSpan dst_shape, ShapeSpan window_dimensions,
-                           ShapeSpan strides, ShapeSpan pad_low) {
+iree_status_t PoolingSum::Execute(absl::Span<const T> src_buffer,
+                                  absl::Span<const T> init_buffer,
+                                  absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                                  ShapeSpan dst_shape,
+                                  ShapeSpan window_dimensions,
+                                  ShapeSpan strides, ShapeSpan pad_low) {
   return impl::GenericPooling<T, impl::SumKernel>(
       src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
       window_dimensions, strides, pad_low);
 }
 
 template <typename T>
-Status PoolingMin::Execute(absl::Span<const T> src_buffer,
-                           absl::Span<const T> init_buffer,
-                           absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                           ShapeSpan dst_shape, ShapeSpan window_dimensions,
-                           ShapeSpan strides, ShapeSpan pad_low) {
+iree_status_t PoolingMin::Execute(absl::Span<const T> src_buffer,
+                                  absl::Span<const T> init_buffer,
+                                  absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                                  ShapeSpan dst_shape,
+                                  ShapeSpan window_dimensions,
+                                  ShapeSpan strides, ShapeSpan pad_low) {
   return impl::GenericPooling<T, impl::MinKernel>(
       src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
       window_dimensions, strides, pad_low);
 }
 
 template <typename T>
-Status PoolingMax::Execute(absl::Span<const T> src_buffer,
-                           absl::Span<const T> init_buffer,
-                           absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                           ShapeSpan dst_shape, ShapeSpan window_dimensions,
-                           ShapeSpan strides, ShapeSpan pad_low) {
+iree_status_t PoolingMax::Execute(absl::Span<const T> src_buffer,
+                                  absl::Span<const T> init_buffer,
+                                  absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                                  ShapeSpan dst_shape,
+                                  ShapeSpan window_dimensions,
+                                  ShapeSpan strides, ShapeSpan pad_low) {
   return impl::GenericPooling<T, impl::MaxKernel>(
       src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
       window_dimensions, strides, pad_low);

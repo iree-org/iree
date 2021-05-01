@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

@@ -29,7 +29,6 @@
 // clang-format on
 
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/status.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
