@@ -107,27 +107,27 @@ class FunctionInvoker:
 #   desc: The ABI descriptor list (or None if in dynamic mode).
 
 
-def _bool_to_vm(inv: Invocation, t: VmVariantList, desc):
+def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   _int_to_vm(t, int(x), desc)
 
 
-def _int_to_vm(inv: Invocation, t: VmVariantList, desc):
+def _int_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   _raise_argument_error(inv, "Python int arguments not yet supported")
 
 
-def _float_to_vm(inv: Invocation, t: VmVariantList, desc):
+def _float_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   _raise_argument_error(inv, "Python float arguments not yet supported")
 
 
-def _list_to_vm(inv: Invocation, t: VmVariantList, desc):
+def _list_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   _raise_argument_error(inv, "Python list arguments not yet supported")
 
 
-def _tuple_to_vm(inv: Invocation, t: VmVariantList, desc):
+def _tuple_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   _raise_argument_error(inv, "Python tuple arguments not yet supported")
 
 
-def _dict_to_vm(inv: Invocation, t: VmVariantList, desc):
+def _dict_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   _raise_argument_error(inv, "Python dict arguments not yet supported")
 
 
