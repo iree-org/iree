@@ -110,7 +110,7 @@ class Config:
   device: _binding.HalDevice
   vm_instance: _binding.VmInstance
   host_type_factory: _binding.HostTypeFactory
-  default_modules: Tuple[AnyModule]
+  default_modules: Sequence[AnyModule]
 
   def __init__(self, driver_name: Optional[str] = None):
     self.vm_instance = _binding.VmInstance()

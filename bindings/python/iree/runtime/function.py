@@ -108,7 +108,7 @@ class FunctionInvoker:
 
 
 def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  _int_to_vm(t, int(x), desc)
+  _int_to_vm(inv, t, int(x), desc)
 
 
 def _int_to_vm(inv: Invocation, t: VmVariantList, x, desc):
