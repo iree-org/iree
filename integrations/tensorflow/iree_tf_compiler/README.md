@@ -13,19 +13,19 @@ XLA IR).
 
 ## Production Tools
 
-### iree-tf-import
+### iree-import-tf
 
-`iree-tf-import` provides a single entry-point for compiling TensorFlow saved
+`iree-import-tf` provides a single entry-point for compiling TensorFlow saved
 models to "IREE Input Dialects" that can be fed to `iree-translate` or
 `iree-opt` and operated on further.
 
 #### Usage
 
 ```shell
-iree-tf-import /path/to/saved_model_v2
+iree-import-tf /path/to/saved_model_v2
 # Optional args: --tf-savedmodel-exported-names=subset,of,exported,names
 
-iree-tf-import /path/to/saved_model_v1 --tf-import-type=savedmodel_v1
+iree-import-tf /path/to/saved_model_v1 --tf-import-type=savedmodel_v1
 # Optional args:
 #   --tf-savedmodel-exported-names=subset,of,exported,names
 #   --tf-savedmodel-tags=serving
