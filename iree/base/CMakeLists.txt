@@ -21,10 +21,13 @@ iree_cc_library(
     "api.h"
   SRCS
     "allocator.c"
+    "allocator.h"
     "api.c"
     "status.c"
     "string_view.c"
+    "string_view.h"
     "time.c"
+    "time.h"
   DEPS
     ::core_headers
     ::tracing

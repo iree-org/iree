@@ -38,6 +38,7 @@
 #include <stdlib.h>
 
 #include "iree/base/attributes.h"
+#include "iree/base/config.h"
 
 #ifndef IREE_BASE_TRACING_H_
 #define IREE_BASE_TRACING_H_
