@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/base/string_view.h"
+
 #include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>

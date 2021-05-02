@@ -15,6 +15,7 @@
 #ifndef IREE_BASE_STRING_VIEW_H_
 #define IREE_BASE_STRING_VIEW_H_
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -157,6 +158,19 @@ IREE_API_EXPORT bool iree_string_view_match_pattern(iree_string_view_t value,
 IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(
     iree_string_view_t source_value, iree_string_view_t* target_value,
     char* buffer);
+
+IREE_API_EXPORT bool iree_string_view_atoi_int32(iree_string_view_t value,
+                                                 int32_t* out_value);
+IREE_API_EXPORT bool iree_string_view_atoi_uint32(iree_string_view_t value,
+                                                  uint32_t* out_value);
+IREE_API_EXPORT bool iree_string_view_atoi_int64(iree_string_view_t value,
+                                                 int64_t* out_value);
+IREE_API_EXPORT bool iree_string_view_atoi_uint64(iree_string_view_t value,
+                                                  uint64_t* out_value);
+IREE_API_EXPORT bool iree_string_view_atof(iree_string_view_t value,
+                                           float* out_value);
+IREE_API_EXPORT bool iree_string_view_atod(iree_string_view_t value,
+                                           double* out_value);
 
 #ifdef __cplusplus
 }  // extern "C"

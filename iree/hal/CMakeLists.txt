@@ -50,10 +50,9 @@ iree_cc_library(
     "resource.h"
     "semaphore.c"
     "semaphore.h"
-    "string_util.cc"
+    "string_util.c"
     "string_util.h"
   DEPS
-    absl::strings
     iree::base
     iree::base::core_headers
     iree::base::internal

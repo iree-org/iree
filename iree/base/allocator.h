@@ -17,6 +17,7 @@
 
 #include <memory.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "iree/base/attributes.h"
 #include "iree/base/config.h"
@@ -97,20 +98,21 @@ static inline iree_const_byte_span_t iree_make_const_byte_span(
 //===----------------------------------------------------------------------===//
 
 // Defines how an allocation from an iree_allocator_t should be made.
-typedef enum {
+enum iree_allocation_mode_e {
   // The contents of the allocation *must* be zeroed by the allocator prior to
   // returning. Allocators may be able to elide the zeroing if they allocate
   // fresh pages from the system. It is always safe to zero contents if the
   // behavior of the allocator is not under our control.
-  IREE_ALLOCATION_MODE_ZERO_CONTENTS = 1 << 0,
+  IREE_ALLOCATION_MODE_ZERO_CONTENTS = 1u << 0,
   // Tries to reuse an existing allocation provided via |out_ptr| if possible.
   // If the existing allocation is not reused then it is freed as if a call to
   // iree_allocator_free had been called on it. If the allocation fails then
   // the provided existing allocation is unmodified.
   //
   // This models the C realloc behavior.
-  IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING = 1 << 1,
-} iree_allocation_mode_t;
+  IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING = 1u << 1,
+};
+typedef uint32_t iree_allocation_mode_t;
 
 // TODO(benvanik): replace with a single method with the mode setting. This will
 // reduce the overhead to just two pointers per allocator (from 3) and allow us
