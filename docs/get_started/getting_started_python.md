@@ -61,22 +61,16 @@ $ python -m pip install numpy absl-py
 
 ## Building
 
-From the *parent* directory of the IREE git repository clone, create and enter a
-build directory, such as:
+Configure:
 
 ```shell
-$ mkdir iree-build
-$ cd iree-build
+$ cmake -G Ninja -B ../iree-build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
 ```
 
-Then build like this:
+Build all targets:
 
 ```shell
-$ cmake ../iree -G Ninja \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DIREE_BUILD_PYTHON_BINDINGS=ON  .
-$ cmake --build .
+$ cmake --build ../iree-build/
 ```
 
 ## Running Python Tests
