@@ -32,7 +32,6 @@ cc_library(
         "api.c",
         "status.c",
         "string_view.c",
-        "string_view.cc",
         "string_view.h",
         "time.c",
         "time.h",
@@ -42,7 +41,6 @@ cc_library(
     deps = [
         ":core_headers",
         ":tracing",
-        "@com_google_absl//absl/strings",
     ],
 )
 

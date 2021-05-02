@@ -25,14 +25,12 @@ iree_cc_library(
     "api.c"
     "status.c"
     "string_view.c"
-    "string_view.cc"
     "string_view.h"
     "time.c"
     "time.h"
   DEPS
     ::core_headers
     ::tracing
-    absl::strings
   PUBLIC
 )
 
