@@ -253,9 +253,8 @@ static iree_status_t iree_hal_executable_library_run(
   void* binding_ptrs[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
   size_t binding_lengths[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
   for (iree_host_size_t i = 0; i < dispatch_params.binding_count; ++i) {
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_parse(dispatch_params.bindings[i], heap_allocator,
-                                   host_allocator, &buffer_views[i]));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
+        dispatch_params.bindings[i], heap_allocator, &buffer_views[i]));
     iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_views[i]);
     iree_device_size_t buffer_length =
         iree_hal_buffer_view_byte_length(buffer_views[i]);

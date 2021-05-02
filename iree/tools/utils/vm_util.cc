@@ -192,7 +192,7 @@ Status ParseToVariantList(
         IREE_RETURN_IF_ERROR(
             iree_hal_buffer_view_parse(
                 iree_string_view_t{input_string.data(), input_string.size()},
-                allocator, iree_allocator_system(), &buffer_view),
+                allocator, &buffer_view),
             "parsing value '%.*s'", (int)input_string.size(),
             input_string.data());
         auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
