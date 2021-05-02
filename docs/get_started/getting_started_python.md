@@ -64,7 +64,10 @@ $ python -m pip install numpy absl-py
 Configure:
 
 ```shell
-$ cmake -G Ninja -B ../iree-build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
+cmake -B ../iree-build/ -G Ninja \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DIREE_BUILD_PYTHON_BINDINGS=ON  .
 ```
 
 Build all targets:
