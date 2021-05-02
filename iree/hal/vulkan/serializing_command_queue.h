@@ -72,7 +72,7 @@ class SerializingCommandQueue final : public CommandQueue {
   void AbortQueueSubmission();
 
   // Informs this queue that the given |fences| are known to have signaled.
-  void SignalFences(absl::Span<VkFence> fences);
+  void SignalFences(const std::vector<VkFence>& fences);
 
  private:
   // A submission batch together with the fence to singal its status.

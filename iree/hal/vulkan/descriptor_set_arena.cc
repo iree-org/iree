@@ -28,10 +28,11 @@ namespace vulkan {
 
 namespace {
 
-static absl::Span<VkWriteDescriptorSet> PopulateDescriptorSetWriteInfos(
+static void PopulateDescriptorSetWriteInfos(
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings, VkDescriptorSet dst_set,
-    Arena* arena) {
+    Arena* arena, iree_host_size_t* out_info_count,
+    VkWriteDescriptorSet** out_infos) {
   arena->Reset();
   auto buffer_infos =
       arena->AllocateSpan<VkDescriptorBufferInfo>(binding_count);
@@ -80,7 +81,8 @@ static absl::Span<VkWriteDescriptorSet> PopulateDescriptorSetWriteInfos(
     write_info.pTexelBufferView = nullptr;
   }
 
-  return write_infos;
+  *out_info_count = write_infos.size();
+  *out_infos = write_infos.data();
 }
 
 static VkDescriptorSetAllocateInfo PopulateDescriptorSetsAllocateInfo(
@@ -108,8 +110,8 @@ DescriptorSetArena::DescriptorSetArena(
 
 DescriptorSetArena::~DescriptorSetArena() {
   if (!used_descriptor_pools_.empty()) {
-    iree_status_ignore(descriptor_pool_cache_->ReleaseDescriptorPools(
-        absl::MakeSpan(used_descriptor_pools_)));
+    iree_status_ignore(
+        descriptor_pool_cache_->ReleaseDescriptorPools(used_descriptor_pools_));
     used_descriptor_pools_.clear();
   }
 }
@@ -189,8 +191,11 @@ iree_status_t DescriptorSetArena::BindDescriptorSet(
   }
 
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.
-  auto write_infos = PopulateDescriptorSetWriteInfos(
-      binding_count, bindings, descriptor_set, &scratch_arena_);
+  iree_host_size_t write_info_count = 0;
+  VkWriteDescriptorSet* write_infos = NULL;
+  PopulateDescriptorSetWriteInfos(binding_count, bindings, descriptor_set,
+                                  &scratch_arena_, &write_info_count,
+                                  &write_infos);
 
   // This is the reason why push descriptor sets are good.
   // We can't batch these effectively as we don't know prior to recording what
@@ -198,8 +203,8 @@ iree_status_t DescriptorSetArena::BindDescriptorSet(
   // doing just as much work as actually recording the buffer to try to find
   // out).
   syms().vkUpdateDescriptorSets(*logical_device_,
-                                static_cast<uint32_t>(write_infos.size()),
-                                write_infos.data(), 0, nullptr);
+                                static_cast<uint32_t>(write_info_count),
+                                write_infos, 0, nullptr);
 
   // Bind the descriptor set.
   syms().vkCmdBindDescriptorSets(
@@ -220,14 +225,17 @@ void DescriptorSetArena::PushDescriptorSet(
       iree_hal_vulkan_native_executable_layout_handle(executable_layout);
 
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.
-  auto write_infos = PopulateDescriptorSetWriteInfos(
-      binding_count, bindings, VK_NULL_HANDLE, &scratch_arena_);
+  iree_host_size_t write_info_count = 0;
+  VkWriteDescriptorSet* write_infos = NULL;
+  PopulateDescriptorSetWriteInfos(binding_count, bindings, VK_NULL_HANDLE,
+                                  &scratch_arena_, &write_info_count,
+                                  &write_infos);
 
   // Fast path using push descriptors. These are pooled internally by the
   // command buffer and prevent the need for our own pooling mechanisms.
   syms().vkCmdPushDescriptorSetKHR(
       command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, device_executable_layout,
-      set, static_cast<uint32_t>(write_infos.size()), write_infos.data());
+      set, static_cast<uint32_t>(write_info_count), write_infos);
 }
 
 DescriptorSetGroup DescriptorSetArena::Flush() {

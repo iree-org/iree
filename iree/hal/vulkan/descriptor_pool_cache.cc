@@ -40,8 +40,8 @@ iree_status_t DescriptorSetGroup::Reset() {
   IREE_TRACE_SCOPE0("DescriptorSetGroup::Reset");
 
   if (descriptor_pool_cache_ != nullptr) {
-    IREE_RETURN_IF_ERROR(descriptor_pool_cache_->ReleaseDescriptorPools(
-        absl::MakeSpan(descriptor_pools_)));
+    IREE_RETURN_IF_ERROR(
+        descriptor_pool_cache_->ReleaseDescriptorPools(descriptor_pools_));
   }
   descriptor_pools_.clear();
 
@@ -84,7 +84,7 @@ iree_status_t DescriptorPoolCache::AcquireDescriptorPool(
 }
 
 iree_status_t DescriptorPoolCache::ReleaseDescriptorPools(
-    absl::Span<DescriptorPool> descriptor_pools) {
+    const std::vector<DescriptorPool>& descriptor_pools) {
   IREE_TRACE_SCOPE0("DescriptorPoolCache::ReleaseDescriptorPools");
 
   for (const auto& descriptor_pool : descriptor_pools) {

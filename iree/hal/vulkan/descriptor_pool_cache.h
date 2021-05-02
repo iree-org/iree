@@ -90,7 +90,7 @@ class DescriptorPoolCache final {
   // Releases descriptor pools back to the cache. The pools will be reset
   // immediately and must no longer be in use by any in-flight command.
   iree_status_t ReleaseDescriptorPools(
-      absl::Span<DescriptorPool> descriptor_pools);
+      const std::vector<DescriptorPool>& descriptor_pools);
 
  private:
   VkDeviceHandle* logical_device_;

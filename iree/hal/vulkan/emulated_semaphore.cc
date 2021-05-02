@@ -355,7 +355,7 @@ iree_status_t EmulatedTimelineSemaphore::TryToAdvanceTimeline(
   if (!signaled_fences.empty()) {
     for (iree_host_size_t i = 0; i < command_queue_count_; ++i) {
       ((SerializingCommandQueue*)command_queues_[i])
-          ->SignalFences(absl::MakeSpan(signaled_fences));
+          ->SignalFences(signaled_fences);
     }
   }
   return status;
