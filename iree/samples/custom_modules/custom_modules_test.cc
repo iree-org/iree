@@ -14,7 +14,6 @@
 
 // Tests that our bytecode module can call through into our native module.
 
-#include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
@@ -85,12 +84,11 @@ class CustomModulesTest : public ::testing::Test {
     iree_vm_instance_release(instance_);
   }
 
-  iree_vm_function_t LookupFunction(absl::string_view function_name) {
+  iree_vm_function_t LookupFunction(const char* function_name) {
     iree_vm_function_t function;
     IREE_CHECK_OK(bytecode_module_->lookup_function(
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
-        &function))
+        iree_make_cstring_view(function_name), &function))
         << "Exported function '" << function_name << "' not found";
     return function;
   }

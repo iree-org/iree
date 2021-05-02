@@ -14,7 +14,6 @@
 
 #include <iostream>
 
-#include "absl/strings/string_view.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
@@ -97,7 +96,7 @@ iree_status_t Run() {
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(std::string(FLAG_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 

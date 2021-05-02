@@ -63,7 +63,6 @@ iree_cc_binary(
   SRCS
     "iree-benchmark-module-main.cc"
   DEPS
-    absl::strings
     benchmark
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -124,7 +123,6 @@ iree_cc_binary(
   SRCS
     "iree-run-module-main.cc"
   DEPS
-    absl::strings
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::status
@@ -363,7 +361,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRSupport
       MLIRTargetLLVMIRExport
       absl::span
-      absl::strings
       iree::base
       iree::base::internal::flags
       iree::base::status

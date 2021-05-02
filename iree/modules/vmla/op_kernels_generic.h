@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <iterator>
 #include <numeric>

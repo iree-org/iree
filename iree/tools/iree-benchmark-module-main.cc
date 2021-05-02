@@ -187,8 +187,7 @@ class IREEBenchmark {
         iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     // Create IREE's device and module.
-    IREE_RETURN_IF_ERROR(
-        iree::CreateDevice(std::string(FLAG_driver), &device_));
+    IREE_RETURN_IF_ERROR(iree::CreateDevice(FLAG_driver, &device_));
     IREE_RETURN_IF_ERROR(CreateHalModule(device_, &hal_module_));
     IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data_, &input_module_));
 

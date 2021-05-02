@@ -19,10 +19,6 @@
 #include <cstdio>
 #include <vector>
 
-#include "absl/strings/ascii.h"
-#include "absl/strings/numbers.h"
-#include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"

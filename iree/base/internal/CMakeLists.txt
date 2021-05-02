@@ -284,8 +284,6 @@ iree_cc_library(
     "status.cc"
     "statusor.cc"
   DEPS
-    absl::core_headers
-    absl::strings
     absl::utility
     iree::base
     iree::base::core_headers
