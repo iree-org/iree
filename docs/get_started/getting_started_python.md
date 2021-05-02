@@ -78,14 +78,18 @@ $ cmake --build ../iree-build/
 
 ## Running Python Tests
 
-We continue to assume that we are in the build directory where we made the build
-in the previous section.
+Move into the build directory where we made the build in the previous section.
+
+```shell
+$ cd ../iree-build/
+```
 
 To run tests for core Python bindings built with CMake:
 
 ```shell
 $ ctest -L bindings/python
 ```
+
 ## Using Colab
 
 There are some sample colabs in the `colab` folder. If you have built the
