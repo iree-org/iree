@@ -8,6 +8,28 @@ flexible deployment solutions for its compiled ML models.
 
 <!-- TODO(??): more motivation, key features, supported platforms, binary size, etc. -->
 
+## Supported Platforms
+
+Platforms - Linux, Windows, macOS, iOS, Android, WebAssembly
+
+CPU Architectures - x86, ARM, RISC-V
+
+GPU - Vulkan, CUDA, Metal, WebGPU
+
+## Key Features
+
+Binary size
+
+Low overhead
+
+Pipelined execution
+
+Ahead-of-time compilation
+
+Debugging and profiling support
+
+Flexible deployment configurations
+
 ## Introduction
 
 IREE adopts a _holistic_ approach towards ML model compilation: the IR produced
