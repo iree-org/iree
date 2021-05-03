@@ -223,42 +223,43 @@ MODEL_BENCHMARKS = [
                                targets=get_s20_default_target_list(
                                    skipped_target=["cpu2", "vlk2"],)),
         ]),
-    ModelBenchmarkInfo(
-        name="mobilenet-v2",
-        model_artifacts_name="mobilenet-v2.tar.gz",
-        model_path="mobilenet-v2/iree_input.mlir",
-        flagfile_path="mobilenet-v2/flagfile",
-        phones=[
-            PhoneBenchmarkInfo(
-                name="Pixel4",
-                benchmark_key="6338759231537152",
-                targets=get_pixel4_default_target_list(
-                    skipped_target=["vlk2"],
-                    compilation_flags={
-                        'cpu': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
-                            "-iree-llvm-loop-unrolling=true"
-                        ],
-                        'cpu3t': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
-                            "-iree-llvm-loop-unrolling=true"
-                        ]
-                    })),
-            PhoneBenchmarkInfo(
-                name="S20",
-                benchmark_key="5618403088793600",
-                targets=get_s20_default_target_list(
-                    compilation_flags={
-                        'cpu': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
-                            "-iree-llvm-loop-unrolling=true"
-                        ],
-                        'cpu3t': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
-                            "-iree-llvm-loop-unrolling=true"
-                        ]
-                    })),
-        ]),
+    # TODO(thomasraoux): re-enable once this compiles successfully again
+    # ModelBenchmarkInfo(
+    #     name="mobilenet-v2",
+    #     model_artifacts_name="mobilenet-v2.tar.gz",
+    #     model_path="mobilenet-v2/iree_input.mlir",
+    #     flagfile_path="mobilenet-v2/flagfile",
+    #     phones=[
+    #         PhoneBenchmarkInfo(
+    #             name="Pixel4",
+    #             benchmark_key="6338759231537152",
+    #             targets=get_pixel4_default_target_list(
+    #                 skipped_target=["vlk2"],
+    #                 compilation_flags={
+    #                     'cpu': [
+    #                         "--iree-flow-dispatch-formation-enable-operand-fusion",
+    #                         "-iree-llvm-loop-unrolling=true"
+    #                     ],
+    #                     'cpu3t': [
+    #                         "--iree-flow-dispatch-formation-enable-operand-fusion",
+    #                         "-iree-llvm-loop-unrolling=true"
+    #                     ]
+    #                 })),
+    #         PhoneBenchmarkInfo(
+    #             name="S20",
+    #             benchmark_key="5618403088793600",
+    #             targets=get_s20_default_target_list(
+    #                 compilation_flags={
+    #                     'cpu': [
+    #                         "--iree-flow-dispatch-formation-enable-operand-fusion",
+    #                         "-iree-llvm-loop-unrolling=true"
+    #                     ],
+    #                     'cpu3t': [
+    #                         "--iree-flow-dispatch-formation-enable-operand-fusion",
+    #                         "-iree-llvm-loop-unrolling=true"
+    #                     ]
+    #                 })),
+    #     ]),
     ModelBenchmarkInfo(
         name="mobilebert-f16",
         model_artifacts_name="mobilebert-f16.tar.gz",
