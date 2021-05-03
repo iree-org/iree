@@ -57,6 +57,7 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 # Respect the user setting, but default to turning off the vulkan tests
 # and turning on the llvmaot ones.
+# TODO(#5716): Fix and enable Vulkan tests.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
@@ -104,6 +105,7 @@ fi
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 # These tests currently have asan failures
+# TODO(#5715): Fix these
 declare -a excluded_tests=(
   "iree/base/internal/file_io_test"
   "iree/base/internal/wait_handle_test"
