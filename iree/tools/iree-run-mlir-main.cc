@@ -39,8 +39,6 @@
 #include <iostream>
 #include <utility>
 
-#include "absl/strings/match.h"
-#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
@@ -259,10 +257,11 @@ Status PrepareModule(std::string target_backend,
 Status EvaluateFunction(iree_vm_context_t* context,
                         iree_hal_allocator_t* allocator,
                         iree_vm_function_t function,
-                        absl::string_view export_name) {
+                        iree_string_view_t export_name) {
   IREE_TRACE_SCOPE();
 
-  std::cout << "EXEC @" << export_name << std::endl;
+  std::cout << "EXEC @" << std::string(export_name.data, export_name.size)
+            << std::endl;
   std::vector<RawSignatureParser::Description> input_descs;
   IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
   vm::ref<iree_vm_list_t> inputs;
@@ -293,7 +292,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
 
 // Evaluates all exported functions within given module.
 Status EvaluateFunctions(iree_vm_instance_t* instance,
-                         absl::string_view driver_name,
+                         const std::string& driver_name,
                          const std::string& flatbuffer_data) {
   IREE_TRACE_SCOPE0("EvaluateFunctions");
 
@@ -313,21 +312,22 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   }
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(driver_name, &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(driver_name.c_str(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
     iree_vm_function_t function;
-    iree_string_view_t export_name_isv;
+    iree_string_view_t export_name;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
                              bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                             ordinal, &function, &export_name_isv),
+                             ordinal, &function, &export_name),
                          "Looking up function export %d", ordinal);
-    absl::string_view export_name(export_name_isv.data, export_name_isv.size);
-    if (absl::StartsWith(export_name, "__") ||
-        export_name.find('$') != absl::string_view::npos) {
+    if (iree_string_view_starts_with(export_name,
+                                     iree_make_cstring_view("__")) ||
+        iree_string_view_find_char(export_name, '$', 0) !=
+            IREE_STRING_VIEW_NPOS) {
       // Skip internal or special functions.
       return OkStatus();
     }

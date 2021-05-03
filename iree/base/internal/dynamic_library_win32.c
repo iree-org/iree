@@ -15,10 +15,10 @@
 #include <stdio.h>
 
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/call_once.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/internal/file_path.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/threading.h"
 #include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)

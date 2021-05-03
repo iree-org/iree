@@ -76,9 +76,8 @@ IREE_FLAG(
 // Task system factory functions
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_task_executor_create_from_flags(iree_allocator_t host_allocator,
-                                     iree_task_executor_t** out_executor) {
+iree_status_t iree_task_executor_create_from_flags(
+    iree_allocator_t host_allocator, iree_task_executor_t** out_executor) {
   IREE_ASSERT_ARGUMENT(out_executor);
   *out_executor = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);

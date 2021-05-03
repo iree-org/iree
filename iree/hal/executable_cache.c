@@ -31,7 +31,7 @@ void iree_hal_executable_spec_initialize(iree_hal_executable_spec_t* out_spec) {
 
 IREE_HAL_API_RETAIN_RELEASE(executable_cache);
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_create(
+IREE_API_EXPORT iree_status_t iree_hal_executable_cache_create(
     iree_hal_device_t* device, iree_string_view_t identifier,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(device);
@@ -45,7 +45,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_create(
   return status;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
+IREE_API_EXPORT bool iree_hal_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format) {
@@ -54,8 +54,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
       executable_cache, caching_mode, executable_format);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_executable_cache_prepare_executable(
+IREE_API_EXPORT iree_status_t iree_hal_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* executable_cache,
     const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {

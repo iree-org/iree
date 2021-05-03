@@ -49,7 +49,7 @@ iree_cc_library(
     "vulkan_gui_util.cc"
   DEPS
     imgui::imgui
-    iree::base::api
+    iree::base
     iree::base::logging
     iree::hal::vulkan
     SDL2::SDL2

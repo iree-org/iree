@@ -14,8 +14,6 @@
 
 #include <iostream>
 
-#include "absl/strings/match.h"
-#include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
@@ -79,7 +77,7 @@ class CheckModuleTest : public ::testing::Test {
   iree_vm_context_t* context_ = nullptr;
 };
 
-Status Run(std::string module_file_path, int* out_exit_code) {
+iree_status_t Run(std::string module_file_path, int* out_exit_code) {
   IREE_TRACE_SCOPE0("iree-check-module");
   *out_exit_code = 1;
 
@@ -96,14 +94,14 @@ Status Run(std::string module_file_path, int* out_exit_code) {
                               std::istreambuf_iterator<char>()};
   } else {
     IREE_RETURN_IF_ERROR(
-        file_io::GetFileContents(module_file_path.c_str(), &module_data));
+        GetFileContents(module_file_path.c_str(), &module_data));
   }
 
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(std::string(FLAG_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
   iree_vm_module_t* check_module = nullptr;
@@ -115,21 +113,17 @@ Status Run(std::string module_file_path, int* out_exit_code) {
   for (iree_host_size_t ordinal = 0;
        ordinal < module_signature.export_function_count; ++ordinal) {
     iree_vm_function_t function;
-    iree_string_view_t export_name_sv;
+    iree_string_view_t export_name;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
                              input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                             ordinal, &function, &export_name_sv),
+                             ordinal, &function, &export_name),
                          "looking up function export %zu", ordinal);
 
-    // TODO(gcmn): Implicit conversion from iree to absl string view.
-    auto export_name =
-        absl::string_view(export_name_sv.data, export_name_sv.size);
-
-    iree_string_view_t module_name_iree_sv = iree_vm_module_name(input_module);
-    auto module_name =
-        absl::string_view(module_name_iree_sv.data, module_name_iree_sv.size);
-    if (absl::StartsWith(export_name, "__") ||
-        export_name.find('$') != absl::string_view::npos) {
+    iree_string_view_t module_name = iree_vm_module_name(input_module);
+    if (iree_string_view_starts_with(export_name,
+                                     iree_make_cstring_view("__")) ||
+        iree_string_view_find_char(export_name, '$', 0) !=
+            IREE_STRING_VIEW_NPOS) {
       // Skip internal or special functions.
       continue;
     }
@@ -153,12 +147,12 @@ Status Run(std::string module_file_path, int* out_exit_code) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "expected function with no inputs or outputs, "
                               "but export '%.*s' has signature '%.*s'",
-                              (int)export_name.size(), export_name.data(),
+                              (int)export_name.size, export_name.data,
                               (int)sig_f.size, sig_f.data);
     }
 
     ::testing::RegisterTest(
-        module_name.data(), export_name.data(), nullptr,
+        module_name.data, export_name.data, nullptr,
         std::to_string(ordinal).c_str(), __FILE__, __LINE__,
         [&instance, modules, function]() -> CheckModuleTest* {
           return new CheckModuleTest(instance, modules, function);
@@ -172,7 +166,7 @@ Status Run(std::string module_file_path, int* out_exit_code) {
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace
@@ -195,12 +189,11 @@ extern "C" int main(int argc, char** argv) {
   auto module_file_path = std::string(argv[1]);
 
   int exit_code = 1;
-  auto status = Run(std::move(module_file_path), &exit_code);
-  int ret = status.ok() ? exit_code : 1;
+  iree_status_t status = Run(std::move(module_file_path), &exit_code);
+  int ret = iree_status_is_ok(status) ? exit_code : 1;
   if (FLAG_expect_failure) {
     if (ret == 0) {
       std::cout << "Test passed but expected failure\n";
-      std::cout << status;
       return 1;
     }
     std::cout << "Test failed as expected\n";
@@ -209,7 +202,7 @@ extern "C" int main(int argc, char** argv) {
 
   if (ret != 0) {
     std::cout << "Test failed\n";
-    std::cout << status;
+    std::cout << Status(std::move(status));
   }
 
   return ret;

@@ -61,7 +61,7 @@ class DynamicLibraryTest : public ::testing::Test {
     library_temp_path_ = GetTempFilename(ext);
 
     const auto* file_toc = dynamic_library_test_library_create();
-    IREE_ASSERT_OK(file_io::SetFileContents(
+    IREE_ASSERT_OK(iree_file_write_contents(
         library_temp_path_.c_str(),
         iree_make_const_byte_span(file_toc->data, file_toc->size)));
 

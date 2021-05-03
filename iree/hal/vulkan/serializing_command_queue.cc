@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -108,10 +107,11 @@ iree_status_t TryToPrepareSemaphores(
 // waiting on |wait_semaphores| and signalling |signal_semaphores|. Necessary
 // structures are allocated from |arena| and the result `VkSubmitInfo` is
 // written to |submit_info|.
-void PrepareSubmitInfo(absl::Span<const VkSemaphore> wait_semaphore_handles,
-                       absl::Span<const VkCommandBuffer> command_buffer_handles,
-                       absl::Span<const VkSemaphore> signal_semaphore_handles,
-                       VkSubmitInfo* submit_info, Arena* arena) {
+void PrepareSubmitInfo(
+    const std::vector<VkSemaphore>& wait_semaphore_handles,
+    const std::vector<VkCommandBuffer>& command_buffer_handles,
+    const std::vector<VkSemaphore>& signal_semaphore_handles,
+    VkSubmitInfo* submit_info, Arena* arena) {
   // TODO(benvanik): see if we can go to finer-grained stages.
   // For example, if this was just queue ownership transfers then we can use
   // the pseudo-stage of VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT.
@@ -407,7 +407,7 @@ void SerializingCommandQueue::AbortQueueSubmission() {
   iree_slim_mutex_unlock(&queue_mutex_);
 }
 
-void SerializingCommandQueue::SignalFences(absl::Span<VkFence> fences) {
+void SerializingCommandQueue::SignalFences(const std::vector<VkFence>& fences) {
   const auto span_contains = [fences](VkFence fence) {
     for (VkFence f : fences) {
       if (f == fence) return true;

@@ -21,10 +21,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if IREE_FLAGS_ENABLE_CLI == 1
+
 #include "iree/base/internal/debugging.h"
 #include "iree/base/tracing.h"
-
-#if IREE_FLAGS_ENABLE_CLI == 1
 
 //===----------------------------------------------------------------------===//
 // Flag manipulation utilities
@@ -452,58 +452,7 @@ void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file) {
 
 #if IREE_FLAGS_ENABLE_FLAG_FILE == 1
 
-// TODO(benvanik): use this to replace file_io.cc.
-static iree_status_t iree_file_read_contents(const char* path,
-                                             iree_allocator_t allocator,
-                                             iree_byte_span_t* out_contents) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  *out_contents = iree_make_byte_span(NULL, 0);
-  FILE* file = fopen(path, "rb");
-  if (file == NULL) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "failed to open file '%s'", path);
-  }
-  iree_status_t status = iree_ok_status();
-  if (fseek(file, 0, SEEK_END) == -1) {
-    status = iree_make_status(iree_status_code_from_errno(errno), "seek (end)");
-  }
-  size_t file_size = 0;
-  if (iree_status_is_ok(status)) {
-    file_size = ftell(file);
-    if (file_size == -1L) {
-      status =
-          iree_make_status(iree_status_code_from_errno(errno), "size query");
-    }
-  }
-  if (iree_status_is_ok(status)) {
-    if (fseek(file, 0, SEEK_SET) == -1) {
-      status =
-          iree_make_status(iree_status_code_from_errno(errno), "seek (beg)");
-    }
-  }
-  // Allocate +1 to force a trailing \0 in case this is a string.
-  char* contents = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_allocator_malloc(allocator, file_size + 1, (void**)&contents);
-  }
-  if (iree_status_is_ok(status)) {
-    if (fread(contents, file_size, 1, file) != 1) {
-      status =
-          iree_make_status(iree_status_code_from_errno(errno),
-                           "unable to read entire file contents of '%s'", path);
-    }
-  }
-  if (iree_status_is_ok(status)) {
-    contents[file_size] = 0;  // NUL
-    *out_contents = iree_make_byte_span(contents, file_size);
-  } else {
-    iree_allocator_free(allocator, contents);
-  }
-  fclose(file);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
+#include "iree/base/internal/file_io.h"
 
 // Parses a newline-separated list of flags from a file.
 static iree_status_t iree_flags_parse_file(iree_string_view_t file_path) {

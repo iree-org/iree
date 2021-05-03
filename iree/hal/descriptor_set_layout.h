@@ -81,8 +81,7 @@ typedef struct iree_hal_descriptor_set_layout_s
     iree_hal_descriptor_set_layout_t;
 
 // Creates a descriptor set layout with the given bindings.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_descriptor_set_layout_create(
+IREE_API_EXPORT iree_status_t iree_hal_descriptor_set_layout_create(
     iree_hal_device_t* device,
     iree_hal_descriptor_set_layout_usage_type_t usage_type,
     iree_host_size_t binding_count,
@@ -90,11 +89,11 @@ iree_hal_descriptor_set_layout_create(
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
 
 // Retains the given |descriptor_set_layout| for the caller.
-IREE_API_EXPORT void IREE_API_CALL iree_hal_descriptor_set_layout_retain(
+IREE_API_EXPORT void iree_hal_descriptor_set_layout_retain(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 // Releases the given |descriptor_set_layout| from the caller.
-IREE_API_EXPORT void IREE_API_CALL iree_hal_descriptor_set_layout_release(
+IREE_API_EXPORT void iree_hal_descriptor_set_layout_release(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 //===----------------------------------------------------------------------===//
@@ -109,7 +108,7 @@ typedef struct {
       iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 } iree_hal_descriptor_set_layout_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_descriptor_set_layout_destroy(
+IREE_API_EXPORT void iree_hal_descriptor_set_layout_destroy(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 #ifdef __cplusplus

@@ -21,7 +21,7 @@
 #include "iree/vm/bytecode_module.h"
 
 // flatcc schemas:
-#include "iree/base/flatcc.h"
+#include "iree/base/internal/flatcc.h"
 #include "iree/schemas/vmla_executable_def_reader.h"
 #include "iree/schemas/vmla_executable_def_verifier.h"
 
@@ -207,8 +207,8 @@ static iree_status_t iree_hal_vmla_executable_issue_call(
       executable->base.executable_layouts[ordinal];
   IREE_CHECK_EQ(local_layout->push_constants,
                 dispatch_state->push_constant_count);
-  IREE_CHECK_OK(interface.SetConstants(absl::MakeConstSpan(
-      dispatch_state->push_constants, dispatch_state->push_constant_count)));
+  IREE_CHECK_OK(interface.SetConstants(dispatch_state->push_constants,
+                                       dispatch_state->push_constant_count));
 
   for (iree_host_size_t set_ordinal = 0;
        set_ordinal < local_layout->set_layout_count; ++set_ordinal) {

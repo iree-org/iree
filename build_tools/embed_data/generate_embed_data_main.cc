@@ -151,15 +151,25 @@ bool GenerateImpl(const std::string& impl_file,
   const auto& c_output = absl::GetFlag(FLAGS_c_output);
   if (c_output) {
     f << "#include <stddef.h>\n";
-    f << "#include <stdalign.h>\n";
+    f << R"(
+#if !defined(IREE_DATA_ALIGNAS_PTR)
+#if defined(_MSVC)
+#define IREE_DATA_ALIGNAS_PTR __declspec(align(__alignof(void*)))
+#else
+#include <stdalign.h>
+#define IREE_DATA_ALIGNAS_PTR alignas(alignof(void*))
+#endif  // _MSVC
+#endif  // !IREE_DATA_ALIGNAS_PTR
+    )";
     GenerateTocStruct(f);
   } else {
     f << "#include <cstddef>\n";
+    f << "#define IREE_DATA_ALIGNAS_PTR alignas(alignof(void*))\n";
     GenerateTocStruct(f);
     GenerateNamespaceOpen(f);
   }
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
-    f << "alignas(alignof(void*)) static char const file_" << i << "[] = {\n";
+    f << "IREE_DATA_ALIGNAS_PTR static char const file_" << i << "[] = {\n";
     std::string contents;
     if (!SlurpFile(input_files[i], &contents)) {
       std::cerr << "Error reading file " << input_files[i] << "\n";

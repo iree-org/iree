@@ -16,6 +16,8 @@
 # These are not part of the IREE API. Though they may be used by external
 # projects their API may change at any time.
 
+load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
+load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -78,8 +80,8 @@ cc_library(
     hdrs = ["atomic_slist.h"],
     deps = [
         ":internal",
+        ":synchronization",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
     ],
 )
 
@@ -103,18 +105,19 @@ cc_library(
     deps = [
         ":file_path",
         ":internal",
+        ":synchronization",
+        "//build_tools:default_linkopts",
         "//iree/base:core_headers",
-        "//iree/base:threading",
         "//iree/base:tracing",
     ],
 )
 
 cc_library(
     name = "file_io",
-    srcs = ["file_io.cc"],
+    srcs = ["file_io.c"],
     hdrs = ["file_io.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -135,7 +138,7 @@ cc_library(
     srcs = ["file_path.c"],
     hdrs = ["file_path.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
     ],
 )
@@ -158,8 +161,9 @@ cc_library(
     srcs = ["flags.c"],
     hdrs = ["flags.h"],
     deps = [
+        ":file_io",
         ":internal",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:tracing",
     ],
 )
@@ -181,6 +185,57 @@ iree_lit_test_suite(
         "//iree/tools:IreeFileCheck",
     ],
     tags = ["hostonly"],
+)
+
+cc_library(
+    name = "flatcc",
+    hdrs = ["flatcc.h"],
+    deps = [
+        ":flatcc_dummy",
+        "@com_github_dvidelabs_flatcc//:runtime",
+    ],
+)
+
+iree_flatbuffer_c_library(
+    name = "flatcc_dummy",
+    srcs = ["flatcc.fbs"],
+    flatcc_args = [
+        "--reader",
+        "--builder",
+        "--verifier",
+        "--json",
+    ],
+)
+
+cc_library(
+    name = "fpu_state",
+    srcs = ["fpu_state.c"],
+    hdrs = ["fpu_state.h"],
+    deps = [
+        ":internal",
+        "//iree/base",
+        "//iree/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "fpu_state_benchmark",
+    srcs = ["fpu_state_benchmark.cc"],
+    deps = [
+        ":fpu_state",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_test(
+    name = "fpu_state_test",
+    srcs = ["fpu_state_test.cc"],
+    deps = [
+        ":fpu_state",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
 )
 
 cc_library(
@@ -226,12 +281,88 @@ cc_library(
         "statusor.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:logging",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/utility",
+    ],
+)
+
+cc_library(
+    name = "synchronization",
+    srcs = [
+        "synchronization.c",
+    ],
+    hdrs = [
+        "call_once.h",
+        "synchronization.h",
+    ],
+    deps = [
+        ":internal",
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_binary(
+    name = "synchronization_benchmark",
+    testonly = True,
+    srcs = ["synchronization_benchmark.cc"],
+    deps = [
+        ":synchronization",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+run_binary_test(
+    name = "synchronization_benchmark_test",
+    args = ["--benchmark_min_time=0"],
+    test_binary = ":synchronization_benchmark",
+)
+
+cc_test(
+    name = "synchronization_test",
+    srcs = ["synchronization_test.cc"],
+    deps = [
+        ":synchronization",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "threading",
+    srcs = [
+        "threading.c",
+        "threading_darwin.c",
+        "threading_impl.h",
+        "threading_pthreads.c",
+        "threading_win32.c",
+    ],
+    hdrs = ["threading.h"],
+    deps = [
+        ":internal",
+        ":synchronization",
+        "//build_tools:default_linkopts",
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_test(
+    name = "threading_test",
+    srcs = [
+        "threading_impl.h",
+        "threading_test.cc",
+    ],
+    deps = [
+        ":synchronization",
+        ":threading",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -249,7 +380,7 @@ cc_library(
     ],
     hdrs = ["wait_handle.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],

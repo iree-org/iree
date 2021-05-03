@@ -111,212 +111,12 @@
 #include "iree/base/alignment.h"
 #include "iree/base/attributes.h"
 #include "iree/base/config.h"
-
-#if defined(_WIN32)
-// The safe malloca that may fall back to heap in the case of stack overflows:
-// https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/malloca?view=vs-2019
-// Because that gets really annoying to deal with during error handling we just
-// go for _alloca which may generate SEH exceptions if we blow the stack.
-#include <malloc.h>
-#define iree_alloca(sz) _alloca(sz)
-#else
-#include <alloca.h>
-#define iree_alloca(sz) alloca(sz)
-#endif  // _WIN32
+#include "iree/base/string_view.h"
+#include "iree/base/time.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-//===----------------------------------------------------------------------===//
-// Types and Enums
-//===----------------------------------------------------------------------===//
-
-// TODO(benvanik): switch to static_cast/reinterpret_cast when in C++.
-// TODO(benvanik): see if we can shove in static_asserts somehow?
-#define iree_static_cast(type, value) (type)(value)
-#define iree_reinterpret_cast(type, value) (type)(value)
-
-// Returns the number of elements in an array as a compile-time constant, which
-// can be used in defining new arrays. Fails at compile-time if |arr| is not a
-// static array (such as if used on a pointer type).
-//
-// Example:
-//  uint8_t kConstantArray[512];
-//  assert(IREE_ARRAYSIZE(kConstantArray) == 512);
-#define IREE_ARRAYSIZE(arr) (sizeof(arr) / sizeof(arr[0]))
-
-#define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
-#define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
-
-// Returns true if any bit from |rhs| is set in |lhs|.
-#define iree_any_bit_set(lhs, rhs) (((lhs) & (rhs)) != 0)
-// Returns true iff all bits from |rhs| are set in |lhs|.
-#define iree_all_bits_set(lhs, rhs) (((lhs) & (rhs)) == (rhs))
-
-//===----------------------------------------------------------------------===//
-// Byte buffers and memory utilities
-//===----------------------------------------------------------------------===//
-
-// A span of mutable bytes (ala std::span of uint8_t).
-typedef struct {
-  uint8_t* data;
-  iree_host_size_t data_length;
-} iree_byte_span_t;
-
-static inline iree_byte_span_t iree_make_byte_span(
-    void* data, iree_host_size_t data_length) {
-  iree_byte_span_t v = {(uint8_t*)data, data_length};
-  return v;
-}
-
-// A span of constant bytes (ala std::span of const uint8_t).
-typedef struct {
-  const uint8_t* data;
-  iree_host_size_t data_length;
-} iree_const_byte_span_t;
-
-static inline iree_const_byte_span_t iree_make_const_byte_span(
-    const void* data, iree_host_size_t data_length) {
-  iree_const_byte_span_t v = {(const uint8_t*)data, data_length};
-  return v;
-}
-
-//===----------------------------------------------------------------------===//
-// iree_string_view_t (like std::string_view/absl::string_view)
-//===----------------------------------------------------------------------===//
-
-#define IREE_STRING_VIEW_NPOS SIZE_MAX
-
-// A string view (ala std::string_view) into a non-NUL-terminated string.
-typedef struct {
-  const char* data;
-  iree_host_size_t size;
-} iree_string_view_t;
-
-// Returns an empty string view ("").
-static inline iree_string_view_t iree_string_view_empty() {
-  iree_string_view_t v = {0, 0};
-  return v;
-}
-
-// Returns true if the given string view is the empty string.
-#define iree_string_view_is_empty(sv) (((sv).data == NULL) || ((sv).size == 0))
-
-static inline iree_string_view_t iree_make_string_view(
-    const char* str, iree_host_size_t str_length) {
-  iree_string_view_t v = {str, str_length};
-  return v;
-}
-
-// Returns a string view initialized with a reference to the given
-// NUL-terminated string literal.
-static inline iree_string_view_t iree_make_cstring_view(const char* str) {
-  iree_string_view_t v = {str, strlen(str)};
-  return v;
-}
-
-#define iree_string_view_literal(str) \
-  { .data = (str), .size = IREE_ARRAYSIZE(str) - 1 }
-
-// Returns a string view initialized with the given cstring.
-#define IREE_SV(cstr) iree_make_cstring_view(cstr)
-
-// Returns true if the two strings are equal (compare == 0).
-IREE_API_EXPORT bool IREE_API_CALL
-iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs);
-
-// Like std::string::compare but with iree_string_view_t values.
-IREE_API_EXPORT int IREE_API_CALL
-iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
-
-// Finds the first occurrence of |c| in |value| starting at |pos|.
-// Returns the found character position or IREE_STRING_VIEW_NPOS if not found.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
-    iree_string_view_t value, char c, iree_host_size_t pos);
-
-// Returns the index of the first occurrence of one of the characters in |s| or
-// -1 if none of the characters were found.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
-    iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos);
-
-// Returns the index of the last occurrence of one of the characters in |s| or
-// -1 if none of the characters were found.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
-    iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos);
-
-// Returns true if the string starts with the given prefix.
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
-    iree_string_view_t value, iree_string_view_t prefix);
-
-// Returns true if the string starts with the given suffix.
-IREE_API_EXPORT bool IREE_API_CALL
-iree_string_view_ends_with(iree_string_view_t value, iree_string_view_t suffix);
-
-// Removes the first |n| characters from the string view (not the data).
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
-iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n);
-
-// Removes the last |n| characters from the string view (not the data).
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
-iree_string_view_remove_suffix(iree_string_view_t value, iree_host_size_t n);
-
-// Removes the given substring prefix from the string view if present.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_prefix(
-    iree_string_view_t value, iree_string_view_t prefix);
-
-// Removes the given substring suffix from the string view if present.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_suffix(
-    iree_string_view_t value, iree_string_view_t suffix);
-
-// Removes the given substring prefix from the string view if present in-place.
-// Returns true if the strip succeeded.
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_prefix(
-    iree_string_view_t* value, iree_string_view_t prefix);
-
-// Removes the given substring suffix from the string view if present in-place.
-// Returns true if the strip succeeded.
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_suffix(
-    iree_string_view_t* value, iree_string_view_t suffix);
-
-// Removes leading and trailing whitespace.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
-iree_string_view_trim(iree_string_view_t value);
-
-// Returns a substring of the string view at offset |pos| and length |n|.
-// Use |n| == INTPTR_MAX to take the remaineder of the string after |pos|.
-// Returns empty string on failure.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_substr(
-    iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n);
-
-// Splits |value| into two parts based on the first occurrence of |split_char|.
-// Returns the index of the |split_char| in the original |value| or -1 if not
-// found.
-IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
-    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
-    iree_string_view_t* out_rhs);
-
-// Replaces all occurrences of |old_char| with |new_char|.
-IREE_API_EXPORT void IREE_API_CALL iree_string_view_replace_char(
-    iree_string_view_t value, char old_char, char new_char);
-
-// Returns true if the given |value| matches |pattern| (normal * and ? rules).
-// This accepts wildcards in the form of '*' and '?' for any delimited value.
-// '*' will match zero or more of any character and '?' will match exactly one
-// of any character.
-//
-// For example,
-// 'foo-*-bar' matches: 'foo-123-bar', 'foo-456-789-bar'
-// 'foo-10?' matches: 'foo-101', 'foo-102'
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
-    iree_string_view_t value, iree_string_view_t pattern);
-
-// Copies the string bytes into the target buffer and returns the number of
-// characters copied. Does not include a NUL terminator.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL
-iree_string_view_append_to_buffer(iree_string_view_t source_value,
-                                  iree_string_view_t* target_value,
-                                  char* buffer);
 
 //===----------------------------------------------------------------------===//
 // IREE_STATUS_FEATURE flags and IREE_STATUS_MODE setting
@@ -335,18 +135,6 @@ iree_string_view_append_to_buffer(iree_string_view_t source_value,
 // Captures the current callstack on a call to iree_make_status.
 // Status storage will be allocated.
 #define IREE_STATUS_FEATURE_STACK_TRACE (1 << 2)
-
-// If no status mode override is provided we'll change the behavior based on
-// build configuration.
-#if !defined(IREE_STATUS_MODE)
-#ifdef NDEBUG
-// Release mode: just source location.
-#define IREE_STATUS_MODE 2
-#else
-// Debug mode: annotations and stack traces.
-#define IREE_STATUS_MODE 3
-#endif  // NDEBUG
-#endif  // !IREE_STATUS_MODE
 
 // Set IREE_STATUS_FEATURES based on IREE_STATUS_MODE if the user hasn't
 // overridden it with more specific settings.
@@ -598,6 +386,88 @@ typedef struct iree_status_handle_t* iree_status_t;
   IREE_STATUS_IMPL_IGNORE_ERROR_( \
       IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
 
+// Returns the canonical status code for the given errno value.
+// https://en.cppreference.com/w/cpp/error/errno_macros
+IREE_API_EXPORT iree_status_code_t
+iree_status_code_from_errno(int error_number);
+
+#if defined(_WIN32) || defined(_WIN64)
+// Returns the canonical status code for the given Win32 GetLastError code.
+// https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
+IREE_API_EXPORT iree_status_code_t
+iree_status_code_from_win32_error(uint32_t error);
+#endif  // _WIN32 || _WIN64
+
+// Returns a NUL-terminated string constant for the given status code, such as
+// IREE_STATUS_UNAVAILABLE = "UNAVAILABLE". Do not rely on string-matching the
+// result as the exact text may change.
+IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code);
+
+// Allocates a new status instance for a failing error |code|.
+// |file| and |line| should be populated with __FILE__ and __LINE__ at the call
+// site and an optional string |message| may be provided.
+//
+// The status will be allocated using the default system allocator and must be
+// freed using either iree_status_free or iree_status_ignore.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
+                     iree_string_view_t message);
+
+// Allocates a new status instance for a failing error |code| and annotates it
+// with a printf-style format string. Roughly equivalent (though more efficient)
+// than iree_status_allocate + iree_status_annotate_f.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(4, 5)
+    iree_status_allocate_f(iree_status_code_t code, const char* file,
+                           uint32_t line, const char* format, ...);
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t iree_status_allocate_vf(
+    iree_status_code_t code, const char* file, uint32_t line,
+    const char* format, va_list varargs_0, va_list varargs_1);
+
+// Clones |status| into a new status instance.
+// No payloads, if present, will be cloned.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_status_clone(iree_status_t status);
+
+// Frees |status| if it has any associated storage.
+IREE_API_EXPORT void iree_status_free(iree_status_t status);
+
+// Ignores |status| regardless of its value and frees any associated payloads.
+// Returns an OK status that can be used when chaining.
+IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
+
+// Consumes the |status| by freeing its storage and returning its code.
+IREE_API_EXPORT iree_status_code_t
+iree_status_consume_code(iree_status_t status);
+
+// Annotates a status message with the given constant string message.
+// Ignored if |base_status| is OK.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_status_annotate(iree_status_t base_status, iree_string_view_t message);
+
+// Annotates a status message with the given printf-style message.
+// Ignored if |base_status| is OK.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
+    iree_status_annotate_f(iree_status_t base_status, const char* format, ...);
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_status_annotate_vf(iree_status_t base_status, const char* format,
+                        va_list varargs_0, va_list varargs_1);
+
+// Formats the status as a multi-line string containing all associated payloads.
+// Note that this may contain PII such as file paths and must only be used for
+// presenting errors to users and not sent to a logs aggregation service.
+IREE_API_EXPORT bool iree_status_format(iree_status_t status,
+                                        iree_host_size_t buffer_capacity,
+                                        char* buffer,
+                                        iree_host_size_t* out_buffer_length);
+
+// Converts the status to an allocated string value.
+// The caller must free the buffer with the system allocator.
+IREE_API_EXPORT bool iree_status_to_string(iree_status_t status,
+                                           char** out_buffer,
+                                           iree_host_size_t* out_buffer_length);
+
 // TODO(#2843): better logging of status checks.
 #define IREE_CHECK_OK(expr) \
   IREE_CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
@@ -656,93 +526,6 @@ typedef struct iree_status_handle_t* iree_status_t;
 #define IREE_ASSERT_GE(x, y, ...) _IREE_ASSERT_CMP(x, >=, y, __VA_ARGS__)
 #define IREE_ASSERT_GT(x, y, ...) _IREE_ASSERT_CMP(x, >, y, __VA_ARGS__)
 
-// Returns the canonical status code for the given errno value.
-// https://en.cppreference.com/w/cpp/error/errno_macros
-IREE_API_EXPORT iree_status_code_t
-iree_status_code_from_errno(int error_number);
-
-#if defined(_WIN32) || defined(_WIN64)
-// Returns the canonical status code for the given Win32 GetLastError code.
-// https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
-IREE_API_EXPORT iree_status_code_t
-iree_status_code_from_win32_error(uint32_t error);
-#endif  // _WIN32 || _WIN64
-
-// Returns a NUL-terminated string constant for the given status code, such as
-// IREE_STATUS_UNAVAILABLE = "UNAVAILABLE". Do not rely on string-matching the
-// result as the exact text may change.
-IREE_API_EXPORT const char* IREE_API_CALL
-iree_status_code_string(iree_status_code_t code);
-
-// Allocates a new status instance for a failing error |code|.
-// |file| and |line| should be populated with __FILE__ and __LINE__ at the call
-// site and an optional string |message| may be provided.
-//
-// The status will be allocated using the default system allocator and must be
-// freed using either iree_status_free or iree_status_ignore.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
-                     iree_string_view_t message);
-
-// Allocates a new status instance for a failing error |code| and annotates it
-// with a printf-style format string. Roughly equivalent (though more efficient)
-// than iree_status_allocate + iree_status_annotate_f.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-    IREE_PRINTF_ATTRIBUTE(4, 5)
-        iree_status_allocate_f(iree_status_code_t code, const char* file,
-                               uint32_t line, const char* format, ...);
-
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_allocate_vf(iree_status_code_t code, const char* file,
-                        uint32_t line, const char* format, va_list varargs_0,
-                        va_list varargs_1);
-
-// Clones |status| into a new status instance.
-// No payloads, if present, will be cloned.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_clone(iree_status_t status);
-
-// Frees |status| if it has any associated storage.
-IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status);
-
-// Ignores |status| regardless of its value and frees any associated payloads.
-// Returns an OK status that can be used when chaining.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_status_ignore(iree_status_t status);
-
-// Consumes the |status| by freeing its storage and returning its code.
-IREE_API_EXPORT iree_status_code_t IREE_API_CALL
-iree_status_consume_code(iree_status_t status);
-
-// Annotates a status message with the given constant string message.
-// Ignored if |base_status| is OK.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_annotate(iree_status_t base_status, iree_string_view_t message);
-
-// Annotates a status message with the given printf-style message.
-// Ignored if |base_status| is OK.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-    IREE_PRINTF_ATTRIBUTE(2, 3)
-        iree_status_annotate_f(iree_status_t base_status, const char* format,
-                               ...);
-
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_annotate_vf(iree_status_t base_status, const char* format,
-                        va_list varargs_0, va_list varargs_1);
-
-// Formats the status as a multi-line string containing all associated payloads.
-// Note that this may contain PII such as file paths and must only be used for
-// presenting errors to users and not sent to a logs aggregation service.
-IREE_API_EXPORT bool IREE_API_CALL
-iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
-                   char* buffer, iree_host_size_t* out_buffer_length);
-
-// Converts the status to an allocated string value.
-// The caller must free the buffer with the system allocator.
-IREE_API_EXPORT bool IREE_API_CALL
-iree_status_to_string(iree_status_t status, char** out_buffer,
-                      iree_host_size_t* out_buffer_length);
-
 //===----------------------------------------------------------------------===//
 // IREE Core API
 //===----------------------------------------------------------------------===//
@@ -767,240 +550,14 @@ typedef uint32_t iree_api_version_t;
 //
 // Returns IREE_STATUS_OUT_OF_RANGE if the actual version is not compatible with
 // the expected version.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_api_version_check(iree_api_version_t expected_version,
                        iree_api_version_t* out_actual_version);
-
-//===----------------------------------------------------------------------===//
-// iree_time_t and iree_duration_t
-//===----------------------------------------------------------------------===//
-
-// A point in time represented as nanoseconds since unix epoch.
-// TODO(benvanik): pick something easy to get into/outof time_t/etc.
-typedef int64_t iree_time_t;
-// A time in the infinite past used to indicate "already happened".
-// This forces APIs that wait for a point in time to act as a poll and always
-// return IREE_STATUS_DEADLINE_EXCEEDED instead of blocking the caller.
-#define IREE_TIME_INFINITE_PAST INT64_MIN
-// A time in the infinite future used to indicate "never".
-// This causes APIs that wait for a point in time to wait however long is needed
-// to satisfy the wait condition.
-#define IREE_TIME_INFINITE_FUTURE INT64_MAX
-
-// A duration represented as relative nanoseconds.
-typedef int64_t iree_duration_t;
-// A zero-length duration.
-// Like IREE_TIME_INFINITE_FUTURE this forces APIs that would wait to instead
-// return IREE_STATUS_DEADLINE_EXCEEDED immediately.
-#define IREE_DURATION_ZERO 0
-// An infinite-length duration.
-// Like IREE_TIME_INFINITE_FUTURE this causes APIs that wait to do so until
-// their wait condition is satisfied without returning early.
-#define IREE_DURATION_INFINITE INT64_MAX
-
-// Returns the current system time in unix nanoseconds.
-// Depending on the system architecture and power mode this time may have a
-// very coarse granularity (on the order of microseconds to milliseconds).
-//
-// The system timer may not be monotonic; users should ensure when comparing
-// times they check for negative values in case the time moves backwards.
-IREE_API_EXPORT iree_time_t iree_time_now();
-
-// Converts a relative timeout duration to an absolute deadline time.
-// This handles the special cases of IREE_DURATION_ZERO and
-// IREE_DURATION_INFINITE to avoid extraneous time queries.
-IREE_API_EXPORT iree_time_t
-iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
-
-// Converts an absolute deadline time to a relative timeout duration.
-// This handles the special cases of IREE_TIME_INFINITE_PAST and
-// IREE_TIME_INFINITE_FUTURE to avoid extraneous time queries.
-IREE_API_EXPORT iree_duration_t
-iree_absolute_deadline_to_timeout_ns(iree_time_t deadline_ns);
-
-typedef enum {
-  // Timeout is defined by an absolute value `deadline_ns`.
-  IREE_TIMEOUT_ABSOLUTE = 0,
-  // Timeout is defined by a relative value `timeout_ns`.
-  IREE_TIMEOUT_RELATIVE = 1,
-} iree_timeout_type_t;
-
-// A timeout defined either by an absolute or relative value.
-typedef struct {
-  iree_timeout_type_t type;
-  iree_time_t nanos;
-} iree_timeout_t;
-
-// Returns a timeout that will be exceeded immediately.
-// This can be used with APIs that would otherwise wait to cause them to poll.
-//
-// Example:
-//   status = iree_wait_for_signal_or_timeout(&obj, iree_immediate_timeout());
-//   if (iree_status_is_deadline_exceeded(status)) {
-//     // Would have waited indicating the signal has not occurred. If the
-//     // timeout was not immediate the call would have blocked the caller.
-//   }
-static inline iree_timeout_t iree_immediate_timeout() {
-  iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_PAST};
-  return timeout;
-}
-
-// Returns true if the |timeout| indicates an immediate/polling/nonblocking
-// timeout.
-static inline bool iree_timeout_is_immediate(iree_timeout_t timeout) {
-  return timeout.type == IREE_TIMEOUT_ABSOLUTE
-             ? timeout.nanos == IREE_TIME_INFINITE_PAST
-             : timeout.nanos == IREE_DURATION_ZERO;
-}
-
-// Returns a timeout that will never be reached.
-// This can be used with APIs that can wait to disable the early
-// deadline-exceeded returns when a condition is not met. It should be used with
-// care as it can complicate program state and make termination more prone to
-// hangs. On the other hand, it's really useful to not bother with actual
-// deadlines. YMMV.
-static inline iree_timeout_t iree_infinite_timeout() {
-  iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_FUTURE};
-  return timeout;
-}
-
-// Returns true if the |timeout| indicates an infinite/forever blocking timeout.
-static inline bool iree_timeout_is_infinite(iree_timeout_t timeout) {
-  return timeout.type == IREE_TIMEOUT_ABSOLUTE
-             ? timeout.nanos == IREE_TIME_INFINITE_FUTURE
-             : timeout.nanos == IREE_DURATION_INFINITE;
-}
-
-// Defines an absolute timeout with the given time in nanoseconds.
-static inline iree_timeout_t iree_make_deadline(iree_time_t deadline_ns) {
-  iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, deadline_ns};
-  return timeout;
-}
-
-// Defines a relative timeout with the given time in nanoseconds.
-static inline iree_timeout_t iree_make_timeout(iree_duration_t timeout_ns) {
-  iree_timeout_t timeout = {IREE_TIMEOUT_RELATIVE, timeout_ns};
-  return timeout;
-}
-
-// Converts a timeout from relative to absolute (if it is).
-//
-// Absolute timeouts (deadlines) are better for long-running tasks or when
-// making calls that may complete in stages as relative ones will tend to skew;
-// if a wait is performed with a relative timeout of 10ms but it takes 5ms to
-// get from the origin of the call to the actual wait using the timeout then
-// the total latency of the call may be 15ms (5ms to prepare + 10ms on the
-// wait). Instead if an absolute deadline is used the caller can ensure that
-// the total time spent in the operation happens regardless of the intervening
-// work that happens.
-//
-// For this reason IREE internal APIs try to convert to absolute times and users
-// may be able to reduce overhead by populating the times as absolute to start
-// with via iree_make_deadline.
-static inline void iree_convert_timeout_to_absolute(iree_timeout_t* timeout) {
-  if (timeout->type == IREE_TIMEOUT_RELATIVE) {
-    timeout->type = IREE_TIMEOUT_ABSOLUTE;
-    timeout->nanos = iree_relative_timeout_to_deadline_ns(timeout->nanos);
-  }
-}
-
-// Returns an absolute deadline in nanoseconds from the given timeout.
-static inline iree_time_t iree_timeout_as_deadline_ns(iree_timeout_t timeout) {
-  return timeout.type == IREE_TIMEOUT_ABSOLUTE
-             ? timeout.nanos
-             : iree_relative_timeout_to_deadline_ns(timeout.nanos);
-}
-
-//===----------------------------------------------------------------------===//
-// iree_allocator_t (std::allocator-like interface)
-//===----------------------------------------------------------------------===//
-
-// Defines how an allocation from an iree_allocator_t should be made.
-typedef enum {
-  // The contents of the allocation *must* be zeroed by the allocator prior to
-  // returning. Allocators may be able to elide the zeroing if they allocate
-  // fresh pages from the system. It is always safe to zero contents if the
-  // behavior of the allocator is not under our control.
-  IREE_ALLOCATION_MODE_ZERO_CONTENTS = 1 << 0,
-  // Tries to reuse an existing allocation provided via |out_ptr| if possible.
-  // If the existing allocation is not reused then it is freed as if a call to
-  // iree_allocator_free had been called on it. If the allocation fails then
-  // the provided existing allocation is unmodified.
-  //
-  // This models the C realloc behavior.
-  IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING = 1 << 1,
-} iree_allocation_mode_t;
-
-// TODO(benvanik): replace with a single method with the mode setting. This will
-// reduce the overhead to just two pointers per allocator (from 3) and allow us
-// to add more distinct behavior in the future. If we really wanted to stretch
-// we could turn it into a pointer and require the allocator live somewhere
-// (possibly in .text as a const static), but two pointers seems fine.
-typedef iree_status_t(IREE_API_PTR* iree_allocator_alloc_fn_t)(
-    void* self, iree_allocation_mode_t mode, iree_host_size_t byte_length,
-    void** out_ptr);
-typedef void(IREE_API_PTR* iree_allocator_free_fn_t)(void* self, void* ptr);
-
-// An allocator for host-memory allocations.
-// IREE will attempt to use this in place of the system malloc and free.
-// Pass the iree_allocator_system() macro to use the system allocator.
-typedef struct {
-  // User-defined pointer passed to all functions.
-  void* self;
-  // Allocates |byte_length| of memory and stores the pointer in |out_ptr|.
-  // Systems should align to 16 byte boundaries (or otherwise their natural
-  // SIMD alignment). The runtime pools internally and small allocations
-  // (usually) won't be made through this interface.
-  iree_allocator_alloc_fn_t alloc;
-  // Frees |ptr| from a previous alloc call.
-  iree_allocator_free_fn_t free;
-} iree_allocator_t;
-
-// Allocates a block of |byte_length| bytes from the given allocator.
-// The contents of the returned memory is guaranteed to be zeroed.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
-    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
-
-// Reallocates |out_ptr| to |byte_length| bytes with the given allocator.
-// If the reallocation fails then the original |out_ptr| is unmodified.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
-    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
-
-// Duplicates the given byte block by allocating memory and copying it in.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_allocator_clone(iree_allocator_t allocator,
-                     iree_const_byte_span_t source_bytes, void** out_ptr);
-
-// Frees a previously-allocated block of memory to the given allocator.
-IREE_API_EXPORT void IREE_API_CALL
-iree_allocator_free(iree_allocator_t allocator, void* ptr);
-
-// Allocates a block of |byte_length| bytes from the default system allocator.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
-                               iree_host_size_t byte_length, void** out_ptr);
-
-// Frees a previously-allocated block of memory to the default system allocator.
-IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
-                                                              void* ptr);
-
-// Allocates using the iree_allocator_malloc and iree_allocator_free methods.
-// These will usually be backed by malloc and free.
-static inline iree_allocator_t iree_allocator_system() {
-  iree_allocator_t v = {NULL, iree_allocator_system_allocate,
-                        iree_allocator_system_free};
-  return v;
-}
-
-// Does not perform any allocation or deallocation; used to wrap objects that
-// are owned by external code/live in read-only memory/etc.
-static inline iree_allocator_t iree_allocator_null() {
-  iree_allocator_t v = {NULL, NULL, NULL};
-  return v;
-}
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+#include "iree/base/allocator.h"
 
 #endif  // IREE_BASE_API_H_

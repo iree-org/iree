@@ -15,14 +15,27 @@
 #ifndef IREE_HAL_VULKAN_UTIL_ARENA_H_
 #define IREE_HAL_VULKAN_UTIL_ARENA_H_
 
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 
-#include "absl/types/span.h"
-
 namespace iree {
 
-// TODO(b/140026716): add InlineArena/FixedArena to avoid malloc.
+template <typename T>
+class Span {
+ public:
+  Span(T* data, size_t size) noexcept : data_(data), size_(size) {}
+
+  T* data() const noexcept { return data_; }
+  size_t size() const noexcept { return size_; }
+  bool empty() const noexcept { return size() == 0; }
+
+  T& operator[](size_t i) noexcept { return *(data() + i); }
+
+ private:
+  T* data_;
+  size_t size_;
+};
 
 // Arena allocator.
 // Allocates memory from a cached block list grown at specified intervals.
@@ -83,9 +96,9 @@ class Arena {
 
   // Allocates an array of items and returns a span pointing to them.
   template <typename T>
-  absl::Span<T> AllocateSpan(size_t count) {
+  Span<T> AllocateSpan(size_t count) {
     void* storage = AllocateBytes(count * sizeof(T));
-    return absl::MakeSpan(reinterpret_cast<T*>(storage), count);
+    return Span<T>(reinterpret_cast<T*>(storage), count);
   }
 
   // Allocates a block of raw bytes from the arena.

@@ -14,7 +14,7 @@
 
 #include "iree/hal/local/event_pool.h"
 
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
 
 struct iree_hal_local_event_pool_s {

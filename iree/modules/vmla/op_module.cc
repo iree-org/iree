@@ -146,13 +146,14 @@ StatusOr<uint32_t> Interface::GetConstant(uint32_t offset) const {
   return constants_[offset];
 }
 
-Status Interface::SetConstants(absl::Span<const uint32_t> values) {
-  if (values.size() > kMaxConstants) {
+Status Interface::SetConstants(const uint32_t* values,
+                               iree_host_size_t value_count) {
+  if (value_count > kMaxConstants) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "constant value overflow; have %zu but max is %d",
-                            values.size(), kMaxConstants);
+                            value_count, kMaxConstants);
   }
-  for (size_t i = 0; i < values.size(); ++i) {
+  for (size_t i = 0; i < value_count; ++i) {
     constants_[i] = values[i];
   }
   return OkStatus();

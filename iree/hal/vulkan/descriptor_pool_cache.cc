@@ -36,23 +36,24 @@ DescriptorSetGroup::~DescriptorSetGroup() {
       << "DescriptorSetGroup must be reset explicitly";
 }
 
-Status DescriptorSetGroup::Reset() {
+iree_status_t DescriptorSetGroup::Reset() {
   IREE_TRACE_SCOPE0("DescriptorSetGroup::Reset");
 
   if (descriptor_pool_cache_ != nullptr) {
-    IREE_RETURN_IF_ERROR(descriptor_pool_cache_->ReleaseDescriptorPools(
-        absl::MakeSpan(descriptor_pools_)));
+    IREE_RETURN_IF_ERROR(
+        descriptor_pool_cache_->ReleaseDescriptorPools(descriptor_pools_));
   }
   descriptor_pools_.clear();
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 DescriptorPoolCache::DescriptorPoolCache(VkDeviceHandle* logical_device)
     : logical_device_(logical_device) {}
 
-StatusOr<DescriptorPool> DescriptorPoolCache::AcquireDescriptorPool(
-    VkDescriptorType descriptor_type, int max_descriptor_count) {
+iree_status_t DescriptorPoolCache::AcquireDescriptorPool(
+    VkDescriptorType descriptor_type, int max_descriptor_count,
+    DescriptorPool* out_descriptor_pool) {
   IREE_TRACE_SCOPE0("DescriptorPoolCache::AcquireDescriptorPool");
 
   // TODO(benvanik): lookup in cache.
@@ -78,11 +79,12 @@ StatusOr<DescriptorPool> DescriptorPoolCache::AcquireDescriptorPool(
                          logical_device_->allocator(), &descriptor_pool.handle),
                      "vkCreateDescriptorPool");
 
-  return descriptor_pool;
+  *out_descriptor_pool = descriptor_pool;
+  return iree_ok_status();
 }
 
-Status DescriptorPoolCache::ReleaseDescriptorPools(
-    absl::Span<DescriptorPool> descriptor_pools) {
+iree_status_t DescriptorPoolCache::ReleaseDescriptorPools(
+    const std::vector<DescriptorPool>& descriptor_pools) {
   IREE_TRACE_SCOPE0("DescriptorPoolCache::ReleaseDescriptorPools");
 
   for (const auto& descriptor_pool : descriptor_pools) {
@@ -98,7 +100,7 @@ Status DescriptorPoolCache::ReleaseDescriptorPools(
                                    logical_device_->allocator());
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace vulkan

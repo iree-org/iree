@@ -23,9 +23,9 @@ iree_cc_library(
   DEPS
     absl::span
     benchmark
-    iree::base::api
+    iree::base
     iree::base::logging
-    iree::hal::api
+    iree::hal
     iree::modules::hal
     iree::vm
     iree::vm::cc
@@ -46,9 +46,9 @@ iree_cc_test(
     ::strings_module_test_module_cc
     absl::span
     benchmark
-    iree::base::api
+    iree::base
     iree::base::logging
-    iree::hal::api
+    iree::hal
     iree::hal::vmla::registration
     iree::modules::hal
     iree::testing::gtest

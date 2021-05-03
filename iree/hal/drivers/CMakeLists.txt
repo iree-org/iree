@@ -38,7 +38,7 @@ iree_cc_library(
   SRCS
     "init.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::tracing
     ${IREE_HAL_DRIVER_MODULES}
   PUBLIC

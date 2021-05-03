@@ -195,7 +195,7 @@ struct iree_vm_stack {
 // Stack implementation
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
+IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_state_resolver_t state_resolver,
     iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
   IREE_ASSERT_ARGUMENT(out_stack);
@@ -229,8 +229,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
+IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   while (stack->top) {
@@ -244,7 +243,7 @@ iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_allocate(
+IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
     iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
     iree_vm_stack_t** out_stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -267,7 +266,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_allocate(
   return status;
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_free(iree_vm_stack_t* stack) {
+IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_allocator_t allocator = stack->allocator;
@@ -278,19 +277,19 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_free(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL
-iree_vm_stack_current_frame(iree_vm_stack_t* stack) {
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_current_frame(
+    iree_vm_stack_t* stack) {
   return stack->top ? &stack->top->frame : NULL;
 }
 
-IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL
-iree_vm_stack_parent_frame(iree_vm_stack_t* stack) {
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_parent_frame(
+    iree_vm_stack_t* stack) {
   if (!stack->top) return NULL;
   iree_vm_stack_frame_header_t* parent_header = stack->top->parent;
   return parent_header ? &parent_header->frame : NULL;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
+IREE_API_EXPORT iree_status_t iree_vm_stack_query_module_state(
     iree_vm_stack_t* stack, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state) {
   return stack->state_resolver.query_module_state(stack->state_resolver.self,
@@ -370,7 +369,7 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
+IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
     iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
     iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn,
@@ -432,7 +431,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_stack_function_leave(iree_vm_stack_t* stack) {
   if (IREE_UNLIKELY(!stack->top)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,

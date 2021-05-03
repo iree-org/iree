@@ -26,6 +26,7 @@
 #include "iree/modules/strings/strings_module.h"
 #include "iree/modules/tensorlist/native_module.h"
 #include "iree/vm/api.h"
+#include "pybind11/numpy.h"
 
 namespace iree {
 namespace python {
@@ -53,6 +54,35 @@ VmModule CreateTensorListModule() {
       iree_tensorlist_module_create(iree_allocator_system(), &module),
       "Error creating tensorlist module");
   return VmModule::CreateRetained(module);
+}
+
+// RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
+// out of scope.
+class PyBufferReleaser {
+ public:
+  PyBufferReleaser(Py_buffer& b) : b_(b) {}
+  ~PyBufferReleaser() { PyBuffer_Release(&b_); }
+
+ private:
+  Py_buffer& b_;
+};
+
+py::dict GetFunctionReflectionDict(iree_vm_function_t& f) {
+  py::dict attrs;
+  for (int i = 0;; ++i) {
+    iree_string_view_t key;
+    iree_string_view_t value;
+    auto status = iree_vm_get_function_reflection_attr(f, i, &key, &value);
+    if (iree_status_is_not_found(status)) {
+      iree_status_ignore(status);
+      break;
+    }
+    CheckApiStatus(status, "Error getting reflection attr");
+    py::str key_str(key.data, key.size);
+    py::str value_str(value.data, value.size);
+    attrs[std::move(key_str)] = std::move(value_str);
+  }
+  return attrs;
 }
 
 }  // namespace
@@ -192,6 +222,130 @@ absl::optional<iree_vm_function_t> VmModule::LookupFunction(
 // VmVariantList
 //------------------------------------------------------------------------------
 
+void VmVariantList::PushBufferView(HalDevice& device,
+                                   py::object py_buffer_object,
+                                   iree_hal_element_type_e element_type) {
+  // Request a view of the buffer (use the raw python C API to avoid some
+  // allocation and copying at the pybind level).
+  Py_buffer py_view;
+  // Note that only C-Contiguous ND-arrays are presently supported, so
+  // only request that via PyBUF_ND. Long term, we should consult an
+  // "oracle" in the runtime to determine the precise required format and
+  // set flags accordingly (and fallback/copy on failure).
+  int flags = PyBUF_FORMAT | PyBUF_ND;
+
+  // Acquire the backing buffer and setup RAII release.
+  if (PyObject_GetBuffer(py_buffer_object.ptr(), &py_view, flags) != 0) {
+    // The GetBuffer call is required to set an appropriate error.
+    throw py::error_already_set();
+  }
+  PyBufferReleaser py_view_releaser(py_view);
+
+  // Whether the py object needs to be retained with the argument.
+  // Should be set to true if directly mapping, false if copied.
+  bool depends_on_pyobject = false;
+
+  // Allocate a HalBuffer.
+  // This is hard-coded to C-contiguous right now.
+  // TODO(laurenzo): Expand to other layouts as needed.
+  // TODO(laurenzo): Wrap and retain original buffer (depends_on_pyobject=true).
+  iree_hal_buffer_t* raw_buffer;
+  CheckApiStatus(iree_hal_allocator_allocate_buffer(
+                     device.allocator(),
+                     static_cast<iree_hal_memory_type_t>(
+                         IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+                     IREE_HAL_BUFFER_USAGE_ALL, py_view.len, &raw_buffer),
+                 "Failed to allocate device visible buffer");
+  CheckApiStatus(
+      iree_hal_buffer_write_data(raw_buffer, 0, py_view.buf, py_view.len),
+      "Error writing to input buffer");
+
+  // Only capture the reference to the exporting object (incrementing it)
+  // once guaranteed successful.
+  if (depends_on_pyobject) {
+    // Note for future implementation: there needs to be a place to stash
+    // references to be kept alive which back a buffer. This is likely an
+    // additional bag of refs returned from this function, which can then
+    // be attached to an invocation.
+    throw RaisePyError(PyExc_NotImplementedError,
+                       "Dependent buffer arguments not implemented");
+  }
+
+  // Create the buffer_view. (note that numpy shape is ssize_t)
+  std::vector<int> dims(py_view.ndim);
+  std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
+  iree_hal_buffer_view_t* buffer_view;
+  CheckApiStatus(
+      iree_hal_buffer_view_create(raw_buffer, element_type, dims.data(),
+                                  dims.size(), &buffer_view),
+      "Error allocating buffer_view");
+  iree_hal_buffer_release(raw_buffer);
+  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+  CheckApiStatus(iree_vm_list_push_ref_move(raw_ptr(), &buffer_view_ref),
+                 "Error moving buffer view");
+}
+
+py::object VmVariantList::GetAsNdarray(int index) {
+  iree_vm_variant_t v = iree_vm_variant_empty();
+  CheckApiStatus(iree_vm_list_get_variant(raw_ptr(), index, &v),
+                 "Could not access list element");
+  iree_hal_buffer_view_t* buffer_view = iree_hal_buffer_view_deref(v.ref);
+  if (!buffer_view) {
+    throw RaiseValueError("Could not deref result buffer view (wrong type?)");
+  }
+  iree_hal_buffer_t* raw_buffer = iree_hal_buffer_view_buffer(buffer_view);
+  if (!raw_buffer) {
+    throw RaiseValueError("Could not deref result buffer (wrong type?)");
+  }
+  HalBuffer buffer = HalBuffer::RetainAndCreate(raw_buffer);
+
+  // Extract dims from the buffer view.
+  size_t rank = 0;
+  std::vector<int32_t> dims(6);
+  iree_status_t status = iree_hal_buffer_view_shape(
+      buffer_view, dims.capacity(), dims.data(), &rank);
+  if (iree_status_is_out_of_range(status)) {
+    dims.resize(rank);
+    status = iree_hal_buffer_view_shape(buffer_view, dims.capacity(),
+                                        dims.data(), &rank);
+  }
+  CheckApiStatus(status, "Error extracting shape");
+  dims.resize(rank);
+
+  // Convert element type to dtype.
+  iree_hal_element_type_t element_type =
+      iree_hal_buffer_view_element_type(buffer_view);
+  // See: https://docs.python.org/3/c-api/arg.html#numbers
+  const char* dtype_code;
+  switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+      dtype_code = "f";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+      dtype_code = "d";
+      break;
+  }
+  auto dtype = py::dtype(dtype_code);
+
+  // Map memory.
+  iree_device_size_t byte_length =
+      iree_hal_buffer_byte_length(buffer.raw_ptr());
+  iree_hal_buffer_mapping_t mapped_memory;
+  CheckApiStatus(iree_hal_buffer_map_range(
+                     buffer.raw_ptr(), IREE_HAL_MEMORY_ACCESS_READ,
+                     0 /* element_offset */, byte_length, &mapped_memory),
+                 "Could not map memory");
+
+  // Turn the mapping into a python object that retains until the array is
+  // destroyed.
+  HalMappedMemory hal_mapped_memory(mapped_memory, buffer_view);
+  py::object py_mapped_memory = py::cast(
+      std::move(hal_mapped_memory), py::return_value_policy::take_ownership);
+  return py::array(std::move(dtype), dims, mapped_memory.contents.data,
+                   std::move(py_mapped_memory) /* base */);
+}
+
 std::string VmVariantList::DebugString() const {
   // The variant list API requires mutability, so we const cast to it internally
   // so we can maintain a const DebugString() for callers.
@@ -261,11 +415,32 @@ void SetupVmBindings(pybind11::module m) {
   py::class_<VmVariantList>(m, "VmVariantList")
       .def(py::init(&VmVariantList::Create))
       .def_property_readonly("size", &VmVariantList::size)
+      .def("__len__", &VmVariantList::size)
+      .def("get_as_ndarray", &VmVariantList::GetAsNdarray)
+      .def("push_buffer_view", &VmVariantList::PushBufferView)
       .def("__repr__", &VmVariantList::DebugString);
 
   py::class_<iree_vm_function_t>(m, "VmFunction")
       .def_readonly("linkage", &iree_vm_function_t::linkage)
-      .def_readonly("ordinal", &iree_vm_function_t::ordinal);
+      .def_readonly("ordinal", &iree_vm_function_t::ordinal)
+      .def_property_readonly("reflection",
+                             [](iree_vm_function_t& self) {
+                               return GetFunctionReflectionDict(self);
+                             })
+      .def("__repr__", [](iree_vm_function_t& self) {
+        iree_string_view_t name = iree_vm_function_name(&self);
+        std::string repr("<VmFunction ");
+        repr.append(name.data, name.size);
+
+        iree_vm_function_signature_t sig = iree_vm_function_signature(&self);
+        repr.append("(");
+        repr.append(sig.calling_convention.data, sig.calling_convention.size);
+        repr.append("), reflection = ");
+        py::dict reflection = GetFunctionReflectionDict(self);
+        repr.append(py::cast<std::string>(py::repr(reflection)));
+        repr.append(">");
+        return repr;
+      });
 
   py::class_<VmInstance>(m, "VmInstance").def(py::init(&VmInstance::Create));
 
@@ -282,7 +457,37 @@ void SetupVmBindings(pybind11::module m) {
       .def_static("from_flatbuffer", &VmModule::FromFlatbufferBlob)
       .def_property_readonly("name", &VmModule::name)
       .def("lookup_function", &VmModule::LookupFunction, py::arg("name"),
-           py::arg("linkage") = IREE_VM_FUNCTION_LINKAGE_EXPORT);
+           py::arg("linkage") = IREE_VM_FUNCTION_LINKAGE_EXPORT)
+      .def("__repr__", [](VmModule& self) {
+        std::string repr("<VmModule ");
+        iree_string_view_t name = iree_vm_module_name(self.raw_ptr());
+        repr.append(name.data, name.size);
+
+        iree_vm_module_signature_t sig =
+            iree_vm_module_signature(self.raw_ptr());
+        repr.append(" : [");
+        for (size_t ordinal = 0; ordinal < sig.export_function_count;
+             ++ordinal) {
+          iree_vm_function_t f;
+          iree_string_view_t linkage_name;
+          auto status = iree_vm_module_lookup_function_by_ordinal(
+              self.raw_ptr(), IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &f,
+              &linkage_name);
+          if (iree_status_is_not_found(status)) {
+            iree_status_ignore(status);
+            break;
+          }
+          CheckApiStatus(status, "Error enumerating module");
+          iree_string_view_t fname = iree_vm_function_name(&f);
+          if (ordinal > 0) {
+            repr.append(", ");
+          }
+          repr.append(fname.data, fname.size);
+        }
+        repr.append("]");
+        repr.append(">");
+        return repr;
+      });
 }
 
 }  // namespace python

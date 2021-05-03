@@ -98,6 +98,9 @@ class VmVariantList {
   }
 
   std::string DebugString() const;
+  void PushBufferView(HalDevice& device, py::object py_buffer_object,
+                      iree_hal_element_type_e element_type);
+  py::object GetAsNdarray(int index);
 
  private:
   VmVariantList(iree_vm_list_t* list) : list_(list) {}

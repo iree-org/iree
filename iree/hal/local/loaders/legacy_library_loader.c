@@ -20,7 +20,7 @@
 #include "iree/hal/local/local_executable.h"
 
 // flatcc schemas:
-#include "iree/base/flatcc.h"
+#include "iree/base/internal/flatcc.h"
 #include "iree/schemas/dylib_executable_def_reader.h"
 #include "iree/schemas/dylib_executable_def_verifier.h"
 

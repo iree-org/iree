@@ -17,7 +17,7 @@
 
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/prng.h"
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"

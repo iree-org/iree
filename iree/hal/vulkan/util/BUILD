@@ -25,7 +25,6 @@ cc_library(
     deps = [
         "//iree/base:core_headers",
         "//iree/base:logging",
-        "@com_google_absl//absl/types:span",
     ],
 )
 

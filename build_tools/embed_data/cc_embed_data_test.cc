@@ -20,7 +20,7 @@ namespace {
 
 TEST(Generator, TestContents) {
   auto* toc1 = ::foobar::testembed1_create();
-  ASSERT_EQ("file1.txt", std::string(toc1->name));
+  ASSERT_EQ("file1.bin", std::string(toc1->name));
   ASSERT_EQ(R"(Are you '"Still"' here?)"
             "\n",
             std::string(toc1->data));
@@ -28,7 +28,7 @@ TEST(Generator, TestContents) {
   ASSERT_EQ(0, *(toc1->data + toc1->size));
 
   ++toc1;
-  ASSERT_EQ("file2.txt", std::string(toc1->name));
+  ASSERT_EQ("file2.bin", std::string(toc1->name));
   ASSERT_EQ(R"(¯\_(ツ)_/¯)"
             "\n",
             std::string(toc1->data));
@@ -40,7 +40,7 @@ TEST(Generator, TestContents) {
   ASSERT_EQ(nullptr, toc1->data);
 
   auto* toc2 = ::foobar::testembed2_create();
-  ASSERT_EQ("file3.txt", std::string(toc2->name));
+  ASSERT_EQ("file3.bin", std::string(toc2->name));
   ASSERT_EQ(R"(ᕕ( ᐛ )ᕗ)"
             "\n",
             std::string(toc2->data));

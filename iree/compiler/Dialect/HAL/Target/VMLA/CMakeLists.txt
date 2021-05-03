@@ -26,7 +26,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
-    iree::base::flatcc
+    iree::base::internal::flatcc
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::VM::Conversion

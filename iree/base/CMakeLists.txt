@@ -16,15 +16,18 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    api
+    base
   HDRS
     "api.h"
   SRCS
     "allocator.c"
+    "allocator.h"
     "api.c"
     "status.c"
     "string_view.c"
+    "string_view.h"
     "time.c"
+    "time.h"
   DEPS
     ::core_headers
     ::tracing
@@ -47,30 +50,6 @@ iree_cc_library(
     target_platform
   HDRS
     "target_platform.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    flatcc
-  HDRS
-    "flatcc.h"
-  DEPS
-    ::flatcc_dummy
-    flatcc::runtime
-  PUBLIC
-)
-
-flatbuffer_c_library(
-  NAME
-    flatcc_dummy
-  SRCS
-    "flatcc.fbs"
-  FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
   PUBLIC
 )
 
@@ -140,98 +119,7 @@ iree_cc_test(
   SRCS
     "string_view_test.cc"
   DEPS
-    ::api
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    synchronization
-  HDRS
-    "synchronization.h"
-  SRCS
-    "synchronization.c"
-  DEPS
-    ::api
-    ::core_headers
-    ::tracing
-    iree::base::internal
-  PUBLIC
-)
-
-iree_cc_binary(
-  NAME
-    synchronization_benchmark
-  SRCS
-    "synchronization_benchmark.cc"
-  DEPS
-    ::synchronization
-    benchmark
-    iree::testing::benchmark_main
-  TESTONLY
-)
-
-iree_run_binary_test(
-  NAME
-    synchronization_benchmark_test
-  TEST_BINARY
-    ::synchronization_benchmark
-  ARGS
-    "--benchmark_min_time=0"
-)
-
-iree_cc_test(
-  NAME
-    synchronization_test
-  SRCS
-    "synchronization_test.cc"
-  DEPS
-    ::synchronization
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    threading
-  HDRS
-    "threading.h"
-  SRCS
-    "threading.c"
-    "threading_darwin.c"
-    "threading_impl.h"
-    "threading_pthreads.c"
-    "threading_win32.c"
-  DEPS
-    ::api
-    ::core_headers
-    ::synchronization
-    ::tracing
-    iree::base::internal
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    threading_benchmark
-  SRCS
-    "threading_benchmark.cc"
-  DEPS
-    ::threading
-    benchmark
-    iree::testing::benchmark_main
-)
-
-iree_cc_test(
-  NAME
-    threading_test
-  SRCS
-    "threading_impl.h"
-    "threading_test.cc"
-  DEPS
-    ::synchronization
-    ::threading
+    ::base
     iree::testing::gtest
     iree::testing::gtest_main
 )

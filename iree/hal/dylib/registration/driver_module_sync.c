@@ -67,8 +67,7 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_dylib_sync_driver_module_register(
+IREE_API_EXPORT iree_status_t iree_hal_dylib_sync_driver_module_register(
     iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
       .self = NULL,

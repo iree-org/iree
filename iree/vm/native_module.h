@@ -118,12 +118,12 @@ IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size();
 //
 // The provided |descriptor| will be referenced by the created module and must
 // be kept live for the lifetime of the module.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_create(
+IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_allocator_t allocator, iree_vm_module_t** out_module);
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_initialize(
+IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_allocator_t allocator, iree_vm_module_t* module);

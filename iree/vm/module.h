@@ -226,22 +226,20 @@ typedef struct {
 //  `0_ir`      -> arguments = ``, results = `ir`
 //  `0v_ir`     -> arguments = ``, results = `ir`
 //  `0iCiD_rr`  -> arguments = `iCiD`, results = `rr`
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_function_call_get_cconv_fragments(
+IREE_API_EXPORT iree_status_t iree_vm_function_call_get_cconv_fragments(
     const iree_vm_function_signature_t* signature,
     iree_string_view_t* out_arguments, iree_string_view_t* out_results);
 
 // Returns true if the given cconv contains one or more variadic types.
-IREE_API_EXPORT bool IREE_API_CALL
-iree_vm_function_call_is_variadic_cconv(iree_string_view_t cconv);
+IREE_API_EXPORT bool iree_vm_function_call_is_variadic_cconv(
+    iree_string_view_t cconv);
 
 // Returns the required size, in bytes, to store the data in the given cconv
 // fragment (like `iICriDr`).
 //
 // The provided |segment_size_list| is used for variadic arguments/results. Each
 // entry represents one of the top level arguments with spans being flattened.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_function_call_compute_cconv_fragment_size(
+IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
     iree_string_view_t cconv_fragment,
     const iree_vm_register_list_t* segment_size_list,
     iree_host_size_t* out_required_size);
@@ -250,9 +248,9 @@ iree_vm_function_call_compute_cconv_fragment_size(
 // This needs only be called if a call fails as implementations are required to
 // clean up the arguments as they are marshaled in and callers are required to
 // clean up the results as they are marshaled out.
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_function_call_release(iree_vm_function_call_t* call,
-                              const iree_vm_function_signature_t* signature);
+IREE_API_EXPORT void iree_vm_function_call_release(
+    iree_vm_function_call_t* call,
+    const iree_vm_function_signature_t* signature);
 
 // Results of an iree_vm_module_execute request.
 typedef struct {
@@ -349,32 +347,28 @@ typedef struct iree_vm_module {
 // interface function pointers. This ensures that version adaptation can be
 // performed by the library as needed.
 // TODO(benvanik): version/module size.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_module_initialize(iree_vm_module_t* module, void* self);
 
 // Retains the given |module| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_module_retain(iree_vm_module_t* module);
+IREE_API_EXPORT void iree_vm_module_retain(iree_vm_module_t* module);
 
 // Releases the given |module| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_module_release(iree_vm_module_t* module);
+IREE_API_EXPORT void iree_vm_module_release(iree_vm_module_t* module);
 
 // Returns the name of the module (used during resolution).
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_vm_module_name(const iree_vm_module_t* module);
 
 // Returns the signature of the module describing the contents.
-IREE_API_EXPORT iree_vm_module_signature_t IREE_API_CALL
+IREE_API_EXPORT iree_vm_module_signature_t
 iree_vm_module_signature(const iree_vm_module_t* module);
 
 // Looks up a function with the given name and linkage in the |module|.
 // This may perform a linear scan and results should be cached.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_module_lookup_function_by_name(const iree_vm_module_t* module,
-                                       iree_vm_function_linkage_t linkage,
-                                       iree_string_view_t name,
-                                       iree_vm_function_t* out_function);
+IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_name(
+    const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
+    iree_string_view_t name, iree_vm_function_t* out_function);
 
 // Looks up a function with the given ordinal and linkage in the |module|.
 // If |linkage_name| is not null, then it will be populated with the name
@@ -383,19 +377,17 @@ iree_vm_module_lookup_function_by_name(const iree_vm_module_t* module,
 // TODO(laurenzo): Remove out_linkage_name in favore of a LINKAGE_PUBLIC (with
 // the name that you'd get from a function_name call on that being the public
 // name).
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
-                                          iree_vm_function_linkage_t linkage,
-                                          iree_host_size_t ordinal,
-                                          iree_vm_function_t* out_function,
-                                          iree_string_view_t* out_linkage_name);
+IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
+    const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
+    iree_host_size_t ordinal, iree_vm_function_t* out_function,
+    iree_string_view_t* out_linkage_name);
 
 // Returns the name of the given function or empty string if not available.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_vm_function_name(const iree_vm_function_t* function);
 
 // Returns the signature of the function if reflection metadata is available.
-IREE_API_EXPORT iree_vm_function_signature_t IREE_API_CALL
+IREE_API_EXPORT iree_vm_function_signature_t
 iree_vm_function_signature(const iree_vm_function_t* function);
 
 // Returns a value for the given reflection attribute |key|, if found.
@@ -403,9 +395,8 @@ iree_vm_function_signature(const iree_vm_function_t* function);
 // key is not found.
 //
 // See: docs/design_docs/function_abi.md for documentation on the ABI.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
-iree_vm_function_reflection_attr(const iree_vm_function_t* function,
-                                 iree_string_view_t key);
+IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
+    const iree_vm_function_t* function, iree_string_view_t key);
 
 // TODO(#1979): remove this and use iree_vm_function_reflection_attr.
 // Gets a reflection attribute for a function by index.
@@ -415,11 +406,9 @@ iree_vm_function_reflection_attr(const iree_vm_function_t* function,
 // Returns IREE_STATUS_NOT_FOUND if index >= the number of attributes for
 // the function.
 // See: docs/design_docs/function_abi.md
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_get_function_reflection_attr(iree_vm_function_t function,
-                                     iree_host_size_t index,
-                                     iree_string_view_t* key,
-                                     iree_string_view_t* value);
+IREE_API_EXPORT iree_status_t iree_vm_get_function_reflection_attr(
+    iree_vm_function_t function, iree_host_size_t index,
+    iree_string_view_t* key, iree_string_view_t* value);
 
 #ifdef __cplusplus
 }  // extern "C"
