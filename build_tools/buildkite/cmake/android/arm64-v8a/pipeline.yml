@@ -52,6 +52,7 @@ steps:
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     timeout_in_minutes: "15"
+    skip: "Currently offline"
 
   - label: "test on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
