@@ -80,7 +80,7 @@ nav:
       - TensorFlow Lite: 'frontends/tensorflow-lite.md'
       - JAX: 'frontends/jax.md'
   - 'Backends':
-      - CPU - LLVM: 'backends/cpu-llvm.md'
+      - CPU - Dylib: 'backends/cpu-dylib.md'
       - GPU - Vulkan: 'backends/gpu-vulkan.md'
   - 'Building from source':
       # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes

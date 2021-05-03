@@ -77,7 +77,7 @@ iree-tf-import
     and v2 if you see one of them gives an empty dump.
 
 Afterwards you can further compile the model in `iree_input.mlir` for
-[CPU](/backends/cpu-llvm/) or [GPU](/backends/gpu-vulkan/).
+[CPU](/backends/cpu-dylib/) or [GPU](/backends/gpu-vulkan/).
 
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
 
