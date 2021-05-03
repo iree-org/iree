@@ -24,6 +24,8 @@ CMake[^2].
 
 ## Concepts
 
+<!-- TODO(scotttodd): diagrams -->
+
 ### IREE VM
 
 <!-- TODO(scotttodd): VM "instances" -->
@@ -48,7 +50,7 @@ Include headers:
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"
 
-// The VM and HAL native modules will typically be included, along
+// The VM bytecode and HAL modules will typically be included, along
 // with those for the specific HAL drivers your application uses.
 // Functionality extensions can be used via custom modules.
 #include "iree/modules/hal/hal_module.h"
