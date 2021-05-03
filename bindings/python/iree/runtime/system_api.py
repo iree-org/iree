@@ -379,7 +379,10 @@ def load_vm_flatbuffer(vm_flatbuffer: bytes,
                        *,
                        driver: Optional[str] = None,
                        backend: Optional[str] = None) -> BoundModule:
-  """Loads a VM Flatbuffer into a callable module."""
+  """Loads a VM Flatbuffer into a callable module.
+
+  Either 'driver' or 'backend' must be specified.
+  """
   if driver is None and backend is None:
     raise ValueError("Either 'driver' or 'backend' must be specified, but got "
                      "'None' for both.")
@@ -400,7 +403,10 @@ def load_vm_flatbuffer_file(path: str,
                             *,
                             driver: Optional[str] = None,
                             backend: Optional[str] = None) -> BoundModule:
-  """Loads a file containing a VM Flatbuffer into a callable module."""
+  """Loads a file containing a VM Flatbuffer into a callable module.
+
+  Either 'driver' or 'backend' must be specified.
+  """
   with open(path, "rb") as f:
     vm_flatbuffer = f.read()
   return load_vm_flatbuffer(vm_flatbuffer, driver=driver, backend=backend)
