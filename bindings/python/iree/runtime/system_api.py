@@ -353,16 +353,32 @@ def load_vm_module(vm_module, config: Optional[Config] = None):
   return load_vm_modules(vm_module, config=config)[0]
 
 
-def load_vm_flatbuffer(vm_flatbuffer: bytes, backend: str) -> BoundModule:
+def load_vm_flatbuffer(vm_flatbuffer: bytes,
+                       *,
+                       driver: Optional[str] = None,
+                       backend: Optional[str] = None) -> BoundModule:
   """Loads a VM Flatbuffer into a callable module."""
+  if driver is None and backend is None:
+    raise ValueError("Either 'driver' or 'backend' must be specified, but got "
+                     "'None' for both.")
+  if backend is not None and driver is not None:
+    raise ValueError("Cannot specify both 'driver' and a 'backend' to infer "
+                     "the driver from.")
+  if backend is not None:
+    driver = TARGET_BACKEND_TO_DRIVER[backend]
   vm_module = _binding.VmModule.from_flatbuffer(vm_flatbuffer)
   config = Config(TARGET_BACKEND_TO_DRIVER[backend])
   bound_module = load_vm_module(vm_module, config)
   return bound_module
 
 
-def load_vm_flatbuffer_file(path: str, backend: str) -> BoundModule:
+# TODO: There should be an API for mmap'ing the file which should be used
+# instead of reading into memory.
+def load_vm_flatbuffer_file(path: str,
+                            *,
+                            driver: Optional[str] = None,
+                            backend: Optional[str] = None) -> BoundModule:
   """Loads a file containing a VM Flatbuffer into a callable module."""
   with open(path, "rb") as f:
     vm_flatbuffer = f.read()
-  return load_vm_flatbuffer(vm_flatbuffer, backend)
+  return load_vm_flatbuffer(vm_flatbuffer, driver=driver, backend=backend)
