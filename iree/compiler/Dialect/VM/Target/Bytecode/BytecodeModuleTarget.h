@@ -53,6 +53,10 @@ struct BytecodeTargetOptions {
   bool stripSourceMap = false;
   // Strips vm ops with the VM_DebugOnly trait.
   bool stripDebugOps = false;
+
+  // Enables the output .vmfb to be inspected as a ZIP file.
+  // This is only useful for debugging and should be disabled otherwise.
+  bool emitPolyglotZip = false;
 };
 
 // Translates a vm.module to a bytecode module flatbuffer.

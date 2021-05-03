@@ -2161,7 +2161,8 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   let arguments = (ins
     StrAttr:$sym_name,
     StrAttr:$format,
-    HAL_ExecutableDataAttr:$data
+    HAL_ExecutableDataAttr:$data,
+    OptionalAttr<StrAttr>:$mime_type
     // TODO(benvanik): add compatibility and versioning attributes.
   );
 

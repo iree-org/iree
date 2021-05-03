@@ -169,13 +169,13 @@ class raw_flatbuffer_uint8_vec_ostream : public llvm::raw_ostream {
   void write_impl(const char *Ptr, size_t Size) override {
     flatbuffers_uint8_vec_append(builder,
                                  reinterpret_cast<const uint8_t *>(Ptr), Size);
+    pos += Size;
   }
 
-  uint64_t current_pos() const override {
-    return tell() - GetNumBytesInBuffer();
-  }
+  uint64_t current_pos() const override { return pos - GetNumBytesInBuffer(); }
 
   flatcc_builder_t *builder;
+  uint64_t pos = 0;
 };
 
 }  // namespace iree_compiler

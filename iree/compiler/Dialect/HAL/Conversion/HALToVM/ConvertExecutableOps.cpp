@@ -82,6 +82,9 @@ class ExecutableCreateOpConversion
             .str(),
         executableBinaryOp.data());
     rodataOp.setPrivate();
+    if (executableBinaryOp.mime_type().hasValue()) {
+      rodataOp.mime_typeAttr(executableBinaryOp.mime_typeAttr());
+    }
     rewriter.restoreInsertionPoint(insertPoint);
 
     auto executableFormatString = detail::rewriteAttrToOperands(
