@@ -24,22 +24,41 @@ CMake[^2].
 
 ## Concepts
 
+By default, IREE uses a Virtual Machine (VM) at runtime to interpret program
+instructions on the host system. VM instructions may also be lowered further to
+LLVM IR, C, or other representations for static or resource constrained
+deployment.
+
+The VM supports generic operations like loads, stores, arithmetic, function
+calls, and control flow. It builds streams of more complex program logic and
+dense math into command buffers that are dispatched to hardware backends
+through the Hardware Abstraction Layer (HAL) interface.
+
+Most interaction with IREE's C API involves either the VM or the HAL.
+
 <!-- TODO(scotttodd): diagrams -->
 
 ### IREE VM
 
-<!-- TODO(scotttodd): VM "instances" -->
-<!-- TODO(scotttodd): VM "contexts" -->
-<!-- TODO(scotttodd): VM "modules" -->
+* VM _instances_ can serve multiple isolated execution _contexts_
+* VM _contexts_ are effectively sandboxes for loading modules and running
+  programs
+* VM _modules_ provide extra functionality to execution _contexts_, such as
+  access to hardware accelerators through the HAL
 
 ### IREE HAL
 
-<!-- TODO(scotttodd): HAL "drivers" -->
-<!-- TODO(scotttodd): HAL "devices" -->
+* HAL _drivers_ are used to enumerate and create HAL _devices_
+* HAL _devices_ interface with hardware, such as by allocating device memory,
+  preparing executables, recording and dispatching command buffers, and
+  synchronizing with the host
 
 ## Using the C API
 
 <!-- TODO(scotttodd): general overview (setup, prepare input, call function, get output) -->
+
+<!-- !!! tip
+    Move initialization / setup off the hot path. -->
 
 ### Setup
 
@@ -85,12 +104,6 @@ IREE_CHECK_OK(iree_hal_dylib_driver_module_register(
 ### Configure stateful objects
 
 Create a VM instance along with a HAL driver and device:
-
-* VM _instances_ serve isolated execution _contexts_
-* HAL _drivers_ are used to enumerate and create HAL _devices_
-* HAL _devices_ interface with hardware, such as by allocating device memory,
-  preparing executables, recording and dispatching command buffers, and
-  synchronizing with the host
 
 ``` c
 // Applications should try to reuse instances so resource usage across contexts
