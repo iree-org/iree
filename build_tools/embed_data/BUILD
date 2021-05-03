@@ -36,8 +36,8 @@ cc_embed_data(
     name = "testembed1",
     # do not sort
     srcs = [
-        "file1.txt",
-        "data/file2.txt",
+        "file1.bin",
+        "data/file2.bin",
     ],
     cc_file_output = "testembed1.cc",
     cpp_namespace = "foobar",
@@ -48,7 +48,7 @@ cc_embed_data(
 cc_embed_data(
     name = "testembed2",
     srcs = [
-        "data/file3.txt",
+        "data/file3.bin",
     ],
     cc_file_output = "testembed2.cc",
     cpp_namespace = "foobar",
@@ -71,8 +71,8 @@ c_embed_data(
     name = "testembed1_c",
     # do not sort
     srcs = [
-        "file1.txt",
-        "data/file2.txt",
+        "file1.bin",
+        "data/file2.bin",
     ],
     c_file_output = "testembed1_c.c",
     flatten = True,
