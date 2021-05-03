@@ -14,9 +14,6 @@
 
 # Common types and utilities used in the IREE codebase.
 
-load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -28,13 +25,16 @@ package(
 #===------------------------------------------------------------------------===#
 
 cc_library(
-    name = "api",
+    name = "base",
     srcs = [
         "allocator.c",
+        "allocator.h",
         "api.c",
         "status.c",
         "string_view.c",
+        "string_view.h",
         "time.c",
+        "time.h",
     ],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],
@@ -66,26 +66,6 @@ cc_library(
 #===------------------------------------------------------------------------===#
 # Internal IREE C++ wrappers and utilities
 #===------------------------------------------------------------------------===#
-
-cc_library(
-    name = "flatcc",
-    hdrs = ["flatcc.h"],
-    deps = [
-        ":flatcc_dummy",
-        "@com_github_dvidelabs_flatcc//:runtime",
-    ],
-)
-
-iree_flatbuffer_c_library(
-    name = "flatcc_dummy",
-    srcs = ["flatcc.fbs"],
-    flatcc_args = [
-        "--reader",
-        "--builder",
-        "--verifier",
-        "--json",
-    ],
-)
 
 cc_library(
     name = "logging",
@@ -147,90 +127,7 @@ cc_test(
     name = "string_view_test",
     srcs = ["string_view_test.cc"],
     deps = [
-        ":api",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "synchronization",
-    srcs = ["synchronization.c"],
-    hdrs = ["synchronization.h"],
-    deps = [
-        ":api",
-        ":core_headers",
-        ":tracing",
-        "//iree/base/internal",
-    ],
-)
-
-cc_binary(
-    name = "synchronization_benchmark",
-    testonly = True,
-    srcs = ["synchronization_benchmark.cc"],
-    deps = [
-        ":synchronization",
-        "//iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-run_binary_test(
-    name = "synchronization_benchmark_test",
-    args = ["--benchmark_min_time=0"],
-    test_binary = ":synchronization_benchmark",
-)
-
-cc_test(
-    name = "synchronization_test",
-    srcs = ["synchronization_test.cc"],
-    deps = [
-        ":synchronization",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "threading",
-    srcs = [
-        "threading.c",
-        "threading_darwin.c",
-        "threading_impl.h",
-        "threading_pthreads.c",
-        "threading_win32.c",
-    ],
-    hdrs = ["threading.h"],
-    deps = [
-        ":api",
-        ":core_headers",
-        ":synchronization",
-        ":tracing",
-        "//build_tools:default_linkopts",
-        "//iree/base/internal",
-    ],
-)
-
-cc_test(
-    name = "threading_benchmark",
-    srcs = ["threading_benchmark.cc"],
-    deps = [
-        ":threading",
-        "//iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-cc_test(
-    name = "threading_test",
-    srcs = [
-        "threading_impl.h",
-        "threading_test.cc",
-    ],
-    deps = [
-        ":synchronization",
-        ":threading",
+        ":base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

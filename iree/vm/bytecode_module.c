@@ -725,7 +725,7 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
     iree_const_byte_span_t flatbuffer_data,
     iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
     iree_vm_module_t** out_module) {

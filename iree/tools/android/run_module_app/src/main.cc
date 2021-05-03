@@ -106,7 +106,7 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(invocation.module, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(invocation.driver, &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(invocation.driver.c_str(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 

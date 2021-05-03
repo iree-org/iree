@@ -28,6 +28,50 @@
 
 namespace iree {
 
+Status GetFileContents(const char* path, std::string* out_contents) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  *out_contents = std::string();
+  FILE* file = fopen(path, "rb");
+  if (file == NULL) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to open file '%s'", path);
+  }
+  iree_status_t status = iree_ok_status();
+  if (fseek(file, 0, SEEK_END) == -1) {
+    status = iree_make_status(iree_status_code_from_errno(errno), "seek (end)");
+  }
+  size_t file_size = 0;
+  if (iree_status_is_ok(status)) {
+    file_size = ftell(file);
+    if (file_size == -1L) {
+      status =
+          iree_make_status(iree_status_code_from_errno(errno), "size query");
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    if (fseek(file, 0, SEEK_SET) == -1) {
+      status =
+          iree_make_status(iree_status_code_from_errno(errno), "seek (beg)");
+    }
+  }
+  std::string contents;
+  if (iree_status_is_ok(status)) {
+    contents.resize(file_size);
+    if (fread((char*)contents.data(), file_size, 1, file) != 1) {
+      status =
+          iree_make_status(iree_status_code_from_errno(errno),
+                           "unable to read entire file contents of '%s'", path);
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    *out_contents = std::move(contents);
+  }
+  fclose(file);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 Status ValidateFunctionAbi(const iree_vm_function_t& function) {
   // Benchmark functions are always allowed through as they are () -> ().
   // That we are requiring SIP for everything in this util file is bad, and this
@@ -148,7 +192,7 @@ Status ParseToVariantList(
         IREE_RETURN_IF_ERROR(
             iree_hal_buffer_view_parse(
                 iree_string_view_t{input_string.data(), input_string.size()},
-                allocator, iree_allocator_system(), &buffer_view),
+                allocator, &buffer_view),
             "parsing value '%.*s'", (int)input_string.size(),
             input_string.data());
         auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
@@ -242,20 +286,17 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
   return OkStatus();
 }
 
-Status CreateDevice(absl::string_view driver_name,
-                    iree_hal_device_t** out_device) {
+Status CreateDevice(const char* driver_name, iree_hal_device_t** out_device) {
   IREE_LOG(INFO) << "Creating driver and device for '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_driver_registry_try_create_by_name(
-          iree_hal_driver_registry_default(),
-          iree_string_view_t{driver_name.data(), driver_name.size()},
-          iree_allocator_system(), &driver),
-      "creating driver '%.*s'", (int)driver_name.size(), driver_name.data());
+  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
+                           iree_hal_driver_registry_default(),
+                           iree_make_cstring_view(driver_name),
+                           iree_allocator_system(), &driver),
+                       "creating driver '%s'", driver_name);
   IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
                            driver, iree_allocator_system(), out_device),
-                       "creating default device for driver '%.*s'",
-                       (int)driver_name.size(), driver_name.data());
+                       "creating default device for driver '%s'", driver_name);
   iree_hal_driver_release(driver);
   return OkStatus();
 }

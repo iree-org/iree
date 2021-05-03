@@ -167,7 +167,7 @@ class CheckTest : public ::testing::Test {
         shape.size(), &*out_buffer_view));
   }
 
-  Status Invoke(const char* function_name) {
+  iree_status_t Invoke(const char* function_name) {
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(
         check_module_->lookup_function(
@@ -180,7 +180,8 @@ class CheckTest : public ::testing::Test {
                           /*outputs=*/nullptr, iree_allocator_system());
   }
 
-  Status Invoke(const char* function_name, std::vector<iree_vm_value> args) {
+  iree_status_t Invoke(const char* function_name,
+                       std::vector<iree_vm_value> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, args.size(),
                             iree_allocator_system(), &inputs_));
@@ -190,8 +191,8 @@ class CheckTest : public ::testing::Test {
     return Invoke(function_name);
   }
 
-  Status Invoke(const char* function_name,
-                std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
+  iree_status_t Invoke(const char* function_name,
+                       std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, args.size(),
                             iree_allocator_system(), &inputs_));

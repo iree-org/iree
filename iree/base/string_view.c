@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/base/string_view.h"
+
 #include <ctype.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,8 +26,8 @@ static inline size_t iree_min_host_size(size_t a, size_t b) {
   return a < b ? a : b;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL
-iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs) {
+IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
+                                            iree_string_view_t rhs) {
   if (lhs.size != rhs.size) return false;
   for (iree_host_size_t i = 0; i < lhs.size; ++i) {
     if (lhs.data[i] != rhs.data[i]) return false;
@@ -32,8 +35,8 @@ iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs) {
   return true;
 }
 
-IREE_API_EXPORT int IREE_API_CALL
-iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
+IREE_API_EXPORT int iree_string_view_compare(iree_string_view_t lhs,
+                                             iree_string_view_t rhs) {
   iree_host_size_t min_size = iree_min_host_size(lhs.size, rhs.size);
   int cmp = strncmp(lhs.data, rhs.data, min_size);
   if (cmp != 0) {
@@ -44,7 +47,7 @@ iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
   return lhs.size < rhs.size ? -1 : 1;
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_char(
     iree_string_view_t value, char c, iree_host_size_t pos) {
   if (iree_string_view_is_empty(value) || pos >= value.size) {
     return IREE_STRING_VIEW_NPOS;
@@ -54,7 +57,7 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
   return result != NULL ? result - value.data : IREE_STRING_VIEW_NPOS;
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_first_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos) {
   if (iree_string_view_is_empty(value) || iree_string_view_is_empty(s)) {
     return IREE_STRING_VIEW_NPOS;
@@ -75,7 +78,7 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
   return IREE_STRING_VIEW_NPOS;
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_last_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos) {
   if (iree_string_view_is_empty(value) || iree_string_view_is_empty(s)) {
     return IREE_STRING_VIEW_NPOS;
@@ -95,16 +98,16 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
   return IREE_STRING_VIEW_NPOS;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
-    iree_string_view_t value, iree_string_view_t prefix) {
+IREE_API_EXPORT bool iree_string_view_starts_with(iree_string_view_t value,
+                                                  iree_string_view_t prefix) {
   if (!value.data || !prefix.data || !prefix.size || prefix.size > value.size) {
     return false;
   }
   return strncmp(value.data, prefix.data, prefix.size) == 0;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_ends_with(
-    iree_string_view_t value, iree_string_view_t suffix) {
+IREE_API_EXPORT bool iree_string_view_ends_with(iree_string_view_t value,
+                                                iree_string_view_t suffix) {
   if (!value.data || !suffix.data || !suffix.size || suffix.size > value.size) {
     return false;
   }
@@ -112,7 +115,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_ends_with(
                  suffix.size) == 0;
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n) {
   if (n >= value.size) {
     return iree_string_view_empty();
@@ -120,7 +123,7 @@ iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n) {
   return iree_make_string_view(value.data + n, value.size - n);
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_remove_suffix(iree_string_view_t value, iree_host_size_t n) {
   if (n >= value.size) {
     return iree_string_view_empty();
@@ -128,7 +131,7 @@ iree_string_view_remove_suffix(iree_string_view_t value, iree_host_size_t n) {
   return iree_make_string_view(value.data, value.size - n);
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_prefix(
+IREE_API_EXPORT iree_string_view_t iree_string_view_strip_prefix(
     iree_string_view_t value, iree_string_view_t prefix) {
   if (iree_string_view_starts_with(value, prefix)) {
     return iree_string_view_remove_prefix(value, prefix.size);
@@ -136,7 +139,7 @@ IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_prefix(
   return value;
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_suffix(
+IREE_API_EXPORT iree_string_view_t iree_string_view_strip_suffix(
     iree_string_view_t value, iree_string_view_t suffix) {
   if (iree_string_view_ends_with(value, suffix)) {
     return iree_string_view_remove_suffix(value, suffix.size);
@@ -144,7 +147,7 @@ IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_suffix(
   return value;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_prefix(
+IREE_API_EXPORT bool iree_string_view_consume_prefix(
     iree_string_view_t* value, iree_string_view_t prefix) {
   if (iree_string_view_starts_with(*value, prefix)) {
     *value = iree_string_view_remove_prefix(*value, prefix.size);
@@ -153,7 +156,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_prefix(
   return false;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_suffix(
+IREE_API_EXPORT bool iree_string_view_consume_suffix(
     iree_string_view_t* value, iree_string_view_t suffix) {
   if (iree_string_view_ends_with(*value, suffix)) {
     *value = iree_string_view_remove_suffix(*value, suffix.size);
@@ -162,7 +165,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_suffix(
   return false;
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_trim(iree_string_view_t value) {
   if (iree_string_view_is_empty(value)) return value;
   iree_host_size_t start = 0;
@@ -184,16 +187,17 @@ iree_string_view_trim(iree_string_view_t value) {
   return iree_make_string_view(value.data + start, end - start + 1);
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_substr(
+IREE_API_EXPORT iree_string_view_t iree_string_view_substr(
     iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n) {
   pos = iree_min_host_size(pos, value.size);
   n = iree_min_host_size(n, value.size - pos);
   return iree_make_string_view(value.data + pos, n);
 }
 
-IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
-    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
-    iree_string_view_t* out_rhs) {
+IREE_API_EXPORT intptr_t iree_string_view_split(iree_string_view_t value,
+                                                char split_char,
+                                                iree_string_view_t* out_lhs,
+                                                iree_string_view_t* out_rhs) {
   *out_lhs = iree_string_view_empty();
   *out_rhs = iree_string_view_empty();
   if (!value.data || !value.size) {
@@ -259,17 +263,124 @@ static bool iree_string_view_match_pattern_impl(iree_string_view_t value,
   return false;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
+IREE_API_EXPORT bool iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern) {
   return iree_string_view_match_pattern_impl(value, pattern);
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL
-iree_string_view_append_to_buffer(iree_string_view_t source_value,
-                                  iree_string_view_t* target_value,
-                                  char* buffer) {
+IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(
+    iree_string_view_t source_value, iree_string_view_t* target_value,
+    char* buffer) {
   memcpy(buffer, source_value.data, source_value.size);
   target_value->data = buffer;
   target_value->size = source_value.size;
   return source_value.size;
+}
+
+// NOTE: these implementations aren't great due to the enforced memcpy we
+// perform. These _should_ never be on a hot path, though, so this keeps our
+// code size small.
+
+IREE_API_EXPORT bool iree_string_view_atoi_int32(iree_string_view_t value,
+                                                 int32_t* out_value) {
+  // Copy to scratch memory with a NUL terminator.
+  char temp[16] = {0};
+  if (value.size >= IREE_ARRAYSIZE(temp)) return false;
+  memcpy(temp, value.data, value.size);
+
+  // Attempt to parse.
+  errno = 0;
+  char* end = NULL;
+  long parsed_value = strtol(temp, &end, 0);
+  if (temp == end) return false;
+  if ((parsed_value == LONG_MIN || parsed_value == LONG_MAX) &&
+      errno == ERANGE) {
+    return false;
+  }
+  *out_value = (int32_t)parsed_value;
+  return parsed_value != 0 || errno == 0;
+}
+
+IREE_API_EXPORT bool iree_string_view_atoi_uint32(iree_string_view_t value,
+                                                  uint32_t* out_value) {
+  // Copy to scratch memory with a NUL terminator.
+  char temp[16] = {0};
+  if (value.size >= IREE_ARRAYSIZE(temp)) return false;
+  memcpy(temp, value.data, value.size);
+
+  // Attempt to parse.
+  errno = 0;
+  char* end = NULL;
+  unsigned long parsed_value = strtoul(temp, &end, 0);
+  if (temp == end) return false;
+  if (parsed_value == ULONG_MAX && errno == ERANGE) return false;
+  *out_value = (uint32_t)parsed_value;
+  return parsed_value != 0 || errno == 0;
+}
+
+IREE_API_EXPORT bool iree_string_view_atoi_int64(iree_string_view_t value,
+                                                 int64_t* out_value) {
+  // Copy to scratch memory with a NUL terminator.
+  char temp[32] = {0};
+  if (value.size >= IREE_ARRAYSIZE(temp)) return false;
+  memcpy(temp, value.data, value.size);
+
+  // Attempt to parse.
+  errno = 0;
+  char* end = NULL;
+  long long parsed_value = strtoll(temp, &end, 0);
+  if (temp == end) return false;
+  if ((parsed_value == LLONG_MIN || parsed_value == LLONG_MAX) &&
+      errno == ERANGE) {
+    return false;
+  }
+  *out_value = (int64_t)parsed_value;
+  return parsed_value != 0 || errno == 0;
+}
+
+IREE_API_EXPORT bool iree_string_view_atoi_uint64(iree_string_view_t value,
+                                                  uint64_t* out_value) {
+  // Copy to scratch memory with a NUL terminator.
+  char temp[32] = {0};
+  if (value.size >= IREE_ARRAYSIZE(temp)) return false;
+  memcpy(temp, value.data, value.size);
+
+  // Attempt to parse.
+  errno = 0;
+  char* end = NULL;
+  unsigned long long parsed_value = strtoull(temp, &end, 0);
+  if (temp == end) return false;
+  if (parsed_value == ULLONG_MAX && errno == ERANGE) return false;
+  *out_value = (uint64_t)parsed_value;
+  return parsed_value != 0 || errno == 0;
+}
+
+IREE_API_EXPORT bool iree_string_view_atof(iree_string_view_t value,
+                                           float* out_value) {
+  // Copy to scratch memory with a NUL terminator.
+  char temp[32] = {0};
+  if (value.size >= IREE_ARRAYSIZE(temp)) return false;
+  memcpy(temp, value.data, value.size);
+
+  // Attempt to parse.
+  errno = 0;
+  char* end = NULL;
+  *out_value = strtof(temp, &end);
+  if (temp == end) return false;
+  return *out_value != 0 || errno == 0;
+}
+
+IREE_API_EXPORT bool iree_string_view_atod(iree_string_view_t value,
+                                           double* out_value) {
+  // Copy to scratch memory with a NUL terminator.
+  char temp[32] = {0};
+  if (value.size >= IREE_ARRAYSIZE(temp)) return false;
+  memcpy(temp, value.data, value.size);
+
+  // Attempt to parse.
+  errno = 0;
+  char* end = NULL;
+  *out_value = strtod(temp, &end);
+  if (temp == end) return false;
+  return *out_value != 0 || errno == 0;
 }

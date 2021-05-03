@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_THREADING_IMPL_H_
-#define IREE_BASE_THREADING_IMPL_H_
+#ifndef IREE_BASE_INTERNAL_THREADING_IMPL_H_
+#define IREE_BASE_INTERNAL_THREADING_IMPL_H_
 
 // Ensure that any posix header we include exposes GNU stuff. Ignored on
 // platforms where we either don't have the GNU stuff or don't have posix
@@ -33,9 +33,9 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
+#include "iree/base/internal/threading.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/threading.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,4 +82,4 @@ void iree_thread_override_remove_self(iree_thread_override_t* override);
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_THREADING_IMPL_H_
+#endif  // IREE_BASE_INTERNAL_THREADING_IMPL_H_

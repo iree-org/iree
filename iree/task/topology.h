@@ -18,7 +18,7 @@
 #include <limits.h>
 
 #include "iree/base/api.h"
-#include "iree/base/threading.h"
+#include "iree/base/internal/threading.h"
 #include "iree/task/tuning.h"
 
 #ifdef __cplusplus

@@ -264,36 +264,32 @@ typedef struct {
 typedef struct iree_hal_buffer_s iree_hal_buffer_t;
 
 // Returns success iff the buffer was allocated with the given memory type.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_buffer_validate_memory_type(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
     iree_hal_memory_type_t actual_memory_type,
     iree_hal_memory_type_t expected_memory_type);
 
 // Returns success iff the buffer allows the requested access.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_validate_access(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_access(
     iree_hal_memory_access_t allowed_memory_access,
     iree_hal_memory_access_t required_memory_access);
 
 // Returns success iff the buffer usage allows the given usage type.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_buffer_validate_usage(iree_hal_buffer_usage_t allowed_usage,
                                iree_hal_buffer_usage_t required_usage);
 
 // Returns success iff the given byte range falls within the valid buffer.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_validate_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_range(
     iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length);
 
 // Tests whether the given buffers overlap, including support for subspans.
 // IREE_WHOLE_BUFFER may be used for |lhs_length| and/or |rhs_length| to use the
 // lengths of those buffers, respectively.
-IREE_API_EXPORT iree_hal_buffer_overlap_t IREE_API_CALL
-iree_hal_buffer_test_overlap(iree_hal_buffer_t* lhs_buffer,
-                             iree_device_size_t lhs_offset,
-                             iree_device_size_t lhs_length,
-                             iree_hal_buffer_t* rhs_buffer,
-                             iree_device_size_t rhs_offset,
-                             iree_device_size_t rhs_length);
+IREE_API_EXPORT iree_hal_buffer_overlap_t iree_hal_buffer_test_overlap(
+    iree_hal_buffer_t* lhs_buffer, iree_device_size_t lhs_offset,
+    iree_device_size_t lhs_length, iree_hal_buffer_t* rhs_buffer,
+    iree_device_size_t rhs_offset, iree_device_size_t rhs_length);
 
 // Returns a reference to a subspan of the |buffer|.
 // If |byte_length| is IREE_WHOLE_BUFFER the remaining bytes in the buffer after
@@ -305,59 +301,57 @@ iree_hal_buffer_test_overlap(iree_hal_buffer_t* lhs_buffer,
 //
 // Returns the given |buffer| if the requested span covers the entire range.
 // |out_buffer| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_subspan(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
     iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, iree_hal_buffer_t** out_buffer);
 
 // Retains the given |buffer| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_retain(iree_hal_buffer_t* buffer);
+IREE_API_EXPORT void iree_hal_buffer_retain(iree_hal_buffer_t* buffer);
 
 // Releases the given |buffer| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_release(iree_hal_buffer_t* buffer);
+IREE_API_EXPORT void iree_hal_buffer_release(iree_hal_buffer_t* buffer);
 
 // Returns the allocator this buffer was allocated from.
-IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
-iree_hal_buffer_allocator(const iree_hal_buffer_t* buffer);
+IREE_API_EXPORT iree_hal_allocator_t* iree_hal_buffer_allocator(
+    const iree_hal_buffer_t* buffer);
 
 // Returns a pointer to the buffer containing the actual allocation.
 // The buffer represents a span of the allocated bytes defined by byte_offset
 // and byte_length. If the provided buffer *is* the allocated buffer then the
 // returned value will be the provided buffer pointer.
-IREE_API_EXPORT iree_hal_buffer_t* IREE_API_CALL
-iree_hal_buffer_allocated_buffer(const iree_hal_buffer_t* buffer);
+IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_allocated_buffer(
+    const iree_hal_buffer_t* buffer);
 
 // Returns the size of the resource memory allocation in bytes.
 // This may be rounded up from the originally requested size or the ideal
 // size for the resource based on device restrictions.
-IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_allocation_size(const iree_hal_buffer_t* buffer);
 
 // Returns the offset in bytes of the buffer within its allocated_buffer.
-IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_byte_offset(const iree_hal_buffer_t* buffer);
 
 // Returns the size in bytes of the buffer.
-IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_byte_length(const iree_hal_buffer_t* buffer);
 
 // Returns the memory type the buffer was allocated with.
 IREE_API_EXPORT
-iree_hal_memory_type_t IREE_API_CALL
-iree_hal_buffer_memory_type(const iree_hal_buffer_t* buffer);
+iree_hal_memory_type_t iree_hal_buffer_memory_type(
+    const iree_hal_buffer_t* buffer);
 
 // Returns the allowed memory access modes.
 // These may be more strict than the underlying allocation, for example when the
 // buffer is exposing read-only memory that may be in mutable pages.
 IREE_API_EXPORT
-iree_hal_memory_access_t IREE_API_CALL
-iree_hal_buffer_allowed_access(const iree_hal_buffer_t* buffer);
+iree_hal_memory_access_t iree_hal_buffer_allowed_access(
+    const iree_hal_buffer_t* buffer);
 
 // Returns the allowed buffer usage modes.
 IREE_API_EXPORT
-iree_hal_buffer_usage_t IREE_API_CALL
-iree_hal_buffer_allowed_usage(const iree_hal_buffer_t* buffer);
+iree_hal_buffer_usage_t iree_hal_buffer_allowed_usage(
+    const iree_hal_buffer_t* buffer);
 
 // Sets a range of the buffer to binary zero.
 //
@@ -368,7 +362,7 @@ iree_hal_buffer_allowed_usage(const iree_hal_buffer_t* buffer);
 // queues; using this synchronous function may incur additional cache flushes
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_fill_buffer.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
                      iree_device_size_t byte_length);
 
@@ -382,7 +376,7 @@ iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
 // queues; using this synchronous function may incur additional cache flushes
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_fill_buffer.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
                      iree_device_size_t byte_length, const void* pattern,
                      iree_host_size_t pattern_length);
@@ -395,7 +389,7 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
 // queues; using this synchronous function may incur additional cache flushes
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_copy_buffer.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_read_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length);
 
@@ -409,7 +403,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_read_data(
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_update_buffer and
 // iree_hal_command_buffer_copy_buffer.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_write_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length);
 
@@ -422,7 +416,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_write_data(
 // queues; using this synchronous function may incur additional cache flushes
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_copy_buffer.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_copy_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length);
@@ -437,7 +431,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_copy_data(
 // If the buffer is not IREE_HAL_MEMORY_TYPE_HOST_COHERENT then the caller must
 // invalidate the byte range they want to access to update the visibility of the
 // mapped memory.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
     iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree_hal_buffer_mapping_t* out_buffer_mapping);
@@ -446,15 +440,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map_range(
 //
 // If the buffer is not IREE_HAL_MEMORY_TYPE_HOST_COHERENT then the caller must
 // flush the byte range they want to make available to other threads/devices.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* buffer_mapping);
+IREE_API_EXPORT void iree_hal_buffer_unmap_range(
+    iree_hal_buffer_mapping_t* buffer_mapping);
 
 // Invalidates ranges of non-coherent memory from the host caches.
 // This guarantees that device writes to the memory ranges provided are
 // visible on the host. Use before reading from non-coherent memory.
 //
 // Only required for memory types without IREE_HAL_MEMORY_TYPE_HOST_COHERENT.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_invalidate_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(
     iree_hal_buffer_mapping_t* buffer_mapping, iree_device_size_t byte_offset,
     iree_device_size_t byte_length);
 
@@ -463,7 +457,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_invalidate_range(
 // for device access. Use after writing to non-coherent memory.
 //
 // Only required for memory types without IREE_HAL_MEMORY_TYPE_HOST_COHERENT.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_flush_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_flush_range(
     iree_hal_buffer_mapping_t* buffer_mapping, iree_device_size_t byte_offset,
     iree_device_size_t byte_length);
 
@@ -475,7 +469,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_flush_range(
 // not host coherent and writeable then the caller must use the
 // iree_hal_buffer_invalidate_range and iree_hal_buffer_flush_range methods to
 // ensure memory is in the expected state.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_mapping_subspan(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
     iree_hal_buffer_mapping_t* buffer_mapping,
     iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, iree_byte_span_t* out_span);
@@ -489,7 +483,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_mapping_subspan(
 // free |data|. Pass iree_allocator_null() to wrap without ownership semantics.
 //
 // |out_buffer| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
+IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
@@ -542,8 +536,7 @@ struct iree_hal_buffer_s {
   iree_hal_buffer_usage_t allowed_usage;
 };
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_destroy(iree_hal_buffer_t* buffer);
+IREE_API_EXPORT void iree_hal_buffer_destroy(iree_hal_buffer_t* buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

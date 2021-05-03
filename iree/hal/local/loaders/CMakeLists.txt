@@ -18,10 +18,10 @@ iree_cc_library(
   SRCS
     "embedded_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
     iree::hal::local::elf::elf_module
   DEFINES
@@ -37,12 +37,12 @@ iree_cc_library(
   SRCS
     "legacy_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
-    iree::base::flatcc
     iree::base::internal::dynamic_library
+    iree::base::internal::flatcc
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
     iree::schemas::dylib_executable_def_c_fbs
   DEFINES
@@ -58,9 +58,9 @@ iree_cc_library(
   SRCS
     "static_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
   DEFINES
     "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
@@ -75,11 +75,11 @@ iree_cc_library(
   SRCS
     "system_library_loader.c"
   DEPS
-    iree::base::api
-    iree::base::flatcc
+    iree::base
     iree::base::internal::file_io
+    iree::base::internal::flatcc
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
   DEFINES
     "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
@@ -96,10 +96,10 @@ iree_cc_library(
   SRCS
     "vmla_module_loader.cc"
   DEPS
-    iree::base::api
-    iree::base::flatcc
+    iree::base
+    iree::base::internal::flatcc
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
     iree::modules::vmla::op_module
     iree::schemas::vmla_executable_def_c_fbs

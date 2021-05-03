@@ -23,8 +23,7 @@
 #include <string>
 #include <vector>
 
-#include "iree/base/status.h"
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
@@ -73,7 +72,7 @@ class SerializingCommandQueue final : public CommandQueue {
   void AbortQueueSubmission();
 
   // Informs this queue that the given |fences| are known to have signaled.
-  void SignalFences(absl::Span<VkFence> fences);
+  void SignalFences(const std::vector<VkFence>& fences);
 
  private:
   // A submission batch together with the fence to singal its status.

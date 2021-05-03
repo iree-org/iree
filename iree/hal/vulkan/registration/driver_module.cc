@@ -17,7 +17,6 @@
 #include <inttypes.h>
 
 #include "iree/base/internal/flags.h"
-#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"
@@ -122,7 +121,7 @@ static iree_status_t iree_hal_vulkan_driver_factory_try_create(
                                                   out_driver);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_vulkan_driver_module_register(iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
       /*self=*/NULL,

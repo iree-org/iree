@@ -27,7 +27,7 @@
 #include "iree/vm/api.h"
 
 // NOTE: include order matters:
-#include "iree/base/flatcc.h"
+#include "iree/base/internal/flatcc.h"
 #include "iree/schemas/bytecode_module_def_reader.h"
 #include "iree/schemas/bytecode_module_def_verifier.h"
 

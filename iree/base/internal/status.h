@@ -23,7 +23,6 @@
 #include <memory>
 #include <string>
 
-#include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/attributes.h"
 #include "iree/base/logging.h"
@@ -143,22 +142,20 @@ class Status final {
 
   // Creates a status with the specified code and error message.
   // If `code` is kOk, `message` is ignored.
-  Status(StatusCode code, absl::string_view message) {
+  Status(StatusCode code, const char* message) {
     if (IREE_UNLIKELY(code != StatusCode::kOk)) {
-      value_ = message.empty()
+      value_ = (!message || !strlen(message))
                    ? iree_status_from_code(code)
-                   : iree_status_allocate(
-                         static_cast<iree_status_code_t>(code),
-                         /*file=*/nullptr, /*line=*/0,
-                         iree_make_string_view(message.data(), message.size()));
+                   : iree_status_allocate(static_cast<iree_status_code_t>(code),
+                                          /*file=*/nullptr, /*line=*/0,
+                                          iree_make_cstring_view(message));
     }
   }
-  Status(StatusCode code, SourceLocation location, absl::string_view message) {
+  Status(StatusCode code, SourceLocation location, const char* message) {
     if (IREE_UNLIKELY(code != StatusCode::kOk)) {
-      value_ = iree_status_allocate(
-          static_cast<iree_status_code_t>(code), location.file_name(),
-          location.line(),
-          iree_make_string_view(message.data(), message.size()));
+      value_ = iree_status_allocate(static_cast<iree_status_code_t>(code),
+                                    location.file_name(), location.line(),
+                                    iree_make_cstring_view(message));
     }
   }
 

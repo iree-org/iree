@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_THREADING_H_
-#define IREE_BASE_THREADING_H_
+#ifndef IREE_BASE_INTERNAL_THREADING_H_
+#define IREE_BASE_INTERNAL_THREADING_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -180,122 +180,8 @@ void iree_thread_request_affinity(iree_thread_t* thread,
 // This has no effect if the thread is not suspended.
 void iree_thread_resume(iree_thread_t* thread);
 
-//==============================================================================
-// iree_fpu_state_*
-//==============================================================================
-
-// Flags controlling FPU features.
-enum iree_fpu_state_flags_e {
-  // Platform default.
-  IREE_FPU_STATE_DEFAULT = 0,
-
-  // Denormals can cause some serious slowdowns in certain ISAs where they may
-  // be implemented in microcode. Flushing them to zero instead of letting them
-  // propagate ensures that the slow paths aren't hit. This is a fast-math style
-  // optimization (and is often part of all compiler's fast-math set of flags).
-  //
-  // https://en.wikipedia.org/wiki/Denormal_number
-  // https://carlh.net/plugins/denormals.php
-  // https://www.xspdf.com/resolution/50507310.html
-  IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO = 1 << 0,
-};
-typedef uint32_t iree_fpu_state_flags_t;
-
-// Opaque FPU state vector manipulated with iree_fpu_* functions.
-typedef struct {
-  uint64_t previous_value;
-  uint64_t current_value;
-} iree_fpu_state_t;
-
-// Pushes a new floating-point unit (FPU) state for the current thread.
-// May lead to a pipeline flush; avoid if possible.
-iree_fpu_state_t iree_fpu_state_push(iree_fpu_state_flags_t flags);
-
-// Restores the FPU state of the thread to its original value.
-// May lead to a pipeline flush; avoid if possible.
-void iree_fpu_state_pop(iree_fpu_state_t state);
-
-//==============================================================================
-// iree_call_once
-//==============================================================================
-// Emulates the C11 call_once feature as few seem to have it.
-// https://en.cppreference.com/w/c/thread/call_once
-
-#if defined(__has_include)
-#if __has_include(<thread.h>)
-#define IREE_HAS_C11_THREAD_H 1
-#endif
-#endif
-
-#if defined(IREE_HAS_C11_THREAD_H)
-
-// Always prefer the C11 header if present.
-#include <thread.h>
-#define IREE_ONCE_FLAG_INIT ONCE_FLAG_INIT
-#define iree_once_flag ONCE_FLAG
-#define iree_call_once call_once
-
-#elif defined(IREE_PLATFORM_WINDOWS)
-
-// Windows fallback using the native InitOnceExecuteOnce:
-// https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-initonceexecuteonce
-
-// Expands to a value that can be used to initialize an object of type
-// iree_once_flag.
-#define IREE_ONCE_FLAG_INIT INIT_ONCE_STATIC_INIT
-
-// Complete object type capable of holding a flag used by iree_call_once.
-typedef INIT_ONCE iree_once_flag;
-
-typedef struct {
-  void (*func)(void);
-} iree_call_once_impl_params_t;
-static BOOL CALLBACK iree_call_once_callback_impl(PINIT_ONCE InitOnce,
-                                                  PVOID Parameter,
-                                                  PVOID* Context) {
-  // https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nc-synchapi-pinit_once_fn
-  iree_call_once_impl_params_t* param =
-      (iree_call_once_impl_params_t*)Parameter;
-  (param->func)();
-  ((void)InitOnce);
-  ((void)Context);  // suppress warning
-  return TRUE;
-}
-
-// Calls |func| exactly once, even if invoked from several threads.
-// The completion of the function synchronizes with all previous or subsequent
-// calls to call_once with the same flag variable.
-static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {
-  iree_call_once_impl_params_t param;
-  param.func = func;
-  InitOnceExecuteOnce(flag, iree_call_once_callback_impl, (PVOID)&param, NULL);
-}
-
-#else
-
-// Fallback using pthread_once:
-// https://pubs.opengroup.org/onlinepubs/007908775/xsh/pthread_once.html
-
-#include <pthread.h>
-
-// Expands to a value that can be used to initialize an object of type
-// iree_once_flag.
-#define IREE_ONCE_FLAG_INIT PTHREAD_ONCE_INIT
-
-// Complete object type capable of holding a flag used by iree_call_once.
-typedef pthread_once_t iree_once_flag;
-
-// Calls |func| exactly once, even if invoked from several threads.
-// The completion of the function synchronizes with all previous or subsequent
-// calls to call_once with the same flag variable.
-static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {
-  pthread_once(flag, func);
-}
-
-#endif  // IREE_HAS_C11_THREAD_H / fallbacks
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_THREADING_H_
+#endif  // IREE_BASE_INTERNAL_THREADING_H_

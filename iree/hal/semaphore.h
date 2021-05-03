@@ -65,17 +65,16 @@ typedef struct iree_hal_semaphore_s iree_hal_semaphore_t;
 // Creates a semaphore that can be used with command queues owned by this
 // device. To use the semaphores with other devices or instances they must
 // first be exported.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_create(iree_hal_device_t* device, uint64_t initial_value,
                           iree_hal_semaphore_t** out_semaphore);
 
 // Retains the given |semaphore| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
+IREE_API_EXPORT void iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
 
 // Releases the given |semaphore| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore);
+IREE_API_EXPORT void iree_hal_semaphore_release(
+    iree_hal_semaphore_t* semaphore);
 
 // Queries the current payload of the semaphore and stores the result in
 // |out_value|. As the payload is monotonically increasing it is guaranteed that
@@ -87,20 +86,20 @@ iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore);
 // such is only valid after a semaphore has been signaled. The same failure
 // status will be returned regardless of when in the timeline the error
 // occurred.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value);
 
 // Signals the |semaphore| to the given payload value.
 // The call is ignored if the current payload value exceeds |new_value|.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value);
 
 // Signals the |semaphore| with a failure. The |status| will be returned from
 // iree_hal_semaphore_query and iree_hal_semaphore_signal for the lifetime
 // of the semaphore. Ownership of the status transfers to the semaphore and
 // callers must clone it if they wish to retain it.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status);
+IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
+                                             iree_status_t status);
 
 // Blocks the caller until the semaphore reaches or exceedes the specified
 // payload value or the |timeout| elapses.
@@ -115,7 +114,7 @@ iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status);
 // Returns IREE_STATUS_ABORTED if one or more semaphores has failed. Callers can
 // use iree_hal_semaphore_query on the semaphores to find the ones that have
 // failed and get the status.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_wait(
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
     iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout);
 
 //===----------------------------------------------------------------------===//
@@ -139,8 +138,8 @@ typedef struct {
                                     uint64_t value, iree_timeout_t timeout);
 } iree_hal_semaphore_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_semaphore_destroy(iree_hal_semaphore_t* semaphore);
+IREE_API_EXPORT void iree_hal_semaphore_destroy(
+    iree_hal_semaphore_t* semaphore);
 
 #ifdef __cplusplus
 }  // extern "C"

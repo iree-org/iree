@@ -21,8 +21,8 @@
 
 #include <array>
 
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/status.h"
-#include "iree/base/synchronization.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/util/intrusive_list.h"
 #include "iree/hal/vulkan/util/ref_ptr.h"
@@ -139,7 +139,7 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
   // Callers are expected to handle this by waiting on previous fences or for
   // complete device idle. Yes, that's as bad as it sounds, and if we start
   // seeing that we should bump up the max count.
-  Status Acquire(ref_ptr<TimePointFence>* out_fence);
+  iree_status_t Acquire(ref_ptr<TimePointFence>* out_fence);
 
   // Releases one fence back to the pool. The fence must either be signaled or
   // not be in flight on GPU.
@@ -152,7 +152,7 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
 
   const ref_ptr<DynamicSymbols>& syms() const;
 
-  Status PreallocateFences();
+  iree_status_t PreallocateFences();
 
   VkDeviceHandle* logical_device_;
 
@@ -183,7 +183,7 @@ class TimePointSemaphorePool final : public RefObject<TimePointSemaphorePool> {
   // Callers are expected to handle this by waiting on previous fences or for
   // complete device idle. Yes, that's as bad as it sounds, and if we start
   // seeing that we should bump up the max count.
-  Status Acquire(TimePointSemaphore** out_semaphore);
+  iree_status_t Acquire(TimePointSemaphore** out_semaphore);
 
   // Releases one or more semaphores back to the pool. The binary semaphore must
   // be unsignaled and not in flight on GPU.
@@ -199,7 +199,7 @@ class TimePointSemaphorePool final : public RefObject<TimePointSemaphorePool> {
 
   const ref_ptr<DynamicSymbols>& syms() const;
 
-  Status PreallocateSemaphores();
+  iree_status_t PreallocateSemaphores();
 
   VkDeviceHandle* logical_device_;
 

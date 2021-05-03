@@ -20,7 +20,7 @@ iree_cc_library(
   SRCS
     "driver_module.c"
   DEPS
-    iree::hal::api
+    iree::hal
     iree::hal::local::loaders::vmla_module_loader
     iree::hal::local::task_driver
   DEFINES

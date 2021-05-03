@@ -47,15 +47,15 @@ iree_cc_library(
     "status_util.h"
   DEPS
     ::dynamic_symbols
-    iree::base::api
+    iree::base
     iree::base::core_headers
-    iree::base::flatcc
     iree::base::internal
+    iree::base::internal::flatcc
+    iree::base::internal::synchronization
     iree::base::logging
     iree::base::status
-    iree::base::synchronization
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )

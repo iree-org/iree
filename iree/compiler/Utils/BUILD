@@ -33,8 +33,8 @@ cc_library(
         "TracingUtils.h",
     ],
     deps = [
-        "//iree/base:flatcc",
         "//iree/base:tracing",
+        "//iree/base/internal:flatcc",
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",

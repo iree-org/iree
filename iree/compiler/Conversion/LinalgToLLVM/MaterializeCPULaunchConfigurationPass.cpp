@@ -17,6 +17,7 @@
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
@@ -131,6 +132,8 @@ void MaterializeCPULaunchConfigurationPass::runOnOperation() {
       OwningRewritePatternList canonicalization(&getContext());
       AffineMinOp::getCanonicalizationPatterns(canonicalization, context);
       populateAffineMinSCFCanonicalizationPattern(canonicalization);
+      IREE::Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,
+                                                               context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalization));
     }
   }

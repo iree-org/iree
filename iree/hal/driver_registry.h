@@ -99,16 +99,14 @@ typedef struct iree_hal_driver_registry_s iree_hal_driver_registry_t;
 // having this be global like it is. Alternatively, this can be opt-in thanks to
 // LTO: if a user doesn't call this then the default registry is never
 // allocated.
-IREE_API_EXPORT iree_hal_driver_registry_t* IREE_API_CALL
-iree_hal_driver_registry_default();
+IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default();
 
 // Registers a driver factory to serve future queries/requests for drivers.
 // See iree_hal_driver_registry_t for more information.
 //
 // Thread-safe. The factory is not retained and must be kept alive by the caller
 // until it is unregistered (or the application terminates).
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_register_factory(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_register_factory(
     iree_hal_driver_registry_t* registry,
     const iree_hal_driver_factory_t* factory);
 
@@ -120,8 +118,7 @@ iree_hal_driver_registry_register_factory(
 //
 // Thread-safe. As the factory is not retained by the registry the caller must
 // release its memory (if needed) after this call returns.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_unregister_factory(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
     iree_hal_driver_registry_t* registry,
     const iree_hal_driver_factory_t* factory);
 
@@ -136,7 +133,7 @@ iree_hal_driver_registry_unregister_factory(
 //
 // Thread-safe. Note that the factory may be unregistered between the query
 // completing and any attempt to instantiate the driver.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_enumerate(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
     iree_hal_driver_registry_t* registry, iree_allocator_t allocator,
     iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count);
@@ -148,7 +145,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_enumerate(
 //
 // Thread-safe. May block the caller if the driver is delay-loaded and needs to
 // perform additional loading/verification/etc before returning.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_try_create(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_t* registry, iree_hal_driver_id_t driver_id,
     iree_allocator_t allocator, iree_hal_driver_t** out_driver);
 
@@ -160,8 +157,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_try_create(
 //
 // Thread-safe. May block the caller if the driver is delay-loaded and needs to
 // perform additional loading/verification/etc before returning.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_try_create_by_name(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
     iree_allocator_t allocator, iree_hal_driver_t** out_driver);
 

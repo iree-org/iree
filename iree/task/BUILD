@@ -60,14 +60,14 @@ cc_library(
         "tuning.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
-        "//iree/base:threading",
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/base/internal:atomic_slist",
         "//iree/base/internal:prng",
+        "//iree/base/internal:synchronization",
+        "//iree/base/internal:threading",
         "//iree/base/internal:wait_handle",
         "@cpuinfo",
     ],
@@ -78,7 +78,7 @@ cc_test(
     srcs = ["executor_test.cc"],
     deps = [
         ":task",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base/internal:prng",
         "//iree/task/testing:test_util",
@@ -92,7 +92,7 @@ cc_test(
     srcs = ["list_test.cc"],
     deps = [
         ":task",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/task/testing:test_util",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -104,7 +104,7 @@ cc_test(
     srcs = ["pool_test.cc"],
     deps = [
         ":task",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/task/testing:test_util",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -116,7 +116,7 @@ cc_test(
     srcs = ["queue_test.cc"],
     deps = [
         ":task",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/task/testing:test_util",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -131,7 +131,7 @@ cc_test(
     ],
     deps = [
         ":task",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/task/testing:test_util",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -150,7 +150,7 @@ cc_test(
     ],
     deps = [
         ":task",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/task/testing:task_test",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -165,7 +165,7 @@ cc_test(
     ],
     deps = [
         ":task",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "@cpuinfo",

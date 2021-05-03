@@ -23,7 +23,7 @@
 
 IREE_HAL_API_RETAIN_RELEASE(event);
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_event_create(iree_hal_device_t* device, iree_hal_event_t** out_event) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_event);

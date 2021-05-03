@@ -41,7 +41,7 @@ static iree_hal_cuda_driver_t* iree_hal_cuda_driver_cast(
   return (iree_hal_cuda_driver_t*)base_value;
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_cuda_driver_options_initialize(
+IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
     iree_hal_cuda_driver_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->default_device_index = 0;
@@ -82,7 +82,7 @@ static void iree_hal_cuda_driver_destroy(iree_hal_driver_t* base_driver) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_cuda_driver_create(
+IREE_API_EXPORT iree_status_t iree_hal_cuda_driver_create(
     iree_string_view_t identifier,
     const iree_hal_cuda_driver_options_t* options,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {

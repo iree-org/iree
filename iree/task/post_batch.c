@@ -15,8 +15,8 @@
 #include "iree/task/post_batch.h"
 
 #include "iree/base/internal/math.h"
-#include "iree/base/synchronization.h"
-#include "iree/base/threading.h"
+#include "iree/base/internal/synchronization.h"
+#include "iree/base/internal/threading.h"
 #include "iree/base/tracing.h"
 #include "iree/task/executor_impl.h"
 
