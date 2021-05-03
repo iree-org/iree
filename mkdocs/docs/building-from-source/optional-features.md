@@ -21,7 +21,8 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
 
 * A relatively recent Python3 installation (we aim to support
   [non-eol Python versions](https://endoflife.date/python)).
-* Installation of python dependencies as specified in `bindings/python/build_requirements.txt`.
+* Installation of python dependencies as specified in
+  [`bindings/python/build_requirements.txt`](https://github.com/google/iree/blob/main/bindings/python/build_requirements.txt).
 
 **CMake Variables:**
 
@@ -37,7 +38,7 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
     with multiple Python versions. Explicitly setting this is recommended.
     Note that mixed case of the option.
 
-??? Setup
+???+ Setup
     We recommend using virtual environments to manage python packages, such
     as through `venv`, which may need to be installed via your system
     package manager ([about](https://docs.python.org/3/library/venv.html),
