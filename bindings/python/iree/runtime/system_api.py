@@ -39,6 +39,7 @@ import sys
 from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
 from . import binding as _binding
+from .function import FunctionInvoker
 
 import numpy as np
 
@@ -109,7 +110,7 @@ class Config:
   device: _binding.HalDevice
   vm_instance: _binding.VmInstance
   host_type_factory: _binding.HostTypeFactory
-  default_modules: Tuple[AnyModule]
+  default_modules: Sequence[AnyModule]
 
   def __init__(self, driver_name: Optional[str] = None):
     self.vm_instance = _binding.VmInstance()
@@ -243,6 +244,10 @@ class BoundModule:
   def name(self):
     return self._vm_module.name
 
+  @property
+  def vm_module(self):
+    return self._vm_module
+
   def __getattr__(self, name):
     try:
       return self[name]
@@ -256,7 +261,20 @@ class BoundModule:
 
     vm_function = self._vm_module.lookup_function(name)
     if vm_function is None:
-      raise KeyError(f"Function '{name}' not found in module '{self.name}'")
+      raise KeyError(f"Function '{name}' not found in module '{self}'")
+
+    # TODO: Remove this fork and delete the local BoundFunction once SIP is
+    # removed. We take the new path if there is a native IREE ABI attribute
+    # or no SIP ('f') attribute.
+    reflection_dict = vm_function.reflection
+    if "iree.abi" in reflection_dict or "f" not in reflection_dict:
+      # TODO: Needing to know the precise device to allocate on here is bad
+      # layering and will need to be fixed in some fashion if/when doing
+      # heterogenous dispatch.
+      return FunctionInvoker(self._context.vm_context,
+                             self._context.config.device, vm_function)
+
+    # Legacy SIP path.
     bound_function = BoundFunction(self._context, vm_function)
     self._lazy_functions[name] = bound_function
     return bound_function
@@ -299,6 +317,10 @@ class SystemContext:
       self._modules = Modules([
           (m.name, BoundModule(self, m)) for m in init_modules
       ])
+
+  @property
+  def vm_context(self) -> _binding.VmContext:
+    return self._vm_context
 
   @property
   def is_dynamic(self) -> bool:
