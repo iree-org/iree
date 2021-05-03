@@ -40,6 +40,7 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::tracing
     iree::hal
     iree::hal::drivers

@@ -55,6 +55,10 @@
 #define IREE_PTR_GUARDED_BY(x)
 #endif  // __cplusplus
 
+// Allow users to fully disable all synchronization for systems that are known
+// to never need it. This removes our dependency on pthreads.
+#if !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
 // NOTE: we only support futex when not using tsan as we need to add annotations
 // for tsan to understand what we are doing.
 // https://github.com/llvm-mirror/compiler-rt/blob/master/include/sanitizer/tsan_interface.h
@@ -80,6 +84,8 @@
 // on workloads.
 #define IREE_MUTEX_USE_WIN32_SRW 1
 
+#endif  // !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -99,7 +105,9 @@ extern "C" {
 // Windows: Slim Reader/Writer (SRW) Locks
 // All others: pthread_mutex_t
 typedef struct IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) {
-#if defined(IREE_PLATFORM_WINDOWS) && defined(IREE_MUTEX_USE_WIN32_SRW)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+  int reserved;
+#elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_MUTEX_USE_WIN32_SRW)
   SRWLOCK value;
 #elif defined(IREE_PLATFORM_WINDOWS)
   CRITICAL_SECTION value;
@@ -210,7 +218,9 @@ void iree_mutex_unlock(iree_mutex_t* mutex)
 //   https://eli.thegreenplace.net/2018/basics-of-futexes/
 //   https://bartoszmilewski.com/2008/09/01/thin-lock-vs-futex/
 typedef struct IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) {
-#if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+  int reserved;
+#elif (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS)
   iree_mutex_t impl;  // re-route to slow mutex
 #elif defined(IREE_PLATFORM_APPLE)
   os_unfair_lock value;
@@ -280,7 +290,9 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
 // https://github.com/facebook/folly/blob/master/folly/experimental/EventCount.h
 // https://github.com/concurrencykit/ck/blob/master/include/ck_ec.h
 typedef struct {
-#if !defined(IREE_PLATFORM_HAS_FUTEX)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+  // Nothing required.
+#elif !defined(IREE_PLATFORM_HAS_FUTEX)
   // No futex on darwin, so use mutex/condvar instead.
   pthread_mutex_t mutex;
   pthread_cond_t cond;

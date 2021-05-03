@@ -95,8 +95,9 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // core that is guaranteed to ever call an IREE API - all synchronization
 // primitives used throughout IREE can be turned into no-ops. Note that behavior
 // is undefined if there is use of any `iree_*` API call or memory that is
-// owned by IREE. Unless your target system is in a similar class to an Arduino
-// this is definitely not what you want.
+// owned by IREE from multiple threads concurrently or across threads without
+// proper barriers in place. Unless your target system is in a similar class to
+// an Arduino this is definitely not what you want.
 
 #if !defined(IREE_SYNCHRONIZATION_DISABLE_UNSAFE)
 #define IREE_SYNCHRONIZATION_DISABLE_UNSAFE 0

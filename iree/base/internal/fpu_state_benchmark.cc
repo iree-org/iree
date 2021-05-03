@@ -13,13 +13,9 @@
 // limitations under the License.
 
 #include "benchmark/benchmark.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/internal/fpu_state.h"
 
 namespace {
-
-//==============================================================================
-// iree_fpu_state_*
-//==============================================================================
 
 constexpr size_t kElementBufferSize = 2048;
 

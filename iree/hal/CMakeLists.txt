@@ -59,7 +59,6 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::synchronization
-    iree::base::internal::threading
     iree::base::tracing
   PUBLIC
 )

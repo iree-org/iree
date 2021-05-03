@@ -85,7 +85,7 @@ iree_cc_library(
   DEPS
     ::file_path
     ::internal
-    ::threading
+    ::synchronization
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
@@ -203,6 +203,42 @@ flatbuffer_c_library(
 
 iree_cc_library(
   NAME
+    fpu_state
+  HDRS
+    "fpu_state.h"
+  SRCS
+    "fpu_state.c"
+  DEPS
+    ::internal
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    fpu_state_benchmark
+  SRCS
+    "fpu_state_benchmark.cc"
+  DEPS
+    ::fpu_state
+    benchmark
+    iree::testing::benchmark_main
+)
+
+iree_cc_test(
+  NAME
+    fpu_state_test
+  SRCS
+    "fpu_state_test.cc"
+  DEPS
+    ::fpu_state
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     main
   HDRS
     "main.h"
@@ -260,6 +296,7 @@ iree_cc_library(
   NAME
     synchronization
   HDRS
+    "call_once.h"
     "synchronization.h"
   SRCS
     "synchronization.c"
@@ -321,17 +358,6 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    threading_benchmark
-  SRCS
-    "threading_benchmark.cc"
-  DEPS
-    ::threading
-    benchmark
-    iree::testing::benchmark_main
 )
 
 iree_cc_test(
