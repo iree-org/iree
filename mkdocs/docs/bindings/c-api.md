@@ -141,7 +141,7 @@ IREE_CHECK_OK(iree_vm_bytecode_module_create(
 
 !!! note
     Many IREE samples use
-    [`cc_embed_data`](https://github.com/google/iree/tree/main/build_tools/embed_data)
+    [`c_embed_data`](https://github.com/google/iree/tree/main/build_tools/embed_data)
     to embed vmfb files as C code to avoid file I/O and ease portability.
     Applications should use what makes sense for their platforms and deployment
     configurations.
