@@ -167,11 +167,9 @@ class HalMappedMemory {
       }
     }
 
-    // TODO(laurenzo): We need to figure out how to propagate dtype in the
-    // buffer view.
     return py::buffer_info(
         mapped_memory_.contents.data, element_size,
-        py::format_descriptor<float>::format(),  // TODO(laurenzo): DTYPE!
+        py::format_descriptor<float>::format(),
         shape.size(), dims, strides);
   }
 
