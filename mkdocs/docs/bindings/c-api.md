@@ -55,11 +55,6 @@ Most interaction with IREE's C API involves either the VM or the HAL.
 
 ## Using the C API
 
-<!-- TODO(scotttodd): general overview (setup, prepare input, call function, get output) -->
-
-<!-- !!! tip
-    Move initialization / setup off the hot path. -->
-
 ### Setup
 
 Include headers:
@@ -140,8 +135,6 @@ iree_hal_driver_release(driver);
     The default `iree_allocator_system()` is backed by `malloc` and `free`,
     but custom allocators may also be used.
 
-<!-- TODO(scotttodd): tip about APIs for specific HAL drivers -->
-
 Load a vmfb bytecode module containing program data:
 
 ``` c
@@ -185,7 +178,6 @@ IREE_CHECK_OK(iree_vm_context_resolve_function(
 ### Invoke functions
 
 <!-- TODO(scotttodd): I/O buffers (TODO pending new helpers) -->
-<!-- TODO(scotttodd): iree_vm_invoke -->
 
 ``` c
 // (Application-specific I/O buffer setup, making data available to the device)
