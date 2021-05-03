@@ -104,8 +104,7 @@ typedef uint32_t iree_hal_vulkan_extensibility_set_t;
 // The returned strings originate from the _EXTENSION_NAME Vulkan macros
 // (such as 'VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME') and have a
 // lifetime matching whatever module they are defined in.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_query_extensibility_set(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     iree_hal_vulkan_features_t requested_features,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
     const char** out_string_values, iree_host_size_t* out_string_count);
@@ -124,7 +123,7 @@ typedef struct iree_hal_vulkan_syms_s iree_hal_vulkan_syms_t;
 // statically linking Vulkan.
 //
 // |out_syms| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_syms_create(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create(
     void* vkGetInstanceProcAddr_fn, iree_allocator_t host_allocator,
     iree_hal_vulkan_syms_t** out_syms);
 
@@ -133,17 +132,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_syms_create(
 // dlsym the functions from that.
 //
 // |out_syms| must be released by the caller with iree_hal_vulkan_syms_release.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_syms_create_from_system_loader(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create_from_system_loader(
     iree_allocator_t host_allocator, iree_hal_vulkan_syms_t** out_syms);
 
 // Retains the given |syms| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_vulkan_syms_retain(iree_hal_vulkan_syms_t* syms);
+IREE_API_EXPORT void iree_hal_vulkan_syms_retain(iree_hal_vulkan_syms_t* syms);
 
 // Releases the given |syms| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
+IREE_API_EXPORT void iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_vulkan_device_t
@@ -173,7 +169,7 @@ typedef struct {
   iree_hal_vulkan_device_flags_t flags;
 } iree_hal_vulkan_device_options_t;
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_device_options_initialize(
+IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options);
 
 // Creates a Vulkan HAL device that wraps an existing VkDevice.
@@ -205,7 +201,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_device_options_initialize(
 // The queue sets can be the same.
 //
 // |out_device| must be released by the caller (see |iree_hal_device_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_wrap_device(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     iree_string_view_t identifier,
     const iree_hal_vulkan_device_options_t* options,
     const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
@@ -245,13 +241,13 @@ typedef struct {
   int default_device_index;
 } iree_hal_vulkan_driver_options_t;
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_driver_options_initialize(
+IREE_API_EXPORT void iree_hal_vulkan_driver_options_initialize(
     iree_hal_vulkan_driver_options_t* out_options);
 
 // Creates a Vulkan HAL driver that manages its own VkInstance.
 //
 // |out_driver| must be released by the caller (see |iree_hal_driver_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create(
     iree_string_view_t identifier,
     const iree_hal_vulkan_driver_options_t* options,
     iree_hal_vulkan_syms_t* syms, iree_allocator_t host_allocator,
@@ -264,8 +260,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
 //
 // |instance| must remain valid for the life of |out_driver| and |out_driver|
 // itself must be released by the caller (see |iree_hal_driver_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_driver_create_using_instance(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create_using_instance(
     iree_string_view_t identifier,
     const iree_hal_vulkan_driver_options_t* options,
     iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,

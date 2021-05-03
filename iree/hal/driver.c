@@ -22,8 +22,7 @@
 
 IREE_HAL_API_RETAIN_RELEASE(driver);
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_query_available_devices(
+IREE_API_EXPORT iree_status_t iree_hal_driver_query_available_devices(
     iree_hal_driver_t* driver, iree_allocator_t allocator,
     iree_hal_device_info_t** out_device_infos,
     iree_host_size_t* out_device_info_count) {
@@ -38,7 +37,7 @@ iree_hal_driver_query_available_devices(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_create_device(
+IREE_API_EXPORT iree_status_t iree_hal_driver_create_device(
     iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
     iree_allocator_t allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
@@ -51,10 +50,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_create_device(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_create_default_device(iree_hal_driver_t* driver,
-                                      iree_allocator_t allocator,
-                                      iree_hal_device_t** out_device) {
+IREE_API_EXPORT iree_status_t iree_hal_driver_create_default_device(
+    iree_hal_driver_t* driver, iree_allocator_t allocator,
+    iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;

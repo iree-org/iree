@@ -53,18 +53,18 @@ typedef struct iree_hal_executable_layout_s iree_hal_executable_layout_t;
 // Creates an executable layout composed of the given descriptor set layouts.
 // The returned executable layout can be used by multiple executables with the
 // same compatible resource binding layouts.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
+IREE_API_EXPORT iree_status_t iree_hal_executable_layout_create(
     iree_hal_device_t* device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t** set_layouts,
     iree_hal_executable_layout_t** out_executable_layout);
 
 // Retains the given |executable_layout| for the caller.
-IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_layout_retain(
+IREE_API_EXPORT void iree_hal_executable_layout_retain(
     iree_hal_executable_layout_t* executable_layout);
 
 // Releases the given |executable_layout| from the caller.
-IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_layout_release(
+IREE_API_EXPORT void iree_hal_executable_layout_release(
     iree_hal_executable_layout_t* executable_layout);
 
 //===----------------------------------------------------------------------===//
@@ -78,7 +78,7 @@ typedef struct {
   void(IREE_API_PTR* destroy)(iree_hal_executable_layout_t* executable_layout);
 } iree_hal_executable_layout_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_layout_destroy(
+IREE_API_EXPORT void iree_hal_executable_layout_destroy(
     iree_hal_executable_layout_t* executable_layout);
 
 #ifdef __cplusplus

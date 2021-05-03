@@ -95,8 +95,7 @@ static iree_vm_registers_t iree_vm_bytecode_get_register_storage(
 }
 
 // Releases any remaining refs held in the frame storage.
-static void IREE_API_CALL
-iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
+static void iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
   iree_vm_registers_t regs = iree_vm_bytecode_get_register_storage(frame);
   // TODO(benvanik): allow the VM to elide this when it's known that there are
   // no more live registers.

@@ -152,14 +152,13 @@ typedef struct iree_vm_stack iree_vm_stack_t;
 //  ...
 //  iree_vm_stack_deinitialize(stack);
 //  // stack_storage can now be reused/freed/etc
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
+IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_state_resolver_t state_resolver,
     iree_allocator_t allocator, iree_vm_stack_t** out_stack);
 
 // Deinitializes a statically-allocated |stack| previously initialized with
 // iree_vm_stack_initialize.
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
+IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
 
 // Allocates a dynamically-growable stack.
 //
@@ -175,23 +174,23 @@ iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
 //  iree_vm_stack_allocate(..., iree_allocator_system(), &stack);
 //  ...
 //  iree_vm_stack_free(stack);
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_stack_allocate(iree_vm_state_resolver_t state_resolver,
                        iree_allocator_t allocator, iree_vm_stack_t** out_stack);
 
 // Frees a dynamically-allocated |stack| from iree_vm_stack_allocate.
-IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_free(iree_vm_stack_t* stack);
+IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack);
 
 // Returns the current stack frame or nullptr if the stack is empty.
-IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL
-iree_vm_stack_current_frame(iree_vm_stack_t* stack);
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_current_frame(
+    iree_vm_stack_t* stack);
 
 // Returns the parent stack frame or nullptr if the stack is empty.
-IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL
-iree_vm_stack_parent_frame(iree_vm_stack_t* stack);
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_parent_frame(
+    iree_vm_stack_t* stack);
 
 // Queries the context-specific module state for the given module.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
+IREE_API_EXPORT iree_status_t iree_vm_stack_query_module_state(
     iree_vm_stack_t* stack, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state);
 
@@ -203,14 +202,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
 // callee data. |frame_cleanup_fn| will be called when the frame is left either
 // normally via an iree_vm_stack_function_leave call or if an error occurs and
 // the stack needs to be torn down.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
+IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
     iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
     iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn,
     iree_vm_stack_frame_t** out_callee_frame);
 
 // Leaves the current stack frame.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_stack_function_leave(iree_vm_stack_t* stack);
 
 #ifdef __cplusplus

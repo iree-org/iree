@@ -18,8 +18,8 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/synchronization.h"
 #include "iree/task/affinity_set.h"
 
 #ifdef __cplusplus

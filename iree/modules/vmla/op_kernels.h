@@ -57,335 +57,339 @@ inline size_t GetElementCount(ShapeSpan shape) {
 
 struct CompareEQ {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<uint8_t> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<uint8_t> dst_buffer);
 };
 struct CompareNE {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<uint8_t> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<uint8_t> dst_buffer);
 };
 struct CompareLT {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<uint8_t> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<uint8_t> dst_buffer);
 };
 struct CompareLE {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<uint8_t> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<uint8_t> dst_buffer);
 };
 struct CompareGT {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<uint8_t> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<uint8_t> dst_buffer);
 };
 struct CompareGE {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<uint8_t> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<uint8_t> dst_buffer);
 };
 
 struct Conv2D {
   template <typename T>
-  static Status Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
-                        absl::Span<const T> filter_buffer,
-                        ShapeSpan filter_shape, absl::Span<T> dst_buffer,
-                        ShapeSpan dst_shape, ShapeSpan strides, ShapeSpan pad_h,
-                        ShapeSpan pad_w, ShapeSpan lhs_dilation,
-                        ShapeSpan rhs_dilation, const int32_t groups);
+  static iree_status_t Execute(absl::Span<const T> input_buffer,
+                               ShapeSpan input_shape,
+                               absl::Span<const T> filter_buffer,
+                               ShapeSpan filter_shape, absl::Span<T> dst_buffer,
+                               ShapeSpan dst_shape, ShapeSpan strides,
+                               ShapeSpan pad_h, ShapeSpan pad_w,
+                               ShapeSpan lhs_dilation, ShapeSpan rhs_dilation,
+                               const int32_t groups);
 };
 
 struct Copy {
   template <int element_size>
-  static Status Execute(absl::Span<const uint8_t> src_buffer,
-                        ShapeSpan src_shape,
-                        absl::Span<const int32_t> src_indices,
-                        absl::Span<uint8_t> dst_buffer, ShapeSpan dst_shape,
-                        absl::Span<const int32_t> dst_indices,
-                        absl::Span<const int32_t> lengths);
+  static iree_status_t Execute(absl::Span<const uint8_t> src_buffer,
+                               ShapeSpan src_shape,
+                               absl::Span<const int32_t> src_indices,
+                               absl::Span<uint8_t> dst_buffer,
+                               ShapeSpan dst_shape,
+                               absl::Span<const int32_t> dst_indices,
+                               absl::Span<const int32_t> lengths);
 };
 
 struct Select {
   template <typename T>
-  static Status Execute(absl::Span<const uint8_t> cond_buffer,
-                        absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const uint8_t> cond_buffer,
+                               absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Finite {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<bool> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<bool> dst_buffer);
 };
 
 struct Transpose {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        absl::Span<const int32_t> perm);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               absl::Span<const int32_t> perm);
 };
 
 struct Pad {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> padding_value,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        ShapeSpan dst_shape,
-                        absl::Span<const int32_t> edge_padding_low,
-                        absl::Span<const int32_t> edge_padding_high,
-                        absl::Span<const int32_t> interior_padding);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> padding_value,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               ShapeSpan dst_shape,
+                               absl::Span<const int32_t> edge_padding_low,
+                               absl::Span<const int32_t> edge_padding_high,
+                               absl::Span<const int32_t> interior_padding);
 };
 
 struct Gather {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const int32_t> indices_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        ShapeSpan indices_shape, ShapeSpan dst_shape,
-                        const int32_t dim, const int32_t batch_dims);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const int32_t> indices_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               ShapeSpan indices_shape, ShapeSpan dst_shape,
+                               const int32_t dim, const int32_t batch_dims);
 };
 
 struct Scatter {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const int32_t> indices_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        ShapeSpan indices_shape, ShapeSpan dst_shape);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const int32_t> indices_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               ShapeSpan indices_shape, ShapeSpan dst_shape);
 };
 
 struct Reverse {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        absl::Span<const int32_t> dimensions);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               absl::Span<const int32_t> dimensions);
 };
 
 struct Sort {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<int32_t> dst_buffer, ShapeSpan src_shape);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<int32_t> dst_buffer,
+                               ShapeSpan src_shape);
 };
 
 struct Broadcast {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Iota {
   template <typename T>
-  static Status Execute(absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<T> dst_buffer);
 };
 
 struct Tile {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        ShapeSpan dst_shape);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               ShapeSpan dst_shape);
 };
 
 struct Not {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct And {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer, T rhs,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer, T rhs,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Or {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Xor {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer, T rhs,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer, T rhs,
+                               absl::Span<T> dst_buffer);
 };
 
 struct ShiftLeft {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct ShiftRight {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Add {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Sub {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Abs {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Neg {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Mul {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Div {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Rem {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Pow {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Exp {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Log {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Rsqrt {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Sqrt {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Cos {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Sin {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Tanh {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Atan2 {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Min {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Max {
   template <typename T>
-  static Status Execute(absl::Span<const T> lhs_buffer,
-                        absl::Span<const T> rhs_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> lhs_buffer,
+                               absl::Span<const T> rhs_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Clamp {
   template <typename T>
-  static Status Execute(absl::Span<const T> min_buffer,
-                        absl::Span<const T> src_buffer,
-                        absl::Span<const T> max_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> min_buffer,
+                               absl::Span<const T> src_buffer,
+                               absl::Span<const T> max_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Floor {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Ceil {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Round {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<T> dst_buffer);
 };
 
 struct Convert {
   template <typename SRC, typename DST>
-  static Status Execute(absl::Span<const SRC> src_buffer,
-                        absl::Span<DST> dst_buffer);
+  static iree_status_t Execute(absl::Span<const SRC> src_buffer,
+                               absl::Span<DST> dst_buffer);
 };
 
 struct MatMul {
@@ -413,8 +417,9 @@ struct MatMul {
   };
 
   template <typename LhsEl, typename RhsEl, typename AccumEl, typename DstEl>
-  static Status Execute(RuntimeState* runtime_state,
-                        const Buffers<LhsEl, RhsEl, AccumEl, DstEl>& buffers);
+  static iree_status_t Execute(
+      RuntimeState* runtime_state,
+      const Buffers<LhsEl, RhsEl, AccumEl, DstEl>& buffers);
 };
 
 struct RuntimeState {
@@ -424,69 +429,69 @@ struct RuntimeState {
 
 struct ReduceSum {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, int32_t dimension,
-                        ShapeSpan src_shape, ShapeSpan dst_shape);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> init_buffer,
+                               absl::Span<T> dst_buffer, int32_t dimension,
+                               ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
 struct ReduceMin {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, int32_t dimension,
-                        ShapeSpan src_shape, ShapeSpan dst_shape);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> init_buffer,
+                               absl::Span<T> dst_buffer, int32_t dimension,
+                               ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
 struct ReduceMax {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, int32_t dimension,
-                        ShapeSpan src_shape, ShapeSpan dst_shape);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> init_buffer,
+                               absl::Span<T> dst_buffer, int32_t dimension,
+                               ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
 struct ReduceAnd {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, int32_t dimension,
-                        ShapeSpan src_shape, ShapeSpan dst_shape);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> init_buffer,
+                               absl::Span<T> dst_buffer, int32_t dimension,
+                               ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
 struct ReduceOr {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, int32_t dimension,
-                        ShapeSpan src_shape, ShapeSpan dst_shape);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> init_buffer,
+                               absl::Span<T> dst_buffer, int32_t dimension,
+                               ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
 struct PoolingSum {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        ShapeSpan dst_shape, ShapeSpan window_dimensions,
-                        ShapeSpan strides, ShapeSpan pad_low);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> init_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                               ShapeSpan strides, ShapeSpan pad_low);
 };
 
 struct PoolingMin {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        ShapeSpan dst_shape, ShapeSpan window_dimensions,
-                        ShapeSpan strides, ShapeSpan pad_low);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> init_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                               ShapeSpan strides, ShapeSpan pad_low);
 };
 
 struct PoolingMax {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
-                        ShapeSpan dst_shape, ShapeSpan window_dimensions,
-                        ShapeSpan strides, ShapeSpan pad_low);
+  static iree_status_t Execute(absl::Span<const T> src_buffer,
+                               absl::Span<const T> init_buffer,
+                               absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                               ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                               ShapeSpan strides, ShapeSpan pad_low);
 };
 
 }  // namespace kernels

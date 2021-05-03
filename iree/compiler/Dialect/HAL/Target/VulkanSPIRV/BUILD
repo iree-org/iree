@@ -37,7 +37,7 @@ cc_library(
         "VulkanSPIRVTarget.h",
     ],
     deps = [
-        "//iree/base:flatcc",
+        "//iree/base/internal:flatcc",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "//iree/compiler/Conversion/LinalgToSPIRV:CodeGenOptionUtils",

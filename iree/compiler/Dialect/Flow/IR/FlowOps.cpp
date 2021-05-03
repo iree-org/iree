@@ -1684,6 +1684,15 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   return newOp;
 }
 
+//===----------------------------------------------------------------------===//
+// Public methods
+//===----------------------------------------------------------------------===//
+
+void populateFlowDispatchCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  DispatchTensorLoadOp::getCanonicalizationPatterns(results, context);
+}
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

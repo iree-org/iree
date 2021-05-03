@@ -16,8 +16,8 @@
 
 #include <inttypes.h>
 
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/synchronization.h"
 #include "iree/base/tracing.h"
 
 // Sentinel used the semaphore has failed and an error status is set.

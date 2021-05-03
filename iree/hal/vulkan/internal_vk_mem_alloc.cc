@@ -15,8 +15,8 @@
 // Only compile if an external implementation has not been otherwise linked.
 #if !defined(VULKAN_MEMORY_ALLOCATOR_EXTERNAL_IMPL)
 
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/logging.h"
-#include "iree/base/synchronization.h"
 
 #define VMA_ASSERT IREE_DCHECK
 #define VMA_HEAVY_ASSERT IREE_DCHECK

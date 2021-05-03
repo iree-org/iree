@@ -142,8 +142,7 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
             analyzeMemRefValue(arg);
           }
         })
-        .Case<memref::AllocOp, IREE::PlaceholderOp,
-              IREE::HAL::InterfaceBindingSubspanOp>(
+        .Case<memref::AllocOp, IREE::HAL::InterfaceBindingSubspanOp>(
             [this](auto op) { analyzeMemRefValue(op); });
   });
 }
@@ -337,23 +336,6 @@ class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
   }
 };
 
-class ProcessPlaceHolder final
-    : public MemRefConversionPattern<IREE::PlaceholderOp> {
- public:
-  using MemRefConversionPattern<IREE::PlaceholderOp>::MemRefConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::PlaceholderOp placeholder, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = placeholder.getType().dyn_cast<MemRefType>();
-    if (!memrefType) return failure();
-    auto vecMemRef = getVectorizedMemRefType(rewriter, placeholder.getResult());
-    if (!vecMemRef) return failure();
-    rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
-        placeholder, *vecMemRef, ValueRange(), placeholder->getAttrs());
-    return success();
-  }
-};
-
 class ProcessInterfaceBinding final
     : public MemRefConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
  public:
@@ -467,8 +449,8 @@ void VectorizeMemRefLoadStorePass::runOnOperation() {
   RewritePatternSet conversionPatterns(context);
   conversionPatterns
       .add<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
-           ProcessAlloc, ProcessPlaceHolder, ProcessInterfaceBinding>(
-          context, *memrefUsageAnalysis);
+           ProcessAlloc, ProcessInterfaceBinding>(context,
+                                                  *memrefUsageAnalysis);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
@@ -479,10 +461,6 @@ void VectorizeMemRefLoadStorePass::runOnOperation() {
   target.addDynamicallyLegalOp<memref::AllocOp>([&](memref::AllocOp alloc) {
     return !memrefUsageAnalysis->vectorizeMemRef(alloc);
   });
-  target.addDynamicallyLegalOp<IREE::PlaceholderOp>(
-      [&](IREE::PlaceholderOp placeholder) {
-        return !memrefUsageAnalysis->vectorizeMemRef(placeholder);
-      });
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&](IREE::HAL::InterfaceBindingSubspanOp bindingOp) {
         return !memrefUsageAnalysis->vectorizeMemRef(bindingOp);

@@ -39,18 +39,34 @@ std::string GetUniqueContents(const char* unique_name) {
   return std::string("Test with name ") + unique_name + "\n";
 }
 
-TEST(FileIo, GetSetContents) {
-  constexpr const char* kUniqueName = "GetSetContents";
+TEST(FileIO, ReadWriteContents) {
+  constexpr const char* kUniqueName = "ReadWriteContents";
   auto path = GetUniquePath(kUniqueName);
-  ASSERT_THAT(FileExists(path.c_str()), StatusIs(StatusCode::kNotFound));
-  auto to_write = GetUniqueContents(kUniqueName);
 
-  IREE_ASSERT_OK(SetFileContents(
+  // File must not exist.
+  ASSERT_THAT(Status(iree_file_exists(path.c_str())),
+              StatusIs(StatusCode::kNotFound));
+
+  // Generate file contents.
+  auto write_contents = GetUniqueContents(kUniqueName);
+
+  // Write the contents to disk.
+  IREE_ASSERT_OK(iree_file_write_contents(
       path.c_str(),
-      iree_make_const_byte_span(to_write.data(), to_write.size())));
-  std::string read;
-  IREE_ASSERT_OK(GetFileContents(path.c_str(), &read));
-  EXPECT_EQ(to_write, read);
+      iree_make_const_byte_span(write_contents.data(), write_contents.size())));
+
+  // Read the contents from disk.
+  iree_byte_span_t read_contents;
+  IREE_ASSERT_OK(iree_file_read_contents(path.c_str(), iree_allocator_system(),
+                                         &read_contents));
+
+  // Expect the contents are equal.
+  EXPECT_EQ(write_contents.size(), read_contents.data_length);
+  EXPECT_EQ(memcmp(write_contents.data(), read_contents.data,
+                   read_contents.data_length),
+            0);
+
+  iree_allocator_free(iree_allocator_system(), read_contents.data);
 }
 
 }  // namespace

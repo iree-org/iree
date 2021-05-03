@@ -14,7 +14,6 @@
 
 #include <iostream>
 
-#include "absl/strings/string_view.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
@@ -69,20 +68,19 @@ IREE_FLAG_CALLBACK(
 namespace iree {
 namespace {
 
-Status GetModuleContentsFromFlags(std::string* out_contents) {
+iree_status_t GetModuleContentsFromFlags(std::string* out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
     *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
                                 std::istreambuf_iterator<char>()};
   } else {
-    IREE_RETURN_IF_ERROR(
-        file_io::GetFileContents(module_file.c_str(), out_contents));
+    IREE_RETURN_IF_ERROR(GetFileContents(module_file.c_str(), out_contents));
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
-Status Run() {
+iree_status_t Run() {
   IREE_TRACE_SCOPE0("iree-run-module");
 
   IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
@@ -98,7 +96,7 @@ Status Run() {
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(std::string(FLAG_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
@@ -156,7 +154,7 @@ Status Run() {
   iree_hal_device_release(device);
   iree_vm_context_release(context);
   iree_vm_instance_release(instance);
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace

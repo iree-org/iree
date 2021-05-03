@@ -331,7 +331,7 @@ iree_vm_native_module_resume_call(void* self, iree_vm_stack_t* stack,
                           "native module does not support resume");
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_create(
+IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
@@ -377,7 +377,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_create(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_initialize(
+IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_allocator_t allocator, iree_vm_module_t* base_module) {

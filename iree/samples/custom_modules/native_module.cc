@@ -178,7 +178,7 @@ class CustomModuleState final {
     vm::ref<iree_hal_buffer_view_t> buffer_view;
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_parse(message->value, host_local_allocator_.get(),
-                                   allocator_, &buffer_view),
+                                   &buffer_view),
         "parsing value '%.*s'", (int)message->value.size, message->value.data);
     return std::move(buffer_view);
   }

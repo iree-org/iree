@@ -24,11 +24,11 @@ if(${IREE_HAL_DRIVER_VMLA})
     DEPS
       ::native_module
       absl::span
-      iree::base::api
+      iree::base
       iree::base::internal
       iree::base::logging
       iree::base::status
-      iree::hal::api
+      iree::hal
       iree::hal::vmla::registration
       iree::modules::hal
       iree::testing::gtest
@@ -48,10 +48,10 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::internal
     iree::base::status
-    iree::hal::api
+    iree::hal
     iree::modules::hal
     iree::testing::gtest
     iree::vm

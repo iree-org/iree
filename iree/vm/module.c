@@ -20,8 +20,7 @@
 #include "iree/base/tracing.h"
 #include "iree/vm/ref.h"
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_function_call_get_cconv_fragments(
+IREE_API_EXPORT iree_status_t iree_vm_function_call_get_cconv_fragments(
     const iree_vm_function_signature_t* signature,
     iree_string_view_t* out_arguments, iree_string_view_t* out_results) {
   memset(out_arguments, 0, sizeof(*out_arguments));
@@ -42,14 +41,13 @@ iree_vm_function_call_get_cconv_fragments(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT bool IREE_API_CALL
-iree_vm_function_call_is_variadic_cconv(iree_string_view_t cconv) {
+IREE_API_EXPORT bool iree_vm_function_call_is_variadic_cconv(
+    iree_string_view_t cconv) {
   return iree_string_view_find_char(cconv, IREE_VM_CCONV_TYPE_SPAN_START, 0) !=
          IREE_STRING_VIEW_NPOS;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_function_call_compute_cconv_fragment_size(
+IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
     iree_string_view_t cconv_fragment,
     const iree_vm_register_list_t* segment_size_list,
     iree_host_size_t* out_required_size) {
@@ -115,9 +113,9 @@ iree_vm_function_call_compute_cconv_fragment_size(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_function_call_release(iree_vm_function_call_t* call,
-                              const iree_vm_function_signature_t* signature) {
+IREE_API_EXPORT void iree_vm_function_call_release(
+    iree_vm_function_call_t* call,
+    const iree_vm_function_signature_t* signature) {
   if (!call->arguments.data_length || !call->results.data_length) {
     return;
   }
@@ -149,7 +147,7 @@ iree_vm_function_call_release(iree_vm_function_call_t* call,
   }
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_module_initialize(iree_vm_module_t* module, void* self) {
   IREE_TRACE_ZONE_BEGIN(z0);
   memset(module, 0, sizeof(iree_vm_module_t));
@@ -159,21 +157,19 @@ iree_vm_module_initialize(iree_vm_module_t* module, void* self) {
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_module_retain(iree_vm_module_t* module) {
+IREE_API_EXPORT void iree_vm_module_retain(iree_vm_module_t* module) {
   if (module) {
     iree_atomic_ref_count_inc(&module->ref_count);
   }
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_module_release(iree_vm_module_t* module) {
+IREE_API_EXPORT void iree_vm_module_release(iree_vm_module_t* module) {
   if (module && iree_atomic_ref_count_dec(&module->ref_count) == 1) {
     module->destroy(module->self);
   }
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_vm_module_name(const iree_vm_module_t* module) {
   if (!module) {
     return iree_make_cstring_view("null");
@@ -181,7 +177,7 @@ iree_vm_module_name(const iree_vm_module_t* module) {
   return module->name(module->self);
 }
 
-IREE_API_EXPORT iree_vm_module_signature_t IREE_API_CALL
+IREE_API_EXPORT iree_vm_module_signature_t
 iree_vm_module_signature(const iree_vm_module_t* module) {
   if (!module) {
     iree_vm_module_signature_t empty;
@@ -191,26 +187,22 @@ iree_vm_module_signature(const iree_vm_module_t* module) {
   return module->signature(module->self);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_module_lookup_function_by_name(const iree_vm_module_t* module,
-                                       iree_vm_function_linkage_t linkage,
-                                       iree_string_view_t name,
-                                       iree_vm_function_t* out_function) {
+IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_name(
+    const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
+    iree_string_view_t name, iree_vm_function_t* out_function) {
   return module->lookup_function(module->self, linkage, name, out_function);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
-                                          iree_vm_function_linkage_t linkage,
-                                          iree_host_size_t ordinal,
-                                          iree_vm_function_t* out_function,
-                                          iree_string_view_t* linkage_name) {
+IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
+    const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
+    iree_host_size_t ordinal, iree_vm_function_t* out_function,
+    iree_string_view_t* linkage_name) {
   return module->get_function(module->self, linkage, ordinal, out_function,
                               /*out_name=*/linkage_name,
                               /*out_signature=*/NULL);
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_vm_function_name(const iree_vm_function_t* function) {
   iree_string_view_t name;
   iree_status_t status = function->module->get_function(
@@ -225,7 +217,7 @@ iree_vm_function_name(const iree_vm_function_t* function) {
   return name;
 }
 
-IREE_API_EXPORT iree_vm_function_signature_t IREE_API_CALL
+IREE_API_EXPORT iree_vm_function_signature_t
 iree_vm_function_signature(const iree_vm_function_t* function) {
   iree_vm_function_signature_t signature;
   memset(&signature, 0, sizeof(signature));
@@ -237,9 +229,8 @@ iree_vm_function_signature(const iree_vm_function_t* function) {
   return signature;
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
-iree_vm_function_reflection_attr(const iree_vm_function_t* function,
-                                 iree_string_view_t key) {
+IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
+    const iree_vm_function_t* function, iree_string_view_t key) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_vm_module_t* module = function->module;
   if (!module->get_function_reflection_attr) {
@@ -264,11 +255,9 @@ iree_vm_function_reflection_attr(const iree_vm_function_t* function,
   return iree_string_view_empty();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_get_function_reflection_attr(iree_vm_function_t function,
-                                     iree_host_size_t index,
-                                     iree_string_view_t* key,
-                                     iree_string_view_t* value) {
+IREE_API_EXPORT iree_status_t iree_vm_get_function_reflection_attr(
+    iree_vm_function_t function, iree_host_size_t index,
+    iree_string_view_t* key, iree_string_view_t* value) {
   if (!function.module->get_function_reflection_attr) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "reflection not available for the given module");

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/threading.h"
+#include "iree/base/internal/threading.h"
 
 #include <chrono>
 #include <thread>
 
-#include "iree/base/synchronization.h"
-#include "iree/base/threading_impl.h"  // to test the override list
+#include "iree/base/internal/synchronization.h"
+#include "iree/base/internal/threading_impl.h"  // to test the override list
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -222,25 +222,6 @@ TEST(ThreadOverrideListTest, PriorityClass) {
   ASSERT_EQ(IREE_THREAD_PRIORITY_CLASS_NORMAL, current_priority_class);
 
   iree_thread_override_list_deinitialize(&list);
-}
-
-//==============================================================================
-// iree_fpu_state_*
-//==============================================================================
-
-// NOTE: depending on compiler options or architecture denormals may always be
-// flushed to zero. Here we just test that they are flushed when we request them
-// to be.
-TEST(FPUStateTest, FlushDenormalsToZero) {
-  iree_fpu_state_t fpu_state =
-      iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
-
-  float f = 1.0f;
-  volatile float* fp = &f;
-  *fp = *fp * 1e-39f;
-  EXPECT_EQ(0.0f, f);
-
-  iree_fpu_state_pop(fpu_state);
 }
 
 }  // namespace

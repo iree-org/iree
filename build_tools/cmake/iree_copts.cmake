@@ -322,6 +322,7 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-ldl"
+    "-lm"
     ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
 )

@@ -39,7 +39,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:flags",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/vulkan",
     ],
 )

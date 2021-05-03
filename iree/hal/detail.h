@@ -45,21 +45,21 @@ extern "C" {
 
 // Defines the iree_hal_<type_name>_retain/_release methods.
 #define IREE_HAL_API_RETAIN_RELEASE(type_name)                           \
-  IREE_API_EXPORT void IREE_API_CALL iree_hal_##type_name##_destroy(     \
+  IREE_API_EXPORT void iree_hal_##type_name##_destroy(                   \
       iree_hal_##type_name##_t* type_name) {                             \
     if (IREE_LIKELY(type_name)) {                                        \
       IREE_HAL_VTABLE_DISPATCH(type_name, iree_hal_##type_name, destroy) \
       (type_name);                                                       \
     }                                                                    \
   }                                                                      \
-  IREE_API_EXPORT void IREE_API_CALL iree_hal_##type_name##_retain(      \
+  IREE_API_EXPORT void iree_hal_##type_name##_retain(                    \
       iree_hal_##type_name##_t* type_name) {                             \
     if (IREE_LIKELY(type_name)) {                                        \
       iree_atomic_ref_count_inc(                                         \
           &((iree_hal_resource_t*)(type_name))->ref_count);              \
     }                                                                    \
   }                                                                      \
-  IREE_API_EXPORT void IREE_API_CALL iree_hal_##type_name##_release(     \
+  IREE_API_EXPORT void iree_hal_##type_name##_release(                   \
       iree_hal_##type_name##_t* type_name) {                             \
     if (IREE_LIKELY(type_name) &&                                        \
         iree_atomic_ref_count_dec(                                       \

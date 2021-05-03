@@ -77,19 +77,19 @@ typedef struct iree_hal_descriptor_set_s iree_hal_descriptor_set_t;
 
 // Creates a descriptor set of the given layout and bindings.
 // Descriptor sets are immutable and retain their bindings.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
+IREE_API_EXPORT iree_status_t iree_hal_descriptor_set_create(
     iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings,
     iree_hal_descriptor_set_t** out_descriptor_set);
 
 // Retains the given |set| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_descriptor_set_retain(iree_hal_descriptor_set_t* descriptor_set);
+IREE_API_EXPORT void iree_hal_descriptor_set_retain(
+    iree_hal_descriptor_set_t* descriptor_set);
 
 // Releases the given |set| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_descriptor_set_release(iree_hal_descriptor_set_t* descriptor_set);
+IREE_API_EXPORT void iree_hal_descriptor_set_release(
+    iree_hal_descriptor_set_t* descriptor_set);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_descriptor_set_t implementation details
@@ -102,8 +102,8 @@ typedef struct {
   void(IREE_API_PTR* destroy)(iree_hal_descriptor_set_t* descriptor_set);
 } iree_hal_descriptor_set_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_descriptor_set_destroy(iree_hal_descriptor_set_t* descriptor_set);
+IREE_API_EXPORT void iree_hal_descriptor_set_destroy(
+    iree_hal_descriptor_set_t* descriptor_set);
 
 #ifdef __cplusplus
 }  // extern "C"

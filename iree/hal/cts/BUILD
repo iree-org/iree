@@ -23,8 +23,8 @@ cc_library(
     testonly = True,
     hdrs = ["cts_test_base.h"],
     deps = [
-        "//iree/base:api",
-        "//iree/hal:api",
+        "//iree/base",
+        "//iree/hal",
         "//iree/testing:gtest",
     ],
 )
