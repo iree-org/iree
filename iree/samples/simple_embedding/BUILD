@@ -45,14 +45,17 @@ c_embed_data(
 )
 
 cc_binary(
-    name = "simple_embedding_run",
-    srcs = ["simple_embedding_run.c"],
+    name = "simple_embedding_dylib",
+    srcs = [
+        "device_dylib.c",
+        "simple_embedding.c",
+    ],
     deps = [
         ":simple_embedding_test_bytecode_module_c",
         ":simple_embedding_test_llvm_aot_rv64",
         "//iree/base",
         "//iree/hal",
-        "//iree/hal/drivers",
+        "//iree/hal/dylib/registration",
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:bytecode_module",
@@ -60,8 +63,29 @@ cc_binary(
 )
 
 cc_binary(
-    name = "simple_embedding_run_local_sync",
-    srcs = ["simple_embedding_run_local_sync.c"],
+    name = "simple_embedding_vulkan",
+    srcs = [
+        "device_vulkan.c",
+        "simple_embedding.c",
+    ],
+    deps = [
+        ":simple_embedding_test_bytecode_module_c",
+        ":simple_embedding_test_llvm_aot_rv64",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/vulkan/registration",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+    ],
+)
+
+cc_binary(
+    name = "simple_embedding_local_sync",
+    srcs = [
+        "device_local_sync.c",
+        "simple_embedding.c",
+    ],
     deps = [
         ":simple_embedding_test_bytecode_module_c",
         ":simple_embedding_test_llvm_aot_rv64",
@@ -115,17 +139,15 @@ endif()
 
 run_binary_test(
     name = "simple_embedding_dylib_test",
-    args = ["dylib"],
-    test_binary = ":simple_embedding_run",
+    test_binary = ":simple_embedding_dylib",
 )
 
 run_binary_test(
-    name = "simple_embedding_run_local_sync_test",
-    test_binary = ":simple_embedding_run_local_sync",
+    name = "simple_embedding_local_sync_test",
+    test_binary = ":simple_embedding_local_sync",
 )
 
 run_binary_test(
     name = "simple_embedding_vulkan_test",
-    args = ["vulkan"],
-    test_binary = ":simple_embedding_run",
+    test_binary = ":simple_embedding_vulkan",
 )

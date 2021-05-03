@@ -12,19 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// A example of setting up the HAL mddule to run simple pointwise array
-// multiplication with the dylib driver.
+// A example of setting up the HAL module to run simple pointwise array
+// multiplication with the device implemented by different backends via
+// create_sample_driver().
+
 #include <stdio.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-
-#if IREE_ARCH_RISCV_64
-#include "iree/hal/dylib/registration/driver_module.h"
-#else
-#include "iree/hal/drivers/init.h"
-#endif
-
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -36,7 +31,12 @@
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_c.h"
 #endif
 
-iree_status_t Run(char* hal_driver_name) {
+// A function to create the HAL device from the different backend targets.
+// The HAL device is returned based on the implementation, and it must be
+// released by the caller.
+extern iree_status_t create_sample_device(iree_hal_device_t** device);
+
+iree_status_t Run() {
   // TODO(benvanik): move to instance-based registration.
   IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
 
@@ -44,30 +44,11 @@ iree_status_t Run(char* hal_driver_name) {
   IREE_RETURN_IF_ERROR(
       iree_vm_instance_create(iree_allocator_system(), &instance));
 
-#if IREE_ARCH_RISCV_64
-  // Only register dylib HAL driver
-  IREE_RETURN_IF_ERROR(iree_hal_dylib_driver_module_register(
-      iree_hal_driver_registry_default()));
-#else
-  // Register all drivers so it can be selected by the driver name.
-  IREE_RETURN_IF_ERROR(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
-#endif
-
-  // Create the hal driver from the name. The driver name can be assigned as a
-  // hard-coded char array such as "dylib" as well.
-  iree_hal_driver_t* driver = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
-      iree_hal_driver_registry_default(),
-      iree_make_cstring_view(hal_driver_name), iree_allocator_system(),
-      &driver));
   iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
-      driver, iree_allocator_system(), &device));
+  IREE_RETURN_IF_ERROR(create_sample_device(&device), "create device");
   iree_vm_module_t* hal_module = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));
-  iree_hal_driver_release(driver);
 
   // Load bytecode module from the embedded data.
 #if IREE_ARCH_RISCV_64
@@ -198,13 +179,8 @@ iree_status_t Run(char* hal_driver_name) {
   return iree_ok_status();
 }
 
-int main(int argc, char** argv) {
-  if (argc < 2) {
-    printf("usage: simple_embedding_run <HAL driver name>\n");
-    return -1;
-  }
-  char* hal_driver_name = argv[1];
-  const iree_status_t result = Run(hal_driver_name);
+int main() {
+  const iree_status_t result = Run();
   if (!iree_status_is_ok(result)) {
     char* message;
     size_t message_length;

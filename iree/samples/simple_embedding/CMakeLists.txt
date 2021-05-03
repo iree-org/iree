@@ -25,15 +25,16 @@ iree_c_embed_data(
 
 iree_cc_binary(
   NAME
-    simple_embedding_run
+    simple_embedding_dylib
   SRCS
-    "simple_embedding_run.c"
+    "device_dylib.c"
+    "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_c
     ::simple_embedding_test_llvm_aot_rv64
     iree::base
     iree::hal
-    iree::hal::drivers
+    iree::hal::dylib::registration
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
@@ -41,9 +42,27 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
-    simple_embedding_run_local_sync
+    simple_embedding_vulkan
   SRCS
-    "simple_embedding_run_local_sync.c"
+    "device_vulkan.c"
+    "simple_embedding.c"
+  DEPS
+    ::simple_embedding_test_bytecode_module_c
+    ::simple_embedding_test_llvm_aot_rv64
+    iree::base
+    iree::hal
+    iree::hal::vulkan::registration
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+)
+
+iree_cc_binary(
+  NAME
+    simple_embedding_local_sync
+  SRCS
+    "device_local_sync.c"
+    "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_c
     ::simple_embedding_test_llvm_aot_rv64
@@ -87,26 +106,22 @@ endif()
 iree_run_binary_test(
   NAME
     "simple_embedding_dylib_test"
-  ARGS
-    "dylib"
   TEST_BINARY
-    ::simple_embedding_run
+    ::simple_embedding_dylib
 )
 
 iree_run_binary_test(
   NAME
-    "simple_embedding_run_local_sync_test"
+    "simple_embedding_local_sync_test"
   TEST_BINARY
-    ::simple_embedding_run_local_sync
+    ::simple_embedding_local_sync
 )
 
 iree_run_binary_test(
   NAME
     "simple_embedding_vulkan_test"
-  ARGS
-    "vulkan"
   TEST_BINARY
-    ::simple_embedding_run
+    ::simple_embedding_vulkan
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
