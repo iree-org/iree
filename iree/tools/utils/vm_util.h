@@ -79,8 +79,7 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
 
 // Creates the default device for |driver| in |out_device|.
 // The returned |out_device| must be released by the caller.
-Status CreateDevice(absl::string_view driver_name,
-                    iree_hal_device_t** out_device);
+Status CreateDevice(const char* driver_name, iree_hal_device_t** out_device);
 
 // Creates a hal module |driver| in |out_hal_module|.
 // The returned |out_module| must be released by the caller.

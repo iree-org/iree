@@ -38,7 +38,6 @@ iree_cc_test(
   DEPS
     ::custom_modules_test_module_cc
     ::native_module
-    absl::strings
     iree::base
     iree::base::logging
     iree::hal

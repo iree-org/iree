@@ -192,7 +192,7 @@ Status ParseToVariantList(
         IREE_RETURN_IF_ERROR(
             iree_hal_buffer_view_parse(
                 iree_string_view_t{input_string.data(), input_string.size()},
-                allocator, iree_allocator_system(), &buffer_view),
+                allocator, &buffer_view),
             "parsing value '%.*s'", (int)input_string.size(),
             input_string.data());
         auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
@@ -286,20 +286,17 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
   return OkStatus();
 }
 
-Status CreateDevice(absl::string_view driver_name,
-                    iree_hal_device_t** out_device) {
+Status CreateDevice(const char* driver_name, iree_hal_device_t** out_device) {
   IREE_LOG(INFO) << "Creating driver and device for '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_driver_registry_try_create_by_name(
-          iree_hal_driver_registry_default(),
-          iree_string_view_t{driver_name.data(), driver_name.size()},
-          iree_allocator_system(), &driver),
-      "creating driver '%.*s'", (int)driver_name.size(), driver_name.data());
+  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
+                           iree_hal_driver_registry_default(),
+                           iree_make_cstring_view(driver_name),
+                           iree_allocator_system(), &driver),
+                       "creating driver '%s'", driver_name);
   IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
                            driver, iree_allocator_system(), out_device),
-                       "creating default device for driver '%.*s'",
-                       (int)driver_name.size(), driver_name.data());
+                       "creating default device for driver '%s'", driver_name);
   iree_hal_driver_release(driver);
   return OkStatus();
 }

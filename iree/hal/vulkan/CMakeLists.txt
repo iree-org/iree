@@ -73,8 +73,6 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     Vulkan::Headers
-    absl::span
-    absl::strings
     iree::base
     iree::base::core_headers
     iree::base::internal

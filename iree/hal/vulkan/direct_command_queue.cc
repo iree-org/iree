@@ -94,7 +94,7 @@ iree_status_t DirectCommandQueue::TranslateBatchInfo(
       static_cast<uint32_t>(signal_semaphore_values.size());
   timeline_submit_info->pSignalSemaphoreValues = signal_semaphore_values.data();
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 iree_status_t DirectCommandQueue::Submit(

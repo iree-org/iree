@@ -36,9 +36,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create(
   IREE_ASSERT_ARGUMENT(out_syms);
   *out_syms = nullptr;
 
-  IREE_ASSIGN_OR_RETURN(
-      auto syms, DynamicSymbols::Create([&vkGetInstanceProcAddr_fn](
-                                            const char* function_name) {
+  iree::ref_ptr<iree::hal::vulkan::DynamicSymbols> syms;
+  IREE_RETURN_IF_ERROR(DynamicSymbols::Create(
+      [&vkGetInstanceProcAddr_fn](const char* function_name) {
         // Only resolve vkGetInstanceProcAddr, rely on syms->LoadFromInstance()
         // and/or syms->LoadFromDevice() for further loading.
         std::string fn = "vkGetInstanceProcAddr";
@@ -46,7 +46,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create(
           return reinterpret_cast<PFN_vkVoidFunction>(vkGetInstanceProcAddr_fn);
         }
         return reinterpret_cast<PFN_vkVoidFunction>(NULL);
-      }));
+      },
+      &syms));
 
   *out_syms = reinterpret_cast<iree_hal_vulkan_syms_t*>(syms.release());
   return iree_ok_status();
@@ -58,7 +59,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create_from_system_loader(
   IREE_ASSERT_ARGUMENT(out_syms);
   *out_syms = nullptr;
 
-  IREE_ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
+  iree::ref_ptr<iree::hal::vulkan::DynamicSymbols> syms;
+  IREE_RETURN_IF_ERROR(DynamicSymbols::CreateFromSystemLoader(&syms));
   *out_syms = reinterpret_cast<iree_hal_vulkan_syms_t*>(syms.release());
   return iree_ok_status();
 }

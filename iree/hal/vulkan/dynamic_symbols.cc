@@ -76,8 +76,8 @@ static const char* kVulkanLoaderSearchNames[] = {
 #endif  // IREE_PLATFORM_ANDROID
 };
 
-Status ResolveFunctions(DynamicSymbols* syms,
-                        const DynamicSymbols::GetProcAddrFn& get_proc_addr) {
+iree_status_t ResolveFunctions(
+    DynamicSymbols* syms, const DynamicSymbols::GetProcAddrFn& get_proc_addr) {
   // Resolve the method the shared object uses to resolve other functions.
   // Some libraries will export all symbols while others will only export this
   // single function.
@@ -141,24 +141,27 @@ Status ResolveFunctions(DynamicSymbols* syms,
     }
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace
 
 // static
-StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
-    const GetProcAddrFn& get_proc_addr) {
+iree_status_t DynamicSymbols::Create(const GetProcAddrFn& get_proc_addr,
+                                     ref_ptr<DynamicSymbols>* out_syms) {
   IREE_TRACE_SCOPE0("DynamicSymbols::Create");
 
   auto syms = make_ref<DynamicSymbols>();
   IREE_RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
   syms->FixupExtensionFunctions();
-  return syms;
+
+  *out_syms = std::move(syms);
+  return iree_ok_status();
 }
 
 // static
-StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
+iree_status_t DynamicSymbols::CreateFromSystemLoader(
+    ref_ptr<DynamicSymbols>* out_syms) {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
 
   iree_dynamic_library_t* loader_library = NULL;
@@ -189,15 +192,18 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
         return fn;
       }));
   syms->FixupExtensionFunctions();
-  return syms;
+
+  *out_syms = std::move(syms);
+  return iree_ok_status();
 }
 
-Status DynamicSymbols::LoadFromInstance(VkInstance instance) {
+iree_status_t DynamicSymbols::LoadFromInstance(VkInstance instance) {
   IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromInstance");
   return LoadFromDevice(instance, VK_NULL_HANDLE);
 }
 
-Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
+iree_status_t DynamicSymbols::LoadFromDevice(VkInstance instance,
+                                             VkDevice device) {
   IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromDevice");
 
   if (!instance) {
@@ -237,7 +243,7 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
 
   FixupExtensionFunctions();
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 DynamicSymbols::DynamicSymbols() = default;

@@ -221,7 +221,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
 // buffer.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_parse(
     iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
-    iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view);
+    iree_hal_buffer_view_t** out_buffer_view);
 
 // Converts buffer view elements into a fully-specified string-form format like
 // `2x4xi16=[[1 2][3 4]]`.

@@ -28,10 +28,13 @@ cc_library(
     name = "base",
     srcs = [
         "allocator.c",
+        "allocator.h",
         "api.c",
         "status.c",
         "string_view.c",
+        "string_view.h",
         "time.c",
+        "time.h",
     ],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],

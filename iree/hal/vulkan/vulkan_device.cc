@@ -18,9 +18,7 @@
 #include <utility>
 #include <vector>
 
-#include "absl/strings/str_cat.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/command_queue.h"

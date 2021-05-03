@@ -284,8 +284,6 @@ cc_library(
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:logging",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/utility",
     ],
 )

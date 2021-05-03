@@ -92,7 +92,7 @@ TimePointFencePool::~TimePointFencePool() {
   iree_slim_mutex_deinitialize(&mutex_);
 }
 
-Status TimePointFencePool::Acquire(ref_ptr<TimePointFence>* out_fence) {
+iree_status_t TimePointFencePool::Acquire(ref_ptr<TimePointFence>* out_fence) {
   IREE_TRACE_SCOPE0("TimePointFencePool::Acquire");
 
   RaiiLocker locker(&mutex_);
@@ -112,7 +112,7 @@ Status TimePointFencePool::Acquire(ref_ptr<TimePointFence>* out_fence) {
   std::unique_ptr<TimePointFence> fence =
       free_fences_.take(free_fences_.front());
   *out_fence = add_ref(fence.release());
-  return OkStatus();
+  return iree_ok_status();
 }
 
 void TimePointFencePool::ReleaseResolved(TimePointFence* fence) {
@@ -130,7 +130,7 @@ const ref_ptr<DynamicSymbols>& TimePointFencePool::syms() const {
   return logical_device_->syms();
 }
 
-Status TimePointFencePool::PreallocateFences() {
+iree_status_t TimePointFencePool::PreallocateFences() {
   IREE_TRACE_SCOPE0("TimePointFencePool::PreallocateFences");
 
   VkFenceCreateInfo create_info;
@@ -162,7 +162,7 @@ Status TimePointFencePool::PreallocateFences() {
     fences[i].release()->ReleaseReference();
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 // static
@@ -194,7 +194,8 @@ TimePointSemaphorePool::~TimePointSemaphorePool() {
   iree_slim_mutex_deinitialize(&mutex_);
 }
 
-Status TimePointSemaphorePool::Acquire(TimePointSemaphore** out_semaphore) {
+iree_status_t TimePointSemaphorePool::Acquire(
+    TimePointSemaphore** out_semaphore) {
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::Acquire");
 
   RaiiLocker locker(&mutex_);
@@ -205,7 +206,7 @@ Status TimePointSemaphorePool::Acquire(TimePointSemaphore** out_semaphore) {
 
   *out_semaphore = free_semaphores_.front();
   free_semaphores_.pop_front();
-  return OkStatus();
+  return iree_ok_status();
 }
 
 void TimePointSemaphorePool::ReleaseResolved(
@@ -242,7 +243,7 @@ const ref_ptr<DynamicSymbols>& TimePointSemaphorePool::syms() const {
   return logical_device_->syms();
 }
 
-Status TimePointSemaphorePool::PreallocateSemaphores() {
+iree_status_t TimePointSemaphorePool::PreallocateSemaphores() {
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::PreallocateSemaphores");
 
   VkSemaphoreCreateInfo create_info;
@@ -260,7 +261,7 @@ Status TimePointSemaphorePool::PreallocateSemaphores() {
     free_semaphores_.push_back(semaphore);
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace vulkan

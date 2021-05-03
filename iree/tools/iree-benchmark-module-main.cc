@@ -125,7 +125,7 @@ void RegisterModuleBenchmarks(
       ->Unit(benchmark::kMillisecond);
 }
 
-Status GetModuleContentsFromFlags(std::string* out_contents) {
+iree_status_t GetModuleContentsFromFlags(std::string* out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
@@ -134,7 +134,7 @@ Status GetModuleContentsFromFlags(std::string* out_contents) {
   } else {
     IREE_RETURN_IF_ERROR(GetFileContents(module_file.c_str(), out_contents));
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
 // TODO(hanchung): Consider to refactor this out and reuse in iree-run-module.
@@ -159,7 +159,7 @@ class IREEBenchmark {
     iree_vm_instance_release(instance_);
   };
 
-  Status Register() {
+  iree_status_t Register() {
     IREE_TRACE_SCOPE0("IREEBenchmark::Register");
 
     if (!instance_ || !device_ || !hal_module_ || !context_ || !input_module_) {
@@ -172,11 +172,11 @@ class IREEBenchmark {
     } else {
       IREE_RETURN_IF_ERROR(RegisterAllExportedFunctions());
     }
-    return iree::OkStatus();
+    return iree_ok_status();
   }
 
  private:
-  Status Init() {
+  iree_status_t Init() {
     IREE_TRACE_SCOPE0("IREEBenchmark::Init");
     IREE_TRACE_FRAME_MARK_BEGIN_NAMED("init");
 
@@ -187,8 +187,7 @@ class IREEBenchmark {
         iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     // Create IREE's device and module.
-    IREE_RETURN_IF_ERROR(
-        iree::CreateDevice(std::string(FLAG_driver), &device_));
+    IREE_RETURN_IF_ERROR(iree::CreateDevice(FLAG_driver, &device_));
     IREE_RETURN_IF_ERROR(CreateHalModule(device_, &hal_module_));
     IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data_, &input_module_));
 
@@ -200,10 +199,10 @@ class IREEBenchmark {
         &context_));
 
     IREE_TRACE_FRAME_MARK_END_NAMED("init");
-    return iree::OkStatus();
+    return iree_ok_status();
   }
 
-  Status RegisterSpecificFunction(const std::string& function_name) {
+  iree_status_t RegisterSpecificFunction(const std::string& function_name) {
     IREE_TRACE_SCOPE0("IREEBenchmark::RegisterSpecificFunction");
 
     iree_vm_function_t function;
@@ -225,10 +224,10 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
     RegisterModuleBenchmarks(function_name, context_, function, inputs_.get(),
                              output_descs);
-    return iree::OkStatus();
+    return iree_ok_status();
   }
 
-  Status RegisterAllExportedFunctions() {
+  iree_status_t RegisterAllExportedFunctions() {
     IREE_TRACE_SCOPE0("IREEBenchmark::RegisterAllExportedFunctions");
     iree_vm_function_t function;
     iree_vm_module_signature_t signature =
@@ -253,7 +252,7 @@ class IREEBenchmark {
       iree::RegisterModuleBenchmarks(function_name, context_, function,
                                      /*inputs=*/nullptr, output_descs);
     }
-    return iree::OkStatus();
+    return iree_ok_status();
   }
 
   std::string module_data_;
@@ -280,10 +279,11 @@ int main(int argc, char** argv) {
       iree_hal_driver_registry_default()));
 
   iree::IREEBenchmark iree_benchmark;
-  auto status = iree_benchmark.Register();
-  if (!status.ok()) {
-    std::cout << status << std::endl;
-    return static_cast<int>(status.code());
+  iree_status_t status = iree_benchmark.Register();
+  if (!iree_status_is_ok(status)) {
+    int ret = static_cast<int>(iree_status_code(status));
+    std::cout << iree::Status(std::move(status)) << std::endl;
+    return ret;
   }
   ::benchmark::RunSpecifiedBenchmarks();
   return 0;

@@ -39,6 +39,8 @@
 #ifndef IREE_BASE_CONFIG_H_
 #define IREE_BASE_CONFIG_H_
 
+#include <stddef.h>
+
 #include "iree/base/target_platform.h"
 
 //===----------------------------------------------------------------------===//
@@ -87,6 +89,32 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
 
 // Size, in bytes, of a buffer on remote devices.
 typedef IREE_DEVICE_SIZE_T iree_device_size_t;
+
+//===----------------------------------------------------------------------===//
+// iree_status_t configuration
+//===----------------------------------------------------------------------===//
+// Controls how much information an iree_status_t carries. When set to 0 all of
+// iree_status_t will be turned into just integer results that will never
+// allocate and all string messages will be stripped. Of course, this isn't
+// very useful and the higher modes should be preferred unless binary size is
+// a major concern.
+//
+// IREE_STATUS_MODE = 0: statuses are just integers
+// IREE_STATUS_MODE = 1: statuses have source location of error
+// IREE_STATUS_MODE = 2: statuses also have custom annotations
+// IREE_STATUS_MODE = 3: statuses also have stack traces of the error site
+
+// If no status mode override is provided we'll change the behavior based on
+// build configuration.
+#if !defined(IREE_STATUS_MODE)
+#ifdef NDEBUG
+// Release mode: just source location.
+#define IREE_STATUS_MODE 2
+#else
+// Debug mode: annotations and stack traces.
+#define IREE_STATUS_MODE 3
+#endif  // NDEBUG
+#endif  // !IREE_STATUS_MODE
 
 //===----------------------------------------------------------------------===//
 // Synchronization and threading
