@@ -45,38 +45,39 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
 
     === "Linux and MacOS"
 
-      ``` shell
-      # Make sure your 'python' is what you expect. Note that on multi-python
-      # systems, this may have a version suffix, and on many Linuxes and MacOS where
-      # python2 and python3 co-exist, you may also want to use `python3`.
-      which python
-      python --version
+        ``` shell
+        # Make sure your 'python' is what you expect. Note that on multi-python
+        # systems, this may have a version suffix, and on many Linuxes and MacOS where
+        # python2 and python3 co-exist, you may also want to use `python3`.
+        which python
+        python --version
 
-      # Create a persistent virtual environment (first time only).
-      python -m venv .venv
+        # Create a persistent virtual environment (first time only).
+        python -m venv .venv
 
-      # Activate the virtual environment (per shell).
-      # Now the `python` command will resolve to your virtual environment
-      # (even on systems where you typically use `python3`).
-      source .venv/bin/activate
+        # Activate the virtual environment (per shell).
+        # Now the `python` command will resolve to your virtual environment
+        # (even on systems where you typically use `python3`).
+        source .venv/bin/activate
 
-      # Upgrade PIP. On Linux, many packages cannot be installed for older
-      # PIP versions. See: https://github.com/pypa/manylinux
-      python -m pip install --upgrade pip
+        # Upgrade PIP. On Linux, many packages cannot be installed for older
+        # PIP versions. See: https://github.com/pypa/manylinux
+        python -m pip install --upgrade pip
 
-      # Install IREE build pre-requisites.
-      python -m pip install -r ./bindings/python/build_requirements.txt
+        # Install IREE build pre-requisites.
+        python -m pip install -r ./bindings/python/build_requirements.txt
 
-      ```
+        ```
 
     === "Windows"
 
-      ``` powershell
-      python -m venv .venv
-      .venv\Scripts\activate.bat
-      python -m pip install --upgrade pip
-      python -m pip install -r bindings\python\build_requirements.txt
-      ```
+        ``` powershell
+        python -m venv .venv
+        .venv\Scripts\activate.bat
+        python -m pip install --upgrade pip
+        python -m pip install -r bindings\python\build_requirements.txt
+        ```
+
     When done, close your shell or run `deactivate`.
 
 ???+ Usage
@@ -84,26 +85,26 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
 
     === "Linux and MacOS"
 
-      ``` shell
-      cmake -DIREE_BUILD_PYTHON_BINDINGS=ON -DPython3_EXECUTABLE="$(which python)" .
-      ninja
+        ``` shell
+        cmake -DIREE_BUILD_PYTHON_BINDINGS=ON -DPython3_EXECUTABLE="$(which python)" .
+        ninja
 
-      # Add ./bindings/python to PYTHONPATH and use the API.
-      export PYTHONPATH="$PWD/bindings/python"
-      python -c "import iree.compiler"
-      python -c "import iree.runtime"
-      ```
+        # Add ./bindings/python to PYTHONPATH and use the API.
+        export PYTHONPATH="$PWD/bindings/python"
+        python -c "import iree.compiler"
+        python -c "import iree.runtime"
+        ```
 
     === "Windows"
 
-      ``` powershell
-      cmake -DIREE_BUILD_PYTHON_BINDINGS=ON .
-      ninja
+        ``` powershell
+        cmake -DIREE_BUILD_PYTHON_BINDINGS=ON .
+        ninja
 
-      # Add bindings\python to PYTHONPATH and use the API.
-      set PYTHONPATH="$pwd\bindings\python;%PYTHONPATH%"
-      python -c "import iree.compiler"
-      python -c "import iree.runtime"
-      ```
+        # Add bindings\python to PYTHONPATH and use the API.
+        set PYTHONPATH="$pwd\bindings\python;%PYTHONPATH%"
+        python -c "import iree.compiler"
+        python -c "import iree.runtime"
+        ```
 
     Tests can now be run individually via python or via ctest.
