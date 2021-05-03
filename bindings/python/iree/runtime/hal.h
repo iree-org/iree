@@ -167,10 +167,9 @@ class HalMappedMemory {
       }
     }
 
-    return py::buffer_info(
-        mapped_memory_.contents.data, element_size,
-        py::format_descriptor<float>::format(),
-        shape.size(), dims, strides);
+    return py::buffer_info(mapped_memory_.contents.data, element_size,
+                           py::format_descriptor<float>::format(), shape.size(),
+                           dims, strides);
   }
 
  private:
