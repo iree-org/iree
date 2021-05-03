@@ -114,7 +114,7 @@ cc_library(
 
 cc_library(
     name = "file_io",
-    srcs = ["file_io.cc"],
+    srcs = ["file_io.c"],
     hdrs = ["file_io.h"],
     deps = [
         "//iree/base",
@@ -161,6 +161,7 @@ cc_library(
     srcs = ["flags.c"],
     hdrs = ["flags.h"],
     deps = [
+        ":file_io",
         ":internal",
         "//iree/base",
         "//iree/base:tracing",

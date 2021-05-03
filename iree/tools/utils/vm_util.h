@@ -30,6 +30,9 @@ namespace iree {
 
 // TODO(benvanik) Update these when we can use RAII with the C API.
 
+// Synchronously reads a file's contents into a string.
+Status GetFileContents(const char* path, std::string* out_contents);
+
 // Validates the ABI of the specified function is supported by current tooling.
 Status ValidateFunctionAbi(const iree_vm_function_t& function);
 

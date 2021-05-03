@@ -15,26 +15,35 @@
 #ifndef IREE_BASE_INTERNAL_FILE_IO_H_
 #define IREE_BASE_INTERNAL_FILE_IO_H_
 
-#include <string>
-
 #include "iree/base/api.h"
 
-namespace iree {
-namespace file_io {
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-// Checks if a file exists at the provided path.
+// Checks if a file exists at the provided |path|.
 //
-// Returns an OK status if the file definitely exists.
-// Errors can include PermissionDeniedError, NotFoundError, etc.
-iree_status_t FileExists(const char* path);
+// Returns an OK status if the file definitely exists. An OK status does not
+// indicate that attempts to read or write the file will succeed.
+// Returns IREE_STATUS_NOT_FOUND if the file does not exist.
+iree_status_t iree_file_exists(const char* path);
 
-// Synchronously reads a file's contents into a string.
-iree_status_t GetFileContents(const char* path, std::string* out_contents);
+// Synchronously reads a file's contents into memory.
+//
+// Returns the contents of the file in |out_contents|.
+// |allocator| is used to allocate the memory and the caller must use the same
+// allocator when freeing it.
+iree_status_t iree_file_read_contents(const char* path,
+                                      iree_allocator_t allocator,
+                                      iree_byte_span_t* out_contents);
 
-// Synchronously writes a string into a file, overwriting its contents.
-iree_status_t SetFileContents(const char* path, iree_const_byte_span_t content);
+// Synchronously writes a byte buffer into a file.
+// Existing contents are overwritten.
+iree_status_t iree_file_write_contents(const char* path,
+                                       iree_const_byte_span_t content);
 
-}  // namespace file_io
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif
 
 #endif  // IREE_BASE_INTERNAL_FILE_IO_H_
