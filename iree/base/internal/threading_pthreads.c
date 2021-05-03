@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/call_once.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
 #include "iree/base/tracing.h"

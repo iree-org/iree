@@ -77,7 +77,6 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/base/internal:synchronization",
-        "//iree/base/internal:threading",
         "@com_google_absl//absl/strings",
     ],
 )

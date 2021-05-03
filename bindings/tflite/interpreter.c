@@ -17,7 +17,7 @@
 #include "bindings/tflite/model.h"
 #include "bindings/tflite/shim.h"
 #include "bindings/tflite/tensor.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/internal/call_once.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"

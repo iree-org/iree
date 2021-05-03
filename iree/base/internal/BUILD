@@ -105,7 +105,8 @@ cc_library(
     deps = [
         ":file_path",
         ":internal",
-        ":threading",
+        ":synchronization",
+        "//build_tools:default_linkopts",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -206,6 +207,37 @@ iree_flatbuffer_c_library(
 )
 
 cc_library(
+    name = "fpu_state",
+    srcs = ["fpu_state.c"],
+    hdrs = ["fpu_state.h"],
+    deps = [
+        ":internal",
+        "//iree/base",
+        "//iree/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "fpu_state_benchmark",
+    srcs = ["fpu_state_benchmark.cc"],
+    deps = [
+        ":fpu_state",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_test(
+    name = "fpu_state_test",
+    srcs = ["fpu_state_test.cc"],
+    deps = [
+        ":fpu_state",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
     name = "main",
     srcs = [
         "main_posix.cc",
@@ -259,8 +291,13 @@ cc_library(
 
 cc_library(
     name = "synchronization",
-    srcs = ["synchronization.c"],
-    hdrs = ["synchronization.h"],
+    srcs = [
+        "synchronization.c",
+    ],
+    hdrs = [
+        "call_once.h",
+        "synchronization.h",
+    ],
     deps = [
         ":internal",
         "//iree/base",
@@ -313,16 +350,6 @@ cc_library(
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
-    ],
-)
-
-cc_test(
-    name = "threading_benchmark",
-    srcs = ["threading_benchmark.cc"],
-    deps = [
-        ":threading",
-        "//iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
     ],
 )
 
