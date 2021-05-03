@@ -16,8 +16,8 @@ iree_cc_library(
   HDRS
     "cts_test_base.h"
   DEPS
-    iree::base::api
-    iree::hal::api
+    iree::base
+    iree::hal
     iree::testing::gtest
   TESTONLY
   PUBLIC

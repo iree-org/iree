@@ -18,7 +18,7 @@
 #include "iree/hal/local/local_executable.h"
 
 // flatcc schemas:
-#include "iree/base/flatcc.h"
+#include "iree/base/internal/flatcc.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_system_executable_t

@@ -16,7 +16,6 @@
 
 #include <inttypes.h>
 
-#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/api.h"
@@ -61,7 +60,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_cuda_driver_module_register(iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
       .self = NULL,

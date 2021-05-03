@@ -34,7 +34,7 @@ cc_library(
     deps = [
         ":arch",
         ":platform",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -45,7 +45,7 @@ cc_test(
     srcs = ["elf_module_test.cc"],
     deps = [
         ":elf_module",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/hal/local:executable_library",
         "//iree/hal/local/elf/testdata:simple_mul_dispatch",
@@ -72,7 +72,7 @@ cc_library(
         "arch.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -90,7 +90,7 @@ cc_library(
         "platform.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],

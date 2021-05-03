@@ -83,8 +83,7 @@ static iree_status_t iree_hal_command_buffer_validate_dispatch_bindings(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_wrap_validation(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wrap_validation(
     iree_hal_device_t* device, iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(target_command_buffer);

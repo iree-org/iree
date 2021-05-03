@@ -64,7 +64,7 @@ static iree_hal_vulkan_driver_t* iree_hal_vulkan_driver_cast(
   return (iree_hal_vulkan_driver_t*)base_value;
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_driver_options_initialize(
+IREE_API_EXPORT void iree_hal_vulkan_driver_options_initialize(
     iree_hal_vulkan_driver_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->api_version = VK_API_VERSION_1_2;
@@ -207,7 +207,7 @@ static iree_status_t iree_hal_vulkan_driver_compute_enabled_extensibility_sets(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create(
     iree_string_view_t identifier,
     const iree_hal_vulkan_driver_options_t* options,
     iree_hal_vulkan_syms_t* opaque_syms, iree_allocator_t host_allocator,
@@ -263,8 +263,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_driver_create_using_instance(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create_using_instance(
     iree_string_view_t identifier,
     const iree_hal_vulkan_driver_options_t* options,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,

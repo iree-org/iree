@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
 
 #include <assert.h>
 
-#if defined(IREE_PLATFORM_EMSCRIPTEN)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
+// Disabled.
+
+#elif defined(IREE_PLATFORM_EMSCRIPTEN)
 
 #include <emscripten/threading.h>
 #include <errno.h>
@@ -152,7 +156,15 @@ static inline void iree_futex_wake(void* address, int32_t count) {
 // iree_mutex_t
 //==============================================================================
 
-#if defined(IREE_PLATFORM_WINDOWS) && defined(IREE_MUTEX_USE_WIN32_SRW)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
+#define iree_mutex_impl_initialize(mutex)
+#define iree_mutex_impl_deinitialize(mutex)
+#define iree_mutex_impl_lock(mutex)
+#define iree_mutex_impl_try_lock(mutex)
+#define iree_mutex_impl_unlock(mutex)
+
+#elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_MUTEX_USE_WIN32_SRW)
 
 // Win32 Slim Reader/Writer (SRW) Lock (same as std::mutex)
 #define iree_mutex_impl_initialize(mutex) InitializeSRWLock(&(mutex)->value)
@@ -294,7 +306,22 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
 
 #else
 
-#if defined(IREE_PLATFORM_APPLE)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
+void iree_slim_mutex_initialize(iree_slim_mutex_t* out_mutex) {}
+
+void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {}
+
+void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
+    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {}
+
+bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
+    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {}
+
+void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
+    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {}
+
+#elif defined(IREE_PLATFORM_APPLE)
 
 void iree_slim_mutex_initialize(iree_slim_mutex_t* out_mutex) {
   out_mutex->value = OS_UNFAIR_LOCK_INIT;
@@ -531,7 +558,9 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
 
 void iree_notification_initialize(iree_notification_t* out_notification) {
   memset(out_notification, 0, sizeof(*out_notification));
-#if !defined(IREE_PLATFORM_HAS_FUTEX)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+  // No-op.
+#elif !defined(IREE_PLATFORM_HAS_FUTEX)
   pthread_mutex_init(&out_notification->mutex, NULL);
   pthread_cond_init(&out_notification->cond, NULL);
 #endif  // IREE_PLATFORM_HAS_FUTEX
@@ -542,7 +571,9 @@ void iree_notification_deinitialize(iree_notification_t* notification) {
   SYNC_ASSERT(
       (iree_atomic_load_int64(&notification->value, iree_memory_order_seq_cst) &
        IREE_NOTIFICATION_WAITER_MASK) == 0);
-#if !defined(IREE_PLATFORM_HAS_FUTEX)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+  // No-op.
+#elif !defined(IREE_PLATFORM_HAS_FUTEX)
   pthread_cond_destroy(&notification->cond);
   pthread_mutex_destroy(&notification->mutex);
 #endif  // IREE_PLATFORM_HAS_FUTEX
@@ -554,7 +585,9 @@ void iree_notification_post(iree_notification_t* notification, int32_t count) {
       iree_memory_order_acq_rel);
   // Ensure we have at least one waiter; wake up to |count| of them.
   if (IREE_UNLIKELY(previous_value & IREE_NOTIFICATION_WAITER_MASK)) {
-#if defined(IREE_PLATFORM_HAS_FUTEX)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+    // No-op.
+#elif defined(IREE_PLATFORM_HAS_FUTEX)
     iree_futex_wake(iree_notification_epoch_address(notification), count);
 #else
     pthread_mutex_lock(&notification->mutex);
@@ -585,7 +618,9 @@ void iree_notification_commit_wait(iree_notification_t* notification,
   while ((iree_atomic_load_int64(&notification->value,
                                  iree_memory_order_acquire) >>
           IREE_NOTIFICATION_EPOCH_SHIFT) == wait_token) {
-#if defined(IREE_PLATFORM_HAS_FUTEX)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+    // TODO(benvanik): platform sleep? this spins.
+#elif defined(IREE_PLATFORM_HAS_FUTEX)
     iree_status_ignore(
         iree_futex_wait(iree_notification_epoch_address(notification),
                         wait_token, IREE_INFINITE_TIMEOUT_MS));

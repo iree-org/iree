@@ -22,25 +22,25 @@
 
 IREE_HAL_API_RETAIN_RELEASE(device);
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_hal_device_id(iree_hal_device_t* device) {
   IREE_ASSERT_ARGUMENT(device);
   return _VTABLE_DISPATCH(device, id)(device);
 }
 
-IREE_API_EXPORT iree_allocator_t IREE_API_CALL
+IREE_API_EXPORT iree_allocator_t
 iree_hal_device_host_allocator(iree_hal_device_t* device) {
   IREE_ASSERT_ARGUMENT(device);
   return _VTABLE_DISPATCH(device, host_allocator)(device);
 }
 
-IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
-iree_hal_device_allocator(iree_hal_device_t* device) {
+IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
+    iree_hal_device_t* device) {
   IREE_ASSERT_ARGUMENT(device);
   return _VTABLE_DISPATCH(device, device_allocator)(device);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_query_i32(
+IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     iree_hal_device_t* device, iree_string_view_t key, int32_t* out_value) {
   IREE_ASSERT_ARGUMENT(device);
   return _VTABLE_DISPATCH(device, query_i32)(device, key, out_value);
@@ -69,7 +69,7 @@ static iree_status_t iree_hal_device_validate_submission(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches) {
@@ -84,7 +84,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
+IREE_API_EXPORT iree_status_t iree_hal_device_submit_and_wait(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches,
@@ -102,7 +102,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_wait_semaphores(
+IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
   IREE_ASSERT_ARGUMENT(device);

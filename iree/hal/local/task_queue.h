@@ -16,7 +16,7 @@
 #define IREE_HAL_LOCAL_TASK_QUEUE_H_
 
 #include "iree/base/api.h"
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/arena.h"
 #include "iree/hal/local/task_queue_state.h"

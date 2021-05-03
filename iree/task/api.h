@@ -35,9 +35,8 @@ extern "C" {
 // process as the flags are globals. When multiple executors may exist or
 // programmatic configuration is needed use the iree_task_executor_create method
 // directly.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_task_executor_create_from_flags(iree_allocator_t host_allocator,
-                                     iree_task_executor_t** out_executor);
+iree_status_t iree_task_executor_create_from_flags(
+    iree_allocator_t host_allocator, iree_task_executor_t** out_executor);
 
 //===----------------------------------------------------------------------===//
 // Task system simple invocation utilities

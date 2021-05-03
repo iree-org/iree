@@ -92,19 +92,19 @@ typedef int32_t iree_hal_dim_t;
 //===----------------------------------------------------------------------===//
 
 // Calculates the allocation size of a buffer view.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_compute_view_size(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_element_type_t element_type,
     iree_device_size_t* out_allocation_size);
 
 // Calculates a byte offset into a buffer at the given indices.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_compute_view_offset(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_element_type_t element_type, const iree_hal_dim_t* indices,
     size_t indices_count, iree_device_size_t* out_offset);
 
 // Calculates a byte range into a buffer of the given contiguous range.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_compute_view_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_element_type_t element_type, const iree_hal_dim_t* start_indices,
     iree_host_size_t indices_count, const iree_hal_dim_t* lengths,
@@ -125,25 +125,25 @@ typedef struct iree_hal_buffer_view_s iree_hal_buffer_view_t;
 
 // Creates a buffer view with the given |buffer|.
 // |out_buffer_view| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_create(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_t* buffer, iree_hal_element_type_t element_type,
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Creates a buffer view referencing a subview of the given |buffer_view|.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_subview(
     const iree_hal_buffer_view_t* buffer_view,
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
     const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Retains the given |buffer_view| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_view_retain(iree_hal_buffer_view_t* buffer_view);
+IREE_API_EXPORT void iree_hal_buffer_view_retain(
+    iree_hal_buffer_view_t* buffer_view);
 
 // Releases the given |buffer_view| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view);
+IREE_API_EXPORT void iree_hal_buffer_view_release(
+    iree_hal_buffer_view_t* buffer_view);
 
 // Returns the buffer underlying the buffer view.
 // The caller must retain the returned buffer if they want to continue using it.
@@ -152,20 +152,20 @@ iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view);
 // bytes representing this buffer view due to padding. Always query the actual
 // valid length with iree_hal_buffer_view_byte_length instead of assuming the
 // buffer is already clamped.
-IREE_API_EXPORT iree_hal_buffer_t* IREE_API_CALL
-iree_hal_buffer_view_buffer(const iree_hal_buffer_view_t* buffer_view);
+IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_view_buffer(
+    const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the rank of the shape associated with the buffer view.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL
+IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_shape_rank(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns a pointer to the shape dimensions; the array limit is defined by
 // iree_hal_buffer_view_shape_rank.
-IREE_API_EXPORT const iree_hal_dim_t* IREE_API_CALL
-iree_hal_buffer_view_shape_dims(const iree_hal_buffer_view_t* buffer_view);
+IREE_API_EXPORT const iree_hal_dim_t* iree_hal_buffer_view_shape_dims(
+    const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the value of the given dimension.
-IREE_API_EXPORT iree_hal_dim_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
+IREE_API_EXPORT iree_hal_dim_t iree_hal_buffer_view_shape_dim(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t index);
 
 // Returns the dimensions of the shape in |out_shape| and its rank in
@@ -173,7 +173,7 @@ IREE_API_EXPORT iree_hal_dim_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
 // available in the |out_shape| buffer. If there is not enough capacity to store
 // all of the dimensions IREE_STATUS_OUT_OF_RANGE is returned.
 // |out_shape_rank| can be omitted if the rank is already known.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_shape(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t rank_capacity,
     iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank);
 
@@ -181,7 +181,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
 // The new rank and element count must match the existing values. The buffer
 // contents are left untouched; if the buffer is not dense this may make the
 // contents undefined.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_reshape(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_reshape(
     iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank);
 
@@ -190,26 +190,26 @@ IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_element_count(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the element type of the buffer.
-IREE_API_EXPORT iree_hal_element_type_t IREE_API_CALL
+IREE_API_EXPORT iree_hal_element_type_t
 iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the size of each element in the buffer view in bytes.
 // Note that not all buffers are contiguous or densely packed.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL
+IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the total size of the specified view in bytes.
 // Note that not all buffers are contiguous or densely packed.
-IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view);
 
 // Calculates a byte offset into the |buffer_view| at the given indices.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_offset(
     const iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* indices,
     iree_host_size_t indices_count, iree_device_size_t* out_offset);
 
 // Calculates a byte range into the |buffer_view| of the given contiguous range.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
     const iree_hal_buffer_view_t* buffer_view,
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
     const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
@@ -219,9 +219,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
 // (the same as produced by iree_hal_buffer_view_format). The underlying buffer
 // will be allocated with |buffer_allocator| as a host-local/device-visible
 // buffer.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_parse(
     iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
-    iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view);
+    iree_hal_buffer_view_t** out_buffer_view);
 
 // Converts buffer view elements into a fully-specified string-form format like
 // `2x4xi16=[[1 2][3 4]]`.
@@ -235,7 +235,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
 // formatted elements and |out_buffer_length| will contain the required size.
 //
 // Follows the standard API string formatting rules. See iree/base/api.h.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_format(
     const iree_hal_buffer_view_t* buffer_view,
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length);
@@ -244,8 +244,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
 // iree_hal_buffer_view_t implementation details
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_view_destroy(iree_hal_buffer_view_t* buffer_view);
+IREE_API_EXPORT void iree_hal_buffer_view_destroy(
+    iree_hal_buffer_view_t* buffer_view);
 
 #ifdef __cplusplus
 }  // extern "C"

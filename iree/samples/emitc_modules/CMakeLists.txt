@@ -29,7 +29,7 @@ if(${IREE_ENABLE_EMITC})
       "add_module_test.cc"
     DEPS
       ::add_module
-      iree::base::api
+      iree::base
       iree::base::status
       iree::testing::gtest
       iree::testing::gtest_main

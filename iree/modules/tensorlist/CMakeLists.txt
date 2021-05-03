@@ -19,9 +19,9 @@ iree_cc_library(
     "native_module.cc"
   DEPS
     absl::span
-    iree::base::api
+    iree::base
     iree::base::status
-    iree::hal::api
+    iree::hal
     iree::modules::hal
     iree::vm
     iree::vm::cc
@@ -55,9 +55,9 @@ iree_cc_test(
     ::native_module
     ::tensorlist_test_module_cc
     absl::span
-    iree::base::api
+    iree::base
     iree::base::logging
-    iree::hal::api
+    iree::hal
     iree::hal::vmla::registration
     iree::modules::hal
     iree::testing::gtest

@@ -36,4 +36,18 @@
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h.inc"
 
+namespace mlir {
+namespace iree_compiler {
+namespace IREE {
+namespace Flow {
+
+// Populates flow.dispatch.* canonicalization patterns.
+void populateFlowDispatchCanonicalizationPatterns(
+    ::mlir::OwningRewritePatternList &results, ::mlir::MLIRContext *context);
+
+}  // namespace Flow
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 #endif  // IREE_COMPILER_DIALECT_FLOW_IR_FLOWOPS_H_

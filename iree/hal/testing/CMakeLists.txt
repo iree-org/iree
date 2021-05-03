@@ -16,7 +16,7 @@ iree_cc_library(
   HDRS
     "driver_registry.h"
   DEPS
-    iree::hal::api
+    iree::hal
     iree::hal::drivers
   TESTONLY
   PUBLIC

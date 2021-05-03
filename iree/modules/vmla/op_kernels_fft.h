@@ -48,11 +48,12 @@ using ShapeSpan = absl::Span<const int32_t>;
 
 struct Fft {
   template <typename T>
-  static Status Execute(absl::Span<const T> real_src_buffer,
-                        absl::Span<const T> imag_src_buffer,
-                        absl::Span<T> real_dst_buffer,
-                        absl::Span<T> imag_dst_buffer, ShapeSpan real_src_shape,
-                        ShapeSpan imag_src_shape) {
+  static iree_status_t Execute(absl::Span<const T> real_src_buffer,
+                               absl::Span<const T> imag_src_buffer,
+                               absl::Span<T> real_dst_buffer,
+                               absl::Span<T> imag_dst_buffer,
+                               ShapeSpan real_src_shape,
+                               ShapeSpan imag_src_shape) {
     PFFFT_Setup* fft_state =
         pffft_new_setup(real_src_shape.back(), PFFFT_COMPLEX);
     int element_count = real_src_buffer.size();
@@ -77,17 +78,18 @@ struct Fft {
       imag_dst_buffer[i] = complex_output[i * 2 + 1];
     }
     pffft_destroy_setup(fft_state);
-    return OkStatus();
+    return iree_ok_status();
   }
 };
 
 struct Ifft {
   template <typename T>
-  static Status Execute(absl::Span<const T> real_src_buffer,
-                        absl::Span<const T> imag_src_buffer,
-                        absl::Span<T> real_dst_buffer,
-                        absl::Span<T> imag_dst_buffer, ShapeSpan real_src_shape,
-                        ShapeSpan imag_src_shape) {
+  static iree_status_t Execute(absl::Span<const T> real_src_buffer,
+                               absl::Span<const T> imag_src_buffer,
+                               absl::Span<T> real_dst_buffer,
+                               absl::Span<T> imag_dst_buffer,
+                               ShapeSpan real_src_shape,
+                               ShapeSpan imag_src_shape) {
     PFFFT_Setup* fft_state =
         pffft_new_setup(real_src_shape.back(), PFFFT_COMPLEX);
     int element_count = real_src_buffer.size();
@@ -113,16 +115,16 @@ struct Ifft {
       imag_dst_buffer[i] = complex_output[i * 2 + 1] / element_count;
     }
     pffft_destroy_setup(fft_state);
-    return OkStatus();
+    return iree_ok_status();
   }
 };
 
 struct Rfft {
   template <typename T>
-  static Status Execute(absl::Span<const T> real_src_buffer,
-                        absl::Span<T> real_dst_buffer,
-                        absl::Span<T> imag_dst_buffer,
-                        ShapeSpan real_src_shape) {
+  static iree_status_t Execute(absl::Span<const T> real_src_buffer,
+                               absl::Span<T> real_dst_buffer,
+                               absl::Span<T> imag_dst_buffer,
+                               ShapeSpan real_src_shape) {
     PFFFT_Setup* fft_state = pffft_new_setup(real_src_shape.back(), PFFFT_REAL);
     int element_count = real_src_buffer.size() / 2 + 1;
 
@@ -142,16 +144,17 @@ struct Rfft {
     real_dst_buffer[element_count - 1] = imag_dst_buffer[0];
     imag_dst_buffer[0] = temp;
     pffft_destroy_setup(fft_state);
-    return OkStatus();
+    return iree_ok_status();
   }
 };
 
 struct Irfft {
   template <typename T>
-  static Status Execute(absl::Span<const T> real_src_buffer,
-                        absl::Span<const T> imag_src_buffer,
-                        absl::Span<T> real_dst_buffer, ShapeSpan real_src_shape,
-                        ShapeSpan imag_src_shape) {
+  static iree_status_t Execute(absl::Span<const T> real_src_buffer,
+                               absl::Span<const T> imag_src_buffer,
+                               absl::Span<T> real_dst_buffer,
+                               ShapeSpan real_src_shape,
+                               ShapeSpan imag_src_shape) {
     PFFFT_Setup* fft_state = pffft_new_setup(real_src_shape.back(), PFFFT_REAL);
     int element_count = real_src_buffer.size();
     std::vector<T> complex_input;
@@ -167,7 +170,7 @@ struct Irfft {
                             NULL, PFFFT_BACKWARD);
 
     pffft_destroy_setup(fft_state);
-    return OkStatus();
+    return iree_ok_status();
   }
 };
 

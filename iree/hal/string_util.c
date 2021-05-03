@@ -19,47 +19,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "absl/strings/numbers.h"
-#include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"
 
-// TODO(benvanik): implement these ato* helpers and move to iree/base/.
-
-IREE_API_EXPORT bool iree_string_view_atoi_int32(iree_string_view_t value,
-                                                 int32_t* out_value) {
-  return absl::SimpleAtoi(absl::string_view(value.data, value.size), out_value);
-}
-
-IREE_API_EXPORT bool iree_string_view_atoi_uint32(iree_string_view_t value,
-                                                  uint32_t* out_value) {
-  return absl::SimpleAtoi(absl::string_view(value.data, value.size), out_value);
-}
-
-IREE_API_EXPORT bool iree_string_view_atoi_int64(iree_string_view_t value,
-                                                 int64_t* out_value) {
-  return absl::SimpleAtoi(absl::string_view(value.data, value.size), out_value);
-}
-
-IREE_API_EXPORT bool iree_string_view_atoi_uint64(iree_string_view_t value,
-                                                  uint64_t* out_value) {
-  return absl::SimpleAtoi(absl::string_view(value.data, value.size), out_value);
-}
-
-IREE_API_EXPORT bool iree_string_view_atof(iree_string_view_t value,
-                                           float* out_value) {
-  return absl::SimpleAtof(absl::string_view(value.data, value.size), out_value);
-}
-
-IREE_API_EXPORT bool iree_string_view_atod(iree_string_view_t value,
-                                           double* out_value) {
-  return absl::SimpleAtod(absl::string_view(value.data, value.size), out_value);
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
+IREE_API_EXPORT iree_status_t iree_hal_parse_shape(
     iree_string_view_t value, iree_host_size_t shape_capacity,
     iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank) {
   IREE_ASSERT_ARGUMENT(out_shape_rank);
@@ -110,7 +76,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
                       iree_host_size_t buffer_capacity, char* buffer,
                       iree_host_size_t* out_buffer_length) {
@@ -119,14 +85,14 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
   }
   iree_host_size_t buffer_length = 0;
   for (iree_host_size_t i = 0; i < shape_rank; ++i) {
-    int n = snprintf(buffer ? buffer + buffer_length : nullptr,
+    int n = snprintf(buffer ? buffer + buffer_length : NULL,
                      buffer ? buffer_capacity - buffer_length : 0,
                      (i < shape_rank - 1) ? "%dx" : "%d", shape[i]);
     if (n < 0) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "snprintf failed to write dimension %zu", i);
     } else if (buffer && n >= buffer_capacity - buffer_length) {
-      buffer = nullptr;
+      buffer = NULL;
     }
     buffer_length += n;
   }
@@ -137,7 +103,7 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
                 : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
+IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
     iree_string_view_t value, iree_hal_element_type_t* out_element_type) {
   IREE_ASSERT_ARGUMENT(out_element_type);
   *out_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
@@ -171,7 +137,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
+IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
     iree_hal_element_type_t element_type, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
   if (out_buffer_length) {
@@ -192,9 +158,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
       prefix = "*";
       break;
   }
-  int n =
-      snprintf(buffer, buffer_capacity, "%s%d", prefix,
-               static_cast<int32_t>(iree_hal_element_bit_count(element_type)));
+  int n = snprintf(buffer, buffer_capacity, "%s%d", prefix,
+                   (int32_t)iree_hal_element_bit_count(element_type));
   if (n < 0) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "snprintf failed");
   }
@@ -209,7 +174,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
 static void iree_hal_hex_string_to_bytes(const char* from, uint8_t* to,
                                          ptrdiff_t num) {
   /* clang-format off */
-  static constexpr char kHexValue[256] = {
+  static const char kHexValue[256] = {
       0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -319,7 +284,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
   }
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element(
+IREE_API_EXPORT iree_status_t iree_hal_parse_element(
     iree_string_view_t data_str, iree_hal_element_type_t element_type,
     iree_byte_span_t data_ptr) {
   iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
@@ -335,7 +300,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element(
 // Converts a sequence of bytes into hex number strings.
 static void iree_hal_bytes_to_hex_string(const uint8_t* src, char* dest,
                                          ptrdiff_t num) {
-  static constexpr char kHexTable[513] =
+  static const char kHexTable[513] =
       "000102030405060708090A0B0C0D0E0F"
       "101112131415161718191A1B1C1D1E1F"
       "202122232425262728292A2B2C2D2E2F"
@@ -352,13 +317,14 @@ static void iree_hal_bytes_to_hex_string(const uint8_t* src, char* dest,
       "D0D1D2D3D4D5D6D7D8D9DADBDCDDDEDF"
       "E0E1E2E3E4E5E6E7E8E9EAEBECEDEEEF"
       "F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF";
-  for (auto src_ptr = src; src_ptr != (src + num); ++src_ptr, dest += 2) {
+  for (const uint8_t* src_ptr = src; src_ptr != (src + num);
+       ++src_ptr, dest += 2) {
     const char* hex_p = &kHexTable[*src_ptr * 2];
     memcpy(dest, hex_p, 2);
   }
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
+IREE_API_EXPORT iree_status_t iree_hal_format_element(
     iree_const_byte_span_t data, iree_hal_element_type_t element_type,
     iree_host_size_t buffer_capacity, char* buffer,
     iree_host_size_t* out_buffer_length) {
@@ -427,7 +393,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
   if (n < 0) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "snprintf failed");
   } else if (buffer && n >= buffer_capacity) {
-    buffer = nullptr;
+    buffer = NULL;
   }
   if (out_buffer_length) {
     *out_buffer_length = n;
@@ -436,10 +402,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
                 : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
+IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
     iree_string_view_t data_str, iree_hal_element_type_t element_type,
     iree_byte_span_t data_ptr) {
-  IREE_TRACE_SCOPE0("iree_hal_parse_buffer_elements");
   iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
   iree_host_size_t element_capacity = data_ptr.data_length / element_size;
   if (iree_string_view_is_empty(data_str)) {
@@ -467,8 +432,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
           element_capacity, dst_i);
     }
     IREE_RETURN_IF_ERROR(iree_hal_parse_element_unsafe(
-        iree_string_view_t{data_str.data + token_start,
-                           src_i - 2 - token_start + 1},
+        iree_make_string_view(data_str.data + token_start,
+                              src_i - 2 - token_start + 1),
         element_type, data_ptr.data + dst_i * element_size));
     ++dst_i;
     token_start = IREE_STRING_VIEW_NPOS;
@@ -481,8 +446,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
           element_capacity, dst_i);
     }
     IREE_RETURN_IF_ERROR(iree_hal_parse_element_unsafe(
-        iree_string_view_t{data_str.data + token_start,
-                           data_str.size - token_start},
+        iree_make_string_view(data_str.data + token_start,
+                              data_str.size - token_start),
         element_type, data_ptr.data + dst_i * element_size));
     ++dst_i;
   }
@@ -501,24 +466,25 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
   return iree_ok_status();
 }
 
+#define APPEND_CHAR(c)                           \
+  {                                              \
+    if (buffer) {                                \
+      if (buffer_length < buffer_capacity - 1) { \
+        buffer[buffer_length] = c;               \
+        buffer[buffer_length + 1] = '\0';        \
+      } else {                                   \
+        buffer = NULL;                           \
+      }                                          \
+    }                                            \
+    ++buffer_length;                             \
+  }
+
 static iree_status_t iree_hal_format_buffer_elements_recursive(
     iree_const_byte_span_t data, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_host_size_t* max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
   iree_host_size_t buffer_length = 0;
-  auto append_char = [&](char c) {
-    if (buffer) {
-      if (buffer_length < buffer_capacity - 1) {
-        buffer[buffer_length] = c;
-        buffer[buffer_length + 1] = '\0';
-      } else {
-        buffer = nullptr;
-      }
-    }
-    ++buffer_length;
-  };
-
   if (shape_rank == 0) {
     // Scalar value; recurse to get on to the leaf dimension path.
     const iree_hal_dim_t one = 1;
@@ -537,27 +503,26 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
           "input data underflow: data_length=%zu < expected=%zu",
-          data.data_length,
-          static_cast<iree_host_size_t>(dim_stride * shape[0]));
+          data.data_length, (iree_host_size_t)(dim_stride * shape[0]));
     }
     iree_const_byte_span_t subdata;
     subdata.data = data.data;
     subdata.data_length = dim_stride;
     for (iree_hal_dim_t i = 0; i < shape[0]; ++i) {
-      append_char('[');
+      APPEND_CHAR('[');
       iree_host_size_t actual_length = 0;
       iree_status_t status = iree_hal_format_buffer_elements_recursive(
           subdata, shape + 1, shape_rank - 1, element_type, max_element_count,
           buffer ? buffer_capacity - buffer_length : 0,
-          buffer ? buffer + buffer_length : nullptr, &actual_length);
+          buffer ? buffer + buffer_length : NULL, &actual_length);
       buffer_length += actual_length;
       if (iree_status_is_out_of_range(status)) {
-        buffer = nullptr;
+        buffer = NULL;
       } else if (!iree_status_is_ok(status)) {
         return status;
       }
       subdata.data += dim_stride;
-      append_char(']');
+      APPEND_CHAR(']');
     }
   } else {
     // Leaf dimension; output data.
@@ -569,31 +534,30 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
           "input data underflow; data_length=%zu < expected=%zu",
-          data.data_length,
-          static_cast<iree_host_size_t>(max_count * element_stride));
+          data.data_length, (iree_host_size_t)(max_count * element_stride));
     }
     *max_element_count -= max_count;
     iree_const_byte_span_t subdata;
     subdata.data = data.data;
     subdata.data_length = element_stride;
     for (iree_hal_dim_t i = 0; i < max_count; ++i) {
-      if (i > 0) append_char(' ');
+      if (i > 0) APPEND_CHAR(' ');
       iree_host_size_t actual_length = 0;
       iree_status_t status = iree_hal_format_element(
           subdata, element_type, buffer ? buffer_capacity - buffer_length : 0,
-          buffer ? buffer + buffer_length : nullptr, &actual_length);
+          buffer ? buffer + buffer_length : NULL, &actual_length);
       subdata.data += element_stride;
       buffer_length += actual_length;
       if (iree_status_is_out_of_range(status)) {
-        buffer = nullptr;
+        buffer = NULL;
       } else if (!iree_status_is_ok(status)) {
         return status;
       }
     }
     if (max_count < shape[0]) {
-      append_char('.');
-      append_char('.');
-      append_char('.');
+      APPEND_CHAR('.');
+      APPEND_CHAR('.');
+      APPEND_CHAR('.');
     }
   }
   if (out_buffer_length) {
@@ -603,12 +567,11 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
                 : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_buffer_elements(
+IREE_API_EXPORT iree_status_t iree_hal_format_buffer_elements(
     iree_const_byte_span_t data, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
-  IREE_TRACE_SCOPE0("iree_hal_format_buffer_elements");
   if (out_buffer_length) {
     *out_buffer_length = 0;
   }

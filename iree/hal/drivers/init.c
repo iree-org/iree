@@ -36,7 +36,7 @@
 #include "iree/hal/vulkan/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_VULKAN_DRIVER_MODULE
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry) {
   IREE_TRACE_ZONE_BEGIN(z0);
 

@@ -32,10 +32,10 @@ iree_pyext_module(
   UNIX_LINKER_SCRIPT
     "unix_version.lds"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::signature_parser
     iree::base::status
-    iree::hal::api
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::modules::strings::strings_module

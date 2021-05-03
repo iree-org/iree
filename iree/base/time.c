@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/base/time.h"
+
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-#include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 
 IREE_API_EXPORT iree_time_t iree_time_now() {

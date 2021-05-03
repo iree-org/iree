@@ -23,7 +23,7 @@
 
 #include "iree/base/alignment.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/synchronization.h"
+#include "iree/base/internal/synchronization.h"
 
 #ifdef __cplusplus
 extern "C" {
