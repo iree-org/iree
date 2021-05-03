@@ -44,11 +44,11 @@ If you want to explicitly specify HAL drivers to support, you will need to add
 
 #### Download as Python package
 
-IREE uses continuous integration services to compile and publish artifacts into
-[GitHub Releases][iree-releases] page. Right now these are just snapshots of
-the `main` development branch.
+Python packages for various IREE functionalities are regularly published on
+IREE's [GitHub Releases][iree-releases] page.  Right now these are just
+snapshots of the `main` development branch.
 
-You can install the Python package containing the SPIR-V compiler by
+You can install the Python package containing the LLVM-based dylib compiler by
 
 ``` shell
 python -m pip install iree-compiler-snapshot \
@@ -95,7 +95,7 @@ In the build directory, run the following command:
 iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=dylib-llvm-aot \
-    iree_input.mlir -o mobilenet.vmfb
+    iree_input.mlir -o mobilenet-dylib.vmfb
 ```
 
 !!! todo
@@ -114,7 +114,7 @@ In the build directory, run the following command:
 ``` shell hl_lines="2"
 iree/tools/iree-run-module \
     --driver=dylib \
-    --module_file=mobilenet.vmfb \
+    --module_file=mobilenet-dylib.vmfb \
     --entry_function=predict \
     --function_inputs="1x224x224x3xf32=0"
 ```
