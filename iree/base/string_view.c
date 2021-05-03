@@ -23,8 +23,8 @@ static inline size_t iree_min_host_size(size_t a, size_t b) {
   return a < b ? a : b;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL
-iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs) {
+IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
+                                            iree_string_view_t rhs) {
   if (lhs.size != rhs.size) return false;
   for (iree_host_size_t i = 0; i < lhs.size; ++i) {
     if (lhs.data[i] != rhs.data[i]) return false;
@@ -32,8 +32,8 @@ iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs) {
   return true;
 }
 
-IREE_API_EXPORT int IREE_API_CALL
-iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
+IREE_API_EXPORT int iree_string_view_compare(iree_string_view_t lhs,
+                                             iree_string_view_t rhs) {
   iree_host_size_t min_size = iree_min_host_size(lhs.size, rhs.size);
   int cmp = strncmp(lhs.data, rhs.data, min_size);
   if (cmp != 0) {
@@ -44,7 +44,7 @@ iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
   return lhs.size < rhs.size ? -1 : 1;
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_char(
     iree_string_view_t value, char c, iree_host_size_t pos) {
   if (iree_string_view_is_empty(value) || pos >= value.size) {
     return IREE_STRING_VIEW_NPOS;
@@ -54,7 +54,7 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
   return result != NULL ? result - value.data : IREE_STRING_VIEW_NPOS;
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_first_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos) {
   if (iree_string_view_is_empty(value) || iree_string_view_is_empty(s)) {
     return IREE_STRING_VIEW_NPOS;
@@ -75,7 +75,7 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
   return IREE_STRING_VIEW_NPOS;
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_last_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos) {
   if (iree_string_view_is_empty(value) || iree_string_view_is_empty(s)) {
     return IREE_STRING_VIEW_NPOS;
@@ -95,16 +95,16 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
   return IREE_STRING_VIEW_NPOS;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
-    iree_string_view_t value, iree_string_view_t prefix) {
+IREE_API_EXPORT bool iree_string_view_starts_with(iree_string_view_t value,
+                                                  iree_string_view_t prefix) {
   if (!value.data || !prefix.data || !prefix.size || prefix.size > value.size) {
     return false;
   }
   return strncmp(value.data, prefix.data, prefix.size) == 0;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_ends_with(
-    iree_string_view_t value, iree_string_view_t suffix) {
+IREE_API_EXPORT bool iree_string_view_ends_with(iree_string_view_t value,
+                                                iree_string_view_t suffix) {
   if (!value.data || !suffix.data || !suffix.size || suffix.size > value.size) {
     return false;
   }
@@ -112,7 +112,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_ends_with(
                  suffix.size) == 0;
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n) {
   if (n >= value.size) {
     return iree_string_view_empty();
@@ -120,7 +120,7 @@ iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n) {
   return iree_make_string_view(value.data + n, value.size - n);
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_remove_suffix(iree_string_view_t value, iree_host_size_t n) {
   if (n >= value.size) {
     return iree_string_view_empty();
@@ -128,7 +128,7 @@ iree_string_view_remove_suffix(iree_string_view_t value, iree_host_size_t n) {
   return iree_make_string_view(value.data, value.size - n);
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_prefix(
+IREE_API_EXPORT iree_string_view_t iree_string_view_strip_prefix(
     iree_string_view_t value, iree_string_view_t prefix) {
   if (iree_string_view_starts_with(value, prefix)) {
     return iree_string_view_remove_prefix(value, prefix.size);
@@ -136,7 +136,7 @@ IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_prefix(
   return value;
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_suffix(
+IREE_API_EXPORT iree_string_view_t iree_string_view_strip_suffix(
     iree_string_view_t value, iree_string_view_t suffix) {
   if (iree_string_view_ends_with(value, suffix)) {
     return iree_string_view_remove_suffix(value, suffix.size);
@@ -144,7 +144,7 @@ IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_suffix(
   return value;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_prefix(
+IREE_API_EXPORT bool iree_string_view_consume_prefix(
     iree_string_view_t* value, iree_string_view_t prefix) {
   if (iree_string_view_starts_with(*value, prefix)) {
     *value = iree_string_view_remove_prefix(*value, prefix.size);
@@ -153,7 +153,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_prefix(
   return false;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_suffix(
+IREE_API_EXPORT bool iree_string_view_consume_suffix(
     iree_string_view_t* value, iree_string_view_t suffix) {
   if (iree_string_view_ends_with(*value, suffix)) {
     *value = iree_string_view_remove_suffix(*value, suffix.size);
@@ -162,7 +162,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_suffix(
   return false;
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_trim(iree_string_view_t value) {
   if (iree_string_view_is_empty(value)) return value;
   iree_host_size_t start = 0;
@@ -184,16 +184,17 @@ iree_string_view_trim(iree_string_view_t value) {
   return iree_make_string_view(value.data + start, end - start + 1);
 }
 
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_substr(
+IREE_API_EXPORT iree_string_view_t iree_string_view_substr(
     iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n) {
   pos = iree_min_host_size(pos, value.size);
   n = iree_min_host_size(n, value.size - pos);
   return iree_make_string_view(value.data + pos, n);
 }
 
-IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
-    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
-    iree_string_view_t* out_rhs) {
+IREE_API_EXPORT intptr_t iree_string_view_split(iree_string_view_t value,
+                                                char split_char,
+                                                iree_string_view_t* out_lhs,
+                                                iree_string_view_t* out_rhs) {
   *out_lhs = iree_string_view_empty();
   *out_rhs = iree_string_view_empty();
   if (!value.data || !value.size) {
@@ -259,15 +260,14 @@ static bool iree_string_view_match_pattern_impl(iree_string_view_t value,
   return false;
 }
 
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
+IREE_API_EXPORT bool iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern) {
   return iree_string_view_match_pattern_impl(value, pattern);
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL
-iree_string_view_append_to_buffer(iree_string_view_t source_value,
-                                  iree_string_view_t* target_value,
-                                  char* buffer) {
+IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(
+    iree_string_view_t source_value, iree_string_view_t* target_value,
+    char* buffer) {
   memcpy(buffer, source_value.data, source_value.size);
   target_value->data = buffer;
   target_value->size = source_value.size;

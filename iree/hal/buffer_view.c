@@ -73,30 +73,30 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
   return status;
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_view_retain(iree_hal_buffer_view_t* buffer_view) {
+IREE_API_EXPORT void iree_hal_buffer_view_retain(
+    iree_hal_buffer_view_t* buffer_view) {
   if (IREE_LIKELY(buffer_view)) {
     iree_atomic_ref_count_inc(&buffer_view->ref_count);
   }
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view) {
+IREE_API_EXPORT void iree_hal_buffer_view_release(
+    iree_hal_buffer_view_t* buffer_view) {
   if (IREE_LIKELY(buffer_view) &&
       iree_atomic_ref_count_dec(&buffer_view->ref_count) == 1) {
     iree_hal_buffer_view_destroy(buffer_view);
   }
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_view_destroy(iree_hal_buffer_view_t* buffer_view) {
+IREE_API_EXPORT void iree_hal_buffer_view_destroy(
+    iree_hal_buffer_view_t* buffer_view) {
   iree_allocator_t host_allocator = iree_hal_allocator_host_allocator(
       iree_hal_buffer_allocator(buffer_view->buffer));
   iree_hal_buffer_release(buffer_view->buffer);
   iree_allocator_free(host_allocator, buffer_view);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_subview(
     const iree_hal_buffer_view_t* buffer_view,
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
     const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
@@ -127,19 +127,19 @@ IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_view_buffer(
   return buffer_view->buffer;
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL
+IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_shape_rank(const iree_hal_buffer_view_t* buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer_view);
   return buffer_view->shape_rank;
 }
 
-IREE_API_EXPORT const iree_hal_dim_t* IREE_API_CALL
-iree_hal_buffer_view_shape_dims(const iree_hal_buffer_view_t* buffer_view) {
+IREE_API_EXPORT const iree_hal_dim_t* iree_hal_buffer_view_shape_dims(
+    const iree_hal_buffer_view_t* buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer_view);
   return buffer_view->shape;
 }
 
-IREE_API_EXPORT iree_hal_dim_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
+IREE_API_EXPORT iree_hal_dim_t iree_hal_buffer_view_shape_dim(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t index) {
   IREE_ASSERT_ARGUMENT(buffer_view);
   if (IREE_UNLIKELY(index > buffer_view->shape_rank)) {
@@ -158,7 +158,7 @@ iree_hal_buffer_view_element_count(const iree_hal_buffer_view_t* buffer_view) {
   return element_count;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_shape(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t rank_capacity,
     iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank) {
   IREE_ASSERT_ARGUMENT(buffer_view);
@@ -182,7 +182,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_reshape(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_reshape(
     iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank) {
   IREE_ASSERT_ARGUMENT(buffer_view);
@@ -215,7 +215,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_reshape(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_hal_element_type_t IREE_API_CALL
+IREE_API_EXPORT iree_hal_element_type_t
 iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer_view);
   return buffer_view->element_type;
@@ -227,13 +227,13 @@ iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view) {
   return iree_hal_element_byte_count(buffer_view->element_type);
 }
 
-IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer_view);
   return buffer_view->byte_length;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_offset(
     const iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* indices,
     iree_host_size_t indices_count, iree_device_size_t* out_offset) {
   IREE_ASSERT_ARGUMENT(buffer_view);
@@ -242,7 +242,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
       indices, indices_count, out_offset);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
     const iree_hal_buffer_view_t* buffer_view,
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
     const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
@@ -254,7 +254,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
       out_length);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_compute_view_size(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_element_type_t element_type,
     iree_device_size_t* out_allocation_size) {
@@ -269,7 +269,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_compute_view_size(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_compute_view_offset(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_element_type_t element_type, const iree_hal_dim_t* indices,
     iree_host_size_t indices_count, iree_device_size_t* out_offset) {
@@ -302,7 +302,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_compute_view_offset(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_compute_view_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_element_type_t element_type, const iree_hal_dim_t* start_indices,
     iree_host_size_t indices_count, const iree_hal_dim_t* lengths,

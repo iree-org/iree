@@ -25,7 +25,7 @@ typedef struct iree_hal_heap_allocator_s {
 
 static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable;
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_create_heap(
+IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
     iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(out_allocator);

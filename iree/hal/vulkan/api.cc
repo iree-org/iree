@@ -29,7 +29,7 @@ using namespace iree::hal::vulkan;
 // iree::hal::vulkan::DynamicSymbols
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_syms_create(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create(
     void* vkGetInstanceProcAddr_fn, iree_allocator_t host_allocator,
     iree_hal_vulkan_syms_t** out_syms) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_syms_create");
@@ -52,8 +52,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_syms_create(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_syms_create_from_system_loader(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create_from_system_loader(
     iree_allocator_t host_allocator, iree_hal_vulkan_syms_t** out_syms) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_syms_create_from_system_loader");
   IREE_ASSERT_ARGUMENT(out_syms);
@@ -64,8 +63,7 @@ iree_hal_vulkan_syms_create_from_system_loader(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_vulkan_syms_retain(iree_hal_vulkan_syms_t* syms) {
+IREE_API_EXPORT void iree_hal_vulkan_syms_retain(iree_hal_vulkan_syms_t* syms) {
   IREE_ASSERT_ARGUMENT(syms);
   auto* handle = reinterpret_cast<DynamicSymbols*>(syms);
   if (handle) {
@@ -73,8 +71,8 @@ iree_hal_vulkan_syms_retain(iree_hal_vulkan_syms_t* syms) {
   }
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms) {
+IREE_API_EXPORT void iree_hal_vulkan_syms_release(
+    iree_hal_vulkan_syms_t* syms) {
   IREE_ASSERT_ARGUMENT(syms);
   auto* handle = reinterpret_cast<DynamicSymbols*>(syms);
   if (handle) {

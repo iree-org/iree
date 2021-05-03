@@ -18,7 +18,7 @@
 // IREE Core API
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_api_version_check(iree_api_version_t expected_version,
                        iree_api_version_t* out_actual_version) {
   if (!out_actual_version) {

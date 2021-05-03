@@ -132,11 +132,6 @@ extern "C" {
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): switch to static_cast/reinterpret_cast when in C++.
-// TODO(benvanik): see if we can shove in static_asserts somehow?
-#define iree_static_cast(type, value) (type)(value)
-#define iree_reinterpret_cast(type, value) (type)(value)
-
 // Returns the number of elements in an array as a compile-time constant, which
 // can be used in defining new arrays. Fails at compile-time if |arr| is not a
 // static array (such as if used on a pointer type).
@@ -223,82 +218,84 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
 #define IREE_SV(cstr) iree_make_cstring_view(cstr)
 
 // Returns true if the two strings are equal (compare == 0).
-IREE_API_EXPORT bool IREE_API_CALL
-iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs);
+IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
+                                            iree_string_view_t rhs);
 
 // Like std::string::compare but with iree_string_view_t values.
-IREE_API_EXPORT int IREE_API_CALL
-iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
+IREE_API_EXPORT int iree_string_view_compare(iree_string_view_t lhs,
+                                             iree_string_view_t rhs);
 
 // Finds the first occurrence of |c| in |value| starting at |pos|.
 // Returns the found character position or IREE_STRING_VIEW_NPOS if not found.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_char(
     iree_string_view_t value, char c, iree_host_size_t pos);
 
 // Returns the index of the first occurrence of one of the characters in |s| or
 // -1 if none of the characters were found.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_first_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos);
 
 // Returns the index of the last occurrence of one of the characters in |s| or
 // -1 if none of the characters were found.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
+IREE_API_EXPORT iree_host_size_t iree_string_view_find_last_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos);
 
 // Returns true if the string starts with the given prefix.
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
-    iree_string_view_t value, iree_string_view_t prefix);
+IREE_API_EXPORT bool iree_string_view_starts_with(iree_string_view_t value,
+                                                  iree_string_view_t prefix);
 
 // Returns true if the string starts with the given suffix.
-IREE_API_EXPORT bool IREE_API_CALL
-iree_string_view_ends_with(iree_string_view_t value, iree_string_view_t suffix);
+IREE_API_EXPORT bool iree_string_view_ends_with(iree_string_view_t value,
+                                                iree_string_view_t suffix);
 
 // Removes the first |n| characters from the string view (not the data).
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n);
 
 // Removes the last |n| characters from the string view (not the data).
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_remove_suffix(iree_string_view_t value, iree_host_size_t n);
 
 // Removes the given substring prefix from the string view if present.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_prefix(
+IREE_API_EXPORT iree_string_view_t iree_string_view_strip_prefix(
     iree_string_view_t value, iree_string_view_t prefix);
 
 // Removes the given substring suffix from the string view if present.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_strip_suffix(
+IREE_API_EXPORT iree_string_view_t iree_string_view_strip_suffix(
     iree_string_view_t value, iree_string_view_t suffix);
 
 // Removes the given substring prefix from the string view if present in-place.
 // Returns true if the strip succeeded.
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_prefix(
-    iree_string_view_t* value, iree_string_view_t prefix);
+IREE_API_EXPORT bool iree_string_view_consume_prefix(iree_string_view_t* value,
+                                                     iree_string_view_t prefix);
 
 // Removes the given substring suffix from the string view if present in-place.
 // Returns true if the strip succeeded.
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_consume_suffix(
-    iree_string_view_t* value, iree_string_view_t suffix);
+IREE_API_EXPORT bool iree_string_view_consume_suffix(iree_string_view_t* value,
+                                                     iree_string_view_t suffix);
 
 // Removes leading and trailing whitespace.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_string_view_trim(iree_string_view_t value);
 
 // Returns a substring of the string view at offset |pos| and length |n|.
 // Use |n| == INTPTR_MAX to take the remaineder of the string after |pos|.
 // Returns empty string on failure.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_substr(
+IREE_API_EXPORT iree_string_view_t iree_string_view_substr(
     iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n);
 
 // Splits |value| into two parts based on the first occurrence of |split_char|.
 // Returns the index of the |split_char| in the original |value| or -1 if not
 // found.
-IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
-    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
-    iree_string_view_t* out_rhs);
+IREE_API_EXPORT intptr_t iree_string_view_split(iree_string_view_t value,
+                                                char split_char,
+                                                iree_string_view_t* out_lhs,
+                                                iree_string_view_t* out_rhs);
 
 // Replaces all occurrences of |old_char| with |new_char|.
-IREE_API_EXPORT void IREE_API_CALL iree_string_view_replace_char(
-    iree_string_view_t value, char old_char, char new_char);
+IREE_API_EXPORT void iree_string_view_replace_char(iree_string_view_t value,
+                                                   char old_char,
+                                                   char new_char);
 
 // Returns true if the given |value| matches |pattern| (normal * and ? rules).
 // This accepts wildcards in the form of '*' and '?' for any delimited value.
@@ -308,15 +305,14 @@ IREE_API_EXPORT void IREE_API_CALL iree_string_view_replace_char(
 // For example,
 // 'foo-*-bar' matches: 'foo-123-bar', 'foo-456-789-bar'
 // 'foo-10?' matches: 'foo-101', 'foo-102'
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
-    iree_string_view_t value, iree_string_view_t pattern);
+IREE_API_EXPORT bool iree_string_view_match_pattern(iree_string_view_t value,
+                                                    iree_string_view_t pattern);
 
 // Copies the string bytes into the target buffer and returns the number of
 // characters copied. Does not include a NUL terminator.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL
-iree_string_view_append_to_buffer(iree_string_view_t source_value,
-                                  iree_string_view_t* target_value,
-                                  char* buffer);
+IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(
+    iree_string_view_t source_value, iree_string_view_t* target_value,
+    char* buffer);
 
 //===----------------------------------------------------------------------===//
 // IREE_STATUS_FEATURE flags and IREE_STATUS_MODE setting
@@ -671,8 +667,7 @@ iree_status_code_from_win32_error(uint32_t error);
 // Returns a NUL-terminated string constant for the given status code, such as
 // IREE_STATUS_UNAVAILABLE = "UNAVAILABLE". Do not rely on string-matching the
 // result as the exact text may change.
-IREE_API_EXPORT const char* IREE_API_CALL
-iree_status_code_string(iree_status_code_t code);
+IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code);
 
 // Allocates a new status instance for a failing error |code|.
 // |file| and |line| should be populated with __FILE__ and __LINE__ at the call
@@ -680,68 +675,64 @@ iree_status_code_string(iree_status_code_t code);
 //
 // The status will be allocated using the default system allocator and must be
 // freed using either iree_status_free or iree_status_ignore.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
                      iree_string_view_t message);
 
 // Allocates a new status instance for a failing error |code| and annotates it
 // with a printf-style format string. Roughly equivalent (though more efficient)
 // than iree_status_allocate + iree_status_annotate_f.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-    IREE_PRINTF_ATTRIBUTE(4, 5)
-        iree_status_allocate_f(iree_status_code_t code, const char* file,
-                               uint32_t line, const char* format, ...);
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(4, 5)
+    iree_status_allocate_f(iree_status_code_t code, const char* file,
+                           uint32_t line, const char* format, ...);
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_allocate_vf(iree_status_code_t code, const char* file,
-                        uint32_t line, const char* format, va_list varargs_0,
-                        va_list varargs_1);
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t iree_status_allocate_vf(
+    iree_status_code_t code, const char* file, uint32_t line,
+    const char* format, va_list varargs_0, va_list varargs_1);
 
 // Clones |status| into a new status instance.
 // No payloads, if present, will be cloned.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_clone(iree_status_t status);
 
 // Frees |status| if it has any associated storage.
-IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status);
+IREE_API_EXPORT void iree_status_free(iree_status_t status);
 
 // Ignores |status| regardless of its value and frees any associated payloads.
 // Returns an OK status that can be used when chaining.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_status_ignore(iree_status_t status);
+IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
 
 // Consumes the |status| by freeing its storage and returning its code.
-IREE_API_EXPORT iree_status_code_t IREE_API_CALL
+IREE_API_EXPORT iree_status_code_t
 iree_status_consume_code(iree_status_t status);
 
 // Annotates a status message with the given constant string message.
 // Ignored if |base_status| is OK.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_annotate(iree_status_t base_status, iree_string_view_t message);
 
 // Annotates a status message with the given printf-style message.
 // Ignored if |base_status| is OK.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-    IREE_PRINTF_ATTRIBUTE(2, 3)
-        iree_status_annotate_f(iree_status_t base_status, const char* format,
-                               ...);
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
+    iree_status_annotate_f(iree_status_t base_status, const char* format, ...);
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_annotate_vf(iree_status_t base_status, const char* format,
                         va_list varargs_0, va_list varargs_1);
 
 // Formats the status as a multi-line string containing all associated payloads.
 // Note that this may contain PII such as file paths and must only be used for
 // presenting errors to users and not sent to a logs aggregation service.
-IREE_API_EXPORT bool IREE_API_CALL
-iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
-                   char* buffer, iree_host_size_t* out_buffer_length);
+IREE_API_EXPORT bool iree_status_format(iree_status_t status,
+                                        iree_host_size_t buffer_capacity,
+                                        char* buffer,
+                                        iree_host_size_t* out_buffer_length);
 
 // Converts the status to an allocated string value.
 // The caller must free the buffer with the system allocator.
-IREE_API_EXPORT bool IREE_API_CALL
-iree_status_to_string(iree_status_t status, char** out_buffer,
-                      iree_host_size_t* out_buffer_length);
+IREE_API_EXPORT bool iree_status_to_string(iree_status_t status,
+                                           char** out_buffer,
+                                           iree_host_size_t* out_buffer_length);
 
 //===----------------------------------------------------------------------===//
 // IREE Core API
@@ -767,7 +758,7 @@ typedef uint32_t iree_api_version_t;
 //
 // Returns IREE_STATUS_OUT_OF_RANGE if the actual version is not compatible with
 // the expected version.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_api_version_check(iree_api_version_t expected_version,
                        iree_api_version_t* out_actual_version);
 
@@ -958,31 +949,29 @@ typedef struct {
 
 // Allocates a block of |byte_length| bytes from the given allocator.
 // The contents of the returned memory is guaranteed to be zeroed.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
+IREE_API_EXPORT iree_status_t iree_allocator_malloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
 
 // Reallocates |out_ptr| to |byte_length| bytes with the given allocator.
 // If the reallocation fails then the original |out_ptr| is unmodified.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
+IREE_API_EXPORT iree_status_t iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
 
 // Duplicates the given byte block by allocating memory and copying it in.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_allocator_clone(iree_allocator_t allocator,
                      iree_const_byte_span_t source_bytes, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the given allocator.
-IREE_API_EXPORT void IREE_API_CALL
-iree_allocator_free(iree_allocator_t allocator, void* ptr);
+IREE_API_EXPORT void iree_allocator_free(iree_allocator_t allocator, void* ptr);
 
 // Allocates a block of |byte_length| bytes from the default system allocator.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
                                iree_host_size_t byte_length, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the default system allocator.
-IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
-                                                              void* ptr);
+IREE_API_EXPORT void iree_allocator_system_free(void* self, void* ptr);
 
 // Allocates using the iree_allocator_malloc and iree_allocator_free methods.
 // These will usually be backed by malloc and free.
