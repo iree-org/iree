@@ -475,6 +475,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_dim,  //
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace,  //
                    iree_hal_module_state_t,            //
                    rCrD, v) {
+#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+
   iree_vm_buffer_t* key = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r0, &key));
   iree_string_view_t key_str = iree_vm_buffer_as_string(key);
@@ -512,6 +514,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace,  //
   }
   fprintf(stderr, "\n");
 
+#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
   return iree_ok_status();
 }
 
