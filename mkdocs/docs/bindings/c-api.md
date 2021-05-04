@@ -24,10 +24,10 @@ CMake[^2].
 
 ## Concepts
 
-By default, IREE uses a Virtual Machine (VM) at runtime to interpret program
-instructions on the host system. VM instructions may also be lowered further to
-LLVM IR, C, or other representations for static or resource constrained
-deployment.
+By default, IREE uses its own tiny Virtual Machine (VM) at runtime to interpret
+program instructions on the host system. VM instructions may also be lowered
+further to LLVM IR, C, or other representations for static or resource
+constrained deployment.
 
 The VM supports generic operations like loads, stores, arithmetic, function
 calls, and control flow. It builds streams of more complex program logic and
@@ -44,7 +44,8 @@ Most interaction with IREE's C API involves either the VM or the HAL.
 * VM _contexts_ are effectively sandboxes for loading modules and running
   programs
 * VM _modules_ provide extra functionality to execution _contexts_, such as
-  access to hardware accelerators through the HAL
+  access to hardware accelerators through the HAL. Compiled user programs are
+  also modules.
 
 ### IREE HAL
 
@@ -52,6 +53,8 @@ Most interaction with IREE's C API involves either the VM or the HAL.
 * HAL _devices_ interface with hardware, such as by allocating device memory,
   preparing executables, recording and dispatching command buffers, and
   synchronizing with the host
+* HAL _buffers_ and _buffer views_ represent storage and shaped/typed views
+  into that storage (aka "tensors")
 
 ## Using the C API
 
@@ -92,9 +95,8 @@ IREE_CHECK_OK(iree_hal_dylib_driver_module_register(
 ```
 
 !!! tip
-    Macros like `IREE_CHECK_OK()` can be used to help with error handling.
-    In many cases, errors should be bubbled up to hosting applications to
-    handle as they see fit.
+    The `IREE_CHECK_OK()` macro calls `assert()` if an error occurs.
+    Applications should propagate errors and handle or report them as desired.
 
 ### Configure stateful objects
 
@@ -219,6 +221,4 @@ iree_vm_instance_release(instance);
   future too, see
   [this GitHub project](https://github.com/google/iree/projects/18)
 
-*[VM]: Virtual Machine
-*[HAL]: Hardware Abstraction Layer
 *[vmfb]: VM FlatBuffer
