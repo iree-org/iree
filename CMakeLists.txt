@@ -46,6 +46,7 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
 
+option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
@@ -64,7 +65,8 @@ set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision informat
 # Note that this is a normal CMake variable used to gate build features (not
 # a cache variable that is user-settable).
 set(IREE_ENABLE_TENSORFLOW OFF)
-if(${IREE_BUILD_TENSORFLOW_COMPILER} OR
+if(${IREE_BUILD_TENSORFLOW_ALL} OR
+   ${IREE_BUILD_TENSORFLOW_COMPILER} OR
    ${IREE_BUILD_TFLITE_COMPILER} OR
    ${IREE_BUILD_XLA_COMPILER})
   set(IREE_ENABLE_TENSORFLOW ON)
