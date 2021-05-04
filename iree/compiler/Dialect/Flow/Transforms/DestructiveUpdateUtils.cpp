@@ -383,8 +383,6 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
   // Try to rewrite inplace.
   if (failed(rewriteSubTensorInsertInPlace(
           b, cast<SubTensorInsertOp>(capture.rootDestructiveUpdate), target))) {
-    // Nothing has changed yet, so return success. SubTensorInserts will be
-    // handled later.
     return failure();
   }
 

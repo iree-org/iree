@@ -808,7 +808,12 @@ struct TileAndDistributeOnTensorsPattern
   }
 };
 
-static bool checkAllShapesAreEqual(ArrayRef<SmallVector<Value>> shapes) {
+/// Given a list of shapes, returns whether it is statically provable that all
+/// shapes are the same. For now checks if
+/// 1) Each dimension has the same dynamic value, or,
+/// 2) The defining op for each dimension is a `constant` op with the same
+///    scalar value.
+static bool areAllShapesEqual(ArrayRef<SmallVector<Value>> shapes) {
   assert(!shapes.empty());
   if (shapes.size() == 1) return true;
   auto isSameShape = [&](ArrayRef<Value> lhsShape,
@@ -830,7 +835,7 @@ static bool checkAllShapesAreEqual(ArrayRef<SmallVector<Value>> shapes) {
 }
 
 /// The workload is computed based on the problem size. For a given operation,
-/// return the problem size.
+/// return the shape of all its results.
 static Optional<SmallVector<SmallVector<Value>>> getResultShapes(
     PatternRewriter &rewriter, Operation *op) {
   if (op->getNumResults() == 0) return llvm::None;
@@ -898,7 +903,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     if (!resultShapesOpt) return failure();
     ArrayRef<SmallVector<Value>> resultShapes = *resultShapesOpt;
     if (resultShapes.size() != op->getNumResults() ||
-        !checkAllShapesAreEqual(resultShapes))
+        !areAllShapesEqual(resultShapes))
       return failure();
 
     // TODO(ravishankarm): For now the Flow -> HAL conversion only handles
