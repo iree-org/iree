@@ -16,20 +16,37 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/dylib/registration/driver_module.h"
+#include "iree/hal/local/executable_loader.h"
+#include "iree/hal/local/loaders/embedded_library_loader.h"
+#include "iree/hal/local/loaders/legacy_library_loader.h"
+#include "iree/hal/local/task_device.h"
+#include "iree/task/api.h"
 
 iree_status_t create_sample_device(iree_hal_device_t** device) {
-  // Only register the dylib HAL driver.
-  IREE_RETURN_IF_ERROR(iree_hal_dylib_driver_module_register(
-      iree_hal_driver_registry_default()));
-  // Create the hal driver from the name.
-  iree_hal_driver_t* driver = NULL;
+  // Set paramters for the device created in the next step.
+  iree_hal_task_device_params_t params;
+  iree_hal_task_device_params_initialize(&params);
+
+  iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
+  iree_host_size_t loader_count = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_embedded_library_loader_create(
+      iree_allocator_system(), &loaders[loader_count++]));
+  IREE_RETURN_IF_ERROR(iree_hal_legacy_library_loader_create(
+      iree_allocator_system(), &loaders[loader_count++]));
+
+  iree_task_executor_t* executor = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_task_executor_create_from_flags(iree_allocator_system(), &executor));
+
   iree_string_view_t identifier = iree_make_cstring_view("dylib");
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
-      iree_hal_driver_registry_default(), identifier, iree_allocator_system(),
-      &driver));
-  IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
-      driver, iree_allocator_system(), device));
-  iree_hal_driver_release(driver);
+
+  // Create the device and release the executor and loader afterwards.
+  IREE_RETURN_IF_ERROR(iree_hal_task_device_create(
+      identifier, &params, executor, IREE_ARRAYSIZE(loaders), loaders,
+      iree_allocator_system(), device));
+  iree_task_executor_release(executor);
+  for (iree_host_size_t i = 0; i < loader_count; ++i) {
+    iree_hal_executable_loader_release(loaders[i]);
+  }
   return iree_ok_status();
 }

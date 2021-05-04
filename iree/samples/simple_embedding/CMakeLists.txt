@@ -34,8 +34,12 @@ iree_cc_binary(
     ::simple_embedding_test_llvm_aot_rv64
     iree::base
     iree::hal
-    iree::hal::dylib::registration
+    iree::hal::local
+    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::loaders::legacy_library_loader
+    iree::hal::local::task_driver
     iree::modules::hal
+    iree::task::api
     iree::vm
     iree::vm::bytecode_module
 )
