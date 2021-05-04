@@ -440,6 +440,10 @@ IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
 IREE_API_EXPORT iree_status_code_t
 iree_status_consume_code(iree_status_t status);
 
+// NOTE: varargs don't optimize well so we hard-no-op the functions when
+// annotations are not enabled.
+#if IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS
+
 // Annotates a status message with the given constant string message.
 // Ignored if |base_status| is OK.
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
@@ -453,6 +457,12 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_annotate_vf(iree_status_t base_status, const char* format,
                         va_list varargs_0, va_list varargs_1);
+
+#else
+#define iree_status_annotate(base_status, ...) (base_status)
+#define iree_status_annotate_f(base_status, ...) (base_status)
+#define iree_status_annotate_vf(base_status, ...) (base_status)
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 
 // Formats the status as a multi-line string containing all associated payloads.
 // Note that this may contain PII such as file paths and must only be used for

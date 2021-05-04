@@ -24,6 +24,10 @@
 extern "C" {
 #endif  // __cplusplus
 
+//===----------------------------------------------------------------------===//
+// Flags configuration
+//===----------------------------------------------------------------------===//
+
 // 1 to enable command line parsing from argc/argv; 0 otherwise.
 // When parsing is disabled flags are just variables that can still be queried
 // and manually overridden by code if desired.
@@ -37,7 +41,9 @@ extern "C" {
 #endif  // !IREE_FLAGS_ENABLE_FLAG_FILE
 
 // Maximum number of flags that can be registered in a single binary.
+#if !defined(IREE_FLAGS_CAPACITY)
 #define IREE_FLAGS_CAPACITY 64
+#endif  // !IREE_FLAGS_CAPACITY
 
 //===----------------------------------------------------------------------===//
 // Static initialization utility
@@ -96,6 +102,13 @@ typedef enum {
   IREE_FLAG_DUMP_MODE_VERBOSE = 1u << 0,
 } iree_flag_dump_mode_t;
 
+#define IREE_FLAG_CTYPE_bool bool
+#define IREE_FLAG_CTYPE_int32_t int32_t
+#define IREE_FLAG_CTYPE_int64_t int64_t
+#define IREE_FLAG_CTYPE_float float
+#define IREE_FLAG_CTYPE_double double
+#define IREE_FLAG_CTYPE_string const char*
+
 #if IREE_FLAGS_ENABLE_CLI == 1
 
 // Types of flags supported by the parser.
@@ -127,13 +140,6 @@ typedef enum {
   // live for as long as the flag value references them.
   IREE_FLAG_TYPE_string,
 } iree_flag_type_t;
-
-#define IREE_FLAG_CTYPE_bool bool
-#define IREE_FLAG_CTYPE_int32_t int32_t
-#define IREE_FLAG_CTYPE_int64_t int64_t
-#define IREE_FLAG_CTYPE_float float
-#define IREE_FLAG_CTYPE_double double
-#define IREE_FLAG_CTYPE_string const char*
 
 // Custom callback issued for each time the flag is seen during parsing.
 // The |value| provided will already be trimmed and may be empty. For
@@ -211,7 +217,7 @@ int iree_flag_register(const char* file, int line, iree_flag_type_t type,
 #else
 
 #define IREE_FLAG(type, name, default_value, description) \
-  static IREE_FLAG_CTYPE_##type name = (default_value);
+  static const IREE_FLAG_CTYPE_##type FLAG_##name = (default_value);
 
 #define IREE_FLAG_CALLBACK(parse_callback, print_callback, storage, name, \
                            description)
