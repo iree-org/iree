@@ -132,10 +132,12 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     iree_MetalExecutableDef_end_as_root(builder);
 
     // 5. Add the binary data to the target executable.
-    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(), targetOp.sym_name(),
         executableBuilder.getStringAttr("MTLE"),
         builder.getBufferAttr(executableBuilder.getContext()));
+    binaryOp.mime_typeAttr(
+        executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();
   }
