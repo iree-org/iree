@@ -88,9 +88,9 @@ binary exchange format, which the model must be compiled into.
 
 #### Download as Python package
 
-IREE uses continuous integration services to compile and publish artifacts into
-[GitHub Releases][iree-releases] page. Right now these are just snapshots of
-the `main` development branch.
+Python packages for various IREE functionalities are regularly published on
+IREE's [GitHub Releases][iree-releases] page.  Right now these are just
+snapshots of the `main` development branch.
 
 You can install the Python package containing the SPIR-V compiler by
 
@@ -139,7 +139,7 @@ In the build directory, run the following command:
 iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
-    iree_input.mlir -o mobilenet.vmfb
+    iree_input.mlir -o mobilenet-vulkan.vmfb
 ```
 
 !!! todo
@@ -158,7 +158,7 @@ In the build directory, run the following command:
 ``` shell hl_lines="2"
 iree/tools/iree-run-module \
     --driver=vulkan \
-    --module_file=mobilenet.vmfb \
+    --module_file=mobilenet-vulkan.vmfb \
     --entry_function=predict \
     --function_inputs="1x224x224x3xf32=0"
 ```
