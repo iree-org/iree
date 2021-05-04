@@ -192,6 +192,7 @@ struct ConvertToNVVMPass
           patterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
+      mlir::vector::populateVectorTransposeLoweringPatterns(patterns);
       (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
     }
     {
