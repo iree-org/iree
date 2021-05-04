@@ -94,7 +94,8 @@ For now, packages can be installed from our
 
 ### Building from source
 
-See the [Building Python bindings](../building-from-source/python.md) page.
+See [Building Python bindings](../../building-from-source/optional-features/#building-python-bindings)
+page for instructions for building from source.
 
 ## Using the Python bindings
 

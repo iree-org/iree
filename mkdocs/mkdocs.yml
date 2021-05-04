@@ -87,12 +87,12 @@ nav:
       - TensorFlow Lite: 'frontends/tensorflow-lite.md'
       - JAX: 'frontends/jax.md'
   - 'Backends':
-      - CPU - LLVM: 'backends/cpu-llvm.md'
+      - CPU - Dylib: 'backends/cpu-dylib.md'
       - GPU - Vulkan: 'backends/gpu-vulkan.md'
   - 'Building from source':
       # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
       - 'building-from-source/getting-started.md'
-      - Python bindings: 'building-from-source/python.md'
+      - Optional features: 'building-from-source/optional-features.md'
       - Android cross-compilation: 'building-from-source/android.md'
   - 'Bindings':
       - Python: 'bindings/python.md'
