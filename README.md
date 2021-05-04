@@ -79,7 +79,7 @@ hardware/API-specific binaries like SPIR-V.
 
 The architecture of IREE is best illustrated by the following picture:
 
-![IREE Architecture](./docs/iree_architecture.svg)
+![IREE Architecture](./docs/developers/iree_architecture.svg)
 
 Being compilation-based means IREE does not have a traditional runtime that
 dispatches "ops" to their fat kernel implementations. What IREE provides is a
@@ -111,12 +111,12 @@ IREE aims to
 ## Roadmap and Milestones
 
 IREE is in the early stages of development and not yet ready for broad adoption.
-Check out the [long-term design roadmap](./docs/design_roadmap.md) to get
-a sense of where we're headed.
+Check out the [long-term design roadmap](./docs/developers/design_roadmap.md) to
+get a sense of where we're headed.
 
 We plan on a quarterly basis using [OKRs](https://en.wikipedia.org/wiki/OKR).
-Review our latest [objectives](./docs/objectives.md) to get a sense of what
-we're up to in the near term.
+Review our latest [objectives](./docs/developers/objectives.md) to get a sense
+of what we're up to in the near term.
 
 We use [GitHub Projects](https://github.com/google/iree/projects) to track
 progress on IREE components and specific efforts. We use
