@@ -170,7 +170,6 @@ func @tile_from_pointwise_lhs() {
   }
   return
 }
-
 hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -1668,3 +1667,70 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //     CHECK-NOT:   linalg.copy
 //         CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
 //         CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func @multi_result() {
+  %c0 = constant 0 : index
+  %c2 = constant 2 : index
+  %c4 = constant 4 : index
+  %c1 = constant 1 : index
+  %c3 = constant 3 : index
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+  %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+  %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
+  %3 = hal.interface.binding.subspan @io::@ret1[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
+  %4 = hal.interface.load.constant offset = 0 : index
+  %5 = hal.interface.load.constant offset = 1 : index
+  %6 = hal.interface.load.constant offset = 2 : index
+  %7 = hal.interface.load.constant offset = 3 : index
+  %8 = hal.interface.workgroup.id[0] : index
+  %9 = hal.interface.workgroup.id[1] : index
+  %10 = hal.interface.workgroup.count[0] : index
+  %11 = hal.interface.workgroup.count[1] : index
+  %12 = hal.interface.workgroup.size[0] : index
+  %13 = hal.interface.workgroup.size[1] : index
+  %14 = muli %9, %13 : index
+  %15 = muli %11, %13 : index
+  %16 = muli %8, %12 : index
+  %17 = muli %10, %12 : index
+  scf.for %arg0 = %14 to %4 step %15 {
+    scf.for %arg1 = %16 to %5 step %17 {
+      %18 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg0)[%4, %13]
+      %19 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg1)[%5, %12]
+      %20 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+      %21 = flow.dispatch.tensor.load %1, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+      %shape = linalg.init_tensor [%18, %19] : tensor<?x?xf32>
+      %22:2 = linalg.generic {indexing_maps = [#map, #map, #map, #map], iterator_types = ["parallel", "parallel"]}
+        ins(%20, %21 : tensor<?x?xf32>, tensor<?x?xf32>)
+        outs(%shape, %shape : tensor<?x?xf32>, tensor<?x?xf32>) {
+        ^bb0(%arg2: f32, %arg3 : f32, %arg4 : f32, %arg5 : f32):  // no predecessors
+          %23 = mulf %arg2, %arg3 : f32
+          %24 = addf %arg2, %arg3 : f32
+          linalg.yield %23, %24 : f32, f32
+        } -> tensor<?x?xf32>, tensor<?x?xf32>
+      flow.dispatch.tensor.store %22#0, %2, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+      flow.dispatch.tensor.store %22#1, %3, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+    }
+  }
+  return
+}
+hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @ret1, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @multi_result()
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
+//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@ret1
+//   CHECK-DAG:   %[[ARG0V:.+]] = memref.subview %[[ARG0]]
+//   CHECK-DAG:   %[[ARG1V:.+]] = memref.subview %[[ARG1]]
+//   CHECK-DAG:   %[[RET0V:.+]] = memref.subview %[[RET0]]
+//   CHECK-DAG:   %[[RET1V:.+]] = memref.subview %[[RET1]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[ARG0V]], %[[ARG1V]]
+//  CHECK-SAME:     outs(%[[RET0V]], %[[RET1V]]

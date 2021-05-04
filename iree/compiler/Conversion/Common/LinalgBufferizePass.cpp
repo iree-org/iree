@@ -463,10 +463,11 @@ static SmallVector<Value, 4> getDynamicDims(OpBuilder &b, Location loc,
 /// `InferShapedTypeOpInterface` where possible to get the shape of the output
 /// in terms of the shapes of the operands.
 static Value allocateBufferForResult(OpBuilder &b, Operation *op,
+                                     unsigned resultNum,
                                      WorkgroupMemoryAllocationFn allocationFn) {
-  assert(op->getNumResults() == 1);
+  assert(op->getNumResults() > resultNum);
   RankedTensorType resultType =
-      op->getResult(0).getType().cast<RankedTensorType>();
+      op->getResult(resultNum).getType().cast<RankedTensorType>();
   SmallVector<Value, 4> dynamicDims;
 
   // Get the shape of the result
@@ -476,7 +477,7 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
     if (failed(shapedOp.reifyReturnTypeShapesPerResultDim(b, resultShape))) {
       return nullptr;
     }
-    for (auto shape : enumerate(resultShape[0])) {
+    for (auto shape : enumerate(resultShape[resultNum])) {
       if (resultType.isDynamicDim(shape.index())) {
         dynamicDims.push_back(shape.value());
       }
@@ -625,19 +626,24 @@ static Value getReverseOfCastOp(OpBuilder &b, tensor::CastOp castOp,
 /// gets the buffer to use to compute the value in-place.
 static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
                                     BlockAndValueMapping &bvm) {
-  Operation *currOp = resultValue.getOwner();
   SmallVector<Operation *> traversedOps;
 
   // Traverse the use-def chains to get the `flow.dispatch.tensor.store`
   // operation keeping track of all the traversed operations. Note that the
   // equivalence set construction should ensure that all operations traversed
   // here have a single use.
-  while (!isa<IREE::Flow::DispatchTensorStoreOp>(currOp)) {
-    traversedOps.push_back(currOp);
-    if (!currOp->hasOneUse() || currOp->getNumResults() != 1) return nullptr;
-    currOp = *currOp->user_begin();
+  Operation *user = nullptr;
+  Value defVal = resultValue;
+  while (defVal.hasOneUse()) {
+    user = *(defVal.user_begin());
+    // If the user is a store op, we are done.
+    if (isa<IREE::Flow::DispatchTensorStoreOp>(user)) break;
+    // If user has more than one results, abort.
+    if (user->getNumResults() != 1) return nullptr;
+    traversedOps.push_back(user);
+    defVal = user->getResult(0);
   }
-  auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(currOp);
+  auto storeOp = dyn_cast_or_null<IREE::Flow::DispatchTensorStoreOp>(user);
   if (!storeOp) return nullptr;
   Operation *insertBefore = &(*b.getInsertionPoint());
   Value resultBuffer =
@@ -645,7 +651,7 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
   if (!resultBuffer) return nullptr;
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "Pair :\n\tTensor :";
-    currOp->print(llvm::dbgs());
+    resultValue.getOwner()->print(llvm::dbgs());
     llvm::dbgs() << "\nt\tMemref :";
     resultBuffer.print(llvm::dbgs());
     llvm::dbgs() << "\n";
@@ -779,7 +785,7 @@ static LogicalResult getOrAllocateResultBuffers(
       buffer = getInplaceResultBuffer(b, result.value(), bvm);
     }
     if (!buffer) {
-      buffer = allocateBufferForResult(b, op, allocationFn);
+      buffer = allocateBufferForResult(b, op, result.index(), allocationFn);
     }
     if (!buffer) {
       return op->emitError("unable to get result buffer for op");
@@ -814,7 +820,11 @@ static LogicalResult convertAnyLinalgOp(
     // a mapping for the buffer. Allocate a buffer for these.
     Value inputBuffer = bvm.lookupOrNull(v);
     if (!inputBuffer) {
-      inputBuffer = allocateBufferForResult(b, v.getDefiningOp(), allocationFn);
+      OpResult definingOpResult = v.dyn_cast<OpResult>();
+      if (!definingOpResult) return failure();
+      inputBuffer = allocateBufferForResult(b, definingOpResult.getOwner(),
+                                            definingOpResult.getResultNumber(),
+                                            allocationFn);
     }
     newInputBuffers.push_back(inputBuffer);
   }

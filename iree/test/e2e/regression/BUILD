@@ -25,6 +25,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+BACKEND_TESTS = [
+    "linalg_ops.mlir",
+]
+
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
@@ -52,7 +56,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
-        ],
+        ] + BACKEND_TESTS,
     ),
     data = [
         "//iree/tools:IreeFileCheck",
@@ -61,4 +65,18 @@ iree_lit_test_suite(
         "//iree/tools:iree-translate",
     ],
     tags = ["hostonly"],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_linalg_ops_dylib-llvm-aot",
+    srcs = BACKEND_TESTS,
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_linalg_ops_vulkan-spirv",
+    srcs = BACKEND_TESTS,
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
 )
