@@ -59,6 +59,9 @@ extra:
     - icon: fontawesome/brands/discord
       link: https://discord.gg/26P4xW4
       name: IREE Discord Server
+    - icon: fontawesome/solid/users
+      link: https://groups.google.com/forum/#!forum/iree-discuss
+      name: IREE Discuss Google Group
   generator: false  # TODO(scotttodd): join mkdocs-material insiders for this
 
 extra_css:
@@ -78,6 +81,8 @@ markdown_extensions:
   - pymdownx.tabbed
   - pymdownx.superfences
   - pymdownx.tabbed
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - tables
   - toc:
       permalink: true  # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
@@ -99,8 +104,8 @@ nav:
       - Optional features: 'building-from-source/optional-features.md'
       - Android cross-compilation: 'building-from-source/android.md'
   - 'Bindings':
-      - Python: 'bindings/python.md'
       - C API: 'bindings/c-api.md'
+      - Python: 'bindings/python.md'
       - TensorFlow Lite: 'bindings/tensorflow-lite.md'
   - 'Community':
       - Projects: 'community/projects.md'
