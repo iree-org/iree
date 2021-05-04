@@ -123,10 +123,12 @@ class VMLATargetBackend final : public TargetBackend {
     // Add the binary data to the target executable.
     // NOTE: this snapshots the flatbuffer builder data at the time it is called
     // and future changes will not be observed.
-    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(), targetOp.sym_name(),
         executableBuilder.getStringAttr("VMLA"),
         builder.getBufferAttr(executableBuilder.getContext()));
+    binaryOp.mime_typeAttr(
+        executableBuilder.getStringAttr("application/x-flatbuffers"));
     return success();
   }
 

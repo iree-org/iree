@@ -890,7 +890,8 @@ def VM_RodataOp : VM_Op<"rodata", [
     StrAttr:$sym_name,
     ElementsAttr:$value,
     OptionalAttr<I64Attr>:$alignment,
-    OptionalAttr<VM_Ordinal>:$ordinal
+    OptionalAttr<VM_Ordinal>:$ordinal,
+    OptionalAttr<StrAttr>:$mime_type
   );
 
   let skipDefaultBuilders = 1;

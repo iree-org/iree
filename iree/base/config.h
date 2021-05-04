@@ -132,6 +132,21 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #endif  // !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 
 //===----------------------------------------------------------------------===//
+// IREE HAL configuration
+//===----------------------------------------------------------------------===//
+// Enables optional HAL features. Each of these may add several KB to the final
+// binary when linked dynamically.
+
+#if !defined(IREE_HAL_MODULE_STRING_UTIL_ENABLE)
+// Enables HAL module methods that perform string printing/parsing.
+// This functionality pulls in a large amount of string manipulation code that
+// can be elided if these ops will not be used at runtime. When disabled
+// applications can still call the parse/print routines directly but compiled
+// modules can not.
+#define IREE_HAL_MODULE_STRING_UTIL_ENABLE 1
+#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
+
+//===----------------------------------------------------------------------===//
 // IREE VM configuration
 //===----------------------------------------------------------------------===//
 // Enables optional VM features. Each of these adds a few KB to the final binary

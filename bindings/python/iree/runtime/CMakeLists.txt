@@ -53,6 +53,7 @@ iree_py_library(
     runtime
   SRCS
     "__init__.py"
+    "function.py"
     "system_api.py"
   PYEXT_DEPS
     ::PyExtRt

@@ -25,11 +25,19 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
+struct SerializedConstantRef {
+  flatbuffers_uint8_vec_ref_t ref = 0;
+  int64_t totalSize = 0;
+  uint32_t crc32 = 0;
+};
+
 // Serializes a constant attribute to the FlatBuffer as a binary blob.
-flatbuffers_uint8_vec_ref_t serializeConstant(Location loc,
-                                              ElementsAttr elementsAttr,
-                                              size_t alignment,
-                                              FlatbufferBuilder &fbb);
+// Returns the size in bytes of the serialized value and the flatbuffers offset
+// to the uint8 vec containing the data. If |calculateCRC32| is provided then a
+// CRC32 of the data will be computed and returned as well.
+SerializedConstantRef serializeConstant(Location loc, ElementsAttr elementsAttr,
+                                        size_t alignment, bool calculateCRC32,
+                                        FlatbufferBuilder &fbb);
 
 }  // namespace VM
 }  // namespace IREE

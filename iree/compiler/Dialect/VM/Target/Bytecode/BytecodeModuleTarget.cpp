@@ -31,6 +31,8 @@
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/schemas/bytecode_module_def_builder.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/Endian.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -50,10 +52,224 @@ namespace VM {
 
 namespace {
 
+using namespace llvm::support;
+
 struct TypeDef {
   Type type;
   std::string full_name;
 };
+
+LLVM_PACKED_START
+struct ZIPEndOfCentralDirectoryRecord {
+  ulittle32_t signature;  // 0x06054B50
+  ulittle16_t diskNumber;
+  ulittle16_t startDiskNumber;
+  ulittle16_t entriesOnDisk;
+  ulittle16_t entryCount;
+  ulittle32_t directorySize;
+  ulittle32_t directoryOffset;
+  ulittle16_t commentLength;
+  // comment (variable size)
+};
+static_assert(sizeof(ZIPEndOfCentralDirectoryRecord) == 22, "bad packing");
+struct ZIPCentralDirectoryRecord {
+  ulittle32_t signature;  // 0x02014B50
+  ulittle16_t versionMadeBy;
+  ulittle16_t versionToExtract;
+  ulittle16_t generalPurposeFlags;
+  ulittle16_t compressionMethod;
+  ulittle16_t lastModifiedTime;
+  ulittle16_t lastModifiedDate;
+  ulittle32_t crc32;
+  ulittle32_t compressedSize;
+  ulittle32_t uncompressedSize;
+  ulittle16_t fileNameLength;
+  ulittle16_t extraFieldLength;
+  ulittle16_t fileCommentLength;
+  ulittle16_t diskStartNumber;
+  ulittle16_t internalFileAttributes;
+  ulittle32_t externalFileAttributes;
+  ulittle32_t localHeaderOffset;
+  // file name (variable size)
+  // extra field (variable size)
+  // file comment (variable size)
+};
+static_assert(sizeof(ZIPCentralDirectoryRecord) == 46, "bad packing");
+struct ZIPLocalFileHeader {
+  ulittle32_t signature;  // 0x04034B50
+  ulittle16_t versionToExtract;
+  ulittle16_t generalPurposeFlag;
+  ulittle16_t compressionMethod;
+  ulittle16_t lastModifiedTime;
+  ulittle16_t lastModifiedDate;
+  ulittle32_t crc32;
+  ulittle32_t compressedSize;
+  ulittle32_t uncompressedSize;
+  ulittle16_t fileNameLength;
+  ulittle16_t extraFieldLength;
+  // file name (variable size)
+  // extra field (variable size)
+};
+static_assert(sizeof(ZIPLocalFileHeader) == 30, "bad packing");
+struct ZIPExtraFieldHeader {
+  ulittle16_t id;
+  ulittle16_t size;
+};
+static_assert(sizeof(ZIPExtraFieldHeader) == 4, "bad packing");
+LLVM_PACKED_END
+
+// A ZIP file reference into the flatbuffer output data.
+struct ZIPFileRef {
+  // Offset of the local file header in the flatbuffer. Relative to the end of
+  // the file.
+  flatcc_builder_ref_t localHeaderOffset;
+  // Name of the file used within the ZIP archive.
+  std::string fileName;
+  // Total size, in bytes, of the file uncompressed.
+  uint32_t totalSize;
+  // CRC32 of the file.
+  uint32_t crc32;
+  // Extra field padding (total).
+  uint16_t paddingLength;
+};
+
+// TODO(benvanik): figure out why we need to offset all flatbuffer refs by this
+// value in order to get proper absolute file offsets. The current value used
+// here was derived empirically and is like a combination of the flatbuffer
+// file prefix and some alignment.
+static constexpr int kZIPMagicLocalOffset = 90;
+
+// Gets a file extension based on the given |mimeType| that can be used to help
+// applications guess the file type of embedded data.
+static StringRef mimeTypeToFileExtension(StringRef mimeType) {
+  return StringSwitch<StringRef>(mimeType)
+      .Case("application/x-flatbuffers", ".fb")
+      .Case("application/x-elf", ".so")
+      .Default(".bin");
+}
+
+// Appends a ZIP local file header at the current location.
+// The header is a prefix to the actual rodata contents. ZIP requires that the
+// payload start immediately after the header but we have the flatbuffer header
+// there. To skip over the flatbuffer data we pad out the header with a dummy
+// extra data field that lets us control the length.
+//
+//  [zip local file header] + 4 byte suffix length
+//  [flatbuffer vector header] (4 bytes)
+//  [payload]
+static ZIPFileRef appendZIPLocalFileHeader(IREE::VM::RodataOp rodataOp,
+                                           size_t rodataSize, uint32_t crc32,
+                                           FlatbufferBuilder &fbb) {
+  // Use the mime type to map to a file extension.
+  std::string fileName =
+      (rodataOp.getName() +
+       mimeTypeToFileExtension(rodataOp.mime_type().getValueOr("")))
+          .str();
+
+  // The data is stored in the flatbuffer prefixed with a vector header of
+  // a 32-bit byte count. We need to ignore this when computing the CRC as we
+  // want only the payload to be visible in the ZIP.
+  size_t vectorPrefixLength = sizeof(uint32_t);
+
+  // header + file name + extra field header
+  size_t totalHeaderLength = sizeof(ZIPLocalFileHeader) + fileName.size() +
+                             sizeof(ZIPExtraFieldHeader);
+
+  // Append local file header.
+  auto *header = reinterpret_cast<ZIPLocalFileHeader *>(
+      flatcc_builder_start_struct(fbb, totalHeaderLength, 1));
+  header->signature = 0x04034B50u;
+  header->versionToExtract = 0;
+  header->generalPurposeFlag = 0;
+  header->compressionMethod = 0;  // COMP_STORED
+  header->lastModifiedTime = 0;
+  header->lastModifiedDate = 0;
+  header->crc32 = crc32;
+  header->compressedSize = static_cast<uint32_t>(rodataSize);
+  header->uncompressedSize = static_cast<uint32_t>(rodataSize);
+  header->fileNameLength = static_cast<uint16_t>(fileName.size());
+  header->extraFieldLength = sizeof(ZIPExtraFieldHeader) + vectorPrefixLength;
+  char *fileNamePtr = reinterpret_cast<char *>(header + 1);
+  memcpy(fileNamePtr, fileName.data(), fileName.size());
+  auto *extraField =
+      reinterpret_cast<ZIPExtraFieldHeader *>(fileNamePtr + fileName.size());
+  extraField->id = 0xFECAu;
+  extraField->size = static_cast<uint16_t>(vectorPrefixLength);
+  flatcc_builder_ref_t relativeHeaderOffset = flatcc_builder_end_struct(fbb);
+
+  ZIPFileRef fileRef;
+  fileRef.localHeaderOffset = relativeHeaderOffset;
+  fileRef.fileName = std::move(fileName);
+  fileRef.totalSize = static_cast<uint32_t>(rodataSize);
+  fileRef.crc32 = crc32;
+  fileRef.paddingLength = static_cast<uint16_t>(vectorPrefixLength);
+  return fileRef;
+}
+
+// Appends a ZIP central directory to |output| with the references to all of
+// |zipFileRefs| with offsets applied. |startOffset| and |endOffset| define the
+// absolute offsets into |output| of the flatbuffer data.
+//
+// The technique used here is the same as that used in self-extracting archives:
+// byte offset 0 of the file will contain the native format header (like the
+// flatbuffers file identifier) and a ZIP application will need to scan from the
+// back of the file to find the ZIP central directory. This often means that
+// naming the file .zip will not work: most ZIP applications will try to find
+// a PK header at byte 0.
+static void appendZIPCentralDirectory(ArrayRef<ZIPFileRef> zipFileRefs,
+                                      uint64_t startOffset, uint64_t endOffset,
+                                      llvm::raw_ostream &output) {
+  // Append the central directory, which contains the local file headers with
+  // some extra junk and references back to where the local headers are in the
+  // file.
+  uint64_t centralDirectoryStartOffset = output.tell();
+  for (auto zipFileRef : zipFileRefs) {
+    // Fixed-size header.
+    ZIPCentralDirectoryRecord cdr;
+    cdr.signature = 0x02014B50u;
+    cdr.versionMadeBy = 798;
+    cdr.versionToExtract = 20;
+    cdr.generalPurposeFlags = 0;
+    cdr.compressionMethod = 0;  // COMP_STORED
+    cdr.lastModifiedTime = 0;
+    cdr.lastModifiedDate = 0;
+    cdr.crc32 = zipFileRef.crc32;
+    cdr.compressedSize = zipFileRef.totalSize;
+    cdr.uncompressedSize = zipFileRef.totalSize;
+    cdr.fileNameLength = static_cast<uint16_t>(zipFileRef.fileName.size());
+    cdr.extraFieldLength =
+        sizeof(ZIPExtraFieldHeader) + zipFileRef.paddingLength;
+    cdr.fileCommentLength = 0;
+    cdr.diskStartNumber = 0;
+    cdr.internalFileAttributes = 0;
+    cdr.externalFileAttributes = 0;
+    cdr.localHeaderOffset = static_cast<uint32_t>(
+        endOffset + zipFileRef.localHeaderOffset - kZIPMagicLocalOffset);
+    output.write(reinterpret_cast<const char *>(&cdr), sizeof(cdr));
+    output.write(zipFileRef.fileName.data(), zipFileRef.fileName.size());
+    ZIPExtraFieldHeader extraField;
+    extraField.id = 0xFECAu;
+    extraField.size = zipFileRef.paddingLength;
+    output.write(reinterpret_cast<const char *>(&extraField),
+                 sizeof(extraField));
+    output.write_zeros(extraField.size);
+  }
+  uint64_t centralDirectoryEndOffset = output.tell();
+
+  // Append the final ZIP file footer.
+  // NOTE: this must come at the very end of the file.
+  ZIPEndOfCentralDirectoryRecord endOfCDR;
+  endOfCDR.signature = 0x06054B50u;
+  endOfCDR.diskNumber = 0;
+  endOfCDR.startDiskNumber = 0;
+  endOfCDR.entriesOnDisk = static_cast<uint16_t>(zipFileRefs.size());
+  endOfCDR.entryCount = static_cast<uint16_t>(zipFileRefs.size());
+  endOfCDR.directorySize = static_cast<uint32_t>(centralDirectoryEndOffset -
+                                                 centralDirectoryStartOffset);
+  endOfCDR.directoryOffset = static_cast<uint32_t>(centralDirectoryStartOffset);
+  endOfCDR.commentLength = 0;
+  output.write(reinterpret_cast<const char *>(&endOfCDR), sizeof(endOfCDR));
+}
 
 }  // namespace
 
@@ -274,6 +490,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
 // representation at runtime.
 static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
                                            IREE::VM::ModuleOp moduleOp,
+                                           SmallVector<ZIPFileRef> &zipFileRefs,
                                            FlatbufferBuilder &fbb) {
   // Start the buffer so that we can begin recording data prior to the root
   // table (which we do at the very end). This does not change the layout of the
@@ -327,17 +544,30 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   static constexpr int kDefaultRodataAlignment = 16;
 
   for (auto rodataOp : llvm::reverse(rodataOps)) {
+    // Only include rodata entries in the ZIP if they are file-like. This
+    // prevents all of our string tables from getting included.
+    bool includeInZIP =
+        targetOptions.emitPolyglotZip && rodataOp.mime_type().hasValue();
+
+    // Embed the rodata contents.
     size_t alignment =
         rodataOp.alignment()
             ? static_cast<size_t>(rodataOp.alignment().getValue())
             : 0;
     if (alignment == 0) alignment = kDefaultRodataAlignment;
-    auto rodataRef =
-        serializeConstant(rodataOp.getLoc(), rodataOp.value(), alignment, fbb);
-    if (!rodataRef) {
+    auto constantRef =
+        serializeConstant(rodataOp.getLoc(), rodataOp.value(), alignment,
+                          /*calculateCRC32=*/includeInZIP, fbb);
+    if (!constantRef.ref) {
       return rodataOp.emitOpError() << "failed to encode";
     }
-    rodataContentRefs.push_back(rodataRef);
+    rodataContentRefs.push_back(constantRef.ref);
+
+    // Add the ZIP per-file header.
+    if (includeInZIP) {
+      zipFileRefs.push_back(appendZIPLocalFileHeader(
+          rodataOp, constantRef.totalSize, constantRef.crc32, fbb));
+    }
   }
   // List of references needs to be swapped forward (we wrote backward).
   std::reverse(rodataContentRefs.begin(), rodataContentRefs.end());
@@ -489,12 +719,15 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
                                                      functionDescriptorsRef);
   iree_vm_BytecodeModuleDef_bytecode_data_add(fbb, bytecodeDataRef);
   iree_vm_BytecodeModuleDef_end_as_root(fbb);
+
   return success();
 }
 
 LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                                         BytecodeTargetOptions targetOptions,
                                         llvm::raw_ostream &output) {
+  uint64_t startOffset = output.tell();
+
   if (failed(canonicalizeModule(targetOptions, moduleOp))) {
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";
@@ -526,7 +759,9 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   // the first few pages need to be accessed to get the metadata and the rest
   // can be large bulk data.
   FlatbufferBuilder fbb;
-  if (failed(buildFlatBufferModule(targetOptions, moduleOp, fbb))) {
+  SmallVector<ZIPFileRef> zipFileRefs;
+  if (failed(
+          buildFlatBufferModule(targetOptions, moduleOp, zipFileRefs, fbb))) {
     return moduleOp.emitError()
            << "failed to build FlatBuffer BytecodeModuleDef";
   }
@@ -553,6 +788,15 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
     }
     default:
       llvm_unreachable("unimplemented output format");
+  }
+  output.flush();
+
+  if (targetOptions.emitPolyglotZip) {
+    // Append the ZIP central directory to the end of the output.
+    // We have to do this here as we need to have flushed the flatbuffer
+    // contents to the output so that we have their final absolute addresses.
+    uint64_t endOffset = output.tell();
+    appendZIPCentralDirectory(zipFileRefs, startOffset, endOffset, output);
   }
 
   output.flush();

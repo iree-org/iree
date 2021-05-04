@@ -25,11 +25,6 @@ declare -a excluded_files_patterns=(
   "^\.gitmodules$"
   "/third_party/"
   "^third_party/"
-  "\.pb$"
-  "\.fb$"
-  "\.jar$"
-  "\.so$"
-  "\.vmfb$"
 )
 
 # Join on |
@@ -39,7 +34,7 @@ readarray -t files < <(\
   (git diff --name-only --diff-filter=d "${BASE_REF}" || kill $$) \
     | grep -v -E "${excluded_files_pattern?}")
 
-diff="$(grep --with-filename --line-number --perl-regexp '\t' "${files[@]}")"
+diff="$(grep --with-filename --line-number --perl-regexp --binary-files=without-match '\t' "${files[@]}")"
 
 grep_exit="$?"
 
