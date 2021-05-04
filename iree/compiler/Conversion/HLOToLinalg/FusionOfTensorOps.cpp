@@ -110,9 +110,13 @@ struct FusionOfTensorOpsPass
         };
 
     linalg::populateElementwiseOpsFusionPatterns(
-        fusionPatterns, linalg::LinalgElementwiseFusionOptions()
-                            .setAllowFoldingUnitDimReshapes(true)
-                            .setControlElementwiseOpsFusionFn(controlFn));
+        fusionPatterns,
+        linalg::LinalgElementwiseFusionOptions()
+            // Disable folding unit dim reshapes to avoid
+            // creating linalg with unit dimensions.
+            // TODO: Find a better solution if this blocks fusion.
+            .setAllowFoldingUnitDimReshapes(false)
+            .setControlElementwiseOpsFusionFn(controlFn));
 
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));
