@@ -566,12 +566,10 @@ iree_status_consume_code(iree_status_t status) {
   return code;
 }
 
+#if IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS
+
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
-#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
-  // Annotations are disabled so we ignore this entirely.
-  return base_status;
-#else
   if (iree_status_is_ok(base_status) || iree_string_view_is_empty(message)) {
     return base_status;
   }
@@ -599,7 +597,6 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
   payload->message = message;
   return iree_status_append_payload(base_status, storage,
                                     (iree_status_payload_t*)payload);
-#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
@@ -617,9 +614,6 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_annotate_vf(iree_status_t base_status, const char* format,
                         va_list varargs_0, va_list varargs_1) {
-#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
-  return base_status;
-#else
   if (iree_status_is_ok(base_status)) return base_status;
 
   // If there's no storage yet we can just reuse normal allocation. Both that
@@ -663,8 +657,9 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
   }
   return iree_status_append_payload(base_status, storage,
                                     (iree_status_payload_t*)payload);
-#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
+
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 
 IREE_API_EXPORT bool iree_status_format(iree_status_t status,
                                         iree_host_size_t buffer_capacity,
