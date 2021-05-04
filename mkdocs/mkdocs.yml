@@ -12,7 +12,7 @@ theme:
     - navigation.instant  # Faster loading
 
     # TODO(scotttodd): join mkdocs-material insiders for this
-    - navigation.tracking # Update URL in address bar with the active anchor
+    - navigation.tracking  # Update URL in address bar with the active anchor
 
     # TODO(scotttodd): decide if we want this
     #     these move sections from the left nav to tabs below the header
