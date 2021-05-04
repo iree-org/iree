@@ -44,6 +44,7 @@ compile_commands.json
 
 # Pyenv files
 .python-version
+*.venv
 .venv
 
 # Android Studio / Gradle files
