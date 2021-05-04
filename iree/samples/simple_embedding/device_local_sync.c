@@ -18,7 +18,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/legacy_library_loader.h"
-#include "iree/hal/local/sync_driver.h"
+#include "iree/hal/local/sync_device.h"
 
 iree_status_t create_sample_device(iree_hal_device_t** device) {
   // Set paramters for the device created in the next step.
