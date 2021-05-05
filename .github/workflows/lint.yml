@@ -57,8 +57,6 @@ jobs:
 
   yapf:
     runs-on: ubuntu-18.04
-    env:
-      BASE_REF: ${{ github.base_ref }}
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
@@ -66,24 +64,22 @@ jobs:
         uses: actions/setup-python@v2
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
+        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Install yapf
         run: |
           python3 -m pip install yapf==0.30.0
       - name: Run format_diff.py with yapf
         run: |
-          git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i
+          git diff -U0 "${GITHUB_BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i
           git diff --exit-code
       - name: Instructions for fixing the above linting errors
         if: ${{ failure() }}
         run: |
           printf "You can fix the lint errors above by running\n"
-          printf "  git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n"
+          printf "  git diff -U0 "${GITHUB_BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n"
 
   pytype:
     runs-on: ubuntu-18.04
-    env:
-      BASE_REF: ${{ github.base_ref }}
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
@@ -94,16 +90,14 @@ jobs:
           python-version: '3.8'
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
+        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Install pytype
         run: python3 -m pip install pytype
       - name: Run pytype on changed files
-        run: ./build_tools/pytype/check_diff.sh "${BASE_REF?}"
+        run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
 
   clang-format:
     runs-on: ubuntu-18.04
-    env:
-      BASE_REF: ${{ github.base_ref }}
     steps:
       - name: Installing dependencies
         run: |
@@ -115,10 +109,10 @@ jobs:
         uses: actions/checkout@v2
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
+        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Running clang-format on changed source files
         run: |
-          /tmp/git-clang-format "${BASE_REF?}" --binary=clang-format-9 --style=file
+          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-9 --style=file
           git diff --exit-code
 
   submodules:
@@ -131,16 +125,14 @@ jobs:
 
   tabs:
     runs-on: ubuntu-18.04
-    env:
-      BASE_REF: ${{ github.base_ref }}
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
+        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Checking tabs
-        run: ./scripts/check_tabs.sh "${BASE_REF?}"
+        run: ./scripts/check_tabs.sh "${GITHUB_BASE_REF?}"
 
   yamllint:
     runs-on: ubuntu-18.04
