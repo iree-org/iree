@@ -8,12 +8,14 @@
 
 #include "emitc/Dialect/EmitC/IR/EmitC.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -159,7 +161,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{cmpOp.lhs()});
+          /*operands=*/ArrayRef<Value>{operands[0]});
     }
 
     if (moveRhs) {
@@ -169,7 +171,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{cmpOp.rhs()});
+          /*operands=*/ArrayRef<Value>{operands[1]});
     }
 
     return success();
@@ -215,7 +217,7 @@ class CompareRefNotZeroOpConversion
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{cmpOp.operand()});
+          /*operands=*/ArrayRef<Value>{operands[0]});
     }
 
     return success();
@@ -365,7 +367,9 @@ class ConstRefRodataOpConversion
 
     auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::CallOp>(
         /*op=*/constRefRodataOp,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        /*type=*/
+        emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        // /*type=*/typeConverter->convertType(constRefRodataOp.getResult().getType()),
         /*callee=*/StringAttr::get(ctx, "VM_ARRAY_ELEMENT_ADDRESS"),
         /*args=*/
         ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, "local_refs"),
@@ -383,6 +387,20 @@ class ConstRefRodataOpConversion
         ArrayRef<Value>{byteBufferPtrOp.getResult(0), typeIdOp.getResult(0),
                         refPtrOp.getResult(0)});
 
+    return success();
+  }
+};
+
+class DoNotOptimizeConversion
+    : public OpConversionPattern<IREE::DoNotOptimizeOp> {
+  using OpConversionPattern<IREE::DoNotOptimizeOp>::OpConversionPattern;
+
+ private:
+  LogicalResult matchAndRewrite(
+      IREE::DoNotOptimizeOp doNotOptimizeOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::DoNotOptimizeOp>(
+        doNotOptimizeOp, operands, doNotOptimizeOp->getAttrs());
     return success();
   }
 };
@@ -496,7 +514,7 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
       return op.emitError() << " index for list argument out of range";
     }
 
-    Value listOperand = op.getOperation()->getOperand(listArgumentIndex);
+    Value listOperand = operands[listArgumentIndex];
 
     // deref
     auto refOp = rewriter.create<emitc::ApplyOp>(
@@ -591,6 +609,12 @@ class ListAllocOpConversion
     auto ctx = allocOp.getContext();
     auto loc = allocOp.getLoc();
 
+    Type convertedType = typeConverter->convertType(allocOp.getType());
+
+    if (!convertedType) {
+      return allocOp.emitOpError() << "type conversion failed";
+    }
+
     auto listType = allocOp.getType()
                         .cast<IREE::VM::RefType>()
                         .getObjectType()
@@ -679,7 +703,8 @@ class ListAllocOpConversion
 
     auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::CallOp>(
         /*op=*/allocOp,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        // /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        /*type=*/convertedType,
         /*callee=*/StringAttr::get(ctx, "VM_ARRAY_ELEMENT_ADDRESS"),
         /*args=*/
         ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, "local_refs"),
@@ -756,7 +781,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
         /*applicableOperator=*/StringAttr::get(ctx, "*"),
-        /*operand=*/getOp.list());
+        /*operand=*/operands[0]);
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -819,7 +844,7 @@ class ListGetRefOpConversion
         /*callee=*/StringAttr::get(ctx, "*"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{getOp.list()});
+        /*operands=*/ArrayRef<Value>{operands[0]});
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -972,7 +997,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
         /*applicableOperator=*/StringAttr::get(ctx, "*"),
-        /*operand=*/setOp.list());
+        /*operand=*/operands[0]);
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1025,7 +1050,7 @@ class ListSetRefOpConversion
         /*callee=*/StringAttr::get(ctx, "*"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{setOp.list()});
+        /*operands=*/ArrayRef<Value>{operands[0]});
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1063,8 +1088,7 @@ class ListSetRefOpConversion
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{listDerefOp.getResult(0), setOp.index(),
-                        setOp.value()});
+        ArrayRef<Value>{listDerefOp.getResult(0), setOp.index(), operands[2]});
 
     rewriter.eraseOp(setOp);
 
@@ -1073,8 +1097,11 @@ class ListSetRefOpConversion
 };
 }  // namespace
 
-void populateVMToCPatterns(MLIRContext *context,
-                           OwningRewritePatternList &patterns) {
+void populateVMToEmitCPatterns(MLIRContext *context,
+                               IREE::VM::EmitCTypeConverter &typeConverter,
+                               OwningRewritePatternList &patterns) {
+  patterns.insert<DoNotOptimizeConversion>(typeConverter, context);
+
   // Globals
   patterns.insert<
       GlobalLoadOpConversion<IREE::VM::GlobalLoadI32Op, IREE::VM::GlobalI32Op>>(
@@ -1090,7 +1117,7 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<ConstRefRodataOpConversion>(context);
 
   // List ops
-  patterns.insert<ListAllocOpConversion>(context);
+  patterns.insert<ListAllocOpConversion>(typeConverter, context);
   patterns.insert<ListOpConversion<IREE::VM::ListReserveOp>>(
       context, "iree_vm_list_reserve", 0, true);
   patterns.insert<ListOpConversion<IREE::VM::ListResizeOp>>(
@@ -1298,13 +1325,21 @@ class ConvertVMToEmitCPass
 
   void runOnOperation() override {
     ConversionTarget target(getContext());
+    EmitCTypeConverter typeConverter;
+
+    for (auto funcOp : getOperation().getOps<IREE::VM::FuncOp>()) {
+      getChildAnalysis<RegisterAllocation>(funcOp);
+    }
 
     OwningRewritePatternList patterns(&getContext());
-    populateVMToCPatterns(&getContext(), patterns);
+    populateVMToEmitCPatterns(&getContext(), typeConverter, patterns);
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
-    target.addLegalDialect<iree_compiler::IREEDialect>();
-    target.addIllegalDialect<IREE::VM::VMDialect>();
+
+    target.addDynamicallyLegalOp<IREE::DoNotOptimizeOp>(
+        [&](IREE::DoNotOptimizeOp op) {
+          return typeConverter.isLegal(op.getResultTypes());
+        });
 
     // Structural ops
     target.addLegalOp<IREE::VM::ModuleOp>();

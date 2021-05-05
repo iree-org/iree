@@ -7,14 +7,16 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_CONVERTVMTOEMITC_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_CONVERTVMTOEMITC_H_
 
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/EmitCTypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-void populateVMToCPatterns(MLIRContext *context,
-                           OwningRewritePatternList &patterns);
+void populateVMToEmitCPatterns(MLIRContext *context,
+                               IREE::VM::EmitCTypeConverter &typeConverter,
+                               OwningRewritePatternList &patterns);
 
 namespace IREE {
 namespace VM {
