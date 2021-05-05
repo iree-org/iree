@@ -409,7 +409,7 @@ class IdentifyDispatchRegions2Pass
     auto dispatchability = getCachedParentAnalysis<Dispatchability>();
     FuncOp func = getOperation();
     if (!dispatchability.hasValue()) {
-      getOperation().emitError()
+      func.emitError()
           << "dispatchability analysis not performed "
              "on module; run -iree-flow-dispatchability-analysis first";
       return signalPassFailure();
