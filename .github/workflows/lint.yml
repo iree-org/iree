@@ -37,14 +37,23 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
-      - name: Running Buildifier
-        # TODO(gcmn): Look into only running on changed files.
-        uses: thompsonja/bazel-buildifier@v0.2.1
-        with:
-          excludes: "*/third_party/*"
-          # For compatibility with Google's internal source repository, we still
-          # use this.
-          warnings: "-native-cc,-native-py"
+      - name: Fetching Base Branch
+        # We have to explicitly fetch the base branch as well
+        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
+      - name: Downloading Buildifier
+        run: |
+          mkdir -p "${HOME?}/bin"
+          wget https://github.com/bazelbuild/buildtools/releases/download/4.0.1/buildifier -O "${HOME?}/bin/buildifier"
+          chmod +x "${HOME?}/bin/buildifier"
+          echo "${HOME?}/bin" >> $GITHUB_PATH
+      - name: Running buildifier on changed files
+        run: |
+          # Fail if the script fails (unfixable lint warnings) or it creates a
+          # diff (fixable lint warnings or formatting).
+          EXIT_CODE=0
+          ./scripts/buildifier.sh || EXIT_CODE=1
+          git diff --exit-code
+          exit "${EXIT_CODE?}"
 
   yapf:
     runs-on: ubuntu-18.04
