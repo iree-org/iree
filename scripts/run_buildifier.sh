@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Checks buildifier formatting in files modified vs the specified reference
-# commit (default "main")
+# Checks buildifier formatting and lint in files modified vs the specified
+# reference commit (default "main")
+# See https://github.com/bazelbuild/buildtools/tree/master/buildifier
 
 set -o pipefail
 
