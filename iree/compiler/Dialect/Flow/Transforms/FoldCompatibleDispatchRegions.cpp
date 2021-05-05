@@ -396,7 +396,7 @@ class FoldCompatibleDispatchRegionsPass
           FoldCompatibleDispatchRegionsPass> {
  public:
   void runOnOperation() override {
-    auto func = getOperation();
+    FuncOp func = getOperation();
     for (auto &block : func) {
       if (failed(mergeBlockDispatchRegions(func, &block))) {
         return signalPassFailure();
