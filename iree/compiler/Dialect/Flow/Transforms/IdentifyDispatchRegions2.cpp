@@ -407,6 +407,7 @@ class IdentifyDispatchRegions2Pass
   void runOnOperation() override {
     // NOTE: we require the DispatchabilityAnalysisPass to have run first.
     auto dispatchability = getCachedParentAnalysis<Dispatchability>();
+    FuncOp func = getOperation();
     if (!dispatchability.hasValue()) {
       getOperation().emitError()
           << "dispatchability analysis not performed "
