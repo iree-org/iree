@@ -14,3 +14,4 @@ gcr.io/iree-oss/cmake-bazel-frontends@sha256:699f6470e618c151f36cb4769ccaf2cfbf3
 gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:02c21884ec62a548992fc62031c41375d5cb7ebc33cb4ecbb8ac0ec2c83a2aa1
 gcr.io/iree-oss/cmake-bazel-frontends-nvidia@sha256:79998983c574bb6fd0625a99a541364749c76f8ff6c6ee98411b612a9950470b
 gcr.io/iree-oss/cmake-bazel-frontends-swiftshader@sha256:012dd9b452da5c4f4248edf27a7a7faa0eeca6a7a2a1e21d00bc932b125246e1
+gcr.io/iree-oss/cmake-riscv@sha256:a09ff1e6ab65a436822894acf58ef6c4cbc523581960e918a07ddf4a46c8af95
