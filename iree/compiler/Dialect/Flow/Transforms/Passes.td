@@ -48,7 +48,7 @@ def ExpandVariableDynamicDims :
 }
 
 def ExportBenchmarkFuncs :
-    Pass<"iree-flow-export-benchmark-funcs", "ModuleOp"> {
+    Pass<"iree-flow-export-benchmark-funcs-pass", "ModuleOp"> {
   let summary = "Exports benchmark functions";
   let constructor = "mlir::iree_compiler::IREE::Flow::createExportBenchmarkFuncsPass()";
 }
