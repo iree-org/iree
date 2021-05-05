@@ -16,15 +16,14 @@ model features
 - [x] Low overhead, pipelined execution for efficient power and resource usage
 - [x] Binary size as low as 30KB on embedded systems
 - [x] Debugging and profiling support
-- [ ] Support for running quantized models (Coming soon!)
+- [ ] Support for running quantized models (coming soon!)
 
 ### Support matrix
 
 The IREE compiler tools run on :fontawesome-brands-linux: Linux,
 :fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS.
-IREE supports compiling from a variety of ML frameworks and running compiled
-models on a wide range of platforms, CPU architectures, and hardware
-accelerators.
+IREE supports importing from a variety of ML frameworks and running models on a
+wide range of platforms, CPU architectures, and hardware accelerators.
 
 Model formats
 
@@ -126,7 +125,7 @@ _bindings_ for running IREE models using other languages.
 ## Communication channels
 
 *   :fontawesome-brands-github:
-    [GitHub issues](https://github.com/google/iree/issues): Feature requests
+    [GitHub issues](https://github.com/google/iree/issues): Feature requests,
     bugs, and other work tracking
 *   :fontawesome-brands-discord:
     [IREE Discord server](https://discord.gg/26P4xW4): Daily development
@@ -136,8 +135,8 @@ _bindings_ for running IREE models using other languages.
 
 ## Roadmap
 
-IREE is in the early stages of development and not yet ready for broad adoption.
-Check out the
+IREE is in the early stages of development and is not yet ready for broad
+adoption. Check out the
 [long-term design roadmap](https://github.com/google/iree/blob/main/docs/design_roadmap.md)
 to get a sense of where we're headed.
 
