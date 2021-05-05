@@ -97,10 +97,10 @@ cc_test(
 
 cc_library(
     name = "dynamic_library",
-    srcs = glob([
+    srcs = [
         "dynamic_library_posix.c",
         "dynamic_library_win32.c",
-    ]),
+    ],
     hdrs = ["dynamic_library.h"],
     deps = [
         ":file_path",
