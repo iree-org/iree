@@ -6,26 +6,19 @@ Learning (ML) models to a unified IR optimized for real-time inference on
 mobile/edge devices against heterogeneous hardware accelerators. IREE also
 provides flexible deployment solutions for its compiled ML models.
 
-## Introduction
+## Key features
 
-### Key features
-
-- [x] Support for dynamic shapes, flow control, streaming, and other advanced
-model features
 - [x] Ahead-of-time compilation of scheduling and execution logic together
+- [x] Support for dynamic shapes, flow control, streaming, and other advanced
+      model features
+- [x] Optimized for many CPU and GPU architectures
 - [x] Low overhead, pipelined execution for efficient power and resource usage
 - [x] Binary size as low as 30KB on embedded systems
 - [x] Debugging and profiling support
-- [ ] Support for running quantized models (coming soon!)
 
-### Support matrix
+## Support matrix
 
-The IREE compiler tools run on :fontawesome-brands-linux: Linux,
-:fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS.
-IREE supports importing from a variety of ML frameworks and running models on a
-wide range of platforms, CPU architectures, and hardware accelerators.
-
-Model formats
+IREE supports importing from a variety of ML frameworks:
 
 - [x] TensorFlow
 - [x] TensorFlow Lite
@@ -33,24 +26,32 @@ Model formats
 - [ ] PyTorch
 <!-- - [ ] ONNX -->
 
-Runtime platforms and architectures
+The IREE compiler tools run on :fontawesome-brands-linux: Linux,
+:fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS
+and can generate efficient code for a variety of runtime platforms:
 
 - [x] Linux
 - [x] Windows
-- [x] macOS, iOS
+- [x] macOS
+- [x] iOS
 - [x] Android
-- [x] Bare metal, including RISC-V
-- [x] ARM and x86
+- [x] Bare metal
 - [ ] WebAssembly
 
-Accelerators and APIs
+and architectures:
+
+- [x] ARM
+- [x] x86
+- [x] RISC-V
+
+Support for hardware accelerators and APIs is also included:
 
 - [x] Vulkan
 - [x] CUDA
 - [ ] Metal
 - [ ] WebGPU
 
-### Project architecture
+## Project architecture
 
 IREE adopts a _holistic_ approach towards ML model compilation: the IR produced
 contains both the _scheduling_ logic, required to communicate data dependencies
@@ -98,8 +99,8 @@ model format.
 IREE provides a flexible set of tools for various deployment scenarios - use as
 much or as little of IREE as you like.
 
-* What hardware should the bulk of your model run on? CPU? GPU?
 * What platforms are you targeting? Desktop? Mobile? An embedded system?
+* What hardware should the bulk of your model run on? CPU? GPU?
 * How fixed is your model itself? Can the weights be changed? Do you want
   to support loading different model architectures dynamically?
 
@@ -109,12 +110,13 @@ technology.
 ### Compiling models
 
 Model compilation is performed ahead-of-time on a _host_ machine for any
-combination of _targets_. The compilation process converts from "ops" used by
-high level frameworks down into optimized native code and associated scheduling
-logic.
+combination of _targets_. The compilation process converts from layers and
+operators used by high level frameworks down into optimized native code and
+associated scheduling logic.
 
-For example, compiling for GPU execution using Vulkan generates SPIR-V kernels
-and Vulkan API calls. For CPU execution, native code with static or dynamic
+For example, compiling for [GPU execution](backends/gpu-vulkan.md) using Vulkan
+generates SPIR-V kernels and Vulkan API calls. For
+[CPU execution](backends/cpu-dylib.md), native code with static or dynamic
 linkage and the associated function calls are generated.
 
 ### Running models
