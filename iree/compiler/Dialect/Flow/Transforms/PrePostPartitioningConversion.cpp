@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/Conversion/StandardToFlow/ConvertStandardToFlow.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Patterns.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
@@ -37,14 +38,14 @@ namespace IREE {
 namespace Flow {
 
 class PrePartitioningConversionPass
-    : public PassWrapper<PrePartitioningConversionPass, FunctionPass> {
+    : public PrePartitioningConversionBase<PrePartitioningConversionPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, FlowDialect, mhlo::MhloDialect,
                     StandardOpsDialect, tensor::TensorDialect>();
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(*context);
     OwningRewritePatternList conversionPatterns(&getContext());
@@ -85,9 +86,10 @@ class PrePartitioningConversionPass
         .markOpRecursivelyLegal<linalg::GenericOp, linalg::IndexedGenericOp>();
     populateStandardToFlowPatterns(context, conversionPatterns);
 
-    if (failed(applyPartialConversion(getFunction(), conversionTarget,
+    if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {
-      getFunction().emitError() << "module is not in a compatible input format";
+      getOperation().emitError()
+          << "module is not in a compatible input format";
       return signalPassFailure();
     }
   }
@@ -96,10 +98,6 @@ class PrePartitioningConversionPass
 std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass() {
   return std::make_unique<PrePartitioningConversionPass>();
 }
-
-static PassRegistration<PrePartitioningConversionPass> prePass(
-    "iree-flow-pre-partitioning-conversion",
-    "Dialect conversion prior to partitioning");
 
 }  // namespace Flow
 }  // namespace IREE

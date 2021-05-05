@@ -14,6 +14,7 @@
 
 #include <numeric>
 
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
@@ -806,13 +807,13 @@ class ReorderBroadcastInDimOpAndElementwiseOp
 };
 
 struct HLOToHLOPreprocessingPass
-    : public PassWrapper<HLOToHLOPreprocessingPass, FunctionPass> {
+    : public HLOToHLOPreprocessingBase<HLOToHLOPreprocessingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<shape::ShapeDialect, mhlo::MhloDialect,
                     tensor::TensorDialect>();
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
     ConversionTarget conversionTarget(*context);
     OwningRewritePatternList conversionPatterns(&getContext());
@@ -824,7 +825,7 @@ struct HLOToHLOPreprocessingPass
                                      mlir::StandardOpsDialect,
                                      mlir::tensor::TensorDialect>();
     conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
-    if (failed(applyPartialConversion(getFunction(), conversionTarget,
+    if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {
       return signalPassFailure();
     }
@@ -902,10 +903,6 @@ struct HLOToHLOPreprocessingPass
 std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass() {
   return std::make_unique<HLOToHLOPreprocessingPass>();
 }
-
-static PassRegistration<HLOToHLOPreprocessingPass> legalize_pass(
-    "iree-flow-hlo-to-hlo-preprocessing",
-    "Apply hlo to hlo transformations for some hlo ops");
 
 }  // namespace Flow
 }  // namespace IREE

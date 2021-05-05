@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SetVector.h"
@@ -245,7 +246,7 @@ void replaceEntryPointUses(
 }  // namespace
 
 class DeduplicateExecutablesPass
-    : public PassWrapper<DeduplicateExecutablesPass, OperationPass<ModuleOp>> {
+    : public DeduplicateExecutablesBase<DeduplicateExecutablesPass> {
  public:
   explicit DeduplicateExecutablesPass() {}
   DeduplicateExecutablesPass(const DeduplicateExecutablesPass &pass) {}
@@ -322,10 +323,6 @@ class DeduplicateExecutablesPass
 std::unique_ptr<OperationPass<ModuleOp>> createDeduplicateExecutablesPass() {
   return std::make_unique<DeduplicateExecutablesPass>();
 }
-
-static PassRegistration<DeduplicateExecutablesPass> pass(
-    "iree-flow-deduplicate-executables",
-    "Deduplicates executables that are identical");
 
 }  // namespace Flow
 }  // namespace IREE
