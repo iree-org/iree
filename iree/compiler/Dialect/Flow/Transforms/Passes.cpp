@@ -314,6 +314,19 @@ void registerFlowTransformPassPipeline() {
       });
 }
 
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+}  // namespace
+
+void registerFlowPasses() {
+  // Generated.
+  registerPasses();
+
+  // Pipelines.
+  registerFlowTransformPassPipeline();
+}
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

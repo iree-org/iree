@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -33,7 +34,7 @@ namespace Flow {
 //     exported attribute from the old functions.
 // The input are provided using flow.variable and flow.lookup.
 class ExportBenchmarkFuncsPass
-    : public PassWrapper<ExportBenchmarkFuncsPass, OperationPass<ModuleOp>> {
+    : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
  public:
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();

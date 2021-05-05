@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
@@ -196,10 +197,6 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
 std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass() {
   return std::make_unique<FormStreamsPass>();
 }
-
-static PassRegistration<FormStreamsPass> pass(
-    "iree-flow-form-streams",
-    "Identifies dispatches that can be grouped into streams within functions");
 
 }  // namespace Flow
 }  // namespace IREE

@@ -10,6 +10,15 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    Passes_inc_gen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    -gen-pass-decls Passes.h.inc
+)
+
 iree_cc_library(
   NAME
     Transforms
@@ -36,6 +45,7 @@ iree_cc_library(
     "OutlineDispatchRegions.cpp"
     "OutlineDispatchRegions2.cpp"
     "OutlineLargeConstants.cpp"
+    "PassDetail.h"
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
     "StripAndSplatConstantVariables.cpp"

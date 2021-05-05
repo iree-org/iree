@@ -20,6 +20,21 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+gentbl(
+    name = "Passes_inc_gen",
+    tbl_outs = [
+        (
+            "-gen-pass-decls",
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    td_srcs = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
 cc_library(
     name = "Transforms",
     srcs = [
@@ -41,6 +56,7 @@ cc_library(
         "OutlineDispatchRegions.cpp",
         "OutlineDispatchRegions2.cpp",
         "OutlineLargeConstants.cpp",
+        "PassDetail.h",
         "Passes.cpp",
         "PrePostPartitioningConversion.cpp",
         "StripAndSplatConstantVariables.cpp",
@@ -51,6 +67,7 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        ":Passes_inc_gen",
         "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/HLOToLinalg:HLOToLinalgOnTensors",
         "//iree/compiler/Conversion/LinalgToLinalg",

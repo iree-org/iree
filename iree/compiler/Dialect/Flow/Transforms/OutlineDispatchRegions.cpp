@@ -16,6 +16,8 @@
 
 #include "iree/compiler/Dialect/Flow/Analysis/Dispatchability.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -217,7 +219,7 @@ LogicalResult outlineDispatchRegion(
 }  // namespace
 
 class OutlineDispatchRegionsPass
-    : public PassWrapper<OutlineDispatchRegionsPass, OperationPass<ModuleOp>> {
+    : public OutlineDispatchRegionsBase<OutlineDispatchRegionsPass> {
  public:
   OutlineDispatchRegionsPass() = default;
 
@@ -252,10 +254,6 @@ class OutlineDispatchRegionsPass
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass() {
   return std::make_unique<OutlineDispatchRegionsPass>();
 }
-
-static PassRegistration<OutlineDispatchRegionsPass> pass(
-    "iree-flow-outline-dispatch-regions",
-    "Outlines dispatch regions into standalone functions");
 
 }  // namespace Flow
 }  // namespace IREE
