@@ -14,9 +14,9 @@
 
 namespace iree.vm;
 
-// 'Bytecode MODule'.
-file_identifier "BMOD";
-file_extension "module";
+// IREE bytecode module.
+file_identifier "IREE";
+file_extension "vmfb";
 
 // Arbitrary key/value reflection attribute.
 table ReflectionAttrDef {
