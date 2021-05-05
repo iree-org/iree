@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:tblgen.bzl", "gentbl")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
@@ -65,6 +66,7 @@ cc_library(
         "DestructiveUpdateUtils.h",
         "DispatchConfig.h",
         "Passes.h",
+        "Passes.h.inc",
     ],
     deps = [
         ":Passes_inc_gen",

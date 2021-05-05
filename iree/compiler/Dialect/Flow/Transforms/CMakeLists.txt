@@ -26,6 +26,7 @@ iree_cc_library(
     "DestructiveUpdateUtils.h"
     "DispatchConfig.h"
     "Passes.h"
+    "Passes.h.inc"
   SRCS
     "ConvertToFlowTensorOps.cpp"
     "DeduplicateExecutables.cpp"
