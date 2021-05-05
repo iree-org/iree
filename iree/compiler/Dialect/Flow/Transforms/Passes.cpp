@@ -325,6 +325,7 @@ void registerFlowPasses() {
 
   // Pipelines.
   registerFlowTransformPassPipeline();
+  registerInputTransformPassPipeline();
 }
 
 }  // namespace Flow
