@@ -10,17 +10,15 @@
 
 iree_add_all_subdirs()
 
-iree_cc_embed_data(
+iree_c_embed_data(
   NAME
     check_imports
   SRCS
     "check.imports.mlir"
-  CC_FILE_OUTPUT
-    "check.imports.cc"
+  C_FILE_OUTPUT
+    "check.imports.c"
   H_FILE_OUTPUT
     "check.imports.h"
-  CPP_NAMESPACE
-    "mlir::iree_compiler::IREE::Check"
   FLATTEN
   PUBLIC
 )

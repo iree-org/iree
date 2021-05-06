@@ -11,18 +11,16 @@
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_SIMPLE_MUL_DISPATCH_X_SO LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS simple_mul_dispatch_*.so)
-iree_cc_embed_data(
+iree_c_embed_data(
   NAME
     simple_mul_dispatch
   SRCS
     "${_GLOB_SIMPLE_MUL_DISPATCH_X_SO}"
-  CC_FILE_OUTPUT
-    "simple_mul_dispatch.cc"
+  C_FILE_OUTPUT
+    "simple_mul_dispatch.c"
   H_FILE_OUTPUT
     "simple_mul_dispatch.h"
   TESTONLY
-  CPP_NAMESPACE
-    "iree::elf"
   FLATTEN
   PUBLIC
 )

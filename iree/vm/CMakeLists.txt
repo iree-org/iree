@@ -207,7 +207,7 @@ iree_cc_test(
     iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
-    iree::vm::test::all_bytecode_modules_cc
+    iree::vm::test::all_bytecode_modules_c
   LABELS
     "notap"
     "manual"

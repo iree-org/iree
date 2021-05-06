@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -27,12 +27,11 @@ cc_binary(
     linkshared = True,
 )
 
-cc_embed_data(
+c_embed_data(
     name = "dynamic_library_test_library",
     testonly = True,
     srcs = [":dynamic_library_test_library.so"],
-    cc_file_output = "dynamic_library_test_library_embed.cc",
-    cpp_namespace = "iree",
+    c_file_output = "dynamic_library_test_library_embed.c",
     flatten = True,
     h_file_output = "dynamic_library_test_library_embed.h",
 )

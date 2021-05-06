@@ -14,9 +14,9 @@ if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
   return()
 endif()
 
-iree_cc_embed_data(
+iree_c_embed_data(
   NAME
-    all_bytecode_modules_cc
+    all_bytecode_modules_c
   GENERATED_SRCS
     "arithmetic_ops.vmfb"
     "arithmetic_ops_f32.vmfb"
@@ -39,12 +39,10 @@ iree_cc_embed_data(
     "list_variant_ops.vmfb"
     "shift_ops.vmfb"
     "shift_ops_i64.vmfb"
-  CC_FILE_OUTPUT
-    "all_bytecode_modules.cc"
+  C_FILE_OUTPUT
+    "all_bytecode_modules.c"
   H_FILE_OUTPUT
     "all_bytecode_modules.h"
-  CPP_NAMESPACE
-    "iree::vm::test"
   FLATTEN
   PUBLIC
 )
