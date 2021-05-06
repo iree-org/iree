@@ -167,9 +167,9 @@ typedef enum {
   IREE_VM_OP_CORE_RSV_0x9D,
   IREE_VM_OP_CORE_RSV_0x9E,
   IREE_VM_OP_CORE_RSV_0x9F,
-  IREE_VM_OP_CORE_PrefixExtI64 = 0xA0,
-  IREE_VM_OP_CORE_PrefixExtF32 = 0xA1,
-  IREE_VM_OP_CORE_PrefixExtF64 = 0xA2,
+  IREE_VM_OP_CORE_RSV_0xA0,
+  IREE_VM_OP_CORE_RSV_0xA1,
+  IREE_VM_OP_CORE_RSV_0xA2,
   IREE_VM_OP_CORE_RSV_0xA3,
   IREE_VM_OP_CORE_RSV_0xA4,
   IREE_VM_OP_CORE_RSV_0xA5,
@@ -183,38 +183,38 @@ typedef enum {
   IREE_VM_OP_CORE_RSV_0xAD,
   IREE_VM_OP_CORE_RSV_0xAE,
   IREE_VM_OP_CORE_RSV_0xAF,
-  IREE_VM_OP_CORE_RSV_0xB0,
-  IREE_VM_OP_CORE_RSV_0xB1,
+  IREE_VM_OP_CORE_BufferLoadI8U = 0xB0,
+  IREE_VM_OP_CORE_BufferLoadI16U = 0xB1,
   IREE_VM_OP_CORE_RSV_0xB2,
-  IREE_VM_OP_CORE_RSV_0xB3,
-  IREE_VM_OP_CORE_RSV_0xB4,
-  IREE_VM_OP_CORE_RSV_0xB5,
+  IREE_VM_OP_CORE_BufferLoadI32 = 0xB3,
+  IREE_VM_OP_CORE_BufferLoadI8S = 0xB4,
+  IREE_VM_OP_CORE_BufferLoadI16S = 0xB5,
   IREE_VM_OP_CORE_RSV_0xB6,
   IREE_VM_OP_CORE_RSV_0xB7,
-  IREE_VM_OP_CORE_RSV_0xB8,
-  IREE_VM_OP_CORE_RSV_0xB9,
+  IREE_VM_OP_CORE_BufferStoreI8 = 0xB8,
+  IREE_VM_OP_CORE_BufferStoreI16 = 0xB9,
   IREE_VM_OP_CORE_RSV_0xBA,
-  IREE_VM_OP_CORE_RSV_0xBB,
+  IREE_VM_OP_CORE_BufferStoreI32 = 0xBB,
   IREE_VM_OP_CORE_RSV_0xBC,
   IREE_VM_OP_CORE_RSV_0xBD,
   IREE_VM_OP_CORE_RSV_0xBE,
   IREE_VM_OP_CORE_RSV_0xBF,
-  IREE_VM_OP_CORE_RSV_0xC0,
-  IREE_VM_OP_CORE_RSV_0xC1,
-  IREE_VM_OP_CORE_RSV_0xC2,
+  IREE_VM_OP_CORE_BufferAlloc = 0xC0,
+  IREE_VM_OP_CORE_BufferClone = 0xC1,
+  IREE_VM_OP_CORE_BufferLength = 0xC2,
   IREE_VM_OP_CORE_RSV_0xC3,
   IREE_VM_OP_CORE_RSV_0xC4,
   IREE_VM_OP_CORE_RSV_0xC5,
-  IREE_VM_OP_CORE_RSV_0xC6,
-  IREE_VM_OP_CORE_RSV_0xC7,
+  IREE_VM_OP_CORE_BufferCopy = 0xC6,
+  IREE_VM_OP_CORE_BufferCompare = 0xC7,
   IREE_VM_OP_CORE_RSV_0xC8,
   IREE_VM_OP_CORE_RSV_0xC9,
   IREE_VM_OP_CORE_RSV_0xCA,
   IREE_VM_OP_CORE_RSV_0xCB,
-  IREE_VM_OP_CORE_RSV_0xCC,
-  IREE_VM_OP_CORE_RSV_0xCD,
+  IREE_VM_OP_CORE_BufferFillI8 = 0xCC,
+  IREE_VM_OP_CORE_BufferFillI16 = 0xCD,
   IREE_VM_OP_CORE_RSV_0xCE,
-  IREE_VM_OP_CORE_RSV_0xCF,
+  IREE_VM_OP_CORE_BufferFillI32 = 0xCF,
   IREE_VM_OP_CORE_RSV_0xD0,
   IREE_VM_OP_CORE_RSV_0xD1,
   IREE_VM_OP_CORE_RSV_0xD2,
@@ -231,9 +231,9 @@ typedef enum {
   IREE_VM_OP_CORE_RSV_0xDD,
   IREE_VM_OP_CORE_RSV_0xDE,
   IREE_VM_OP_CORE_RSV_0xDF,
-  IREE_VM_OP_CORE_RSV_0xE0,
-  IREE_VM_OP_CORE_RSV_0xE1,
-  IREE_VM_OP_CORE_RSV_0xE2,
+  IREE_VM_OP_CORE_PrefixExtI64 = 0xE0,
+  IREE_VM_OP_CORE_PrefixExtF32 = 0xE1,
+  IREE_VM_OP_CORE_PrefixExtF64 = 0xE2,
   IREE_VM_OP_CORE_RSV_0xE3,
   IREE_VM_OP_CORE_RSV_0xE4,
   IREE_VM_OP_CORE_RSV_0xE5,
@@ -426,9 +426,9 @@ typedef enum {
     RSV(0x9D) \
     RSV(0x9E) \
     RSV(0x9F) \
-    OPC(0xA0, PrefixExtI64) \
-    OPC(0xA1, PrefixExtF32) \
-    OPC(0xA2, PrefixExtF64) \
+    RSV(0xA0) \
+    RSV(0xA1) \
+    RSV(0xA2) \
     RSV(0xA3) \
     RSV(0xA4) \
     RSV(0xA5) \
@@ -442,38 +442,38 @@ typedef enum {
     RSV(0xAD) \
     RSV(0xAE) \
     RSV(0xAF) \
-    RSV(0xB0) \
-    RSV(0xB1) \
+    OPC(0xB0, BufferLoadI8U) \
+    OPC(0xB1, BufferLoadI16U) \
     RSV(0xB2) \
-    RSV(0xB3) \
-    RSV(0xB4) \
-    RSV(0xB5) \
+    OPC(0xB3, BufferLoadI32) \
+    OPC(0xB4, BufferLoadI8S) \
+    OPC(0xB5, BufferLoadI16S) \
     RSV(0xB6) \
     RSV(0xB7) \
-    RSV(0xB8) \
-    RSV(0xB9) \
+    OPC(0xB8, BufferStoreI8) \
+    OPC(0xB9, BufferStoreI16) \
     RSV(0xBA) \
-    RSV(0xBB) \
+    OPC(0xBB, BufferStoreI32) \
     RSV(0xBC) \
     RSV(0xBD) \
     RSV(0xBE) \
     RSV(0xBF) \
-    RSV(0xC0) \
-    RSV(0xC1) \
-    RSV(0xC2) \
+    OPC(0xC0, BufferAlloc) \
+    OPC(0xC1, BufferClone) \
+    OPC(0xC2, BufferLength) \
     RSV(0xC3) \
     RSV(0xC4) \
     RSV(0xC5) \
-    RSV(0xC6) \
-    RSV(0xC7) \
+    OPC(0xC6, BufferCopy) \
+    OPC(0xC7, BufferCompare) \
     RSV(0xC8) \
     RSV(0xC9) \
     RSV(0xCA) \
     RSV(0xCB) \
-    RSV(0xCC) \
-    RSV(0xCD) \
+    OPC(0xCC, BufferFillI8) \
+    OPC(0xCD, BufferFillI16) \
     RSV(0xCE) \
-    RSV(0xCF) \
+    OPC(0xCF, BufferFillI32) \
     RSV(0xD0) \
     RSV(0xD1) \
     RSV(0xD2) \
@@ -490,9 +490,9 @@ typedef enum {
     RSV(0xDD) \
     RSV(0xDE) \
     RSV(0xDF) \
-    RSV(0xE0) \
-    RSV(0xE1) \
-    RSV(0xE2) \
+    OPC(0xE0, PrefixExtI64) \
+    OPC(0xE1, PrefixExtF32) \
+    OPC(0xE2, PrefixExtF64) \
     RSV(0xE3) \
     RSV(0xE4) \
     RSV(0xE5) \
@@ -700,8 +700,8 @@ typedef enum {
   IREE_VM_OP_EXT_F32_RSV_0xAD,
   IREE_VM_OP_EXT_F32_RSV_0xAE,
   IREE_VM_OP_EXT_F32_RSV_0xAF,
-  IREE_VM_OP_EXT_F32_RSV_0xB0,
-  IREE_VM_OP_EXT_F32_RSV_0xB1,
+  IREE_VM_OP_EXT_F32_BufferLoadF32 = 0xB0,
+  IREE_VM_OP_EXT_F32_BufferStoreF32 = 0xB1,
   IREE_VM_OP_EXT_F32_RSV_0xB2,
   IREE_VM_OP_EXT_F32_RSV_0xB3,
   IREE_VM_OP_EXT_F32_RSV_0xB4,
@@ -716,7 +716,7 @@ typedef enum {
   IREE_VM_OP_EXT_F32_RSV_0xBD,
   IREE_VM_OP_EXT_F32_RSV_0xBE,
   IREE_VM_OP_EXT_F32_RSV_0xBF,
-  IREE_VM_OP_EXT_F32_RSV_0xC0,
+  IREE_VM_OP_EXT_F32_BufferFillF32 = 0xC0,
   IREE_VM_OP_EXT_F32_RSV_0xC1,
   IREE_VM_OP_EXT_F32_RSV_0xC2,
   IREE_VM_OP_EXT_F32_RSV_0xC3,
@@ -959,8 +959,8 @@ typedef enum {
     RSV(0xAD) \
     RSV(0xAE) \
     RSV(0xAF) \
-    RSV(0xB0) \
-    RSV(0xB1) \
+    OPC(0xB0, BufferLoadF32) \
+    OPC(0xB1, BufferStoreF32) \
     RSV(0xB2) \
     RSV(0xB3) \
     RSV(0xB4) \
@@ -975,7 +975,7 @@ typedef enum {
     RSV(0xBD) \
     RSV(0xBE) \
     RSV(0xBF) \
-    RSV(0xC0) \
+    OPC(0xC0, BufferFillF32) \
     RSV(0xC1) \
     RSV(0xC2) \
     RSV(0xC3) \
@@ -1217,8 +1217,8 @@ typedef enum {
   IREE_VM_OP_EXT_F64_RSV_0xAD,
   IREE_VM_OP_EXT_F64_RSV_0xAE,
   IREE_VM_OP_EXT_F64_RSV_0xAF,
-  IREE_VM_OP_EXT_F64_RSV_0xB0,
-  IREE_VM_OP_EXT_F64_RSV_0xB1,
+  IREE_VM_OP_EXT_F64_BufferLoadF64 = 0xB0,
+  IREE_VM_OP_EXT_F64_BufferStoreF64 = 0xB1,
   IREE_VM_OP_EXT_F64_RSV_0xB2,
   IREE_VM_OP_EXT_F64_RSV_0xB3,
   IREE_VM_OP_EXT_F64_RSV_0xB4,
@@ -1233,7 +1233,7 @@ typedef enum {
   IREE_VM_OP_EXT_F64_RSV_0xBD,
   IREE_VM_OP_EXT_F64_RSV_0xBE,
   IREE_VM_OP_EXT_F64_RSV_0xBF,
-  IREE_VM_OP_EXT_F64_RSV_0xC0,
+  IREE_VM_OP_EXT_F64_BufferFillF64 = 0xC0,
   IREE_VM_OP_EXT_F64_RSV_0xC1,
   IREE_VM_OP_EXT_F64_RSV_0xC2,
   IREE_VM_OP_EXT_F64_RSV_0xC3,
@@ -1476,8 +1476,8 @@ typedef enum {
     RSV(0xAD) \
     RSV(0xAE) \
     RSV(0xAF) \
-    RSV(0xB0) \
-    RSV(0xB1) \
+    OPC(0xB0, BufferLoadF64) \
+    OPC(0xB1, BufferStoreF64) \
     RSV(0xB2) \
     RSV(0xB3) \
     RSV(0xB4) \
@@ -1492,7 +1492,7 @@ typedef enum {
     RSV(0xBD) \
     RSV(0xBE) \
     RSV(0xBF) \
-    RSV(0xC0) \
+    OPC(0xC0, BufferFillF64) \
     RSV(0xC1) \
     RSV(0xC2) \
     RSV(0xC3) \
@@ -1734,8 +1734,8 @@ typedef enum {
   IREE_VM_OP_EXT_I64_RSV_0xAD,
   IREE_VM_OP_EXT_I64_RSV_0xAE,
   IREE_VM_OP_EXT_I64_RSV_0xAF,
-  IREE_VM_OP_EXT_I64_RSV_0xB0,
-  IREE_VM_OP_EXT_I64_RSV_0xB1,
+  IREE_VM_OP_EXT_I64_BufferLoadI64 = 0xB0,
+  IREE_VM_OP_EXT_I64_BufferStoreI64 = 0xB1,
   IREE_VM_OP_EXT_I64_RSV_0xB2,
   IREE_VM_OP_EXT_I64_RSV_0xB3,
   IREE_VM_OP_EXT_I64_RSV_0xB4,
@@ -1750,7 +1750,7 @@ typedef enum {
   IREE_VM_OP_EXT_I64_RSV_0xBD,
   IREE_VM_OP_EXT_I64_RSV_0xBE,
   IREE_VM_OP_EXT_I64_RSV_0xBF,
-  IREE_VM_OP_EXT_I64_RSV_0xC0,
+  IREE_VM_OP_EXT_I64_BufferFillI64 = 0xC0,
   IREE_VM_OP_EXT_I64_RSV_0xC1,
   IREE_VM_OP_EXT_I64_RSV_0xC2,
   IREE_VM_OP_EXT_I64_RSV_0xC3,
@@ -1993,8 +1993,8 @@ typedef enum {
     RSV(0xAD) \
     RSV(0xAE) \
     RSV(0xAF) \
-    RSV(0xB0) \
-    RSV(0xB1) \
+    OPC(0xB0, BufferLoadI64) \
+    OPC(0xB1, BufferStoreI64) \
     RSV(0xB2) \
     RSV(0xB3) \
     RSV(0xB4) \
@@ -2009,7 +2009,7 @@ typedef enum {
     RSV(0xBD) \
     RSV(0xBE) \
     RSV(0xBF) \
-    RSV(0xC0) \
+    OPC(0xC0, BufferFillI64) \
     RSV(0xC1) \
     RSV(0xC2) \
     RSV(0xC3) \

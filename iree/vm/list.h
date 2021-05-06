@@ -59,7 +59,7 @@ IREE_API_EXPORT iree_status_t iree_vm_list_initialize(
     iree_host_size_t capacity, iree_vm_list_t** out_list);
 
 // Deinitializes a statically-allocated |list| previously initialized with
-// iree_vm_list_initialize.
+// iree_vm_list_initialize. Aborts if there are still references remaining.
 IREE_API_EXPORT void iree_vm_list_deinitialize(iree_vm_list_t* list);
 
 // Creates a growable list containing the given |element_type|, which may either

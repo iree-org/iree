@@ -971,6 +971,358 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
 }
 
 //===----------------------------------------------------------------------===//
+// Buffers
+//===----------------------------------------------------------------------===//
+
+def VM_BufferAllocOp :
+    VM_PureOp<"buffer.alloc", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemAlloc]>,
+    ]> {
+  let summary = [{allocates a new zero-initialized buffer}];
+  let description = [{
+    Allocates a new zero-initialized buffer with the given size in bytes.
+  }];
+
+  let arguments = (ins
+    VM_Index:$length
+  );
+  let results = (outs
+    VM_RefOf<VM_BufferType>:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_BufferAlloc>,
+    VM_EncOperand<"length", 0>,
+    VM_EncResult<"result">,
+  ];
+}
+
+def VM_BufferCloneOp :
+    VM_PureOp<"buffer.clone", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemAlloc]>,
+      MemoryEffects<[MemRead]>,
+    ]> {
+  let summary = [{clones a buffer}];
+  let description = [{
+    Clones a range of the source buffer to produce a mutable buffer with the
+    same contents.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$source_buffer,
+    VM_Index:$source_offset,
+    VM_Index:$length
+  );
+  let results = (outs
+    VM_RefOf<VM_BufferType>:$result
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($source_buffer) `->` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_BufferClone>,
+    VM_EncOperand<"source_buffer", 0>,
+    VM_EncOperand<"source_offset", 1>,
+    VM_EncOperand<"length", 2>,
+    VM_EncResult<"result">,
+  ];
+}
+
+def VM_BufferLengthOp :
+    VM_PureOp<"buffer.length", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{returns the byte length of a buffer}];
+  let description = [{
+    Returns the total byte length of the given buffer. This is the exact value
+    as specified during buffer allocation though the underlying system buffer
+    may have additional padding.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$buffer
+  );
+  let results = (outs
+    VM_Index:$result
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($buffer) `->` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_BufferLength>,
+    VM_EncOperand<"buffer", 0>,
+    VM_EncResult<"result">,
+  ];
+}
+
+def VM_BufferCopyOp :
+    VM_Op<"buffer.copy", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemRead]>,
+      MemoryEffects<[MemWrite]>,
+    ]> {
+  let summary = [{copies a range of a buffer to another}];
+  let description = [{
+    Copies a range of one buffer to another, like memcpy.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$source_buffer,
+    VM_Index:$source_offset,
+    VM_RefOf<VM_BufferType>:$target_buffer,
+    VM_Index:$target_offset,
+    VM_Index:$length
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($source_buffer) `->` type($target_buffer)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_BufferCopy>,
+    VM_EncOperand<"source_buffer", 0>,
+    VM_EncOperand<"source_offset", 1>,
+    VM_EncOperand<"target_buffer", 2>,
+    VM_EncOperand<"target_offset", 3>,
+    VM_EncOperand<"length", 4>
+  ];
+}
+
+def VM_BufferCompareOp :
+    VM_Op<"buffer.compare", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemRead]>,
+      MemoryEffects<[MemWrite]>,
+    ]> {
+  let summary = [{compares a range of a buffer to another}];
+  let description = [{
+    Returns 1 if the two ranges are bitwise equivalent, somewhat like memcmp.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$lhs_buffer,
+    VM_Index:$lhs_offset,
+    VM_RefOf<VM_BufferType>:$rhs_buffer,
+    VM_Index:$rhs_offset,
+    VM_Index:$length
+  );
+  let results = (outs
+    VM_CondValue:$result
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($lhs_buffer) `,` type($rhs_buffer)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_BufferCompare>,
+    VM_EncOperand<"lhs_buffer", 0>,
+    VM_EncOperand<"lhs_offset", 1>,
+    VM_EncOperand<"rhs_buffer", 2>,
+    VM_EncOperand<"rhs_offset", 3>,
+    VM_EncOperand<"length", 4>,
+    VM_EncResult<"result">
+  ];
+}
+
+class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
+                      list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemWrite]>,
+    ])> {
+  let description = [{
+    Fills a range of the buffer with the given value, like memset.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$target_buffer,
+    VM_Index:$target_offset,
+    VM_Index:$length,
+    AnyTypeOf<[type, I32]>:$value
+  );
+
+  let assemblyFormat = [{
+    $target_buffer `,` $target_offset `,` $length `,` $value
+    attr-dict `:` type($value) `->` type($target_buffer)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"target_buffer", 0>,
+    VM_EncOperand<"target_offset", 1>,
+    VM_EncOperand<"length", 2>,
+    VM_EncOperand<"value", 3>
+  ];
+}
+
+def VM_BufferFillI8Op :
+    VM_BufferFillOp<I8, "buffer.fill.i8", VM_OPC_BufferFillI8> {
+  let summary = [{fills the buffer with the given repeating 8-bit value}];
+}
+def VM_BufferFillI16Op :
+    VM_BufferFillOp<I16, "buffer.fill.i16", VM_OPC_BufferFillI16> {
+  let summary = [{fills the buffer with the given repeating 16-bit value}];
+}
+def VM_BufferFillI32Op :
+    VM_BufferFillOp<I32, "buffer.fill.i32", VM_OPC_BufferFillI32> {
+  let summary = [{fills the buffer with the given repeating 32-bit value}];
+}
+def VM_BufferFillI64Op :
+    VM_BufferFillOp<I64, "buffer.fill.i64", VM_OPC_BufferFillI64,
+                    [VM_ExtI64]> {
+  let summary = [{fills the buffer with the given repeating 64-bit value}];
+}
+def VM_BufferFillF32Op :
+    VM_BufferFillOp<F32, "buffer.fill.f32", VM_OPC_BufferFillF32,
+                    [VM_ExtF32]> {
+  let summary = [{fills the buffer with the given repeating 32-bit value}];
+}
+def VM_BufferFillF64Op :
+    VM_BufferFillOp<F64, "buffer.fill.f64", VM_OPC_BufferFillF64,
+                    [VM_ExtF64]> {
+  let summary = [{fills the buffer with the given repeating 64-bit value}];
+}
+
+class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
+                      list<OpTrait> traits = []> :
+    VM_PureOp<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemRead]>,
+    ])> {
+  let description = [{
+    Loads a value from the buffer at the given offset. Offsets must match the
+    natural alignment of the loaded type and will be coerced to the alignment
+    at runtime automatically.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$source_buffer,
+    VM_Index:$source_offset
+  );
+  let results = (outs
+    AnyTypeOf<[type, I32]>:$result
+  );
+
+  let assemblyFormat = [{
+    $source_buffer `[` $source_offset `]`
+    attr-dict `:` type($source_buffer) `->` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"source_buffer", 0>,
+    VM_EncOperand<"source_offset", 1>,
+    VM_EncResult<"result">,
+  ];
+}
+
+class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
+                       list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemWrite]>,
+    ])> {
+  let description = [{
+    Stores a value to the buffer at the given offset. Offsets must match the
+    natural alignment of the loaded type and will be coerced to the alignment
+    at runtime automatically.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$target_buffer,
+    VM_Index:$target_offset,
+    AnyTypeOf<[type, I32]>:$value
+  );
+
+  let assemblyFormat = [{
+    $value `,` $target_buffer `[` $target_offset `]`
+    attr-dict `:` type($value) `->` type($target_buffer)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"target_buffer", 0>,
+    VM_EncOperand<"target_offset", 1>,
+    VM_EncOperand<"value", 2>,
+  ];
+}
+
+def VM_BufferLoadI8UOp :
+    VM_BufferLoadOp<I32, "buffer.load.i8.u", VM_OPC_BufferLoadI8U, []> {
+  let summary = [{unsigned 8-bit integer load}];
+}
+def VM_BufferLoadI8SOp :
+    VM_BufferLoadOp<I32, "buffer.load.i8.s", VM_OPC_BufferLoadI8S, []> {
+  let summary = [{signed 8-bit integer load}];
+}
+
+def VM_BufferLoadI16UOp :
+    VM_BufferLoadOp<I32, "buffer.load.i16.u", VM_OPC_BufferLoadI16U, []> {
+  let summary = [{unsigned 16-bit integer load}];
+}
+def VM_BufferLoadI16SOp :
+    VM_BufferLoadOp<I32, "buffer.load.i16.s", VM_OPC_BufferLoadI16S, []> {
+  let summary = [{signed 16-bit integer load}];
+}
+
+def VM_BufferLoadI32Op :
+    VM_BufferLoadOp<I32, "buffer.load.i32", VM_OPC_BufferLoadI32, []> {
+  let summary = [{32-bit integer load}];
+}
+def VM_BufferLoadI64Op :
+    VM_BufferLoadOp<I64, "buffer.load.i64", VM_OPC_BufferLoadI64,
+                    [VM_ExtI64]> {
+  let summary = [{64-bit integer load}];
+}
+def VM_BufferLoadF32Op :
+    VM_BufferLoadOp<F32, "buffer.load.f32", VM_OPC_BufferLoadF32,
+                    [VM_ExtF32]> {
+  let summary = [{32-bit floating-point load}];
+}
+def VM_BufferLoadF64Op :
+    VM_BufferLoadOp<F64, "buffer.load.f64", VM_OPC_BufferLoadF64,
+                    [VM_ExtF64]> {
+  let summary = [{64-bit floating-point load}];
+}
+
+def VM_BufferStoreI8Op :
+    VM_BufferStoreOp<I32, "buffer.store.i8", VM_OPC_BufferStoreI8, []> {
+  let summary = [{unsigned 8-bit integer store}];
+}
+def VM_BufferStoreI16Op :
+    VM_BufferStoreOp<I32, "buffer.store.i16", VM_OPC_BufferStoreI16, []> {
+  let summary = [{unsigned 16-bit integer store}];
+}
+def VM_BufferStoreI32Op :
+    VM_BufferStoreOp<I32, "buffer.store.i32", VM_OPC_BufferStoreI32, []> {
+  let summary = [{32-bit integer store}];
+}
+def VM_BufferStoreI64Op :
+    VM_BufferStoreOp<I64, "buffer.store.i64", VM_OPC_BufferStoreI64,
+                     [VM_ExtI64]> {
+  let summary = [{64-bit integer store}];
+}
+def VM_BufferStoreF32Op :
+    VM_BufferStoreOp<F32, "buffer.store.f32", VM_OPC_BufferStoreF32,
+                     [VM_ExtF32]> {
+  let summary = [{32-bit floating-point store}];
+}
+def VM_BufferStoreF64Op :
+    VM_BufferStoreOp<F64, "buffer.store.f64", VM_OPC_BufferStoreF64,
+                     [VM_ExtF64]> {
+  let summary = [{64-bit floating-point store}];
+}
+
+//===----------------------------------------------------------------------===//
 // Lists
 //===----------------------------------------------------------------------===//
 
@@ -990,7 +1342,7 @@ def VM_ListAllocOp :
   }];
 
   let arguments = (ins
-    I32:$initial_capacity
+    VM_Index:$initial_capacity
   );
   let results = (outs
     VM_AnyList:$result
@@ -1018,7 +1370,7 @@ def VM_ListReserveOp :
 
   let arguments = (ins
     VM_AnyList:$list,
-    I32:$minimum_capacity
+    VM_Index:$minimum_capacity
   );
 
   let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($minimum_capacity) `)`";
@@ -1044,7 +1396,7 @@ def VM_ListSizeOp :
     VM_AnyList:$list
   );
   let results = (outs
-    I32:$result
+    VM_Index:$result
   );
 
   let assemblyFormat = "operands attr-dict `:` `(` type($list) `)` `->` type($result)";
@@ -1070,7 +1422,7 @@ def VM_ListResizeOp :
 
   let arguments = (ins
     VM_AnyList:$list,
-    I32:$new_size
+    VM_Index:$new_size
   );
 
   let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($new_size) `)`";
@@ -1095,7 +1447,7 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     VM_ListOf<VM_PrimitiveType>:$list,
-    I32:$index
+    VM_Index:$index
   );
   let results = (outs
     type:$result
@@ -1124,7 +1476,7 @@ class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     VM_ListOf<VM_PrimitiveType>:$list,
-    I32:$index,
+    VM_Index:$index,
     type:$value
   );
 
@@ -1175,7 +1527,7 @@ def VM_ListGetRefOp :
 
   let arguments = (ins
     VM_AnyList:$list,
-    I32:$index
+    VM_Index:$index
   );
   let results = (outs
     VM_AnyRef:$result
@@ -1206,7 +1558,7 @@ def VM_ListSetRefOp :
 
   let arguments = (ins
     VM_AnyList:$list,
-    I32:$index,
+    VM_Index:$index,
     VM_AnyRef:$value
   );
 
@@ -1340,7 +1692,7 @@ class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
   }];
 
   let arguments = (ins
-    I32:$index,
+    VM_Index:$index,
     type:$default_value,
     Variadic<type>:$values
   );
@@ -1379,7 +1731,7 @@ class VM_SwitchFloatOp<F type, string mnemonic, VM_OPC opcode,
   }];
 
   let arguments = (ins
-    I32:$index,
+    VM_Index:$index,
     type:$default_value,
     Variadic<type>:$values
   );
@@ -1440,7 +1792,7 @@ def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
   }];
 
   let arguments = (ins
-    I32:$index,
+    VM_Index:$index,
     VM_AnyRef:$default_value,
     Variadic<VM_AnyRef>:$values
   );
@@ -2065,7 +2417,7 @@ class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
     type:$operand
   );
   let results = (outs
-    I32:$result
+    VM_CondValue:$result
   );
 
   let assemblyFormat = "$operand attr-dict `:` type($operand)";
@@ -2092,7 +2444,7 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
     type:$rhs
   );
   let results = (outs
-    I32:$result
+    VM_CondValue:$result
   );
 
   let assemblyFormat = "operands attr-dict `:` type($lhs)";
@@ -2120,7 +2472,7 @@ class VM_BinaryComparisonPseudoOp<Type type, string mnemonic,
     type:$rhs
   );
   let results = (outs
-    I32:$result
+    VM_CondValue:$result
   );
 
   let assemblyFormat = "operands attr-dict `:` type($lhs)";
