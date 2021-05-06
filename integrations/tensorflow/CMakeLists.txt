@@ -30,7 +30,7 @@ set(IREE_TF_TOOLS_ROOT
     CACHE STRING "Root directory for IREE TensorFlow integration binaries")
 
 
-if(${IREE_BUILD_TENSORFLOW_COMPILER})
+if(${IREE_BUILD_TENSORFLOW_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
   add_executable(iree_tf_compiler_iree-tf-import IMPORTED GLOBAL)
   set_property(TARGET iree_tf_compiler_iree-tf-import
     PROPERTY IMPORTED_LOCATION
@@ -38,7 +38,7 @@ if(${IREE_BUILD_TENSORFLOW_COMPILER})
   )
 endif()
 
-if(${IREE_BUILD_TFLITE_COMPILER})
+if(${IREE_BUILD_TFLITE_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
   add_executable(iree_tf_compiler_iree-import-tflite IMPORTED GLOBAL)
   set_property(TARGET iree_tf_compiler_iree-import-tflite
     PROPERTY IMPORTED_LOCATION
@@ -46,7 +46,7 @@ if(${IREE_BUILD_TFLITE_COMPILER})
   )
 endif()
 
-if(${IREE_BUILD_XLA_COMPILER})
+if(${IREE_BUILD_XLA_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
   add_executable(iree_tf_compiler_iree-import-xla IMPORTED GLOBAL)
   set_property(TARGET iree_tf_compiler_iree-import-xla
     PROPERTY IMPORTED_LOCATION

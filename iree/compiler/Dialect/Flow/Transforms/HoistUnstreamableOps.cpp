@@ -17,6 +17,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/SmallVector.h"
@@ -66,11 +67,11 @@ namespace {
 //
 // This pass shares similar goals to HoistShapeCalculationsPass, but is not
 // limited to shape calculation operations.
-class HoistUnstreamableOps
-    : public PassWrapper<HoistUnstreamableOps, FunctionPass> {
+class HoistUnstreamableOpsPass
+    : public HoistUnstreamableOpsBase<HoistUnstreamableOpsPass> {
  public:
-  void runOnFunction() override {
-    auto func = getFunction();
+  void runOnOperation() override {
+    auto func = getOperation();
     for (Block &block : func) {
       // TODO(gcmn): isBeforeInBlock is O(n) with repeated block modification,
       // making this quadratic.
@@ -96,12 +97,8 @@ class HoistUnstreamableOps
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass() {
-  return std::make_unique<HoistUnstreamableOps>();
+  return std::make_unique<HoistUnstreamableOpsPass>();
 }
-
-static PassRegistration<HoistUnstreamableOps> pass(
-    "iree-flow-hoist-unstreamable-ops",
-    "Hoist ops that cannot be captured in streams to the top of their block.");
 
 }  // namespace Flow
 }  // namespace IREE

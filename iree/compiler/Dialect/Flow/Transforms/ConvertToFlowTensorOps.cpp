@@ -15,6 +15,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -233,7 +235,7 @@ struct SubTensorToTensorSlice : public OpRewritePattern<SubTensorOp> {
 
 /// Converts operations that can map to flow.tensor.* operations.
 struct ConvertToFlowTensorOpsPass
-    : public PassWrapper<ConvertToFlowTensorOpsPass, OperationPass<FuncOp>> {
+    : public ConvertToFlowTensorOpsBase<ConvertToFlowTensorOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, memref::MemRefDialect,
                     mlir::StandardOpsDialect>();
@@ -259,11 +261,6 @@ struct ConvertToFlowTensorOpsPass
 std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass() {
   return std::make_unique<ConvertToFlowTensorOpsPass>();
 }
-
-static PassRegistration<ConvertToFlowTensorOpsPass> pass(
-    "iree-flow-convert-to-flow-tensor-ops-pass",
-    "Convert operations to equivalent flow.tensor.* operations",
-    [] { return std::make_unique<ConvertToFlowTensorOpsPass>(); });
 
 }  // namespace Flow
 }  // namespace IREE

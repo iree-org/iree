@@ -16,6 +16,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DestructiveUpdateUtils.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -105,7 +107,7 @@ struct PatternRewriterWithScopedReplaceOp : public PatternRewriter {
 };
 
 struct DispatchLinalgOnTensorsPass
-    : public PassWrapper<DispatchLinalgOnTensorsPass, OperationPass<FuncOp>> {
+    : public DispatchLinalgOnTensorsBase<DispatchLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
@@ -1205,11 +1207,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
 }
-
-static PassRegistration<DispatchLinalgOnTensorsPass> pass(
-    "iree-flow-dispatch-linalg-on-tensors-pass",
-    "Dispatch Linalg operations on tensors by using tile and distribute",
-    [] { return std::make_unique<DispatchLinalgOnTensorsPass>(); });
 
 }  // namespace Flow
 }  // namespace IREE

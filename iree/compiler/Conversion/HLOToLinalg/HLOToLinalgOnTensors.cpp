@@ -34,6 +34,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
@@ -140,7 +141,8 @@ struct ConcatenateOpConversion
   LogicalResult matchAndRewrite(
       mhlo::ConcatenateOp op, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultType = op.getResult().getType().dyn_cast<RankedTensorType>();
+    auto resultType = this->typeConverter->convertType(op.getResult().getType())
+                          .dyn_cast<RankedTensorType>();
     if (!resultType || !resultType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(op,
                                          "expected static shape for output");
@@ -346,15 +348,25 @@ struct ConvertHLOToLinalgOnTensorsPass
 struct ConvertHLOToLinalgOnTensorsPassExperimental
     : public ConvertHLOToLinalgOnTensorsPass {
   ConvertHLOToLinalgOnTensorsPassExperimental()
-      : ConvertHLOToLinalgOnTensorsPass(true){};
+      : ConvertHLOToLinalgOnTensorsPass(true) {}
 };
 
 /// Convert mhlo.constant op into std.const.
-struct ConstOpConversion : public OpRewritePattern<mhlo::ConstOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(mhlo::ConstOp op,
-                                PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<ConstantOp>(op, op.value());
+struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      mhlo::ConstOp op, ArrayRef<Value> /*operands*/,
+      ConversionPatternRewriter &rewriter) const override {
+    auto valueAttr = op.value();
+    Type oldElType = valueAttr.getType().getElementType();
+    Type newElType = this->typeConverter->convertType(oldElType);
+    ElementsAttr newValueAttr = valueAttr;
+    if (newElType != oldElType) {
+      // Values don't change, just their reported type.
+      newValueAttr = valueAttr.mapValues(
+          newElType, [](const APInt &oldEl) { return oldEl; });
+    }
+    rewriter.replaceOpWithNewOp<ConstantOp>(op, newValueAttr);
     return success();
   }
 };
@@ -366,7 +378,7 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
     OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
   patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion>(
-      context);
+      typeConverter, context);
 }
 
 static llvm::cl::opt<bool> clUseLinalgOnTensorsPath(

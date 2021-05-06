@@ -12,12 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:tblgen.bzl", "gentbl")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+gentbl(
+    name = "Passes_inc_gen",
+    tbl_outs = [
+        (
+            "-gen-pass-decls",
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    td_srcs = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
 )
 
 cc_library(
@@ -41,6 +57,7 @@ cc_library(
         "OutlineDispatchRegions.cpp",
         "OutlineDispatchRegions2.cpp",
         "OutlineLargeConstants.cpp",
+        "PassDetail.h",
         "Passes.cpp",
         "PrePostPartitioningConversion.cpp",
         "StripAndSplatConstantVariables.cpp",
@@ -49,8 +66,10 @@ cc_library(
         "DestructiveUpdateUtils.h",
         "DispatchConfig.h",
         "Passes.h",
+        "Passes.h.inc",
     ],
     deps = [
+        ":Passes_inc_gen",
         "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/HLOToLinalg:HLOToLinalgOnTensors",
         "//iree/compiler/Conversion/LinalgToLinalg",

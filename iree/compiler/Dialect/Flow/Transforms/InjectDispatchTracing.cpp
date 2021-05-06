@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -36,7 +37,7 @@ static SmallVector<Value, 4> filterTensorValues(ValueRange&& range) {
 }
 
 class InjectDispatchTracingPass
-    : public PassWrapper<InjectDispatchTracingPass, OperationPass<FuncOp>> {
+    : public InjectDispatchTracingBase<InjectDispatchTracingPass> {
  public:
   InjectDispatchTracingPass() = default;
 
@@ -69,10 +70,6 @@ class InjectDispatchTracingPass
 std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass() {
   return std::make_unique<InjectDispatchTracingPass>();
 }
-
-static PassRegistration<InjectDispatchTracingPass> pass(
-    "iree-flow-inject-dispatch-tracing",
-    "Outlines dispatch regions into executables");
 
 }  // namespace Flow
 }  // namespace IREE

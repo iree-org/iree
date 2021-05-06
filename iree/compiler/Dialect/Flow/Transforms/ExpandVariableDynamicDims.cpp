@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -29,8 +30,7 @@ namespace IREE {
 namespace Flow {
 
 class ExpandVariableDynamicDimsPass
-    : public PassWrapper<ExpandVariableDynamicDimsPass,
-                         OperationPass<ModuleOp>> {
+    : public ExpandVariableDynamicDimsBase<ExpandVariableDynamicDimsPass> {
  public:
   ExpandVariableDynamicDimsPass() = default;
 
@@ -139,11 +139,6 @@ class ExpandVariableDynamicDimsPass
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass() {
   return std::make_unique<ExpandVariableDynamicDimsPass>();
 }
-
-static PassRegistration<ExpandVariableDynamicDimsPass> pass(
-    "iree-flow-expand-variable-dynamic-dims",
-    "Expands !shapex.ranked_shape dynamic dimensions stored in variables.",
-    [] { return std::make_unique<ExpandVariableDynamicDimsPass>(); });
 
 }  // namespace Flow
 }  // namespace IREE

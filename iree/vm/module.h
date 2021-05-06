@@ -334,7 +334,7 @@ typedef struct iree_vm_module {
   // attributes.
   // Returns IREE_STATUS_NOT_FOUND if index >= the number of attributes for
   // the function.
-  // See: docs/design_docs/function_abi.md
+  // See: docs/developers/design_docs/function_abi.md
   iree_status_t(IREE_API_PTR* get_function_reflection_attr)(
       void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
       iree_host_size_t index, iree_string_view_t* key,
@@ -394,7 +394,8 @@ iree_vm_function_signature(const iree_vm_function_t* function);
 // Returns the empty string if the reflection data in general or the specific
 // key is not found.
 //
-// See: docs/design_docs/function_abi.md for documentation on the ABI.
+// See: docs/developers/design_docs/function_abi.md for documentation on the
+// ABI.
 IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
     const iree_vm_function_t* function, iree_string_view_t key);
 
@@ -405,7 +406,7 @@ IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
 // attributes.
 // Returns IREE_STATUS_NOT_FOUND if index >= the number of attributes for
 // the function.
-// See: docs/design_docs/function_abi.md
+// See: docs/developers/design_docs/function_abi.md
 IREE_API_EXPORT iree_status_t iree_vm_get_function_reflection_attr(
     iree_vm_function_t function, iree_host_size_t index,
     iree_string_view_t* key, iree_string_view_t* value);

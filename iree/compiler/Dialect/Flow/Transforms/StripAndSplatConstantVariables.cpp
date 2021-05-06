@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -27,8 +28,8 @@ namespace IREE {
 namespace Flow {
 
 class StripAndSplatConstantVariablesPass
-    : public PassWrapper<StripAndSplatConstantVariablesPass,
-                         OperationPass<ModuleOp>> {
+    : public StripAndSplatConstantVariablesBase<
+          StripAndSplatConstantVariablesPass> {
  public:
   StripAndSplatConstantVariablesPass() = default;
 
@@ -85,11 +86,6 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createStripAndSplatConstantVariablesPass() {
   return std::make_unique<StripAndSplatConstantVariablesPass>();
 }
-
-static PassRegistration<StripAndSplatConstantVariablesPass> pass(
-    "iree-flow-strip-and-splat-constant-variables",
-    "Strips constant flow.variables and replaces them with splats.",
-    [] { return std::make_unique<StripAndSplatConstantVariablesPass>(); });
 
 }  // namespace Flow
 }  // namespace IREE
