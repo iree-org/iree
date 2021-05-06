@@ -5,15 +5,15 @@ Most of these are controlled by various CMake options, sometimes requiring
 extra setup or preparation. Each section extends the basic build steps
 in the [getting started](../getting-started/) page.
 
-## Building Python Bindings
+## Building Python bindings
 
 This section describes how to build and interactively use built-from-source
 Python bindings for the following packages:
 
-| Python Import             | Description                                                                 |
-|------------------------------|-----------------------------------------------------------------------------|
-| `import iree.compiler`     | IREE's generic compiler tools and helpers                                   |
-| `import iree.runtime`      | IREE's runtime, including CPU and GPU backends                              |
+| Python Import          | Description                                    |
+|------------------------|------------------------------------------------|
+| `import iree.compiler` | IREE's generic compiler tools and helpers      |
+| `import iree.runtime`  | IREE's runtime, including CPU and GPU backends |
 
 Also see [instructions for installing pre-built binaries](../../bindings/python/).
 
@@ -21,25 +21,28 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
 
 * A relatively recent Python3 installation (we aim to support
   [non-eol Python versions](https://endoflife.date/python)).
-* Installation of python dependencies as specified in
+* Installation of Python dependencies as specified in
   [`bindings/python/build_requirements.txt`](https://github.com/google/iree/blob/main/bindings/python/build_requirements.txt).
 
-**CMake Variables:**
+**CMake variables:**
 
 * **`IREE_BUILD_PYTHON_BINDINGS`** : `BOOL`
 
-    Enables building of Python bindings under `bindings/python` in the repository.
+    Enables building of Python bindings under `bindings/python/`.
     Defaults to `OFF`.
 
 * **`Python3_EXECUTABLE`** : `PATH`
 
-    Full path to the Python3 executable to build against. If not specified, CMake
-    will auto-detect this, which often yields incorrect results on systems
-    with multiple Python versions. Explicitly setting this is recommended.
-    Note that mixed case of the option.
+    Full path to the Python3 executable to build against. Note the mixed case
+    of the option.
+
+    !!! warning
+        If not specified, CMake will auto-detect this, which often yields
+        incorrect results on systems with multiple Python versions. Explicitly
+        setting this is recommended.
 
 ???+ Setup
-    We recommend using virtual environments to manage python packages, such
+    We recommend using virtual environments to manage Python packages, such
     as through `venv`, which may need to be installed via your system
     package manager ([about](https://docs.python.org/3/library/venv.html),
     [tutorial](https://docs.python.org/3/tutorial/venv.html)):
@@ -117,7 +120,7 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
     Tests can now be run individually via python or via ctest.
 
 
-## Building TensorFlow Frontend Bindings
+## Building TensorFlow frontend bindings
 
 This section describes how to build compiler tools and Python bindings for
 importing models from various TensorFlow-ecosystem frontends, including
@@ -128,8 +131,8 @@ ends, but this section describes the canonical method that the core
 developers recommend. Upon completing these steps, you will have access to
 additional Python packages:
 
-| Python Import             | Description                                                                 |
-|------------------------------|-----------------------------------------------------------------------------|
+| Python Import                       | Description                                                                 |
+|-------------------------------------|-----------------------------------------------------------------------------|
 | `import iree.compiler.tools.tf`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
 | `import iree.compiler.tools.tflite` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
 | `import iree.compiler.tools.xla`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |

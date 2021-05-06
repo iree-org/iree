@@ -7,7 +7,7 @@
 You will need to install [CMake](https://cmake.org/), along with a C/C++
 compiler:
 
-=== "Linux"
+=== "Linux and MacOS"
 
     <!-- TODO(scotttodd): annotation about gcc vs clang -->
 
@@ -60,7 +60,9 @@ cmake --build ../iree-build/
 
 ## What's next?
 
-<!-- TODO(scotttodd): "at this point you can..." -->
+See the [Optional features](optional-features.md) page for configuration
+options and optional components, or the [Android cross-compilation](android.md)
+page for details on targeting Android.
 
 ### Running tests
 
@@ -79,6 +81,7 @@ Check out the contents of the 'tools' build directory:
 ``` shell
 ls ../iree-build/iree/tools/
 ../iree-build/iree/tools/iree-translate --help
+../iree-build/iree/tools/iree-run-module --help
 ```
 
 <!-- TODO(scotttodd): troubleshooting section? link to github issues? -->
