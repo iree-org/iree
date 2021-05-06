@@ -51,7 +51,7 @@ jobs:
           # Fail if the script fails (unfixable lint warnings) or it creates a
           # diff (fixable lint warnings or formatting).
           EXIT_CODE=0
-          ./scripts/run_buildifier.sh || EXIT_CODE=1
+          ./scripts/run_buildifier.sh "${GITHUB_BASE_REF?}" || EXIT_CODE=1
           git diff --exit-code
           exit "${EXIT_CODE?}"
 
