@@ -287,6 +287,12 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
   return success();
 }
 
+static LogicalResult analysePadTensorOp(linalg::PadTensorOp padTensorOp,
+                                        BufferizationPlan &plan) {
+  plan.insert(padTensorOp.result());
+  return success();
+}
+
 /// For every result of the LinalgOp, gets the operands (`ins` or `outs`) whose
 /// buffer can be reused for the result.
 static SmallVector<Value> getTiedOperandsForLinalgOps(
@@ -400,6 +406,9 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
               return analyseInterfaceBindingSubspanOp(subspanOp, plan);
             })
+        .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
+          return analysePadTensorOp(padTensorOp, plan);
+        })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return analyseLinalgOps(linalgOp, plan);
         })
@@ -1032,13 +1041,18 @@ static void copyFromAliasingBufferToResultBuffer(OpBuilder &b, Location loc,
 
 static LogicalResult convertPadTensorOp(
     OpBuilder &b, linalg::PadTensorOp padTensorOp, BlockAndValueMapping &bvm,
-    WorkgroupMemoryAllocationFn allocationFn) {
+    BufferizationPlan &plan, WorkgroupMemoryAllocationFn allocationFn) {
   auto inputTensor = padTensorOp.source();
   auto inputMemref = bvm.lookup(inputTensor);
 
   auto loc = padTensorOp.getLoc();
-  auto resultPaddedBuffer =
-      allocateBufferForResult(b, padTensorOp, 0, allocationFn);
+
+  if (failed(getOrAllocateResultBuffers(b, padTensorOp, padTensorOp.result(),
+                                        bvm, plan, allocationFn))) {
+    return failure();
+  }
+
+  auto resultPaddedBuffer = bvm.lookup(padTensorOp.result());
 
   // Get padding value and fill the result buffer.
   linalg::YieldOp yeildOp =
@@ -1064,8 +1078,6 @@ static LogicalResult convertPadTensorOp(
                                                    sizeMixedValues, strides);
   // Copy to the interior region.
   b.create<linalg::CopyOp>(loc, inputMemref, resultSubView);
-
-  bvm.map(padTensorOp.result(), resultPaddedBuffer);
   return success();
 }
 
@@ -1156,7 +1168,7 @@ void LinalgBufferizePass::runOnFunction() {
               return success();
             })
         .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
-          return convertPadTensorOp(b, padTensorOp, bvm, allocationFn);
+          return convertPadTensorOp(b, padTensorOp, bvm, plan, allocationFn);
         })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           SmallVector<Value> tiedOperands =
