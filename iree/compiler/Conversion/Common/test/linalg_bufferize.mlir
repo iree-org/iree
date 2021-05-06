@@ -645,7 +645,7 @@ func @reshape_simple() {
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:12xi32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
-  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<12xi32> into tensor<3x4xi32>
+  %3 = linalg.tensor_reshape %2 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
   flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
@@ -653,11 +653,10 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
-//       CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //       CHECK: func @reshape_simple()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP]]]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] {{\[}}[0, 1]]
 //       CHECK:   linalg.copy(%[[RESHAPE]], %[[RET0]])
 
 // -----
@@ -671,7 +670,7 @@ func @reshape_fused_source() {
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:12xi32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
-  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<12xi32> into tensor<3x4xi32>
+  %3 = linalg.tensor_reshape %2 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
   %4 = linalg.init_tensor [3, 4] : tensor<3x4xi32>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
@@ -688,12 +687,11 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
-//   CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //       CHECK: func @reshape_fused_source()
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<3x4xi32>
-//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP]]]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] {{\[}}[0, 1]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<3x4xi32>)
 //  CHECK-SAME:     outs(%[[RET0]] : memref<3x4xi32>)
@@ -710,7 +708,7 @@ func @reshape_fused_source_and_copyout() {
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = hal.interface.binding.subspan @io::@ret1[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
-  %4 = linalg.tensor_reshape %3 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<12xi32> into tensor<3x4xi32>
+  %4 = linalg.tensor_reshape %3 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
   %5 = linalg.init_tensor [3, 4] : tensor<3x4xi32>
   %6 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
@@ -729,13 +727,12 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 }
-//   CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //       CHECK: func @reshape_fused_source_and_copyout()
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@ret1[%[[C0]]] : memref<3x4xi32>
-//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP]]]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] {{\[}}[0, 1]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<3x4xi32>)
 //  CHECK-SAME:     outs(%[[RET0]] : memref<3x4xi32>)
@@ -761,7 +758,7 @@ func @reshape_fused_target() {
       %5 = addi %arg0, %arg0 : i32
       linalg.yield %5 : i32
     } -> tensor<3x4xi32>
-  %5 = linalg.tensor_reshape %4 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<3x4xi32> into tensor<12xi32>
+  %5 = linalg.tensor_reshape %4 [[0, 1]] : tensor<3x4xi32> into tensor<12xi32>
   flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<12xi32> -> !flow.dispatch.tensor<writeonly:12xi32>
   return
 }
@@ -769,12 +766,11 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
-//   CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //       CHECK: func @reshape_fused_target()
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<12xi32>
-//   CHECK-DAG:   %[[RESHAPE:.+]] = linalg.reshape %[[RET0]] [#[[MAP]]]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[RET0]] {{\[}}[0, 1]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[ARG0]] : memref<3x4xi32>)
 //  CHECK-SAME:     outs(%[[RESHAPE]] : memref<3x4xi32>)
@@ -791,7 +787,7 @@ func @dot_general_lowering() {
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:2x3xf32>
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:1x3xf32>
   %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x1x2xf32> -> tensor<1x1x2xf32>
-  %4 = linalg.tensor_reshape %3 [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d2)>] : tensor<1x1x2xf32> into tensor<1x2xf32>
+  %4 = linalg.tensor_reshape %3 [[0, 1], [2]] : tensor<1x1x2xf32> into tensor<1x2xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -1100,7 +1096,7 @@ func @rhs_non_splat_constant() {
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x5x3x1xf32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:5x5xf32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x5x3x1xf32> -> tensor<1x5x3x1xf32>
-  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d2, d3)>] : tensor<1x5x3x1xf32> into tensor<5x3xf32>
+  %3 = linalg.tensor_reshape %2 [[0, 1], [2, 3]] : tensor<1x5x3x1xf32> into tensor<5x3xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -1297,7 +1293,7 @@ func @reshape_read_only() {
   %0 = hal.interface.binding.subspan @io::@ro0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
   %1 = hal.interface.binding.subspan @io::@wo0[%c0] : !flow.dispatch.tensor<writeonly:?xf32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
-  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1) -> (d0, d1)>]
+  %3 = linalg.tensor_reshape %2 [[0, 1]]
       : tensor<?x?xf32> into tensor<?xf32>
   %4 = memref.dim %3, %c0 : tensor<?xf32>
   %5 = linalg.init_tensor [%4] : tensor<?xf32>

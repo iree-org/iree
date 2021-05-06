@@ -212,11 +212,10 @@ func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tensor<?x
 
 func @fuse_reshape_op(%arg0: tensor<?x?xf32>) -> tensor<?xf32>
 {
-  %0 = linalg.tensor_reshape %arg0 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<?x?xf32> into tensor<?xf32>
+  %0 = linalg.tensor_reshape %arg0 [[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
   return %0 : tensor<?xf32>
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //      CHECK: func @fuse_reshape_op
 // CHECK-SAME:   (%[[ARG0:.+]]: tensor<?x?xf32>)
 //  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
@@ -229,7 +228,7 @@ func @fuse_reshape_op(%arg0: tensor<?x?xf32>) -> tensor<?xf32>
 // CHECK-NEXT:     %[[ARG1:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 // CHECK-SAME:     %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:?xf32>
 //      CHECK:       %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG1]], {{.*}}
-//      CHECK:       %[[RESHAPE:.+]] = linalg.tensor_reshape %[[LOAD]] [#[[MAP1]]]
+//      CHECK:       %[[RESHAPE:.+]] = linalg.tensor_reshape %[[LOAD]] {{\[}}[0, 1]]
 //      CHECK:       flow.dispatch.tensor.store %[[RESHAPE]], %[[ARG2]], {{.*}}
 
 // -----
@@ -285,7 +284,7 @@ func @always_fuse_reshape
   %cst = constant 0.0 : f32
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = linalg.tensor_reshape %lhs [affine_map<(d0, d1) -> (d0, d1)>]
+  %0 = linalg.tensor_reshape %lhs [[0, 1]]
     : tensor<?xf32> into tensor<?x4xf32>
   %m = memref.dim %0, %c0 : tensor<?x4xf32>
   %n1 = memref.dim %rhs1, %c1 : tensor<4x?xf32>
@@ -555,14 +554,14 @@ func @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: tensor<1
 func @inline_dag_1(
     %arg0: tensor<?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
     %arg3 : index) -> tensor<?xf32> {
-  %0 = linalg.tensor_reshape %arg0 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<?xf32> into tensor<1x?xf32>
+  %0 = linalg.tensor_reshape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
   %1 = subtensor %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %2 = linalg.tensor_reshape %1 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<1x?xf32> into tensor<?xf32>
-  %3 = linalg.tensor_reshape %arg1 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<1x?xf32> into tensor<?xf32>
+  %2 = linalg.tensor_reshape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %3 = linalg.tensor_reshape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %4 = subtensor %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %5 = linalg.tensor_reshape %4 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<1x?xf32> into tensor<?xf32>
+  %5 = linalg.tensor_reshape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %6 = subtensor %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %7 = linalg.tensor_reshape %6 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<1x?xf32> into tensor<?xf32>
+  %7 = linalg.tensor_reshape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %8 = linalg.init_tensor [%arg3] : tensor<?xf32>
   %9 = linalg.generic {
       indexing_maps = [#map0, #map1, #map1, #map1, #map1, #map1],
@@ -608,16 +607,16 @@ func @inline_dag_1(
 func @inline_dag_2(
     %arg0: tensor<?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
     %arg3 : index) -> tensor<?xf32> {
-  %0 = linalg.tensor_reshape %arg0 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<?xf32> into tensor<1x?xf32>
+  %0 = linalg.tensor_reshape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
   %1 = subtensor %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %2 = linalg.tensor_reshape %arg1 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<1x?xf32> into tensor<?xf32>
+  %2 = linalg.tensor_reshape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   br ^bb1
 ^bb1:
-  %3 = linalg.tensor_reshape %1 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<1x?xf32> into tensor<?xf32>
+  %3 = linalg.tensor_reshape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %4 = subtensor %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %5 = linalg.tensor_reshape %4 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<1x?xf32> into tensor<?xf32>
+  %5 = linalg.tensor_reshape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %6 = subtensor %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %7 = linalg.tensor_reshape %6 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<1x?xf32> into tensor<?xf32>
+  %7 = linalg.tensor_reshape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %8 = linalg.init_tensor [%arg3] : tensor<?xf32>
   %9 = linalg.generic {
       indexing_maps = [#map0, #map1, #map1, #map1, #map1, #map1],
