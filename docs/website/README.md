@@ -1,6 +1,6 @@
 # IREE User-Facing Documentation Website
 
-This directory contains the source for IREE's website, hosted on
+This directory contains the source and assets for IREE's website, hosted on
 [GitHub Pages](https://pages.github.com/).
 
 The website is generated using [MkDocs](https://www.mkdocs.org/), with the
