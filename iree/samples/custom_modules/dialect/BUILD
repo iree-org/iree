@@ -80,6 +80,7 @@ c_embed_data(
     c_file_output = "custom.imports.c",
     flatten = True,
     h_file_output = "custom.imports.h",
+    identifier = "iree_custom_imports",
 )
 
 cc_library(

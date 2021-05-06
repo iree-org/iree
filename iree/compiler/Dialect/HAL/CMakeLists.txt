@@ -19,6 +19,8 @@ iree_c_embed_data(
     "hal.imports.c"
   H_FILE_OUTPUT
     "hal.imports.h"
+  IDENTIFIER
+    "iree_hal_imports"
   FLATTEN
   PUBLIC
 )

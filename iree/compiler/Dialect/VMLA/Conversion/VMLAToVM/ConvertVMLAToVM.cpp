@@ -398,9 +398,9 @@ class ConvertVMLAToVMPass
     std::tie(outerModuleOp, innerModuleOp) =
         VMConversionTarget::nestModuleForConversion(getOperation());
 
-    (void)appendImportModule(
-        StringRef(vmla_imports_create()->data, vmla_imports_create()->size),
-        innerModuleOp);
+    (void)appendImportModule(StringRef(iree_vmla_imports_create()->data,
+                                       iree_vmla_imports_create()->size),
+                             innerModuleOp);
 
     OwningRewritePatternList conversionPatterns(&getContext());
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);

@@ -26,4 +26,5 @@ c_embed_data(
     c_file_output = "check.imports.c",
     flatten = True,
     h_file_output = "check.imports.h",
+    identifier = "iree_check_imports",
 )

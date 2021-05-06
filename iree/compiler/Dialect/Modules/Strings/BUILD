@@ -26,4 +26,5 @@ c_embed_data(
     c_file_output = "strings.imports.c",
     flatten = True,
     h_file_output = "strings.imports.h",
+    identifier = "iree_strings_imports",
 )

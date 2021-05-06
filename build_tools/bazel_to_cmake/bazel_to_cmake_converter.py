@@ -469,9 +469,6 @@ class BuildFileFunctions(object):
                    flatten=None,
                    identifier=None,
                    **kwargs):
-    if identifier:
-      self._convert_unimplemented_function("c_embed_data",
-                                           name + " has identifier")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     c_file_output_block = _convert_string_arg_block("C_FILE_OUTPUT",
@@ -479,6 +476,7 @@ class BuildFileFunctions(object):
     h_file_output_block = _convert_string_arg_block("H_FILE_OUTPUT",
                                                     h_file_output)
     testonly_block = _convert_option_block("TESTONLY", testonly)
+    identifier_block = _convert_string_arg_block("IDENTIFIER", identifier)
     flatten_block = _convert_option_block("FLATTEN", flatten)
 
     self.converter.body += (f"iree_c_embed_data(\n"
@@ -486,6 +484,7 @@ class BuildFileFunctions(object):
                             f"{srcs_block}"
                             f"{c_file_output_block}"
                             f"{h_file_output_block}"
+                            f"{identifier_block}"
                             f"{testonly_block}"
                             f"{flatten_block}"
                             f"  PUBLIC\n)\n\n")

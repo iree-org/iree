@@ -26,4 +26,5 @@ c_embed_data(
     c_file_output = "tensorlist.imports.c",
     flatten = True,
     h_file_output = "tensorlist.imports.h",
+    identifier = "iree_tensorlist_imports",
 )

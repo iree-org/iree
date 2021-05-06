@@ -54,7 +54,8 @@ class CustomToVMConversionInterface : public VMConversionDialectInterface {
 
   OwningModuleRef parseVMImportModule() const override {
     return mlir::parseSourceString(
-        StringRef(custom_imports_create()->data, custom_imports_create()->size),
+        StringRef(iree_custom_imports_create()->data,
+                  iree_custom_imports_create()->size),
         getDialect()->getContext());
   }
 

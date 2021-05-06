@@ -55,6 +55,8 @@ iree_c_embed_data(
     "custom.imports.c"
   H_FILE_OUTPUT
     "custom.imports.h"
+  IDENTIFIER
+    "iree_custom_imports"
   FLATTEN
   PUBLIC
 )
