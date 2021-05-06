@@ -45,11 +45,6 @@ void addLinalgBufferizePasses(
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 
-/// Pass to rewrite Linalg on tensors destructive updates into updates through
-/// memory.
-std::unique_ptr<OperationPass<FuncOp>>
-createLinalgRewriteDestructiveUpdatesPass();
-
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 

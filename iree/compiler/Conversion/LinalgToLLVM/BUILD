@@ -44,7 +44,6 @@ cc_library(
         "FoldTensorExtractOpPass.cpp",
         "KernelDispatch.cpp",
         "LLVMCodeGenOptions.cpp",
-        "LinalgTileAndDistributePass.cpp",
         "LinalgTileAndVectorizePass.cpp",
         "LinalgVectorizePass.cpp",
         "MaterializeCPULaunchConfigurationPass.cpp",

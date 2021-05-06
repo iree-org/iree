@@ -35,7 +35,6 @@ iree_lit_test_suite(
             "materialize_launch_configuration.mlir",
             "matmul_vectorization.mlir",
             "plan_conv_loop_order.mlir",
-            "tile_and_distribute.mlir",
             "unfused_fma.mlir",
         ],
         include = ["*.mlir"],
