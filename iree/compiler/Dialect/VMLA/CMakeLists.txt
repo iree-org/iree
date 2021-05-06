@@ -19,6 +19,8 @@ iree_c_embed_data(
     "vmla.imports.c"
   H_FILE_OUTPUT
     "vmla.imports.h"
+  IDENTIFIER
+    "iree_vmla_imports"
   FLATTEN
   PUBLIC
 )

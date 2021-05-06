@@ -19,6 +19,8 @@ iree_c_embed_data(
     "strings.imports.c"
   H_FILE_OUTPUT
     "strings.imports.h"
+  IDENTIFIER
+    "iree_strings_imports"
   FLATTEN
   PUBLIC
 )

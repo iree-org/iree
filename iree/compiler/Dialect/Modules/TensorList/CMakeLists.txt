@@ -19,6 +19,8 @@ iree_c_embed_data(
     "tensorlist.imports.c"
   H_FILE_OUTPUT
     "tensorlist.imports.h"
+  IDENTIFIER
+    "iree_tensorlist_imports"
   FLATTEN
   PUBLIC
 )

@@ -26,4 +26,5 @@ c_embed_data(
     c_file_output = "vmla.imports.c",
     flatten = True,
     h_file_output = "vmla.imports.h",
+    identifier = "iree_vmla_imports",
 )

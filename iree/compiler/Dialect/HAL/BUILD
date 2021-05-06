@@ -26,4 +26,5 @@ c_embed_data(
     c_file_output = "hal.imports.c",
     flatten = True,
     h_file_output = "hal.imports.h",
+    identifier = "iree_hal_imports",
 )
