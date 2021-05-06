@@ -54,6 +54,22 @@ IREE_API_EXPORT iree_status_t
 iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
                        iree_vm_module_t** out_module);
 
+// Returns the device currently in use by the HAL module.
+// Returns NULL if no device has been initialized yet.
+IREE_API_EXPORT iree_hal_device_t* iree_hal_module_state_device(
+    iree_vm_module_state_t* module_state);
+
+// TODO(benvanik): generate these list helpers:
+
+IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_assign(
+    const iree_vm_list_t* list, iree_host_size_t i);
+
+IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_retain(
+    const iree_vm_list_t* list, iree_host_size_t i);
+
+IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_view_retain(
+    iree_vm_list_t* list, iree_host_size_t i, iree_hal_buffer_view_t* value);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

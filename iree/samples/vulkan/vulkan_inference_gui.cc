@@ -394,11 +394,13 @@ extern "C" int iree_main(int argc, char** argv) {
         iree_hal_buffer_view_t* input0_buffer_view = nullptr;
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
         IREE_CHECK_OK(iree_hal_buffer_view_create(
-            input0_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-            /*shape=*/&kElementCount, /*shape_rank=*/1, &input0_buffer_view));
+            input0_buffer,
+            /*shape=*/&kElementCount, /*shape_rank=*/1,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, &input0_buffer_view));
         IREE_CHECK_OK(iree_hal_buffer_view_create(
-            input1_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-            /*shape=*/&kElementCount, /*shape_rank=*/1, &input1_buffer_view));
+            input1_buffer,
+            /*shape=*/&kElementCount, /*shape_rank=*/1,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, &input1_buffer_view));
         iree_hal_buffer_release(input0_buffer);
         iree_hal_buffer_release(input1_buffer);
         // Marshal inputs through a VM variant list.

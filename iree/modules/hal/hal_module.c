@@ -415,7 +415,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
 
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      source_buffer, element_type, shape_dims, shape_rank, &buffer_view));
+      source_buffer, shape_dims, shape_rank, element_type, &buffer_view));
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
 }
@@ -1090,4 +1090,35 @@ iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
 
   *out_module = base_module;
   return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_hal_device_t* iree_hal_module_state_device(
+    iree_vm_module_state_t* module_state) {
+  iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
+  return state->shared_device;
+}
+
+//===--------------------------------------------------------------------===//
+// Utilities
+//===--------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_assign(
+    const iree_vm_list_t* list, iree_host_size_t i) {
+  return (iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
+      list, i, iree_hal_buffer_view_get_descriptor());
+}
+
+IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_retain(
+    const iree_vm_list_t* list, iree_host_size_t i) {
+  iree_hal_buffer_view_t* value = iree_vm_list_get_buffer_view_assign(list, i);
+  iree_hal_buffer_view_retain(value);
+  return value;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_view_retain(
+    iree_vm_list_t* list, iree_host_size_t i, iree_hal_buffer_view_t* value) {
+  iree_vm_ref_t value_ref;
+  IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
+      value, iree_hal_buffer_view_type_id(), &value_ref));
+  return iree_vm_list_set_ref_retain(list, i, &value_ref);
 }
