@@ -68,7 +68,7 @@ ability to directly execute pages from the memory.
 ## Support
 
 |   | Glossary
-| - | --------
+| --- | --------
 | ✔️ | Supported and expected to match tflite semantics
 | ⚠️ | Supported with compatibility caveats (avoid if possible)
 | 🐢 | Supported with performance caveats (prefer the IREE C API)
@@ -87,7 +87,7 @@ Only the public C API functions are supported. The contents of internal
 structures like `TfLiteTensor` and `TfLiteContext` are undefined.
 
 |   | TFLite API |  Notes |
-| - | -------- | ----- |
+| --- | -------- | ----- |
 | ✔️ | `TfLiteVersion` | returns an IREE version string
 |  |  |
 | 🔒 | `TfLiteModel struct` | _implementation detail_
@@ -133,7 +133,7 @@ structures like `TfLiteTensor` and `TfLiteContext` are undefined.
 ### Features
 
 |   | TFLite Feature |  Notes |
-| - | -------- | ----- |
+| --- | -------- | ----- |
 | 🔒 | Sparsity | **API not public**; likely possible
 | 🔒 | Complex Numbers | **API not public**; likely possible
 | 🔒 | External Contexts | **API not public**; support possible but API inadequate for performance sensitive applications
