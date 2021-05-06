@@ -49,6 +49,15 @@ cmake -B ../iree-build/ .
 cmake --build ../iree-build/
 ```
 
+???+ Tip
+    Most IREE Core devs use [Ninja](https://ninja-build.org/) as the CMake
+    generator. The benefit is that it works the same across all platforms and
+    automatically takes advantage of parallelism. to use it, add a `-GNinja`
+    argument to your initial cmake command (and make sure to install
+    `ninja-build` from either your favorite OS package manager, or generically
+    via `python -m pip install ninja`).
+
+
 ## What's next?
 
 <!-- TODO(scotttodd): "at this point you can..." -->

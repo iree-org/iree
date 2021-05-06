@@ -1,4 +1,4 @@
-# TensorFlow frontend
+# TensorFlow Integration
 
 IREE supports compiling and running TensorFlow programs represented as
 `tf.Module` [classes](https://www.tensorflow.org/api_docs/python/tf/Module)

@@ -1,8 +1,9 @@
-# TensorFlow Lite frontend
+# TensorFlow Lite Integration
+
+!!! todo
+    [Issue#5455](https://github.com/google/iree/issues/5455): write this documentation
 
 <!-- TODO(??): overview (mention TOSA?) -->
-
-## Prerequisites
 
 <!-- TODO(??): pip install vs build from source -->
 
