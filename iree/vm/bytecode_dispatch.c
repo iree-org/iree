@@ -1961,6 +1961,22 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
 
+      DISPATCH_OP_EXT_F32_UNARY_F32(AtanF32, vm_atan_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(Atan2F32, vm_atan2_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(CosF32, vm_cos_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(SinF32, vm_sin_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(ExpF32, vm_exp_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(Exp2F32, vm_exp2_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(ExpM1F32, vm_expm1_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(LogF32, vm_log_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(Log10F32, vm_log10_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(Log1pF32, vm_log1p_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(Log2F32, vm_log2_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(PowF32, vm_pow_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(RsqrtF32, vm_rsqrt_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(SqrtF32, vm_sqrt_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(TanhF32, vm_tanh_f32);
+
       //===----------------------------------------------------------------===//
       // ExtF32: Casting and type conversion/emulation
       //===----------------------------------------------------------------===//
@@ -1977,13 +1993,18 @@ iree_status_t iree_vm_bytecode_dispatch(
     *result = op_func(lhs, rhs);                      \
   });
 
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpEQF32, vm_cmp_eq_f32);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpNEF32, vm_cmp_ne_f32);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTF32, vm_cmp_lt_f32);
-      DISPATCH_OP(EXT_F32, CmpNZF32, {
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpEQF32O, vm_cmp_eq_f32o);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpEQF32U, vm_cmp_eq_f32u);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpNEF32O, vm_cmp_ne_f32o);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpNEF32U, vm_cmp_ne_f32u);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTF32O, vm_cmp_lt_f32o);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTF32U, vm_cmp_lt_f32u);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTEF32O, vm_cmp_lte_f32o);
+      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTEF32U, vm_cmp_lte_f32u);
+      DISPATCH_OP(EXT_F32, CmpNaNF32, {
         float operand = VM_DecOperandRegF32("operand");
         int32_t* result = VM_DecResultRegI32("result");
-        *result = vm_cmp_nz_f32(operand);
+        *result = vm_cmp_nan_f32(operand);
       });
 
       //===----------------------------------------------------------------===//

@@ -22,9 +22,11 @@
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
+#include "iree/compiler/Dialect/VM/Conversion/MathToVM/ConvertMathToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -84,7 +86,8 @@ class ConversionPass
       : targetOptions_(targetOptions) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, IREE::VM::VMDialect, StandardOpsDialect>();
+    registry.insert<IREEDialect, IREE::VM::VMDialect, StandardOpsDialect,
+                    math::MathDialect>();
   }
 
   void runOnOperation() override {
@@ -123,7 +126,11 @@ class ConversionPass
     OwningRewritePatternList conversionPatterns(&getContext());
     populateIREEToVMPatterns(context, typeConverter, conversionPatterns);
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
+    populateMathToVMPatterns(context, typeConverter, conversionPatterns);
     conversionPatterns.insert<ElideTieShapeOp>(context);
+
+    conversionTarget.addIllegalDialect<StandardOpsDialect>();
+    conversionTarget.addIllegalDialect<math::MathDialect>();
 
     // Populate patterns from all used dialects, providing the imports they
     // registered earlier.

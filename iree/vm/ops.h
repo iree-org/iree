@@ -92,6 +92,24 @@ static inline float vm_neg_f32(float operand) { return -operand; }
 static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
 static inline float vm_floor_f32(float operand) { return floorf(operand); }
 
+static inline float vm_atan_f32(float operand) { return atanf(operand); }
+static inline float vm_atan2_f32(float y, float x) { return atan2f(y, x); }
+static inline float vm_cos_f32(float operand) { return cosf(operand); }
+static inline float vm_sin_f32(float operand) { return sinf(operand); }
+static inline float vm_exp_f32(float operand) { return expf(operand); }
+static inline float vm_exp2_f32(float operand) { return exp2f(operand); }
+static inline float vm_expm1_f32(float operand) { return expm1f(operand); }
+static inline float vm_log_f32(float operand) { return logf(operand); }
+static inline float vm_log10_f32(float operand) { return log10f(operand); }
+static inline float vm_log1p_f32(float operand) { return log1pf(operand); }
+static inline float vm_log2_f32(float operand) { return log2f(operand); }
+static inline float vm_pow_f32(float b, float e) { return powf(b, e); }
+static inline float vm_rsqrt_f32(float operand) {
+  return 1.0f / sqrtf(operand);
+}
+static inline float vm_sqrt_f32(float operand) { return sqrtf(operand); }
+static inline float vm_tanh_f32(float operand) { return tanhf(operand); }
+
 //===------------------------------------------------------------------===//
 // Casting and type conversion/emulation
 //===------------------------------------------------------------------===//
@@ -149,16 +167,31 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
   return (operand != 0) ? 1 : 0;
 }
 
-static inline int32_t vm_cmp_eq_f32(float lhs, float rhs) {
+static inline int32_t vm_cmp_eq_f32o(float lhs, float rhs) {
   return (lhs == rhs) ? 1 : 0;
 }
-static inline int32_t vm_cmp_ne_f32(float lhs, float rhs) {
+static inline int32_t vm_cmp_eq_f32u(float lhs, float rhs) {
+  return (isunordered(lhs, rhs) || (lhs == rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_f32o(float lhs, float rhs) {
   return (lhs != rhs) ? 1 : 0;
 }
-static inline int32_t vm_cmp_nz_f32(float lhs) { return (lhs != 0.0f) ? 1 : 0; }
-static inline int32_t vm_cmp_lt_f32(float lhs, float rhs) {
-  return (lhs < rhs) ? 1 : 0;
+static inline int32_t vm_cmp_ne_f32u(float lhs, float rhs) {
+  return (isunordered(lhs, rhs) || (lhs != rhs)) ? 1 : 0;
 }
+static inline int32_t vm_cmp_lt_f32o(float lhs, float rhs) {
+  return isless(lhs, rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_f32u(float lhs, float rhs) {
+  return (isunordered(lhs, rhs) || isless(lhs, rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lte_f32o(float lhs, float rhs) {
+  return islessequal(lhs, rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lte_f32u(float lhs, float rhs) {
+  return (isunordered(lhs, rhs) || islessequal(lhs, rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_nan_f32(float operand) { return isnan(operand); }
 
 //===------------------------------------------------------------------===//
 // Control flow ops

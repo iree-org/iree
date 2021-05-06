@@ -2118,6 +2118,118 @@ def VM_FloorF64Op :
 }
 
 //===----------------------------------------------------------------------===//
+// Floating-point math
+//===----------------------------------------------------------------------===//
+// These map directly to the `math` dialect.
+
+def VM_AtanF32Op : VM_UnaryArithmeticOp<F32, "atan.f32", VM_OPC_AtanF32, [VM_ExtF32]> {
+  let summary = [{arcus tangent of the given value}];
+}
+def VM_AtanF64Op : VM_UnaryArithmeticOp<F64, "atan.f64", VM_OPC_AtanF64, [VM_ExtF64]> {
+  let summary = [{arcus tangent of the given value}];
+}
+
+def VM_Atan2F32Op : VM_BinaryArithmeticOp<F32, "atan2.f32", VM_OPC_Atan2F32, [VM_ExtF32]> {
+  let summary = [{2-argument arcus tangent of the given values}];
+}
+def VM_Atan2F64Op : VM_BinaryArithmeticOp<F64, "atan2.f64", VM_OPC_Atan2F64, [VM_ExtF64]> {
+  let summary = [{2-argument arcus tangent of the given values}];
+}
+
+def VM_CosF32Op : VM_UnaryArithmeticOp<F32, "cos.f32", VM_OPC_CosF32, [VM_ExtF32]> {
+  let summary = [{cosine of the specified value}];
+}
+def VM_CosF64Op : VM_UnaryArithmeticOp<F64, "cos.f64", VM_OPC_CosF64, [VM_ExtF64]> {
+  let summary = [{cosine of the specified value}];
+}
+
+def VM_SinF32Op : VM_UnaryArithmeticOp<F32, "sin.f32", VM_OPC_SinF32, [VM_ExtF32]> {
+  let summary = [{sine of the specified value}];
+}
+def VM_SinF64Op : VM_UnaryArithmeticOp<F64, "sin.f64", VM_OPC_SinF64, [VM_ExtF64]> {
+  let summary = [{sine of the specified value}];
+}
+
+def VM_ExpF32Op : VM_UnaryArithmeticOp<F32, "exp.f32", VM_OPC_ExpF32, [VM_ExtF32]> {
+  let summary = [{base-e exponential of the specified value}];
+}
+def VM_ExpF64Op : VM_UnaryArithmeticOp<F64, "exp.f64", VM_OPC_ExpF64, [VM_ExtF64]> {
+  let summary = [{base-e exponential of the specified value}];
+}
+
+def VM_Exp2F32Op : VM_UnaryArithmeticOp<F32, "exp2.f32", VM_OPC_Exp2F32, [VM_ExtF32]> {
+  let summary = [{base-2 exponential of the specified value}];
+}
+def VM_Exp2F64Op : VM_UnaryArithmeticOp<F64, "exp2.f64", VM_OPC_Exp2F64, [VM_ExtF64]> {
+  let summary = [{base-2 exponential of the specified value}];
+}
+
+def VM_ExpM1F32Op : VM_UnaryArithmeticOp<F32, "expm1.f32", VM_OPC_ExpM1F32, [VM_ExtF32]> {
+  let summary = [{base-e exponential of the specified value minus 1}];
+}
+def VM_ExpM1F64Op : VM_UnaryArithmeticOp<F64, "expm1.f64", VM_OPC_ExpM1F64, [VM_ExtF64]> {
+  let summary = [{base-e exponential of the specified value minus 1}];
+}
+
+def VM_LogF32Op : VM_UnaryArithmeticOp<F32, "log.f32", VM_OPC_LogF32, [VM_ExtF32]> {
+  let summary = [{base-e logarithm of the specified value}];
+}
+def VM_LogF64Op : VM_UnaryArithmeticOp<F64, "log.f64", VM_OPC_LogF64, [VM_ExtF64]> {
+  let summary = [{base-e logarithm of the specified value}];
+}
+
+def VM_Log10F32Op : VM_UnaryArithmeticOp<F32, "log10.f32", VM_OPC_Log10F32, [VM_ExtF32]> {
+  let summary = [{base-10 logarithm of the specified value}];
+}
+def VM_Log10F64Op : VM_UnaryArithmeticOp<F64, "log10.f64", VM_OPC_Log10F64, [VM_ExtF64]> {
+  let summary = [{base-10 logarithm of the specified value}];
+}
+
+def VM_Log1pF32Op : VM_UnaryArithmeticOp<F32, "log1p.f32", VM_OPC_Log1pF32, [VM_ExtF32]> {
+  let summary = [{natural logarithm of one plus the given value}];
+}
+def VM_Log1pF64Op : VM_UnaryArithmeticOp<F64, "log1p.f64", VM_OPC_Log1pF64, [VM_ExtF64]> {
+  let summary = [{natural logarithm of one plus the given value}];
+}
+
+def VM_Log2F32Op : VM_UnaryArithmeticOp<F32, "log2.f32", VM_OPC_Log2F32, [VM_ExtF32]> {
+  let summary = [{base-2 logarithm of the specified value}];
+}
+def VM_Log2F64Op : VM_UnaryArithmeticOp<F64, "log2.f64", VM_OPC_Log2F64, [VM_ExtF64]> {
+  let summary = [{base-2 logarithm of the specified value}];
+}
+
+def VM_PowF32Op : VM_BinaryArithmeticOp<F32, "pow.f32", VM_OPC_PowF32, [VM_ExtF32]> {
+  let summary = [{floating point raised to the power of operation}];
+}
+def VM_PowF64Op : VM_BinaryArithmeticOp<F64, "pow.f64", VM_OPC_PowF64, [VM_ExtF64]> {
+  let summary = [{floating point raised to the power of operation}];
+}
+
+def VM_RsqrtF32Op : VM_UnaryArithmeticOp<F32, "rsqrt.f32", VM_OPC_RsqrtF32, [VM_ExtF32]> {
+  let summary = [{reciprocal of sqrt (1 / sqrt of the specified value)}];
+}
+def VM_RsqrtF64Op : VM_UnaryArithmeticOp<F64, "rsqrt.f64", VM_OPC_RsqrtF64, [VM_ExtF64]> {
+  let summary = [{reciprocal of sqrt (1 / sqrt of the specified value)}];
+}
+
+def VM_SqrtF32Op : VM_UnaryArithmeticOp<F32, "sqrt.f32", VM_OPC_SqrtF32, [VM_ExtF32]> {
+  let summary = [{sqrt of the specified value}];
+  let hasFolder = 1;
+}
+def VM_SqrtF64Op : VM_UnaryArithmeticOp<F64, "sqrt.f64", VM_OPC_SqrtF64, [VM_ExtF64]> {
+  let summary = [{sqrt of the specified value}];
+  let hasFolder = 1;
+}
+
+def VM_TanhF32Op : VM_UnaryArithmeticOp<F32, "tanh.f32", VM_OPC_TanhF32, [VM_ExtF32]> {
+  let summary = [{hyperbolic tangent of the specified value}];
+}
+def VM_TanhF64Op : VM_UnaryArithmeticOp<F64, "tanh.f64", VM_OPC_TanhF64, [VM_ExtF64]> {
+  let summary = [{hyperbolic tangent of the specified value}];
+}
+
+//===----------------------------------------------------------------------===//
 // Integer bit manipulation
 //===----------------------------------------------------------------------===//
 
@@ -2429,6 +2541,25 @@ class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
+class VM_UnaryComparisonPseudoOp<Type type, string mnemonic,
+                                 list<OpTrait> traits = []> :
+    VM_PureOp<mnemonic, !listconcat(traits, [
+      VM_PseudoOp,
+    ])> {
+  let description = [{
+    Compares an operand with the specified predicate.
+  }];
+
+  let arguments = (ins
+    type:$operand
+  );
+  let results = (outs
+    VM_CondValue:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` type($operand)";
+}
+
 class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
                             list<OpTrait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
@@ -2494,22 +2625,6 @@ def VM_CmpEQI64Op :
   let hasFolder = 1;
 }
 
-def VM_CmpEQF32Op :
-    VM_BinaryComparisonOp<F32, "cmp.eq.f32", VM_OPC_CmpEQF32,
-                          [VM_ExtF32, Commutative]> {
-  let summary = [{floating-point equality comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def VM_CmpEQF64Op :
-    VM_BinaryComparisonOp<F64, "cmp.eq.f64", VM_OPC_CmpEQF64,
-                          [VM_ExtF64, Commutative]> {
-  let summary = [{floating-point equality comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
 def VM_CmpNEI32Op :
     VM_BinaryComparisonOp<I32, "cmp.ne.i32", VM_OPC_CmpNEI32,
                           [Commutative]> {
@@ -2526,22 +2641,6 @@ def VM_CmpNEI64Op :
   let hasFolder = 1;
 }
 
-def VM_CmpNEF32Op :
-    VM_BinaryComparisonOp<F32, "cmp.ne.f32", VM_OPC_CmpNEF32,
-                          [VM_ExtF32, Commutative]> {
-  let summary = [{floating-point inequality comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def VM_CmpNEF64Op :
-    VM_BinaryComparisonOp<F64, "cmp.ne.f64", VM_OPC_CmpNEF64,
-                          [VM_ExtF64, Commutative]> {
-  let summary = [{floating-point inequality comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
 def VM_CmpLTI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.lt.i32.s", VM_OPC_CmpLTI32S> {
   let summary = [{signed integer less-than comparison operation}];
@@ -2553,22 +2652,6 @@ def VM_CmpLTI64SOp :
     VM_BinaryComparisonOp<I64, "cmp.lt.i64.s", VM_OPC_CmpLTI64S,
                           [VM_ExtI64]> {
   let summary = [{signed integer less-than comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def VM_CmpLTF32Op :
-    VM_BinaryComparisonOp<F32, "cmp.lt.f32", VM_OPC_CmpLTF32,
-                          [VM_ExtF32]> {
-  let summary = [{floating-point less-than comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def VM_CmpLTF64Op :
-    VM_BinaryComparisonOp<F64, "cmp.lt.f64", VM_OPC_CmpLTF64,
-                          [VM_ExtF64]> {
-  let summary = [{floating-point less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
@@ -2618,22 +2701,6 @@ def VM_CmpLTEI64UOp :
   let hasFolder = 1;
 }
 
-def VM_CmpLTEF32Op :
-    VM_BinaryComparisonPseudoOp<F32, "cmp.lte.f32",
-                                [VM_ExtF32]> {
-  let summary = [{floating-point less-than-or-equal comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def VM_CmpLTEF64Op :
-    VM_BinaryComparisonPseudoOp<F64, "cmp.lte.f64",
-                                [VM_ExtF64]> {
-  let summary = [{floating-point less-than-or-equal comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
 def VM_CmpGTI32SOp :
     VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.s"> {
   let summary = [{signed integer greater-than comparison operation}];
@@ -2660,22 +2727,6 @@ def VM_CmpGTI64UOp :
     VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.u",
                                 [VM_ExtI64]> {
   let summary = [{unsigned integer greater-than comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def VM_CmpGTF32Op :
-    VM_BinaryComparisonPseudoOp<F32, "cmp.gt.f32",
-                                [VM_ExtF32]> {
-  let summary = [{floating-point greater-than comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def VM_CmpGTF64Op :
-    VM_BinaryComparisonPseudoOp<F64, "cmp.gt.f64",
-                                [VM_ExtF64]> {
-  let summary = [{floating-point greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
@@ -2710,22 +2761,6 @@ def VM_CmpGTEI64UOp :
   let hasFolder = 1;
 }
 
-def VM_CmpGTEF32Op :
-    VM_BinaryComparisonPseudoOp<F32, "cmp.gte.f32",
-                                [VM_ExtF32]> {
-  let summary = [{floating-point greater-than-or-equal comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def VM_CmpGTEF64Op :
-    VM_BinaryComparisonPseudoOp<F64, "cmp.gte.f64",
-                                [VM_ExtF64]> {
-  let summary = [{floating-point greater-than-or-equal comparison operation}];
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
 def VM_CmpNZI32Op :
     VM_UnaryComparisonOp<I32, "cmp.nz.i32", VM_OPC_CmpNZI32> {
   let summary = [{integer non-zero comparison operation}];
@@ -2745,25 +2780,265 @@ def VM_CmpNZI64Op :
   let hasFolder = 1;
 }
 
-def VM_CmpNZF32Op :
-    VM_UnaryComparisonOp<F32, "cmp.nz.f32", VM_OPC_CmpNZF32,
-                         [VM_ExtF32]> {
+//===----------------------------------------------------------------------===//
+// Floating-point comparison
+//===----------------------------------------------------------------------===//
+
+def VM_CmpEQF32OOp :
+    VM_BinaryComparisonOp<F32, "cmp.eq.f32.o", VM_OPC_CmpEQF32O,
+                          [VM_ExtF32, Commutative]> {
+  let summary = [{floating-point equality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpEQF64OOp :
+    VM_BinaryComparisonOp<F64, "cmp.eq.f64.o", VM_OPC_CmpEQF64O,
+                          [VM_ExtF64, Commutative]> {
+  let summary = [{floating-point equality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpEQF32UOp :
+    VM_BinaryComparisonOp<F32, "cmp.eq.f32.u", VM_OPC_CmpEQF32U,
+                          [VM_ExtF32, Commutative]> {
+  let summary = [{floating-point equality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpEQF64UOp :
+    VM_BinaryComparisonOp<F64, "cmp.eq.f64.u", VM_OPC_CmpEQF64U,
+                          [VM_ExtF64, Commutative]> {
+  let summary = [{floating-point equality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNEF32OOp :
+    VM_BinaryComparisonOp<F32, "cmp.ne.f32.o", VM_OPC_CmpNEF32O,
+                          [VM_ExtF32, Commutative]> {
+  let summary = [{floating-point inequality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNEF64OOp :
+    VM_BinaryComparisonOp<F64, "cmp.ne.f64.o", VM_OPC_CmpNEF64O,
+                          [VM_ExtF64, Commutative]> {
+  let summary = [{floating-point inequality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNEF32UOp :
+    VM_BinaryComparisonOp<F32, "cmp.ne.f32.u", VM_OPC_CmpNEF32U,
+                          [VM_ExtF32, Commutative]> {
+  let summary = [{floating-point inequality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNEF64UOp :
+    VM_BinaryComparisonOp<F64, "cmp.ne.f64.u", VM_OPC_CmpNEF64U,
+                          [VM_ExtF64, Commutative]> {
+  let summary = [{floating-point inequality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpLTF32OOp :
+    VM_BinaryComparisonOp<F32, "cmp.lt.f32.o", VM_OPC_CmpLTF32O,
+                          [VM_ExtF32]> {
+  let summary = [{floating-point less-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpLTF64OOp :
+    VM_BinaryComparisonOp<F64, "cmp.lt.f64.o", VM_OPC_CmpLTF64O,
+                          [VM_ExtF64]> {
+  let summary = [{floating-point less-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpLTF32UOp :
+    VM_BinaryComparisonOp<F32, "cmp.lt.f32.u", VM_OPC_CmpLTF32U,
+                          [VM_ExtF32]> {
+  let summary = [{floating-point less-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpLTF64UOp :
+    VM_BinaryComparisonOp<F64, "cmp.lt.f64.u", VM_OPC_CmpLTF64U,
+                          [VM_ExtF64]> {
+  let summary = [{floating-point less-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpLTEF32OOp :
+    VM_BinaryComparisonOp<F32, "cmp.lte.f32.o", VM_OPC_CmpLTEF32O,
+                                [VM_ExtF32]> {
+  let summary = [{floating-point less-than-or-equal comparison operation}];
+  let hasFolder = 1;
+}
+
+def VM_CmpLTEF64OOp :
+    VM_BinaryComparisonOp<F64, "cmp.lte.f64.o", VM_OPC_CmpLTEF64O,
+                          [VM_ExtF64]> {
+  let summary = [{floating-point less-than-or-equal comparison operation}];
+  let hasFolder = 1;
+}
+
+def VM_CmpLTEF32UOp :
+    VM_BinaryComparisonOp<F32, "cmp.lte.f32.u", VM_OPC_CmpLTEF32U,
+                          [VM_ExtF32]> {
+  let summary = [{floating-point less-than-or-equal comparison operation}];
+  let hasFolder = 1;
+}
+
+def VM_CmpLTEF64UOp :
+    VM_BinaryComparisonOp<F64, "cmp.lte.f64.u", VM_OPC_CmpLTEF64U,
+                          [VM_ExtF64]> {
+  let summary = [{floating-point less-than-or-equal comparison operation}];
+  let hasFolder = 1;
+}
+
+def VM_CmpGTF32OOp :
+    VM_BinaryComparisonPseudoOp<F32, "cmp.gt.f32.o",
+                                [VM_ExtF32]> {
+  let summary = [{floating-point greater-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpGTF64OOp :
+    VM_BinaryComparisonPseudoOp<F64, "cmp.gt.f64.o",
+                                [VM_ExtF64]> {
+  let summary = [{floating-point greater-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpGTF32UOp :
+    VM_BinaryComparisonPseudoOp<F32, "cmp.gt.f32.u",
+                                [VM_ExtF32]> {
+  let summary = [{floating-point greater-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpGTF64UOp :
+    VM_BinaryComparisonPseudoOp<F64, "cmp.gt.f64.u",
+                                [VM_ExtF64]> {
+  let summary = [{floating-point greater-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpGTEF32OOp :
+    VM_BinaryComparisonPseudoOp<F32, "cmp.gte.f32.o",
+                                [VM_ExtF32]> {
+  let summary = [{floating-point greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpGTEF64OOp :
+    VM_BinaryComparisonPseudoOp<F64, "cmp.gte.f64.o",
+                                [VM_ExtF64]> {
+  let summary = [{floating-point greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpGTEF32UOp :
+    VM_BinaryComparisonPseudoOp<F32, "cmp.gte.f32.u",
+                                [VM_ExtF32]> {
+  let summary = [{floating-point greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpGTEF64UOp :
+    VM_BinaryComparisonPseudoOp<F64, "cmp.gte.f64.u",
+                                [VM_ExtF64]> {
+  let summary = [{floating-point greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNZF32OOp :
+    VM_UnaryComparisonPseudoOp<F32, "cmp.nz.f32.o",
+                               [VM_ExtF32]> {
   let summary = [{floating-point non-zero comparison operation}];
   let description = [{
     Compares the given floating-point operand for a non-zero value.
+  }];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNZF64OOp :
+    VM_UnaryComparisonPseudoOp<F64, "cmp.nz.f64.o",
+                               [VM_ExtF64]> {
+  let summary = [{floating-point non-zero comparison operation}];
+  let description = [{
+    Compares the given floating-point operand for a non-zero value.
+  }];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNZF32UOp :
+    VM_UnaryComparisonPseudoOp<F32, "cmp.nz.f32.u",
+                               [VM_ExtF32]> {
+  let summary = [{floating-point non-zero comparison operation}];
+  let description = [{
+    Compares the given floating-point operand for a non-zero value.
+  }];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNZF64UOp :
+    VM_UnaryComparisonPseudoOp<F64, "cmp.nz.f64.u",
+                               [VM_ExtF64]> {
+  let summary = [{floating-point non-zero comparison operation}];
+  let description = [{
+    Compares the given floating-point operand for a non-zero value.
+  }];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNaNF32Op :
+    VM_UnaryComparisonOp<F32, "cmp.nan.f32", VM_OPC_CmpNaNF32,
+                         [VM_ExtF32]> {
+  let summary = [{floating-point NaN comparison operation}];
+  let description = [{
+    Returns 1 if the value is NaN.
   }];
   let hasFolder = 1;
 }
 
-def VM_CmpNZF64Op :
-    VM_UnaryComparisonOp<F64, "cmp.nz.f64", VM_OPC_CmpNZF64,
+def VM_CmpNaNF64Op :
+    VM_UnaryComparisonOp<F64, "cmp.nan.f64", VM_OPC_CmpNaNF64,
                          [VM_ExtF64]> {
-  let summary = [{floating-point non-zero comparison operation}];
+  let summary = [{floating-point NaN comparison operation}];
   let description = [{
-    Compares the given floating-point operand for a non-zero value.
+    Returns 1 if the value is NaN.
   }];
   let hasFolder = 1;
 }
+
+//===----------------------------------------------------------------------===//
+// vm.ref comparison
+//===----------------------------------------------------------------------===//
 
 def VM_CmpEQRefOp :
     VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef,
