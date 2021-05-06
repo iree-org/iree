@@ -108,10 +108,13 @@ struct FusionOfTensorOpsPass
           }
           return numUsers.empty();
         };
-
+    linalg::ControlElementwiseOpsFusionFn foldAllFn =
+        [](const OpResult &producer, const OpOperand &consumer) {
+          return true;
+        };
     linalg::populateElementwiseOpsFusionPatterns(
         fusionPatterns, linalg::LinalgElementwiseFusionOptions()
-                            .setAllowFoldingUnitDimReshapes(true)
+                            .setControlFoldingReshapes(foldAllFn)
                             .setControlElementwiseOpsFusionFn(controlFn));
 
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
