@@ -329,25 +329,25 @@ class BuildFileFunctions(object):
                  hdrs=None,
                  textual_hdrs=None,
                  srcs=None,
+                 copts=None,
+                 defines=None,
                  data=None,
                  deps=None,
-                 defines=None,
                  testonly=None,
                  linkopts=None,
-                 copts=None,
                  **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
-    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
     textual_hdrs_block = _convert_string_list_block("TEXTUAL_HDRS",
                                                     textual_hdrs,
                                                     sort=True)
     srcs_block = _convert_srcs_block(srcs)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
-    defines_block = _convert_string_list_block("DEFINES", defines)
     testonly_block = _convert_option_block("TESTONLY", testonly)
 
     self.converter.body += (f"iree_cc_library(\n"
@@ -366,6 +366,8 @@ class BuildFileFunctions(object):
               name,
               hdrs=None,
               srcs=None,
+              copts=None,
+              defines=None,
               data=None,
               deps=None,
               tags=None,
@@ -373,6 +375,8 @@ class BuildFileFunctions(object):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
     srcs_block = _convert_srcs_block(srcs)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
     labels_block = _convert_string_list_block("LABELS", tags)
@@ -381,6 +385,8 @@ class BuildFileFunctions(object):
                             f"{name_block}"
                             f"{hdrs_block}"
                             f"{srcs_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
                             f"{data_block}"
                             f"{deps_block}"
                             f"{labels_block}"
@@ -391,12 +397,16 @@ class BuildFileFunctions(object):
                 srcs=None,
                 data=None,
                 deps=None,
+                copts=None,
+                defines=None,
                 linkopts=None,
                 testonly=None,
                 **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
@@ -405,6 +415,8 @@ class BuildFileFunctions(object):
     self.converter.body += (f"iree_cc_binary(\n"
                             f"{name_block}"
                             f"{srcs_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
                             f"{data_block}"
                             f"{deps_block}"
                             f"{testonly_block}"

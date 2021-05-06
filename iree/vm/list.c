@@ -601,6 +601,20 @@ IREE_API_EXPORT iree_status_t iree_vm_list_push_ref_move(iree_vm_list_t* list,
   return iree_vm_list_set_ref_move(list, i, value);
 }
 
+IREE_API_EXPORT iree_status_t iree_vm_list_pop_front_ref_move(
+    iree_vm_list_t* list, iree_vm_ref_t* out_value) {
+  iree_host_size_t list_size = iree_vm_list_size(list);
+  if (list_size == 0) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "cannot pop from an empty list");
+  }
+  IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_assign(list, 0, out_value));
+  memmove(list->storage, (uint8_t*)list->storage + list->element_size,
+          (list_size - 1) * list->element_size);
+  --list->count;
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t
 iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
                          iree_vm_variant_t* out_value) {

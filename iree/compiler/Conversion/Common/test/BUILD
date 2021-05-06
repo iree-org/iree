@@ -31,7 +31,6 @@ iree_lit_test_suite(
             "canonicalize_interface_load_store.mlir",
             "flatten_memref_subspan.mlir",
             "linalg_bufferize.mlir",
-            "linalg_rewrite_destructive_updates.mlir",
             "remove_dead_allocs.mlir",
         ],
         include = ["*.mlir"],

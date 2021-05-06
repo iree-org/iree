@@ -26,10 +26,6 @@ namespace iree_compiler {
 /// order.
 std::unique_ptr<FunctionPass> createPlanConvLoopOrderPass();
 
-/// Distributes linalg ops among hal.interface.workgroup logical threads.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createLinalgTileAndDistributePass();
-
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 

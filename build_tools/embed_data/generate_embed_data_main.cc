@@ -75,16 +75,14 @@ void GenerateTocStruct(std::ofstream& f) {
   } else {
     f << "namespace iree {\n";
   }
-  f << "struct iree_file_toc_t {\n";
+  f << "typedef struct iree_file_toc_t {\n";
   f << "  const char* name;             // the file's original name\n";
   f << "  const char* data;             // beginning of the file\n";
+  f << "  size_t size;                  // length of the file\n";
+  f << "} iree_file_toc_t;\n";
   if (c_output) {
-    f << "  size_t size;                  // length of the file\n";
-    f << "};\n";
     GenerateExternCClose(f);
   } else {
-    f << "  std::size_t size;             // length of the file\n";
-    f << "};\n";
     f << "}  // namespace iree\n";
   }
   f << "#endif  // IREE_FILE_TOC\n";
@@ -100,7 +98,7 @@ bool GenerateHeader(const std::string& header_file,
     f << "#include <stddef.h>\n";
     GenerateTocStruct(f);
     GenerateExternCOpen(f);
-    f << "const struct iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
+    f << "const iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
       << "_create();\n";
     f << "static inline size_t " << absl::GetFlag(FLAGS_identifier)
       << "_size() {\n";
@@ -111,9 +109,9 @@ bool GenerateHeader(const std::string& header_file,
     f << "#include <cstddef>\n";
     GenerateTocStruct(f);
     GenerateNamespaceOpen(f);
-    f << "extern const struct ::iree::iree_file_toc_t* "
+    f << "extern const ::iree::iree_file_toc_t* "
       << absl::GetFlag(FLAGS_identifier) << "_create();\n";
-    f << "static inline std::size_t " << absl::GetFlag(FLAGS_identifier)
+    f << "static inline size_t " << absl::GetFlag(FLAGS_identifier)
       << "_size() { \n";
     f << "  return " << toc_files.size() << ";\n";
     f << "}\n";
@@ -153,12 +151,12 @@ bool GenerateImpl(const std::string& impl_file,
     f << "#include <stddef.h>\n";
     f << R"(
 #if !defined(IREE_DATA_ALIGNAS_PTR)
-#if defined(_MSVC)
-#define IREE_DATA_ALIGNAS_PTR __declspec(align(__alignof(void*)))
+#if defined(_MSC_VER)
+#define IREE_DATA_ALIGNAS_PTR __declspec(align(8))
 #else
 #include <stdalign.h>
 #define IREE_DATA_ALIGNAS_PTR alignas(alignof(void*))
-#endif  // _MSVC
+#endif  // _MSC_VER
 #endif  // !IREE_DATA_ALIGNAS_PTR
     )";
     GenerateTocStruct(f);

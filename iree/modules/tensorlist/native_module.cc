@@ -114,8 +114,8 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
 
       iree_hal_buffer_view_t* slice = nullptr;
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-          subview_buffer.get(), iree_hal_buffer_view_element_type(tensor.get()),
-          element_shape.data(), element_shape.size(), &slice));
+          subview_buffer.get(), element_shape.data(), element_shape.size(),
+          iree_hal_buffer_view_element_type(tensor.get()), &slice));
       list->SetItem(i, slice);
     }
     return list;
@@ -176,9 +176,9 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
       result_shape.push_back(dim);
     }
     vm::ref<iree_hal_buffer_view_t> result_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        result_buffer.get(), type, result_shape.data(), result_shape.size(),
-        &result_view));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
+                                    result_shape.size(), type, &result_view));
     return std::move(result_view);
   }
 
@@ -251,9 +251,9 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
       result_shape.push_back(dim);
     }
     vm::ref<iree_hal_buffer_view_t> result_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        result_buffer.get(), type, result_shape.data(), result_shape.size(),
-        &result_view));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
+                                    result_shape.size(), type, &result_view));
 
     return std::move(result_view);
   }

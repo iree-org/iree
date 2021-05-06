@@ -72,6 +72,7 @@ static inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
 typedef struct {
   iree_vm_type_def_t type;
   union {
+    // TODO(benvanik): replace with iree_vm_value_t.
     int8_t i8;
     int16_t i16;
     int32_t i32;

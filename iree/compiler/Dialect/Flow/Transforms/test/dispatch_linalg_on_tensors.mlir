@@ -655,3 +655,74 @@ func @inline_dag_2(
 //       CHECK:     %[[OP3:.+]] = linalg.tensor_reshape %[[LEAF1]]
 //       CHECK:     %[[OP4:.+]] = linalg.tensor_reshape %[[OP1]]
 //       CHECK:     %[[OP5:.+]] = linalg.tensor_reshape %[[OP2]]
+
+// -----
+
+func @multi_result(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?xi32>) -> (tensor<?xi32>, tensor<?xi32>) {
+  %cmin = constant -2147483648 : i32
+  %c0_i32 = constant 0 : i32
+  %c0 = constant 0 : index
+  %0 = memref.dim %arg0, %c0 : tensor<?x?xi32>
+  %1 = linalg.init_tensor [%0] : tensor<?xi32>
+  %2 = linalg.fill(%1, %cmin) : tensor<?xi32>, i32 -> tensor<?xi32>
+  %3 = linalg.fill(%1, %c0_i32) : tensor<?xi32>, i32 -> tensor<?xi32>
+  %4:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xi32>)
+      outs(%1, %2 : tensor<?xi32>, tensor<?xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):  // no predecessors
+    %5 = cmpi sge, %arg2, %arg4 : i32
+    %6 = select %5, %arg2, %arg4 : i32
+    %7 = cmpi eq, %arg2, %arg4 : i32
+    %8 = cmpi slt, %arg3, %arg5 : i32
+    %9 = select %8, %arg3, %arg5 : i32
+    %10 = select %5, %arg3, %arg5 : i32
+    %11 = select %7, %9, %10 : i32
+    linalg.yield %6, %11 : i32, i32
+  } -> tensor<?xi32>, tensor<?xi32>
+  return %4#0, %4#1 : tensor<?xi32>, tensor<?xi32>
+}
+// CHECK-LABEL: func @multi_result
+//       CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroups
+//  CHECK-NEXT:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xi32>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xi32>
+//       CHECK:     scf.for
+//       CHECK:       %[[TILED_RESULT:.+]]:2 = linalg.generic
+//   CHECK-DAG:       flow.dispatch.tensor.store %[[TILED_RESULT]]#0, %[[ARG5]]
+//   CHECK-DAG:       flow.dispatch.tensor.store %[[TILED_RESULT]]#1, %[[ARG6]]
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func @multi_result_fallback(%arg0: tensor<?x10xi32>, %arg1: tensor<?x10xi32>)
+    -> (tensor<?x10xi32>, tensor<?x10xi32>) {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = memref.dim %arg0, %c0 : tensor<?x10xi32>
+  %1 = linalg.init_tensor [%0, 10] : tensor<?x10xi32>
+  %2:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, 10-d1)>,
+                       affine_map<(d0, d1) -> (d0, 10-d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0, %arg1 : tensor<?x10xi32>, tensor<?x10xi32>)
+      outs(%1, %1 : tensor<?x10xi32>, tensor<?x10xi32>) {
+      ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):
+        linalg.yield %arg2, %arg3 : i32, i32
+      } -> tensor<?x10xi32>, tensor<?x10xi32>
+  return %2#0, %2#1 : tensor<?x10xi32>, tensor<?x10xi32>
+}
+// CHECK-LABEL: func @multi_result_fallback
+//       CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroup
+//  CHECK-NEXT:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x10xi32>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x10xi32>
+//   CHECK-NOT:     scf.for
+//       CHECK:     %[[OP_RESULT:.+]]:2 = linalg.generic
+//   CHECK-DAG:     flow.dispatch.tensor.store %[[OP_RESULT]]#0, %[[ARG5]]
+//   CHECK-DAG:     flow.dispatch.tensor.store %[[OP_RESULT]]#1, %[[ARG6]]
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1

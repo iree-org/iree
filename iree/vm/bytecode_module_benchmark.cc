@@ -144,8 +144,7 @@ static void BM_ModuleCreate(benchmark::State& state) {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        iree_allocator_null(), iree_allocator_system(), &module))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &module));
 
     // Just testing creation and verification here!
     benchmark::DoNotOptimize(module);
@@ -163,8 +162,7 @@ static void BM_ModuleCreateState(benchmark::State& state) {
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      iree_allocator_null(), iree_allocator_system(), &module))
-      << "Bytecode module failed to load";
+      iree_allocator_null(), iree_allocator_system(), &module));
 
   while (state.KeepRunning()) {
     iree_vm_module_state_t* module_state;
@@ -190,8 +188,7 @@ static void BM_FullModuleInit(benchmark::State& state) {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        iree_allocator_null(), iree_allocator_system(), &module))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &module));
 
     iree_vm_module_state_t* module_state;
     module->alloc_state(module->self, iree_allocator_system(), &module_state);

@@ -113,10 +113,10 @@ iree_status_t Run() {
   iree_hal_buffer_view_t* arg0_buffer_view = NULL;
   iree_hal_buffer_view_t* arg1_buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      arg0_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape, IREE_ARRAYSIZE(shape),
+      arg0_buffer, shape, IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
       &arg0_buffer_view));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      arg1_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape, IREE_ARRAYSIZE(shape),
+      arg1_buffer, shape, IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
       &arg1_buffer_view));
   iree_hal_buffer_release(arg0_buffer);
   iree_hal_buffer_release(arg1_buffer);

@@ -167,6 +167,10 @@ IREE_API_EXPORT iree_status_t iree_vm_list_set_ref_move(iree_vm_list_t* list,
 IREE_API_EXPORT iree_status_t iree_vm_list_push_ref_move(iree_vm_list_t* list,
                                                          iree_vm_ref_t* value);
 
+// Pops the front ref value from the list and transfers ownership to the caller.
+IREE_API_EXPORT iree_status_t
+iree_vm_list_pop_front_ref_move(iree_vm_list_t* list, iree_vm_ref_t* out_value);
+
 // Returns the value of the element at the given index. If the element contains
 // a ref it will *not* be retained and the caller must retain it to extend its
 // lifetime.

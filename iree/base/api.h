@@ -105,6 +105,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -310,9 +311,14 @@ typedef struct iree_status_handle_t* iree_status_t;
     (tail_expr);                                                             \
     return IREE_STATUS_IMPL_ANNOTATE_SWITCH_(var, __VA_ARGS__);              \
   }
+
 #define IREE_STATUS_IMPL_IGNORE_ERROR_(var, expr) \
   iree_status_t var = (expr);                     \
   if (IREE_UNLIKELY(var)) iree_status_ignore(var);
+
+#define IREE_STATUS_IMPL_CHECK_OK_(var, expr) \
+  iree_status_t var = (expr);                 \
+  if (IREE_UNLIKELY(var)) iree_status_abort(var);
 
 // We cut out all status storage code when not used.
 #if IREE_STATUS_FEATURES == 0
@@ -335,6 +341,10 @@ typedef struct iree_status_handle_t* iree_status_t;
 #define IREE_STATUS_IMPL_IGNORE_ERROR_(var, expr) \
   iree_status_t var = (expr);                     \
   (void)(var);
+#undef IREE_STATUS_IMPL_CHECK_OK_
+#define IREE_STATUS_IMPL_CHECK_OK_(var, expr) \
+  iree_status_t var = (expr);                 \
+  if (IREE_UNLIKELY(!iree_status_is_ok(var))) abort();
 #else
 #define IREE_STATUS_IMPL_MAKE_(...) \
   IREE_STATUS_IMPL_MAKE_SWITCH_(__FILE__, __LINE__, __VA_ARGS__)
@@ -386,6 +396,20 @@ typedef struct iree_status_handle_t* iree_status_t;
   IREE_STATUS_IMPL_IGNORE_ERROR_( \
       IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
 
+// Aborts the program if the result of (expr) is not IREE_STATUS_OK.
+//
+// WARNING: this should only be used when absolutely required and avoided in any
+// core IREE code. Aborting is a very user-hostile behavior and on some systems
+// can cause major issues. Prefer instead to properly handle errors and route
+// them through hosting application infrastructure in a way that preserves more
+// context than just an instruction pointer and a SIGABRT.
+//
+// Example:
+//  IREE_CHECK_OK(some_fn_that_may_fail());
+#define IREE_CHECK_OK(expr)                                                    \
+  IREE_STATUS_IMPL_CHECK_OK_(IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), \
+                             (expr))
+
 // Returns the canonical status code for the given errno value.
 // https://en.cppreference.com/w/cpp/error/errno_macros
 IREE_API_EXPORT iree_status_code_t
@@ -436,6 +460,12 @@ IREE_API_EXPORT void iree_status_free(iree_status_t status);
 // Returns an OK status that can be used when chaining.
 IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
 
+// Aborts the program with a failing |status|.
+// This will trigger a SIGABRT. It's best not to use this at all outside of
+// demos or tools.
+IREE_API_EXPORT IREE_ATTRIBUTE_NORETURN void iree_status_abort(
+    iree_status_t status);
+
 // Consumes the |status| by freeing its storage and returning its code.
 IREE_API_EXPORT iree_status_code_t
 iree_status_consume_code(iree_status_t status);
@@ -454,19 +484,18 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message);
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
     iree_status_annotate_f(iree_status_t base_status, const char* format, ...);
 
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
-iree_status_annotate_vf(iree_status_t base_status, const char* format,
-                        va_list varargs_0, va_list varargs_1);
-
 #else
 #define iree_status_annotate(base_status, ...) (base_status)
 #define iree_status_annotate_f(base_status, ...) (base_status)
-#define iree_status_annotate_vf(base_status, ...) (base_status)
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 
 // Formats the status as a multi-line string containing all associated payloads.
 // Note that this may contain PII such as file paths and must only be used for
 // presenting errors to users and not sent to a logs aggregation service.
+//
+// If |buffer_capacity| is insufficient, then |out_buffer_length| is the
+// number of characters that would have been written if |buffer_capacity|
+// had been sufficiently large, not counting the terminating null character.
 IREE_API_EXPORT bool iree_status_format(iree_status_t status,
                                         iree_host_size_t buffer_capacity,
                                         char* buffer,
@@ -478,9 +507,10 @@ IREE_API_EXPORT bool iree_status_to_string(iree_status_t status,
                                            char** out_buffer,
                                            iree_host_size_t* out_buffer_length);
 
-// TODO(#2843): better logging of status checks.
-#define IREE_CHECK_OK(expr) \
-  IREE_CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
+// Prints |status| to the given |file| as a string with all available
+// annotations. This will produce multiple lines of output and should be used
+// only when dumping a status on failure.
+IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status);
 
 //===----------------------------------------------------------------------===//
 // IREE_ASSERT macros
