@@ -88,16 +88,19 @@ Using IREE involves these general steps:
 
 ### Importing models from ML frameworks
 
-IREE supports importing models from multiple ML frameworks and model formats.
+IREE supports importing models from a growing list of ML frameworks and model
+formats:
 
-<!-- TODO(#5555): rename "frontends" to "ML frameworks"? -->
-See the "Frontends" pages for guidance on working with each framework and
-model format.
+* [TensorFlow](ml-frameworks/tensorflow.md)
+* [TensorFlow Lite](ml-frameworks/tensorflow-lite.md)
+* [JAX](ml-frameworks/jax.md)
 
 ### Selecting deployment configurations
 
-IREE provides a flexible set of tools for various deployment scenarios - use as
-much or as little of IREE as you like.
+IREE provides a flexible set of tools for various deployment scenarios.
+Fully featured environments can use IREE for dynamic model deployments taking
+advantage of multi-threaded hardware, while embedded systems can bypass IREE's
+runtime entirely or interface with custom accelerators.
 
 * What platforms are you targeting? Desktop? Mobile? An embedded system?
 * What hardware should the bulk of your model run on? CPU? GPU?
@@ -123,7 +126,11 @@ static or dynamic linkage and the associated function calls are generated.
 ### Running models
 
 IREE offers a low level C API, as well as several specialized sets of
-_bindings_ for running IREE models using other languages.
+_bindings_ for running IREE models using other languages:
+
+* [C API](bindings/c-api.md)
+* [Python](bindings/python.md)
+* [TensorFlow Lite](bindings/tensorflow-lite.md)
 
 ## Communication channels
 
