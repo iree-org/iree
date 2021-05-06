@@ -114,10 +114,11 @@ combination of _targets_. The compilation process converts from layers and
 operators used by high level frameworks down into optimized native code and
 associated scheduling logic.
 
-For example, compiling for [GPU execution](backends/gpu-vulkan.md) using Vulkan
-generates SPIR-V kernels and Vulkan API calls. For
-[CPU execution](backends/cpu-dylib.md), native code with static or dynamic
-linkage and the associated function calls are generated.
+For example, compiling for
+[GPU execution](deployment-configurations/gpu-vulkan.md) using Vulkan generates
+SPIR-V kernels and Vulkan API calls. For
+[CPU execution](deployment-configurations/cpu-dylib.md), native code with
+static or dynamic linkage and the associated function calls are generated.
 
 ### Running models
 
