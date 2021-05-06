@@ -216,11 +216,6 @@ int main(int argc, char **argv) {
     return success();
   };
 
-  // Save temp output.
-  if (!saveTempIreeImport.empty()) {
-    if (failed(saveToFile(saveTempIreeImport))) return 10;
-  }
-
   // Run passes.
   PassManager pm(&context, PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
@@ -230,6 +225,11 @@ int main(int argc, char **argv) {
     llvm::errs()
         << "Running iree-xla-import pass pipeline failed (see diagnostics)\n";
     return 2;
+  }
+
+  // Save temp output.
+  if (!saveTempIreeImport.empty()) {
+    if (failed(saveToFile(saveTempIreeImport))) return 10;
   }
 
   // Save output.
