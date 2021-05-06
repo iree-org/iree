@@ -60,7 +60,7 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
 //      CHECK-NOT:   spv.Load "StorageBuffer"
 //          CHECK:   spv.mlir.loop
 // CHECK-COUNT-12:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-32:   spv.FMul %{{.*}}, %{{.*}} : vector<4xf32>
+// CHECK-COUNT-32:   spv.GLSL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
 //  CHECK-COUNT-8:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
 
 // -----
@@ -137,7 +137,7 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
 //      CHECK-NOT:   spv.Load "StorageBuffer"
 //          CHECK:   spv.mlir.loop
 // CHECK-COUNT-12:     spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-32:     spv.FMul %{{.*}}, %{{.*}} : vector<4xf32>
+// CHECK-COUNT-32:     spv.GLSL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
 //          CHECK:   spv.mlir.merge
 //  CHECK-COUNT-8:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
 //      CHECK-NOT:   spv.Load "StorageBuffer"

@@ -79,7 +79,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
 //      CHECK:     scf.for %{{.*}} = %c0 to %c16 step %c4
 // CHECK-SAME:         -> (vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>)
 
-// CHECK-COUNT-16: vector.contract
+// CHECK-COUNT-16: vector.fma
 
 // CHECK-COUNT-3: scf.yield
 

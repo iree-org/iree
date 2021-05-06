@@ -41,42 +41,6 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
 
 // -----
 
-#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @contract_ops(%arg0 : vector<1x1xf32>, %arg1 : vector<1x4xf32>,
-                    %arg2 : vector<1x4xf32>, %arg3 : vector<1x1xf32>,
-                    %arg4 : vector<1x1xf32>) -> (vector<1x1xf32>, vector<1x4xf32>) attributes {spv.entry_point_abi = {local_size = dense<[128, 1, 1]> : vector<3xi32>}} {
-  %0 = vector.contract {indexing_maps = [#map0, #map1, #map2],
-    iterator_types = ["parallel", "parallel", "reduction"]} %arg0, %arg3, %arg4
-                      : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
-  %1 = vector.contract {indexing_maps = [#map0, #map1, #map2],
-    iterator_types = ["parallel", "parallel", "reduction"]} %arg0, %arg1, %arg2
-                      : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
-  return %0, %1 : vector<1x1xf32>, vector<1x4xf32>
-  }
-  // CHECK-LABEL: func @contract_ops
-  //  CHECK-SAME: (%[[ARG0:.*]]: vector<1x1xf32>, %[[ARG1:.*]]: vector<1x4xf32>, %[[ARG2:.*]]: vector<1x4xf32>, %[[ARG3:.*]]: vector<1x1xf32>, %[[ARG4:.*]]: vector<1x1xf32>)
-  //       CHECK:   %[[A:.*]] = vector.extract %[[ARG0]][0, 0] : vector<1x1xf32>
-  //       CHECK:   %[[B:.*]] = vector.extract %[[ARG3]][0, 0] : vector<1x1xf32>
-  //       CHECK:   %[[C:.*]] = vector.extract %[[ARG4]][0, 0] : vector<1x1xf32>
-  //       CHECK:   %[[MUL:.*]] = mulf %[[A]], %[[B]] : f32
-  //       CHECK:   %[[ADD:.*]] = addf %[[MUL]], %[[C]] : f32
-  //       CHECK:   %[[R0:.*]] = vector.broadcast %[[ADD]] : f32 to vector<1x1xf32>
-  //       CHECK:   %[[A:.*]] = vector.extract %[[ARG0]][0, 0] : vector<1x1xf32>
-  //       CHECK:   %[[VA:.*]] = vector.broadcast %[[A]] : f32 to vector<4xf32>
-  //       CHECK:   %[[VB:.*]] = vector.shape_cast %[[ARG1]] : vector<1x4xf32> to vector<4xf32>
-  //       CHECK:   %[[VC:.*]] = vector.shape_cast %[[ARG2]] : vector<1x4xf32> to vector<4xf32>
-  //       CHECK:   %[[VMUL:.*]] = mulf %[[VA]], %[[VB]] : vector<4xf32>
-  //       CHECK:   %[[VADD:.*]] = addf %[[VMUL]], %[[VC]] : vector<4xf32>
-  //       CHECK:   %[[R1:.*]] = vector.shape_cast %[[VADD]] : vector<4xf32> to vector<1x4xf32>
-  //       CHECK:   return %[[R0]], %[[R1]] : vector<1x1xf32>, vector<1x4xf32>
-}
-
-// -----
-
 module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @extract(%arg0 : vector<1x4xf32>) -> vector<1x1xf32> attributes {spv.entry_point_abi = {local_size = dense<[128, 1, 1]> : vector<3xi32>}} {
     %0 = vector.extract_strided_slice %arg0

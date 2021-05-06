@@ -57,6 +57,31 @@ static void eraseDeadAllocAndStores(FuncOp funcOp) {
 
 namespace {
 
+// Pattern to canonialize tranpose where only one dimension is not unit
+// dimension. In this case the transpose is a no-op and should be simplified
+// before getting to the conversion to llvm/spirv.
+// TODO(thomasraoux): This should be moved in
+// `populateCastAwayVectorLeadingOneDimPatterns` but might need more discussion
+// on the semantic of transpose in this case.
+class TransposeUnitDimToShapeCast
+    : public OpRewritePattern<vector::TransposeOp> {
+ public:
+  using OpRewritePattern<vector::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::TransposeOp op,
+                                PatternRewriter& rewriter) const override {
+    unsigned numNonUnitSrcDim = 0;
+    unsigned numNonUnitDstDim = 0;
+    for (int64_t srcDim : op.getVectorType().getShape()) {
+      if (srcDim > 1) numNonUnitSrcDim++;
+    }
+    if (numNonUnitDstDim > 1) return failure();
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(op, op.getResultType(),
+                                                     op.vector());
+    return success();
+  }
+};
+
 struct VectorTransferOptimizationPass
     : public PassWrapper<VectorTransferOptimizationPass, FunctionPass> {
   void runOnFunction() override {
@@ -66,6 +91,7 @@ struct VectorTransferOptimizationPass
     // to transfer reads.
     OwningRewritePatternList patterns(&getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+    patterns.add<TransposeUnitDimToShapeCast>(&getContext());
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
     vector::transferOpflowOpt(funcOp);
