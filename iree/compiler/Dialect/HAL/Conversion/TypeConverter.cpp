@@ -51,8 +51,16 @@ HALTypeConverter::HALTypeConverter(
   addTargetMaterialization([](OpBuilder &builder, IREE::HAL::BufferType type,
                               ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
-    assert(inputs[0].getType().isa<TensorType>());
-    return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputs[0]);
+    if (inputs[0].getType().isa<TensorType>()) {
+      return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputs[0]);
+    } else if (inputs[0].getType().isa<IREE::HAL::BufferViewType>()) {
+      return builder.create<IREE::HAL::BufferViewBufferOp>(loc, type,
+                                                           inputs[0]);
+    } else {
+      emitError(loc) << "unsupported HAL target materialization: "
+                     << inputs[0].getType();
+      return nullptr;
+    }
   });
   addTargetMaterialization([](OpBuilder &builder,
                               IREE::HAL::BufferViewType type, ValueRange inputs,
