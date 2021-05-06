@@ -86,7 +86,11 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
     === "Linux and MacOS"
 
         ``` shell
-        cmake -DIREE_BUILD_PYTHON_BINDINGS=ON -DPython3_EXECUTABLE="$(which python)" .
+        cmake \
+          -DIREE_BUILD_PYTHON_BINDINGS=ON \
+          -DPython3_EXECUTABLE="$(which python)" \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          .
         cmake --build .
 
         # Add ./bindings/python to PYTHONPATH and use the API.
@@ -98,7 +102,10 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
     === "Windows"
 
         ``` powershell
-        cmake -DIREE_BUILD_PYTHON_BINDINGS=ON .
+        cmake \
+          -DIREE_BUILD_PYTHON_BINDINGS=ON \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          .
         cmake --build .
 
         # Add bindings\python to PYTHONPATH and use the API.
