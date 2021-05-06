@@ -34,6 +34,7 @@ iree_lit_test_suite(
             "linalg_vectorize.mlir",
             "materialize_launch_configuration.mlir",
             "matmul_vectorization.mlir",
+            "pad_linalg_workgroup_tiles.mlir",
             "plan_conv_loop_order.mlir",
             "unfused_fma.mlir",
         ],
