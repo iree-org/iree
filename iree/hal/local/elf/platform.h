@@ -81,10 +81,10 @@ void iree_memory_query_info(iree_memory_info_t* out_info);
 // Enter a W^X region where pages will be changed RW->RX or RX->RW and write
 // protection should be suspended. Only effects the calling thread and must be
 // paired with iree_memory_jit_context_end.
-void iree_memory_jit_context_begin();
+void iree_memory_jit_context_begin(void);
 
 // Exits a W^X region previously entered with iree_memory_jit_context_begin.
-void iree_memory_jit_context_end();
+void iree_memory_jit_context_end(void);
 
 //==============================================================================
 // Virtual address space manipulation

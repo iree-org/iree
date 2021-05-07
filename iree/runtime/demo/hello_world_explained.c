@@ -16,7 +16,7 @@
 
 #include "iree/runtime/api.h"
 
-static int iree_runtime_demo_main();
+static int iree_runtime_demo_main(void);
 static iree_status_t iree_runtime_demo_run_session(
     iree_runtime_instance_t* instance);
 static iree_status_t iree_runtime_demo_perform_mul(
@@ -78,7 +78,7 @@ static iree_status_t iree_runtime_demo_load_module(
 // This would live in your application startup/shutdown code or scoped to the
 // usage of IREE. Creating and destroying instances is expensive and should be
 // avoided.
-static int iree_runtime_demo_main() {
+static int iree_runtime_demo_main(void) {
   // Set up the shared runtime instance.
   // An application should usually only have one of these and share it across
   // all of the sessions it has. The instance is thread-safe, while the

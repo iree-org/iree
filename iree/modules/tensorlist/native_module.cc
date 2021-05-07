@@ -323,7 +323,7 @@ struct ref_type_descriptor<TensorList> {
 };
 }  // namespace vm
 
-extern "C" iree_status_t iree_tensorlist_module_register_types() {
+extern "C" iree_status_t iree_tensorlist_module_register_types(void) {
   static bool has_registered = false;
   if (has_registered) return iree_ok_status();
   IREE_VM_REGISTER_CC_TYPE(TensorList, "tensorlist.list",

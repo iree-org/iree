@@ -35,7 +35,7 @@ typedef struct {
 } iree_string_view_t;
 
 // Returns an empty string view ("").
-static inline iree_string_view_t iree_string_view_empty() {
+static inline iree_string_view_t iree_string_view_empty(void) {
   iree_string_view_t v = {0, 0};
   return v;
 }

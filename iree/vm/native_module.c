@@ -40,7 +40,7 @@ typedef struct {
   const iree_vm_native_module_descriptor_t* descriptor;
 } iree_vm_native_module_t;
 
-IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size() {
+IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size(void) {
   return sizeof(iree_vm_native_module_t);
 }
 

@@ -104,7 +104,7 @@ typedef struct {
 
 // Returns the size, in bytes, of the allocation required for native modules.
 // Callers may allocate more memory if they need additional storage.
-IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size();
+IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size(void);
 
 // Creates a new native module with the metadata tables in |descriptor|.
 // These tables will be used for reflection and function lookup, and the

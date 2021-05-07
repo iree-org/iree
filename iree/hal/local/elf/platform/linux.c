@@ -45,9 +45,9 @@ void iree_memory_query_info(iree_memory_info_t* out_info) {
   out_info->can_allocate_executable_pages = true;
 }
 
-void iree_memory_jit_context_begin() {}
+void iree_memory_jit_context_begin(void) {}
 
-void iree_memory_jit_context_end() {}
+void iree_memory_jit_context_end(void) {}
 
 //==============================================================================
 // Virtual address space manipulation

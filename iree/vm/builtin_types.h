@@ -23,7 +23,7 @@ extern "C" {
 
 // Registers the builtin VM types. This must be called on startup. Safe to call
 // multiple times.
-IREE_API_EXPORT iree_status_t iree_vm_register_builtin_types();
+IREE_API_EXPORT iree_status_t iree_vm_register_builtin_types(void);
 
 #ifdef __cplusplus
 }  // extern "C"

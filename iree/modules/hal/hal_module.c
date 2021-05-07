@@ -50,7 +50,7 @@ static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
   descriptor.destroy = (iree_vm_ref_destroy_t)destroy_fn;                 \
   IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
 
-IREE_API_EXPORT iree_status_t iree_hal_module_register_types() {
+IREE_API_EXPORT iree_status_t iree_hal_module_register_types(void) {
   static bool has_registered = false;
   if (has_registered) return iree_ok_status();
 
