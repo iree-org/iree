@@ -73,8 +73,8 @@ class ConvertToHALPass
 
     OwningRewritePatternList patterns(&getContext());
 
-    setupIREEToHALLegality(context, conversionTarget);
-    populateIREEToHALPatterns(context, patterns);
+    populateIREEToHALPatterns(context, conversionTarget, typeConverter,
+                              patterns);
 
     setupCompilerHintsLegality(context, conversionTarget, typeConverter);
     populatePreserveCompilerHintsPatterns(context, patterns);
@@ -96,10 +96,11 @@ class ConvertToHALPass
     }
 
     // NOTE: we allow ops that we don't know about to allow custom dialects
-    // that don't need anything HAL-specific to pass through. This is handled by
-    // the fallback type legality support of the
-    if (failed(applyPartialConversion(getOperation(), conversionTarget,
-                                      std::move(patterns)))) {
+    // that don't need anything HAL-specific to pass through.
+    // TODO(benvanik): figure out how to make this a safe full conversion.
+    // The partial conversion will allow through things we don't want (tensors).
+    if (failed(applyFullConversion(getOperation(), conversionTarget,
+                                   std::move(patterns)))) {
       return signalPassFailure();
     }
   }

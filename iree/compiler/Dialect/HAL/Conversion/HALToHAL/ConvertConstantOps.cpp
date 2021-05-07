@@ -30,6 +30,7 @@ class ConstantSubspanConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::ConstantSubspanOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    // Get a !hal.buffer that references the range of constant bytes.
     auto bufferValue = rewriter.createOrFold<IREE::HAL::VariableLoadOp>(
         op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
         op.runtime_buffer().getLeafReference());
@@ -37,8 +38,28 @@ class ConstantSubspanConversion
         op.getLoc(), op.runtime_range().offsetAttr());
     auto lengthValue = rewriter.createOrFold<mlir::ConstantOp>(
         op.getLoc(), op.runtime_range().lengthAttr());
-    rewriter.replaceOpWithNewOp<IREE::HAL::BufferSubspanOp>(
-        op, bufferValue.getType(), bufferValue, offsetValue, lengthValue);
+    auto subspanValue = rewriter.createOrFold<IREE::HAL::BufferSubspanOp>(
+        op.getLoc(), bufferValue.getType(), bufferValue, offsetValue,
+        lengthValue);
+
+    // Build the shape and element type required to initialize the buffer view.
+    auto shapedType = op.getType();
+    auto elementType =
+        IREE::HAL::getElementTypeValue(shapedType.getElementType());
+    if (!elementType.hasValue()) {
+      return rewriter.notifyMatchFailure(op, "unhandled element type");
+    }
+    SmallVector<Value, 4> shape;
+    if (shapedType.getRank() >= 1) {
+      for (auto dim : shapedType.getShape()) {
+        shape.push_back(
+            rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), dim));
+      }
+    }
+
+    // Wrap in a !hal.buffer_view.
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewCreateOp>(
+        op, subspanValue, elementType.getValue(), shape);
     return success();
   }
 };

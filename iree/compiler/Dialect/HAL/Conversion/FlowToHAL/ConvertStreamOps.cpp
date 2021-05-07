@@ -395,7 +395,6 @@ class StreamSchedulingState {
     }
   }
 
- private:
   Value getElementType(Type elementType, OpBuilder &builder) {
     auto it = memoizedElementTypesConstants.find(elementType);
     if (it != memoizedElementTypesConstants.end()) return it->second;
@@ -407,6 +406,7 @@ class StreamSchedulingState {
     return constantValue;
   }
 
+ private:
   Location loc;
 
   // !hal.device used throughout the stream.
@@ -470,18 +470,39 @@ static BufferRange allocateOutputBuffer(Value streamValue, Value externalValue,
       IREE::HAL::BufferUsageBitfield::All;
 
   // Compute the allocation size for the value.
+  auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
+      streamValue.getLoc(), streamValue, rewriter);
   auto allocationSize = schedulingState.lookupOrComputeSize(
-      streamValue.getType().cast<ShapedType>(),
-      Shape::buildOrFindDynamicDimsForValue(streamValue.getLoc(), streamValue,
-                                            rewriter),
-      rewriter);
+      streamValue.getType().cast<ShapedType>(), dynamicDims, rewriter);
 
-  auto buffer = rewriter
-                    .create<IREE::HAL::AllocatorAllocateOp>(
-                        loc, IREE::HAL::BufferType::get(rewriter.getContext()),
-                        schedulingState.allocator(), memoryTypes, bufferUsage,
-                        allocationSize)
-                    .getResult();
+  auto allocatedBuffer =
+      rewriter
+          .create<IREE::HAL::AllocatorAllocateOp>(
+              loc, IREE::HAL::BufferType::get(rewriter.getContext()),
+              schedulingState.allocator(), memoryTypes, bufferUsage,
+              allocationSize)
+          .getResult();
+
+  // TODO(benvanik): merge into lookupOrComputeSize; this is mostly what that is
+  // doing so we are inserting extra IR.
+  auto shapedType = externalValue.getType().cast<ShapedType>();
+  auto elementType =
+      schedulingState.getElementType(shapedType.getElementType(), rewriter);
+  assert(elementType && "unhandled element type for allocation");
+  SmallVector<Value> shapeDims(shapedType.getRank());
+  int64_t dynamicDimIndex = 0;
+  for (int64_t i = 0; i < shapedType.getRank(); ++i) {
+    if (shapedType.isDynamicDim(i)) {
+      shapeDims[i] = dynamicDims[dynamicDimIndex++];
+    } else {
+      shapeDims[i] = schedulingState.lookupOrCreateIndex(
+          shapedType.getDimSize(i), rewriter);
+    }
+  }
+  auto bufferView = rewriter.create<IREE::HAL::BufferViewCreateOp>(
+      loc, allocatedBuffer, elementType, shapeDims);
+  auto buffer = rewriter.create<IREE::HAL::BufferViewBufferOp>(
+      loc, IREE::HAL::BufferType::get(rewriter.getContext()), bufferView);
 
   return BufferRange{buffer, allocationSize};
 }

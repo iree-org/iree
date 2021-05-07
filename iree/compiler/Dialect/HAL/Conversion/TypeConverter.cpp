@@ -36,14 +36,13 @@ HALTypeConverter::HALTypeConverter(
     return success();
   });
 
-  // Tensors become buffers by default.
-  // TODO(benvanik): make them buffer views instead? then they carry shape but
-  // are memory type erased which is not good.
+  // Tensors become buffers views by default.
+  // They may be stripped to buffers by canonicalization if they are not
+  // required to remain as buffer views.
   addConversion([](TensorType type) -> Optional<Type> {
     // HAL only should be concerned with numeric values.
     if (HALTypeConverter::shouldConvertToBuffer(type)) {
-      // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
-      return IREE::HAL::BufferType::get(type.getContext());
+      return IREE::HAL::BufferViewType::get(type.getContext());
     }
     return llvm::None;
   });
@@ -66,8 +65,22 @@ HALTypeConverter::HALTypeConverter(
                               IREE::HAL::BufferViewType type, ValueRange inputs,
                               Location loc) -> Value {
     assert(inputs.size() == 1);
-    assert(inputs[0].getType().isa<TensorType>());
-    return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputs[0]);
+    auto inputValue = inputs[0];
+    auto inputType = inputValue.getType();
+    if (inputType.isa<TensorType>()) {
+      return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputValue);
+    } else if (inputType.isa<IREE::HAL::BufferType>()) {
+      // Look for the buffer view this buffer came from, if any.
+      // If we don't have the origin buffer view then we can't know the shape
+      // and can't materialize one here - it's too late.
+      if (auto bvbOp = dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
+              inputValue.getDefiningOp())) {
+        return bvbOp.buffer_view();
+      }
+      return nullptr;
+    } else {
+      return nullptr;
+    }
   });
 
   // Recursively handle pointer target types (we want to convert
