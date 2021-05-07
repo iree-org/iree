@@ -234,6 +234,11 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_get_cconv_fragments(
 IREE_API_EXPORT bool iree_vm_function_call_is_variadic_cconv(
     iree_string_view_t cconv);
 
+// Counts the total number of arguments and results of a function.
+IREE_API_EXPORT iree_status_t iree_vm_function_call_count_arguments_and_results(
+    const iree_vm_function_signature_t* signature,
+    iree_host_size_t* out_argument_count, iree_host_size_t* out_result_count);
+
 // Returns the required size, in bytes, to store the data in the given cconv
 // fragment (like `iICriDr`).
 //

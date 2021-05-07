@@ -21,7 +21,6 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::internal::file_io
-    iree::base::signature_parser
     iree::base::status
     iree::hal
     iree::modules::hal

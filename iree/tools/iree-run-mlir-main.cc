@@ -36,6 +36,7 @@
 // used to separate the compiler flags from the runtime flags, such as:
 //   iree-run-mlir -iree-hal-target-backends=vulkan-spirv -- --logtostderr
 
+#include <array>
 #include <iostream>
 #include <utility>
 
@@ -262,21 +263,18 @@ Status EvaluateFunction(iree_vm_context_t* context,
 
   std::cout << "EXEC @" << std::string(export_name.data, export_name.size)
             << std::endl;
-  std::vector<RawSignatureParser::Description> input_descs;
-  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
+
+  // Parse input values from the flags.
   vm::ref<iree_vm_list_t> inputs;
   auto function_inputs_list = absl::MakeConstSpan(
       function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
       function_inputs_flag.size());
-  IREE_RETURN_IF_ERROR(ParseToVariantList(input_descs, allocator,
-                                          function_inputs_list, &inputs));
+  IREE_RETURN_IF_ERROR(
+      ParseToVariantList(allocator, function_inputs_list, &inputs));
 
-  std::vector<RawSignatureParser::Description> output_descs;
-  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                           output_descs.size(),
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
@@ -285,7 +283,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
                                       iree_allocator_system()));
 
   // Print outputs.
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()));
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()));
 
   return OkStatus();
 }
@@ -331,7 +329,6 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
       // Skip internal or special functions.
       return OkStatus();
     }
-    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
     // Create the context we'll use for this (ensuring that we can't interfere
     // with other running evaluations, such as when in a multithreaded test

@@ -77,6 +77,8 @@ typedef struct {
     int16_t i16;
     int32_t i32;
     int64_t i64;
+    float f32;
+    double f64;
     iree_vm_ref_t ref;
 
     uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value

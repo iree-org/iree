@@ -41,6 +41,71 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_get_cconv_fragments(
   return iree_ok_status();
 }
 
+static iree_status_t iree_vm_function_call_count_fragment_values(
+    iree_string_view_t cconv_fragment, iree_host_size_t* out_count) {
+  IREE_ASSERT_ARGUMENT(out_count);
+  *out_count = 0;
+  iree_host_size_t count = 0;
+  for (iree_host_size_t i = 0; i < cconv_fragment.size; ++i) {
+    switch (cconv_fragment.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
+      case IREE_VM_CCONV_TYPE_REF:
+        ++count;
+        break;
+      case IREE_VM_CCONV_TYPE_SPAN_START: {
+        for (i = i + 1; i < cconv_fragment.size &&
+                        cconv_fragment.data[i] != IREE_VM_CCONV_TYPE_SPAN_END;
+             ++i) {
+          switch (cconv_fragment.data[i]) {
+            case IREE_VM_CCONV_TYPE_VOID:
+              break;
+            case IREE_VM_CCONV_TYPE_I32:
+            case IREE_VM_CCONV_TYPE_F32:
+            case IREE_VM_CCONV_TYPE_I64:
+            case IREE_VM_CCONV_TYPE_F64:
+            case IREE_VM_CCONV_TYPE_REF:
+              ++count;
+              break;
+            default:
+              return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "unsupported cconv span type %c",
+                                      cconv_fragment.data[i]);
+          }
+        }
+      } break;
+      default:
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "unsupported cconv type %c",
+                                cconv_fragment.data[i]);
+    }
+  }
+  *out_count = count;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_function_call_count_arguments_and_results(
+    const iree_vm_function_signature_t* signature,
+    iree_host_size_t* out_argument_count, iree_host_size_t* out_result_count) {
+  IREE_ASSERT_ARGUMENT(signature);
+  IREE_ASSERT_ARGUMENT(out_argument_count);
+  IREE_ASSERT_ARGUMENT(out_result_count);
+  *out_argument_count = 0;
+  *out_result_count = 0;
+  iree_string_view_t arguments, results;
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
+      signature, &arguments, &results));
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_count_fragment_values(
+      arguments, out_argument_count));
+  IREE_RETURN_IF_ERROR(
+      iree_vm_function_call_count_fragment_values(results, out_result_count));
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT bool iree_vm_function_call_is_variadic_cconv(
     iree_string_view_t cconv) {
   return iree_string_view_find_char(cconv, IREE_VM_CCONV_TYPE_SPAN_START, 0) !=

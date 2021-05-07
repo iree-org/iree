@@ -24,7 +24,6 @@ cc_library(
     srcs = ["vm_util.cc"],
     hdrs = ["vm_util.h"],
     deps = [
-        "//iree/base:signature_parser",
         "//iree/base:status",
         "//iree/base/internal:file_io",
         "//iree/hal",
