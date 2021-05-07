@@ -397,6 +397,7 @@ if(${IREE_BUILD_COMPILER})
   # Finally do our normal aliasing trick to make this accessible as a qualified
   # target name throughout the project.
   add_executable(iree_tools_IreeFileCheck ALIAS IreeFileCheck_exe)
+  add_executable(iree::tools::IreeFileCheck ALIAS IreeFileCheck_exe)
 
   if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
     add_custom_target(BundledLLVMFileCheck ALL
