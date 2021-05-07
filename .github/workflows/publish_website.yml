@@ -1,0 +1,40 @@
+# Builds the website sourced from docs/website/ using `mkdocs` and pushes
+# to the gh-pages branch for publishing on GitHub Pages.
+#
+# See https://squidfunk.github.io/mkdocs-material/publishing-your-site/
+
+name: Publish Website
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/website/**'
+
+defaults:
+  run:
+    working-directory: docs/website
+
+jobs:
+  publish_website:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout out repository
+        uses: actions/checkout@v2
+      - name: Fetching base gh-pages branch
+        # We have to explicitly fetch the gh-pages branch as well to preserve history
+        run: git fetch --no-tags --prune --depth=1 origin "gh-pages:gh-pages"
+      - name: Setting up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Installing Material for MkDocs
+        run: pip install mkdocs-material
+      - name: Setting git config
+        run: |
+          git config --local user.email "iree-github-actions-bot@google.com"
+          git config --local user.name "Website Publish Action"
+      - name: Deploying to gh-pages
+        run: mkdocs gh-deploy
