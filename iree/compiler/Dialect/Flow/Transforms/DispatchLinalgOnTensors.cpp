@@ -995,7 +995,7 @@ static unsigned makeElementwiseOpsRootOps(FuncOp funcOp, unsigned numRoots) {
         continue;
       if (!isa<GenericOpTy>(op) ||
           !llvm::all_of(
-              cast<linalg::LinalgOp>(op).getIndexingMaps(),
+              cast<linalg::LinalgOp>(op).getOutputIndexingMaps(),
               [](AffineMap map) { return map.isProjectedPermutation(); })) {
         continue;
       }
