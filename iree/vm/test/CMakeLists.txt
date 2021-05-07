@@ -30,6 +30,7 @@ iree_cc_embed_data(
     "comparison_ops_i64.vmfb"
     "control_flow_ops.vmfb"
     "conversion_ops.vmfb"
+    "conversion_ops_f32.vmfb"
     "conversion_ops_i64.vmfb"
     "global_ops.vmfb"
     "global_ops_f32.vmfb"
@@ -163,6 +164,18 @@ iree_bytecode_module(
     conversion_ops
   SRC
     "conversion_ops.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    conversion_ops_f32
+  SRC
+    "conversion_ops_f32.mlir"
+  CC_NAMESPACE
+    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC

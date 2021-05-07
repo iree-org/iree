@@ -13,4 +13,5 @@ vm.module @conversion_ops_i64 {
     vm.check.eq %v, %c2, "truncate unsigned i64 to unsigned i32" : i32
     vm.return
   }
+
 }

@@ -452,6 +452,86 @@ class CastingOpConversion : public OpConversionPattern<StdOp> {
   }
 };
 
+class SIToFPOpConversion : public OpConversionPattern<SIToFPOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      SIToFPOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    SIToFPOpAdaptor srcAdaptor(operands);
+    auto srcType = operands[0].getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType.isSignlessInteger(32) || srcType.isSignedInteger(32)) {
+      if (dstType.isF32()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::CastSI32F32Op>(srcOp, dstType,
+                                                             operands[0]);
+        return success();
+      }
+    }
+    return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+  }
+};
+
+class UIToFPOpConversion : public OpConversionPattern<UIToFPOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      UIToFPOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    UIToFPOpAdaptor srcAdaptor(operands);
+    auto srcType = operands[0].getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType.isUnsignedInteger(32)) {
+      if (dstType.isF32()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::CastUI32F32Op>(srcOp, dstType,
+                                                             operands[0]);
+        return success();
+      }
+    }
+    return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+  }
+};
+
+class FPToSIOpConversion : public OpConversionPattern<FPToSIOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      FPToSIOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    FPToSIOpAdaptor srcAdaptor(operands);
+    auto srcType = operands[0].getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType.isF32()) {
+      if (dstType.isSignlessInteger(32) || dstType.isSignedInteger(32)) {
+        rewriter.replaceOpWithNewOp<IREE::VM::CastF32SI32Op>(srcOp, dstType,
+                                                             operands[0]);
+        return success();
+      }
+    }
+    return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+  }
+};
+
+class FPToUIOpConversion : public OpConversionPattern<FPToUIOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      FPToUIOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    FPToUIOpAdaptor srcAdaptor(operands);
+    auto srcType = operands[0].getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType.isF32()) {
+      if (srcType.isUnsignedInteger(32)) {
+        rewriter.replaceOpWithNewOp<IREE::VM::CastF32UI32Op>(srcOp, dstType,
+                                                             operands[0]);
+        return success();
+      }
+    }
+    return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+  }
+};
+
 class SelectOpConversion : public OpConversionPattern<SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -476,6 +556,11 @@ class SelectOpConversion : public OpConversionPattern<SelectOp> {
       return success();
     } else if (valueType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::SelectF64Op>(
+          srcOp, valueType, srcAdaptor.condition(), srcAdaptor.true_value(),
+          srcAdaptor.false_value());
+      return success();
+    } else if (valueType.isa<IREE::VM::RefType>()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::SelectRefOp>(
           srcOp, valueType, srcAdaptor.condition(), srcAdaptor.true_value(),
           srcAdaptor.false_value());
       return success();
@@ -546,7 +631,8 @@ void populateStandardToVMPatterns(MLIRContext *context,
                   CmpFOpConversion, CondBranchOpConversion, ModuleOpConversion,
                   FuncOpConversion, ReturnOpConversion,
                   CastingOpConversion<IndexCastOp>,
-                  CastingOpConversion<TruncateIOp>, SelectOpConversion>(
+                  CastingOpConversion<TruncateIOp>,
+                  CastingOpConversion<ZeroExtendIOp>, SelectOpConversion>(
       typeConverter, context);
   // TODO(#2878): pass typeConverter here.
   patterns.insert<ConstantOpConversion>(context);
@@ -585,6 +671,10 @@ void populateStandardToVMPatterns(MLIRContext *context,
                   BinaryArithmeticOpConversion<SubFOp, IREE::VM::SubF32Op,
                                                IREE::VM::SubF64Op>>(
       typeConverter, context);
+
+  // Floating-point conversion ops.
+  patterns.insert<SIToFPOpConversion, UIToFPOpConversion, FPToUIOpConversion,
+                  FPToUIOpConversion>(typeConverter, context);
 
   // Shift ops
   // TODO(laurenzo): The standard dialect is missing shr ops. Add once in place.
