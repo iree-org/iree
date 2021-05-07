@@ -29,12 +29,15 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
-
 echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
+
+export ROOT_DIR=$(git rev-parse --show-toplevel)
+export BUILD_HOST_DIR="${ROOT_DIR?}/build-host"
+export BUILD_RISCV_DIR="${ROOT_DIR?}/build-riscv"
 
 echo "Cross-compiling with cmake"
 ./build_tools/cmake/build_riscv.sh
 
 echo "Run sanity tests"
-./build_tools/kokoro/gcp_ubuntu/cmake/riscv/riscv64-linux/test.sh
+./build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/test.sh

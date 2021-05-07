@@ -33,7 +33,7 @@ docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   gcr.io/iree-oss/cmake-riscv@sha256:a09ff1e6ab65a436822894acf58ef6c4cbc523581960e918a07ddf4a46c8af95 \
-  build_tools/kokoro/gcp_ubuntu/cmake/riscv/riscv64-linux/build.sh
+  build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.

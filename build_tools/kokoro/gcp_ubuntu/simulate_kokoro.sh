@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Simulates the behavior of Kokoro on a local machine.
-# Usage (under sudo):
+# Usage:
 #   ./build_tools/kokoro/gcp_ubuntu/simulate_kokoro.sh \
 #     build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh
 #
