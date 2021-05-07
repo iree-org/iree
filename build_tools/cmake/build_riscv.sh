@@ -24,8 +24,8 @@
 set -x
 set -e
 
-ROOT_DIR=${ROOT_DIR:-$(git rev-parse --show-toplevel)}
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 
 "${CMAKE_BIN?}" --version
 ninja --version
@@ -65,8 +65,8 @@ fi
 
 # Configure riscv, then build.
 "${CMAKE_BIN?}" -G Ninja -B "${BUILD_RISCV_DIR?}" \
-  -DCMAKE_TOOLCHAIN_FILE=$(realpath "${ROOT_DIR?}/build_tools/cmake/riscv.toolchain.cmake") \
-  -DIREE_HOST_BINARY_ROOT=$(realpath "${BUILD_HOST_DIR?}/install") \
+  -DCMAKE_TOOLCHAIN_FILE="$(realpath ${ROOT_DIR?}/build_tools/cmake/riscv.toolchain.cmake)" \
+  -DIREE_HOST_BINARY_ROOT="$(realpath ${BUILD_HOST_DIR?}/install)" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_ENABLE_MLIR=OFF \
   -DIREE_BUILD_TESTS=ON \
