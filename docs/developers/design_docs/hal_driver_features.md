@@ -103,7 +103,7 @@ overall steps are as follows:
 [d89364]: https://reviews.llvm.org/D89364
 [iree-hal]: https://github.com/google/iree/tree/main/iree/hal
 [iree-hal-c-api]: https://github.com/google/iree/blob/main/iree/hal/api.h
-[iree-hal-dialect]: https://google.github.io/iree/Dialects/HALDialect
+[iree-hal-dialect]: https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL
 [iree-vulkan-dialect]: https://github.com/google/iree/tree/main/iree/compiler/Dialect/Vulkan
 [iree-vulkan-base-td]: https://github.com/google/iree/blob/main/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
 [iree-vulkan-cap-td]: https://github.com/google/iree/blob/main/iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.td
