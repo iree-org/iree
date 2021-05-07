@@ -186,6 +186,7 @@ need for expensive interop and opportunities for the compiler to tightly
 optimize the custom behavior with the rest of the model.
 
 Relevant **unsupported** APIs:
+
 * [`TfLiteRegistration`](https://github.com/tensorflow/tensorflow/blob/4827424ac32433075bf1ec885aa4b38b1ede2d65/tensorflow/lite/c/common.h#L827-L884)
 * [`TfLiteInterpreterOptionsAddCustomOp`](https://github.com/tensorflow/tensorflow/blob/4827424ac32433075bf1ec885aa4b38b1ede2d65/tensorflow/lite/c/c_api_experimental.h#L51-L68)
 * [`TfLiteInterpreterOptionsSetOpResolver`](https://github.com/tensorflow/tensorflow/blob/4827424ac32433075bf1ec885aa4b38b1ede2d65/tensorflow/lite/c/c_api_experimental.h#L70-L91)
@@ -203,6 +204,7 @@ construct models on-demand there are almost no situations in which one should do
 so beyond tools like REPLs and it is not a supported IREE use case.
 
 Relevant **unsupported** APIs:
+
 * [`TfLite*Params` structures](https://github.com/tensorflow/tensorflow/blob/2d03c32d6299935ea74083c943c8d727ff50d4c8/tensorflow%2Flite%2Fc%2Fbuiltin_op_data.h)
 
 #### 🙅‍♀️ Delegates
@@ -227,6 +229,7 @@ and it's easy to map anything you can do with IREE artifacts to that mental
 model.
 
 Relevant **unsupported** APIs:
+
 * [`TfLiteDelegate`](https://github.com/tensorflow/tensorflow/blob/2d03c32d6299935ea74083c943c8d727ff50d4c8/tensorflow/lite/c/common.h#L919-L960)
 * [`TfLiteInterpreterOptionsAddDelegate`](https://github.com/tensorflow/tensorflow/blob/2d03c32d6299935ea74083c943c8d727ff50d4c8/tensorflow/lite/c/c_api.h#L109-L117)
 
