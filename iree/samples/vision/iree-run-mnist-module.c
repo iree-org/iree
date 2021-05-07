@@ -61,10 +61,12 @@ iree_status_t Run() {
   const char kInputImage[] = "mnist_test.png";
   iree_hal_dim_t buffer_shape[] = {1, 28, 28, 1};
   iree_hal_element_type_t hal_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_32;
-  IREE_RETURN_IF_ERROR(iree_tools_utils_buffer_view_from_image(
+  float input_range[2] = {0.0f, 1.0f};
+  IREE_RETURN_IF_ERROR(iree_tools_utils_buffer_view_from_image_rescaled(
                            iree_make_cstring_view(kInputImage), buffer_shape,
                            IREE_ARRAYSIZE(buffer_shape), hal_element_type,
-                           iree_hal_device_allocator(device), &buffer_view),
+                           iree_hal_device_allocator(device), input_range,
+                           IREE_ARRAYSIZE(input_range), &buffer_view),
                        "load image");
   IREE_RETURN_IF_ERROR(
       iree_runtime_call_inputs_push_back_buffer_view(&call, buffer_view));

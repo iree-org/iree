@@ -40,23 +40,41 @@ iree_status_t iree_tools_utils_load_pixel_data(
 // |out_buffer_view|. |out_buffer_view| properties are defined by |shape|,
 // |shape_rank|, and |element_type|, while being allocated by |allocator|.
 //
+// The |element_type| has to be SINT_8 or UINT_8. For FLOAT_32, use
+// |iree_tools_utils_buffer_biew_from_image_rescaled| instead.
+//
 // The returned |out_buffer_view| must be released by the caller.
 iree_status_t iree_tools_utils_buffer_view_from_image(
     const iree_string_view_t filename, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_hal_allocator_t* allocator, iree_hal_buffer_view_t** out_buffer_view);
 
+// Parse the content in an image file in |filename| into a HAL buffer view
+// |out_buffer_view|. |out_buffer_view| properties are defined by |shape|,
+// |shape_rank|, and |element_type|, while being allocated by |allocator|.
+// The value in |out_buffer_view| is rescaled with |input_range|.
+//
+// The |element_type| has to be FLOAT_32, For SINT_8 or UINT_8, use
+// |iree_tools_utils_buffer_biew_from_image| instead.
+//
+// The returned |out_buffer_view| must be released by the caller.
+iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
+    const iree_string_view_t filename, const iree_hal_dim_t* shape,
+    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_allocator_t* allocator, const float* input_range,
+    iree_host_size_t range_length, iree_hal_buffer_view_t** out_buffer_view);
+
 // Normalize uint8_t |pixel data| of the size |buffer_length| to float buffer
-// |out_buffer| with the range [FLAG_input min, FLAG_input_max].
+// |out_buffer| with the range |input_range|.
 //
 // float32_x = (uint8_x - 127.5) / 127.5 * input_scale + input_offset, where
-// input_scale = |FLAG_input_max - FLAG_input_min| / 2
-// input_offset = (FLAG_input_min + FLAG_input_max) / 2
+// input_scale = abs(|input_range[0]| - |input_range[1]| / 2
+// input_offset = |input_range[0]| + |input_range[1]| / 2
 //
 // |out_buffer| needs to be allocated before the call.
 iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
     const uint8_t* pixel_data, iree_host_size_t buffer_length,
-    float* out_buffer);
+    const float* input_range, iree_host_size_t range_length, float* out_buffer);
 
 #if __cplusplus
 }

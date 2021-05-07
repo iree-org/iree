@@ -19,19 +19,16 @@
 #include "iree/base/internal/flags.h"
 #include "stb_image.h"
 
-IREE_FLAG(float, input_range_min, 0,
-          "Lower bound of the input pixel dynamic range for rescale. "
-          "Default to 0");
-
-IREE_FLAG(float, input_range_max, 1,
-          "Upper bound of the input pixel dynamic range for rescale. "
-          "Default to 1");
-
 iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
     const uint8_t* pixel_data, iree_host_size_t buffer_length,
+    const float* input_range, iree_host_size_t range_length,
     float* out_buffer) {
-  float input_scale = fabsf(FLAG_input_range_max - FLAG_input_range_min) / 2.0f;
-  float input_offset = (FLAG_input_range_min + FLAG_input_range_max) / 2.0f;
+  if (range_length != 2) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "range defined as 2-element [min, max] array.");
+  }
+  float input_scale = fabsf(input_range[1] - input_range[0]) / 2.0f;
+  float input_offset = (input_range[0] + input_range[1]) / 2.0f;
   const float kUint8Mean = 127.5f;
   for (int i = 0; i < buffer_length; ++i) {
     out_buffer[i] =
@@ -110,6 +107,12 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_hal_allocator_t* allocator, iree_hal_buffer_view_t** out_buffer_view) {
   *out_buffer_view = NULL;
+  if (element_type != IREE_HAL_ELEMENT_TYPE_SINT_8 &&
+      element_type != IREE_HAL_ELEMENT_TYPE_UINT_8) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "element type should be i8 or u8");
+  }
+
   iree_status_t result;
   uint8_t* pixel_data = NULL;
   iree_host_size_t buffer_length;
@@ -120,57 +123,72 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
   }
 
   iree_host_size_t element_byte = iree_hal_element_byte_count(element_type);
-  switch (element_type) {
-    // SINT_8 and UINT_8 perform direct buffer wrap.
-    case IREE_HAL_ELEMENT_TYPE_UINT_8:
-    case IREE_HAL_ELEMENT_TYPE_SINT_8: {
-      result = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
-          allocator, shape, shape_rank, element_type,
-          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
-          iree_make_byte_span((void*)pixel_data, element_byte * buffer_length),
-          iree_allocator_null(), out_buffer_view);
-      break;
-    }
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_32: {
-      iree_hal_buffer_t* buffer = NULL;
-      result = iree_hal_allocator_allocate_buffer(
-          allocator,
-          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          IREE_HAL_BUFFER_USAGE_ALL, element_byte * buffer_length, &buffer);
-      if (!iree_status_is_ok(result)) {
-        stbi_image_free((void*)pixel_data);
-        return result;
-      }
-      // Need to normalize to the expected input range. Default to [0, 1].
-      iree_hal_buffer_mapping_t mapped_memory;
-      result = iree_hal_buffer_map_range(
-          buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0,
-          element_byte * buffer_length, &mapped_memory);
-      if (!iree_status_is_ok(result)) {
-        iree_hal_buffer_release(buffer);
-        stbi_image_free((void*)pixel_data);
-        return result;
-      }
-      result = iree_tools_utils_pixel_rescaled_to_buffer(
-          pixel_data, buffer_length, (float*)mapped_memory.contents.data);
-      if (!iree_status_is_ok(result)) {
-        iree_hal_buffer_release(buffer);
-        stbi_image_free((void*)pixel_data);
-        return result;
-      }
-      iree_hal_buffer_unmap_range(&mapped_memory);
-      result = iree_hal_buffer_view_create(buffer, shape, shape_rank,
-                                           element_type, out_buffer_view);
-      iree_hal_buffer_release(buffer);
-      break;
-    }
-    default: {
-      stbi_image_free((void*)pixel_data);
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "element type not supported");
-    }
+  // SINT_8 and UINT_8 perform direct buffer wrap.
+  result = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+      allocator, shape, shape_rank, element_type,
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
+      iree_make_byte_span((void*)pixel_data, element_byte * buffer_length),
+      iree_allocator_null(), out_buffer_view);
+
+  stbi_image_free(pixel_data);
+  return result;
+}
+
+iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
+    const iree_string_view_t filename, const iree_hal_dim_t* shape,
+    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_allocator_t* allocator, const float* input_range,
+    iree_host_size_t range_length, iree_hal_buffer_view_t** out_buffer_view) {
+  *out_buffer_view = NULL;
+
+  if (element_type != IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "element type should be f32");
   }
+
+  iree_status_t result;
+  uint8_t* pixel_data = NULL;
+  iree_host_size_t buffer_length;
+  result = iree_tools_utils_load_pixel_data(
+      filename, shape, shape_rank, element_type, &pixel_data, &buffer_length);
+  if (!iree_status_is_ok(result)) {
+    return result;
+  }
+
+  iree_host_size_t element_byte = iree_hal_element_byte_count(element_type);
+  iree_hal_buffer_t* buffer = NULL;
+  result = iree_hal_allocator_allocate_buffer(
+      allocator,
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_ALL, element_byte * buffer_length, &buffer);
+  if (!iree_status_is_ok(result)) {
+    stbi_image_free((void*)pixel_data);
+    return result;
+  }
+  // Need to normalize to the expected input range.
+  iree_hal_buffer_mapping_t mapped_memory;
+  result =
+      iree_hal_buffer_map_range(buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0,
+                                element_byte * buffer_length, &mapped_memory);
+  if (!iree_status_is_ok(result)) {
+    iree_hal_buffer_release(buffer);
+    stbi_image_free((void*)pixel_data);
+    return result;
+  }
+  result = iree_tools_utils_pixel_rescaled_to_buffer(
+      pixel_data, buffer_length, input_range, range_length,
+      (float*)mapped_memory.contents.data);
+  if (!iree_status_is_ok(result)) {
+    iree_hal_buffer_release(buffer);
+    stbi_image_free((void*)pixel_data);
+    return result;
+  }
+  iree_hal_buffer_unmap_range(&mapped_memory);
+  result = iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
+                                       out_buffer_view);
+
+  iree_hal_buffer_release(buffer);
   stbi_image_free(pixel_data);
   return result;
 }
