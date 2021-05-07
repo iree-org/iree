@@ -39,7 +39,7 @@ struct TileSizeFn {
                                          Operation *operation);
 };
 
-Optional<LaunchConfig> initCPULaunchConfig(
+FailureOr<Optional<LaunchConfig>> initCPULaunchConfig(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     ArrayRef<linalg::LinalgOp> linalgOps);
 

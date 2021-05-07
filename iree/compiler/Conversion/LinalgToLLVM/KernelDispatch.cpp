@@ -219,7 +219,7 @@ bool isDispatchOp(Operation *op) {
   return false;
 }
 
-Optional<LaunchConfig> initCPULaunchConfig(
+FailureOr<Optional<LaunchConfig>> initCPULaunchConfig(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     ArrayRef<linalg::LinalgOp> linalgOps) {
   LaunchConfig config;
@@ -230,7 +230,7 @@ Optional<LaunchConfig> initCPULaunchConfig(
     if (rootOperation) {
       linalgOp.emitError(
           "unhandled multiple root operations in dispatch region");
-      return llvm::None;
+      return failure();
     }
     rootOperation = linalgOp;
     SmallVector<int64_t, 4> opTileSizes;
@@ -243,12 +243,12 @@ Optional<LaunchConfig> initCPULaunchConfig(
     config.setRootOperation(linalgOp);
   }
   if (!rootOperation) {
-    return config;
+    return Optional<LaunchConfig>(config);
   }
   if (failed(propogateRootOperationLaunchConfig(config, *rootOperation,
                                                 dependenceGraph)))
-    return llvm::None;
-  return config;
+    return Optional<LaunchConfig>(llvm::None);
+  return Optional<LaunchConfig>(config);
 }
 
 }  // namespace iree_compiler

@@ -66,13 +66,17 @@ void MaterializeCPULaunchConfigurationPass::runOnOperation() {
     }
     linalg::Aliases aliases;
     linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
-    Optional<LaunchConfig> launchConfigOpt =
+    FailureOr<Optional<LaunchConfig>> launchConfigOpt =
         initCPULaunchConfig(context, dependenceGraph, linalgOps);
-    if (!launchConfigOpt) {
+    if (failed(launchConfigOpt)) {
+      funcOp.emitOpError("Failed to initiate CPU launch config");
+      return signalPassFailure();
+    }
+    if (!launchConfigOpt.getValue()) {
       // Nothing to do here. Continue.
       continue;
     }
-    LaunchConfig &launchConfig = *launchConfigOpt;
+    LaunchConfig &launchConfig = *launchConfigOpt.getValue();
 
     LLVM_DEBUG({
       llvm::dbgs() << "@func " << funcOp.getName() << "\n";
