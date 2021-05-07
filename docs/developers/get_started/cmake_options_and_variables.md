@@ -64,10 +64,6 @@ Builds the IREE TFLite Java bindings with the C API compatibility shim. Defaults
 
 Builds the experimental java bindings. Defaults to `OFF`.
 
-#### `IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER`:BOOL
-
-Builds the experimental model builder component. Defaults to `OFF`.
-
 #### `IREE_BUILD_EXPERIMENTAL_REMOTING`:BOOL
 
 Builds experimental remoting component. Defaults to `OFF`.
