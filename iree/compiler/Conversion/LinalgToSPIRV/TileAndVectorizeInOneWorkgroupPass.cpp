@@ -384,19 +384,11 @@ class CombineContractTranspose final
 //====---------------------------------------------------------------------===//
 
 static void applyVectorTransformation(FuncOp funcOp) {
+  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(funcOp));
+  bool useCooperativeMatrix =
+      targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
+      targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix);
   {
-    {
-      OwningRewritePatternList lowerTransferOpPatterns(funcOp.getContext());
-      vector::populateVectorToVectorCanonicalizationPatterns(
-          lowerTransferOpPatterns);
-      vector::populateVectorToVectorTransformationPatterns(
-          lowerTransferOpPatterns);
-      vector::populateVectorTransferLoweringPatterns(lowerTransferOpPatterns);
-      lowerTransferOpPatterns.add<CombineContractTranspose>(
-          funcOp.getContext());
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(lowerTransferOpPatterns));
-    }
     {
       OwningRewritePatternList vectorUnrollPatterns(funcOp.getContext());
       populateVectorUnrollPatterns(funcOp.getContext(), vectorUnrollPatterns);
@@ -416,8 +408,30 @@ static void applyVectorTransformation(FuncOp funcOp) {
 
       OwningRewritePatternList canonicalizationPatterns2(funcOp.getContext());
       vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2);
+      vector::populateVectorTransferLoweringPatterns(canonicalizationPatterns2);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns2));
+
+      if (useCooperativeMatrix) {
+        // When using cooperative matrix we don't want to lower the contract,
+        // instead we want to merge contract and transpose so that they can be
+        // converted to cooperative matrix matmul op.
+        // TODO(thomasraoux): remove that once we support cooperative matrix
+        // lowering in MLIR core.
+        OwningRewritePatternList combineTransposePatterns(funcOp.getContext());
+        combineTransposePatterns.add<CombineContractTranspose>(
+            funcOp.getContext());
+        (void)applyPatternsAndFoldGreedily(funcOp,
+                                           std::move(combineTransposePatterns));
+      } else {
+        OwningRewritePatternList contractLoweringPatterns(funcOp.getContext());
+        vector::populateVectorContractLoweringPatterns(
+            contractLoweringPatterns,
+            vector::VectorTransformsOptions().setVectorTransformsOptions(
+                vector::VectorContractLowering::OuterProduct));
+        (void)applyPatternsAndFoldGreedily(funcOp,
+                                           std::move(contractLoweringPatterns));
+      }
     }
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Vector Unroll ---\n";

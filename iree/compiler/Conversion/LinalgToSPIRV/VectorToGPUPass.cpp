@@ -112,52 +112,6 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
-// Lower vector contract to a single scalar or vector mulf+addf. Insert casts to
-// convert from N-D vector to 1D vector or scalar.
-class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
- public:
-  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::ContractionOp op,
-                                PatternRewriter &rewriter) const override {
-    auto iteratorTypes = op.iterator_types().getValue();
-    if (!isReductionIterator(iteratorTypes.back()) ||
-        op.getContractingDimMap().size() > 1)
-      return failure();
-    if (op.getLhsType().getNumElements() != 1) return failure();
-    auto accType = op.getAccType().cast<VectorType>();
-    auto rhsType = op.getRhsType();
-    unsigned vecSize = accType.getNumElements();
-    if (accType != rhsType || !(vecSize >= 1 && vecSize <= 4) ||
-        accType.getShape().back() != vecSize)
-      return failure();
-    auto loc = op.getLoc();
-    VectorType vecType = VectorType::get(
-        vecSize, op.getResultType().cast<VectorType>().getElementType());
-    llvm::SmallVector<int64_t, 4> zero(iteratorTypes.size() - 1, 0);
-    Value lhs = rewriter.create<vector::ExtractOp>(loc, op.lhs(), zero);
-    Value rhs, acc;
-    if (vecSize == 1) {
-      rhs = rewriter.create<vector::ExtractOp>(loc, op.rhs(), zero);
-      acc = rewriter.create<vector::ExtractOp>(loc, op.acc(), zero);
-    } else {
-      lhs = rewriter.create<vector::BroadcastOp>(loc, vecType, lhs);
-      rhs = rewriter.create<vector::ShapeCastOp>(loc, vecType, op.rhs());
-      acc = rewriter.create<vector::ShapeCastOp>(loc, vecType, op.acc());
-    }
-    Value newOp = rewriter.create<MulFOp>(loc, lhs, rhs);
-    newOp = rewriter.create<AddFOp>(loc, newOp, acc);
-    if (vecSize == 1)
-      newOp =
-          rewriter.create<vector::BroadcastOp>(loc, op.getResultType(), newOp);
-    else
-      newOp =
-          rewriter.create<vector::ShapeCastOp>(loc, op.getResultType(), newOp);
-    rewriter.replaceOp(op, newOp);
-    return success();
-  }
-};
-
 // Lower elementwise operation from N-D vector to 1-D vectors that can be
 // natively supported.
 // TODO(thomasraoux):  Move this to MLIR core vector transformations.
@@ -227,8 +181,7 @@ class ExtractStridedLowering
 void ConvertVectorToGPUPass::lowerVectorOps(FuncOp funcOp,
                                             MLIRContext *context) {
   OwningRewritePatternList patterns(&getContext());
-  patterns.insert<VectorContractLowering, ExtractStridedLowering,
-                  ElementwiseLowering>(context);
+  patterns.insert<ExtractStridedLowering, ElementwiseLowering>(context);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 

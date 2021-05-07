@@ -121,172 +121,227 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[SUBVIEW_ARG1]]
 // CHECK-SAME:      [%[[IIDZ]], %[[IV0]], %[[IOFFSET_X]]] [1, 4, 4] [1, 1, 1]
 
-//  CHECK-DAG:    %[[READ_LHS_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C0]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C1]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_2:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C2]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_3:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C3]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_4:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C4]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_5:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C5]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_6:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C6]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_7:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C7]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C0]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C1]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_2:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C2]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_3:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C3]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_4:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C4]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_5:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C5]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_6:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C6]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_7:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C7]], %[[C0]]]
 
-//  CHECK-DAG:    %[[READ_RHS_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C0]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_RHS_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C1]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_RHS_2:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C2]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_RHS_3:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C3]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_RHS_0:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C0]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_RHS_1:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C1]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_RHS_2:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C2]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_RHS_3:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C3]], %[[C0]]]
 
-//  CHECK-DAG:    %[[READ_LHS_0_0:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_0]] {offsets = [0, 0, 0]
-//  CHECK-DAG:    %[[READ_LHS_0_1:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_0]] {offsets = [0, 0, 1]
-//  CHECK-DAG:    %[[READ_LHS_0_2:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_0]] {offsets = [0, 0, 2]
-//  CHECK-DAG:    %[[READ_LHS_0_3:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_0]] {offsets = [0, 0, 3]
-//  CHECK-DAG:    %[[READ_LHS_1_0:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_1]] {offsets = [0, 0, 0]
-//  CHECK-DAG:    %[[READ_LHS_1_1:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_1]] {offsets = [0, 0, 1]
-//  CHECK-DAG:    %[[READ_LHS_1_2:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_1]] {offsets = [0, 0, 2]
-//  CHECK-DAG:    %[[READ_LHS_1_3:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_1]] {offsets = [0, 0, 3]
-//  CHECK-DAG:    %[[READ_LHS_2_0:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_2]] {offsets = [0, 0, 0]
-//  CHECK-DAG:    %[[READ_LHS_2_1:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_2]] {offsets = [0, 0, 1]
-//  CHECK-DAG:    %[[READ_LHS_2_2:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_2]] {offsets = [0, 0, 2]
-//  CHECK-DAG:    %[[READ_LHS_2_3:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_2]] {offsets = [0, 0, 3]
-//  CHECK-DAG:    %[[READ_LHS_3_0:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_3]] {offsets = [0, 0, 0]
-//  CHECK-DAG:    %[[READ_LHS_3_1:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_3]] {offsets = [0, 0, 1]
-//  CHECK-DAG:    %[[READ_LHS_3_2:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_3]] {offsets = [0, 0, 2]
-//  CHECK-DAG:    %[[READ_LHS_3_3:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_3]] {offsets = [0, 0, 3]
-//  CHECK-DAG:    %[[READ_LHS_4_0:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_4]] {offsets = [0, 0, 0]
-//  CHECK-DAG:    %[[READ_LHS_4_1:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_4]] {offsets = [0, 0, 1]
-//  CHECK-DAG:    %[[READ_LHS_4_2:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_4]] {offsets = [0, 0, 2]
-//  CHECK-DAG:    %[[READ_LHS_4_3:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_4]] {offsets = [0, 0, 3]
-//  CHECK-DAG:    %[[READ_LHS_5_0:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_5]] {offsets = [0, 0, 0]
-//  CHECK-DAG:    %[[READ_LHS_5_1:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_5]] {offsets = [0, 0, 1]
-//  CHECK-DAG:    %[[READ_LHS_5_2:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_5]] {offsets = [0, 0, 2]
-//  CHECK-DAG:    %[[READ_LHS_5_3:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_5]] {offsets = [0, 0, 3]
-//  CHECK-DAG:    %[[READ_LHS_6_0:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_6]] {offsets = [0, 0, 0]
-//  CHECK-DAG:    %[[READ_LHS_6_1:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_6]] {offsets = [0, 0, 1]
-//  CHECK-DAG:    %[[READ_LHS_6_2:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_6]] {offsets = [0, 0, 2]
-//  CHECK-DAG:    %[[READ_LHS_6_3:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_6]] {offsets = [0, 0, 3]
-//  CHECK-DAG:    %[[READ_LHS_7_0:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_7]] {offsets = [0, 0, 0]
-//  CHECK-DAG:    %[[READ_LHS_7_1:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_7]] {offsets = [0, 0, 1]
-//  CHECK-DAG:    %[[READ_LHS_7_2:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_7]] {offsets = [0, 0, 2]
-//  CHECK-DAG:    %[[READ_LHS_7_3:.+]] = vector.extract_strided_slice
-// CHECK-SAME:      %[[READ_LHS_7]] {offsets = [0, 0, 3]
+//  CHECK-DAG:    %[[READ_LHS_0_0:.+]] = vector.extract_strided_slice %[[READ_LHS_0]] {offsets = [0, 0, 0]
+//  CHECK-DAG:    %[[READ_LHS_0_1:.+]] = vector.extract_strided_slice %[[READ_LHS_0]] {offsets = [0, 0, 1]
+//  CHECK-DAG:    %[[READ_LHS_0_2:.+]] = vector.extract_strided_slice %[[READ_LHS_0]] {offsets = [0, 0, 2]
+//  CHECK-DAG:    %[[READ_LHS_0_3:.+]] = vector.extract_strided_slice %[[READ_LHS_0]] {offsets = [0, 0, 3]
+//  CHECK-DAG:    %[[READ_LHS_1_0:.+]] = vector.extract_strided_slice %[[READ_LHS_1]] {offsets = [0, 0, 0]
+//  CHECK-DAG:    %[[READ_LHS_1_1:.+]] = vector.extract_strided_slice %[[READ_LHS_1]] {offsets = [0, 0, 1]
+//  CHECK-DAG:    %[[READ_LHS_1_2:.+]] = vector.extract_strided_slice %[[READ_LHS_1]] {offsets = [0, 0, 2]
+//  CHECK-DAG:    %[[READ_LHS_1_3:.+]] = vector.extract_strided_slice %[[READ_LHS_1]] {offsets = [0, 0, 3]
+//  CHECK-DAG:    %[[READ_LHS_2_0:.+]] = vector.extract_strided_slice %[[READ_LHS_2]] {offsets = [0, 0, 0]
+//  CHECK-DAG:    %[[READ_LHS_2_1:.+]] = vector.extract_strided_slice %[[READ_LHS_2]] {offsets = [0, 0, 1]
+//  CHECK-DAG:    %[[READ_LHS_2_2:.+]] = vector.extract_strided_slice %[[READ_LHS_2]] {offsets = [0, 0, 2]
+//  CHECK-DAG:    %[[READ_LHS_2_3:.+]] = vector.extract_strided_slice %[[READ_LHS_2]] {offsets = [0, 0, 3]
+//  CHECK-DAG:    %[[READ_LHS_3_0:.+]] = vector.extract_strided_slice %[[READ_LHS_3]] {offsets = [0, 0, 0]
+//  CHECK-DAG:    %[[READ_LHS_3_1:.+]] = vector.extract_strided_slice %[[READ_LHS_3]] {offsets = [0, 0, 1]
+//  CHECK-DAG:    %[[READ_LHS_3_2:.+]] = vector.extract_strided_slice %[[READ_LHS_3]] {offsets = [0, 0, 2]
+//  CHECK-DAG:    %[[READ_LHS_3_3:.+]] = vector.extract_strided_slice %[[READ_LHS_3]] {offsets = [0, 0, 3]
+//  CHECK-DAG:    %[[READ_LHS_4_0:.+]] = vector.extract_strided_slice %[[READ_LHS_4]] {offsets = [0, 0, 0]
+//  CHECK-DAG:    %[[READ_LHS_4_1:.+]] = vector.extract_strided_slice %[[READ_LHS_4]] {offsets = [0, 0, 1]
+//  CHECK-DAG:    %[[READ_LHS_4_2:.+]] = vector.extract_strided_slice %[[READ_LHS_4]] {offsets = [0, 0, 2]
+//  CHECK-DAG:    %[[READ_LHS_4_3:.+]] = vector.extract_strided_slice %[[READ_LHS_4]] {offsets = [0, 0, 3]
+//  CHECK-DAG:    %[[READ_LHS_5_0:.+]] = vector.extract_strided_slice %[[READ_LHS_5]] {offsets = [0, 0, 0]
+//  CHECK-DAG:    %[[READ_LHS_5_1:.+]] = vector.extract_strided_slice %[[READ_LHS_5]] {offsets = [0, 0, 1]
+//  CHECK-DAG:    %[[READ_LHS_5_2:.+]] = vector.extract_strided_slice %[[READ_LHS_5]] {offsets = [0, 0, 2]
+//  CHECK-DAG:    %[[READ_LHS_5_3:.+]] = vector.extract_strided_slice %[[READ_LHS_5]] {offsets = [0, 0, 3]
+//  CHECK-DAG:    %[[READ_LHS_6_0:.+]] = vector.extract_strided_slice %[[READ_LHS_6]] {offsets = [0, 0, 0]
+//  CHECK-DAG:    %[[READ_LHS_6_1:.+]] = vector.extract_strided_slice %[[READ_LHS_6]] {offsets = [0, 0, 1]
+//  CHECK-DAG:    %[[READ_LHS_6_2:.+]] = vector.extract_strided_slice %[[READ_LHS_6]] {offsets = [0, 0, 2]
+//  CHECK-DAG:    %[[READ_LHS_6_3:.+]] = vector.extract_strided_slice %[[READ_LHS_6]] {offsets = [0, 0, 3]
+//  CHECK-DAG:    %[[READ_LHS_7_0:.+]] = vector.extract_strided_slice %[[READ_LHS_7]] {offsets = [0, 0, 0]
+//  CHECK-DAG:    %[[READ_LHS_7_1:.+]] = vector.extract_strided_slice %[[READ_LHS_7]] {offsets = [0, 0, 1]
+//  CHECK-DAG:    %[[READ_LHS_7_2:.+]] = vector.extract_strided_slice %[[READ_LHS_7]] {offsets = [0, 0, 2]
+//  CHECK-DAG:    %[[READ_LHS_7_3:.+]] = vector.extract_strided_slice %[[READ_LHS_7]] {offsets = [0, 0, 3]
+// Vectorization and lowering generates a lot of transpose and shape_cast that
+// are only  simplified later. We could probably improve the pass organization to
+// avoid it.
+//  CHECK-DAG:    %[[READ_RHS_0_T:.+]] = vector.transpose %[[READ_RHS_0]], [0, 2, 1]
+//  CHECK-DAG:    %[[READ_RHS_1_T:.+]] = vector.transpose %[[READ_RHS_1]], [0, 2, 1]
+//  CHECK-DAG:    %[[READ_RHS_2_T:.+]] = vector.transpose %[[READ_RHS_2]], [0, 2, 1]
+//  CHECK-DAG:    %[[READ_RHS_3_T:.+]] = vector.transpose %[[READ_RHS_3]], [0, 2, 1]
 
-//      CHECK:    %[[CONTRACT_0_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0]], %[[ACC_0]]
-//      CHECK:    %[[CONTRACT_0_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1]], %[[CONTRACT_0_0]]
-//      CHECK:    %[[CONTRACT_0_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_2]], %[[READ_RHS_2]], %[[CONTRACT_0_1]]
-//      CHECK:    %[[CONTRACT_0_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_3]], %[[READ_RHS_3]], %[[CONTRACT_0_2]]
+//  CHECK-DAG:    %[[READ_RHS_0_T_1:.+]] = vector.shape_cast %[[READ_RHS_0_T]] : vector<1x4x1xf32> to vector<4x1xf32>
+//  CHECK-DAG:    %[[READ_RHS_0_T_2:.+]] = vector.transpose %[[READ_RHS_0_T_1]], [1, 0] : vector<4x1xf32> to vector<1x4xf32>
+//  CHECK-DAG:    %[[READ_RHS_0_T_3:.+]] = vector.shape_cast %[[READ_RHS_0_T_2]] : vector<1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[READ_LHS_0_0_E:.+]] = vector.extract %[[READ_LHS_0_0]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_0_0_S:.+]] = splat %[[READ_LHS_0_0_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[ACC_0_C:.+]] = vector.shape_cast %[[ACC_0]] : vector<1x1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[FMA_0_0:.+]] = vector.fma %[[READ_LHS_0_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_0_C]] : vector<4xf32>
 
-//      CHECK:    %[[CONTRACT_1_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0]], %[[ACC_1]]
-//      CHECK:    %[[CONTRACT_1_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1]], %[[CONTRACT_1_0]]
-//      CHECK:    %[[CONTRACT_1_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_2]], %[[READ_RHS_2]], %[[CONTRACT_1_1]]
-//      CHECK:    %[[CONTRACT_1_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_3]], %[[READ_RHS_3]], %[[CONTRACT_1_2]]
+//  CHECK-DAG:    %[[READ_RHS_1_T_1:.+]] = vector.shape_cast %[[READ_RHS_1_T]] : vector<1x4x1xf32> to vector<4x1xf32>
+//  CHECK-DAG:    %[[READ_RHS_1_T_2:.+]] = vector.transpose %[[READ_RHS_1_T_1]], [1, 0] : vector<4x1xf32> to vector<1x4xf32>
+//  CHECK-DAG:    %[[READ_RHS_1_T_3:.+]] = vector.shape_cast %[[READ_RHS_1_T_2]] : vector<1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[READ_LHS_0_1_E:.+]] = vector.extract %[[READ_LHS_0_1]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_0_1_S:.+]] = splat %[[READ_LHS_0_1_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_0_1:.+]] = vector.fma %[[READ_LHS_0_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_0_0]] : vector<4xf32>
 
-//      CHECK:    %[[CONTRACT_2_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0]], %[[ACC_2]]
-//      CHECK:    %[[CONTRACT_2_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1]], %[[CONTRACT_2_0]]
-//      CHECK:    %[[CONTRACT_2_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_2]], %[[READ_RHS_2]], %[[CONTRACT_2_1]]
-//      CHECK:    %[[CONTRACT_2_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_3]], %[[READ_RHS_3]], %[[CONTRACT_2_2]]
+//  CHECK-DAG:    %[[READ_RHS_2_T_1:.+]] = vector.shape_cast %[[READ_RHS_2_T]] : vector<1x4x1xf32> to vector<4x1xf32>
+//  CHECK-DAG:    %[[READ_RHS_2_T_2:.+]] = vector.transpose %[[READ_RHS_2_T_1]], [1, 0] : vector<4x1xf32> to vector<1x4xf32>
+//  CHECK-DAG:    %[[READ_RHS_2_T_3:.+]] = vector.shape_cast %[[READ_RHS_2_T_2]] : vector<1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[READ_LHS_0_2_E:.+]] = vector.extract %[[READ_LHS_0_2]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_0_2_S:.+]] = splat %[[READ_LHS_0_2_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_0_2:.+]] = vector.fma %[[READ_LHS_0_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_0_1]] : vector<4xf32>
 
-//      CHECK:    %[[CONTRACT_3_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0]], %[[ACC_3]]
-//      CHECK:    %[[CONTRACT_3_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1]], %[[CONTRACT_3_0]]
-//      CHECK:    %[[CONTRACT_3_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_2]], %[[READ_RHS_2]], %[[CONTRACT_3_1]]
-//      CHECK:    %[[CONTRACT_3_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_3]], %[[READ_RHS_3]], %[[CONTRACT_3_2]]
+//  CHECK-DAG:    %[[READ_RHS_3_T_1:.+]] = vector.shape_cast %[[READ_RHS_3_T]] : vector<1x4x1xf32> to vector<4x1xf32>
+//  CHECK-DAG:    %[[READ_RHS_3_T_2:.+]] = vector.transpose %[[READ_RHS_3_T_1]], [1, 0] : vector<4x1xf32> to vector<1x4xf32>
+//  CHECK-DAG:    %[[READ_RHS_3_T_3:.+]] = vector.shape_cast %[[READ_RHS_3_T_2]] : vector<1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[READ_LHS_0_3_E:.+]] = vector.extract %[[READ_LHS_0_3]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_0_3_S:.+]] = splat %[[READ_LHS_0_3_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_0_3:.+]] = vector.fma %[[READ_LHS_0_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_0_2]] : vector<4xf32>
 
-//      CHECK:    %[[CONTRACT_4_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_4_0]], %[[READ_RHS_0]], %[[ACC_4]]
-//      CHECK:    %[[CONTRACT_4_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_4_1]], %[[READ_RHS_1]], %[[CONTRACT_4_0]]
-//      CHECK:    %[[CONTRACT_4_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_4_2]], %[[READ_RHS_2]], %[[CONTRACT_4_1]]
-//      CHECK:    %[[CONTRACT_4_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_4_3]], %[[READ_RHS_3]], %[[CONTRACT_4_2]]
+//      CHECK:    %[[FMA_0_3_C:.+]] = vector.shape_cast %[[FMA_0_3]] : vector<4xf32> to vector<1x1x4xf32>
 
-//      CHECK:    %[[CONTRACT_5_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_5_0]], %[[READ_RHS_0]], %[[ACC_5]]
-//      CHECK:    %[[CONTRACT_5_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_5_1]], %[[READ_RHS_1]], %[[CONTRACT_5_0]]
-//      CHECK:    %[[CONTRACT_5_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_5_2]], %[[READ_RHS_2]], %[[CONTRACT_5_1]]
-//      CHECK:    %[[CONTRACT_5_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_5_3]], %[[READ_RHS_3]], %[[CONTRACT_5_2]]
+//  CHECK-DAG:    %[[READ_LHS_1_0_E:.+]] = vector.extract %[[READ_LHS_1_0]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_1_0_S:.+]] = splat %[[READ_LHS_1_0_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[ACC_1_C:.+]] = vector.shape_cast %[[ACC_1]] : vector<1x1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[FMA_1_0:.+]] = vector.fma %[[READ_LHS_1_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_1_C]] : vector<4xf32>
 
-//      CHECK:    %[[CONTRACT_6_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_6_0]], %[[READ_RHS_0]], %[[ACC_6]]
-//      CHECK:    %[[CONTRACT_6_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_6_1]], %[[READ_RHS_1]], %[[CONTRACT_6_0]]
-//      CHECK:    %[[CONTRACT_6_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_6_2]], %[[READ_RHS_2]], %[[CONTRACT_6_1]]
-//      CHECK:    %[[CONTRACT_6_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_6_3]], %[[READ_RHS_3]], %[[CONTRACT_6_2]]
+//  CHECK-DAG:    %[[READ_LHS_1_1_E:.+]] = vector.extract %[[READ_LHS_1_1]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_1_1_S:.+]] = splat %[[READ_LHS_1_1_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_1_1:.+]] = vector.fma %[[READ_LHS_1_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_1_0]] : vector<4xf32>
 
-//      CHECK:    %[[CONTRACT_7_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_7_0]], %[[READ_RHS_0]], %[[ACC_7]]
-//      CHECK:    %[[CONTRACT_7_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_7_1]], %[[READ_RHS_1]], %[[CONTRACT_7_0]]
-//      CHECK:    %[[CONTRACT_7_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_7_2]], %[[READ_RHS_2]], %[[CONTRACT_7_1]]
-//      CHECK:    %[[CONTRACT_7_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_7_3]], %[[READ_RHS_3]], %[[CONTRACT_7_2]]
+//  CHECK-DAG:    %[[READ_LHS_1_2_E:.+]] = vector.extract %[[READ_LHS_1_2]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_1_2_S:.+]] = splat %[[READ_LHS_1_2_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_1_2:.+]] = vector.fma %[[READ_LHS_1_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_1_1]] : vector<4xf32>
 
-//      CHECK:  scf.yield %[[CONTRACT_0_3]], %[[CONTRACT_1_3]],
-// CHECK-SAME:    %[[CONTRACT_2_3]], %[[CONTRACT_3_3]], %[[CONTRACT_4_3]],
-// CHECK-SAME:    %[[CONTRACT_5_3]], %[[CONTRACT_6_3]], %[[CONTRACT_7_3]]
+//  CHECK-DAG:    %[[READ_LHS_1_3_E:.+]] = vector.extract %[[READ_LHS_1_3]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_1_3_S:.+]] = splat %[[READ_LHS_1_3_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_1_3:.+]] = vector.fma %[[READ_LHS_1_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_1_2]] : vector<4xf32>
+
+//      CHECK:    %[[FMA_1_3_C:.+]] = vector.shape_cast %[[FMA_1_3]] : vector<4xf32> to vector<1x1x4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_2_0_E:.+]] = vector.extract %[[READ_LHS_2_0]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_2_0_S:.+]] = splat %[[READ_LHS_2_0_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[ACC_2_C:.+]] = vector.shape_cast %[[ACC_2]] : vector<1x1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[FMA_2_0:.+]] = vector.fma %[[READ_LHS_2_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_2_C]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_2_1_E:.+]] = vector.extract %[[READ_LHS_2_1]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_2_1_S:.+]] = splat %[[READ_LHS_2_1_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_2_1:.+]] = vector.fma %[[READ_LHS_2_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_2_0]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_2_2_E:.+]] = vector.extract %[[READ_LHS_2_2]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_2_2_S:.+]] = splat %[[READ_LHS_2_2_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_2_2:.+]] = vector.fma %[[READ_LHS_2_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_2_1]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_2_3_E:.+]] = vector.extract %[[READ_LHS_2_3]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_2_3_S:.+]] = splat %[[READ_LHS_2_3_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_2_3:.+]] = vector.fma %[[READ_LHS_2_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_2_2]] : vector<4xf32>
+
+//      CHECK:    %[[FMA_2_3_C:.+]] = vector.shape_cast %[[FMA_2_3]] : vector<4xf32> to vector<1x1x4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_3_0_E:.+]] = vector.extract %[[READ_LHS_3_0]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_3_0_S:.+]] = splat %[[READ_LHS_3_0_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[ACC_3_C:.+]] = vector.shape_cast %[[ACC_3]] : vector<1x1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[FMA_3_0:.+]] = vector.fma %[[READ_LHS_3_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_3_C]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_3_1_E:.+]] = vector.extract %[[READ_LHS_3_1]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_3_1_S:.+]] = splat %[[READ_LHS_3_1_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_3_1:.+]] = vector.fma %[[READ_LHS_3_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_3_0]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_3_2_E:.+]] = vector.extract %[[READ_LHS_3_2]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_3_2_S:.+]] = splat %[[READ_LHS_3_2_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_3_2:.+]] = vector.fma %[[READ_LHS_3_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_3_1]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_3_3_E:.+]] = vector.extract %[[READ_LHS_3_3]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_3_3_S:.+]] = splat %[[READ_LHS_3_3_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_3_3:.+]] = vector.fma %[[READ_LHS_3_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_3_2]] : vector<4xf32>
+
+//      CHECK:    %[[FMA_3_3_C:.+]] = vector.shape_cast %[[FMA_3_3]] : vector<4xf32> to vector<1x1x4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_4_0_E:.+]] = vector.extract %[[READ_LHS_4_0]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_4_0_S:.+]] = splat %[[READ_LHS_4_0_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[ACC_4_C:.+]] = vector.shape_cast %[[ACC_4]] : vector<1x1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[FMA_4_0:.+]] = vector.fma %[[READ_LHS_4_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_4_C]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_4_1_E:.+]] = vector.extract %[[READ_LHS_4_1]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_4_1_S:.+]] = splat %[[READ_LHS_4_1_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_4_1:.+]] = vector.fma %[[READ_LHS_4_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_4_0]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_4_2_E:.+]] = vector.extract %[[READ_LHS_4_2]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_4_2_S:.+]] = splat %[[READ_LHS_4_2_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_4_2:.+]] = vector.fma %[[READ_LHS_4_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_4_1]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_4_3_E:.+]] = vector.extract %[[READ_LHS_4_3]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_4_3_S:.+]] = splat %[[READ_LHS_4_3_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_4_3:.+]] = vector.fma %[[READ_LHS_4_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_4_2]] : vector<4xf32>
+
+//      CHECK:    %[[FMA_4_3_C:.+]] = vector.shape_cast %[[FMA_4_3]] : vector<4xf32> to vector<1x1x4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_5_0_E:.+]] = vector.extract %[[READ_LHS_5_0]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_5_0_S:.+]] = splat %[[READ_LHS_5_0_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[ACC_5_C:.+]] = vector.shape_cast %[[ACC_5]] : vector<1x1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[FMA_5_0:.+]] = vector.fma %[[READ_LHS_5_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_5_C]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_5_1_E:.+]] = vector.extract %[[READ_LHS_5_1]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_5_1_S:.+]] = splat %[[READ_LHS_5_1_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_5_1:.+]] = vector.fma %[[READ_LHS_5_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_5_0]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_5_2_E:.+]] = vector.extract %[[READ_LHS_5_2]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_5_2_S:.+]] = splat %[[READ_LHS_5_2_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_5_2:.+]] = vector.fma %[[READ_LHS_5_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_5_1]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_5_3_E:.+]] = vector.extract %[[READ_LHS_5_3]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_5_3_S:.+]] = splat %[[READ_LHS_5_3_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_5_3:.+]] = vector.fma %[[READ_LHS_5_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_5_2]] : vector<4xf32>
+
+//      CHECK:    %[[FMA_5_3_C:.+]] = vector.shape_cast %[[FMA_5_3]] : vector<4xf32> to vector<1x1x4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_6_0_E:.+]] = vector.extract %[[READ_LHS_6_0]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_6_0_S:.+]] = splat %[[READ_LHS_6_0_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[ACC_6_C:.+]] = vector.shape_cast %[[ACC_6]] : vector<1x1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[FMA_6_0:.+]] = vector.fma %[[READ_LHS_6_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_6_C]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_6_1_E:.+]] = vector.extract %[[READ_LHS_6_1]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_6_1_S:.+]] = splat %[[READ_LHS_6_1_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_6_1:.+]] = vector.fma %[[READ_LHS_6_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_6_0]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_6_2_E:.+]] = vector.extract %[[READ_LHS_6_2]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_6_2_S:.+]] = splat %[[READ_LHS_6_2_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_6_2:.+]] = vector.fma %[[READ_LHS_6_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_6_1]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_6_3_E:.+]] = vector.extract %[[READ_LHS_6_3]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_6_3_S:.+]] = splat %[[READ_LHS_6_3_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_6_3:.+]] = vector.fma %[[READ_LHS_6_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_6_2]] : vector<4xf32>
+
+//      CHECK:    %[[FMA_6_3_C:.+]] = vector.shape_cast %[[FMA_6_3]] : vector<4xf32> to vector<1x1x4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_7_0_E:.+]] = vector.extract %[[READ_LHS_7_0]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_7_0_S:.+]] = splat %[[READ_LHS_7_0_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[ACC_7_C:.+]] = vector.shape_cast %[[ACC_7]] : vector<1x1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[FMA_7_0:.+]] = vector.fma %[[READ_LHS_7_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_7_C]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_7_1_E:.+]] = vector.extract %[[READ_LHS_7_1]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_7_1_S:.+]] = splat %[[READ_LHS_7_1_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_7_1:.+]] = vector.fma %[[READ_LHS_7_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_7_0]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_7_2_E:.+]] = vector.extract %[[READ_LHS_7_2]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_7_2_S:.+]] = splat %[[READ_LHS_7_2_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_7_2:.+]] = vector.fma %[[READ_LHS_7_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_7_1]] : vector<4xf32>
+
+//  CHECK-DAG:    %[[READ_LHS_7_3_E:.+]] = vector.extract %[[READ_LHS_7_3]][0, 0, 0] : vector<1x1x1xf32>
+//  CHECK-DAG:    %[[READ_LHS_7_3_S:.+]] = splat %[[READ_LHS_7_3_E]] : vector<4xf32>
+//  CHECK-DAG:    %[[FMA_7_3:.+]] = vector.fma %[[READ_LHS_7_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_7_2]] : vector<4xf32>
+
+//      CHECK:    %[[FMA_7_3_C:.+]] = vector.shape_cast %[[FMA_7_3]] : vector<4xf32> to vector<1x1x4xf32>
+
+//      CHECK:  scf.yield %[[FMA_0_3_C]], %[[FMA_1_3_C]], %[[FMA_2_3_C]],
+// CHECK-SAME:  %[[FMA_3_3_C]], %[[FMA_4_3_C]], %[[FMA_5_3_C]], %[[FMA_6_3_C]],
+// CHECK-SAME:  %[[FMA_7_3_C]]
 
 //  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#0, %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C0]], %[[C0]]]
 //  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#1, %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C1]], %[[C0]]]
@@ -363,7 +418,7 @@ hal.executable @fused_fill_batch_matmul attributes {sym_visibility = "private"} 
 //  CHECK-COUNT-8:   vector.transfer_read
 //          CHECK:   %[[FOR_RES:.+]]:8 = scf.for
 // CHECK-COUNT-12:     vector.transfer_read
-// CHECK-COUNT-32:     vector.contract
+// CHECK-COUNT-32:     vector.fma
 //      CHECK:         scf.yield
 //  CHECK-COUNT-8:    vector.transfer_write %[[FOR_RES]]
 //          CHECK:    return
