@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout out repository
         uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
       - name: Fetching base gh-pages branch
         # We have to explicitly fetch the gh-pages branch as well to preserve history
         run: git fetch --no-tags --prune --depth=1 origin "gh-pages:gh-pages"
