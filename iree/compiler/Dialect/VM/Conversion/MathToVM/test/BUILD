@@ -1,4 +1,4 @@
-# Copyright 2021 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,29 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
-    name = "StandardToVM",
-    srcs = [
-        "ConvertStandardToVM.cpp",
-        "ConvertStandardToVMTest.cpp",
-    ],
-    hdrs = [
-        "ConvertStandardToVM.h",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Dialect/VM/IR",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:TransformUtils",
-        "@llvm-project//mlir:Transforms",
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        [
+            "arithmetic_ops.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
     ],
 )
