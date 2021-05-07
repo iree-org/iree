@@ -30,5 +30,9 @@ jobs:
           python-version: 3.x
       - name: Installing Material for MkDocs
         run: pip install mkdocs-material
+      - name: Setting git config
+        run: |
+          git config --local user.email "iree-github-actions-bot@google.com"
+          git config --local user.name "Website Publish Action"
       - name: Deploying to gh-pages
         run: mkdocs gh-deploy
