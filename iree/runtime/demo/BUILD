@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 package(
@@ -23,6 +24,15 @@ package(
 #===------------------------------------------------------------------------===#
 # Hello World!
 #===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+""",
+    inline = True,
+)
 
 cc_binary(
     name = "hello_world_embedded",
