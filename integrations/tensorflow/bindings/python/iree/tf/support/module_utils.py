@@ -293,7 +293,13 @@ class _IreeFunctionWrapper(_FunctionWrapper):
 
   def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
     """Get cxx serialized inputs and outputs for this function."""
-    return self._f.get_serialized_values()
+    if hasattr(self._f, "get_serialized_values"):
+      # TODO: The native ABI does not implement this, and if still needed,
+      # it should not be implemented this way (maybe a thread local trace
+      # listener).
+      return self._f.get_serialized_values()
+    else:
+      return ("",), ("",)
 
 
 class IreeCompiledModule(CompiledModule):

@@ -94,3 +94,17 @@ module @dict_nest attributes {tf.versions = {bad_consumers = [], min_consumer = 
     return %0, %1, %2, %3 : tensor<16xf32>, tensor<16xf32>, tensor<16xf32>, tensor<16xf32>
   }
 }
+
+// -----
+// CHECK-LABEL: module @kwargs
+// CHECK: func @dict_nest
+// CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22sdict\22,[\22list\22,[\22slist\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]]],[\22ndarray\22,\22f32\22,0],[\22sdict_kwargs\22,[\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22b\22,[\22ndarray\22,\22f32\22,1,16]]]],\22r\22:[[\22sdict\22,[\22dict\22,[\22sdict\22,[\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22b\22,[\22ndarray\22,\22f32\22,1,16]]]],[\22list\22,[\22slist\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]]]],\22v\22:1}"
+module @kwargs attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 729 : i32}, tf_saved_model.semantics}  {
+  func @__inference_dict_nest_190(%arg0: tensor<16xf32> {tf_saved_model.index_path = ["a"]}, %arg1: tensor<16xf32> {tf_saved_model.index_path = ["b"]}, %arg2: tensor<16xf32> {tf._user_specified_name = "mapping", tf_saved_model.index_path = [0, "list", 0]}, %arg3: tensor<16xf32> {tf._user_specified_name = "mapping", tf_saved_model.index_path = [0, "list", 1]}, %arg4: tensor<f32> {tf._user_specified_name = "scalar", tf_saved_model.index_path = [1]}) -> (tensor<16xf32> {tf_saved_model.index_path = ["dict", "a"]}, tensor<16xf32> {tf_saved_model.index_path = ["dict", "b"]}, tensor<16xf32> {tf_saved_model.index_path = ["list", 0]}, tensor<16xf32> {tf_saved_model.index_path = ["list", 1]}) attributes {tf._construction_context = "kEagerRuntime", tf._input_shapes = [#tf.shape<16>, #tf.shape<16>, #tf.shape<16>, #tf.shape<16>, #tf.shape<>], tf_saved_model.exported_names = ["dict_nest"]} {
+    %0 = "tf.Identity"(%arg0) {device = ""} : (tensor<16xf32>) -> tensor<16xf32>
+    %1 = "tf.Identity"(%arg1) {device = ""} : (tensor<16xf32>) -> tensor<16xf32>
+    %2 = "tf.Identity"(%arg2) {device = ""} : (tensor<16xf32>) -> tensor<16xf32>
+    %3 = "tf.Identity"(%arg3) {device = ""} : (tensor<16xf32>) -> tensor<16xf32>
+    return %0, %1, %2, %3 : tensor<16xf32>, tensor<16xf32>, tensor<16xf32>, tensor<16xf32>
+  }
+}

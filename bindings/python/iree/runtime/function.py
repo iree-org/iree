@@ -26,13 +26,52 @@ __all__ = [
 
 
 class Invocation:
+  __slots__ = [
+      "current_arg",
+      "current_desc",
+      "current_return_list",
+      "current_return_index",
+      "device",
+  ]
 
   def __init__(self, device: HalDevice):
     self.device = device
+    # Captured during arg/ret processing to emit better error messages.
+    self.current_arg = None
+    self.current_desc = None
+    self.current_return_list = None
+    self.current_return_index = 0
+
+  def summarize_arg_error(self) -> str:
+    if self.current_arg is None:
+      return ""
+    if isinstance(self.current_arg, np.ndarray):
+      current_arg_repr = (
+          f"ndarray({self.current_arg.shape}, {self.current_arg.dtype})")
+    else:
+      current_arg_repr = repr(self.current_arg)
+    return f"{repr(current_arg_repr)} with description {self.current_desc}"
+
+  def summarize_return_error(self) -> str:
+    if self.current_return_list is None:
+      return ""
+    try:
+      vm_repr = f"{self.current_return_index}@{self.current_return_list}"
+    except:
+      vm_repr = "<error printing list item>"
+    return f"{vm_repr} with description {self.current_desc}"
 
 
 class FunctionInvoker:
   """Wraps a VmFunction, enabling invocations against it."""
+  __slots__ = [
+      "_vm_context",
+      "_device",
+      "_vm_function",
+      "_abi_dict",
+      "_arg_descs",
+      "_ret_descs",
+  ]
 
   def __init__(self, vm_context: VmContext, device: HalDevice,
                vm_function: VmFunction):
@@ -148,14 +187,16 @@ def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
       _raise_argument_error(inv, f"unrecognized dtype '{dtype_str}'")
     if dtype != x.dtype:
       x = x.astype(dtype)
-    shape = desc[2:]
-    if len(shape) != len(x.shape):
-      _raise_argument_error(inv,
-                            f"rank mismatch {len(x.shape)} vs {len(shape)}")
-    for exp_dim, act_dim in zip(shape, x.shape):
+    rank = desc[2]
+    shape = desc[3:]
+    ndarray_shape = x.shape
+    if len(shape) != len(ndarray_shape) or rank != len(ndarray_shape):
+      _raise_argument_error(
+          inv, f"rank mismatch {len(ndarray_shape)} vs {len(shape)}")
+    for exp_dim, act_dim in zip(shape, ndarray_shape):
       if exp_dim is not None and exp_dim != act_dim:
-        _raise_argument_error(inv,
-                              f"shape mismatch {x.shape} vs {tuple(shape)}")
+        _raise_argument_error(
+            inv, f"shape mismatch {ndarray_shape} vs {tuple(shape)}")
   actual_dtype = x.dtype
   for match_dtype, element_type in DTYPE_TO_HAL_ELEMENT_TYPE:
     if match_dtype == actual_dtype:
@@ -201,22 +242,39 @@ ABI_TYPE_TO_DTYPE = {
 
 # NOTE: Numpy dtypes are not hashable and exist in a hierarchy that should
 # be queried via isinstance checks. This should be done as a fallback but
-# this is a linear list for quick access to the most common.
+# this is a linear list for quick access to the most common. There may also
+# be a better way to do this.
 DTYPE_TO_HAL_ELEMENT_TYPE = (
-    # TODO: Others.
     (np.float32, HalElementType.FLOAT_32),
     (np.float64, HalElementType.FLOAT_64),
+    (np.float16, HalElementType.FLOAT_16),
+    (np.int32, HalElementType.SINT_32),
+    (np.int64, HalElementType.SINT_64),
+    (np.int16, HalElementType.SINT_16),
+    (np.int8, HalElementType.SINT_8),
+    (np.uint32, HalElementType.UINT_32),
+    (np.uint64, HalElementType.UINT_64),
+    (np.uint16, HalElementType.UINT_16),
+    (np.uint8, HalElementType.UINT_8),
 )
 
 
-def _raise_argument_error(inv: Invocation, summary: str):
-  # TODO: Do some fancier back-tracking in reporting error.
-  raise ValueError(f"Error passing argument: {summary}")
+def _raise_argument_error(inv: Invocation, summary: str, e: Exception = None):
+  new_e = ValueError(f"Error passing argument: {summary} "
+                     f"(while encoding argument {inv.summarize_arg_error()})")
+  if e:
+    raise new_e from e
+  else:
+    raise new_e
 
 
-def _raise_return_error(inv: Invocation, summary: str):
-  # TODO: Do some fancier back-tracking in reporting error.
-  raise ValueError(f"Error processing function return: {summary}")
+def _raise_return_error(inv: Invocation, summary: str, e: Exception = None):
+  new_e = ValueError(f"Error processing function return: {summary} "
+                     f"(while decoding return {inv.summarize_return_error()})")
+  if e:
+    raise new_e from e
+  else:
+    raise new_e
 
 
 def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
@@ -228,12 +286,18 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
         inv, f"mismatched function call arity: "
         f"expected={descs}, got={py_list}")
   for py_value, desc in zip(py_list, descs):
+    inv.current_arg = py_value
+    inv.current_desc = desc
     py_type = py_value.__class__
     try:
       converter = PYTHON_TO_VM_CONVERTERS[py_type]
     except KeyError:
       _raise_argument_error(inv, f"cannot map Python type to VM: {py_type}")
-    converter(inv, vm_list, py_value, desc)
+    try:
+      converter(inv, vm_list, py_value, desc)
+    except Exception as e:
+      _raise_argument_error(inv, f"exception converting from Python type to VM",
+                            e)
 
 
 def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
@@ -245,6 +309,9 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
         inv, f"mismatched return arity: {vm_list_arity} vs {len(descs)}")
   results = []
   for vm_index, desc in zip(range(vm_list_arity), descs):
+    inv.current_return_list = vm_list
+    inv.current_return_index = vm_index
+    inv.current_desc = desc
     if desc is None:
       # Dynamic (non reflection mode).
       _raise_return_error(
@@ -253,6 +320,11 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
     try:
       converter = VM_TO_PYTHON_CONVERTERS[vm_type]
     except KeyError:
-      _raise_return_error(inv, f"cannot map VM type to python: {vm_type}")
-    results.append(converter(inv, vm_list, vm_index, desc))
+      _raise_return_error(inv, f"cannot map VM type to Python: {vm_type}")
+    try:
+      converted = converter(inv, vm_list, vm_index, desc)
+    except Exception as e:
+      _raise_return_error(inv, f"exception converting from VM type to Python",
+                          e)
+    results.append(converted)
   return results

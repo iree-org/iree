@@ -317,14 +317,41 @@ py::object VmVariantList::GetAsNdarray(int index) {
   iree_hal_element_type_t element_type =
       iree_hal_buffer_view_element_type(buffer_view);
   // See: https://docs.python.org/3/c-api/arg.html#numbers
+  // TODO: Handle dtypes that do not map to a code (i.e. fp16).
   const char* dtype_code;
   switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+      dtype_code = "b";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_8:
+      dtype_code = "B";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_SINT_16:
+      dtype_code = "h";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_16:
+      dtype_code = "H";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+      dtype_code = "i";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_32:
+      dtype_code = "I";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_SINT_64:
+      dtype_code = "l";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_64:
+      dtype_code = "L";
+      break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       dtype_code = "f";
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       dtype_code = "d";
       break;
+    default:
+      throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
   }
   auto dtype = py::dtype(dtype_code);
 
