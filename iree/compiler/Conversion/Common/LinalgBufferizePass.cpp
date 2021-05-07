@@ -1070,6 +1070,13 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
       *padTensorOp.region().getOps<linalg::YieldOp>().begin();
   Value paddingValue = yeildOp.values()[0];
 
+  auto constOp = paddingValue.getDefiningOp<ConstantOp>();
+  assert(constOp &&
+         "Converting linalg.pad_tensor with non-constant padding value");
+  assert(!constOp.getValue().isa<DenseElementsAttr>() &&
+         "Converting linalg.pad_tensor with non-scalar constant padding "
+         "value");
+
   b.create<linalg::FillOp>(loc, resultPaddedBuffer, paddingValue);
 
   // Get the interior region.
