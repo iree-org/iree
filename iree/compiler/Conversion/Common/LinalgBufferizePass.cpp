@@ -1071,11 +1071,15 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
   Value paddingValue = yeildOp.values()[0];
 
   auto constOp = paddingValue.getDefiningOp<ConstantOp>();
-  assert(constOp &&
-         "Converting linalg.pad_tensor with non-constant padding value");
-  assert(!constOp.getValue().isa<DenseElementsAttr>() &&
-         "Converting linalg.pad_tensor with non-scalar constant padding "
-         "value");
+  if (!constOp) {
+    return padTensorOp.emitError(
+        "Converting linalg.pad_tensor with non-constant padding value");
+  }
+  if (constOp.getValue().isa<DenseElementsAttr>()) {
+    return padTensorOp.emitError(
+        "Converting linalg.pad_tensor with non-scalar constant padding "
+        "value");
+  }
 
   b.create<linalg::FillOp>(loc, resultPaddedBuffer, paddingValue);
 
