@@ -16,11 +16,9 @@
 
 #include <ostream>
 
-#include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/internal/file_io.h"
-#include "iree/base/signature_parser.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
@@ -72,196 +70,106 @@ Status GetFileContents(const char* path, std::string* out_contents) {
   return status;
 }
 
-Status ValidateFunctionAbi(const iree_vm_function_t& function) {
-  // Benchmark functions are always allowed through as they are () -> ().
-  // That we are requiring SIP for everything in this util file is bad, and this
-  // workaround at least allows us to benchmark non-SIP functions.
-  if (iree_vm_function_reflection_attr(&function, IREE_SV("benchmark")).size !=
-      0) {
-    return OkStatus();
-  }
-
-  iree_string_view_t sig_fv =
-      iree_vm_function_reflection_attr(&function, IREE_SV("fv"));
-  if (absl::string_view{sig_fv.data, sig_fv.size} != "1") {
-    auto function_name = iree_vm_function_name(&function);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "unsupported function ABI for: '%.*s'(%.*s)",
-                            (int)function_name.size, function_name.data,
-                            (int)sig_fv.size, sig_fv.data);
-  }
-  return OkStatus();
-}
-
-Status ParseInputSignature(
-    iree_vm_function_t& function,
-    std::vector<RawSignatureParser::Description>* out_input_descs) {
-  out_input_descs->clear();
-  iree_string_view_t sig_f =
-      iree_vm_function_reflection_attr(&function, IREE_SV("f"));
-  if (sig_f.size == 0) return OkStatus();
-  RawSignatureParser sig_parser;
-  sig_parser.VisitInputs(absl::string_view{sig_f.data, sig_f.size},
-                         [&](const RawSignatureParser::Description& desc) {
-                           out_input_descs->push_back(desc);
-                         });
-  if (sig_parser.GetError()) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "parsing function signature '%.*s' failed getting input",
-        (int)sig_f.size, sig_f.data);
-  }
-  return OkStatus();
-}
-
-Status ParseOutputSignature(
-    const iree_vm_function_t& function,
-    std::vector<RawSignatureParser::Description>* out_output_descs) {
-  out_output_descs->clear();
-  iree_string_view_t sig_f =
-      iree_vm_function_reflection_attr(&function, IREE_SV("f"));
-  if (sig_f.size == 0) return OkStatus();
-  RawSignatureParser sig_parser;
-  sig_parser.VisitResults(absl::string_view{sig_f.data, sig_f.size},
-                          [&](const RawSignatureParser::Description& desc) {
-                            out_output_descs->push_back(desc);
-                          });
-  if (sig_parser.GetError()) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "parsing function signature '%.*s' failed getting input",
-        (int)sig_f.size, sig_f.data);
-  }
-  return OkStatus();
-}
-
-Status ParseToVariantList(
-    absl::Span<const RawSignatureParser::Description> descs,
-    iree_hal_allocator_t* allocator,
-    absl::Span<const absl::string_view> input_strings,
-    iree_vm_list_t** out_list) {
+Status ParseToVariantList(iree_hal_allocator_t* allocator,
+                          absl::Span<const absl::string_view> input_strings,
+                          iree_vm_list_t** out_list) {
   *out_list = NULL;
-  if (input_strings.size() != descs.size()) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "signature mismatch; expected %zu buffer strings but received %zu",
-        descs.size(), input_strings.size());
-  }
   vm::ref<iree_vm_list_t> variant_list;
   IREE_RETURN_IF_ERROR(
       iree_vm_list_create(/*element_type=*/nullptr, input_strings.size(),
                           iree_allocator_system(), &variant_list));
   for (size_t i = 0; i < input_strings.size(); ++i) {
-    auto input_string = input_strings[i];
-    auto desc = descs[i];
-    std::string desc_str;
-    desc.ToString(desc_str);
-    switch (desc.type) {
-      case RawSignatureParser::Type::kScalar: {
-        if (desc.scalar.type != AbiConstants::ScalarType::kSint32) {
-          return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                  "unsupported signature scalar type: %s",
-                                  desc_str.c_str());
-        }
-        iree_string_view_t input_view = iree_string_view_trim(
-            iree_make_string_view(input_string.data(), input_string.size()));
-        input_view = iree_string_view_strip_prefix(input_view, IREE_SV("\""));
-        input_view = iree_string_view_strip_suffix(input_view, IREE_SV("\""));
-        if (!iree_string_view_consume_prefix(&input_view, IREE_SV("i32="))) {
+    iree_string_view_t input_view = iree_string_view_trim(iree_make_string_view(
+        input_strings[i].data(), input_strings[i].size()));
+    bool has_equal =
+        iree_string_view_find_char(input_view, '=', 0) != IREE_STRING_VIEW_NPOS;
+    bool has_x =
+        iree_string_view_find_char(input_view, 'x', 0) != IREE_STRING_VIEW_NPOS;
+    if (has_equal || has_x) {
+      // Buffer view (either just a shape or a shape=value).
+      iree_hal_buffer_view_t* buffer_view = nullptr;
+      IREE_RETURN_IF_ERROR(
+          iree_hal_buffer_view_parse(input_view, allocator, &buffer_view),
+          "parsing value '%.*s'", (int)input_view.size, input_view.data);
+      auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+      IREE_RETURN_IF_ERROR(
+          iree_vm_list_push_ref_move(variant_list.get(), &buffer_view_ref));
+    } else {
+      // Scalar.
+      bool has_dot = iree_string_view_find_char(input_view, '.', 0) !=
+                     IREE_STRING_VIEW_NPOS;
+      iree_vm_value_t val;
+      if (has_dot) {
+        // Float.
+        val = iree_vm_value_make_f32(0.0f);
+        if (!iree_string_view_atof(input_view, &val.f32)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                  "parsing '%.*s'; has i32 descriptor but does "
-                                  "not start with 'i32='",
-                                  (int)input_string.size(),
-                                  input_string.data());
+                                  "parsing value '%.*s' as f32",
+                                  (int)input_view.size, input_view.data);
         }
-        iree_vm_value_t val = iree_vm_value_make_i32(0);
-        if (!absl::SimpleAtoi(
-                absl::string_view(input_view.data, input_view.size),
-                &val.i32)) {
-          return iree_make_status(
-              IREE_STATUS_INVALID_ARGUMENT,
-              "converting '%.*s' to i32 when parsing '%.*s'",
-              (int)input_view.size, input_view.data, (int)input_string.size(),
-              input_string.data());
+      } else {
+        // Integer.
+        val = iree_vm_value_make_i32(0);
+        if (!iree_string_view_atoi_int32(input_view, &val.i32)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "parsing value '%.*s' as i32",
+                                  (int)input_view.size, input_view.data);
         }
-        IREE_RETURN_IF_ERROR(iree_vm_list_push_value(variant_list.get(), &val));
-        break;
       }
-      case RawSignatureParser::Type::kBuffer: {
-        iree_hal_buffer_view_t* buffer_view = nullptr;
-        IREE_RETURN_IF_ERROR(
-            iree_hal_buffer_view_parse(
-                iree_string_view_t{input_string.data(), input_string.size()},
-                allocator, &buffer_view),
-            "parsing value '%.*s'", (int)input_string.size(),
-            input_string.data());
-        auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
-        IREE_RETURN_IF_ERROR(
-            iree_vm_list_push_ref_move(variant_list.get(), &buffer_view_ref));
-        break;
-      }
-      default:
-        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "unsupported signature type: %s",
-                                desc_str.c_str());
+      IREE_RETURN_IF_ERROR(iree_vm_list_push_value(variant_list.get(), &val));
     }
   }
   *out_list = variant_list.release();
   return OkStatus();
 }
 
-Status ParseToVariantList(
-    absl::Span<const RawSignatureParser::Description> descs,
-    iree_hal_allocator_t* allocator,
-    absl::Span<const std::string> input_strings, iree_vm_list_t** out_list) {
+Status ParseToVariantList(iree_hal_allocator_t* allocator,
+                          absl::Span<const std::string> input_strings,
+                          iree_vm_list_t** out_list) {
   std::vector<absl::string_view> input_views(input_strings.size());
   for (int i = 0; i < input_strings.size(); ++i) {
     input_views[i] = input_strings[i];
   }
-  return ParseToVariantList(descs, allocator, input_views, out_list);
+  return ParseToVariantList(allocator, input_views, out_list);
 }
 
-Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
-                        iree_vm_list_t* variant_list, std::ostream* os) {
-  for (int i = 0; i < iree_vm_list_size(variant_list); ++i) {
+Status PrintVariantList(iree_vm_list_t* variant_list, std::ostream* os) {
+  for (iree_host_size_t i = 0; i < iree_vm_list_size(variant_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variant_list, i, &variant),
-                         "variant %d not present", i);
+                         "variant %zu not present", i);
 
-    const auto& desc = descs[i];
-    std::string desc_str;
-    desc.ToString(desc_str);
-    IREE_LOG(INFO) << "result[" << i << "]: " << desc_str;
-
-    switch (desc.type) {
-      case RawSignatureParser::Type::kScalar: {
-        if (variant.type.value_type != IREE_VM_VALUE_TYPE_I32) {
-          return iree_make_status(
-              IREE_STATUS_INVALID_ARGUMENT,
-              "variant %d has value type %d but descriptor information %s", i,
-              (int)variant.type.value_type, desc_str.c_str());
-        }
-        if (desc.scalar.type != AbiConstants::ScalarType::kSint32) {
-          return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                  "unsupported signature scalar type: %s",
-                                  desc_str.c_str());
-        }
-        *os << "i32=" << variant.i32 << "\n";
-        break;
+    *os << "result[" << i << "]: ";
+    if (iree_vm_variant_is_value(variant)) {
+      switch (variant.type.value_type) {
+        case IREE_VM_VALUE_TYPE_I8:
+          *os << "i8=" << variant.i8 << "\n";
+          break;
+        case IREE_VM_VALUE_TYPE_I16:
+          *os << "i16=" << variant.i16 << "\n";
+          break;
+        case IREE_VM_VALUE_TYPE_I32:
+          *os << "i32=" << variant.i32 << "\n";
+          break;
+        case IREE_VM_VALUE_TYPE_I64:
+          *os << "i64=" << variant.i64 << "\n";
+          break;
+        case IREE_VM_VALUE_TYPE_F32:
+          *os << "f32=" << variant.f32 << "\n";
+          break;
+        case IREE_VM_VALUE_TYPE_F64:
+          *os << "f64=" << variant.f64 << "\n";
+          break;
+        default:
+          *os << "?\n";
+          break;
       }
-      case RawSignatureParser::Type::kBuffer: {
-        if (!iree_vm_type_def_is_ref(&variant.type)) {
-          return iree_make_status(
-              IREE_STATUS_INVALID_ARGUMENT,
-              "variant %d has value type %d but descriptor information %s", i,
-              (int)variant.type.value_type, desc_str.c_str());
-        }
+    } else if (iree_vm_variant_is_ref(variant)) {
+      iree_string_view_t type_name =
+          iree_vm_ref_type_name(variant.type.ref_type);
+      *os << std::string(type_name.data, type_name.size) << "\n";
+      if (iree_hal_buffer_view_isa(variant.ref)) {
         auto* buffer_view = iree_hal_buffer_view_deref(variant.ref);
-        if (!buffer_view) {
-          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                  "failed dereferencing variant %d", i);
-        }
-
         std::string result_str(4096, '\0');
         iree_status_t status;
         do {
@@ -272,14 +180,13 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
           result_str.resize(actual_length);
         } while (iree_status_is_out_of_range(status));
         IREE_RETURN_IF_ERROR(status);
-
         *os << result_str << "\n";
-        break;
+      } else {
+        // TODO(benvanik): a way for ref types to describe themselves.
+        *os << "(no printer)\n";
       }
-      default:
-        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "unsupported signature type: %s",
-                                desc_str.c_str());
+    } else {
+      *os << "(null)\n";
     }
   }
 

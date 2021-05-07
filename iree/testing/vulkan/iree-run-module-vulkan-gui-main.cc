@@ -119,11 +119,9 @@ Status RunModuleAndUpdateImGuiWindow(
     iree_hal_device_t* device, iree_vm_context_t* context,
     iree_vm_function_t function, const std::string& function_name,
     const vm::ref<iree_vm_list_t>& function_inputs,
-    const std::vector<RawSignatureParser::Description>& output_descs,
     const std::string& window_title) {
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                           output_descs.size(),
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            iree_allocator_system(), &outputs));
 
   IREE_LOG(INFO) << "EXEC @" << function_name;
@@ -132,7 +130,7 @@ Status RunModuleAndUpdateImGuiWindow(
                                       iree_allocator_system()));
 
   std::ostringstream oss;
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get(), &oss));
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get(), &oss));
 
   outputs.reset();
 
@@ -347,18 +345,10 @@ extern "C" int iree_main(int argc, char** argv) {
                                 main_function_name.size)
                  << "'";
 
-  IREE_CHECK_OK(ValidateFunctionAbi(main_function));
-
-  std::vector<RawSignatureParser::Description> main_function_input_descs;
-  IREE_CHECK_OK(ParseInputSignature(main_function, &main_function_input_descs));
   vm::ref<iree_vm_list_t> main_function_inputs;
-  IREE_CHECK_OK(ParseToVariantList(
-      main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
-      FLAG_function_inputs, &main_function_inputs));
-
-  std::vector<RawSignatureParser::Description> main_function_output_descs;
-  IREE_CHECK_OK(
-      ParseOutputSignature(main_function, &main_function_output_descs));
+  IREE_CHECK_OK(ParseToVariantList(iree_hal_device_allocator(iree_vk_device),
+                                   FLAG_function_inputs,
+                                   &main_function_inputs));
 
   const std::string window_title = std::string(FLAG_module_file);
   // --------------------------------------------------------------------------
@@ -403,7 +393,7 @@ extern "C" int iree_main(int argc, char** argv) {
     // Custom window.
     auto status = RunModuleAndUpdateImGuiWindow(
         iree_vk_device, iree_context, main_function, entry_function,
-        main_function_inputs, main_function_output_descs, window_title);
+        main_function_inputs, window_title);
     if (!status.ok()) {
       IREE_LOG(FATAL) << status;
       done = true;

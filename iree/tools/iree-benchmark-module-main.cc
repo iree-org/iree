@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
+
 #include "benchmark/benchmark.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
@@ -75,12 +77,10 @@ IREE_FLAG_CALLBACK(
 namespace iree {
 namespace {
 
-static void BenchmarkFunction(
-    const std::string& benchmark_name, int batch_size,
-    iree_vm_context_t* context, iree_vm_function_t function,
-    iree_vm_list_t* inputs,
-    const std::vector<RawSignatureParser::Description>& output_descs,
-    benchmark::State& state) {
+static void BenchmarkFunction(const std::string& benchmark_name, int batch_size,
+                              iree_vm_context_t* context,
+                              iree_vm_function_t function,
+                              iree_vm_list_t* inputs, benchmark::State& state) {
   IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
   IREE_TRACE_FRAME_MARK();
 
@@ -89,27 +89,26 @@ static void BenchmarkFunction(
     IREE_TRACE_SCOPE0("BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
     vm::ref<iree_vm_list_t> outputs;
-    IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
-                                      output_descs.size(),
+    IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                       iree_allocator_system(), &outputs));
     IREE_CHECK_OK(iree_vm_invoke(context, function, /*policy=*/nullptr, inputs,
                                  outputs.get(), iree_allocator_system()));
   }
 }
 
-void RegisterModuleBenchmarks(
-    const std::string& function_name, iree_vm_context_t* context,
-    iree_vm_function_t function, iree_vm_list_t* inputs,
-    const std::vector<RawSignatureParser::Description>& output_descs) {
+void RegisterModuleBenchmarks(const std::string& function_name,
+                              iree_vm_context_t* context,
+                              iree_vm_function_t function,
+                              iree_vm_list_t* inputs) {
   auto benchmark_name = "BM_" + function_name;
   int batch_size = FLAG_batch_size;
-  benchmark::RegisterBenchmark(
-      benchmark_name.c_str(),
-      [benchmark_name, batch_size, context, function, inputs,
-       output_descs](benchmark::State& state) -> void {
-        BenchmarkFunction(benchmark_name, batch_size, context, function, inputs,
-                          output_descs, state);
-      })
+  benchmark::RegisterBenchmark(benchmark_name.c_str(),
+                               [benchmark_name, batch_size, context, function,
+                                inputs](benchmark::State& state) -> void {
+                                 BenchmarkFunction(benchmark_name, batch_size,
+                                                   context, function, inputs,
+                                                   state);
+                               })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
       ->MeasureProcessCPUTime()
@@ -210,20 +209,10 @@ class IREEBenchmark {
         input_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_string_view_t{function_name.data(), function_name.size()},
         &function));
-    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
-    // Construct inputs.
-    std::vector<RawSignatureParser::Description> input_descs;
-    IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-    IREE_CHECK_OK(ParseToVariantList(input_descs,
-                                     iree_hal_device_allocator(device_),
+    IREE_CHECK_OK(ParseToVariantList(iree_hal_device_allocator(device_),
                                      FLAG_function_inputs, &inputs_));
-
-    // Creates output signature.
-    std::vector<RawSignatureParser::Description> output_descs;
-    IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
-    RegisterModuleBenchmarks(function_name, context_, function, inputs_.get(),
-                             output_descs);
+    RegisterModuleBenchmarks(function_name, context_, function, inputs_.get());
     return iree_ok_status();
   }
 
@@ -233,24 +222,40 @@ class IREEBenchmark {
     iree_vm_module_signature_t signature =
         input_module_->signature(input_module_->self);
     for (iree_host_size_t i = 0; i < signature.export_function_count; ++i) {
-      iree_string_view_t name;
-      IREE_CHECK_OK(input_module_->get_function(input_module_->self,
-                                                IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                                                i, &function, &name, nullptr));
-      if (!ValidateFunctionAbi(function).ok()) continue;
+      iree_string_view_t export_name;
+      IREE_CHECK_OK(input_module_->get_function(
+          input_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function,
+          &export_name, nullptr));
 
-      std::string function_name(name.data, name.size);
-      std::vector<RawSignatureParser::Description> input_descs;
-      IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-      if (!input_descs.empty()) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "expect not to have input arguments for '%.*s'",
-                                (int)name.size, name.data);
+      // We run anything with the 'benchmark' attribute.
+      // If the attribute is not present we'll run anything that looks runnable.
+      bool known_benchmark = !iree_string_view_is_empty(
+          iree_vm_function_reflection_attr(&function, IREE_SV("benchmark")));
+      if (!known_benchmark) {
+        if (iree_string_view_starts_with(export_name,
+                                         iree_make_cstring_view("__")) ||
+            iree_string_view_find_char(export_name, '$', 0) !=
+                IREE_STRING_VIEW_NPOS) {
+          // Skip internal or special functions.
+          continue;
+        }
+
+        iree_vm_function_signature_t signature =
+            iree_vm_function_signature(&function);
+        iree_host_size_t argument_count = 0;
+        iree_host_size_t result_count = 0;
+        IREE_RETURN_IF_ERROR(iree_vm_function_call_count_arguments_and_results(
+            &signature, &argument_count, &result_count));
+        if (argument_count) {
+          // Only functions with no inputs are run (because we can't pass
+          // anything).
+          continue;
+        }
       }
-      std::vector<RawSignatureParser::Description> output_descs;
-      IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
-      iree::RegisterModuleBenchmarks(function_name, context_, function,
-                                     /*inputs=*/nullptr, output_descs);
+
+      iree::RegisterModuleBenchmarks(
+          std::string(export_name.data, export_name.size), context_, function,
+          /*inputs=*/nullptr);
     }
     return iree_ok_status();
   }
