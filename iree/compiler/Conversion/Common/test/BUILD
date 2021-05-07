@@ -32,6 +32,7 @@ iree_lit_test_suite(
             "flatten_memref_subspan.mlir",
             "linalg_bufferize.mlir",
             "remove_dead_allocs.mlir",
+            "transpose_canonicalization.mlir",
         ],
         include = ["*.mlir"],
     ),
