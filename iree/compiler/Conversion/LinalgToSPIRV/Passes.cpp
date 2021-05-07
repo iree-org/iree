@@ -126,7 +126,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
 
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createFlattenMemRefSubspanPass());
+  pm.nest<ModuleOp>().addPass(createFlattenMemRefSubspanPass());
   pm.nest<ModuleOp>().addPass(createLowerAffinePass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());

@@ -14,31 +14,11 @@
 
 #include "iree/vm/builtin_types.h"
 
-static iree_vm_ref_type_descriptor_t iree_vm_buffer_descriptor = {0};
-
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_buffer, iree_vm_buffer_t);
-
-static void iree_vm_buffer_destroy(void* ptr) {
-  iree_vm_buffer_t* ref = (iree_vm_buffer_t*)ptr;
-  if (ref->destroy) {
-    ref->destroy(ptr);
-  }
-}
-
+iree_status_t iree_vm_buffer_register_types();
 iree_status_t iree_vm_list_register_types();
 
 IREE_API_EXPORT iree_status_t iree_vm_register_builtin_types() {
-  if (iree_vm_buffer_descriptor.type != IREE_VM_REF_TYPE_NULL) {
-    return iree_ok_status();
-  }
-
-  iree_vm_buffer_descriptor.destroy = iree_vm_buffer_destroy;
-  iree_vm_buffer_descriptor.offsetof_counter =
-      offsetof(iree_vm_buffer_t, ref_object.counter);
-  iree_vm_buffer_descriptor.type_name = iree_make_cstring_view("vm.buffer");
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&iree_vm_buffer_descriptor));
-
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_register_types());
   IREE_RETURN_IF_ERROR(iree_vm_list_register_types());
-
   return iree_ok_status();
 }

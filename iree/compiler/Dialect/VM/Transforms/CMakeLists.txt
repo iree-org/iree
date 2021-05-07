@@ -26,6 +26,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRMath
     MLIRPass
     MLIRSideEffectInterfaces
     MLIRSupport
@@ -36,6 +37,7 @@ iree_cc_library(
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::IREEToVM
+    iree::compiler::Dialect::VM::Conversion::MathToVM
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR
   PUBLIC

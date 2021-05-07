@@ -305,4 +305,51 @@ static void BM_LoopSumBytecode(benchmark::State& state) {
 }
 BENCHMARK(BM_LoopSumBytecode)->Arg(100000);
 
+static void BM_BufferReduceReference(benchmark::State& state) {
+  static auto work = +[](int32_t* buffer, int i, int sum) {
+    int new_sum = buffer[i] + sum;
+    benchmark::DoNotOptimize(new_sum);
+    return new_sum;
+  };
+  static auto loop = +[](int32_t* buffer, int count) {
+    int sum = 0;
+    for (int i = 0; i < count; ++i) {
+      benchmark::DoNotOptimize(sum = work(buffer, i, sum));
+    }
+    return sum;
+  };
+  while (state.KeepRunningBatch(state.range(0))) {
+    int32_t* buffer = (int32_t*)malloc(state.range(0) * 4);
+    for (int i = 0; i < state.range(0); ++i) {
+      buffer[i] = 1;
+    }
+    int ret = loop(buffer, static_cast<int>(state.range(0)));
+    benchmark::DoNotOptimize(ret);
+    benchmark::ClobberMemory();
+    free(buffer);
+  }
+}
+BENCHMARK(BM_BufferReduceReference)->Arg(100000);
+
+static void BM_BufferReduceBytecode(benchmark::State& state) {
+  IREE_CHECK_OK(RunFunction(
+      state, iree_make_cstring_view("bytecode_module_benchmark.buffer_reduce"),
+      {static_cast<int32_t>(state.range(0))},
+      /*result_count=*/1,
+      /*batch_size=*/state.range(0)));
+}
+BENCHMARK(BM_BufferReduceBytecode)->Arg(100000);
+
+// NOTE: unrolled 8x, requires %count to be % 8 = 0.
+static void BM_BufferReduceBytecodeUnrolled(benchmark::State& state) {
+  IREE_CHECK_OK(
+      RunFunction(state,
+                  iree_make_cstring_view(
+                      "bytecode_module_benchmark.buffer_reduce_unrolled"),
+                  {static_cast<int32_t>(state.range(0))},
+                  /*result_count=*/1,
+                  /*batch_size=*/state.range(0)));
+}
+BENCHMARK(BM_BufferReduceBytecodeUnrolled)->Arg(100000);
+
 }  // namespace

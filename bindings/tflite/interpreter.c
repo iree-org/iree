@@ -126,8 +126,8 @@ static iree_status_t _TfLiteInterpreterShapeFrameInitialize(
 // will release any resources that may be retained and is required.
 static void _TfLiteInterpreterShapeFrameDeinitialize(
     _TfLiteInterpreterShapeFrame* frame) {
-  iree_vm_list_deinitialize(frame->shape_list);
   iree_vm_list_deinitialize(frame->arg_list);
+  iree_vm_list_deinitialize(frame->shape_list);
 }
 
 // Reads the shape value in the frame storage from the prior application.

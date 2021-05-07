@@ -43,6 +43,7 @@ iree_cc_library(
   NAME
     impl
   HDRS
+    "buffer.h"
     "builtin_types.h"
     "context.h"
     "instance.h"
@@ -56,6 +57,7 @@ iree_cc_library(
     "type_def.h"
     "value.h"
   SRCS
+    "buffer.c"
     "builtin_types.c"
     "context.c"
     "instance.c"
@@ -72,6 +74,19 @@ iree_cc_library(
     iree::base::internal
     iree::base::tracing
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    buffer_test
+  SRCS
+    "buffer_test.cc"
+  DEPS
+    ::cc
+    ::impl
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(

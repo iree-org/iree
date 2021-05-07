@@ -150,6 +150,10 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     }
     return builder.create<IndexCastOp>(loc, type, inputs.front());
   });
+
+  addTargetMaterialization(
+      [](OpBuilder &builder, IntegerType type, ValueRange inputs,
+         Location loc) -> Value { return inputs.front(); });
 }
 
 }  // namespace VM

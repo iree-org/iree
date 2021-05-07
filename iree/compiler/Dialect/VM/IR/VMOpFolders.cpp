@@ -966,6 +966,22 @@ OpFoldResult FloorF64Op::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// Floating-point math
+//===----------------------------------------------------------------------===//
+
+OpFoldResult SqrtF32Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+    return APFloat(sqrtf(a.convertToFloat()));
+  });
+}
+
+OpFoldResult SqrtF64Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+    return APFloat(sqrt(a.convertToDouble()));
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // Integer bit manipulation
 //===----------------------------------------------------------------------===//
 
@@ -1380,32 +1396,6 @@ void CmpEQI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
 }
 
 template <typename T>
-static OpFoldResult foldCmpEQFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
-    // x == x = true
-    return oneOfType(op.getType());
-  }
-  return constFoldBinaryOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
-        return a.compare(b) == APFloat::cmpEqual;
-      });
-}
-
-OpFoldResult CmpEQF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQFOp(*this, operands);
-}
-
-void CmpEQF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {}
-
-OpFoldResult CmpEQF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQFOp(*this, operands);
-}
-
-void CmpEQF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {}
-
-template <typename T>
 static OpFoldResult foldCmpNEOp(T op, ArrayRef<Attribute> operands) {
   if (op.lhs() == op.rhs()) {
     // x != x = false
@@ -1421,26 +1411,6 @@ OpFoldResult CmpNEI32Op::fold(ArrayRef<Attribute> operands) {
 
 OpFoldResult CmpNEI64Op::fold(ArrayRef<Attribute> operands) {
   return foldCmpNEOp(*this, operands);
-}
-
-template <typename T>
-static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
-    // x != x = false
-    return zeroOfType(op.getType());
-  }
-  return constFoldBinaryOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
-        return a.compare(b) != APFloat::cmpEqual;
-      });
-}
-
-OpFoldResult CmpNEF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpNEFOp(*this, operands);
-}
-
-OpFoldResult CmpNEF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpNEFOp(*this, operands);
 }
 
 namespace {
@@ -1471,18 +1441,6 @@ void CmpNEI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                              MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpNEI64Op, CmpEQI64Op>,
                  CmpNEZeroToCmpNZ<CmpNEI64Op, CmpNZI64Op>>(context);
-}
-
-void CmpNEF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpNEF32Op, CmpEQF32Op>,
-                 CmpNEZeroToCmpNZ<CmpNEF32Op, CmpNZF32Op>>(context);
-}
-
-void CmpNEF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpNEF64Op, CmpEQF64Op>,
-                 CmpNEZeroToCmpNZ<CmpNEF64Op, CmpNZF64Op>>(context);
 }
 
 template <typename T>
@@ -1532,32 +1490,6 @@ void CmpLTI32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 
 void CmpLTI64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {}
-
-template <typename T>
-static OpFoldResult foldCmpLTFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
-    // x < x = false
-    return zeroOfType(op.getType());
-  }
-  return constFoldBinaryOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
-        return a.compare(b) == APFloat::cmpLessThan;
-      });
-}
-
-OpFoldResult CmpLTF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTFOp(*this, operands);
-}
-
-OpFoldResult CmpLTF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTFOp(*this, operands);
-}
-
-void CmpLTF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {}
-
-void CmpLTF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {}
 
 namespace {
 
@@ -1639,39 +1571,6 @@ void CmpLTEI64UOp::getCanonicalizationPatterns(
   results.insert<RewritePseudoCmpLTEToLT<CmpLTEI64UOp, CmpLTI64UOp>>(context);
 }
 
-template <typename T>
-static OpFoldResult foldCmpLTEFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
-    // x <= x = true
-    return oneOfType(op.getType());
-  }
-  return constFoldBinaryOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
-        return a.compare(b) == APFloat::cmpLessThan ||
-               a.compare(b) == APFloat::cmpEqual;
-      });
-}
-
-OpFoldResult CmpLTEF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTEFOp(*this, operands);
-}
-
-OpFoldResult CmpLTEF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTEFOp(*this, operands);
-}
-
-void CmpLTEF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpLTEF32Op, CmpGTF32Op>>(context);
-  results.insert<RewritePseudoCmpLTEToLT<CmpLTEF32Op, CmpLTF32Op>>(context);
-}
-
-void CmpLTEF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpLTEF64Op, CmpGTF64Op>>(context);
-  results.insert<RewritePseudoCmpLTEToLT<CmpLTEF64Op, CmpLTF64Op>>(context);
-}
-
 namespace {
 
 /// Rewrites a vm.cmp.gt.* pseudo op to a vm.cmp.lt.* op.
@@ -1748,38 +1647,6 @@ void CmpGTI64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
   results.insert<RewritePseudoCmpGTToLT<CmpGTI64UOp, CmpLTI64UOp>>(context);
 }
 
-template <typename T>
-static OpFoldResult foldCmpGTFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
-    // x > x = false
-    return zeroOfType(op.getType());
-  }
-  return constFoldBinaryOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
-        return a.compare(b) == APFloat::cmpGreaterThan;
-      });
-}
-
-OpFoldResult CmpGTF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTFOp(*this, operands);
-}
-
-OpFoldResult CmpGTF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTFOp(*this, operands);
-}
-
-void CmpGTF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpGTF32Op, CmpLTEF32Op>>(context);
-  results.insert<RewritePseudoCmpGTToLT<CmpGTF32Op, CmpLTF32Op>>(context);
-}
-
-void CmpGTF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpGTF64Op, CmpLTEF64Op>>(context);
-  results.insert<RewritePseudoCmpGTToLT<CmpGTF64Op, CmpLTF64Op>>(context);
-}
-
 namespace {
 
 /// Rewrites a vm.cmp.gte.* pseudo op to a vm.cmp.lt.* op.
@@ -1831,39 +1698,6 @@ void CmpGTEI64SOp::getCanonicalizationPatterns(
 }
 
 template <typename T>
-static OpFoldResult foldCmpGTEFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
-    // x >= x = true
-    return oneOfType(op.getType());
-  }
-  return constFoldBinaryOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
-        return a.compare(b) == APFloat::cmpGreaterThan ||
-               a.compare(b) == APFloat::cmpEqual;
-      });
-}
-
-OpFoldResult CmpGTEF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTEFOp(*this, operands);
-}
-
-OpFoldResult CmpGTEF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTESOp(*this, operands);
-}
-
-void CmpGTEF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpGTEF32Op, CmpLTF32Op>>(context);
-  results.insert<RewritePseudoCmpGTEToLT<CmpGTEF32Op, CmpLTF32Op>>(context);
-}
-
-void CmpGTEF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpGTEF64Op, CmpLTF64Op>>(context);
-  results.insert<RewritePseudoCmpGTEToLT<CmpGTEF64Op, CmpLTF64Op>>(context);
-}
-
-template <typename T>
 static OpFoldResult foldCmpGTEUOp(T op, ArrayRef<Attribute> operands) {
   if (op.lhs() == op.rhs()) {
     // x >= x = true
@@ -1903,15 +1737,401 @@ OpFoldResult CmpNZI64Op::fold(ArrayRef<Attribute> operands) {
       operands, [&](const APInt &a) { return APInt(64, a.getBoolValue()); });
 }
 
-OpFoldResult CmpNZF32Op::fold(ArrayRef<Attribute> operands) {
+//===----------------------------------------------------------------------===//
+// Floating-point comparison
+//===----------------------------------------------------------------------===//
+
+enum CmpFOrdering {
+  ORDERED = 0,
+  UNORDERED = 1,
+};
+
+template <CmpFOrdering ordering, typename T>
+static OpFoldResult foldCmpEQFOp(T op, ArrayRef<Attribute> operands) {
+  if (op.lhs() == op.rhs()) {
+    // x == x = true
+    return oneOfType(op.getType());
+  }
+  return constFoldBinaryOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
+        auto result = a.compare(b);
+        if (ordering == ORDERED) {
+          return result == APFloat::cmpEqual;
+        } else {
+          return result == APFloat::cmpEqual || result == APFloat::cmpUnordered;
+        }
+      });
+}
+
+OpFoldResult CmpEQF32OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpEQFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpEQF64OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpEQFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpEQF32UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpEQFOp<UNORDERED>(*this, operands);
+}
+
+OpFoldResult CmpEQF64UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpEQFOp<UNORDERED>(*this, operands);
+}
+
+void CmpEQF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpEQF32OOp, CmpNEF32OOp>>(context);
+}
+
+void CmpEQF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpEQF64OOp, CmpNEF64OOp>>(context);
+}
+
+void CmpEQF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpEQF32UOp, CmpNEF32UOp>>(context);
+}
+
+void CmpEQF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpEQF64UOp, CmpNEF64UOp>>(context);
+}
+
+template <CmpFOrdering ordering, typename T>
+static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
+  if (op.lhs() == op.rhs()) {
+    // x != x = false
+    return zeroOfType(op.getType());
+  }
+  return constFoldBinaryOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
+        auto result = a.compare(b);
+        if (ordering == ORDERED) {
+          return result != APFloat::cmpEqual;
+        } else {
+          return result != APFloat::cmpEqual || result == APFloat::cmpUnordered;
+        }
+      });
+}
+
+OpFoldResult CmpNEF32OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpNEFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpNEF64OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpNEFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpNEF32UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpNEFOp<UNORDERED>(*this, operands);
+}
+
+OpFoldResult CmpNEF64UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpNEFOp<UNORDERED>(*this, operands);
+}
+
+void CmpNEF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpNEF32OOp, CmpEQF32OOp>>(context);
+}
+
+void CmpNEF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpNEF64OOp, CmpEQF64OOp>>(context);
+}
+
+void CmpNEF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpNEF32UOp, CmpEQF32UOp>>(context);
+}
+
+void CmpNEF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpNEF64UOp, CmpEQF64UOp>>(context);
+}
+
+template <CmpFOrdering ordering, typename T>
+static OpFoldResult foldCmpLTFOp(T op, ArrayRef<Attribute> operands) {
+  if (op.lhs() == op.rhs()) {
+    // x < x = false
+    return zeroOfType(op.getType());
+  }
+  return constFoldBinaryOp<FloatAttr>(operands, [&](const APFloat &a,
+                                                    const APFloat &b) {
+    auto result = a.compare(b);
+    if (ordering == ORDERED) {
+      return result == APFloat::cmpLessThan;
+    } else {
+      return result == APFloat::cmpLessThan || result == APFloat::cmpUnordered;
+    }
+  });
+}
+
+OpFoldResult CmpLTF32OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpLTFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpLTF64OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpLTFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpLTF32UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpLTFOp<UNORDERED>(*this, operands);
+}
+
+OpFoldResult CmpLTF64UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpLTFOp<UNORDERED>(*this, operands);
+}
+
+void CmpLTF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {}
+
+void CmpLTF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {}
+
+void CmpLTF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {}
+
+void CmpLTF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {}
+
+template <CmpFOrdering ordering, typename T>
+static OpFoldResult foldCmpLTEFOp(T op, ArrayRef<Attribute> operands) {
+  if (op.lhs() == op.rhs()) {
+    // x <= x = true
+    return oneOfType(op.getType());
+  }
+  return constFoldBinaryOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
+        auto result = a.compare(b);
+        if (ordering == ORDERED) {
+          return result == APFloat::cmpLessThan || result == APFloat::cmpEqual;
+        } else {
+          return result == APFloat::cmpLessThan ||
+                 result == APFloat::cmpEqual || result == APFloat::cmpUnordered;
+        }
+      });
+}
+
+OpFoldResult CmpLTEF32OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpLTEFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpLTEF64OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpLTEFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpLTEF32UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpLTEFOp<UNORDERED>(*this, operands);
+}
+
+OpFoldResult CmpLTEF64UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpLTEFOp<UNORDERED>(*this, operands);
+}
+
+template <CmpFOrdering ordering, typename T>
+static OpFoldResult foldCmpGTFOp(T op, ArrayRef<Attribute> operands) {
+  if (op.lhs() == op.rhs()) {
+    // x > x = false
+    return zeroOfType(op.getType());
+  }
+  return constFoldBinaryOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
+        auto result = a.compare(b);
+        if (ordering == ORDERED) {
+          return result == APFloat::cmpGreaterThan;
+        } else {
+          return result == APFloat::cmpGreaterThan ||
+                 result == APFloat::cmpUnordered;
+        }
+      });
+}
+
+OpFoldResult CmpGTF32OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpGTFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpGTF64OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpGTFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpGTF32UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpGTFOp<UNORDERED>(*this, operands);
+}
+
+OpFoldResult CmpGTF64UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpGTFOp<UNORDERED>(*this, operands);
+}
+
+void CmpGTF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTF32OOp, CmpLTEF32OOp>>(context);
+  results.insert<RewritePseudoCmpGTToLT<CmpGTF32OOp, CmpLTF32OOp>>(context);
+}
+
+void CmpGTF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTF64OOp, CmpLTEF64OOp>>(context);
+  results.insert<RewritePseudoCmpGTToLT<CmpGTF64OOp, CmpLTF64OOp>>(context);
+}
+
+void CmpGTF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTF32UOp, CmpLTEF32UOp>>(context);
+  results.insert<RewritePseudoCmpGTToLT<CmpGTF32UOp, CmpLTF32UOp>>(context);
+}
+
+void CmpGTF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTF64UOp, CmpLTEF64UOp>>(context);
+  results.insert<RewritePseudoCmpGTToLT<CmpGTF64UOp, CmpLTF64UOp>>(context);
+}
+
+template <CmpFOrdering ordering, typename T>
+static OpFoldResult foldCmpGTEFOp(T op, ArrayRef<Attribute> operands) {
+  if (op.lhs() == op.rhs()) {
+    // x >= x = true
+    return oneOfType(op.getType());
+  }
+  return constFoldBinaryOp<FloatAttr>(operands, [&](const APFloat &a,
+                                                    const APFloat &b) {
+    auto result = a.compare(b);
+    if (ordering == ORDERED) {
+      return result == APFloat::cmpGreaterThan || result == APFloat::cmpEqual;
+    } else {
+      return result == APFloat::cmpGreaterThan || result == APFloat::cmpEqual ||
+             result == APFloat::cmpUnordered;
+    }
+  });
+}
+
+OpFoldResult CmpGTEF32OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpGTEFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpGTEF64OOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpGTEFOp<ORDERED>(*this, operands);
+}
+
+OpFoldResult CmpGTEF32UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpGTEFOp<UNORDERED>(*this, operands);
+}
+
+OpFoldResult CmpGTEF64UOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpGTEFOp<UNORDERED>(*this, operands);
+}
+
+void CmpGTEF32OOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTEF32OOp, CmpLTF32OOp>>(context);
+  results.insert<RewritePseudoCmpGTEToLT<CmpGTEF32OOp, CmpLTF32OOp>>(context);
+}
+
+void CmpGTEF64OOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTEF64OOp, CmpLTF64OOp>>(context);
+  results.insert<RewritePseudoCmpGTEToLT<CmpGTEF64OOp, CmpLTF64OOp>>(context);
+}
+
+void CmpGTEF32UOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTEF32UOp, CmpLTF32UOp>>(context);
+  results.insert<RewritePseudoCmpGTEToLT<CmpGTEF32UOp, CmpLTF32UOp>>(context);
+}
+
+void CmpGTEF64UOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTEF64UOp, CmpLTF64UOp>>(context);
+  results.insert<RewritePseudoCmpGTEToLT<CmpGTEF64UOp, CmpLTF64UOp>>(context);
+}
+
+namespace {
+
+/// Rewrites a vm.cmp.nz.* pseudo op to a vm.cmp.ne.* op with a constant 0.
+template <typename T, typename U, typename CZ>
+struct RewritePseudoCmpNZToNE : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<U>(op, op.getType(), op.operand(),
+                                   rewriter.create<CZ>(op.getLoc()));
+    return success();
+  }
+};
+
+}  // namespace
+
+OpFoldResult CmpNZF32OOp::fold(ArrayRef<Attribute> operands) {
   return constFoldCmpOp<FloatAttr>(
       operands, [&](const APFloat &a) { return APInt(32, a.isNonZero()); });
 }
 
-OpFoldResult CmpNZF64Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpNZF64OOp::fold(ArrayRef<Attribute> operands) {
   return constFoldCmpOp<FloatAttr>(
       operands, [&](const APFloat &a) { return APInt(32, a.isNonZero()); });
 }
+
+OpFoldResult CmpNZF32UOp::fold(ArrayRef<Attribute> operands) {
+  return constFoldCmpOp<FloatAttr>(operands, [&](const APFloat &a) {
+    return APInt(32, a.isNonZero() || a.isNaN());
+  });
+}
+
+OpFoldResult CmpNZF64UOp::fold(ArrayRef<Attribute> operands) {
+  return constFoldCmpOp<FloatAttr>(operands, [&](const APFloat &a) {
+    return APInt(32, a.isNonZero() || a.isNaN());
+  });
+}
+
+void CmpNZF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results
+      .insert<RewritePseudoCmpNZToNE<CmpNZF32OOp, CmpNEF32OOp, ConstF32ZeroOp>>(
+          context);
+}
+
+void CmpNZF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results
+      .insert<RewritePseudoCmpNZToNE<CmpNZF64OOp, CmpNEF64OOp, ConstF64ZeroOp>>(
+          context);
+}
+
+void CmpNZF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results
+      .insert<RewritePseudoCmpNZToNE<CmpNZF32UOp, CmpNEF32UOp, ConstF32ZeroOp>>(
+          context);
+}
+
+void CmpNZF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results
+      .insert<RewritePseudoCmpNZToNE<CmpNZF64UOp, CmpNEF64UOp, ConstF64ZeroOp>>(
+          context);
+}
+
+OpFoldResult CmpNaNF32Op::fold(ArrayRef<Attribute> operands) {
+  if (auto operand = operands[0].dyn_cast_or_null<FloatAttr>()) {
+    return operand.getValue().isNaN() ? oneOfType(getType())
+                                      : zeroOfType(getType());
+  }
+  return {};
+}
+
+OpFoldResult CmpNaNF64Op::fold(ArrayRef<Attribute> operands) {
+  if (auto operand = operands[0].dyn_cast_or_null<FloatAttr>()) {
+    return operand.getValue().isNaN() ? oneOfType(getType())
+                                      : zeroOfType(getType());
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// vm.ref comparison
+//===----------------------------------------------------------------------===//
 
 OpFoldResult CmpEQRefOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
@@ -1990,6 +2210,10 @@ OpFoldResult CmpNZRefOp::fold(ArrayRef<Attribute> operands) {
   }
   return {};
 }
+
+//===----------------------------------------------------------------------===//
+// Control flow
+//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // Control flow
@@ -2340,21 +2564,21 @@ struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
 void CheckEQOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                             MLIRContext *context) {
   results.insert<RewriteCheckToCondFail<CheckEQOp, CmpEQI32Op, CmpEQI64Op,
-                                        CmpEQF32Op, CmpEQF64Op, CmpEQRefOp>>(
+                                        CmpEQF32OOp, CmpEQF64OOp, CmpEQRefOp>>(
       context);
 }
 
 void CheckNEOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                             MLIRContext *context) {
   results.insert<RewriteCheckToCondFail<CheckNEOp, CmpNEI32Op, CmpNEI64Op,
-                                        CmpNEF32Op, CmpNEF64Op, CmpNERefOp>>(
+                                        CmpNEF32OOp, CmpNEF64OOp, CmpNERefOp>>(
       context);
 }
 
 void CheckNZOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                             MLIRContext *context) {
   results.insert<RewriteCheckToCondFail<CheckNZOp, CmpNZI32Op, CmpNZI64Op,
-                                        CmpNZF32Op, CmpNZF64Op, CmpNZRefOp>>(
+                                        CmpNZF32OOp, CmpNZF64OOp, CmpNZRefOp>>(
       context);
 }
 

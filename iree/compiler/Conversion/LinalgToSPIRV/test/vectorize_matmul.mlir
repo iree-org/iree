@@ -141,43 +141,27 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 //      CHECK:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:      [%[[IV0]], %[[BOFFSET_X]]] [32, 64]
 
-//  CHECK-DAG:    %[[READ_LHS_0_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_0_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C16]]]
+//  CHECK-DAG:    %[[READ_LHS_0_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_0_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C16]]]
 
-//  CHECK-DAG:    %[[READ_LHS_1_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C16]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_1_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C16]], %[[C16]]]
+//  CHECK-DAG:    %[[READ_LHS_1_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C16]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_1_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C16]], %[[C16]]]
 
-//  CHECK-DAG:    %[[READ_LHS_2_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C32]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_2_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C32]], %[[C16]]]
+//  CHECK-DAG:    %[[READ_LHS_2_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C32]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_2_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C32]], %[[C16]]]
 
-//  CHECK-DAG:    %[[READ_LHS_3_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C48]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_3_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C48]], %[[C16]]]
+//  CHECK-DAG:    %[[READ_LHS_3_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C48]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_LHS_3_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C48]], %[[C16]]]
 
-//  CHECK-DAG:    %[[READ_RHS_0_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_RHS_0_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C16]]]
-//  CHECK-DAG:    %[[READ_RHS_0_2:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C32]]]
-//  CHECK-DAG:    %[[READ_RHS_0_3:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C48]]]
+//  CHECK-DAG:    %[[READ_RHS_0_0:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_RHS_0_1:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C16]]]
+//  CHECK-DAG:    %[[READ_RHS_0_2:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C32]]]
+//  CHECK-DAG:    %[[READ_RHS_0_3:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C48]]]
 
-//  CHECK-DAG:    %[[READ_RHS_1_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C16]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_RHS_1_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C16]], %[[C16]]]
-//  CHECK-DAG:    %[[READ_RHS_1_2:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C16]], %[[C32]]]
-//  CHECK-DAG:    %[[READ_RHS_1_3:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C16]], %[[C48]]]
+//  CHECK-DAG:    %[[READ_RHS_1_0:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C16]], %[[C0]]]
+//  CHECK-DAG:    %[[READ_RHS_1_1:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C16]], %[[C16]]]
+//  CHECK-DAG:    %[[READ_RHS_1_2:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C16]], %[[C32]]]
+//  CHECK-DAG:    %[[READ_RHS_1_3:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C16]], %[[C48]]]
 
 //      CHECK:    %[[CONTRACT_0_0_1:.+]] = vector.contract
 // CHECK-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_0]], %[[ACC_0_0]]
@@ -424,43 +408,27 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 //      PROMOTE:    linalg.copy(%[[LHS_SUBVIEW]], %[[WGMEM_LHS_SUBVIEW]])
 //      PROMOTE:    linalg.copy(%[[RHS_SUBVIEW]], %[[WGMEM_RHS_SUBVIEW]])
 
-//  PROMOTE-DAG:    %[[READ_LHS_0_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_LHS_SUBVIEW]][%[[C0]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_LHS_0_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_LHS_SUBVIEW]][%[[C0]], %[[C16]]]
+//  PROMOTE-DAG:    %[[READ_LHS_0_0:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C0]], %[[C0]]]
+//  PROMOTE-DAG:    %[[READ_LHS_0_1:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C0]], %[[C16]]]
 
-//  PROMOTE-DAG:    %[[READ_LHS_1_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_LHS_SUBVIEW]][%[[C16]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_LHS_1_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_LHS_SUBVIEW]][%[[C16]], %[[C16]]]
+//  PROMOTE-DAG:    %[[READ_LHS_1_0:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C16]], %[[C0]]]
+//  PROMOTE-DAG:    %[[READ_LHS_1_1:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C16]], %[[C16]]]
 
-//  PROMOTE-DAG:    %[[READ_LHS_2_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_LHS_SUBVIEW]][%[[C32]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_LHS_2_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_LHS_SUBVIEW]][%[[C32]], %[[C16]]]
+//  PROMOTE-DAG:    %[[READ_LHS_2_0:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C32]], %[[C0]]]
+//  PROMOTE-DAG:    %[[READ_LHS_2_1:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C32]], %[[C16]]]
 
-//  PROMOTE-DAG:    %[[READ_LHS_3_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_LHS_SUBVIEW]][%[[C48]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_LHS_3_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_LHS_SUBVIEW]][%[[C48]], %[[C16]]]
+//  PROMOTE-DAG:    %[[READ_LHS_3_0:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C48]], %[[C0]]]
+//  PROMOTE-DAG:    %[[READ_LHS_3_1:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C48]], %[[C16]]]
 
-//  PROMOTE-DAG:    %[[READ_RHS_0_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_RHS_0_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C16]]]
-//  PROMOTE-DAG:    %[[READ_RHS_0_2:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C32]]]
-//  PROMOTE-DAG:    %[[READ_RHS_0_3:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C48]]]
+//  PROMOTE-DAG:    %[[READ_RHS_0_0:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C0]]]
+//  PROMOTE-DAG:    %[[READ_RHS_0_1:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C16]]]
+//  PROMOTE-DAG:    %[[READ_RHS_0_2:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C32]]]
+//  PROMOTE-DAG:    %[[READ_RHS_0_3:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C48]]]
 
-//  PROMOTE-DAG:    %[[READ_RHS_1_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_RHS_1_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C16]]]
-//  PROMOTE-DAG:    %[[READ_RHS_1_2:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C32]]]
-//  PROMOTE-DAG:    %[[READ_RHS_1_3:.+]] = vector.transfer_read
-// PROMOTE-SAME:      %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C48]]]
+//  PROMOTE-DAG:    %[[READ_RHS_1_0:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C0]]]
+//  PROMOTE-DAG:    %[[READ_RHS_1_1:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C16]]]
+//  PROMOTE-DAG:    %[[READ_RHS_1_2:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C32]]]
+//  PROMOTE-DAG:    %[[READ_RHS_1_3:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C48]]]
 
 //      PROMOTE:    %[[CONTRACT_0_0_1:.+]] = vector.contract
 // PROMOTE-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_0]], %[[ACC_0_0]]

@@ -893,7 +893,13 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
   // Map to load4.
   auto rank = op.getVectorType().getRank();
   SmallVector<int64_t, 4> nativeSize(rank, 1);
-  nativeSize.back() = 4;
+  // Load 4 elements on the most inner dimension.
+  for (auto dim : llvm::enumerate(op.permutation_map().getResults())) {
+    if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
+      if (dimExpr.getPosition() == op.permutation_map().getNumDims() - 1)
+        nativeSize[dim.index()] = 4;
+    }
+  }
   return nativeSize;
 }
 
@@ -912,7 +918,13 @@ getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
   // Map to store4.
   auto rank = op.getVectorType().getRank();
   SmallVector<int64_t, 4> nativeSize(rank, 1);
-  nativeSize.back() = 4;
+  // Store 4 elements on the most inner dimension.
+  for (auto dim : llvm::enumerate(op.permutation_map().getResults())) {
+    if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
+      if (dimExpr.getPosition() == op.permutation_map().getNumDims() - 1)
+        nativeSize[dim.index()] = 4;
+    }
+  }
   return nativeSize;
 }
 
