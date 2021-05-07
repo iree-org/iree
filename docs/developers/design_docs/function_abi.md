@@ -180,6 +180,9 @@ type specific fields:
 -   `["sdict", ["key", {slot_type}]...]`: An anonymous structure with named
     slots. Note that when passing these types, the keys are not passed to the
     function (only the slot values).
+-   `["sdict_kwargs", ...]`: Same as `sdict` but signifies to languages that
+    allow keyword-argument passing that this is the keyword-argument dictionary.
+    It can only ever be present as the last entry of the root arguments `slist`.
 
 ## Deprecated V0 ABIs
 

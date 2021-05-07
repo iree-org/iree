@@ -115,11 +115,27 @@ struct StructureLevel {
   // Children (must be heap allocated due to recursion).
   std::vector<StructureLevel> children;
 
+  // The root argument level is still just a list but has a special dict
+  // child in which to shove kwargs. Once everything is constructed, if the
+  // kwargs dict is not empty, it is added as the last child.
+  bool isRootArgs = false;
+  std::unique_ptr<StructureLevel> kwargs;
+
+  // If this is the kwargs dict level, it will have this bit set.
+  bool isKwargs = false;
+
   static StructureLevel leafValue(int valueIndex) {
     return StructureLevel{LevelType::Value, valueIndex};
   }
 
-  static StructureLevel list() { return StructureLevel{LevelType::List}; }
+  static StructureLevel createRootArgsList() {
+    StructureLevel ret = StructureLevel{LevelType::List};
+    ret.isRootArgs = true;
+    ret.kwargs =
+        std::unique_ptr<StructureLevel>(new StructureLevel{LevelType::Dict});
+    ret.kwargs->isKwargs = true;
+    return ret;
+  }
 
   Type getIrType(Builder builder) {
     auto variantType =
@@ -173,7 +189,8 @@ struct StructureLevel {
       }
       case LevelType::Dict: {
         json::Array typeRecord;
-        typeRecord.push_back(json::Value("sdict"));
+        typeRecord.push_back(isKwargs ? json::Value("sdict_kwargs")
+                                      : json::Value("sdict"));
         for (auto &child : children) {
           json::Array nvRecord;
           nvRecord.push_back(child.skey);
@@ -285,6 +302,12 @@ struct StructureLevel {
   }
 
   void normalize() {
+    // Handle root kwargs.
+    if (isRootArgs && !kwargs->children.empty()) {
+      kwargs->ikey = children.size();
+      children.push_back(std::move(*kwargs));
+    }
+
     // Sort by key.
     if (type == LevelType::List || type == LevelType::Tuple) {
       std::sort(
@@ -334,9 +357,14 @@ struct StructureLevel {
   StructureLevel *allocateChild(Location loc, StringRef childKey) {
     if (type == LevelType::None) type = LevelType::Dict;
     if (type != LevelType::Dict) {
-      emitError(loc) << "structure path mismatch: dereference a non-dict "
-                     << "with a dict key '" << childKey << "'";
-      return nullptr;
+      // Special case for root-args: shove it into the kwargs.
+      if (isRootArgs) {
+        return kwargs->allocateChild(loc, childKey);
+      } else {
+        emitError(loc) << "structure path mismatch: dereference a non-dict "
+                       << "with a dict key '" << childKey << "'";
+        return nullptr;
+      }
     }
     for (auto &child : children) {
       if (child.skey == childKey) return &child;
@@ -377,7 +405,7 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   json::Array refReturns;
 
   // Process each flattened argument into the argsRoot.
-  StructureLevel argsRoot = StructureLevel::list();
+  StructureLevel argsRoot = StructureLevel::createRootArgsList();
   SmallVector<StructureLevel *> flattenedArgLevels;
   for (int i = 0, e = internalFunc.getNumArguments(); i < e; i++) {
     auto indexPathAttr = internalFunc.getArgAttrOfType<mlir::ArrayAttr>(
