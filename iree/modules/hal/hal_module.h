@@ -45,7 +45,7 @@ extern "C" {
 
 // Registers the custom types used by the HAL module.
 // WARNING: not thread-safe; call at startup before using.
-IREE_API_EXPORT iree_status_t iree_hal_module_register_types();
+IREE_API_EXPORT iree_status_t iree_hal_module_register_types(void);
 
 // Creates the HAL module initialized to use a specific |device|.
 // Each context using this module will share the device and have compatible

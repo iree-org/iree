@@ -99,7 +99,8 @@ typedef struct iree_hal_driver_registry_s iree_hal_driver_registry_t;
 // having this be global like it is. Alternatively, this can be opt-in thanks to
 // LTO: if a user doesn't call this then the default registry is never
 // allocated.
-IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default();
+IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default(
+    void);
 
 // Registers a driver factory to serve future queries/requests for drivers.
 // See iree_hal_driver_registry_t for more information.

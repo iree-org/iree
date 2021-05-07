@@ -24,7 +24,7 @@ extern "C" {
 
 // Registers the custom types used by the strings module.
 // WARNING: Not threadsafe; call at startup before using..
-iree_status_t iree_strings_module_register_types();
+iree_status_t iree_strings_module_register_types(void);
 
 // Creates a strings module.
 // Modules may exist in multiple contexts should be thread-safe and immutable.

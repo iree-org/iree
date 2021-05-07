@@ -668,7 +668,7 @@ IREE_API_EXPORT iree_status_t iree_vm_list_push_variant(
   return iree_vm_list_set_variant(list, i, value);
 }
 
-iree_status_t iree_vm_list_register_types() {
+iree_status_t iree_vm_list_register_types(void) {
   if (iree_vm_list_descriptor.type != IREE_VM_REF_TYPE_NULL) {
     // Already registered.
     return iree_ok_status();
