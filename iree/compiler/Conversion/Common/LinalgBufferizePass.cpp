@@ -1039,40 +1039,46 @@ static void copyFromAliasingBufferToResultBuffer(OpBuilder &b, Location loc,
   }
 }
 
-static LogicalResult convertPadTensorOp(
-    OpBuilder &b, linalg::PadTensorOp padTensorOp, BlockAndValueMapping &bvm,
-    BufferizationPlan &plan, WorkgroupMemoryAllocationFn allocationFn) {
+/// Returns the static/dynamic mixed sizes of the memref.
+static SmallVector<OpFoldResult> getMemrefSizes(OpBuilder &b, Location loc,
+                                                Value memref) {
+  auto inputShape = memref.getType().cast<ShapedType>().getShape();
+  SmallVector<OpFoldResult> sizeMixedValues;
+  for (int64_t i = 0; i < inputShape.size(); ++i) {
+    if (inputShape[i] == ShapedType::kDynamicSize) {
+      Value dim = b.create<memref::DimOp>(loc, memref, i);
+      sizeMixedValues.push_back(dim);
+    } else {
+      sizeMixedValues.push_back(b.getI64IntegerAttr(inputShape[i]));
+    }
+  }
+  return sizeMixedValues;
+}
+
+static LogicalResult convertPadTensorOp(OpBuilder &b,
+                                        linalg::PadTensorOp padTensorOp,
+                                        BlockAndValueMapping &bvm) {
   auto inputTensor = padTensorOp.source();
   auto inputMemref = bvm.lookup(inputTensor);
 
   auto loc = padTensorOp.getLoc();
-
-  if (failed(getOrAllocateResultBuffers(b, padTensorOp, padTensorOp.result(),
-                                        bvm, plan, allocationFn))) {
-    return failure();
-  }
 
   auto resultPaddedBuffer = bvm.lookup(padTensorOp.result());
 
   // Get padding value and fill the result buffer.
   linalg::YieldOp yeildOp =
       *padTensorOp.region().getOps<linalg::YieldOp>().begin();
-  Value padValue = yeildOp.values()[0];
-  b.create<linalg::FillOp>(loc, resultPaddedBuffer, padValue);
+  Value paddingValue = yeildOp.values()[0];
+
+  b.create<linalg::FillOp>(loc, resultPaddedBuffer, paddingValue);
 
   // Get the interior region.
-  auto inputShape =
-      padTensorOp.source().getType().cast<ShapedType>().getShape();
-  SmallVector<OpFoldResult> sizeMixedValues, strides;
-  for (int64_t i = 0; i < inputShape.size(); ++i) {
-    if (inputShape[i] == ShapedType::kDynamicSize) {
-      Value dim = b.create<memref::DimOp>(loc, inputMemref, i);
-      sizeMixedValues.push_back(dim);
-    } else {
-      sizeMixedValues.push_back(b.getI64IntegerAttr(inputShape[i]));
-    }
-    strides.push_back(b.getI64IntegerAttr(1));
-  }
+  SmallVector<OpFoldResult> sizeMixedValues =
+      getMemrefSizes(b, loc, inputMemref);
+  SmallVector<OpFoldResult> strides(
+      inputMemref.getType().cast<ShapedType>().getRank(),
+      b.getI64IntegerAttr(1));
+
   auto resultSubView = b.create<memref::SubViewOp>(loc, resultPaddedBuffer,
                                                    padTensorOp.getMixedLowPad(),
                                                    sizeMixedValues, strides);
@@ -1168,7 +1174,12 @@ void LinalgBufferizePass::runOnFunction() {
               return success();
             })
         .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
-          return convertPadTensorOp(b, padTensorOp, bvm, plan, allocationFn);
+          if (failed(getOrAllocateResultBuffers(b, padTensorOp,
+                                                padTensorOp.result(), bvm, plan,
+                                                allocationFn))) {
+            return failure();
+          }
+          return convertPadTensorOp(b, padTensorOp, bvm);
         })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           SmallVector<Value> tiedOperands =
