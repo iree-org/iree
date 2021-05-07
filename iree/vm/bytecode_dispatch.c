@@ -1961,6 +1961,27 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
 
+      DISPATCH_OP(EXT_F32, CastSI32F32, {
+        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
+        float* result = VM_DecResultRegF32("result");
+        *result = vm_cast_si32f32(operand);
+      });
+      DISPATCH_OP(EXT_F32, CastUI32F32, {
+        uint32_t operand = (uint32_t)VM_DecOperandRegI32("operand");
+        float* result = VM_DecResultRegF32("result");
+        *result = vm_cast_ui32f32(operand);
+      });
+      DISPATCH_OP(EXT_F32, CastF32SI32, {
+        float operand = VM_DecOperandRegF32("operand");
+        int32_t* result = (int32_t*)VM_DecResultRegI32("result");
+        *result = vm_cast_f32si32(operand);
+      });
+      DISPATCH_OP(EXT_F32, CastF32UI32, {
+        float operand = VM_DecOperandRegF32("operand");
+        uint32_t* result = (uint32_t*)VM_DecResultRegI32("result");
+        *result = vm_cast_f32ui32(operand);
+      });
+
       DISPATCH_OP_EXT_F32_UNARY_F32(AtanF32, vm_atan_f32);
       DISPATCH_OP_EXT_F32_BINARY_F32(Atan2F32, vm_atan2_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(CosF32, vm_cos_f32);

@@ -2506,6 +2506,34 @@ def VM_ExtF32F64Op :
   let hasFolder = 1;
 }
 
+def VM_CastSI32F32Op :
+    VM_ConversionOp<I32, F32, "cast.si32.f32", VM_OPC_CastSI32F32,
+                    [VM_ExtF32]> {
+  let summary = [{cast from a signed integer to a float-point value}];
+  let hasFolder = 1;
+}
+
+def VM_CastUI32F32Op :
+    VM_ConversionOp<I32, F32, "cast.ui32.f32", VM_OPC_CastUI32F32,
+                    [VM_ExtF32]> {
+  let summary = [{cast from an unsigned integer to a float-point value}];
+  let hasFolder = 1;
+}
+
+def VM_CastF32SI32Op :
+    VM_ConversionOp<F32, I32, "cast.f32.si32", VM_OPC_CastF32SI32,
+                    [VM_ExtF32]> {
+  let summary = [{cast from a float-point value to a signed integer}];
+  let hasFolder = 1;
+}
+
+def VM_CastF32UI32Op :
+    VM_ConversionOp<F32, I32, "cast.f32.ui32", VM_OPC_CastF32UI32,
+                    [VM_ExtF32]> {
+  let summary = [{cast from an float-point value to an unsigned integer}];
+  let hasFolder = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Native reduction (horizontal) arithmetic
 //===----------------------------------------------------------------------===//
