@@ -179,7 +179,7 @@ struct StructureLevel {
             json::Value(type == LevelType::List ? "slist" : "stuple"));
         int lastIndex = 0;
         for (auto &child : children) {
-          for (int j = lastIndex; j < child.ikey; ++j) {
+          for (int j = children.size(); j < child.ikey; ++j) {
             typeRecord.push_back(json::Value(nullptr));
           }
           lastIndex = child.valueIndex;

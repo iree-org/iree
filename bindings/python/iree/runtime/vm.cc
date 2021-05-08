@@ -222,6 +222,11 @@ absl::optional<iree_vm_function_t> VmModule::LookupFunction(
 // VmVariantList
 //------------------------------------------------------------------------------
 
+void VmVariantList::PushList(VmVariantList& other) {
+  iree_vm_ref_t retained = iree_vm_list_retain_ref(other.raw_ptr());
+  iree_vm_list_push_ref_move(raw_ptr(), &retained);
+}
+
 void VmVariantList::PushBufferView(HalDevice& device,
                                    py::object py_buffer_object,
                                    iree_hal_element_type_e element_type) {
@@ -373,51 +378,70 @@ py::object VmVariantList::GetAsNdarray(int index) {
                    std::move(py_mapped_memory) /* base */);
 }
 
+namespace {
+
+void AppendListContents(std::string& out, iree_vm_list_t* list,
+                        std::unordered_set<iree_vm_list_t*>& visited) {
+  for (iree_host_size_t i = 0, e = iree_vm_list_size(list); i < e; ++i) {
+    iree_vm_variant_t variant = iree_vm_variant_empty();
+    iree_status_t status = iree_vm_list_get_variant(list, i, &variant);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
+      out.append("Error");
+      continue;
+    }
+    if (i > 0) out.append(", ");
+
+    if (iree_vm_variant_is_value(variant)) {
+      absl::StrAppend(&out, variant.i32);
+    } else if (iree_vm_variant_is_ref(variant)) {
+      // Pretty print a subset of ABI impacting known types.
+      if (iree_hal_buffer_isa(variant.ref)) {
+        auto* hal_buffer = iree_hal_buffer_deref(variant.ref);
+        assert(hal_buffer);
+        absl::StrAppend(&out, "HalBuffer(",
+                        iree_hal_buffer_byte_length(hal_buffer), ")");
+      } else if (iree_hal_buffer_view_isa(variant.ref)) {
+        auto hal_bv = iree_hal_buffer_view_deref(variant.ref);
+        absl::StrAppend(&out, "HalBufferView(");
+        absl::InlinedVector<int32_t, 5> shape(
+            iree_hal_buffer_view_shape_rank(hal_bv));
+        iree_hal_buffer_view_shape(hal_bv, shape.size(), shape.data(), nullptr);
+        absl::StrAppend(&out, absl::StrJoin(shape, "x"), ":0x",
+                        absl::Hex(static_cast<uint32_t>(
+                            iree_hal_buffer_view_element_type(hal_bv))),
+                        ")");
+      } else if (iree_vm_list_isa(variant.ref)) {
+        out.append("List[");
+        iree_vm_list_t* sub_list = iree_vm_list_deref(variant.ref);
+        if (visited.insert(sub_list).second) {
+          AppendListContents(out, sub_list, visited);
+        } else {
+          out.append("...circular...");
+        }
+        out.append("]");
+      } else {
+        absl::StrAppend(&out, "Unknown(", variant.type.ref_type, ")");
+      }
+    } else {
+      out.append("None");
+    }
+  }
+}
+
+}  // namespace
+
 std::string VmVariantList::DebugString() const {
   // The variant list API requires mutability, so we const cast to it internally
   // so we can maintain a const DebugString() for callers.
   auto mutable_this = const_cast<VmVariantList*>(this);
   std::string s;
   absl::StrAppend(&s, "<VmVariantList(", size(), "): [");
-
-  for (iree_host_size_t i = 0, e = size(); i < e; ++i) {
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    iree_status_t status =
-        iree_vm_list_get_variant(mutable_this->raw_ptr(), i, &variant);
-    if (!iree_status_is_ok(status)) {
-      iree_status_ignore(status);
-      absl::StrAppend(&s, "Error");
-      continue;
-    }
-    if (i > 0) absl::StrAppend(&s, ", ");
-
-    if (iree_vm_variant_is_value(variant)) {
-      absl::StrAppend(&s, variant.i32);
-    } else if (iree_vm_variant_is_ref(variant)) {
-      // Pretty print a subset of ABI impacting known types.
-      if (iree_hal_buffer_isa(variant.ref)) {
-        auto* hal_buffer = iree_hal_buffer_deref(variant.ref);
-        assert(hal_buffer);
-        absl::StrAppend(&s, "HalBuffer(",
-                        iree_hal_buffer_byte_length(hal_buffer), ")");
-      } else if (iree_hal_buffer_view_isa(variant.ref)) {
-        auto hal_bv = iree_hal_buffer_view_deref(variant.ref);
-        absl::StrAppend(&s, "HalBufferView(");
-        absl::InlinedVector<int32_t, 5> shape(
-            iree_hal_buffer_view_shape_rank(hal_bv));
-        iree_hal_buffer_view_shape(hal_bv, shape.size(), shape.data(), nullptr);
-        absl::StrAppend(&s, absl::StrJoin(shape, "x"), ":0x",
-                        absl::Hex(static_cast<uint32_t>(
-                            iree_hal_buffer_view_element_type(hal_bv))),
-                        ")");
-      } else {
-        absl::StrAppend(&s, "Unknown(", variant.type.ref_type, ")");
-      }
-    } else {
-      absl::StrAppend(&s, "None");
-    }
-  }
-  absl::StrAppend(&s, "]>");
+  iree_vm_list_t* list = mutable_this->raw_ptr();
+  std::unordered_set<iree_vm_list_t*> visited;
+  visited.insert(list);
+  AppendListContents(s, list, visited);
+  s.append("]>");
   return s;
 }
 
@@ -444,6 +468,7 @@ void SetupVmBindings(pybind11::module m) {
       .def_property_readonly("size", &VmVariantList::size)
       .def("__len__", &VmVariantList::size)
       .def("get_as_ndarray", &VmVariantList::GetAsNdarray)
+      .def("push_list", &VmVariantList::PushList)
       .def("push_buffer_view", &VmVariantList::PushBufferView)
       .def("__repr__", &VmVariantList::DebugString);
 

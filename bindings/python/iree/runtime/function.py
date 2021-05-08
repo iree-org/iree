@@ -71,6 +71,7 @@ class FunctionInvoker:
       "_abi_dict",
       "_arg_descs",
       "_ret_descs",
+      "_has_kwargs",
   ]
 
   def __init__(self, vm_context: VmContext, device: HalDevice,
@@ -84,18 +85,31 @@ class FunctionInvoker:
     self._abi_dict = None
     self._arg_descs = None
     self._ret_descs = None
+    self._has_kwargs = False
     self._parse_abi_dict(vm_function)
 
   @property
   def vm_function(self) -> VmFunction:
     return self._vm_function
 
-  def __call__(self, *args):
+  def __call__(self, *args, **kwargs):
     # Initialize the capacity to our total number of args, since we should
     # be below that when doing a flat invocation. May want to be more
     # conservative here when considering nesting.
     inv = Invocation(self._device)
     ret_descs = self._ret_descs
+
+    # If kwargs are present, we treat those more as kwarg-only parameters (i.e.
+    # you cannot just arbitrarily use them to override positional arguments
+    # by name in the current implementation). If the backing ABI metadata
+    # declares support for kwargs, this will be done by having a final
+    # 'kwargs_sdict' arg descriptor, and we rewrite into this form.
+    # So we just append the kwargs dict to the args list and let decoding
+    # happen normally.
+    if self._has_kwargs:
+      args = list(args)
+      args.append(kwargs if kwargs else dict())
+
     arg_list = VmVariantList(len(args))
     ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
     _merge_python_sequence_to_vm(inv, arg_list, args, self._arg_descs)
@@ -135,6 +149,12 @@ class FunctionInvoker:
       raise RuntimeError(
           f"Malformed function reflection metadata structure: {reflection}")
 
+    # See if kwargs are expected.
+    if self._ret_descs:
+      maybe_kwargs_desc = self._ret_descs[-1]
+      if maybe_kwargs_desc and maybe_kwargs_desc[0] == "kwargs_sdict":
+        self._has_kwargs = True
+
   def __repr__(self):
     return repr(self._vm_function)
 
@@ -158,16 +178,43 @@ def _float_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   _raise_argument_error(inv, "Python float arguments not yet supported")
 
 
-def _list_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  _raise_argument_error(inv, "Python list arguments not yet supported")
-
-
-def _tuple_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  _raise_argument_error(inv, "Python tuple arguments not yet supported")
+def _list_or_tuple_to_vm(inv: Invocation, t: VmVariantList, x, desc):
+  desc_type = desc[0]
+  if desc_type != "slist" and desc_type != "stuple":
+    _raise_argument_error(inv,
+                          f"passed a list or tuple but expected {desc_type}")
+  # When decoding a list or tuple, the desc object is like:
+  # ['slist', [...value_type_0...], ...]
+  # Where the type is either 'slist' or 'stuple'.
+  sub_descriptors = desc[1:]
+  arity = len(sub_descriptors)
+  if len(x) != arity:
+    _raise_argument_error(inv,
+                          f"mismatched list/tuple arity: {len(x)} vs {arity}")
+  sub_list = VmVariantList(arity)
+  _merge_python_sequence_to_vm(inv, sub_list, x, sub_descriptors)
+  t.push_list(sub_list)
 
 
 def _dict_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  _raise_argument_error(inv, "Python dict arguments not yet supported")
+  desc_type = desc[0]
+  if desc_type != "sdict" and desc_type != "kwargs_sdict":
+    _raise_argument_error(inv, f"passed a dict but expected {desc_type}")
+  # When decoding a dict, the desc object is like:
+  # ['sdict', ['key0', [...value_type_0...]], ['key1', [...value_type_1...]]]]
+  sub_descriptors = desc[1:]
+  py_values = []
+  value_descs = []
+  for key, value_desc in sub_descriptors:
+    try:
+      py_values.append(x[key])
+    except KeyError:
+      _raise_argument_error(inv, f"expected dict item with key '{key}'")
+    value_descs.append(value_desc)
+
+  sub_list = VmVariantList(len(py_values))
+  _merge_python_sequence_to_vm(inv, sub_list, py_values, value_descs)
+  t.push_list(sub_list)
 
 
 def _str_to_vm(inv: Invocation, t: VmVariantList, x, desc):
@@ -210,8 +257,8 @@ PYTHON_TO_VM_CONVERTERS = {
     bool: _bool_to_vm,
     int: _int_to_vm,
     float: _float_to_vm,
-    list: _list_to_vm,
-    tuple: _tuple_to_vm,
+    list: _list_or_tuple_to_vm,
+    tuple: _list_or_tuple_to_vm,
     dict: _dict_to_vm,
     str: _str_to_vm,
     np.ndarray: _ndarray_to_vm,
