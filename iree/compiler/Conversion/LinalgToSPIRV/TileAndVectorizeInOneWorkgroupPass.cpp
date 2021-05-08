@@ -74,6 +74,7 @@ static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
       markers, Identifier::get(replaceMarker, context));
 }
 
+/// Converts a symbolic GPU processor dimension to its numeric one.
 static unsigned dimToIndex(StringRef dim) {
   return StringSwitch<unsigned>(dim).Case("x", 0).Case("y", 1).Case("z", 2);
 }
@@ -524,7 +525,8 @@ struct LowerToLoops final : public OpRewritePattern<OpTy> {
 
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
-    // Only handle the cases where tiling to invocations was done.
+    // Only handle the cases where tiling to invocations was done, where tiling
+    // convolution filters or vectorization is expected.
     if (!hasMarker(op, {getConvFilterTileMarker(), getVectorizeMarker()}))
       return failure();
 
@@ -603,9 +605,9 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
       });
     }
 
-    // TODO(thomasraoux, antiagainst): Tiling shouldn't be controlled by
-    // vectorization. This is needed due to historical reasons. Change the
-    // second level tiling to cyclic to loops and remove this.
+    // TODO(thomasraoux, antiagainst): Tiling to subgroups shouldn't be
+    // controlled by vectorization. This is needed due to historical reasons.
+    // Change the second level tiling to cyclic to loops and remove this.
     if (launchConfig.useVectorize()) {
       OwningRewritePatternList secondLevelTilingPatterns(&getContext());
       populateTilingToSubgroupPatterns(context, launchConfig,
@@ -699,7 +701,11 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
       applyVectorTransformation(funcOp);
     }
 
-    // Lower ops that were tiled but not vectorized to loops.
+    // Lower ops that were tiled to invocations but not vectorized to loops.
+    // TODO(antiagainst): This is here now to simplify the interaction with
+    // ConvertToGPUPass, where we finally lower away all Linalg ops. Once that
+    // pass is cleaned up, we can invoke createConvertLinalgToLoopsPass
+    // directly.
     {
       RewritePatternSet patterns(context);
       patterns
