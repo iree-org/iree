@@ -1,55 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/ml-frameworks/tensorflow/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/ml-frameworks/tensorflow-lite/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/ml-frameworks/jax/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/deployment-configurations/cpu-dylib/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/deployment-configurations/gpu-vulkan/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/building-from-source/getting-started/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/building-from-source/optional-features/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/building-from-source/android/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/bindings/c-api/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/bindings/python/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/bindings/tensorflow-lite/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>None</loc>
-     <lastmod>2021-05-07</lastmod>
+     <loc>https://google.github.io/iree/community/projects/</loc>
+     <lastmod>2021-05-08</lastmod>
      <changefreq>daily</changefreq>
     </url>
 </urlset>
