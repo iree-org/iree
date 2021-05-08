@@ -502,16 +502,6 @@ struct ConvertToGPUPass
   void runOnOperation() override;
 };
 
-struct SerializeParallelLoopPattern
-    : public OpConversionPattern<scf::ParallelOp> {
-  using OpConversionPattern<scf::ParallelOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      scf::ParallelOp pLoopOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    return success(serializeDimensionsFrom(rewriter, pLoopOp, 0) != nullptr);
-  }
-};
-
 /// Implementation of the mapping of tiled linalg op to workitems within a
 /// workgroup.
 template <typename LinalgOpTy>
@@ -678,17 +668,6 @@ struct MapLinalgOpToGlobalInvocationId
   }
 };
 
-/// Remove the linalg.range operation created when lowering to loops.
-struct RemoveLinalgRange : public OpConversionPattern<linalg::RangeOp> {
-  using OpConversionPattern<linalg::RangeOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      linalg::RangeOp rangeOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!rangeOp.getResult().use_empty()) return failure();
-    rewriter.eraseOp(rangeOp);
-    return success();
-  }
-};
 }  // namespace
 
 // Applies tiling followed to load/store optimized size then distribute on
@@ -763,24 +742,12 @@ void ConvertToGPUPass::runOnOperation() {
 
   OwningRewritePatternList patterns(&getContext());
 
-  patterns.insert<
-      MapLinalgOpToGlobalInvocationId<linalg::CopyOp>,
-      MapLinalgOpToGlobalInvocationId<linalg::FillOp>,
-      MapLinalgOpToGlobalInvocationId<linalg::GenericOp>,
-      MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
-      MapLinalgOpToLocalInvocationId<linalg::ConvInputNWCFilterWCFOp>,
-      MapLinalgOpToLocalInvocationId<linalg::ConvInputNHWCFilterHWCFOp>,
-      MapLinalgOpToLocalInvocationId<linalg::ConvInputNDHWCFilterDHWCFOp>,
-      MapLinalgOpToLocalInvocationId<linalg::CopyOp>,
-      MapLinalgOpToLocalInvocationId<linalg::FillOp>,
-      MapLinalgOpToLocalInvocationId<linalg::GenericOp>,
-      MapLinalgOpToLocalInvocationId<linalg::IndexedGenericOp>,
-      MapLinalgOpToLocalInvocationId<linalg::MatmulOp>,
-      MapLinalgOpToLocalInvocationId<linalg::BatchMatmulOp>,
-      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCMaxFOp>,
-      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCMinFOp>,
-      MapLinalgOpToLocalInvocationId<linalg::PoolingNHWCSumFOp>,
-      RemoveLinalgRange, SerializeParallelLoopPattern>(context);
+  patterns.insert<MapLinalgOpToGlobalInvocationId<linalg::CopyOp>,
+                  MapLinalgOpToGlobalInvocationId<linalg::FillOp>,
+                  MapLinalgOpToGlobalInvocationId<linalg::GenericOp>,
+                  MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
+                  MapLinalgOpToLocalInvocationId<linalg::CopyOp>,
+                  MapLinalgOpToLocalInvocationId<linalg::FillOp>>(context);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
   for (FuncOp funcOp : getOperation().getInnerModule().getOps<FuncOp>()) {

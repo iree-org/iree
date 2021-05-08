@@ -283,10 +283,18 @@ static void populateTilingToInvocationPatterns(
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
+  patterns.insert<
+      linalg::LinalgTilingPattern<linalg::MatmulOp>,
+      linalg::LinalgTilingPattern<linalg::FillOp>,
+      linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::GenericOp>,
+      linalg::LinalgTilingPattern<linalg::IndexedGenericOp>,
+      linalg::LinalgTilingPattern<linalg::PoolingNHWCMaxFOp>,
+      linalg::LinalgTilingPattern<linalg::PoolingNHWCMinFOp>,
+      linalg::LinalgTilingPattern<linalg::PoolingNHWCSumFOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
@@ -507,6 +515,29 @@ static void populateTilingConvFilterPatterns(
 }
 
 //====---------------------------------------------------------------------===//
+// Patterns to lower linalg ops to loops
+//====---------------------------------------------------------------------===//
+
+template <typename OpTy>
+struct LowerToLoops final : public OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OpTy op,
+                                PatternRewriter &rewriter) const override {
+    // Only handle the cases where tiling to invocations was done.
+    if (!hasMarker(op, {getConvFilterTileMarker(), getVectorizeMarker()}))
+      return failure();
+
+    if (succeeded(linalg::linalgOpToLoops(rewriter, op))) {
+      rewriter.eraseOp(op);
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+//====---------------------------------------------------------------------===//
 // Main pass implementation
 //====---------------------------------------------------------------------===//
 
@@ -668,32 +699,23 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
       applyVectorTransformation(funcOp);
     }
 
-    // Invoke patterns to generalize linalg.depthwise_conv_2d_nhwc ops to Linalg
-    // generic ops. This can handle those cases that failed tiling and
-    // vectorization in the above.
-    // TODO(antiagainst): remove this once we have depthwise convolution
-    // vectorization applicable everywhere.
+    // Lower ops that were tiled but not vectorized to loops.
     {
-      // Carry over the Linalg marker because it is load-bearing and affects
-      // later passes.
-      linalg::LinalgTransformationFilter marker =
-          getLinalgMatchAndReplaceMarker({getWorkgroupMarker()},
-                                         getWorkgroupMarker(), context);
-      marker.addFilter([](Operation *op) -> LogicalResult {
-        return success(isa<linalg::DepthwiseConvInputNHWCFilterHWCFOp,
-                           linalg::DepthwiseConvInputNHWCFilterHWCOp>(op));
-      });
-
-      OwningRewritePatternList patterns(&getContext());
-      linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns, marker);
-
+      RewritePatternSet patterns(context);
+      patterns
+          .add<LowerToLoops<linalg::BatchMatmulOp>,
+               LowerToLoops<linalg::ConvInputNWCFilterWCFOp>,
+               LowerToLoops<linalg::ConvInputNHWCFilterHWCFOp>,
+               LowerToLoops<linalg::ConvInputNDHWCFilterDHWCFOp>,
+               LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
+               LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
+               LowerToLoops<linalg::FillOp>, LowerToLoops<linalg::GenericOp>,
+               LowerToLoops<linalg::IndexedGenericOp>,
+               LowerToLoops<linalg::MatmulOp>,
+               LowerToLoops<linalg::PoolingNHWCMaxFOp>,
+               LowerToLoops<linalg::PoolingNHWCMinFOp>,
+               LowerToLoops<linalg::PoolingNHWCSumFOp>>(context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "--- After generalization ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
     }
 
     launchConfig.finalize(funcOp);
