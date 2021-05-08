@@ -1,4 +1,6 @@
 site_name: IREE
+site_url: https://google.github.io/iree/
+
 theme:
   name: material
   icon:
