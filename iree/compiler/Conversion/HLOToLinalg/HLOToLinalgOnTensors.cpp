@@ -377,8 +377,10 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
+  // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
+  //              then remove the PatternBenefit here
   patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion>(
-      typeConverter, context);
+      typeConverter, context, PatternBenefit(1000));
 }
 
 static llvm::cl::opt<bool> clUseLinalgOnTensorsPath(
