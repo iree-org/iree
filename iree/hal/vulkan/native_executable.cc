@@ -34,6 +34,7 @@ typedef struct {
 static iree_status_t iree_hal_vulkan_create_shader_module(
     VkDeviceHandle* logical_device, iree_const_byte_span_t code,
     VkShaderModule* out_shader_module) {
+  IREE_TRACE_SCOPE();
   VkShaderModuleCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   create_info.pNext = NULL;
@@ -62,6 +63,7 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     iree_hal_executable_layout_t* const* executable_layouts,
     iree_host_size_t pipeline_count,
     iree_hal_vulkan_entry_point_t* out_entry_points) {
+  IREE_TRACE_SCOPE();
   VkComputePipelineCreateInfo* create_infos = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       logical_device->host_allocator(),
@@ -121,6 +123,7 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
 
 static void iree_hal_vulkan_destroy_pipeline(VkDeviceHandle* logical_device,
                                              VkPipeline handle) {
+  IREE_TRACE_SCOPE();
   if (handle == VK_NULL_HANDLE) return;
   logical_device->syms()->vkDestroyPipeline(*logical_device, handle,
                                             logical_device->allocator());

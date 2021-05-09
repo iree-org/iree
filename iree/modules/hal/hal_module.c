@@ -135,7 +135,7 @@ typedef struct {
   iree_hal_semaphore_t* submit_semaphore;
   uint64_t submit_value;
 
-  void* deferred_lru[4];
+  void* deferred_lru[6];
   iree_vm_list_t* deferred_releases;
 } iree_hal_module_state_t;
 
@@ -203,7 +203,7 @@ void iree_hal_module_ex_defer_release(iree_hal_module_state_t* state,
   // repeated patterns in the common case.
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(state->deferred_lru); ++i) {
     if (state->deferred_lru[i] == value.ptr) {
-      // Hit - keep the list sorted my most->least recently used.
+      // Hit - keep the list sorted by most->least recently used.
       state->deferred_lru[i] = state->deferred_lru[0];
       state->deferred_lru[0] = value.ptr;
       return;
