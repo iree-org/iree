@@ -202,6 +202,8 @@ static void iree_hal_vulkan_tracing_query_calibration_timestamps(
       // TODO(benvanik): posix calibrated timestamps - ignored for now.
       break;
 #endif  // IREE_PLATFORM_WINDOWS
+    default:
+      break;
   }
 }
 
