@@ -17,12 +17,14 @@
 #include <math.h>
 
 #include "iree/base/internal/flags.h"
+#include "iree/base/tracing.h"
 #include "stb_image.h"
 
 iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
     const uint8_t* pixel_data, iree_host_size_t buffer_length,
     const float* input_range, iree_host_size_t range_length,
     float* out_buffer) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   if (range_length != 2) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "range defined as 2-element [min, max] array.");
@@ -35,6 +37,7 @@ iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
         (((float)(pixel_data[i])) - kUint8Mean) / kUint8Mean * input_scale +
         input_offset;
   }
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -50,8 +53,11 @@ iree_status_t iree_tools_utils_load_pixel_data(
   if (!(element_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 ||
         element_type == IREE_HAL_ELEMENT_TYPE_SINT_8 ||
         element_type == IREE_HAL_ELEMENT_TYPE_UINT_8)) {
+    char element_type_str[16];
+    IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
+        element_type, sizeof(element_type_str), element_type_str, NULL));
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "element type not supported");
+                            "element type %s not supported", element_type_str);
   }
   switch (shape_rank) {
     case 2: {  // Assume tensor <height x width>

@@ -63,6 +63,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::flags
+    iree::base::tracing
     iree::hal
     stblib::stb_image
   PUBLIC

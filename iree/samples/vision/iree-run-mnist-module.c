@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This sample uses iree/tools/utils/image_util to load an hand-writing image
-// to the iree hall buffer view, and runs on the bytecode module built from
-// mnist.mlir with dylib-llvm-aot backend. Other vision application can follow
-// the similar flow.
+// This sample uses iree/tools/utils/image_util to load a hand-written image
+// as an iree_hal_buffer_view_t then passes it to the bytecode module built
+// from mnist.mlir on the dylib-llvm-aot backend.
 
 #include <float.h>
 
@@ -23,7 +22,7 @@
 #include "iree/samples/vision/mnist_bytecode_module_c.h"
 #include "iree/tools/utils/image_util.h"
 
-iree_status_t Run() {
+iree_status_t Run(const iree_string_view_t image_path) {
   iree_runtime_instance_options_t instance_options;
   iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
                                            &instance_options);
@@ -57,17 +56,18 @@ iree_status_t Run() {
       session, iree_make_cstring_view("module.predict"), &call));
 
   // Prepare the input hal buffer view with image_util library.
+  // The input of the mmist model is single 28x28 pixel image as a
+  // tensor<1x28x28x1xf32>, with pixels in [0.0, 1.0].
   iree_hal_buffer_view_t* buffer_view = NULL;
-  const char kInputImage[] = "mnist_test.png";
   iree_hal_dim_t buffer_shape[] = {1, 28, 28, 1};
   iree_hal_element_type_t hal_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_32;
   float input_range[2] = {0.0f, 1.0f};
-  IREE_RETURN_IF_ERROR(iree_tools_utils_buffer_view_from_image_rescaled(
-                           iree_make_cstring_view(kInputImage), buffer_shape,
-                           IREE_ARRAYSIZE(buffer_shape), hal_element_type,
-                           iree_hal_device_allocator(device), input_range,
-                           IREE_ARRAYSIZE(input_range), &buffer_view),
-                       "load image");
+  IREE_RETURN_IF_ERROR(
+      iree_tools_utils_buffer_view_from_image_rescaled(
+          image_path, buffer_shape, IREE_ARRAYSIZE(buffer_shape),
+          hal_element_type, iree_hal_device_allocator(device), input_range,
+          IREE_ARRAYSIZE(input_range), &buffer_view),
+      "load image");
   IREE_RETURN_IF_ERROR(
       iree_runtime_call_inputs_push_back_buffer_view(&call, buffer_view));
   iree_hal_buffer_view_release(buffer_view);
@@ -79,7 +79,8 @@ iree_status_t Run() {
   IREE_RETURN_IF_ERROR(
       iree_runtime_call_outputs_pop_front_buffer_view(&call, &ret_buffer_view));
 
-  // Read back the results and ensure we have the right values.
+  // Read back the results. The output of the mnist model is a 1x10 prediction
+  // confidence values for each digit in [0, 9].
   iree_hal_buffer_mapping_t mapped_memory;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(ret_buffer_view), IREE_HAL_MEMORY_ACCESS_READ,
@@ -95,11 +96,6 @@ iree_status_t Run() {
   }
   iree_hal_buffer_unmap_range(&mapped_memory);
   // Get the highest index from the output.
-  if (result_idx != 4) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "detection result error. expect 4, get %d",
-                            result_idx);
-  }
   fprintf(stdout, "Detected number: %d\n", result_idx);
   iree_hal_buffer_view_release(ret_buffer_view);
 
@@ -109,8 +105,18 @@ iree_status_t Run() {
   return iree_ok_status();
 }
 
-int main() {
-  iree_status_t result = Run();
+int main(int argc, char** argv) {
+  if (argc > 2) {
+    fprintf(stderr, "Usage: iree-run-mnist-module <image file>\n");
+    return -1;
+  }
+  iree_string_view_t image_path;
+  if (argc == 1) {
+    image_path = iree_make_cstring_view("mnist_test.png");
+  } else {
+    image_path = iree_make_cstring_view(argv[1]);
+  }
+  iree_status_t result = Run(image_path);
   if (!iree_status_is_ok(result)) {
     iree_status_fprint(stderr, result);
     iree_status_ignore(result);
