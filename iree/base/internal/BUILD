@@ -42,6 +42,7 @@ cc_library(
     hdrs = [
         "atomics.h",
         "debugging.h",
+        "inline_array.h",
         "math.h",
     ],
     deps = [
