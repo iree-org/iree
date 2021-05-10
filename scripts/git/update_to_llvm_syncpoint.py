@@ -21,7 +21,7 @@ third_party/mlir-hlo submodules to commits that match the LLVM commit in the
 third_party/llvm-project submodule. We have special conditions around these
 submodules since they are synced as part of the integration of LLVM into
 Google's source repository. See
-https://google.github.io/iree/developing-iree/repository-management#the-special-relationship-with-llvm-and-tensorflow.
+https://github.com/google/iree/blob/main/docs/developers/developing_iree/repository_management.md#the-special-relationship-with-llvm-and-tensorflow.
 
 Typical usage:
   Syntax: ./scripts/git/update_to_llvm_syncpoint.py

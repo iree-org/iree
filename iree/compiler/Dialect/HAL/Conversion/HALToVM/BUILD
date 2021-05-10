@@ -43,6 +43,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Utils",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Conversion",
+        "//iree/compiler/Dialect/VM/Conversion/IREEToVM",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",

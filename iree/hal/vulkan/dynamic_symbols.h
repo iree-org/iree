@@ -75,8 +75,8 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
   //
   // After the instance is created the caller must use LoadFromInstance (or
   // LoadFromDevice) to load the remaining symbols.
-  static StatusOr<ref_ptr<DynamicSymbols>> Create(
-      const GetProcAddrFn& get_proc_addr);
+  static iree_status_t Create(const GetProcAddrFn& get_proc_addr,
+                              ref_ptr<DynamicSymbols>* out_syms);
 
   // Loads all required and optional Vulkan functions from the Vulkan loader.
   // This will look for a Vulkan loader on the system (like libvulkan.so) and
@@ -85,14 +85,15 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
   // The loaded function pointers will point to thunks in the ICD. This may
   // enable additional debug checking and more readable stack traces (as
   // errors come from within the ICD, where we have symbols).
-  static StatusOr<ref_ptr<DynamicSymbols>> CreateFromSystemLoader();
+  static iree_status_t CreateFromSystemLoader(
+      ref_ptr<DynamicSymbols>* out_syms);
 
   // Loads all required and optional Vulkan functions from the given instance.
   //
   // The loaded function pointers will point to thunks in the ICD. This may
   // enable additional debug checking and more readable stack traces (as
   // errors come from within the ICD, where we have symbols).
-  Status LoadFromInstance(VkInstance instance);
+  iree_status_t LoadFromInstance(VkInstance instance);
 
   // Loads all required and optional Vulkan functions from the given device,
   // falling back to the instance when required.
@@ -100,7 +101,7 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
   // This attempts to directly query the methods from the device, bypassing any
   // ICD or shim layers. These methods will generally have less overhead at
   // runtime as they need not jump through the various trampolines.
-  Status LoadFromDevice(VkInstance instance, VkDevice device);
+  iree_status_t LoadFromDevice(VkInstance instance, VkDevice device);
 
   // Define members for each function pointer.
   // See dynamic_symbol_tables.h for the full list of methods.

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
+
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
@@ -29,9 +29,13 @@ namespace iree_compiler {
 void addLinalgToLLVMPasses(OpPassManager &passManager,
                            LLVMCodegenOptions options) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+
+  // Tile and vectorize linalg ops.
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(
       createLinalgTileAndVectorizeWorkgroupsPass());
+  nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
   nestedModulePM.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
 
@@ -60,6 +64,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager,
                                     LLVMCodegenOptions options) {
   passManager.addPass(createMaterializeCPULaunchConfigurationPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addPass(createCanonicalizerPass());
   // TODO(ataei): We want to enable when tensor -> vector pass is fully
   // supported which requires first moving vector-tiling before this step.
   if (options.useLinalgOnTensorsToVectors) {

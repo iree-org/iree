@@ -168,5 +168,4 @@ vm.module @comparison_ops_i64 {
 
     vm.return
   }
-
 }

@@ -27,7 +27,7 @@
 #include "iree/vm/api.h"
 
 // NOTE: include order matters:
-#include "iree/base/flatcc.h"
+#include "iree/base/internal/flatcc.h"
 #include "iree/schemas/bytecode_module_def_reader.h"
 #include "iree/schemas/bytecode_module_def_verifier.h"
 
@@ -118,7 +118,7 @@ typedef struct {
   // Right now these don't do much, however we can perform lazy caching and
   // on-the-fly decompression using this information.
   iree_host_size_t rodata_ref_count;
-  iree_vm_ro_byte_buffer_t* rodata_ref_table;
+  iree_vm_buffer_t* rodata_ref_table;
 
   // Resolved function imports.
   iree_host_size_t import_count;

@@ -23,4 +23,5 @@ vm.module @conversion_ops {
     vm.check.eq %v, %c2, "truncate unsigned i32 to unsigned i16" : i32
     vm.return
   }
+
 }

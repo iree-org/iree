@@ -58,15 +58,9 @@ endif()
 iree_cc_binary(
   NAME
     iree-benchmark-module
-  OUT
-    iree-benchmark-module
   SRCS
     "iree-benchmark-module-main.cc"
   DEPS
-    absl::flags
-    absl::flags_parse
-    absl::flags_usage
-    absl::strings
     benchmark
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -83,15 +77,12 @@ iree_cc_binary(
 iree_cc_binary(
   NAME
     iree-check-module
-  OUT
-    iree-check-module
   SRCS
     "iree-check-module-main.cc"
   DEPS
     iree::modules::check::native_module
-    absl::flags
     absl::strings
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -108,8 +99,6 @@ iree_cc_binary(
 iree_cc_binary(
   NAME
     iree-dump-module
-  OUT
-    iree-dump-module
   SRCS
     "iree-dump-module-main.cc"
   DEPS
@@ -117,18 +106,15 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::status
     iree::schemas::bytecode_module_def_c_fbs
+    iree::tools::utils::vm_util
 )
 
 iree_cc_binary(
   NAME
     iree-run-module
-  OUT
-    iree-run-module
   SRCS
     "iree-run-module-main.cc"
   DEPS
-    absl::flags
-    absl::strings
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::status
@@ -165,6 +151,7 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_passes.h"
     DEPS
       MLIRIR
+      iree::compiler::Bindings::Native::Transforms
       iree::compiler::Bindings::TFLite::Transforms
       iree::compiler::Dialect::Flow::Analysis
       iree::compiler::Dialect::Flow::IR
@@ -332,8 +319,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-translate
-    OUT
-      iree-translate
     DEPS
       ::iree_translate_main
     HOSTONLY
@@ -342,8 +327,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-opt
-    OUT
-      iree-opt
     DEPS
       ::iree_opt_main
     HOSTONLY
@@ -351,8 +334,6 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
-      iree-run-mlir
-    OUT
       iree-run-mlir
     SRCS
       "iree-run-mlir-main.cc"
@@ -365,17 +346,15 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRSupport
       MLIRTargetLLVMIRExport
-      absl::flags
       absl::span
-      absl::strings
-      iree::base::api
+      iree::base
       iree::base::internal::flags
       iree::base::status
       iree::base::tracing
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
-      iree::hal::api
+      iree::hal
       iree::hal::drivers
       iree::modules::hal
       iree::tools::utils::vm_util

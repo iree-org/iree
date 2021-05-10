@@ -48,7 +48,7 @@ static inline iree_task_affinity_set_t iree_task_affinity_for_worker_range(
 }
 
 // Allows for any worker to be selected.
-static inline iree_task_affinity_set_t iree_task_affinity_for_any_worker() {
+static inline iree_task_affinity_set_t iree_task_affinity_for_any_worker(void) {
   return UINT64_MAX;
 }
 

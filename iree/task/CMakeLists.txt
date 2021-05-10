@@ -12,6 +12,20 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    api
+  HDRS
+    "api.h"
+  SRCS
+    "api.c"
+  DEPS
+    ::task
+    iree::base::internal::flags
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     task
   HDRS
     "affinity_set.h"
@@ -41,14 +55,14 @@ iree_cc_library(
     "worker.h"
   DEPS
     cpuinfo
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::atomic_slist
     iree::base::internal::prng
+    iree::base::internal::synchronization
+    iree::base::internal::threading
     iree::base::internal::wait_handle
-    iree::base::synchronization
-    iree::base::threading
     iree::base::tracing
   PUBLIC
 )
@@ -60,7 +74,7 @@ iree_cc_test(
     "executor_test.cc"
   DEPS
     ::task
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal::prng
     iree::task::testing::test_util
@@ -75,7 +89,7 @@ iree_cc_test(
     "list_test.cc"
   DEPS
     ::task
-    iree::base::api
+    iree::base
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
@@ -88,7 +102,7 @@ iree_cc_test(
     "pool_test.cc"
   DEPS
     ::task
-    iree::base::api
+    iree::base
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
@@ -101,7 +115,7 @@ iree_cc_test(
     "queue_test.cc"
   DEPS
     ::task
-    iree::base::api
+    iree::base
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
@@ -115,7 +129,7 @@ iree_cc_test(
     "task_impl.h"
   DEPS
     ::task
-    iree::base::api
+    iree::base
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
@@ -133,7 +147,7 @@ iree_cc_test(
     "task_test_wait.cc"
   DEPS
     ::task
-    iree::base::api
+    iree::base
     iree::task::testing::task_test
     iree::testing::gtest
     iree::testing::gtest_main
@@ -147,7 +161,7 @@ iree_cc_test(
   DEPS
     ::task
     cpuinfo
-    iree::base::api
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

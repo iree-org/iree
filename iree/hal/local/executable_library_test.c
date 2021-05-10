@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
   float arg0[4] = {1.0f, 2.0f, 3.0f, 4.0f};
   float ret0[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   const float ret0_expected[4] = {6.0f, 7.0f, 8.0f, 9.0f};
-  iree_device_size_t binding_lengths[2] = {
+  size_t binding_lengths[2] = {
       sizeof(arg0),
       sizeof(ret0),
   };

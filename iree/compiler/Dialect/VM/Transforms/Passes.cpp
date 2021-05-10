@@ -35,7 +35,9 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createInlinerPass());
   passManager.addPass(createCSEPass());
   passManager.addPass(createSymbolDCEPass());
-  passManager.addNestedPass<VM::ModuleOp>(createSinkDefiningOpsPass());
+  if (targetOptions.optimizeForStackSize) {
+    passManager.addNestedPass<VM::ModuleOp>(createSinkDefiningOpsPass());
+  }
 }
 
 void registerVMTransformPassPipeline() {

@@ -56,11 +56,11 @@ static iree_status_t iree_task_pool_grow(iree_task_pool_t* pool,
   // Note that we pad out our header to iree_max_align_t bytes so that all tasks
   // are aligned on the same boundaries as required by atomic operations.
   iree_host_size_t header_size =
-      iree_math_align(sizeof(iree_task_allocation_header_t), iree_max_align_t);
+      iree_host_align(sizeof(iree_task_allocation_header_t), iree_max_align_t);
   iree_host_size_t pow2_block_size = iree_math_round_up_to_pow2_u64(
       header_size + minimum_capacity * pool->task_size);
   iree_host_size_t aligned_block_size =
-      iree_math_align(pow2_block_size, IREE_TASK_POOL_BLOCK_ALIGNMENT);
+      iree_host_align(pow2_block_size, IREE_TASK_POOL_BLOCK_ALIGNMENT);
   if (aligned_block_size < IREE_TASK_POOL_MIN_BLOCK_SIZE) {
     aligned_block_size = IREE_TASK_POOL_MIN_BLOCK_SIZE;
   }

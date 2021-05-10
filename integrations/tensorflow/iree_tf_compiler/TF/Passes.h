@@ -65,6 +65,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerExportedFunctionsPass();
 // functions for any saved model exported functions.
 std::unique_ptr<OperationPass<ModuleOp>> createSavedModelToIREEABIPass();
 
+// Simplifies TensorFlow debug info for the purposes of making it easier to
+// look at.
+std::unique_ptr<OperationPass<ModuleOp>> createPrettifyDebugInfoPass();
+
 // Push resource casts forward to better propagate resource related shapes.
 std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCastsPass();
 
@@ -92,6 +96,7 @@ inline void registerAllPasses() {
   createFlattenTuplesInCFGPass();
   createLowerGlobalTensorsPass();
   createLowerExportedFunctionsPass();
+  createPrettifyDebugInfoPass();
   createPropagateResourceCastsPass();
   createSavedModelToIREEABIPass();
   createStripAssertsPass();

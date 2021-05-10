@@ -15,6 +15,8 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/Analysis/Dispatchability.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -25,7 +27,7 @@ namespace IREE {
 namespace Flow {
 
 class DispatchabilityAnalysisPass
-    : public PassWrapper<DispatchabilityAnalysisPass, OperationPass<ModuleOp>> {
+    : public DispatchabilityAnalysisBase<DispatchabilityAnalysisPass> {
  public:
   DispatchabilityAnalysisPass() = default;
 
@@ -48,10 +50,6 @@ class DispatchabilityAnalysisPass
 std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityAnalysisPass() {
   return std::make_unique<DispatchabilityAnalysisPass>();
 }
-
-static PassRegistration<DispatchabilityAnalysisPass> pass(
-    "iree-flow-dispatchability-analysis",
-    "Analyzes functions to determine their dispatchability");
 
 }  // namespace Flow
 }  // namespace IREE

@@ -107,7 +107,7 @@ flow.executable @reduction_ex_dispatch_0 {
 //  CHECK-NEXT:     module {
 //  CHECK-NEXT:       vm.module @module {
 //  CHECK-DAG:         vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer>
-//  CHECK-DAG:         vm.import @vmla.buffer.const(%value : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer>
+//  CHECK-DAG:         vm.import @vmla.buffer.const(%value : !vm.buffer) -> !vm.ref<!vmla.buffer>
 //  CHECK-DAG:         vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-DAG:         vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-DAG:         vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32)
@@ -121,8 +121,8 @@ flow.executable @reduction_ex_dispatch_0 {
 //   CHECK-DAG:           %c4 = vm.const.i32 4 : i32
 //   CHECK-DAG:           %c8 = vm.const.i32 8 : i32
 //   CHECK-DAG:           %c1 = vm.const.i32 1 : i32
-//  CHECK-NEXT:           %reduction_ex_dispatch_0_const = vm.const.ref.rodata @reduction_ex_dispatch_0_const : !vm.ref<!iree.byte_buffer>
-//  CHECK-NEXT:           %ref = vm.call @vmla.buffer.const(%reduction_ex_dispatch_0_const) : (!vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:           %reduction_ex_dispatch_0_const = vm.const.ref.rodata @reduction_ex_dispatch_0_const : !vm.buffer
+//  CHECK-NEXT:           %ref = vm.call @vmla.buffer.const(%reduction_ex_dispatch_0_const) : (!vm.buffer) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:           %ref_0 = vm.call @vmla.buffer.alloc(%c4) : (i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:           vm.call @vmla.buffer.fill(%ref, %ref_0) : (!vm.ref<!vmla.buffer>, !vm.ref<!vmla.buffer>) -> ()
 //  CHECK-NEXT:           %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>

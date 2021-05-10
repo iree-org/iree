@@ -24,7 +24,6 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
@@ -203,8 +202,7 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
-  if (options.enableVectorization &&
-      succeeded(getMaliSpecificConfig(op, targetEnv, options, tileSizes,
+  if (succeeded(getMaliSpecificConfig(op, targetEnv, options, tileSizes,
                                       config.workgroupSize,
                                       config.numSubgroups))) {
     config.vectorize = true;
@@ -268,11 +266,11 @@ static LogicalResult getConfigForCooperativeMatmul(
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix))
     return failure();
 
-  ShapedType lhsType = op.inputs().front().getType().cast<ShapedType>();
-  ArrayRef<int64_t> lhsShape = lhsType.getShape();
-  ShapedType rhsType = op.inputs().back().getType().cast<ShapedType>();
-  ArrayRef<int64_t> rhsShape = rhsType.getShape();
-  ShapedType outputType = op.outputs().front().getType().cast<ShapedType>();
+  SmallVector<ShapedType> inputTypes, outputTypes;
+  std::tie(inputTypes, outputTypes) = getInputOutputTypes(op);
+
+  ShapedType lhsType = inputTypes[0], rhsType = inputTypes[1];
+  ShapedType outputType = outputTypes[0];
 
   auto resourceLimits = targetEnv.getResourceLimits();
   Optional<SmallVector<int64_t, 4>> coopMatmulSize =
@@ -285,6 +283,9 @@ static LogicalResult getConfigForCooperativeMatmul(
   auto isMultipleOf = [](int64_t s, int64_t ts) {
     return !ShapedType::isDynamic(s) && (s % ts) == 0;
   };
+
+  ArrayRef<int64_t> lhsShape = lhsType.getShape();
+  ArrayRef<int64_t> rhsShape = rhsType.getShape();
   if (!isMultipleOf(lhsShape[0], (*coopMatmulSize)[0]) ||
       !isMultipleOf(rhsShape[1], (*coopMatmulSize)[1]) ||
       !isMultipleOf(lhsShape[1], (*coopMatmulSize)[2]) ||
@@ -334,10 +335,9 @@ LogicalResult getGenericOpLaunchConfig(linalg::LinalgOp linalgOp,
   // transfer_read ops with permutation maps that we currently cannot lower.
   // TODO: Remove this restriction once the lowering of the permutation map is
   // supported in core.
-  bool vectorize = options.enableVectorization &&
-                   llvm::all_of(linalgOp.getIndexingMaps(), [](AffineMap &map) {
-                     return map.isMinorIdentity();
-                   });
+  bool vectorize = llvm::all_of(linalgOp.getIndexingMaps(), [](AffineMap &map) {
+    return map.isMinorIdentity();
+  });
   int64_t subgroupSize =
       targetEnv.getResourceLimits().subgroup_size().getValue().getSExtValue();
   config.workgroupSize[0] = subgroupSize;
@@ -452,16 +452,15 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
-  if (options.enableVectorization &&
-      succeeded(getConfigForCooperativeMatmul(op, targetEnv, options, tileSizes,
+  if (succeeded(getConfigForCooperativeMatmul(op, targetEnv, options, tileSizes,
                                               config.workgroupSize,
                                               config.numSubgroups))) {
     config.vectorize = true;
     return success();
-  } else if (options.enableVectorization &&
-             succeeded(getTargetSpecificConfig(op, targetEnv, options,
-                                               tileSizes, config.workgroupSize,
-                                               config.numSubgroups))) {
+  }
+  if (succeeded(getTargetSpecificConfig(op, targetEnv, options, tileSizes,
+                                        config.workgroupSize,
+                                        config.numSubgroups))) {
     config.vectorize = true;
     return success();
   }
@@ -480,14 +479,18 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
     // memory available (maybe). For now, just hard-wire it.
     tileSizeK = 32;
   }
-  assert(tileSizes.empty());
-  int64_t M = op.inputs()[0].getType().cast<ShapedType>().getShape()[0];
-  int64_t N = op.inputs()[1].getType().cast<ShapedType>().getShape()[1];
-  int64_t K = op.inputs()[0].getType().cast<ShapedType>().getShape()[1];
+
+  SmallVector<ShapedType> inputTypes;
+  std::tie(inputTypes, std::ignore) = getInputOutputTypes(op);
+  int64_t M = inputTypes[0].getShape()[0];
+  int64_t N = inputTypes[1].getShape()[1];
+  int64_t K = inputTypes[0].getShape()[1];
+
   SmallVector<int64_t, 4> ts = {
       getMinIfShapeStatic(M, nRowsPerWorkitem * config.workgroupSize[1]),
       getMinIfShapeStatic(N, nColsPerWorkitem * config.workgroupSize[0]),
       getMinIfShapeStatic(K, tileSizeK)};
+  assert(tileSizes.empty());
   tileSizes.emplace_back(std::move(ts));
   return success();
 }
@@ -567,8 +570,7 @@ LogicalResult getConvOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
                                     const SPIRVCodegenOptions &options,
                                     TileSizesListType &tileSizes,
                                     LaunchConfigInfo &config) {
-  if (options.enableVectorization &&
-      targetEnv.getVendorID() == spirv::Vendor::ARM &&
+  if (targetEnv.getVendorID() == spirv::Vendor::ARM &&
       succeeded(getMaliSpecificConfig(op, tileSizes, config))) {
     return success();
   }
@@ -579,11 +581,7 @@ LogicalResult getConvOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
   SmallVector<int64_t, 4> ts;
-  if (options.usingLinalgOnTensors) {
-    ts.assign({0, 1, tileSizeY, tileSizeX});
-  } else {
-    ts.assign({1, tileSizeY, tileSizeX});
-  }
+  ts.assign({0, 1, tileSizeY, tileSizeX});
   tileSizes.emplace_back(std::move(ts));
   config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
@@ -681,11 +679,7 @@ LogicalResult getOpLaunchConfig(linalg::DepthwiseConvInputNHWCFilterHWCOp op,
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
   SmallVector<int64_t, 4> ts;
-  if (options.usingLinalgOnTensors) {
-    ts.assign({0, 1, tileSizeY, tileSizeX});
-  } else {
-    ts.assign({1, tileSizeY, tileSizeX});
-  }
+  ts.assign({0, 1, tileSizeY, tileSizeX});
   tileSizes.emplace_back(std::move(ts));
   config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
@@ -703,12 +697,8 @@ LogicalResult getOpLaunchConfig(linalg::DepthwiseConvInputNHWCFilterHWCFOp op,
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
   SmallVector<int64_t, 4> ts;
-  if (options.usingLinalgOnTensors) {
-    // There are five parallel loops in depthwise_conv_2d_input_nhwc_filter_hwcf
-    ts.assign({0, 0, 1, tileSizeY, tileSizeX});
-  } else {
-    ts.assign({1, tileSizeY, tileSizeX});
-  }
+  // There are five parallel loops in depthwise_conv_2d_input_nhwc_filter_hwcf
+  ts.assign({0, 0, 1, tileSizeY, tileSizeX});
   tileSizes.emplace_back(std::move(ts));
   config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
@@ -729,11 +719,7 @@ static LogicalResult getPoolingOpLaunchConfig(
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
   SmallVector<int64_t, 4> ts;
-  if (options.usingLinalgOnTensors) {
-    ts.assign({0, tileSizeY, tileSizeX, 1});
-  } else {
-    ts.assign({0, tileSizeY, tileSizeX});
-  }
+  ts.assign({0, tileSizeY, tileSizeX, 1});
   tileSizes.emplace_back(std::move(ts));
   config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
@@ -774,7 +760,7 @@ Optional<LaunchConfig> initGPULaunchConfig(
       // Invocation level.
       launchConfig.setTileSizes(linalgOp.getOperation(), invocationTileSizes,
                                 2);
-      launchConfig.setVectorize(options.enableVectorization);
+      launchConfig.setVectorize(true);
     }
     SmallVector<int64_t, 3> workgroupSize(options.workgroupSize.begin(),
                                           options.workgroupSize.end());
@@ -907,7 +893,13 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
   // Map to load4.
   auto rank = op.getVectorType().getRank();
   SmallVector<int64_t, 4> nativeSize(rank, 1);
-  nativeSize.back() = 4;
+  // Load 4 elements on the most inner dimension.
+  for (auto dim : llvm::enumerate(op.permutation_map().getResults())) {
+    if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
+      if (dimExpr.getPosition() == op.permutation_map().getNumDims() - 1)
+        nativeSize[dim.index()] = 4;
+    }
+  }
   return nativeSize;
 }
 
@@ -926,7 +918,13 @@ getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
   // Map to store4.
   auto rank = op.getVectorType().getRank();
   SmallVector<int64_t, 4> nativeSize(rank, 1);
-  nativeSize.back() = 4;
+  // Store 4 elements on the most inner dimension.
+  for (auto dim : llvm::enumerate(op.permutation_map().getResults())) {
+    if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
+      if (dimExpr.getPosition() == op.permutation_map().getNumDims() - 1)
+        nativeSize[dim.index()] = 4;
+    }
+  }
   return nativeSize;
 }
 

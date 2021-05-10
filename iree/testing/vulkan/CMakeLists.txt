@@ -49,7 +49,7 @@ iree_cc_library(
     "vulkan_gui_util.cc"
   DEPS
     imgui::imgui
-    iree::base::api
+    iree::base
     iree::base::logging
     iree::hal::vulkan
     SDL2::SDL2
@@ -63,7 +63,6 @@ iree_cc_binary(
     "iree-run-module-vulkan-gui-main.cc"
   DEPS
     ::vulkan_gui_util
-    absl::flags
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::main

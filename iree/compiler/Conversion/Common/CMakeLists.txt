@@ -14,7 +14,6 @@ iree_cc_library(
   NAME
     Common
   HDRS
-    "Attributes.h"
     "LaunchConfig.h"
     "Passes.h"
     "Transforms.h"
@@ -24,7 +23,6 @@ iree_cc_library(
     "ForOpCanonicalizationPass.cpp"
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
-    "LinalgRewriteDestructiveUpdatesPass.cpp"
     "Passes.cpp"
     "Transforms.cpp"
     "VectorTransferOptimization.cpp"

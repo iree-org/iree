@@ -16,6 +16,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/AsmState.h"
@@ -74,6 +76,9 @@ int main(int argc, char **argv) {
   // Convert the Module proto into MLIR.
   MLIRContext context(registry);
   context.loadAllAvailableDialects();
+
+  llvm::SourceMgr sourceMgr;
+  mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
 
   // Load input buffer.
   std::string errorMessage;

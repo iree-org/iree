@@ -45,9 +45,9 @@ void iree_memory_query_info(iree_memory_info_t* out_info) {
   out_info->can_allocate_executable_pages = true;
 }
 
-void iree_memory_jit_context_begin() {}
+void iree_memory_jit_context_begin(void) {}
 
-void iree_memory_jit_context_end() {}
+void iree_memory_jit_context_end(void) {}
 
 //==============================================================================
 // Virtual address space manipulation
@@ -144,7 +144,11 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
 // IREE_ELF_CLEAR_CACHE can be defined externally to override this default
 // behavior.
 #if !defined(IREE_ELF_CLEAR_CACHE)
-#if defined __has_builtin
+// __has_builtin was added in GCC 10, so just hard-code the availability
+// for < 10, special cased here so it can be dropped once no longer needed.
+#if defined __GNUC__ && __GNUC__ < 10
+#define IREE_ELF_CLEAR_CACHE(start, end) __builtin___clear_cache(start, end)
+#elif defined __has_builtin
 #if __has_builtin(__builtin___clear_cache)
 #define IREE_ELF_CLEAR_CACHE(start, end) __builtin___clear_cache(start, end)
 #endif  // __builtin___clear_cache

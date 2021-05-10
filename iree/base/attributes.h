@@ -18,6 +18,25 @@
 #include "iree/base/target_platform.h"
 
 //===----------------------------------------------------------------------===//
+// API/ABI interop
+//===----------------------------------------------------------------------===//
+
+// Denotes a method exported by the IREE API.
+// Any call annotated with this will be relatively stable.
+// Calls without this are considered private to the IREE implementation and
+// should not be relied upon.
+#ifdef __cplusplus
+#define IREE_API_EXPORT extern "C"
+#else
+#define IREE_API_EXPORT
+#endif  // __cplusplus
+
+// Denotes a function pointer that is exposed as part of the IREE API.
+// Example:
+//   iree_status_t(IREE_API_PTR* some_callback)(int value);
+#define IREE_API_PTR
+
+//===----------------------------------------------------------------------===//
 // IREE_HAVE_ATTRIBUTE
 //===----------------------------------------------------------------------===//
 

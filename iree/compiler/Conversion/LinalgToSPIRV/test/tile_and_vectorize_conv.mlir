@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups,iree-spirv-tile-and-vectorize-in-one-workgroup))" -iree-spirv-enable-vectorization -iree-codegen-spirv-experimental-linalg-on-tensors -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups,iree-spirv-tile-and-vectorize-in-one-workgroup))" -canonicalize -cse %s | IreeFileCheck %s
 
 hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -79,7 +79,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
 //      CHECK:     scf.for %{{.*}} = %c0 to %c16 step %c4
 // CHECK-SAME:         -> (vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>)
 
-// CHECK-COUNT-16: vector.contract
+// CHECK-COUNT-16: vector.fma
 
 // CHECK-COUNT-3: scf.yield
 
@@ -107,8 +107,8 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<1x113x113x96xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x3x1x96xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<1x56x56x96xf32>
-        %3 = linalg.reshape %1 [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>] : memref<3x3x1x96xf32> into memref<864xf32>
-        %4 = linalg.reshape %3 [affine_map<(d0, d1, d2) -> (d0, d1, d2)>] : memref<864xf32> into memref<3x3x96xf32>
+        %3 = linalg.reshape %1 [[0, 1, 2, 3]] : memref<3x3x1x96xf32> into memref<864xf32>
+        %4 = linalg.reshape %3 [[0, 1, 2]] : memref<864xf32> into memref<3x3x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index

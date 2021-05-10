@@ -54,11 +54,13 @@ function(iree_lit_test)
     return()
   endif()
 
+  iree_package_ns(_PACKAGE_NS)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   get_filename_component(_TEST_FILE_PATH ${_RULE_TEST_FILE} ABSOLUTE)
 
+  list(TRANSFORM _RULE_DATA REPLACE "^::" "${_PACKAGE_NS}::")
   set(_DATA_DEP_PATHS)
   foreach(_DATA_DEP ${_RULE_DATA})
     string(REPLACE "::" "_" _DATA_DEP_NAME ${_DATA_DEP})

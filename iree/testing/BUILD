@@ -30,7 +30,7 @@ cc_library(
         "benchmark.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:tracing",
         "@com_google_benchmark//:benchmark",
     ],

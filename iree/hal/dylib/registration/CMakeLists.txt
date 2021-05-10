@@ -20,13 +20,14 @@ iree_cc_library(
   HDRS
     "driver_module.h"
   SRCS
-    "driver_module.cc"
+    "driver_module.c"
   DEPS
-    absl::flags
-    iree::hal::api
+    iree::base::internal::flags
+    iree::hal
     iree::hal::local::loaders::embedded_library_loader
     iree::hal::local::loaders::legacy_library_loader
     iree::hal::local::task_driver
+    iree::task::api
   DEFINES
     "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1"
   PUBLIC
@@ -40,7 +41,7 @@ iree_cc_library(
   SRCS
     "driver_module_sync.c"
   DEPS
-    iree::hal::api
+    iree::hal
     iree::hal::local::loaders::legacy_library_loader
     iree::hal::local::sync_driver
   DEFINES

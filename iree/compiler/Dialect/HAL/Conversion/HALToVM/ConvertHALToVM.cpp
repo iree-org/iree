@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
@@ -129,6 +130,7 @@ class ConvertHALToVMPass
 
     OwningRewritePatternList conversionPatterns(&getContext());
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
+    populateIREEToVMPatterns(context, typeConverter, conversionPatterns);
 
     SymbolTable importSymbols(innerModuleOp);
     populateHALToVMPatterns(context, importSymbols, conversionPatterns,

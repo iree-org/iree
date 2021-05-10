@@ -66,6 +66,13 @@ static llvm::cl::opt<bool> stripDebugOpsFlag{
     llvm::cl::init(false),
 };
 
+static llvm::cl::opt<bool> emitPolyglotZipFlag{
+    "iree-vm-emit-polyglot-zip",
+    llvm::cl::desc(
+        "Enables output files to be viewed as zip files for debugging"),
+    llvm::cl::init(true),
+};
+
 BytecodeTargetOptions getBytecodeTargetOptionsFromFlags() {
   BytecodeTargetOptions targetOptions;
   targetOptions.outputFormat = outputFormatFlag;
@@ -73,6 +80,11 @@ BytecodeTargetOptions getBytecodeTargetOptionsFromFlags() {
   targetOptions.stripSymbols = stripSymbolsFlag;
   targetOptions.stripSourceMap = stripSourceMapFlag;
   targetOptions.stripDebugOps = stripDebugOpsFlag;
+  targetOptions.emitPolyglotZip = emitPolyglotZipFlag;
+  if (outputFormatFlag != BytecodeOutputFormat::kFlatBufferBinary) {
+    // Only allow binary output formats to also be .zip files.
+    targetOptions.emitPolyglotZip = false;
+  }
   return targetOptions;
 }
 

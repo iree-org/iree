@@ -109,17 +109,8 @@ static bool hasDestructiveUpdateSubTensorUses(
 // Determine whether `tensor` is produced by a destructive update of another
 // tensor. When successful, fill a SpecialTerminatorOpCapture struct that
 // captures the relevant (distributed) pieces of IR that for the destructive
-// update pattern. There are 2 cases.
-//
-// Simple case
-// ===========
-//
-// Just detect a SubTensorInsertOp.
-//
-// Loop case
-// =========
-//
-// Iteratively traverse an (imperfectly nested) loop nest such as:
+// update pattern. Iteratively traverse an (imperfectly nested) loop nest such
+// as:
 //
 // ```
 // %d0 = for  (iter_args %e0 = %0)
@@ -140,13 +131,6 @@ static bool hasDestructiveUpdateSubTensorUses(
 // value.
 static Value isADestructiveUpdatePattern(Value tensor,
                                          SpecialTerminatorOpCapture &capture) {
-  // Simple case: no loops and directly a tensorInsertOp.
-  if (auto tensorInsertOp =
-          dyn_cast_or_null<SubTensorInsertOp>(tensor.getDefiningOp())) {
-    capture.rootDestructiveUpdate = tensorInsertOp;
-    return tensorInsertOp.dest();
-  }
-
   Value returnValue;
   while (auto scfForOp = dyn_cast_or_null<scf::ForOp>(tensor.getDefiningOp())) {
     LLVM_DEBUG(llvm::dbgs()
@@ -252,25 +236,30 @@ static LogicalResult rewriteSubTensorInsertInPlace(OpBuilder &b,
                                                    Value target) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteSubTensorInsertInPlace: "
                           << *(op.getOperation()) << "\n");
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(op);
-  auto dest = op.dest();
-
-  // Sanity check for insert into an initArg that is immediately yielded.
-  if (!dest.isa<BlockArgument>() || !op.getResult().hasOneUse() ||
-      !isa<scf::YieldOp>(op.getResult().getUses().begin()->getOwner())) {
-    LLVM_DEBUG(llvm::dbgs() << "Rewrite failed: no single scf::YieldOp use\n");
-    return failure();
+  if (!op.getResult().hasOneUse()) {
+    return op.emitError("not a single use operation");
   }
 
-  // Kills the SSA use-def chain.
-  op.replaceAllUsesWith(dest);
+  Operation *user = *(op.getResult().getUsers().begin());
+  if (isa<scf::YieldOp>(user)) {
+    auto dest = op.dest();
+    if (!dest.isa<BlockArgument>()) {
+      return op.emitError("dest is not a argument to the loop");
+    }
+    OpBuilder::InsertionGuard g(b);
+    b.setInsertionPoint(op);
 
-  b.create<IREE::Flow::DispatchTensorStoreOp>(
-      op.getLoc(), op.source(), target, op.offsets(), op.sizes(), op.strides(),
-      op.static_offsets(), op.static_sizes(), op.static_strides());
+    // Kills the SSA use-def chain.
+    op.replaceAllUsesWith(dest);
 
-  return success();
+    b.create<IREE::Flow::DispatchTensorStoreOp>(
+        op.getLoc(), op.source(), target, op.offsets(), op.sizes(),
+        op.strides(), op.static_offsets(), op.static_sizes(),
+        op.static_strides());
+
+    return success();
+  }
+  return failure();
 }
 
 // Return true if any control flow is found in the DispatchWorkgroupsOp besides
@@ -383,15 +372,8 @@ static bool hasNonScfForControlFlow(
 // is elided.
 // This should probably become a dedicated pass based on core alias analysis,
 // when the latter becomes available.
-static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
-                                                     Value target) {
-  SpecialTerminatorOpCapture capture;
-  capture.initValue = v;
-  Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
-
-  // No destructive update semantics, bail.
-  if (!sourceValue || !capture.rootDestructiveUpdate) return success();
-
+static LogicalResult rewriteDestructiveUpdateInPlace(
+    OpBuilder &b, SpecialTerminatorOpCapture &capture, Value target) {
   Operation *outermostProducingOp = (capture.loops.empty())
                                         ? capture.rootDestructiveUpdate
                                         : capture.loops.front();
@@ -401,20 +383,8 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
   // Try to rewrite inplace.
   if (failed(rewriteSubTensorInsertInPlace(
           b, cast<SubTensorInsertOp>(capture.rootDestructiveUpdate), target))) {
-    // Nothing has changed yet, so return success. SubTensorInserts will be
-    // handled later.
-    return success();
+    return failure();
   }
-
-  // Reload the value produced inplace right after the inplace update.
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPointAfter(outermostProducingOp);
-  Value newLoad = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      outermostProducingOp->getLoc(), v.getType(), target);
-  // TODO(nicolasvasilache): this brutally replaces all uses by the result of
-  // this load. In practice we may want more recompute and we may have lost
-  // information. Revisit this when things are more fleshed out.
-  v.replaceAllUsesWith(newLoad);
 
   if (scf::ForOp loopOp = dyn_cast<scf::ForOp>(outermostProducingOp))
     loopOp.walk([&](SubTensorOp op) { (void)propagateSubTensorOp(b, op); });
@@ -449,29 +419,31 @@ LogicalResult rewriteLinalgDestructiveUpdates(
 
   MLIRContext *context = dispatchOp->getContext();
   OpBuilder b(context);
+  SmallVector<IREE::Flow::DispatchTensorStoreOp> processedStores;
   // For each tensor store op, look for destructive updates and replace the
   // destructive pattern by a custom inplace update pattern.
   bool fail = dispatchOp
                   .walk([&](IREE::Flow::DispatchTensorStoreOp op) {
-                    if (failed(rewriteDestructiveUpdateInPlace(b, op.value(),
+                    SpecialTerminatorOpCapture capture;
+                    capture.initValue = op.value();
+                    Value sourceValue =
+                        isADestructiveUpdatePattern(capture.initValue, capture);
+                    if (!sourceValue || !isa_and_nonnull<SubTensorInsertOp>(
+                                            capture.rootDestructiveUpdate))
+                      return WalkResult::advance();
+                    if (failed(rewriteDestructiveUpdateInPlace(b, capture,
                                                                op.target()))) {
                       return WalkResult::interrupt();
                     }
+                    processedStores.push_back(op);
                     return WalkResult::advance();
                   })
                   .wasInterrupted();
   if (fail) return failure();
 
-  // For each tensor store op, redundant load/store optimization.
-  dispatchOp.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
-    auto loadOp = dyn_cast_or_null<IREE::Flow::DispatchTensorLoadOp>(
-        storeOp.value().getDefiningOp());
-    // Bail if there exists an interleaved aliasing.
-    if (!loadOp || hasInterleavedAliases(loadOp, storeOp)) {
-      return;
-    }
-    storeOp.erase();
-  });
+  for (auto op : processedStores) {
+    op.erase();
+  }
 
   // Non-default canonicalization patterns.
   // TODO(nicolasvasilache): add Linalg tiling canonicalization patterns,

@@ -14,7 +14,6 @@
 
 #include "iree/hal/cuda/cuda_device.h"
 
-#include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/api.h"
 #include "iree/hal/cuda/cuda_allocator.h"

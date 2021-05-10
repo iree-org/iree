@@ -20,12 +20,11 @@ iree_cc_library(
   SRCS
     "driver_module.cc"
   DEPS
-    absl::flags
     iree::base::core_headers
     iree::base::internal::flags
     iree::base::status
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::vulkan
   DEFINES
     "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1"

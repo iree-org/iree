@@ -37,6 +37,7 @@ static constexpr int kNumGPUDims = 3;
 /// Allocation callback for allocation workgroup local memory.
 Optional<Value> allocateWorkgroupMemory(OpBuilder &b, memref::SubViewOp subview,
                                         ArrayRef<Value> boundingSubViewSize,
+                                        DataLayout &layout,
                                         OperationFolder *folder);
 
 /// Function used as callback for copyin/copyout in promotion pattern used

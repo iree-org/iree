@@ -321,6 +321,7 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-ldl"
+    "-lm"
     ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
 )
@@ -350,12 +351,18 @@ if(${IREE_SIZE_OPTIMIZED})
       "/Gy"
       "/DNDEBUG"
       "/DIREE_STATUS_MODE=0"
-      "/PDB"
+      "/DIREE_FLAGS_ENABLE_CLI=0"
+      "/DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
+      "/DIREE_VM_EXT_I64_ENABLE=0"
+      "/DIREE_VM_EXT_F32_ENABLE=0"
       "/Os"
       "/Oy"
+      "/Zi"
+      "/c"
   )
   iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS
     MSVC_OR_CLANG_CL
+      "-DEBUG:FULL"
       "-LTCG"
       "-opt:ref,icf"
   )

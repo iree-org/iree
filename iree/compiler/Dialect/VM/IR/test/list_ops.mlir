@@ -63,11 +63,11 @@ vm.module @module {
   vm.func @list_ref_any(%arg0: !vm.list<!vm.ref<?>>) {
     %c100 = vm.const.i32 100 : i32
 
-    // CHECK: %ref = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.ref<?>>, i32) -> !vm.ref<!iree.byte_buffer>
-    %ref = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.ref<?>>, i32) -> !vm.ref<!iree.byte_buffer>
+    // CHECK: %[[BUFFER:.+]] = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.ref<?>>, i32) -> !vm.buffer
+    %buffer = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.ref<?>>, i32) -> !vm.buffer
 
-    // CHECK: vm.list.set.ref %arg0, %c100, %ref : (!vm.list<!vm.ref<?>>, i32, !vm.ref<!iree.byte_buffer>)
-    vm.list.set.ref %arg0, %c100, %ref : (!vm.list<!vm.ref<?>>, i32, !vm.ref<!iree.byte_buffer>)
+    // CHECK: vm.list.set.ref %arg0, %c100, %[[BUFFER]] : (!vm.list<!vm.ref<?>>, i32, !vm.buffer)
+    vm.list.set.ref %arg0, %c100, %buffer : (!vm.list<!vm.ref<?>>, i32, !vm.buffer)
 
     vm.return
   }
@@ -78,14 +78,14 @@ vm.module @module {
 // Typed accessors for lists with strongly-typed ref elements.
 vm.module @module {
   // CHECK: @list_ref_typed
-  vm.func @list_ref_typed(%arg0: !vm.list<!vm.ref<!iree.byte_buffer>>) {
+  vm.func @list_ref_typed(%arg0: !vm.list<!vm.buffer>) {
     %c100 = vm.const.i32 100 : i32
 
-    // CHECK: %ref = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.ref<!iree.byte_buffer>>, i32) -> !vm.ref<!iree.byte_buffer>
-    %ref = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.ref<!iree.byte_buffer>>, i32) -> !vm.ref<!iree.byte_buffer>
+    // CHECK: %[[BUFFER:.+]] = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
+    %buffer = vm.list.get.ref %arg0, %c100 : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
 
-    // CHECK: vm.list.set.ref %arg0, %c100, %ref : (!vm.list<!vm.ref<!iree.byte_buffer>>, i32, !vm.ref<!iree.byte_buffer>)
-    vm.list.set.ref %arg0, %c100, %ref : (!vm.list<!vm.ref<!iree.byte_buffer>>, i32, !vm.ref<!iree.byte_buffer>)
+    // CHECK: vm.list.set.ref %arg0, %c100, %[[BUFFER]] : (!vm.list<!vm.buffer>, i32, !vm.buffer)
+    vm.list.set.ref %arg0, %c100, %buffer : (!vm.list<!vm.buffer>, i32, !vm.buffer)
 
     vm.return
   }
@@ -115,11 +115,11 @@ vm.module @module {
     // CHECK: vm.list.set.i32 %arg0, %c100, %0 : (!vm.list<?>, i32, i32)
     vm.list.set.i32 %arg0, %c100, %0 : (!vm.list<?>, i32, i32)
 
-    // CHECK: %ref = vm.list.get.ref %arg0, %c101 : (!vm.list<?>, i32) -> !vm.ref<!iree.byte_buffer>
-    %ref = vm.list.get.ref %arg0, %c101 : (!vm.list<?>, i32) -> !vm.ref<!iree.byte_buffer>
+    // CHECK: %[[BUFFER:.+]] = vm.list.get.ref %arg0, %c101 : (!vm.list<?>, i32) -> !vm.buffer
+    %buffer = vm.list.get.ref %arg0, %c101 : (!vm.list<?>, i32) -> !vm.buffer
 
-    // CHECK: vm.list.set.ref %arg0, %c101, %ref : (!vm.list<?>, i32, !vm.ref<!iree.byte_buffer>)
-    vm.list.set.ref %arg0, %c101, %ref : (!vm.list<?>, i32, !vm.ref<!iree.byte_buffer>)
+    // CHECK: vm.list.set.ref %arg0, %c101, %[[BUFFER]] : (!vm.list<?>, i32, !vm.buffer)
+    vm.list.set.ref %arg0, %c101, %buffer : (!vm.list<?>, i32, !vm.buffer)
 
     vm.return
   }

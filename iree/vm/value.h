@@ -38,8 +38,12 @@ typedef enum {
   IREE_VM_VALUE_TYPE_I32 = 3,
   // int64_t.
   IREE_VM_VALUE_TYPE_I64 = 4,
+  // float.
+  IREE_VM_VALUE_TYPE_F32 = 5,
+  // double.
+  IREE_VM_VALUE_TYPE_F64 = 6,
 
-  IREE_VM_VALUE_TYPE_MAX = IREE_VM_VALUE_TYPE_I64,
+  IREE_VM_VALUE_TYPE_MAX = IREE_VM_VALUE_TYPE_F64,
   IREE_VM_VALUE_TYPE_COUNT = IREE_VM_VALUE_TYPE_MAX + 1,
 } iree_vm_value_type_t;
 
@@ -54,6 +58,8 @@ typedef struct iree_vm_value {
     int16_t i16;
     int32_t i32;
     int64_t i64;
+    float f32;
+    double f64;
 
     uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value
                                                         // types
@@ -67,7 +73,7 @@ static inline iree_vm_value_t iree_vm_value_make_i32(int32_t value) {
   return result;
 }
 
-// TODO(#5542) Check the value type before accessing the union
+// TODO(#5542): check the value type before accessing the union.
 static inline int32_t iree_vm_value_get_i32(iree_vm_value_t *value) {
   return value->i32;
 }
@@ -79,9 +85,33 @@ static inline iree_vm_value_t iree_vm_value_make_i64(int64_t value) {
   return result;
 }
 
-// TODO(#5542) Check the value type before accessing the union
+// TODO(#5542): check the value type before accessing the union.
 static inline int64_t iree_vm_value_get_i64(iree_vm_value_t *value) {
   return value->i64;
+}
+
+static inline iree_vm_value_t iree_vm_value_make_f32(int32_t value) {
+  iree_vm_value_t result;
+  result.type = IREE_VM_VALUE_TYPE_F32;
+  result.f32 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline float iree_vm_value_get_f32(iree_vm_value_t *value) {
+  return value->f32;
+}
+
+static inline iree_vm_value_t iree_vm_value_make_f64(double value) {
+  iree_vm_value_t result;
+  result.type = IREE_VM_VALUE_TYPE_F64;
+  result.f64 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline double iree_vm_value_get_f64(iree_vm_value_t *value) {
+  return value->f64;
 }
 
 #ifdef __cplusplus

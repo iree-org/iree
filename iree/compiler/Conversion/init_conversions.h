@@ -37,7 +37,6 @@ inline void registerCommonConversionPasses() {
     createFlattenMemRefSubspanPass();
     createForOpCanonicalizationPass();
     createLinalgBufferizePass();
-    createLinalgRewriteDestructiveUpdatesPass();
     return true;
   }();
   (void)init_once;
@@ -64,13 +63,10 @@ inline void registerLinalgToVectorPasses() {
 inline void registerLinalgToSPIRVPasses() {
   static bool init_once = []() {
     // LinalgToSPIRV
-    createConvertToGPUPass(SPIRVCodegenOptions());
+    createConvertToGPUPass();
     createFoldProcessorIDUsesPass();
-    createTileAndDistributeAmongWorkgroupsPass(SPIRVCodegenOptions());
     createTileAndVectorizeInOneWorkgroupPass(SPIRVCodegenOptions());
-    createSplitDispatchFunctionPass();
     createVectorToGPUPass();
-    createMatMulTileAndVectorizeGPUPass();
     createVectorizeMemrefLoadStorePass();
     return true;
   }();
@@ -80,7 +76,6 @@ inline void registerLinalgToSPIRVPasses() {
 inline void registerLinalgToLLVMPasses() {
   static bool init_once = []() {
     // LinalgToLLVM
-    createLinalgTileAndDistributePass();
     createLinalgTileAndVectorizeWorkgroupsPass();
     createMaterializeCPULaunchConfigurationPass();
     createUnfusedFMAOpsPass();

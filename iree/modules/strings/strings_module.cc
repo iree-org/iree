@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
@@ -359,7 +358,7 @@ class StringsModule final : public vm::NativeModule<StringsModuleState> {
 }  // namespace
 }  // namespace iree
 
-extern "C" iree_status_t iree_strings_module_register_types() {
+extern "C" iree_status_t iree_strings_module_register_types(void) {
   if (strings_string_descriptor.type) {
     return iree_ok_status();  // Already registered.
   }

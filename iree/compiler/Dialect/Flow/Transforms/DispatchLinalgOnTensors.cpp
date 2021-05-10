@@ -16,6 +16,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DestructiveUpdateUtils.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -57,13 +59,6 @@ static llvm::cl::opt<bool> clEnableOperandFusion(
     "iree-flow-dispatch-formation-enable-operand-fusion",
     llvm::cl::desc(
         "Enable fusing operand producers during dispatch region formation"),
-    llvm::cl::init(false));
-
-// TODO(#5045): Tile and distribute on CPU causes performance regressions. This
-// needs to be addressed before this can be turned on by default.
-static llvm::cl::opt<bool> clTileAndDistributeElementwiseOps(
-    "iree-flow-tile-and-distribute-elementwise-ops",
-    llvm::cl::desc("Enable tile and distribute on elementwise operations"),
     llvm::cl::init(false));
 
 static const char kRootOpAttr[] = "__root_op__";
@@ -112,7 +107,7 @@ struct PatternRewriterWithScopedReplaceOp : public PatternRewriter {
 };
 
 struct DispatchLinalgOnTensorsPass
-    : public PassWrapper<DispatchLinalgOnTensorsPass, OperationPass<FuncOp>> {
+    : public DispatchLinalgOnTensorsBase<DispatchLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
@@ -649,9 +644,10 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
 
   // The only existing arguments are for the outputs. Just need to add a new
   // argument for the outputs and remap the value to use the new argument.
-  for (auto ba : block.getArguments().take_front(numOldBBArgs)) {
-    assert(ba.getType().isa<IREE::Flow::DispatchTensorType>());
-    ba.replaceAllUsesWith(block.addArgument(ba.getType()));
+  for (unsigned argNum : llvm::seq<unsigned>(0, numOldBBArgs)) {
+    BlockArgument arg = block.getArgument(argNum);
+    assert(arg.getType().isa<IREE::Flow::DispatchTensorType>());
+    arg.replaceAllUsesWith(block.addArgument(arg.getType()));
   }
   // Drop old BB args.
   block.eraseArguments(
@@ -812,10 +808,52 @@ struct TileAndDistributeOnTensorsPattern
   }
 };
 
+/// Given a list of shapes, returns whether it is statically provable that all
+/// shapes are the same. For now checks if
+/// 1) Each dimension has the same dynamic value, or,
+/// 2) The defining op for each dimension is a `constant` op with the same
+///    scalar value.
+static bool areAllShapesEqual(ArrayRef<SmallVector<Value>> shapes) {
+  assert(!shapes.empty());
+  if (shapes.size() == 1) return true;
+  auto isSameShape = [&](ArrayRef<Value> lhsShape,
+                         ArrayRef<Value> rhsShape) -> bool {
+    if (lhsShape.size() != rhsShape.size()) return false;
+    return llvm::all_of(
+        llvm::zip(lhsShape, rhsShape), [&](std::tuple<Value, Value> vals) {
+          APInt lhsInt, rhsInt;
+          Value lhs = std::get<0>(vals);
+          Value rhs = std::get<1>(vals);
+          return lhs == rhs || (matchPattern(lhs, m_ConstantInt(&lhsInt)) &&
+                                matchPattern(rhs, m_ConstantInt(&rhsInt)) &&
+                                lhsInt == rhsInt);
+        });
+  };
+  return llvm::all_of(
+      llvm::make_range(std::next(shapes.begin()), shapes.end()),
+      [&](ArrayRef<Value> shape) { return isSameShape(shapes[0], shape); });
+}
+
 /// The workload is computed based on the problem size. For a given operation,
-/// return the problem size.
-static Optional<SmallVector<Value>> getResultShape(PatternRewriter &rewriter,
-                                                   Operation *op) {
+/// return the shape of all its results.
+static Optional<SmallVector<SmallVector<Value>>> getResultShapes(
+    PatternRewriter &rewriter, Operation *op) {
+  if (op->getNumResults() == 0) return llvm::None;
+  SmallVector<SmallVector<Value>> resultShapes;
+  // Check if the op implements the shape interface.
+  if (auto shapedOp = dyn_cast<InferShapedTypeOpInterface>(op)) {
+    if (failed(shapedOp.reifyReturnTypeShapesPerResultDim(rewriter,
+                                                          resultShapes))) {
+      return llvm::None;
+    }
+    return resultShapes;
+  }
+
+  // Fallback is to get the shape using `dim` of the outputs. Since the
+  // workload depends on the output shape, set the insertion point to after
+  // the operation. After dim canonicalization, the original operation should
+  // become dead.
+  rewriter.setInsertionPointAfter(op);
   Location loc = op->getLoc();
   auto getShapeOfShapedTypeVal = [&](Value v) -> SmallVector<Value> {
     SmallVector<Value> shape;
@@ -825,28 +863,14 @@ static Optional<SmallVector<Value>> getResultShape(PatternRewriter &rewriter,
     }
     return shape;
   };
-  if (op->getNumResults() != 1) return llvm::None;
-
-  // Check if the op implements the shape interface.
-  if (auto shapedOp = dyn_cast<InferShapedTypeOpInterface>(op)) {
-    SmallVector<SmallVector<Value>> resultShape;
-    if (succeeded(shapedOp.reifyReturnTypeShapesPerResultDim(rewriter,
-                                                             resultShape)) &&
-        resultShape.size() == 1) {
-      return resultShape[0];
-    }
-  }
-
-  // TODO(ravishankarm): Since the workload depends on the output shape, set the
-  // insertion point to after the operation. After dim canonicalization, the
-  // original operation should become dead. This needs to be changed after the
-  // output shape interface lands upstream and can be used in IREE.
-  if (auto resultType = op->getResult(0).getType().dyn_cast<ShapedType>()) {
+  for (OpResult result : op->getResults()) {
+    auto resultType = result.getType().dyn_cast<ShapedType>();
+    if (!resultType) return llvm::None;
     rewriter.setInsertionPointAfter(op);
-    return getShapeOfShapedTypeVal(op->getResult(0));
+    auto resultShape = getShapeOfShapedTypeVal(result);
+    resultShapes.emplace_back(std::move(resultShape));
   }
-
-  return llvm::None;
+  return resultShapes;
 }
 
 /// Puts ops that are not-tilable or arent tiled into a
@@ -874,10 +898,13 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     }
 
     // The workgroup count is based on the result shape.
-    if (op->getNumResults() != 1) return failure();
-    Optional<SmallVector<Value>> resultShapeOpt = getResultShape(rewriter, op);
-    if (!resultShapeOpt) return failure();
-    SmallVector<Value> resultShape = *resultShapeOpt;
+    Optional<SmallVector<SmallVector<Value>>> resultShapesOpt =
+        getResultShapes(rewriter, op);
+    if (!resultShapesOpt) return failure();
+    ArrayRef<SmallVector<Value>> resultShapes = *resultShapesOpt;
+    if (resultShapes.size() != op->getNumResults() ||
+        !areAllShapesEqual(resultShapes))
+      return failure();
 
     // TODO(ravishankarm): For now the Flow -> HAL conversion only handles
     // workload count of 3, though it should be generalized. For now making sure
@@ -885,7 +912,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     // workloads for all higher dimensions greater than or equal to
     // kNumMaxParallelDims.
     Location loc = op->getLoc();
-    SmallVector<Value, 4> count(resultShape.begin(), resultShape.end());
+    SmallVector<Value, 4> count(resultShapes[0].begin(), resultShapes[0].end());
     if (count.size() > kNumMaxParallelDims) {
       unsigned numSymbols = 0;
       AffineExpr expr = rewriter.getAffineSymbolExpr(numSymbols++);
@@ -902,12 +929,13 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     auto workload = convertToWorkload(rewriter, loc, count);
 
     // Capture dynamic result dimensions.
-    assert(op->getNumResults() == 1 && "currently assuming a single result");
-    auto resultType = op->getResult(0).getType().cast<ShapedType>();
     SmallVector<Value, 4> resultDynamicDims;
-    for (unsigned i = 0; i < resultType.getRank(); ++i) {
-      if (resultType.isDynamicDim(i)) {
-        resultDynamicDims.push_back(resultShape[i]);
+    for (auto result : llvm::enumerate(op->getResults())) {
+      auto resultType = result.value().getType().cast<ShapedType>();
+      for (unsigned i = 0; i < resultType.getRank(); ++i) {
+        if (resultType.isDynamicDim(i)) {
+          resultDynamicDims.push_back(resultShapes[result.index()][i]);
+        }
       }
     }
 
@@ -1054,16 +1082,12 @@ static unsigned decideFusableLinalgOps(FuncOp funcOp) {
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
   FuncOp funcOp = getOperation();
-  // `isEntryPoint` functions are the ones that are marked public.
-  if (!funcOp.isPublic()) return;
 
   MLIRContext *context = funcOp->getContext();
   context->allowUnregisteredDialects(true);
 
   unsigned numRoots = decideFusableLinalgOps(funcOp);
-  if (clTileAndDistributeElementwiseOps) {
-    makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
-  }
+  makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
@@ -1216,11 +1240,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
 }
-
-static PassRegistration<DispatchLinalgOnTensorsPass> pass(
-    "iree-flow-dispatch-linalg-on-tensors-pass",
-    "Dispatch Linalg operations on tensors by using tile and distribute",
-    [] { return std::make_unique<DispatchLinalgOnTensorsPass>(); });
 
 }  // namespace Flow
 }  // namespace IREE

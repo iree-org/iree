@@ -415,6 +415,7 @@ def HAL_IndexArrayAttr : TypedArrayAttrBase<HAL_IndexAttr,
 def HAL_Dim : TypeAlias<Index>;
 def HAL_Dims : Variadic<HAL_Dim>;
 def HAL_Shape : Variadic<HAL_Dim>;
+def HAL_ShapeDynamicDims : Variadic<HAL_Dim>;
 
 // TODO(benvanik): assert rank 3
 def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<

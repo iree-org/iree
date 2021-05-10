@@ -16,26 +16,25 @@
 
 #include <inttypes.h>
 
-#include "absl/flags/flag.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"
 
 #define IREE_HAL_VULKAN_1_X_DRIVER_ID 0x564C4B31u  // VLK1
 
-ABSL_FLAG(bool, vulkan_validation_layers, true,
+IREE_FLAG(bool, vulkan_validation_layers, true,
           "Enables standard Vulkan validation layers.");
-ABSL_FLAG(bool, vulkan_debug_utils, true,
+IREE_FLAG(bool, vulkan_debug_utils, true,
           "Enables VK_EXT_debug_utils, records markers, and logs errors.");
 
-ABSL_FLAG(int, vulkan_default_index, 0, "Index of the default Vulkan device.");
+IREE_FLAG(int32_t, vulkan_default_index, 0,
+          "Index of the default Vulkan device.");
 
-ABSL_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
+IREE_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
           "Uses timeline semaphore emulation even if native support exists.");
 
-ABSL_FLAG(bool, vulkan_tracing, true,
+IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
 
 static iree_status_t iree_hal_vulkan_create_driver_with_flags(
@@ -58,22 +57,21 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   driver_options.api_version = VK_API_VERSION_1_2;
 #endif  // IREE_PLATFORM_ANDROID
 
-  if (absl::GetFlag(FLAGS_vulkan_validation_layers)) {
+  if (FLAG_vulkan_validation_layers) {
     driver_options.requested_features |=
         IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS;
   }
-  if (absl::GetFlag(FLAGS_vulkan_debug_utils)) {
+  if (FLAG_vulkan_debug_utils) {
     driver_options.requested_features |=
         IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS;
   }
-  if (absl::GetFlag(FLAGS_vulkan_tracing)) {
+  if (FLAG_vulkan_tracing) {
     driver_options.requested_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
   }
 
-  driver_options.default_device_index =
-      absl::GetFlag(FLAGS_vulkan_default_index);
+  driver_options.default_device_index = FLAG_vulkan_default_index;
 
-  if (absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
+  if (FLAG_vulkan_force_timeline_semaphore_emulation) {
     driver_options.device_options.flags |=
         IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION;
   }
@@ -123,7 +121,7 @@ static iree_status_t iree_hal_vulkan_driver_factory_try_create(
                                                   out_driver);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_vulkan_driver_module_register(iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
       /*self=*/NULL,

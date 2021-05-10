@@ -163,25 +163,7 @@ createStripAndSplatConstantVariablesPass();
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
-inline void registerFlowPasses() {
-  registerInputTransformPassPipeline();
-  registerFlowTransformPassPipeline();
-  createConvertToFlowTensorOpsPass();
-  createLegalizeInputTypesPass();
-  createHLOToHLOPreprocessingPass();
-  createPrePartitioningConversionPass();
-  createExpandVariableDynamicDimsPass();
-  createDispatchabilityAnalysisPass();
-  createIdentifyDispatchRegions2Pass();
-  createFoldCompatibleDispatchRegionsPass();
-  createOutlineDispatchRegionsPass();
-  createExportBenchmarkFuncsPass();
-  createOutlineLargeConstantsPass();
-  createDeduplicateExecutablesPass();
-  createFormStreamsPass();
-  createHoistUnstreamableOpsPass();
-  createStripAndSplatConstantVariablesPass();
-}
+void registerFlowPasses();
 
 }  // namespace Flow
 }  // namespace IREE

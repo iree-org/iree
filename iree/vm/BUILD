@@ -33,7 +33,7 @@ cc_library(
     ],
     deps = [
         ":impl",
-        "//iree/base:api",
+        "//iree/base",
     ],
 )
 
@@ -47,7 +47,7 @@ cc_library(
     ],
     deps = [
         ":vm",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:status",
         "@com_google_absl//absl/strings",
@@ -63,6 +63,7 @@ cc_library(
 cc_library(
     name = "impl",
     srcs = [
+        "buffer.c",
         "builtin_types.c",
         "context.c",
         "instance.c",
@@ -75,6 +76,7 @@ cc_library(
         "stack.c",
     ],
     hdrs = [
+        "buffer.h",
         "builtin_types.h",
         "context.h",
         "instance.h",
@@ -89,10 +91,22 @@ cc_library(
         "value.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
+    ],
+)
+
+cc_test(
+    name = "buffer_test",
+    srcs = ["buffer_test.cc"],
+    deps = [
+        ":cc",
+        ":impl",
+        "//iree/base",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -102,7 +116,7 @@ cc_test(
     deps = [
         ":cc",
         ":impl",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -115,7 +129,7 @@ cc_test(
         ":cc",
         ":impl",
         ":native_module_test_hdrs",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -129,7 +143,7 @@ cc_library(
     ],
     deps = [
         ":impl",
-        "//iree/base:api",
+        "//iree/base",
     ],
 )
 
@@ -139,7 +153,7 @@ cc_test(
     deps = [
         ":impl",
         ":native_module_test_hdrs",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:logging",
         "//iree/testing:benchmark_main",
         "@com_google_benchmark//:benchmark",
@@ -152,7 +166,7 @@ cc_test(
     deps = [
         ":cc",
         ":impl",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -163,7 +177,7 @@ cc_test(
     srcs = ["stack_test.cc"],
     deps = [
         ":impl",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -188,11 +202,11 @@ cc_library(
     deps = [
         ":ops",
         ":vm",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:flatcc",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:flatcc",
         "//iree/schemas:bytecode_module_def_c_fbs",
     ],
 )
@@ -250,11 +264,9 @@ cc_binary(
         ":bytecode_module",
         ":bytecode_module_benchmark_module_cc",
         ":vm",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:logging",
         "//iree/testing:benchmark_main",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
         "@com_google_benchmark//:benchmark",
     ],
 )
@@ -280,7 +292,7 @@ cc_test(
         ":bytecode_module",
         ":bytecode_module_size_benchmark_module_cc",
         ":vm",
-        "//iree/base:api",
+        "//iree/base",
     ],
 )
 
@@ -309,7 +321,7 @@ cc_library(
         "ops.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
     ],
 )
 

@@ -37,17 +37,22 @@ iree_cc_library(
     "tensor.c"
     "tensor.h"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
   PUBLIC
 )
+
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
 
 iree_cc_test(
   NAME

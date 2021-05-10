@@ -148,7 +148,8 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
 
   // Pad length allocated so that each pointer bump is always ending at an
   // aligned address and the next allocation will start aligned.
-  iree_host_size_t aligned_length = iree_align(byte_length, iree_max_align_t);
+  iree_host_size_t aligned_length =
+      iree_host_align(byte_length, iree_max_align_t);
 
   // Check to see if the current block (if any) has space - if not, get another.
   if (arena->block_head == NULL ||

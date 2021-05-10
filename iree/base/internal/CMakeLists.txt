@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "atomics.h"
     "debugging.h"
+    "inline_array.h"
     "math.h"
   SRCS
     "atomics_clang.h"
@@ -58,8 +59,8 @@ iree_cc_library(
     "atomic_slist.c"
   DEPS
     ::internal
+    ::synchronization
     iree::base::core_headers
-    iree::base::synchronization
   PUBLIC
 )
 
@@ -85,8 +86,8 @@ iree_cc_library(
   DEPS
     ::file_path
     ::internal
+    ::synchronization
     iree::base::core_headers
-    iree::base::threading
     iree::base::tracing
   PUBLIC
 )
@@ -97,9 +98,9 @@ iree_cc_library(
   HDRS
     "file_io.h"
   SRCS
-    "file_io.cc"
+    "file_io.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
@@ -124,7 +125,7 @@ iree_cc_library(
   SRCS
     "file_path.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
   PUBLIC
 )
@@ -147,11 +148,95 @@ iree_cc_library(
   HDRS
     "flags.h"
   SRCS
-    "flags.cc"
+    "flags.c"
   DEPS
-    absl::flags_parse
-    iree::base::api
+    ::file_io
+    ::internal
+    iree::base
+    iree::base::tracing
   PUBLIC
+)
+
+iree_cc_binary(
+  NAME
+    flags_demo
+  SRCS
+    "flags_demo.c"
+  DEPS
+    ::flags
+    iree::base::core_headers
+)
+
+iree_lit_test_suite(
+  NAME
+    flags_test
+  SRCS
+    "flags_test.txt"
+  DATA
+    ::flags_demo
+    iree::tools::IreeFileCheck
+  LABELS
+    "hostonly"
+)
+
+iree_cc_library(
+  NAME
+    flatcc
+  HDRS
+    "flatcc.h"
+  DEPS
+    ::flatcc_dummy
+    flatcc::runtime
+  PUBLIC
+)
+
+flatbuffer_c_library(
+  NAME
+    flatcc_dummy
+  SRCS
+    "flatcc.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    fpu_state
+  HDRS
+    "fpu_state.h"
+  SRCS
+    "fpu_state.c"
+  DEPS
+    ::internal
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    fpu_state_benchmark
+  SRCS
+    "fpu_state_benchmark.cc"
+  DEPS
+    ::fpu_state
+    benchmark
+    iree::testing::benchmark_main
+)
+
+iree_cc_test(
+  NAME
+    fpu_state_test
+  SRCS
+    "fpu_state_test.cc"
+  DEPS
+    ::fpu_state
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -200,13 +285,92 @@ iree_cc_library(
     "status.cc"
     "statusor.cc"
   DEPS
-    absl::core_headers
-    absl::strings
     absl::utility
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::logging
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    synchronization
+  HDRS
+    "call_once.h"
+    "synchronization.h"
+  SRCS
+    "synchronization.c"
+  DEPS
+    ::internal
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_binary(
+  NAME
+    synchronization_benchmark
+  SRCS
+    "synchronization_benchmark.cc"
+  DEPS
+    ::synchronization
+    benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_run_binary_test(
+  NAME
+    "synchronization_benchmark_test"
+  ARGS
+    "--benchmark_min_time=0"
+  TEST_BINARY
+    ::synchronization_benchmark
+)
+
+iree_cc_test(
+  NAME
+    synchronization_test
+  SRCS
+    "synchronization_test.cc"
+  DEPS
+    ::synchronization
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    threading
+  HDRS
+    "threading.h"
+  SRCS
+    "threading.c"
+    "threading_darwin.c"
+    "threading_impl.h"
+    "threading_pthreads.c"
+    "threading_win32.c"
+  DEPS
+    ::internal
+    ::synchronization
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    threading_test
+  SRCS
+    "threading_impl.h"
+    "threading_test.cc"
+  DEPS
+    ::synchronization
+    ::threading
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -224,7 +388,7 @@ iree_cc_library(
     "wait_handle_posix.h"
     "wait_handle_win32.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
   PUBLIC

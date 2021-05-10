@@ -39,10 +39,6 @@ cc_binary(
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/flags:usage",
-        "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
     ],
 )
@@ -52,7 +48,7 @@ cc_binary(
     testonly = True,
     srcs = ["iree-check-module-main.cc"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",
@@ -64,8 +60,6 @@ cc_binary(
         "//iree/testing:gtest",
         "//iree/tools/utils:vm_util",
         "//iree/vm:bytecode_module",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -76,6 +70,7 @@ cc_binary(
         "//iree/base:status",
         "//iree/base/internal:file_io",
         "//iree/schemas:bytecode_module_def_c_fbs",
+        "//iree/tools/utils:vm_util",
     ],
 )
 
@@ -86,6 +81,7 @@ cc_library(
         "init_iree_passes.h",
     ],
     deps = [
+        "//iree/compiler/Bindings/Native/Transforms",
         "//iree/compiler/Bindings/TFLite/Transforms",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/IR",
@@ -241,21 +237,19 @@ cc_binary(
     deps = [
         ":init_passes_and_dialects",
         ":init_targets",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:flags",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
@@ -280,7 +274,6 @@ cc_binary(
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
     ],
 )

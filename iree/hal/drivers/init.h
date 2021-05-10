@@ -29,7 +29,7 @@ extern "C" {
 // drivers must be directly registered or directly created, though a user could
 // create their own user_register_all_available_drivers() that calls this as
 // well as registering their drivers.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry);
 
 #ifdef __cplusplus

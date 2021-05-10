@@ -17,7 +17,7 @@
 #include "bindings/tflite/model.h"
 #include "bindings/tflite/shim.h"
 #include "bindings/tflite/tensor.h"
-#include "iree/base/threading.h"
+#include "iree/base/internal/call_once.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
@@ -126,8 +126,8 @@ static iree_status_t _TfLiteInterpreterShapeFrameInitialize(
 // will release any resources that may be retained and is required.
 static void _TfLiteInterpreterShapeFrameDeinitialize(
     _TfLiteInterpreterShapeFrame* frame) {
-  iree_vm_list_deinitialize(frame->shape_list);
   iree_vm_list_deinitialize(frame->arg_list);
+  iree_vm_list_deinitialize(frame->shape_list);
 }
 
 // Reads the shape value in the frame storage from the prior application.
@@ -236,7 +236,7 @@ static iree_status_t _TfLiteInterpreterRefreshIOShapes(
 static iree_host_size_t _TfLiteInterpreterCalculateSize(
     const TfLiteModel* model) {
   iree_host_size_t total_size =
-      iree_math_align(sizeof(TfLiteInterpreter), iree_max_align_t);
+      iree_host_align(sizeof(TfLiteInterpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
       iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());
@@ -267,7 +267,7 @@ static iree_status_t _TfLiteInterpreterAllocate(
   _TfLiteModelRetain(interpreter->model);
 
   uint8_t* p = (uint8_t*)interpreter +
-               iree_math_align(sizeof(*interpreter), iree_max_align_t);
+               iree_host_align(sizeof(*interpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
       iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());

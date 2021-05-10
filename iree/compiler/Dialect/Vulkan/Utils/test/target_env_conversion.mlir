@@ -1,7 +1,7 @@
-// RUN: iree-opt -iree-codegen-spirv-experimental-linalg-on-tensors -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s -check-prefix=DEFAULT
-// RUN: iree-opt -iree-codegen-spirv-experimental-linalg-on-tensors -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10 %s | IreeFileCheck %s -check-prefix=ADRENO640
-// RUN: iree-opt -iree-codegen-spirv-experimental-linalg-on-tensors -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=valhall-g77-unknown-android10 %s | IreeFileCheck %s -check-prefix=MALIG77
-// RUN: iree-opt -iree-codegen-spirv-experimental-linalg-on-tensors -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=turing-t4-unknown-linux %s | IreeFileCheck %s -check-prefix=TURINGT4
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s -check-prefix=DEFAULT
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10 %s | IreeFileCheck %s -check-prefix=ADRENO640
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=valhall-g77-unknown-android10 %s | IreeFileCheck %s -check-prefix=MALIG77
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=turing-t4-unknown-linux %s | IreeFileCheck %s -check-prefix=TURINGT4
 
 // TODO(antiagainst): Passing in lenghty strings as command-line options is not
 // optimal. We should consider creating a dedicated test pass to pick up

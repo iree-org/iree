@@ -36,7 +36,7 @@ iree_status_t iree_hal_heap_buffer_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_heap_buffer_t* buffer = NULL;
-  iree_host_size_t header_size = iree_math_align(sizeof(*buffer), 16);
+  iree_host_size_t header_size = iree_host_align(sizeof(*buffer), 16);
   iree_host_size_t total_size = header_size + allocation_size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&buffer);
@@ -61,7 +61,7 @@ iree_status_t iree_hal_heap_buffer_create(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
+IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,

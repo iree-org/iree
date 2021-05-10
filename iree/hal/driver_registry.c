@@ -14,8 +14,8 @@
 
 #include "iree/hal/driver_registry.h"
 
-#include "iree/base/synchronization.h"
-#include "iree/base/threading.h"
+#include "iree/base/internal/call_once.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 
@@ -53,15 +53,14 @@ static void iree_hal_driver_registry_default_initialize(void) {
   iree_slim_mutex_initialize(&iree_hal_driver_registry_default_.mutex);
 }
 
-IREE_API_EXPORT iree_hal_driver_registry_t* IREE_API_CALL
-iree_hal_driver_registry_default() {
+IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default(
+    void) {
   iree_call_once(&iree_hal_driver_registry_default_flag_,
                  iree_hal_driver_registry_default_initialize);
   return &iree_hal_driver_registry_default_;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_register_factory(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_register_factory(
     iree_hal_driver_registry_t* registry,
     const iree_hal_driver_factory_t* factory) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -101,8 +100,7 @@ iree_hal_driver_registry_register_factory(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_unregister_factory(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
     iree_hal_driver_registry_t* registry,
     const iree_hal_driver_factory_t* factory) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -163,7 +161,7 @@ static iree_host_size_t iree_hal_driver_info_copy(
   return storage_size;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_enumerate(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
     iree_hal_driver_registry_t* registry, iree_allocator_t allocator,
     iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count) {
@@ -196,7 +194,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_enumerate(
 
   // Allocate the required memory for both the driver infos and the string
   // storage in a single block.
-  iree_host_size_t total_driver_infos_size = iree_math_align(
+  iree_host_size_t total_driver_infos_size = iree_host_align(
       total_driver_info_count * sizeof(iree_hal_driver_info_t), 8);
   if (iree_status_is_ok(status)) {
     status = iree_allocator_malloc(allocator,
@@ -237,7 +235,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_enumerate(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_try_create(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_t* registry, iree_hal_driver_id_t driver_id,
     iree_allocator_t allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(registry);
@@ -271,8 +269,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_try_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_try_create_by_name(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
     iree_allocator_t allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(registry);

@@ -26,6 +26,7 @@ cc_library(
         "LowerExportedFunctions.cpp",
         "LowerGlobalTensors.cpp",
         "Passes.cpp",
+        "PrettifyDebugInfo.cpp",
         "PropagateResourceCasts.cpp",
         "SavedModelToIreeABI.cpp",
         "StripAsserts.cpp",

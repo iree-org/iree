@@ -431,6 +431,17 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
   }
 };
 
+/// Returns the canonical type of the result of the load op.
+struct DispatchTensorLoadReturnTypeCanonicalizer {
+  RankedTensorType operator()(DispatchTensorLoadOp loadOp,
+                              ArrayRef<OpFoldResult> mixedOffsets,
+                              ArrayRef<OpFoldResult> mixedSizes,
+                              ArrayRef<OpFoldResult> mixedStrides) {
+    return DispatchTensorLoadOp::inferResultType(
+        loadOp.source().getType().cast<DispatchTensorType>(), mixedSizes);
+  }
+};
+
 /// A canonicalizer wrapper to replace DispatchTensorLoadOps.
 struct DispatchTensorLoadOpCanonicalizer {
   void operator()(PatternRewriter &rewriter, DispatchTensorLoadOp op,
@@ -444,11 +455,12 @@ struct DispatchTensorLoadOpCanonicalizer {
 
 void DispatchTensorLoadOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ConvertDimOfDispatchInputLoadToDispatchShape,
-                 ConvertDispatchInputLoadOfTensorToSubTensor,
-                 OpWithOffsetSizesAndStridesConstantArgumentFolder<
-                     DispatchTensorLoadOp, DispatchTensorLoadOpCanonicalizer>>(
-      context);
+  results.insert<
+      ConvertDimOfDispatchInputLoadToDispatchShape,
+      ConvertDispatchInputLoadOfTensorToSubTensor,
+      OpWithOffsetSizesAndStridesConstantArgumentFolder<
+          DispatchTensorLoadOp, DispatchTensorLoadReturnTypeCanonicalizer,
+          DispatchTensorLoadOpCanonicalizer>>(context);
 }
 
 // Inlining producers of an input to the dispatch region results in the
@@ -567,7 +579,8 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
 
 static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                                ShapedType rhsType, ValueRange rhsDynamicDims) {
-  if (lhsType.hasStaticShape() && lhsType == rhsType) {
+  if (lhsType.hasStaticShape() &&
+      lhsType.getNumElements() == rhsType.getNumElements()) {
     // Static shape equivalence means we can fast-path the check.
     return true;
   }

@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -64,7 +65,7 @@ static std::vector<ConstantOp> findLargeConstantsInModule(
 }
 
 class OutlineLargeConstantsPass
-    : public PassWrapper<OutlineLargeConstantsPass, OperationPass<ModuleOp>> {
+    : public OutlineLargeConstantsBase<OutlineLargeConstantsPass> {
  public:
   OutlineLargeConstantsPass() = default;
   OutlineLargeConstantsPass(size_t minLargeConstantSize)
@@ -125,14 +126,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
     size_t minLargeConstantSize) {
   return std::make_unique<OutlineLargeConstantsPass>(minLargeConstantSize);
 }
-
-static PassRegistration<OutlineLargeConstantsPass> pass(
-    "iree-flow-outline-large-constants",
-    "Outlines large tensor constants into flow.variables at the module level.",
-    [] {
-      // TODO(#5493): add a flag for this.
-      return std::make_unique<OutlineLargeConstantsPass>(256);
-    });
 
 }  // namespace Flow
 }  // namespace IREE

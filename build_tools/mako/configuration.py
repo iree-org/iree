@@ -18,7 +18,9 @@ class TargetInfo:
   """Information of a target backend.
 
   Attributes:
-    name: The target name used in iree-translate, e.g., vulkan-spirv.
+    driver: The driver used in iree-benchmark-module, e.g., vulkan.
+    hal_target_backend: The target name used in iree-translate, e.g., vulkan-spirv.
+    taskset: The value used for taskset when benchmarking the IREE module.
     mako_tag: The value_key in Mako config. This will be used in Mako metric
       info, which should match to the config.
     compilation_flags: Addition compilation flags. This is useful to target
@@ -28,24 +30,22 @@ class TargetInfo:
   """
 
   def __init__(self,
-               name,
+               driver,
+               hal_target_backend,
+               taskset,
                mako_tag,
                compilation_flags=None,
                runtime_flags=None):
-    if "_" in name:
-      raise ValueError("The target name contains invalid char '_'")
     if compilation_flags is None:
       compilation_flags = []
     if runtime_flags is None:
       runtime_flags = []
-    self.name = name
+    self.driver = driver
+    self.hal_target_backend = hal_target_backend
+    self.taskset = taskset
     self.mako_tag = mako_tag
     self.compilation_flags = compilation_flags
     self.runtime_flags = runtime_flags
-
-  def get_driver(self) -> str:
-    """ Returns a string indicates the driver of the target."""
-    return self.name.split("-")[0]
 
   def add_batch_flag(self, size):
     self.compilation_flags.append(
@@ -94,69 +94,111 @@ class ModelBenchmarkInfo:
     self.phones = phones
 
 
-def get_pixel4_default_target_list(skipped_target=None, batch_config=None):
+def get_pixel4_default_target_list(skipped_target=None,
+                                   batch_config=None,
+                                   compilation_flags=None):
   if skipped_target is None:
     skipped_target = []
   if batch_config is None:
     batch_config = []
+  if compilation_flags is None:
+    compilation_flags = []
   targets = [
-      TargetInfo(name="vmla", mako_tag="vmla"),
-      TargetInfo(name="dylib-llvm-aot",
+      TargetInfo(driver="vmla",
+                 hal_target_backend="vmla",
+                 taskset="80",
+                 mako_tag="vmla"),
+      TargetInfo(driver="dylib-sync",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="80",
                  mako_tag="cpu",
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
-                     "-iree-flow-inline-constants-max-byte-length=2048",
-                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                 ]),
+      TargetInfo(driver="dylib",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="f0",
+                 mako_tag="cpu3t",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
                  ],
-                 runtime_flags=["--dylib_worker_count=1"]),
+                 runtime_flags=[
+                     "--task_topology_group_count=3",
+                 ]),
       TargetInfo(
-          name="vulkan-spirv",
+          driver="vulkan",
+          hal_target_backend="vulkan-spirv",
+          taskset="80",
           mako_tag="vlk",
           compilation_flags=[
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10",
-              "-iree-flow-inline-constants-max-byte-length=2048",
-              "-iree-flow-dispatch-formation-enable-operand-fusion",
-              "-iree-flow-tile-and-distribute-elementwise-ops"
-              "-iree-enable-fusion-with-reduction-ops"
+              "--iree-flow-inline-constants-max-byte-length=2048",
+              "--iree-flow-dispatch-formation-enable-operand-fusion",
+              "--iree-enable-fusion-with-reduction-ops",
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
   for target in targets:
     if target.mako_tag in batch_config:
       target.add_batch_flag(batch_config[target.mako_tag])
+    if target.mako_tag in compilation_flags:
+      target.compilation_flags += compilation_flags[target.mako_tag]
   return targets
 
 
-def get_s20_default_target_list(skipped_target=None, batch_config=None):
+def get_s20_default_target_list(skipped_target=None,
+                                batch_config=None,
+                                compilation_flags=None):
   if skipped_target is None:
     skipped_target = []
   if batch_config is None:
     batch_config = []
+  if compilation_flags is None:
+    compilation_flags = []
   targets = [
-      TargetInfo(name="vmla", mako_tag="vmla"),
-      TargetInfo(name="dylib-llvm-aot",
+      TargetInfo(driver="vmla",
+                 hal_target_backend="vmla",
+                 taskset="80",
+                 mako_tag="vmla"),
+      TargetInfo(driver="dylib-sync",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="80",
                  mako_tag="cpu",
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
-                     "-iree-flow-inline-constants-max-byte-length=2048",
-                     "-iree-flow-dispatch-formation-enable-operand-fusion"
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                 ]),
+      TargetInfo(driver="dylib",
+                 hal_target_backend="dylib-llvm-aot",
+                 taskset="f0",
+                 mako_tag="cpu3t",
+                 compilation_flags=[
+                     "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
                  ],
-                 runtime_flags=["--dylib_worker_count=1"]),
+                 runtime_flags=[
+                     "--task_topology_group_count=3",
+                 ]),
       TargetInfo(
-          name="vulkan-spirv",
+          driver="vulkan",
+          hal_target_backend="vulkan-spirv",
+          taskset="80",
           mako_tag="vlk",
           compilation_flags=[
               "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
               # TODO(GH-5330): Revisit the number or delete the flag.
-              "-iree-flow-inline-constants-max-byte-length=16",
-              "-iree-flow-dispatch-formation-enable-operand-fusion",
-              "-iree-flow-tile-and-distribute-elementwise-ops",
+              "--iree-flow-inline-constants-max-byte-length=16",
+              "--iree-flow-dispatch-formation-enable-operand-fusion"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
   for target in targets:
     if target.mako_tag in batch_config:
       target.add_batch_flag(batch_config[target.mako_tag])
+    if target.mako_tag in compilation_flags:
+      target.compilation_flags += compilation_flags[target.mako_tag]
   return targets
 
 
@@ -176,16 +218,11 @@ MODEL_BENCHMARKS = [
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="5538704950034432",
                                targets=get_pixel4_default_target_list(
-                                   skipped_target=["cpu2", "vlk2"],
-                                   batch_config={"cpu": 8})),
+                                   skipped_target=["cpu2", "vlk2"],)),
             PhoneBenchmarkInfo(name="S20",
                                benchmark_key="4699630718681088",
                                targets=get_s20_default_target_list(
-                                   skipped_target=["cpu2", "vlk2"],
-                                   batch_config={
-                                       "cpu": 8,
-                                       "vlk": 16
-                                   })),
+                                   skipped_target=["cpu2", "vlk2"],)),
         ]),
     ModelBenchmarkInfo(
         name="mobilenet-v2",
@@ -193,20 +230,31 @@ MODEL_BENCHMARKS = [
         model_path="mobilenet-v2/iree_input.mlir",
         flagfile_path="mobilenet-v2/flagfile",
         phones=[
-            PhoneBenchmarkInfo(name="Pixel4",
-                               benchmark_key="6338759231537152",
-                               targets=get_pixel4_default_target_list(
-                                   skipped_target=["vlk2"],
-                                   batch_config={
-                                       "cpu": 16,
-                                   })),
+            PhoneBenchmarkInfo(
+                name="Pixel4",
+                benchmark_key="6338759231537152",
+                targets=get_pixel4_default_target_list(
+                    skipped_target=["vlk2"],
+                    compilation_flags={
+                        'cpu': [
+                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+                        ],
+                        'cpu3t': [
+                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+                        ]
+                    })),
             PhoneBenchmarkInfo(
                 name="S20",
                 benchmark_key="5618403088793600",
-                targets=get_s20_default_target_list(batch_config={
-                    "cpu": 16,
-                    "vlk": 64,
-                })),
+                targets=get_s20_default_target_list(
+                    compilation_flags={
+                        'cpu': [
+                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+                        ],
+                        'cpu3t': [
+                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+                        ]
+                    })),
         ]),
     ModelBenchmarkInfo(
         name="mobilebert-f16",

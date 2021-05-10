@@ -38,10 +38,10 @@ vm.module @my_module {
 vm.module @my_module {
   vm.rodata @buf0 dense<[0, 1, 2]> : tensor<3xi8>
   // CHECK-LABEL: @const_ref_rodata
-  vm.func @const_ref_rodata() -> !vm.ref<!iree.byte_buffer> {
-    // CHECK: %buf0 = vm.const.ref.rodata @buf0 : !vm.ref<!iree.byte_buffer>
-    %buf0 = vm.const.ref.rodata @buf0 : !vm.ref<!iree.byte_buffer>
-    vm.return %buf0 : !vm.ref<!iree.byte_buffer>
+  vm.func @const_ref_rodata() -> !vm.buffer {
+    // CHECK: %buf0 = vm.const.ref.rodata @buf0 : !vm.buffer
+    %buf0 = vm.const.ref.rodata @buf0 : !vm.buffer
+    vm.return %buf0 : !vm.buffer
   }
 }
 
@@ -49,9 +49,9 @@ vm.module @my_module {
 
 vm.module @my_module {
   // CHECK-LABEL: @inlined_rodata
-  vm.func @inlined_rodata() -> !vm.ref<!iree.byte_buffer> {
-    // CHECK-NEXT: = vm.rodata.inline : !vm.ref<!iree.byte_buffer> = dense<[0, 1, 2]> : tensor<3xi8>
-    %0 = vm.rodata.inline : !vm.ref<!iree.byte_buffer> = dense<[0, 1, 2]> : tensor<3xi8>
-    vm.return %0 : !vm.ref<!iree.byte_buffer>
+  vm.func @inlined_rodata() -> !vm.buffer {
+    // CHECK-NEXT: = vm.rodata.inline : !vm.buffer = dense<[0, 1, 2]> : tensor<3xi8>
+    %0 = vm.rodata.inline : !vm.buffer = dense<[0, 1, 2]> : tensor<3xi8>
+    vm.return %0 : !vm.buffer
   }
 }

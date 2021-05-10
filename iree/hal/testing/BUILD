@@ -25,7 +25,7 @@ cc_library(
     testonly = True,
     hdrs = ["driver_registry.h"],
     deps = [
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/hal/drivers",
     ],
 )

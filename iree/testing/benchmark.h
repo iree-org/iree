@@ -126,7 +126,7 @@ typedef struct iree_benchmark_def_s {
 
 // Registers a benchmark with the given definition.
 void iree_benchmark_register(iree_string_view_t name,
-                             iree_benchmark_def_t* benchmark_def);
+                             const iree_benchmark_def_t* benchmark_def);
 
 //===----------------------------------------------------------------------===//
 // Benchmark infra management
@@ -139,7 +139,7 @@ void iree_benchmark_initialize(int* argc, char** argv);
 // Runs all registered benchmarks specified by the command line flags.
 // Must be called after iree_benchmark_initialize and zero or more benchmarks
 // have been registered with iree_benchmark_register.
-void iree_benchmark_run_specified();
+void iree_benchmark_run_specified(void);
 
 #ifdef __cplusplus
 }  // extern "C"

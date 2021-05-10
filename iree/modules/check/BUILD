@@ -23,10 +23,11 @@ cc_test(
     srcs = ["check_test.cc"],
     deps = [
         ":native_module",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:logging",
         "//iree/base:status",
-        "//iree/hal:api",
+        "//iree/base/internal",
+        "//iree/hal",
         "//iree/hal/vmla/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",
@@ -34,9 +35,7 @@ cc_test(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-        "@half//:includes",
     ],
 )
 
@@ -46,14 +45,13 @@ cc_library(
     srcs = ["native_module.cc"],
     hdrs = ["native_module.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:status",
-        "//iree/hal:api",
+        "//iree/base/internal",
+        "//iree/hal",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/vm",
         "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
-        "@half//:includes",
     ],
 )

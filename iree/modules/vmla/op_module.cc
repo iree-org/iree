@@ -146,13 +146,14 @@ StatusOr<uint32_t> Interface::GetConstant(uint32_t offset) const {
   return constants_[offset];
 }
 
-Status Interface::SetConstants(absl::Span<const uint32_t> values) {
-  if (values.size() > kMaxConstants) {
+Status Interface::SetConstants(const uint32_t* values,
+                               iree_host_size_t value_count) {
+  if (value_count > kMaxConstants) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "constant value overflow; have %zu but max is %d",
-                            values.size(), kMaxConstants);
+                            value_count, kMaxConstants);
   }
-  for (size_t i = 0; i < values.size(); ++i) {
+  for (size_t i = 0; i < value_count; ++i) {
     constants_[i] = values[i];
   }
   return OkStatus();
@@ -218,13 +219,12 @@ class VMLAModuleState final {
   // vmla.buffer.*
   //===--------------------------------------------------------------------===//
 
-  StatusOr<vm::ref<Buffer>> BufferConst(
-      vm::ref<iree_vm_ro_byte_buffer_t> value) {
+  StatusOr<vm::ref<Buffer>> BufferConst(vm::ref<iree_vm_buffer_t> value) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferConst");
     iree_allocator_t external_allocator = {0};
     external_allocator.self = vm::retain_ref(value).release();
     external_allocator.free = +[](void* self, void* ptr) {
-      vm::assign_ref(reinterpret_cast<iree_vm_ro_byte_buffer_t*>(self)).reset();
+      vm::assign_ref(reinterpret_cast<iree_vm_buffer_t*>(self)).reset();
     };
     return Buffer::Wrap(value->data.data, value->data.data_length,
                         external_allocator);

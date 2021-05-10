@@ -14,12 +14,14 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DispatchConfig.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -390,10 +392,11 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
 // This relies on CSE having deduped workloads to simplify the logic to simply
 // looking for dispatch regions using the same values.
 class FoldCompatibleDispatchRegionsPass
-    : public PassWrapper<FoldCompatibleDispatchRegionsPass, FunctionPass> {
+    : public FoldCompatibleDispatchRegionsBase<
+          FoldCompatibleDispatchRegionsPass> {
  public:
-  void runOnFunction() override {
-    auto func = getFunction();
+  void runOnOperation() override {
+    FuncOp func = getOperation();
     for (auto &block : func) {
       if (failed(mergeBlockDispatchRegions(func, &block))) {
         return signalPassFailure();
@@ -406,10 +409,6 @@ std::unique_ptr<OperationPass<FuncOp>>
 createFoldCompatibleDispatchRegionsPass() {
   return std::make_unique<FoldCompatibleDispatchRegionsPass>();
 }
-
-static PassRegistration<FoldCompatibleDispatchRegionsPass> pass(
-    "iree-flow-fold-compatible-dispatch-regions",
-    "Folds dispatch regions that have compatible workloads");
 
 }  // namespace Flow
 }  // namespace IREE

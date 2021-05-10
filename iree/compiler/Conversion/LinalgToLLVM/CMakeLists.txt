@@ -31,7 +31,6 @@ iree_cc_library(
     "FoldTensorExtractOpPass.cpp"
     "KernelDispatch.cpp"
     "LLVMCodeGenOptions.cpp"
-    "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"
     "LinalgVectorizePass.cpp"
     "MaterializeCPULaunchConfigurationPass.cpp"
@@ -69,6 +68,7 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::LinalgToLLVM::FoldTensorExtractOpIncGen
     iree::compiler::Conversion::VectorToLLVM
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR

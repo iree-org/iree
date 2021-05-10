@@ -24,10 +24,9 @@ cc_library(
     srcs = ["vm_util.cc"],
     hdrs = ["vm_util.h"],
     deps = [
-        "//iree/base:signature_parser",
         "//iree/base:status",
         "//iree/base/internal:file_io",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:bytecode_module",
@@ -42,8 +41,8 @@ cc_test(
     srcs = ["vm_util_test.cc"],
     deps = [
         ":vm_util",
-        "//iree/base:api",
-        "//iree/hal:api",
+        "//iree/base",
+        "//iree/hal",
         "//iree/hal/vmla/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",

@@ -38,6 +38,7 @@
 #include <stdlib.h>
 
 #include "iree/base/attributes.h"
+#include "iree/base/config.h"
 
 #ifndef IREE_BASE_TRACING_H_
 #define IREE_BASE_TRACING_H_
@@ -162,8 +163,9 @@
 // All our own usage of DbgHelp must be guarded with the same lock.
 #define TRACY_DBGHELP_LOCK IREEDbgHelp
 
-// TODO(#1926): upstream a TRACY_NO_FRAME_IMAGE flag to remove the frame
-// compression thread and dxt1 compression code.
+// Disable frame image capture to avoid the DXT compression code and the frame
+// capture worker thread.
+#define TRACY_NO_FRAME_IMAGE 1
 
 // We don't care about vsync events as they can pollute traces and don't have
 // much meaning in our workloads. If integrators still want them we can expose
@@ -410,6 +412,8 @@ enum {
 #define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xrgb)
 #define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value)
 #define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, ...)
+#define IREE_TRACE_ZONE_APPEND_TEXT_CSTRING(zone_id, value)
+#define IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(zone_id, value, value_length)
 #define IREE_TRACE_ZONE_END(zone_id)
 #define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
   IREE_RETURN_IF_ERROR(__VA_ARGS__)

@@ -115,14 +115,39 @@ struct FusionOfTensorOpsPass
           }
           return numUsers.empty();
         };
-
+    // Simple heuristic to decide if reshaope should be folded in the linalg.
+    // If the source of the reshape is a linalg op fold to potentially allow the
+    // two linalg ops to be fused. Otherwise leave it to avoid adding dimensions
+    // to the consumer linalg op.
+    linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
+        [](const OpResult &producer, const OpOperand &consumer) {
+          auto reshapeOp = producer.getDefiningOp<linalg::TensorReshapeOp>();
+          return reshapeOp.src().getDefiningOp<linalg::LinalgOp>() != nullptr;
+        };
     linalg::populateElementwiseOpsFusionPatterns(
-        fusionPatterns, linalg::LinalgElementwiseFusionOptions()
-                            .setAllowFoldingUnitDimReshapes(true)
-                            .setControlElementwiseOpsFusionFn(controlFn));
+        fusionPatterns,
+        linalg::LinalgElementwiseFusionOptions()
+            .setControlFoldingReshapes(foldReshapeBetweenLinalgFn)
+            .setControlElementwiseOpsFusionFn(controlFn));
 
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));
+
+    OwningRewritePatternList reshapeCanonicalizations(&getContext());
+    linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
+        reshapeCanonicalizations);
+    linalg::TensorReshapeOp::getCanonicalizationPatterns(
+        reshapeCanonicalizations, context);
+    (void)applyPatternsAndFoldGreedily(op->getRegions(),
+                                       std::move(reshapeCanonicalizations));
+
+    // Push the remaining reshapes down the graphs.
+    OwningRewritePatternList pushReshapePatterns(&getContext());
+    linalg::populatePushReshapeOpsPatterns(pushReshapePatterns);
+    linalg::TensorReshapeOp::getCanonicalizationPatterns(pushReshapePatterns,
+                                                         context);
+    (void)applyPatternsAndFoldGreedily(op->getRegions(),
+                                       std::move(pushReshapePatterns));
 
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        frozenInterfacePatterns);

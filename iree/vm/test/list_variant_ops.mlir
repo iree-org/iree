@@ -40,7 +40,7 @@ vm.module @list_variant_ops {
     %inner0_e2 = vm.list.get.i32 %inner0_ret, %c2 : (!vm.list<i32>, i32) -> i32
     vm.check.eq %inner0_e2, %c102 : i32
 
-    %inner1_ret = vm.list.get.ref %outer, %c0 : (!vm.list<!vm.list<i32>>, i32) -> !vm.list<i32>
+    %inner1_ret = vm.list.get.ref %outer, %c1 : (!vm.list<!vm.list<i32>>, i32) -> !vm.list<i32>
     vm.check.eq %inner1_ret, %inner1 : !vm.list<i32>
     %inner1_e2 = vm.list.get.i32 %inner1_ret, %c2 : (!vm.list<i32>, i32) -> i32
     vm.check.eq %inner1_e2, %c100 : i32
@@ -75,10 +75,10 @@ vm.module @list_variant_ops {
 
     // Access element 11 as a ref object.
     %c11 = vm.const.i32 11 : i32
-    %v11_buf = vm.const.ref.rodata @byte_buffer : !vm.ref<!iree.byte_buffer>
-    vm.list.set.ref %list, %c11, %v11_buf : (!vm.list<?>, i32, !vm.ref<!iree.byte_buffer>)
-    %e11_buf = vm.list.get.ref %list, %c11 : (!vm.list<?>, i32) -> !vm.ref<!iree.byte_buffer>
-    vm.check.eq %e11_buf, %v11_buf : !vm.ref<!iree.byte_buffer>
+    %v11_buf = vm.const.ref.rodata @byte_buffer : !vm.buffer
+    vm.list.set.ref %list, %c11, %v11_buf : (!vm.list<?>, i32, !vm.buffer)
+    %e11_buf = vm.list.get.ref %list, %c11 : (!vm.list<?>, i32) -> !vm.buffer
+    vm.check.eq %e11_buf, %v11_buf : !vm.buffer
 
     // Access element 11 as a different kind of ref object (incompatible).
     // Should return null.
@@ -89,8 +89,8 @@ vm.module @list_variant_ops {
     vm.return
   }
 
-  vm.export @test_variant_slot_change
-  vm.func @test_variant_slot_change() {
+  vm.export @fail_variant_slot_change
+  vm.func @fail_variant_slot_change() {
     %capacity = vm.const.i32 42 : i32
     %list = vm.list.alloc %capacity : (i32) -> !vm.list<?>
     vm.list.resize %list, %capacity : (!vm.list<?>, i32)
@@ -104,14 +104,15 @@ vm.module @list_variant_ops {
     vm.check.eq %e10_i32, %v10_i32 : i32
 
     // Access element 10 as a ref object.
-    %v10_buf = vm.const.ref.rodata @byte_buffer : !vm.ref<!iree.byte_buffer>
-    vm.list.set.ref %list, %c10, %v10_buf : (!vm.list<?>, i32, !vm.ref<!iree.byte_buffer>)
-    %e10_buf = vm.list.get.ref %list, %c10 : (!vm.list<?>, i32) -> !vm.ref<!iree.byte_buffer>
-    vm.check.eq %e10_buf, %v10_buf : !vm.ref<!iree.byte_buffer>
+    %v10_buf = vm.const.ref.rodata @byte_buffer : !vm.buffer
+    vm.list.set.ref %list, %c10, %v10_buf : (!vm.list<?>, i32, !vm.buffer)
+    %e10_buf = vm.list.get.ref %list, %c10 : (!vm.list<?>, i32) -> !vm.buffer
+    vm.check.eq %e10_buf, %v10_buf : !vm.buffer
 
-    // Accessing it as an i32 now that it stores the ref should return a
-    // default (until we support type queries).
+    // Accessing it as an i32 now that it stores the ref should fail at runtime.
+    // TODO(benvanik): support type queries and/or make this silently return 0.
     %e10_any = vm.list.get.i32 %list, %c10 : (!vm.list<?>, i32) -> i32
+    // -- FAILURE HERE --
     %zero = vm.const.i32.zero : i32
     vm.check.eq %e10_any, %zero : i32
 
