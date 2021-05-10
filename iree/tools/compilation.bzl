@@ -14,7 +14,7 @@
 
 """Rules for compiling IREE executables, modules, and archives."""
 
-load("//build_tools/embed_data:build_defs.bzl", "c_embed_data", "cc_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 # TODO(benvanik): port to a full starlark rule, document, etc.
 def iree_bytecode_module(
@@ -22,7 +22,6 @@ def iree_bytecode_module(
         src,
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
-        cc_namespace = None,
         c_output = False,
         **kwargs):
     native.genrule(
@@ -44,20 +43,6 @@ def iree_bytecode_module(
         output_to_bindir = 1,
         **kwargs
     )
-
-    # Embed the module for use in C++. This avoids the need for file IO in
-    # tests and samples that would otherwise complicate execution/porting.
-    if cc_namespace:
-        cc_embed_data(
-            name = "%s_cc" % (name),
-            identifier = name,
-            srcs = ["%s.vmfb" % (name)],
-            cc_file_output = "%s.cc" % (name),
-            h_file_output = "%s.h" % (name),
-            cpp_namespace = cc_namespace,
-            flatten = True,
-            **kwargs
-        )
 
     # Embed the module for use in C.
     if c_output:

@@ -25,8 +25,7 @@ include(CMakeParseArguments)
 #     default flag set is "-iree-mlir-to-vm-bytecode-module".
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
 #     tool is "iree-translate".
-# CC_NAMESPACE: Wraps everything in a C++ namespace.
-# C_OUTPUT: Control flag to generate c embed code instead.
+# C_OUTPUT: Control flag to generate c embed code.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
 #     will be in ${PACKAGE}/internal.
@@ -41,7 +40,7 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY;C_OUTPUT"
-    "NAME;SRC;TRANSLATE_TOOL;CC_NAMESPACE"
+    "NAME;SRC;TRANSLATE_TOOL"
     "FLAGS"
     ${ARGN}
   )
@@ -84,26 +83,6 @@ function(iree_bytecode_module)
   endif()
   if(_RULE_PUBLIC)
     set(_PUBLIC_ARG "PUBLIC")
-  endif()
-
-  if(DEFINED _RULE_CC_NAMESPACE)
-    iree_cc_embed_data(
-      NAME
-        "${_RULE_NAME}_cc"
-      IDENTIFIER
-        "${_RULE_NAME}"
-      GENERATED_SRCS
-        "${_RULE_NAME}.vmfb"
-      CC_FILE_OUTPUT
-        "${_RULE_NAME}.cc"
-      H_FILE_OUTPUT
-        "${_RULE_NAME}.h"
-      CPP_NAMESPACE
-        "${_RULE_CC_NAMESPACE}"
-      FLATTEN
-      "${_PUBLIC_ARG}"
-      "${_TESTONLY_ARG}"
-    )
   endif()
 
   if(_RULE_C_OUTPUT)
