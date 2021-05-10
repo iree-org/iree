@@ -1,10 +1,10 @@
 /* Logo drop shadow, to make it a bit more visible against the background */
-.md-header__button.md-logo img {
+.md-header__button.md-logo svg {
   filter: drop-shadow(0px 2px 3px black);
 }
 
 /* Pulse the drop shadow on hover ^_^ */
-.md-header__button.md-logo img:hover {
+.md-header__button.md-logo svg:hover {
   animation: pulse 1s infinite;
   animation-timing-function: linear;
 }
