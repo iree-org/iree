@@ -161,6 +161,6 @@ progress on IREE components and specific efforts and
 work associated with plans for each quarter.
 
 [^1]:
-  Pronounced "eerie" and often styled with the :ghost: emoji
+  Pronounced "eerie" and often styled with the :iree-ghost: emoji
 
 *[IR]: Intermediate Representation
