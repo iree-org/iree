@@ -425,40 +425,6 @@ class BuildFileFunctions(object):
   # Effectively an alias in IREE code.
   iree_cc_binary = cc_binary
 
-  def cc_embed_data(self,
-                    name,
-                    srcs,
-                    cc_file_output,
-                    h_file_output,
-                    testonly=None,
-                    cpp_namespace=None,
-                    strip_prefix=None,
-                    flatten=None,
-                    identifier=None,
-                    **kwargs):
-    if identifier:
-      self._convert_unimplemented_function("cc_embed_data",
-                                           name + " has identifier")
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    cc_file_output_block = _convert_string_arg_block("CC_FILE_OUTPUT",
-                                                     cc_file_output)
-    h_file_output_block = _convert_string_arg_block("H_FILE_OUTPUT",
-                                                    h_file_output)
-    testonly_block = _convert_option_block("TESTONLY", testonly)
-    namespace_block = _convert_string_arg_block("CPP_NAMESPACE", cpp_namespace)
-    flatten_block = _convert_option_block("FLATTEN", flatten)
-
-    self.converter.body += (f"iree_cc_embed_data(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{cc_file_output_block}"
-                            f"{h_file_output_block}"
-                            f"{testonly_block}"
-                            f"{namespace_block}"
-                            f"{flatten_block}"
-                            f"  PUBLIC\n)\n\n")
-
   def c_embed_data(self,
                    name,
                    srcs,
