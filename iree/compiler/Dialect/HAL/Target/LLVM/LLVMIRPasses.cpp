@@ -77,8 +77,8 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
       /*DebugLogging=*/false);
   standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
 
-  llvm::PassBuilder passBuilder(false, machine, options.pipelineTuningOptions,
-                                {}, &passInstrumentationCallbacks);
+  llvm::PassBuilder passBuilder(machine, options.pipelineTuningOptions, {},
+                                &passInstrumentationCallbacks);
   llvm::AAManager aa = passBuilder.buildDefaultAAPipeline();
   functionAnalysisManager.registerPass([&] { return std::move(aa); });
 
