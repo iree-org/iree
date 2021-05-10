@@ -82,18 +82,18 @@ static LogicalResult verifyModuleOp(ModuleOp op) {
 
 static ParseResult parseFuncOp(OpAsmParser &parser, OperationState *result) {
   auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
-                          ArrayRef<Type> results, impl::VariadicFlag,
-                          std::string &) {
+                          ArrayRef<Type> results,
+                          function_like_impl::VariadicFlag, std::string &) {
     return builder.getFunctionType(argTypes, results);
   };
-  return impl::parseFunctionLikeOp(parser, *result, /*allowVariadic=*/false,
-                                   buildFuncType);
+  return function_like_impl::parseFunctionLikeOp(
+      parser, *result, /*allowVariadic=*/false, buildFuncType);
 }
 
 static void printFuncOp(OpAsmPrinter &p, FuncOp &op) {
   FunctionType fnType = op.getType();
-  impl::printFunctionLikeOp(p, op, fnType.getInputs(), /*isVariadic=*/false,
-                            fnType.getResults());
+  function_like_impl::printFunctionLikeOp(
+      p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
 
 void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
@@ -108,15 +108,10 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
     return;
   }
 
-  unsigned numInputs = type.getNumInputs();
-  assert(numInputs == argAttrs.size() &&
+  assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  SmallString<8> argAttrName;
-  for (unsigned i = 0; i < numInputs; ++i) {
-    if (argAttrs[i] && !argAttrs[i].empty()) {
-      result.addAttribute(getArgAttrName(i, argAttrName), argAttrs[i]);
-    }
-  }
+  function_like_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                           /*resultAttrs=*/llvm::None);
 }
 
 Block *FuncOp::addEntryBlock() {
@@ -227,18 +222,15 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
     return parser.emitError(parser.getCurrentLocation())
            << "invalid result type list";
   }
-  for (int i = 0; i < argAttrs.size(); ++i) {
-    SmallString<8> argName;
-    mlir::impl::getArgAttrName(i, argName);
-    result->addAttribute(argName, argAttrs[i]);
-  }
+  function_like_impl::addArgAndResultAttrs(builder, *result, argAttrs,
+                                           /*resultAttrs=*/llvm::None);
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
 
   auto functionType =
       FunctionType::get(result->getContext(), argTypes, resultTypes);
-  result->addAttribute(mlir::impl::getTypeAttrName(),
+  result->addAttribute(mlir::function_like_impl::getTypeAttrName(),
                        TypeAttr::get(functionType));
 
   // No clue why this is required.
@@ -270,12 +262,12 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
   } else if (op.getNumFuncResults() > 1) {
     p << " -> (" << op.getType().getResults() << ")";
   }
-  mlir::impl::printFunctionAttributes(p, op, op.getNumFuncArguments(),
-                                      op.getNumFuncResults(),
-                                      /*elided=*/
-                                      {
-                                          "is_variadic",
-                                      });
+  mlir::function_like_impl::printFunctionAttributes(
+      p, op, op.getNumFuncArguments(), op.getNumFuncResults(),
+      /*elided=*/
+      {
+          "is_variadic",
+      });
 }
 
 void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
@@ -289,15 +281,10 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
     return;
   }
 
-  unsigned numInputs = type.getNumInputs();
-  assert(numInputs == argAttrs.size() &&
+  assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  SmallString<8> argAttrName;
-  for (unsigned i = 0; i < numInputs; ++i) {
-    if (argAttrs[i] && !argAttrs[i].empty()) {
-      result.addAttribute(getArgAttrName(i, argAttrName), argAttrs[i]);
-    }
-  }
+  function_like_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                           /*resultAttrs=*/llvm::None);
 }
 
 LogicalResult ImportOp::verifyType() {
