@@ -20,8 +20,7 @@ iree_bytecode_module(
     custom_modules_test_module
   SRC
     "custom_modules_test.mlir"
-  CC_NAMESPACE
-    "iree::samples::custom_modules"
+  C_OUTPUT
   TRANSLATE_TOOL
     iree_samples_custom_modules_dialect_custom-translate
   FLAGS
@@ -36,7 +35,7 @@ iree_cc_test(
   SRCS
     "custom_modules_test.cc"
   DEPS
-    ::custom_modules_test_module_cc
+    ::custom_modules_test_module_c
     ::native_module
     iree::base
     iree::base::logging

@@ -37,8 +37,7 @@ iree_bytecode_module(
     tensorlist_test_module
   SRC
     "tensorlist_test.mlir"
-  CC_NAMESPACE
-    "iree::modules::tensorlist"
+  C_OUTPUT
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=dylib-llvm-aot"
@@ -53,7 +52,7 @@ iree_cc_test(
     "tensorlist_test.cc"
   DEPS
     ::native_module
-    ::tensorlist_test_module_cc
+    ::tensorlist_test_module_c
     absl::span
     iree::base
     iree::base::logging

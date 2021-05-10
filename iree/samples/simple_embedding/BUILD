@@ -118,7 +118,6 @@ iree_bytecode_module(
     name = "simple_embedding_test_bytecode_module",
     src = "simple_embedding_test.mlir",
     c_output = True,
-    cc_namespace = "iree::samples",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",

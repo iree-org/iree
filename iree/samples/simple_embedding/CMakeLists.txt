@@ -90,8 +90,6 @@ iree_bytecode_module(
     simple_embedding_test_bytecode_module
   SRC
     "simple_embedding_test.mlir"
-  CC_NAMESPACE
-    "iree::samples"
   C_OUTPUT
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
