@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,38 +19,22 @@ package(
 )
 
 cc_library(
-    name = "Transforms",
+    name = "MemRefToVM",
     srcs = [
-        "Conversion.cpp",
-        "GlobalInitialization.cpp",
-        "HoistInlinedRodata.cpp",
-        "MarkPublicSymbolsExported.cpp",
-        "OrdinalAllocation.cpp",
-        "Passes.cpp",
-        "SinkDefiningOps.cpp",
+        "ConvertMemRefToVM.cpp",
     ],
     hdrs = [
-        "Passes.h",
+        "ConvertMemRefToVM.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/Conversion:PreserveCompilerHints",
         "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Dialect/VM/Conversion/IREEToVM",
-        "//iree/compiler/Dialect/VM/Conversion/MathToVM",
-        "//iree/compiler/Dialect/VM/Conversion/MemRefToVM",
-        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
-        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
-        "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SideEffectInterfaces",
-        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
