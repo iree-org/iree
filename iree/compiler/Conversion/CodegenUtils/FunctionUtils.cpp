@@ -14,6 +14,8 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/SymbolTable.h"
 
@@ -42,11 +44,41 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
   return nullptr;
 }
 
-Value getViewSource(Value view) {
-  while (auto viewOp = view.getDefiningOp<ViewLikeOpInterface>()) {
-    view = viewOp.getViewSource();
+/// Walk up the defs of the view, to get the untiled value. Either walks up
+/// `ViewOpInterface` op-chains or the `subtensor` op-chains.
+static Value getViewSource(Value view) {
+  while (true) {
+    Operation *definingOp = view.getDefiningOp();
+    if (!definingOp) break;
+    if (auto viewOp = view.getDefiningOp<ViewLikeOpInterface>()) {
+      view = viewOp.getViewSource();
+      continue;
+    }
+    if (auto subTensorOp = view.getDefiningOp<SubTensorOp>()) {
+      view = subTensorOp.source();
+      continue;
+    }
+    if (auto dispatchTensorLoadOp =
+            view.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+      view = dispatchTensorLoadOp.source();
+      continue;
+    }
+    break;
   }
   return view;
+}
+
+Type getUntiledType(Value tiledView) {
+  Value viewSource = getViewSource(tiledView);
+  return viewSource.getType();
+}
+
+ArrayRef<int64_t> getUntiledShape(Value tiledView) {
+  auto type = getUntiledType(tiledView);
+  return TypeSwitch<Type, ArrayRef<int64_t>>(type)
+      .Case<ShapedType, IREE::Flow::DispatchTensorType>(
+          [&](auto shapedType) { return shapedType.getShape(); })
+      .Default([&](Type type) { return ArrayRef<int64_t>{}; });
 }
 
 }  // namespace iree_compiler

@@ -50,6 +50,32 @@ class MaterializeCPULaunchConfigurationPass
 };
 }  // namespace
 
+/// Gets the tile sizes to use for the distributed dimensions of the first-level
+/// of tiling. This is obtained by taking the tile sizes for the outer parallel
+/// loops and filtering out the tile sizes set to 0. If there are multiple
+/// linalg ops, verifies all of them are consistent. This is a required property
+/// for a dispatch region.
+static Optional<SmallVector<int64_t, 4>> getDistributedDimsTileSizes(
+    ArrayRef<linalg::LinalgOp> linalgOps) {
+  Optional<SmallVector<int64_t, 4>> distributedTileSizes;
+  for (auto linalgOp : linalgOps) {
+    SmallVector<int64_t, 4> opTileSizes = getTileSizes(linalgOp, 0);
+    ArrayRef<int64_t> opTileSizesRef(opTileSizes);
+    opTileSizes = llvm::to_vector<4>(llvm::make_filter_range(
+        opTileSizesRef.take_front(getNumOuterParallelLoops(linalgOp)),
+        [](int64_t t) -> bool { return t; }));
+    if (!distributedTileSizes) {
+      distributedTileSizes = std::move(opTileSizes);
+      continue;
+    }
+    if (*distributedTileSizes != opTileSizes) {
+      return llvm::None;
+    }
+  }
+  if (!distributedTileSizes) return SmallVector<int64_t, 4>{};
+  return distributedTileSizes;
+}
+
 void MaterializeCPULaunchConfigurationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
@@ -64,68 +90,20 @@ void MaterializeCPULaunchConfigurationPass::runOnOperation() {
       // Nothing to do here. Continue.
       continue;
     }
-    linalg::Aliases aliases;
-    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
-    Optional<LaunchConfig> launchConfigOpt =
-        initCPULaunchConfig(context, dependenceGraph, linalgOps);
-    if (!launchConfigOpt) {
-      // Nothing to do here. Continue.
-      continue;
+    if (failed(initCPULaunchConfig(linalgOps))) {
+      return signalPassFailure();
     }
-    LaunchConfig &launchConfig = *launchConfigOpt;
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "@func " << funcOp.getName() << "\n";
-      for (auto op : linalgOps) {
-        llvm::dbgs() << "\t" << op.getOperation()->getName() << " : ";
-        TileSizesListTypeRef configTileSizes = launchConfig.getTileSizes(op);
-        llvm::dbgs() << "{";
-        std::string sep = "";
-        for (auto &level : enumerate(configTileSizes)) {
-          llvm::dbgs() << sep << level.index() << " : [";
-          sep = ", ";
-          interleaveComma(level.value(), llvm::dbgs());
-          llvm::dbgs() << "]";
-        }
-        llvm::dbgs() << "}\n";
-      }
-    });
-
-    // Find the root operation for the dispatch region and get the tile sizes.
-    Operation *rootOperation =
-        launchConfig.getRootOperation(llvm::to_vector<4>(llvm::map_range(
-            linalgOps, [](linalg::LinalgOp op) { return op.getOperation(); })));
-    if (!rootOperation) {
-      // By default just set the number of workgroups to be {1, 1, 1}.
-      WorkgroupCountRegionBuilder regionBuilder =
-          [](OpBuilder &b, Location loc,
-             std::array<Value, 3> workload) -> std::array<Value, 3> {
-        Value one = b.create<ConstantIndexOp>(loc, 1);
-        return {one, one, one};
-      };
-      OpBuilder builder(context);
-      if (failed(defineWorkgroupCountRegion(builder, funcOp, regionBuilder))) {
-        return signalPassFailure();
-      }
-      launchConfig.finalize(funcOp);
-      return;
-    }
-
-    ArrayRef<int64_t> rootOperationTileSizes =
-        launchConfig.getTileSizes(rootOperation, 0);
-    // Only use the tile sizes for parallel loops of the root operation.
-    rootOperationTileSizes = rootOperationTileSizes.take_front(
-        getNumOuterParallelLoops(rootOperation));
-
-    SmallVector<int64_t, 4> workloadPerWorkgroup =
-        llvm::to_vector<4>(llvm::reverse(rootOperationTileSizes));
-    if (failed(
-            materializeStaticLaunchInformation(funcOp, workloadPerWorkgroup))) {
-      funcOp.emitOpError("failed to materialize static launch information");
+    auto distributedTileSizes = getDistributedDimsTileSizes(linalgOps);
+    if (!distributedTileSizes) {
       return signalPassFailure();
     }
 
-    launchConfig.finalize(funcOp);
+    if (failed(materializeStaticLaunchInformation(
+            funcOp, llvm::to_vector<4>(
+                        llvm::reverse(distributedTileSizes.getValue()))))) {
+      funcOp.emitOpError("failed to materialize static launch information");
+      return signalPassFailure();
+    }
 
     // Apply post distribution canonicalization passes.
     {
