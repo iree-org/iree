@@ -54,15 +54,12 @@ iree_cc_test(
 iree_cc_library(
   NAME
     image_util
-  COPTS
-    "-Wno-implicit-fallthrough"
   HDRS
     "image_util.h"
   SRCS
     "image_util.c"
   DEPS
     iree::base
-    iree::base::internal::flags
     iree::base::tracing
     iree::hal
     stblib::stb_image
