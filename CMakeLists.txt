@@ -426,6 +426,9 @@ endif()
 # IREE top-level targets
 #-------------------------------------------------------------------------------
 
+# Add a top-level custom target to drive generating benchmark suites.
+add_custom_target(iree-generate-benchmark-suites)
+
 if(${IREE_BUILD_DOCS})
   # Add a top-level custom target to drive generating all documentation.
   # Register it to the default target given that IREE_BUILD_DOCS is explicitly

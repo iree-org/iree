@@ -179,6 +179,7 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
   """
   options = ImportOptions(**kwargs)
   import_cl = build_import_command_line(saved_model_dir, options)
+  logging.info(f"import command: {import_cl}")
   if options.import_only:
     # One stage tool pipeline.
     result = invoke_immediate(import_cl)
@@ -188,6 +189,7 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
 
   # Full compilation pipeline.
   compile_cl = build_compile_command_line("-", options)
+  logging.info(f"compile command: {compile_cl}")
   result = invoke_pipeline([import_cl, compile_cl])
   if options.output_file:
     return None

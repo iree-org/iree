@@ -119,3 +119,66 @@ iree_e2e_cartesian_product_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+iree_python_benchmark_suite(
+  MODELS
+    MobileNetV2
+    MobileNetV3Small
+  MODEL_SCRIPT
+    applications_benchmark.py
+  MODEL_SCRIPT_ARGS
+    "--data=imagenet"
+    "--use_external_weights=True"
+  NEED_ARG_FOR_MODEL
+  TARGET_BACKEND
+    iree_vulkan
+  CONFIGURATION_NAME
+    "GPU-Mali-G77"
+  COMPILATION_FLAGS
+    "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+)
+
+iree_python_benchmark_suite(
+  MODELS
+    MobileNetV2
+    MobileNetV3Small
+  MODEL_SCRIPT
+    applications_benchmark.py
+  MODEL_SCRIPT_ARGS
+    "--data=imagenet"
+    "--use_external_weights=True"
+  NEED_ARG_FOR_MODEL
+  TARGET_BACKEND
+    iree_llvmaot
+  CONFIGURATION_NAME
+    "CPU-ARM-A55-A76"
+  COMPILATION_FLAGS
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=3"
+)
+
+iree_python_benchmark_suite(
+  MODELS
+    MobileNetV2
+    MobileNetV3Small
+  MODEL_SCRIPT
+    applications_benchmark.py
+  MODEL_SCRIPT_ARGS
+    "--data=imagenet"
+    "--use_external_weights=True"
+  NEED_ARG_FOR_MODEL
+  TARGET_BACKEND
+    iree_dylib_sync
+  CONFIGURATION_NAME
+    "CPU-ARM-A55-A76"
+  COMPILATION_FLAGS
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+)
