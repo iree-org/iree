@@ -503,12 +503,10 @@ class BuildFileFunctions(object):
                            src,
                            flags=None,
                            translate_tool=None,
-                           cc_namespace=None,
                            c_output=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
-    namespace_block = _convert_string_arg_block("CC_NAMESPACE", cc_namespace)
     c_output_block = _convert_option_block("C_OUTPUT", c_output)
     translate_tool_block = _convert_translate_tool_block(translate_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
@@ -517,7 +515,6 @@ class BuildFileFunctions(object):
     self.converter.body += (f"iree_bytecode_module(\n"
                             f"{name_block}"
                             f"{src_block}"
-                            f"{namespace_block}"
                             f"{c_output_block}"
                             f"{translate_tool_block}"
                             f"{flags_block}"
