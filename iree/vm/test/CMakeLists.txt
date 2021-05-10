@@ -172,8 +172,6 @@ iree_bytecode_module(
     conversion_ops_f32
   SRC
     "conversion_ops_f32.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -184,8 +182,6 @@ iree_bytecode_module(
     conversion_ops_i64
   SRC
     "conversion_ops_i64.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -196,8 +192,6 @@ iree_bytecode_module(
     global_ops
   SRC
     "global_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -208,8 +202,6 @@ iree_bytecode_module(
     global_ops_f32
   SRC
     "global_ops_f32.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -220,8 +212,6 @@ iree_bytecode_module(
     global_ops_i64
   SRC
     "global_ops_i64.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -232,8 +222,6 @@ iree_bytecode_module(
     list_ops
   SRC
     "list_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -244,8 +232,6 @@ iree_bytecode_module(
     list_variant_ops
   SRC
     "list_variant_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -256,8 +242,6 @@ iree_bytecode_module(
     shift_ops
   SRC
     "shift_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -268,8 +252,6 @@ iree_bytecode_module(
     shift_ops_i64
   SRC
     "shift_ops_i64.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC

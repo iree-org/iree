@@ -33,7 +33,7 @@ endif()
 iree_bytecode_module(
     name = "custom_modules_test_module",
     src = "custom_modules_test.mlir",
-    cc_namespace = "iree::samples::custom_modules",
+    c_output = True,
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",
@@ -45,7 +45,7 @@ cc_test(
     name = "custom_modules_test",
     srcs = ["custom_modules_test.cc"],
     deps = [
-        ":custom_modules_test_module_cc",
+        ":custom_modules_test_module_c",
         ":native_module",
         "//iree/base",
         "//iree/base:logging",

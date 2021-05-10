@@ -44,7 +44,7 @@ cc_test(
     srcs = ["strings_module_test.cc"],
     deps = [
         ":strings_module",
-        ":strings_module_test_module_cc",
+        ":strings_module_test_module_c",
         "//iree/base",
         "//iree/base:logging",
         "//iree/hal",
@@ -64,7 +64,7 @@ iree_bytecode_module(
     name = "strings_module_test_module",
     testonly = True,
     src = "strings_module_test.mlir",
-    cc_namespace = "iree::strings_module_test",
+    c_output = True,
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",

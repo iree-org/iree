@@ -136,7 +136,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "conversion_ops_f32",
     src = "conversion_ops_f32.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 

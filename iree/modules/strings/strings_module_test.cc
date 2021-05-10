@@ -25,7 +25,7 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/api.h"
 #include "iree/modules/strings/api_detail.h"
-#include "iree/modules/strings/strings_module_test_module.h"
+#include "iree/modules/strings/strings_module_test_module_c.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
@@ -68,8 +68,7 @@ class StringsModuleTest : public ::testing::Test {
     iree_hal_driver_release(hal_driver);
 
     // Setup the test module.
-    const auto* module_file_toc =
-        iree::strings_module_test::strings_module_test_module_create();
+    const auto* module_file_toc = strings_module_test_module_c_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),

@@ -15,14 +15,14 @@
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/bytecode_module_size_benchmark_module.h"
+#include "iree/vm/bytecode_module_size_benchmark_module_c.h"
 
 extern "C" int main(int argc, char** argv) {
   iree_vm_instance_t* instance = nullptr;
   iree_vm_instance_create(iree_allocator_system(), &instance);
 
   const auto* module_file_toc =
-      iree::vm::bytecode_module_size_benchmark_module_create();
+      bytecode_module_size_benchmark_module_c_create();
   iree_vm_module_t* module = nullptr;
   iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
