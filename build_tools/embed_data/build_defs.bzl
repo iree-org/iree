@@ -14,6 +14,13 @@
 
 """Embeds data files into a C module."""
 
+def clean_dep(dep):
+    """Returns an absolute Bazel path to 'dep'.
+
+    This is necessary when calling these functions from another workspace.
+    """
+    return str(Label(dep))
+
 def c_embed_data(
         name,
         srcs,
@@ -64,7 +71,7 @@ def c_embed_data(
       identifier: The identifier to use in generated names (defaults to name).
       **kwargs: Args to pass to the cc_library.
     """
-    generator = "//build_tools/embed_data:generate_embed_data"
+    generator = clean_dep("//build_tools/embed_data:generate_embed_data")
     generator_location = "$(location %s)" % generator
     if identifier == None:
         identifier = name
