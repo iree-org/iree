@@ -167,7 +167,7 @@ IREE_API_EXPORT void iree_allocator_system_free(void* self, void* ptr);
 
 // Allocates using the iree_allocator_malloc and iree_allocator_free methods.
 // These will usually be backed by malloc and free.
-static inline iree_allocator_t iree_allocator_system() {
+static inline iree_allocator_t iree_allocator_system(void) {
   iree_allocator_t v = {NULL, iree_allocator_system_allocate,
                         iree_allocator_system_free};
   return v;
@@ -175,7 +175,7 @@ static inline iree_allocator_t iree_allocator_system() {
 
 // Does not perform any allocation or deallocation; used to wrap objects that
 // are owned by external code/live in read-only memory/etc.
-static inline iree_allocator_t iree_allocator_null() {
+static inline iree_allocator_t iree_allocator_null(void) {
   iree_allocator_t v = {NULL, NULL, NULL};
   return v;
 }

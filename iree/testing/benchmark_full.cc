@@ -161,4 +161,4 @@ void iree_benchmark_initialize(int* argc, char** argv) {
   benchmark::Initialize(argc, argv);
 }
 
-void iree_benchmark_run_specified() { benchmark::RunSpecifiedBenchmarks(); }
+void iree_benchmark_run_specified(void) { benchmark::RunSpecifiedBenchmarks(); }

@@ -21,7 +21,7 @@
 
 #include "iree/base/target_platform.h"
 
-IREE_API_EXPORT iree_time_t iree_time_now() {
+IREE_API_EXPORT iree_time_t iree_time_now(void) {
 #if defined(IREE_PLATFORM_WINDOWS)
   // GetSystemTimePreciseAsFileTime requires Windows 8, add a fallback
   // (such as using std::chrono) if older support is needed.

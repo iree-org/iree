@@ -58,8 +58,6 @@ endif()
 iree_cc_binary(
   NAME
     iree-benchmark-module
-  OUT
-    iree-benchmark-module
   SRCS
     "iree-benchmark-module-main.cc"
   DEPS
@@ -78,8 +76,6 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
-    iree-check-module
-  OUT
     iree-check-module
   SRCS
     "iree-check-module-main.cc"
@@ -103,8 +99,6 @@ iree_cc_binary(
 iree_cc_binary(
   NAME
     iree-dump-module
-  OUT
-    iree-dump-module
   SRCS
     "iree-dump-module-main.cc"
   DEPS
@@ -117,8 +111,6 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
-    iree-run-module
-  OUT
     iree-run-module
   SRCS
     "iree-run-module-main.cc"
@@ -327,8 +319,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-translate
-    OUT
-      iree-translate
     DEPS
       ::iree_translate_main
     HOSTONLY
@@ -337,8 +327,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-opt
-    OUT
-      iree-opt
     DEPS
       ::iree_opt_main
     HOSTONLY
@@ -346,8 +334,6 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
-      iree-run-mlir
-    OUT
       iree-run-mlir
     SRCS
       "iree-run-mlir-main.cc"

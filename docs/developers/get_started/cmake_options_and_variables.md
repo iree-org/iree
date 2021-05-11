@@ -64,10 +64,6 @@ Builds the IREE TFLite Java bindings with the C API compatibility shim. Defaults
 
 Builds the experimental java bindings. Defaults to `OFF`.
 
-#### `IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER`:BOOL
-
-Builds the experimental model builder component. Defaults to `OFF`.
-
 #### `IREE_BUILD_EXPERIMENTAL_REMOTING`:BOOL
 
 Builds experimental remoting component. Defaults to `OFF`.
@@ -142,6 +138,12 @@ bindings. Defaults to
 "${CMAKE_SOURCE_DIR}/integrations/tensorflow/bazel-bin/iree_tf_compiler", which
 is where they would be placed by a `bazel build` invocation.
 
+#### `IREE_BUILD_EMBEDDING_SAMPLES`:STRING
+
+Enables building the simple embedding example code under
+`iree/samples/simple_embedding`. Default to `OFF`. Note
+`IREE_BUILD_EMBEDDING_SAMPLES` and `IREE_BUILD_SAMPLES` can not be set to `ON`
+at the same time.
 
 ## MLIR-specific CMake Options and Variables
 

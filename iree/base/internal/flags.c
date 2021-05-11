@@ -48,7 +48,7 @@ static void iree_flags_leaky_free(void* self, void* ptr) { free(ptr); }
 // We do this so that we have valid memory for the lifetime of the process.
 // The memory may still be freed but if not will not hurt anything (besides the
 // private working set size).
-static iree_allocator_t iree_flags_leaky_allocator() {
+static iree_allocator_t iree_flags_leaky_allocator(void) {
   iree_allocator_t allocator = {
       .alloc = iree_flags_leaky_alloc,
       .free = iree_flags_leaky_free,

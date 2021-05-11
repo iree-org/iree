@@ -1306,6 +1306,59 @@ void ExtI16I64UOp::getCanonicalizationPatterns(
       ExtI16I64UOp, ExtI16I32UOp, 32, ExtI32I64UOp>>(context);
 }
 
+template <
+    class SrcAttrElementT, class DstAttrElementT,
+    class SrcElementValueT = typename SrcAttrElementT::ValueType,
+    class DstElementValueT = typename DstAttrElementT::ValueType,
+    class CalculationT = std::function<DstElementValueT(SrcElementValueT)>>
+static Attribute constFoldCastOp(Type resultType, ArrayRef<Attribute> operands,
+                                 const CalculationT &calculate) {
+  assert(operands.size() == 1 && "unary op takes one operand");
+  if (auto operand = operands[0].dyn_cast_or_null<SrcAttrElementT>()) {
+    return DstAttrElementT::get(resultType, calculate(operand.getValue()));
+  }
+  return {};
+}
+
+OpFoldResult CastSI32F32Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldCastOp<IntegerAttr, FloatAttr>(
+      Float32Type::get(getContext()), operands, [&](const APInt &a) {
+        APFloat b = APFloat(0.0f);
+        b.convertFromAPInt(a, /*IsSigned=*/true, APFloat::rmTowardZero);
+        return b;
+      });
+}
+
+OpFoldResult CastUI32F32Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldCastOp<IntegerAttr, FloatAttr>(
+      Float32Type::get(getContext()), operands, [&](const APInt &a) {
+        APFloat b = APFloat(0.0f);
+        b.convertFromAPInt(a, /*IsSigned=*/false, APFloat::rmTowardZero);
+        return b;
+      });
+}
+
+OpFoldResult CastF32SI32Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldCastOp<FloatAttr, IntegerAttr>(
+      IntegerType::get(getContext(), 32), operands, [&](const APFloat &a) {
+        bool isExact = false;
+        llvm::APSInt b;
+        a.convertToInteger(b, APFloat::rmTowardZero, &isExact);
+        return b;
+      });
+}
+
+OpFoldResult CastF32UI32Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldCastOp<FloatAttr, IntegerAttr>(
+      IntegerType::get(getContext(), 32), operands, [&](const APFloat &a) {
+        bool isExact = false;
+        llvm::APSInt b;
+        a.convertToInteger(b, APFloat::rmTowardZero, &isExact);
+        b.setIsUnsigned(true);
+        return b;
+      });
+}
+
 //===----------------------------------------------------------------------===//
 // Native reduction (horizontal) arithmetic
 //===----------------------------------------------------------------------===//

@@ -23,6 +23,11 @@ iree_c_embed_data(
   PUBLIC
 )
 
+if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  return()
+endif()
+
 iree_cc_binary(
   NAME
     simple_embedding_dylib
@@ -79,11 +84,6 @@ iree_cc_binary(
     iree::vm
     iree::vm::bytecode_module
 )
-
-if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
-   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
 
 iree_bytecode_module(
   NAME

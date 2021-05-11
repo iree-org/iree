@@ -1,0 +1,14 @@
+{% extends "main.html" %}
+{% block content %}
+<center>
+  <h1>
+    <img alt="👻" class="twemoji" src="ghost.svg" title=":ghost:">
+    404 - Not found
+    <img alt="👻" class="twemoji" src="ghost.svg" title=":ghost:">
+  </h1>
+
+  <p>Sorry, we couldn't find that page.</p>
+  <p>Click <a href="{{ config.site_url }}">here</a> to go back to the home page.</p>
+</center>
+{% endblock %}
+{% block disqus %}{% endblock %}

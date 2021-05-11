@@ -55,7 +55,7 @@ void iree_memory_query_info(iree_memory_info_t* out_info) {
   out_info->can_allocate_executable_pages = true;
 }
 
-void iree_memory_jit_context_begin() {
+void iree_memory_jit_context_begin(void) {
   IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0({
     if (pthread_jit_write_protect_supported_np()) {
       pthread_jit_write_protect_np(0);
@@ -63,7 +63,7 @@ void iree_memory_jit_context_begin() {
   });
 }
 
-void iree_memory_jit_context_end() {
+void iree_memory_jit_context_end(void) {
   IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0({
     if (pthread_jit_write_protect_supported_np()) {
       pthread_jit_write_protect_np(1);

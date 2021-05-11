@@ -50,6 +50,10 @@ iree_cc_library(
   PUBLIC
 )
 
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+
 iree_cc_test(
   NAME
     smoke_test

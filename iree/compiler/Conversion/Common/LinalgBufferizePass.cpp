@@ -287,6 +287,12 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
   return success();
 }
 
+static LogicalResult analysePadTensorOp(linalg::PadTensorOp padTensorOp,
+                                        BufferizationPlan &plan) {
+  plan.insert(padTensorOp.result());
+  return success();
+}
+
 /// For every result of the LinalgOp, gets the operands (`ins` or `outs`) whose
 /// buffer can be reused for the result.
 static SmallVector<Value> getTiedOperandsForLinalgOps(
@@ -400,6 +406,9 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
               return analyseInterfaceBindingSubspanOp(subspanOp, plan);
             })
+        .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
+          return analysePadTensorOp(padTensorOp, plan);
+        })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return analyseLinalgOps(linalgOp, plan);
         })
@@ -1030,6 +1039,65 @@ static void copyFromAliasingBufferToResultBuffer(OpBuilder &b, Location loc,
   }
 }
 
+/// Returns the static/dynamic mixed sizes of the memref.
+static SmallVector<OpFoldResult> getMemrefSizes(OpBuilder &b, Location loc,
+                                                Value memref) {
+  auto inputShape = memref.getType().cast<ShapedType>().getShape();
+  SmallVector<OpFoldResult> sizeMixedValues;
+  for (int64_t i = 0; i < inputShape.size(); ++i) {
+    if (inputShape[i] == ShapedType::kDynamicSize) {
+      Value dim = b.create<memref::DimOp>(loc, memref, i);
+      sizeMixedValues.push_back(dim);
+    } else {
+      sizeMixedValues.push_back(b.getI64IntegerAttr(inputShape[i]));
+    }
+  }
+  return sizeMixedValues;
+}
+
+static LogicalResult convertPadTensorOp(OpBuilder &b,
+                                        linalg::PadTensorOp padTensorOp,
+                                        BlockAndValueMapping &bvm) {
+  auto inputTensor = padTensorOp.source();
+  auto inputMemref = bvm.lookup(inputTensor);
+
+  auto loc = padTensorOp.getLoc();
+
+  auto resultPaddedBuffer = bvm.lookup(padTensorOp.result());
+
+  // Get padding value and fill the result buffer.
+  linalg::YieldOp yeildOp =
+      *padTensorOp.region().getOps<linalg::YieldOp>().begin();
+  Value paddingValue = yeildOp.values()[0];
+
+  auto constOp = paddingValue.getDefiningOp<ConstantOp>();
+  if (!constOp) {
+    return padTensorOp.emitError(
+        "Converting linalg.pad_tensor with non-constant padding value");
+  }
+  if (constOp.getValue().isa<DenseElementsAttr>()) {
+    return padTensorOp.emitError(
+        "Converting linalg.pad_tensor with non-scalar constant padding "
+        "value");
+  }
+
+  b.create<linalg::FillOp>(loc, resultPaddedBuffer, paddingValue);
+
+  // Get the interior region.
+  SmallVector<OpFoldResult> sizeMixedValues =
+      getMemrefSizes(b, loc, inputMemref);
+  SmallVector<OpFoldResult> strides(
+      inputMemref.getType().cast<ShapedType>().getRank(),
+      b.getI64IntegerAttr(1));
+
+  auto resultSubView = b.create<memref::SubViewOp>(loc, resultPaddedBuffer,
+                                                   padTensorOp.getMixedLowPad(),
+                                                   sizeMixedValues, strides);
+  // Copy to the interior region.
+  b.create<linalg::CopyOp>(loc, inputMemref, resultSubView);
+  return success();
+}
+
 namespace {
 /// Pass to convert from tensor based ops to memref based ops.
 class LinalgBufferizePass
@@ -1116,6 +1184,14 @@ void LinalgBufferizePass::runOnFunction() {
                   aliasingOp->getResult(0), bvm, plan);
               return success();
             })
+        .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
+          if (failed(getOrAllocateResultBuffers(b, padTensorOp,
+                                                padTensorOp.result(), bvm, plan,
+                                                allocationFn))) {
+            return failure();
+          }
+          return convertPadTensorOp(b, padTensorOp, bvm);
+        })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           SmallVector<Value> tiedOperands =
               getTiedOperandsForLinalgOps(linalgOp);

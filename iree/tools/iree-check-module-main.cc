@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
 #include <iostream>
 
 #include "iree/base/api.h"
@@ -128,27 +129,19 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
       continue;
     }
 
-    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-    std::vector<RawSignatureParser::Description> input_descs;
-    IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-    std::vector<RawSignatureParser::Description> output_descs;
-    IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
-    if (!input_descs.empty() || !output_descs.empty()) {
-      iree_string_view_t sig_f = iree_vm_function_reflection_attr(
-          &function, iree_make_cstring_view("f"));
-      RawSignatureParser sig_parser;
-      auto sig_str = sig_parser.FunctionSignatureToString(
-          absl::string_view{sig_f.data, sig_f.size});
-      if (!sig_str.has_value()) {
-        return iree_make_status(
-            IREE_STATUS_INVALID_ARGUMENT,
-            "parsing function signature '%.*s': ", (int)sig_f.size, sig_f.data);
-      }
+    iree_vm_function_signature_t signature =
+        iree_vm_function_signature(&function);
+    iree_host_size_t argument_count = 0;
+    iree_host_size_t result_count = 0;
+    IREE_RETURN_IF_ERROR(iree_vm_function_call_count_arguments_and_results(
+        &signature, &argument_count, &result_count));
+    if (argument_count || result_count) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "expected function with no inputs or outputs, "
                               "but export '%.*s' has signature '%.*s'",
                               (int)export_name.size, export_name.data,
-                              (int)sig_f.size, sig_f.data);
+                              (int)signature.calling_convention.size,
+                              signature.calling_convention.data);
     }
 
     ::testing::RegisterTest(

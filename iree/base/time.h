@@ -58,7 +58,7 @@ typedef int64_t iree_duration_t;
 //
 // The system timer may not be monotonic; users should ensure when comparing
 // times they check for negative values in case the time moves backwards.
-IREE_API_EXPORT iree_time_t iree_time_now();
+IREE_API_EXPORT iree_time_t iree_time_now(void);
 
 // Converts a relative timeout duration to an absolute deadline time.
 // This handles the special cases of IREE_DURATION_ZERO and
@@ -94,7 +94,7 @@ typedef struct {
 //     // Would have waited indicating the signal has not occurred. If the
 //     // timeout was not immediate the call would have blocked the caller.
 //   }
-static inline iree_timeout_t iree_immediate_timeout() {
+static inline iree_timeout_t iree_immediate_timeout(void) {
   iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_PAST};
   return timeout;
 }
@@ -113,7 +113,7 @@ static inline bool iree_timeout_is_immediate(iree_timeout_t timeout) {
 // care as it can complicate program state and make termination more prone to
 // hangs. On the other hand, it's really useful to not bother with actual
 // deadlines. YMMV.
-static inline iree_timeout_t iree_infinite_timeout() {
+static inline iree_timeout_t iree_infinite_timeout(void) {
   iree_timeout_t timeout = {IREE_TIMEOUT_ABSOLUTE, IREE_TIME_INFINITE_FUTURE};
   return timeout;
 }

@@ -201,7 +201,7 @@ static void BM_FullModuleInit(benchmark::State& state) {
 }
 BENCHMARK(BM_FullModuleInit);
 
-IREE_ATTRIBUTE_NOINLINE static int empty_fn() {
+IREE_ATTRIBUTE_NOINLINE static int empty_fn(void) {
   int ret = 1;
   benchmark::DoNotOptimize(ret);
   return ret;

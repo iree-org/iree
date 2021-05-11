@@ -1730,3 +1730,67 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[ARG0V]], %[[ARG1V]]
 //  CHECK-SAME:     outs(%[[RET0V]], %[[RET1V]]
+
+// -----
+
+#map0 = affine_map<()[s0] -> (s0 * 64)>
+#map1 = affine_map<()[s0] -> (s0 * 16)>
+module  {
+  func @padded_matmul() {
+    %c0 = constant 0 : index
+    %c12544 = constant 12544 : index
+    %c64 = constant 64 : index
+    %c16 = constant 16 : index
+    %cst = constant 0.000000e+00 : f32
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:12544x27xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:27x16xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:12544x16xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_count_x = hal.interface.workgroup.count[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %workgroup_count_y = hal.interface.workgroup.count[1] : index
+    %3 = affine.apply #map0()[%workgroup_id_y]
+    %4 = affine.apply #map0()[%workgroup_count_y]
+    scf.for %arg0 = %3 to %c12544 step %4 {
+      %5 = affine.apply #map1()[%workgroup_id_x]
+      %6 = affine.apply #map1()[%workgroup_count_x]
+      scf.for %arg1 = %5 to %c16 step %6 {
+        %7 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [64, 27], strides = [1, 1] : !flow.dispatch.tensor<readonly:12544x27xf32> -> tensor<64x27xf32>
+        %8 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [27, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:27x16xf32> -> tensor<27x16xf32>
+        %9 = linalg.init_tensor [64, 16] : tensor<64x16xf32>
+        %10 = linalg.fill(%9, %cst) {__internal_linalg_transform__ = "workgroup"} : tensor<64x16xf32>, f32 -> tensor<64x16xf32>
+        %11 = linalg.pad_tensor %7 low[0, 0] high[0, 5]  {
+        ^bb0(%arg2: index, %arg3: index):  // no predecessors
+          linalg.yield %cst : f32
+        } : tensor<64x27xf32> to tensor<64x32xf32>
+        %12 = linalg.pad_tensor %8 low[0, 0] high[5, 0]  {
+        ^bb0(%arg2: index, %arg3: index):  // no predecessors
+          linalg.yield %cst : f32
+        } : tensor<27x16xf32> to tensor<32x16xf32>
+        %13 = linalg.matmul ins(%11, %12 : tensor<64x32xf32>, tensor<32x16xf32>) outs(%10 : tensor<64x16xf32>) -> tensor<64x16xf32>
+        %14 = tensor.cast %13 : tensor<64x16xf32> to tensor<?x?xf32>
+        flow.dispatch.tensor.store %14, %2, offsets = [%arg0, %arg1], sizes = [%c64, %c16], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:12544x16xf32>
+      }
+    }
+    return
+  }
+}
+
+// CHECK-LABEL: func @padded_matmul()
+// CHECK-DAG: %[[C0:.+]] = constant 0.000000e+00 : f32
+// CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<12544x27xf32>
+// CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<27x16xf32>
+// CHECK-DAG: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<12544x16xf32>
+// CHECK-DAG: %[[LHS_V:.+]] = memref.subview %[[LHS]][%{{.*}}, 0] [64, 27] [1, 1]
+// CHECK-DAG: %[[RHS_V:.+]] = memref.subview %[[RHS]][0, %{{.*}}] [27, 16] [1, 1]
+// CHECK-DAG: %[[DST_V:.+]] = memref.subview %[[DST]][%{{.*}}, %{{.*}}] [64, 16] [1, 1]
+//     CHECK: linalg.fill(%[[DST_V]], %[[C0]])
+//     CHECK: %[[LHS_PADDED:.+]] = memref.alloc() : memref<64x32xf32>
+//     CHECK: linalg.fill(%[[LHS_PADDED]], %[[C0]]) : memref<64x32xf32>, f32
+//     CHECK: %[[LHS_PADDED_INTER:.+]] = memref.subview %[[LHS_PADDED]][0, 0] [64, 27] [1, 1]
+//     CHECK: linalg.copy(%[[LHS_V]], %[[LHS_PADDED_INTER]])
+//     CHECK: %[[RHS_PADDED:.+]] = memref.alloc() : memref<32x16xf32>
+//     CHECK: linalg.fill(%[[RHS_PADDED]], %[[C0]]) : memref<32x16xf32>, f32
+//     CHECK: %[[RHS_PADDED_INTER:.+]] = memref.subview %[[RHS_PADDED]][0, 0] [27, 16] [1, 1]
+//     CHECK: linalg.copy(%[[RHS_V]], %[[RHS_PADDED_INTER]])
+//     CHECK: linalg.matmul ins(%[[LHS_PADDED]], %[[RHS_PADDED]] : memref<64x32xf32>, memref<32x16xf32>)

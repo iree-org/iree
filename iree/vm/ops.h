@@ -92,6 +92,15 @@ static inline float vm_neg_f32(float operand) { return -operand; }
 static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
 static inline float vm_floor_f32(float operand) { return floorf(operand); }
 
+static inline float vm_cast_si32f32(int32_t operand) { return (float)operand; }
+static inline float vm_cast_ui32f32(uint32_t operand) { return (float)operand; }
+static inline int32_t vm_cast_f32si32(float operand) {
+  return (int32_t)roundf(operand);
+}
+static inline uint32_t vm_cast_f32ui32(float operand) {
+  return (uint32_t)roundf(operand);
+}
+
 static inline float vm_atan_f32(float operand) { return atanf(operand); }
 static inline float vm_atan2_f32(float y, float x) { return atan2f(y, x); }
 static inline float vm_cos_f32(float operand) { return cosf(operand); }

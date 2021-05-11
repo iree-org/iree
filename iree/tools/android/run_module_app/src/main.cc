@@ -15,6 +15,7 @@
 #include <android/log.h>
 #include <android_native_app_glue.h>
 
+#include <array>
 #include <chrono>
 #include <thread>
 
@@ -127,21 +128,14 @@ Status RunModule(const IreeModuleInvocation& invocation) {
           &function),
       "looking up function '%s'", function_name.c_str());
 
-  IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-  std::vector<RawSignatureParser::Description> input_descs;
-  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-
   std::vector<absl::string_view> input_views(
       absl::StrSplit(invocation.inputs, '\n', absl::SkipEmpty()));
   vm::ref<iree_vm_list_t> inputs;
-  IREE_RETURN_IF_ERROR(ParseToVariantList(
-      input_descs, iree_hal_device_allocator(device), input_views, &inputs));
+  IREE_RETURN_IF_ERROR(ParseToVariantList(iree_hal_device_allocator(device),
+                                          input_views, &inputs));
 
-  std::vector<RawSignatureParser::Description> output_descs;
-  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                           output_descs.size(),
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            iree_allocator_system(), &outputs));
 
   LOGI("Execute @%s", function_name.c_str());
@@ -151,7 +145,7 @@ Status RunModule(const IreeModuleInvocation& invocation) {
       "invoking function '%s'", function_name.c_str());
 
   std::ostringstream oss;
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get(), &oss),
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get(), &oss),
                        "printing results");
   LOGI("Execution Result:");
   LOGI("%s", oss.str().c_str());

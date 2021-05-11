@@ -86,7 +86,6 @@ endif()
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
-option(IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER "Builds experimental Model-Builder sub-project." OFF)
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
 
@@ -94,7 +93,7 @@ option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindi
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
+if(${IREE_BUILD_SAMPLES})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
 endif()
 
@@ -302,11 +301,6 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
-  # experimental model builder uses vulkan runner.
-  if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
-    set(MLIR_VULKAN_RUNNER_ENABLED ON)
-  endif()
-
   add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
@@ -477,10 +471,6 @@ endif()
 
 if(${IREE_BUILD_EMBEDDING_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples/simple_embedding)
-endif()
-
-if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
-  add_subdirectory(experimental/ModelBuilder)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_REMOTING})

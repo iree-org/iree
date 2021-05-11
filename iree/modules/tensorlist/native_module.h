@@ -26,7 +26,7 @@ extern "C" {
 
 // Registers the custom types used by the module.
 // WARNING: not thread-safe; call at startup before using.
-iree_status_t iree_tensorlist_module_register_types();
+iree_status_t iree_tensorlist_module_register_types(void);
 
 // Creates a native custom module.
 // Modules may exist in multiple contexts and should be thread-safe and (mostly)

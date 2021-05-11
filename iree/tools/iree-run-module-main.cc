@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
 #include <iostream>
 
 #include "iree/base/internal/file_io.h"
@@ -122,20 +123,12 @@ iree_status_t Run() {
         "looking up function '%s'", function_name.c_str());
   }
 
-  IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-  std::vector<RawSignatureParser::Description> input_descs;
-  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-
   vm::ref<iree_vm_list_t> inputs;
-  IREE_CHECK_OK(ParseToVariantList(input_descs,
-                                   iree_hal_device_allocator(device),
+  IREE_CHECK_OK(ParseToVariantList(iree_hal_device_allocator(device),
                                    FLAG_function_inputs, &inputs));
 
-  std::vector<RawSignatureParser::Description> output_descs;
-  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                           output_descs.size(),
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            iree_allocator_system(), &outputs));
 
   std::cout << "EXEC @" << function_name << "\n";
@@ -144,8 +137,7 @@ iree_status_t Run() {
                      outputs.get(), iree_allocator_system()),
       "invoking function '%s'", function_name.c_str());
 
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()),
-                       "printing results");
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()), "printing results");
 
   inputs.reset();
   outputs.reset();

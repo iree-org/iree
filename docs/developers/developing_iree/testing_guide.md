@@ -27,7 +27,7 @@ $ bazel test iree/base:arena_test
 
 ### Setting test environments
 
-Parallel testing for `ctest` can be enabled via the `CTEST_PARALLEL_LEVEL` 
+Parallel testing for `ctest` can be enabled via the `CTEST_PARALLEL_LEVEL`
 environment variable. For example:
 
 ```shell
@@ -254,20 +254,18 @@ func @negative() attributes { iree.module.export } {
 The test case functions are exported using the `iree.module.export` attribute.
 Each of these exported functions will be used to create a test case in gtest.
 
-Note the use of
-[`iree.unfoldable_constant`](https://google.github.io/iree/Dialects/IREEDialect#ireeunfoldable_constant-ireeunfoldableconstantop)
-to specify test constants. If we were to use a regular constant, the compiler
-would "helpfully" fold away everything at compile time and our test would not
-actually test the runtime. `unfoldable_constant` hides the value of the constant
-from the compiler so it cannot use it at compile time. To hide an arbitrary
-SSA-value, you can use
-[`iree.do_not_optimize`](https://google.github.io/iree/Dialects/IREEDialect#ireedo_not_optimize-ireedonotoptimizeop).
-This wraps any value in an unoptimizable identity function.
+Note the use of `iree.unfoldable_constant` to specify test constants. If we were
+to use a regular constant, the compiler would "helpfully" fold away everything
+at compile time and our test would not actually test the runtime.
+`unfoldable_constant` hides the value of the constant from the compiler so it
+cannot use it at compile time. To hide an arbitrary SSA-value, you can use
+`iree.do_not_optimize`. This wraps any value in an unoptimizable identity
+function.
 
 Next we use this input constant to exercise the runtime feature under test (in
 this case, just a single floor operation). Finally, we use a check dialect
 operation to make an assertion about the output. There are a few different
-[assertion operations](https://google.github.io/iree/Dialects/CheckDialect).
+[assertion operations](https://github.com/google/iree/tree/main/iree/compiler/Dialect/Modules/Check).
 Here we use the `expect_almost_eq_const` op: *almost* because we are comparing
 floats and want to allow for floating-point imprecision, and *const* because we
 want to compare it to a constant value. This last part is just syntactic sugar

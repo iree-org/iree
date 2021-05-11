@@ -243,6 +243,11 @@ cc_test(
         "bytecode_dispatch_test.cc",
         "bytecode_module_test.cc",
     ],
+    tags = [
+        # TODO(benvanik): Fix type casting errors for --config=android_arm*.
+        "notap",
+        "manual",
+    ],
     deps = [
         ":bytecode_module",
         ":vm",

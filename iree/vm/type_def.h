@@ -36,7 +36,7 @@ typedef struct {
   iree_vm_ref_type_t ref_type : 24;
 } iree_vm_type_def_t;
 
-static inline iree_vm_type_def_t iree_vm_type_def_make_variant_type() {
+static inline iree_vm_type_def_t iree_vm_type_def_make_variant_type(void) {
   iree_vm_type_def_t result;
   result.value_type = IREE_VM_VALUE_TYPE_NONE;
   result.ref_type = IREE_VM_REF_TYPE_NULL;
@@ -77,6 +77,8 @@ typedef struct {
     int16_t i16;
     int32_t i32;
     int64_t i64;
+    float f32;
+    double f64;
     iree_vm_ref_t ref;
 
     uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value

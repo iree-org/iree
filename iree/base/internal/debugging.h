@@ -42,7 +42,7 @@ extern "C" {
 //
 // We implement this directly in the header with ALWAYS_INLINE so that the
 // stack doesn't get all messed up.
-IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break() {
+IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
 #if defined(IREE_COMPILER_HAS_BUILTIN_DEBUG_TRAP)
   __builtin_debugtrap();
 #elif defined(IREE_PLATFORM_WINDOWS)

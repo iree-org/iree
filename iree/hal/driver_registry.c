@@ -53,7 +53,8 @@ static void iree_hal_driver_registry_default_initialize(void) {
   iree_slim_mutex_initialize(&iree_hal_driver_registry_default_.mutex);
 }
 
-IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default() {
+IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default(
+    void) {
   iree_call_once(&iree_hal_driver_registry_default_flag_,
                  iree_hal_driver_registry_default_initialize);
   return &iree_hal_driver_registry_default_;

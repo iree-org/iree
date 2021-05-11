@@ -1,11 +1,12 @@
 site_name: IREE
+site_url: https://google.github.io/iree/
+
 theme:
   name: material
   icon:
     repo: fontawesome/brands/github
-    logo: material/ghost
-  favicon: assets/images/favicon.png
-  logo: assets/images/favicon.png
+    logo: iree/ghost
+  favicon: ghost.svg
   custom_dir: overrides
 
   features:
@@ -78,6 +79,9 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
+      options:
+        custom_icons:
+          - overrides/.icons
   - pymdownx.tabbed
   - pymdownx.superfences
   - pymdownx.tabbed
