@@ -38,19 +38,3 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     // CHECK:   %[[LOAD:.+]] = vector.transfer_read %[[SVs]][%c0, %c0], %cst {{.*}} : memref<1x4xf32, {{.*}}>, vector<1x4xf32>
     // CHECK:   vector.transfer_write %[[LOAD]], %[[SVd]][%[[C0]], %[[C0]]] {{.*}} : vector<1x4xf32>, memref<1x4xf32
 }
-
-// -----
-
-module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @extract(%arg0 : vector<1x4xf32>) -> vector<1x1xf32> attributes {spv.entry_point_abi = {local_size = dense<[128, 1, 1]> : vector<3xi32>}} {
-    %0 = vector.extract_strided_slice %arg0
-      {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]}
-        : vector<1x4xf32> to vector<1x1xf32>
-    return %0 : vector<1x1xf32>
-  }
-  // CHECK-LABEL: func @extract
-  //  CHECK-SAME: (%[[ARG0:.*]]: vector<1x4xf32>
-  //       CHECK:   %[[A:.*]] = vector.extract %[[ARG0]][0, 2] : vector<1x4xf32>
-  //       CHECK:   %[[B:.*]] = vector.broadcast %[[A]] : f32 to vector<1x1xf32>
-  //       CHECK:   return %[[B]] : vector<1x1xf32>
-}
