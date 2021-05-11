@@ -36,9 +36,9 @@ class VMLAToVMConversionInterface : public VMConversionDialectInterface {
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
   OwningModuleRef parseVMImportModule() const override {
-    return mlir::parseSourceString(
-        StringRef(vmla_imports_create()->data, vmla_imports_create()->size),
-        getDialect()->getContext());
+    return mlir::parseSourceString(StringRef(iree_vmla_imports_create()->data,
+                                             iree_vmla_imports_create()->size),
+                                   getDialect()->getContext());
   }
 
   void populateVMConversionPatterns(

@@ -23,8 +23,8 @@ iree_bytecode_module(
     add_dynamic
   SRC
     "add_dynamic.mlir"
-  CC_NAMESPACE
-    "iree::bindings::tflite::testdata"
+  C_IDENTIFIER
+    "iree_tflite_testdata_add_dynamic"
   FLAGS
     "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"
@@ -39,8 +39,8 @@ iree_bytecode_module(
     add_multi
   SRC
     "add_multi.mlir"
-  CC_NAMESPACE
-    "iree::bindings::tflite::testdata"
+  C_IDENTIFIER
+    "iree_tflite_testdata_add_multi"
   FLAGS
     "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"
@@ -55,8 +55,8 @@ iree_bytecode_module(
     add_static
   SRC
     "add_static.mlir"
-  CC_NAMESPACE
-    "iree::bindings::tflite::testdata"
+  C_IDENTIFIER
+    "iree_tflite_testdata_add_static"
   FLAGS
     "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"

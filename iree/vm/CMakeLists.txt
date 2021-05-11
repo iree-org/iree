@@ -207,7 +207,7 @@ iree_cc_test(
     iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
-    iree::vm::test::all_bytecode_modules_cc
+    iree::vm::test::all_bytecode_modules_c
   LABELS
     "notap"
     "manual"
@@ -220,7 +220,7 @@ iree_cc_binary(
     "bytecode_module_benchmark.cc"
   DEPS
     ::bytecode_module
-    ::bytecode_module_benchmark_module_cc
+    ::bytecode_module_benchmark_module_c
     ::vm
     benchmark
     iree::base
@@ -243,8 +243,8 @@ iree_bytecode_module(
     bytecode_module_benchmark_module
   SRC
     "bytecode_module_benchmark.mlir"
-  CC_NAMESPACE
-    "iree::vm"
+  C_IDENTIFIER
+    "iree_vm_bytecode_module_benchmark_module"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   TESTONLY
@@ -258,7 +258,7 @@ iree_cc_test(
     "bytecode_module_size_benchmark.cc"
   DEPS
     ::bytecode_module
-    ::bytecode_module_size_benchmark_module_cc
+    ::bytecode_module_size_benchmark_module_c
     ::vm
     iree::base
 )
@@ -268,8 +268,8 @@ iree_bytecode_module(
     bytecode_module_size_benchmark_module
   SRC
     "bytecode_module_size_benchmark.mlir"
-  CC_NAMESPACE
-    "iree::vm"
+  C_IDENTIFIER
+    "iree_vm_bytecode_module_size_benchmark_module"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   TESTONLY
