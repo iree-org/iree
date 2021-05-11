@@ -1073,12 +1073,12 @@ static OpFoldResult foldShlOp(T op, ArrayRef<Attribute> operands) {
   if (matchPattern(op.operand(), m_Zero())) {
     // 0 << y = 0
     return zeroOfType(op.getType());
-  } else if (op.amount() == 0) {
+  } else if (matchPattern(op.amount(), m_Zero())) {
     // x << 0 = x
     return op.operand();
   }
-  return constFoldUnaryOp<IntegerAttr>(
-      operands, [&](const APInt &a) { return a.shl(op.amount()); });
+  return constFoldBinaryOp<IntegerAttr>(
+      operands, [&](const APInt &a, const APInt &b) { return a.shl(b); });
 }
 
 OpFoldResult ShlI32Op::fold(ArrayRef<Attribute> operands) {
@@ -1094,12 +1094,12 @@ static OpFoldResult foldShrSOp(T op, ArrayRef<Attribute> operands) {
   if (matchPattern(op.operand(), m_Zero())) {
     // 0 >> y = 0
     return zeroOfType(op.getType());
-  } else if (op.amount() == 0) {
+  } else if (matchPattern(op.amount(), m_Zero())) {
     // x >> 0 = x
     return op.operand();
   }
-  return constFoldUnaryOp<IntegerAttr>(
-      operands, [&](const APInt &a) { return a.ashr(op.amount()); });
+  return constFoldBinaryOp<IntegerAttr>(
+      operands, [&](const APInt &a, const APInt &b) { return a.ashr(b); });
 }
 
 OpFoldResult ShrI32SOp::fold(ArrayRef<Attribute> operands) {
@@ -1115,12 +1115,12 @@ static OpFoldResult foldShrUOp(T op, ArrayRef<Attribute> operands) {
   if (matchPattern(op.operand(), m_Zero())) {
     // 0 >> y = 0
     return zeroOfType(op.getType());
-  } else if (op.amount() == 0) {
+  } else if (matchPattern(op.amount(), m_Zero())) {
     // x >> 0 = x
     return op.operand();
   }
-  return constFoldUnaryOp<IntegerAttr>(
-      operands, [&](const APInt &a) { return a.lshr(op.amount()); });
+  return constFoldBinaryOp<IntegerAttr>(
+      operands, [&](const APInt &a, const APInt &b) { return a.lshr(b); });
 }
 
 OpFoldResult ShrI32UOp::fold(ArrayRef<Attribute> operands) {

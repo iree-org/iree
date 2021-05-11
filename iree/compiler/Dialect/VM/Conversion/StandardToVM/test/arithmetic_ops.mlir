@@ -171,17 +171,36 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t010_shift
-module @t010_shift {
+// CHECK-LABEL: @t010_shift_left
+module @t010_shift_left {
 
 module {
   // CHECK: func @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32) -> (i32) {
-    %cst = constant 3 : i32
-    // CHECK: vm.shl.i32 %[[ARG0]], 3 : i32
-    %1 = shift_left %arg0, %cst : i32
+    %c3 = constant 3 : i32
+    // CHECK: vm.shl.i32 %[[ARG0]], %c3 : i32
+    %1 = shift_left %arg0, %c3 : i32
     return %1 : i32
+  }
+}
+
+}
+
+// -----
+// CHECK-LABEL: @t011_shift_right
+module @t011_shift_right {
+
+module {
+  // CHECK: func @my_fn
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
+  func @my_fn(%arg0: i32) -> (i32) {
+    %c3 = constant 3 : i32
+    // CHECK: %[[T:.+]] = vm.shr.i32.s %[[ARG0]], %c3 : i32
+    %1 = shift_right_signed %arg0, %c3 : i32
+    // CHECK: vm.shr.i32.u %[[T]], %c3 : i32
+    %2 = shift_right_unsigned %1, %c3 : i32
+    return %2 : i32
   }
 }
 

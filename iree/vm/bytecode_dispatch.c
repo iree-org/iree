@@ -1314,7 +1314,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 #define DISPATCH_OP_CORE_SHIFT_I32(op_name, op_func)  \
   DISPATCH_OP(CORE, op_name, {                        \
     int32_t operand = VM_DecOperandRegI32("operand"); \
-    int8_t amount = VM_DecConstI8("amount");          \
+    int32_t amount = VM_DecOperandRegI32("amount");   \
     int32_t* result = VM_DecResultRegI32("result");   \
     *result = op_func(operand, amount);               \
   });
@@ -1720,7 +1720,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 #define DISPATCH_OP_EXT_I64_SHIFT_I64(op_name, op_func) \
   DISPATCH_OP(EXT_I64, op_name, {                       \
     int64_t operand = VM_DecOperandRegI64("operand");   \
-    int8_t amount = VM_DecConstI8("amount");            \
+    int32_t amount = VM_DecOperandRegI32("amount");     \
     int64_t* result = VM_DecResultRegI64("result");     \
     *result = op_func(operand, amount);                 \
   });

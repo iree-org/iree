@@ -2304,7 +2304,7 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     type:$operand,
-    Confined<I8Attr, [IntegerAttrInRange<0, type.bitwidth>]>:$amount
+    I32:$amount
   );
   let results = (outs
     type:$result
@@ -2315,7 +2315,7 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"operand", 0>,
-    VM_EncPrimitiveAttr<"amount", 8>,
+    VM_EncOperand<"amount", 1>,
     VM_EncResult<"result">,
   ];
 }

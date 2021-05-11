@@ -148,13 +148,16 @@ static inline int32_t vm_ext_i16i32u(int32_t operand) {
 // Native bitwise shifts and rotates
 //===------------------------------------------------------------------===//
 
-static inline int32_t vm_shl_i32(int32_t operand, int8_t amount) {
+static inline int32_t vm_shl_i32(int32_t operand, int32_t amount) {
+  amount &= 0x1F;
   return (int32_t)(operand << amount);
 }
-static inline int32_t vm_shr_i32s(int32_t operand, int8_t amount) {
+static inline int32_t vm_shr_i32s(int32_t operand, int32_t amount) {
+  amount &= 0x1F;
   return (int32_t)(operand >> amount);
 }
-static inline int32_t vm_shr_i32u(int32_t operand, int8_t amount) {
+static inline int32_t vm_shr_i32u(int32_t operand, int32_t amount) {
+  amount &= 0x1F;
   return (int32_t)(((uint32_t)operand) >> amount);
 }
 
@@ -270,13 +273,16 @@ static inline int64_t vm_ext_i32i64u(int32_t operand) {
 // ExtI64: Native bitwise shifts and rotates
 //===------------------------------------------------------------------===//
 
-static inline int64_t vm_shl_i64(int64_t operand, int8_t amount) {
+static inline int64_t vm_shl_i64(int64_t operand, int32_t amount) {
+  amount &= 0x3F;
   return (int64_t)(operand << amount);
 }
-static inline int64_t vm_shr_i64s(int64_t operand, int8_t amount) {
+static inline int64_t vm_shr_i64s(int64_t operand, int32_t amount) {
+  amount &= 0x3F;
   return (int64_t)(operand >> amount);
 }
-static inline int64_t vm_shr_i64u(int64_t operand, int8_t amount) {
+static inline int64_t vm_shr_i64u(int64_t operand, int32_t amount) {
+  amount &= 0x3F;
   return (int64_t)(((uint64_t)operand) >> amount);
 }
 

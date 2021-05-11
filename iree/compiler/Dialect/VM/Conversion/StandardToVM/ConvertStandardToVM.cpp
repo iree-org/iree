@@ -414,7 +414,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   }
 };
 
-template <typename SrcOpTy, typename DstOpTy, unsigned kBits = 32>
+template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
 class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
@@ -422,20 +422,24 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::Adaptor srcAdaptor(operands);
-    auto type = srcOp.getType();
-    if (!type.isSignlessInteger() || type.getIntOrFloatBitWidth() != kBits) {
-      return failure();
+    Value amount = srcAdaptor.rhs();
+    if (amount.getType().getIntOrFloatBitWidth() > 32) {
+      // Shift amounts are always 32-bit in the VM.
+      amount = rewriter.createOrFold<TruncateIOp>(
+          srcOp.getLoc(), rewriter.getI32Type(), amount);
     }
-    APInt amount;
-    if (!matchPattern(srcAdaptor.rhs(), m_ConstantInt(&amount))) {
-      return failure();
+    switch (srcAdaptor.lhs().getType().getIntOrFloatBitWidth()) {
+      case 32:
+        rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, srcOp.getType(),
+                                               srcAdaptor.lhs(), amount);
+        break;
+      case 64:
+        rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, srcOp.getType(),
+                                               srcAdaptor.lhs(), amount);
+        break;
+      default:
+        return rewriter.notifyMatchFailure(srcOp, "unsupported type");
     }
-    uint64_t amountRaw = amount.getZExtValue();
-    if (amountRaw > kBits) return failure();
-    IntegerAttr amountAttr =
-        IntegerAttr::get(IntegerType::get(srcOp.getContext(), 8), amountRaw);
-    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcOp.getType(),
-                                         srcAdaptor.lhs(), amountAttr);
     return success();
   }
 };
@@ -676,10 +680,14 @@ void populateStandardToVMPatterns(MLIRContext *context,
   patterns.insert<SIToFPOpConversion, UIToFPOpConversion, FPToUIOpConversion,
                   FPToUIOpConversion>(typeConverter, context);
 
-  // Shift ops
-  // TODO(laurenzo): The standard dialect is missing shr ops. Add once in place.
-  patterns.insert<ShiftArithmeticOpConversion<ShiftLeftOp, IREE::VM::ShlI32Op>>(
-      typeConverter, context);
+  // Shift ops.
+  patterns.insert<
+      ShiftArithmeticOpConversion<ShiftLeftOp, IREE::VM::ShlI32Op,
+                                  IREE::VM::ShlI64Op>,
+      ShiftArithmeticOpConversion<SignedShiftRightOp, IREE::VM::ShrI32SOp,
+                                  IREE::VM::ShrI64SOp>,
+      ShiftArithmeticOpConversion<UnsignedShiftRightOp, IREE::VM::ShrI32UOp,
+                                  IREE::VM::ShrI64UOp>>(typeConverter, context);
 }
 
 }  // namespace iree_compiler
