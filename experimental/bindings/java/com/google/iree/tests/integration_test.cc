@@ -36,7 +36,7 @@ extern "C" int main(int argc, char** argv) {
 
   auto module = std::make_unique<ModuleWrapper>();
   const struct iree_file_toc_t* module_file =
-      simple_mul_bytecode_module_c_create();
+      iree_java_testdata_simple_mul_bytecode_module_create();
   auto module_status = module->Create(
       reinterpret_cast<const uint8_t*>(module_file->data), module_file->size);
   if (!module_status.ok()) {

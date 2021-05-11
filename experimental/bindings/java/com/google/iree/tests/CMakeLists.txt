@@ -18,7 +18,8 @@ if(${IREE_BUILD_COMPILER})
       simple_mul_bytecode_module
     SRC
       "simple_mul.mlir"
-    C_OUTPUT
+    C_IDENTIFIER
+      "iree_java_testdata_simple_mul_bytecode_module"
     FLAGS
       "-iree-mlir-to-vm-bytecode-module"
       "-iree-hal-target-backends=vmla"

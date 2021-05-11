@@ -68,7 +68,7 @@ class StringsModuleTest : public ::testing::Test {
     iree_hal_driver_release(hal_driver);
 
     // Setup the test module.
-    const auto* module_file_toc = strings_module_test_module_c_create();
+    const auto* module_file_toc = iree_strings_module_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),

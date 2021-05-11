@@ -22,7 +22,7 @@ extern "C" int main(int argc, char** argv) {
   iree_vm_instance_create(iree_allocator_system(), &instance);
 
   const auto* module_file_toc =
-      bytecode_module_size_benchmark_module_c_create();
+      iree_vm_bytecode_module_size_benchmark_module_create();
   iree_vm_module_t* module = nullptr;
   iree_vm_bytecode_module_create(
       iree_const_byte_span_t{

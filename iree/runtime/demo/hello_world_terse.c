@@ -59,7 +59,8 @@ static void iree_runtime_demo_run_session(iree_runtime_instance_t* instance) {
   iree_hal_device_release(device);
 
   // Load your user module into the session (from memory, from file, etc).
-  const iree_file_toc_t* module_file = simple_mul_module_c_create();
+  const iree_file_toc_t* module_file =
+      iree_runtime_testdata_simple_mul_module_create();
   IREE_CHECK_OK(iree_runtime_session_append_bytecode_module_from_memory(
       session, iree_make_const_byte_span(module_file->data, module_file->size),
       iree_allocator_null()));

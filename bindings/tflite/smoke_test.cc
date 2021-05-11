@@ -35,14 +35,14 @@ limitations under the License.
 // embedding the module directly in a binary.
 #include "bindings/tflite/testdata/add_dynamic_c.h"
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_EMBEDDED_DATA \
-  add_dynamic_c_create()->data
+  iree_tflite_testdata_add_dynamic_create()->data
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_EMBEDDED_SIZE \
-  add_dynamic_c_create()->size
+  iree_tflite_testdata_add_dynamic_create()->size
 #include "bindings/tflite/testdata/add_static_c.h"
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_DATA \
-  add_static_c_create()->data
+  iree_tflite_testdata_add_static_create()->data
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_SIZE \
-  add_static_c_create()->size
+  iree_tflite_testdata_add_static_create()->size
 
 // TODO(#3971): currently can't nicely load these due to cmake issues.
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_PATH \

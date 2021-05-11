@@ -33,7 +33,7 @@ endif()
 iree_bytecode_module(
     name = "custom_modules_test_module",
     src = "custom_modules_test.mlir",
-    c_output = True,
+    c_identifier = "iree_samples_custom_modules_test_module",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",

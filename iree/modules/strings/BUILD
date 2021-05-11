@@ -64,7 +64,7 @@ iree_bytecode_module(
     name = "strings_module_test_module",
     testonly = True,
     src = "strings_module_test.mlir",
-    c_output = True,
+    c_identifier = "iree_strings_module_test_module",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",

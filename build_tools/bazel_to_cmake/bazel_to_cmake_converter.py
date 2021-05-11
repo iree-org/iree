@@ -469,11 +469,11 @@ class BuildFileFunctions(object):
                            src,
                            flags=None,
                            translate_tool=None,
-                           c_output=None,
+                           c_identifier=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
-    c_output_block = _convert_option_block("C_OUTPUT", c_output)
+    c_identifier_block = _convert_string_arg_block("C_IDENTIFIER", c_identifier)
     translate_tool_block = _convert_translate_tool_block(translate_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
     testonly_block = _convert_option_block("TESTONLY", testonly)
@@ -481,7 +481,7 @@ class BuildFileFunctions(object):
     self.converter.body += (f"iree_bytecode_module(\n"
                             f"{name_block}"
                             f"{src_block}"
-                            f"{c_output_block}"
+                            f"{c_identifier_block}"
                             f"{translate_tool_block}"
                             f"{flags_block}"
                             f"{testonly_block}"
