@@ -1,3 +1,4 @@
+// Copyright 2021 Nod Labs
 // Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/LLVMGPUCodeGenOptions.h"
+#include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
+#include "iree/compiler/Conversion/LinalgToROCDL/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
-#include "iree/schemas/cuda_executable_def_builder.h"
+#include "iree/schemas/rocm_executable_def_builder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -28,7 +28,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
-#include "mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/ROCDL/ROCDLToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
 namespace mlir {
@@ -36,8 +36,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-CUDATargetOptions getCUDATargetOptionsFromFlags() {
-  CUDATargetOptions targetOptions;
+ROCMTargetOptions getROCMTargetOptionsFromFlags() {
+  ROCMTargetOptions targetOptions;
   // TODO: flags
   return targetOptions;
 }
@@ -56,16 +56,16 @@ static std::string translateModuleToISA(llvm::Module &module,
   return targetISA;
 }
 
-class CUDATargetBackend final : public TargetBackend {
+class ROCMTargetBackend final : public iree_compiler::IREE::HAL::TargetBackend {
  public:
-  CUDATargetBackend(CUDATargetOptions options) : options_(std::move(options)) {}
+  ROCMTargetBackend(ROCMTargetOptions options) : options_(std::move(options)) {}
 
-  std::string name() const override { return "cuda"; }
-  std::string filter_pattern() const override { return "cuda"; }
+  std::string name() const override { return "rocm"; }
+  std::string filter_pattern() const override { return "rocm"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
-    mlir::registerNVVMDialectTranslation(registry);
+    mlir::registerROCDLDialectTranslation(registry);
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
@@ -73,7 +73,7 @@ class CUDATargetBackend final : public TargetBackend {
     buildLLVMGPUTransformPassPipeline(passManager, codeGenOptions);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+  LogicalResult serializeExecutable(iree_compiler::IREE::HAL::ExecutableTargetOp targetOp,
                                     OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
@@ -84,18 +84,18 @@ class CUDATargetBackend final : public TargetBackend {
     // intermediate code/binary files), and at runtime (loaded
     // libraries/symbols/etc).
     auto libraryName =
-        targetOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
+        targetOp->getParentOfType<iree_compiler::IREE::HAL::ExecutableOp>().getName().str();
 
     ModuleOp innerModuleOp = targetOp.getInnerModule();
 
-    // Remove all the functions that are not part of the CUDA kernel.
+    // Remove all the functions that are not part of the ROCM kernel.
     // TODO: Find a better solution to handle this.
     auto illegalFuncOps = llvm::to_vector<4>(innerModuleOp.getOps<FuncOp>());
     for (auto funcOp : illegalFuncOps) {
       funcOp.erase();
     }
     auto halInterfaceOps =
-        llvm::to_vector<1>(innerModuleOp.getOps<IREE::HAL::InterfaceOp>());
+        llvm::to_vector<1>(innerModuleOp.getOps<iree_compiler::IREE::HAL::InterfaceOp>());
     for (auto halOp : halInterfaceOps) {
       halOp.erase();
     }
@@ -106,32 +106,23 @@ class CUDATargetBackend final : public TargetBackend {
       return targetOp.emitError() << "failed to translate the MLIR LLVM "
                                      "dialect to the native llvm::Module";
     }
+
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       std::array<int32_t, 3> workgroup_size;
-      for (auto it : llvm::enumerate(func->getAttr("llvmgpu_workgroup_size")
+      for (auto it : llvm::enumerate(func->getAttr("rocm_workgroup_size")
                                          .cast<DenseIntElementsAttr>()
                                          .getIntValues())) {
         workgroup_size[it.index()] = it.value().getZExtValue();
       }
       workgroupSizes.push_back(workgroup_size);
-      llvm::Metadata *llvmMetadata[] = {
-          llvm::ValueAsMetadata::get(llvmFunc),
-          llvm::MDString::get(llvmModule->getContext(), "kernel"),
-          llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
-              llvm::Type::getInt32Ty(llvmModule->getContext()), 1))};
-      llvm::MDNode *llvmMetadataNode =
-          llvm::MDNode::get(llvmModule->getContext(), llvmMetadata);
-      llvmModule->getOrInsertNamedMetadata("nvvm.annotations")
-          ->addOperand(llvmMetadataNode);
     }
 
     std::unique_ptr<llvm::TargetMachine> targetMachine;
     {
-      llvm::Triple triple("nvptx64-nvidia-cuda");
-      std::string targetChip = "sm_35";
-      std::string features = "+ptx60";
+      llvm::Triple triple("amdgcn--amdhsa-amdgiz");
+      std::string targetChip = "gfx908";
       std::string error;
       const llvm::Target *target =
           llvm::TargetRegistry::lookupTarget("", triple, error);
@@ -139,7 +130,7 @@ class CUDATargetBackend final : public TargetBackend {
         return targetOp.emitError() << "cannot initialize target triple";
       }
       targetMachine.reset(target->createTargetMachine(triple.str(), targetChip,
-                                                      features, {}, {}));
+                                                      {}, {}, {}));
       if (targetMachine == nullptr) {
         return targetOp.emitError() << "cannot initialize target machine";
       }
@@ -147,58 +138,56 @@ class CUDATargetBackend final : public TargetBackend {
 
     llvmModule->setDataLayout(targetMachine->createDataLayout());
 
-    FlatbufferBuilder builder;
-    iree_CUDAExecutableDef_start_as_root(builder);
+    iree_compiler::FlatbufferBuilder builder;
+    iree_ROCMExecutableDef_start_as_root(builder);
 
-    // Serialize cuda kernel into the binary that we will embed in the
+    // Serialize hsaco kernel into the binary that we will embed in the
     // final flatbuffer.
     std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
-    auto ptxCudeRef = flatbuffers_uint8_vec_create(
+    auto hsacoRef = flatbuffers_uint8_vec_create(
         builder, reinterpret_cast<const uint8_t *>(targetISA.c_str()),
         targetISA.size());
 
     auto entryPointNames = llvm::to_vector<8>(
-        llvm::map_range(targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
+        llvm::map_range(targetOp.getBlock().getOps<iree_compiler::IREE::HAL::ExecutableEntryPointOp>(),
                         [&](auto op) { return op.getName(); }));
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
-    iree_CUDABlockSizeDef_vec_start(builder);
+    iree_ROCMBlockSizeDef_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
     for (auto shader : entryPointNames) {
-      iree_CUDABlockSizeDef_vec_push_create(builder, (*blockSizes)[0],
+      iree_ROCMBlockSizeDef_vec_push_create(builder, (*blockSizes)[0],
                                             (*blockSizes)[1], (*blockSizes)[2]);
       ++blockSizes;
     }
-    auto blockSizesRef = iree_CUDABlockSizeDef_vec_end(builder);
+    auto blockSizesRef = iree_ROCMBlockSizeDef_vec_end(builder);
 
-    iree_CUDAExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_CUDAExecutableDef_block_sizes_add(builder, blockSizesRef);
-    iree_CUDAExecutableDef_ptx_image_add(builder, ptxCudeRef);
-    iree_CUDAExecutableDef_end_as_root(builder);
+    iree_ROCMExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_ROCMExecutableDef_block_sizes_add(builder, blockSizesRef);
+    iree_ROCMExecutableDef_hsaco_image_add(builder, hsacoRef);
+    iree_ROCMExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
-    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+    executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(), targetOp.sym_name(),
-        executableBuilder.getStringAttr("PTXE"),
+        executableBuilder.getStringAttr("HSACO"),
         builder.getBufferAttr(executableBuilder.getContext()));
-    binaryOp.mime_typeAttr(
-        executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();
   }
 
  private:
-  CUDATargetOptions options_;
+  ROCMTargetOptions options_;
 };
 
-void registerCUDATargetBackends(
-    std::function<CUDATargetOptions()> queryOptions) {
-  static TargetBackendRegistration registration("cuda", [=]() {
-    LLVMInitializeNVPTXTarget();
-    LLVMInitializeNVPTXTargetMC();
-    LLVMInitializeNVPTXTargetInfo();
-    LLVMInitializeNVPTXAsmPrinter();
-    return std::make_unique<CUDATargetBackend>(queryOptions());
+void registerROCMTargetBackends(
+    std::function<ROCMTargetOptions()> queryOptions) {
+  static iree_compiler::IREE::HAL::TargetBackendRegistration registration("rocm", [=]() {
+    LLVMInitializeAMDGPUTarget();
+    LLVMInitializeAMDGPUTargetMC();
+    LLVMInitializeAMDGPUTargetInfo();
+    LLVMInitializeAMDGPUAsmPrinter();
+    return std::make_unique<ROCMTargetBackend>(queryOptions());
   });
 }
 

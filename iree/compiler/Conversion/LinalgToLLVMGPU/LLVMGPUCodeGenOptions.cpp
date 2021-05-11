@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 Nod Labs
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_CONVERSION_LINALGTONVVM_KERNELCONFIG_H_
-#define IREE_COMPILER_CONVERSION_LINALGTONVVM_KERNELCONFIG_H_
-
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
-#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "iree/compiler/Conversion/LinalgToLLVMGPU/LLVMGPUCodeGenOptions.h"
+#include "llvm/Support/CommandLine.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-Optional<LaunchConfig> getCUDALaunchConfig(
-    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    ArrayRef<linalg::LinalgOp> linalgOps);
+static llvm::cl::opt<bool> clUseROCM(
+    "iree-codegen-linalg-to-llvmgpu-enable-rocm",
+    llvm::cl::desc("Use ROCM instead of CUDA"),
+    llvm::cl::init(false));
+
+LLVMGPUCodegenOptions getLLVMGPUCodegenOptionsFromClOptions() {
+  LLVMGPUCodegenOptions options;
+  options.useROCM = clUseROCM;
+  return options;
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir
-#endif  // IREE_COMPILER_CONVERSION_LINALGTONVVM_KERNELCONFIG_H_

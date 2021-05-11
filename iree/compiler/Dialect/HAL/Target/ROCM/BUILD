@@ -22,34 +22,34 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_TARGET_BACKEND_CUDA}")
+if(NOT "${IREE_TARGET_BACKEND_ROCM}")
   return()
 endif()
 """,
 )
 
 cc_library(
-    name = "CUDA",
+    name = "ROCM",
     srcs = [
-        "CUDATarget.cpp",
+        "ROCMTarget.cpp",
     ],
     hdrs = [
-        "CUDATarget.h",
+        "ROCMTarget.h",
     ],
     deps = [
         "//iree/base/internal:flatcc",
         "//iree/compiler/Conversion/LinalgToLLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
-        "//iree/schemas:cuda_executable_def_c_fbs",
+        "//iree/schemas:rocm_executable_def_c_fbs",
         "@llvm-project//llvm:Core",
-        "@llvm-project//llvm:NVPTXCodeGen",
+        "@llvm-project//llvm:AMDGPUCodeGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
-        "@llvm-project//mlir:NVVMDialect",
-        "@llvm-project//mlir:NVVMToLLVMIRTranslation",
+        "@llvm-project//mlir:ROCDLDialect",
+        "@llvm-project//mlir:ROCDLToLLVMIRTranslation",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:ToLLVMIRTranslation",

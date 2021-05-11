@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
-
+#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/LinalgToLLVMGPU/LLVMGPUCodeGenOptions.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
@@ -28,7 +28,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-static void addLinalgToNVVMPasses(OpPassManager &pm) {
+static void addLinalgToLLVMGPUPasses(OpPassManager &pm, const LLVMGPUCodegenOptions &options) {
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
@@ -67,11 +67,16 @@ static void addLinalgToNVVMPasses(OpPassManager &pm) {
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addNestedPass<ModuleOp>(createStripDebugInfoPass());
-  // convert to NVVM.
-  pm.addNestedPass<ModuleOp>(createConvertToNVVMPass());
+  if (options.useROCM) {
+    // convert to ROCDL.
+    pm.addNestedPass<ModuleOp>(createConvertToROCDLPass());
+  } else {
+    // convert to NVVM.
+    pm.addNestedPass<ModuleOp>(createConvertToNVVMPass());
+  }
 }
 
-void buildNVVMTransformPassPipeline(OpPassManager &pm) {
+void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, const LLVMGPUCodegenOptions &options) {
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addPass(createInlinerPass());
 
@@ -84,26 +89,28 @@ void buildNVVMTransformPassPipeline(OpPassManager &pm) {
   addLinalgBufferizePasses(nestedModulePM, allocationFn);
 
   //===--------------------------------------------------------------------===//
-  // Convert Linalg ops to LLVM+NVVM ops.
+  // Convert Linalg ops to LLVM+NVVM/ROCDL ops.
   //
   // Post-conditions:
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
-  addLinalgToNVVMPasses(pm);
+  addLinalgToLLVMGPUPasses(pm, options);
 }
 
-static PassPipelineRegistration<> linalgToNVVMPipeline(
-    "iree-codegen-linalg-to-nvvm-pipeline",
-    "Runs the progressive lowering pipeline from Linalg to NVVM",
-    [](OpPassManager &passManager) { addLinalgToNVVMPasses(passManager); });
-
-static PassPipelineRegistration<> hloToLinalgNVVMPipeline(
-    "iree-codegen-hlo-to-nvvm-pipeline",
-    "Runs the progressive lowering pipeline from XLA HLO to Linalg to "
-    "NVVM",
+static PassPipelineRegistration<> linalgToLLVMGPUPipeline(
+    "iree-codegen-linalg-to-llvmgpu-pipeline",
+    "Runs the progressive lowering pipeline from Linalg to NVVM/ROCDL",
     [](OpPassManager &passManager) {
-      buildNVVMTransformPassPipeline(passManager);
+      addLinalgToLLVMGPUPasses(passManager, getLLVMGPUCodegenOptionsFromClOptions());
+    });
+
+static PassPipelineRegistration<> hloToLinalgLLVMGPUPipeline(
+    "iree-codegen-hlo-to-llvmgpu-pipeline",
+    "Runs the progressive lowering pipeline from XLA HLO to Linalg to "
+    "NVVM/ROCDL",
+    [](OpPassManager &passManager) {
+      buildLLVMGPUTransformPassPipeline(passManager, getLLVMGPUCodegenOptionsFromClOptions());
     });
 
 }  // namespace iree_compiler
