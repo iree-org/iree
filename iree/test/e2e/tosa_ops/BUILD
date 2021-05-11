@@ -27,53 +27,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-VULKAN_SRCS = enforce_glob(
-    [
-        "abs.mlir",
-        "add.mlir",
-        "bitwise_and.mlir",
-        "bitwise_or.mlir",
-        "bitwise_xor.mlir",
-        "ceil.mlir",
-        "clamp.mlir",
-        "const.mlir",
-        "exp.mlir",
-        "floor.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
-        "if.mlir",
-        "log.mlir",
-        "logical_left_shift.mlir",
-        "logical_right_shift.mlir",
-        "maximum.mlir",
-        "minimum.mlir",
-        "mul.mlir",
-        "negate.mlir",
-        "pad.mlir",
-        "reluN.mlir",
-        "reshape.mlir",
-        "rsqrt.mlir",
-        "select.mlir",
-        "sub.mlir",
-        "table.mlir",
-        "tanh.mlir",
-        "transpose.mlir",
-        "while.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-        "reduce.mlir",  # Currently failing on vulkan.
-        "max_pool.mlir",  # Currently failing on vulkan.
-    ],
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_vulkan-spirv_vulkan",
-    srcs = VULKAN_SRCS,
-    driver = "vulkan",
-    target_backend = "vulkan-spirv",
-)
-
 LLVM_SRCS = enforce_glob(
     [
         "abs.mlir",
@@ -119,6 +72,108 @@ iree_check_single_backend_test_suite(
     srcs = LLVM_SRCS,
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
+)
+
+VMVX_SRCS = enforce_glob(
+    [
+        "abs.mlir",
+        "add.mlir",
+        "bitwise_and.mlir",
+        "bitwise_or.mlir",
+        "bitwise_xor.mlir",
+        "ceil.mlir",
+        "clamp.mlir",
+        "const.mlir",
+        "exp.mlir",
+        "floor.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
+        "if.mlir",
+        "log.mlir",
+        "logical_left_shift.mlir",
+        "logical_right_shift.mlir",
+        "max_pool.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "mul.mlir",
+        "negate.mlir",
+        "pad.mlir",
+        "reduce.mlir",
+        "reluN.mlir",
+        "reshape.mlir",
+        "rsqrt.mlir",
+        "select.mlir",
+        "sub.mlir",
+        "table.mlir",
+        "tanh.mlir",
+        "transpose.mlir",
+        "while.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+    ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_vmvx",
+    srcs = VMVX_SRCS,
+    compiler_flags = [
+        # tosa.apply_scale currently expands to i64 math, requiring this
+        # extension. Nothing else about the tests require it, though, and we
+        # really should not be emulating it with 64-bit math. Having this
+        # prevents any of these tests from being executed on a runtime compiled
+        # without the VM's I64 extension.
+        "-iree-vm-target-extension=i64",
+    ],
+    driver = "vmvx",
+    target_backend = "vmvx",
+)
+
+VULKAN_SRCS = enforce_glob(
+    [
+        "abs.mlir",
+        "add.mlir",
+        "bitwise_and.mlir",
+        "bitwise_or.mlir",
+        "bitwise_xor.mlir",
+        "ceil.mlir",
+        "clamp.mlir",
+        "const.mlir",
+        "exp.mlir",
+        "floor.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
+        "if.mlir",
+        "log.mlir",
+        "logical_left_shift.mlir",
+        "logical_right_shift.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "mul.mlir",
+        "negate.mlir",
+        "pad.mlir",
+        "reluN.mlir",
+        "reshape.mlir",
+        "rsqrt.mlir",
+        "select.mlir",
+        "sub.mlir",
+        "table.mlir",
+        "tanh.mlir",
+        "transpose.mlir",
+        "while.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        "reduce.mlir",  # Currently failing on vulkan.
+        "max_pool.mlir",  # Currently failing on vulkan.
+    ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan",
+    srcs = VULKAN_SRCS,
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
 )
 
 test_suite(

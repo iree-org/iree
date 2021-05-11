@@ -12,46 +12,6 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "bitwise_and.mlir"
-    "bitwise_or.mlir"
-    "bitwise_xor.mlir"
-    "ceil.mlir"
-    "clamp.mlir"
-    "const.mlir"
-    "exp.mlir"
-    "floor.mlir"
-    "greater.mlir"
-    "greater_equal.mlir"
-    "if.mlir"
-    "log.mlir"
-    "logical_left_shift.mlir"
-    "logical_right_shift.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "mul.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "reluN.mlir"
-    "reshape.mlir"
-    "rsqrt.mlir"
-    "select.mlir"
-    "sub.mlir"
-    "table.mlir"
-    "tanh.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_dylib-llvm-aot_dylib
   SRCS
     "abs.mlir"
@@ -90,6 +50,90 @@ iree_check_single_backend_test_suite(
     "dylib-llvm-aot"
   DRIVER
     "dylib"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_vmvx
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "bitwise_and.mlir"
+    "bitwise_or.mlir"
+    "bitwise_xor.mlir"
+    "ceil.mlir"
+    "clamp.mlir"
+    "const.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "greater.mlir"
+    "greater_equal.mlir"
+    "if.mlir"
+    "log.mlir"
+    "logical_left_shift.mlir"
+    "logical_right_shift.mlir"
+    "max_pool.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "mul.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reduce.mlir"
+    "reluN.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sub.mlir"
+    "table.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "vmvx"
+  COMPILER_FLAGS
+    "-iree-vm-target-extension=i64"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "bitwise_and.mlir"
+    "bitwise_or.mlir"
+    "bitwise_xor.mlir"
+    "ceil.mlir"
+    "clamp.mlir"
+    "const.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "greater.mlir"
+    "greater_equal.mlir"
+    "if.mlir"
+    "log.mlir"
+    "logical_left_shift.mlir"
+    "logical_right_shift.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "mul.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reluN.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sub.mlir"
+    "table.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
