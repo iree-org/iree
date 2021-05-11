@@ -20,7 +20,6 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: name of target (see Usage below)
-# OUT: OUTPUT_NAME for the target. Defaults to NAME.
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
@@ -31,7 +30,8 @@ include(CMakeParseArguments)
 # HOSTONLY: host only; compile using host toolchain when cross-compiling
 #
 # Note:
-# By default, iree_cc_binary will always create a binary named iree_${NAME}.
+# iree_cc_binary will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
+# iree_base_foo with an alias (readonly) target called ${NAME}.
 #
 # Usage:
 # iree_cc_library(
@@ -56,7 +56,7 @@ function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
     "HOSTONLY;TESTONLY"
-    "NAME;OUT"
+    "NAME"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
   )
@@ -71,11 +71,7 @@ function(iree_cc_binary)
 
   add_executable(${_NAME} "")
   add_executable(${_RULE_NAME} ALIAS ${_NAME})
-  if(_RULE_OUT)
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_OUT}")
-  else()
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
-  endif()
+  set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   if(_RULE_SRCS)
     target_sources(${_NAME}
       PRIVATE

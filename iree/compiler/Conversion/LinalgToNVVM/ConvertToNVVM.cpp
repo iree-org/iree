@@ -62,7 +62,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     SmallVector<NamedAttribute, 4> funcAttrs;
     for (auto attr : funcOp->getAttrs()) {
       if (attr.first == SymbolTable::getSymbolAttrName() ||
-          attr.first == mlir::impl::getTypeAttrName()) {
+          attr.first == mlir::function_like_impl::getTypeAttrName()) {
         continue;
       }
       funcAttrs.push_back(attr);
@@ -192,6 +192,7 @@ struct ConvertToNVVMPass
           patterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
+      mlir::vector::populateVectorTransposeLoweringPatterns(patterns);
       (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
     }
     {

@@ -17,7 +17,7 @@
 #include "bindings/tflite/model.h"
 #include "bindings/tflite/shim.h"
 #include "bindings/tflite/tensor.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/internal/call_once.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
@@ -126,8 +126,8 @@ static iree_status_t _TfLiteInterpreterShapeFrameInitialize(
 // will release any resources that may be retained and is required.
 static void _TfLiteInterpreterShapeFrameDeinitialize(
     _TfLiteInterpreterShapeFrame* frame) {
-  iree_vm_list_deinitialize(frame->shape_list);
   iree_vm_list_deinitialize(frame->arg_list);
+  iree_vm_list_deinitialize(frame->shape_list);
 }
 
 // Reads the shape value in the frame storage from the prior application.

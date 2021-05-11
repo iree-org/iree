@@ -88,6 +88,7 @@ function(iree_check_test)
         "${_RULE_SRC}"
       FLAGS
         "-iree-mlir-to-vm-bytecode-module"
+        "-mlir-print-op-on-diagnostic=false"
         "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
         "--iree-llvm-target-triple=${_TARGET_TRIPLE}"
         ${_RULE_COMPILER_FLAGS}
@@ -101,6 +102,7 @@ function(iree_check_test)
         "${_RULE_SRC}"
       FLAGS
         "-iree-mlir-to-vm-bytecode-module"
+        "-mlir-print-op-on-diagnostic=false"
         "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
         ${_RULE_COMPILER_FLAGS}
       TESTONLY

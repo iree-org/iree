@@ -43,9 +43,9 @@ void iree_memory_query_info(iree_memory_info_t* out_info) {
 #endif  // WINAPI_PARTITION_DESKTOP
 }
 
-void iree_memory_jit_context_begin() {}
+void iree_memory_jit_context_begin(void) {}
 
-void iree_memory_jit_context_end() {}
+void iree_memory_jit_context_end(void) {}
 
 //==============================================================================
 // Virtual address space manipulation

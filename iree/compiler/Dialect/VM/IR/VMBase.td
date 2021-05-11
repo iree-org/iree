@@ -348,7 +348,14 @@ def VM_FuncRefAttr : AliasedSymbolRefAttr;
 
 def VM_Ordinal : SignlessIntegerAttrBase<I32, "ordinal value">;
 
+// NOTE: today we only support a single bit width for pointers/indices/sizes.
+// This is to keep our compatability matrix smaller but is not a fundamental
+// limitation of the VM.
+// TODO(#5732): allow for this to change and be specified as an attribute of the
+// compiled module (a module compiled with 32-bit indices may not be usable on
+// a runtime compiled with 64-bit indices).
 def VM_Ptr : I<32>;
+def VM_Index : I<32>;
 
 def VM_CondValue : I<32> {
   let description = [{

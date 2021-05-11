@@ -23,7 +23,7 @@ extern "C" {
 
 // DEPRECATED: this entire driver will be removed soon.
 // TODO(#3580): remove this entire driver w/ iree_hal_executable_library_t.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_vmla_driver_module_register(iree_hal_driver_registry_t* registry);
 
 #ifdef __cplusplus

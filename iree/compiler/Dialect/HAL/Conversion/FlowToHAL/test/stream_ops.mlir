@@ -356,21 +356,9 @@ func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: ind
 
     // CHECK: #hal.device.match.id<"dylib*">(
     // CHECK-SAME: %[[CMD_INNER:.+]] = %cmd : !hal.command_buffer,
-    // CHECK-SAME: %[[COUNT_X_INNER:.+]] = %c1024 : index,
-    // CHECK-SAME: %[[COUNT_Y_INNER:.+]] = %c512 : index,
-    // CHECK-SAME: %[[COUNT_Z_INNER:.+]] = %c512 : index
-
-    // This makes me so sad.
-    // If you are improving folding/canonicalization of these ops and come
-    // across this feel free to remove it all. And let me know so I can buy you
-    // a drink :)
-    //      CHECK: %[[C1:.+]] = constant 1
-    // CHECK-NEXT: %[[COUNT_X_TMP:.+]] = addi %[[COUNT_X_INNER]], %[[C1]]
-    // CHECK-NEXT: %[[COUNT_X:.+]] = subi %[[COUNT_X_TMP]], %[[C1]]
-    // CHECK-NEXT: %[[COUNT_Y_TMP:.+]] = addi %[[COUNT_Y_INNER]], %[[C1]]
-    // CHECK-NEXT: %[[COUNT_Y:.+]] = subi %[[COUNT_Y_TMP]], %[[C1]]
-    // CHECK-NEXT: %[[COUNT_Z_TMP:.+]] = addi %[[COUNT_Z_INNER]], %[[C1]]
-    // CHECK-NEXT: %[[COUNT_Z:.+]] = subi %[[COUNT_Z_TMP]], %[[C1]]
+    // CHECK-SAME: %[[COUNT_X:.+]] = %c1024 : index,
+    // CHECK-SAME: %[[COUNT_Y:.+]] = %c512 : index,
+    // CHECK-SAME: %[[COUNT_Z:.+]] = %c512 : index
 
     //      CHECK: hal.command_buffer.dispatch.symbol<%[[CMD_INNER]]
     // CHECK-SAME:   target(@ex::@tgt::@entry)

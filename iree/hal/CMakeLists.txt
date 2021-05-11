@@ -24,7 +24,6 @@ iree_cc_library(
     "buffer_heap.c"
     "buffer_heap_impl.h"
     "buffer_view.c"
-    "buffer_view.cc"
     "buffer_view.h"
     "command_buffer.c"
     "command_buffer.h"
@@ -51,15 +50,13 @@ iree_cc_library(
     "resource.h"
     "semaphore.c"
     "semaphore.h"
-    "string_util.cc"
+    "string_util.c"
     "string_util.h"
   DEPS
-    absl::strings
     iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::synchronization
-    iree::base::internal::threading
     iree::base::tracing
   PUBLIC
 )

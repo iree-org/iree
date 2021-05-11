@@ -40,6 +40,7 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::tracing
     iree::hal
     iree::hal::drivers
@@ -49,6 +50,10 @@ iree_cc_library(
   PUBLIC
 )
 
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+
 iree_cc_test(
   NAME
     smoke_test
@@ -56,9 +61,9 @@ iree_cc_test(
     "smoke_test.cc"
   DEPS
     ::shim
-    bindings::tflite::testdata::add_dynamic_cc
-    bindings::tflite::testdata::add_multi_cc
-    bindings::tflite::testdata::add_static_cc
+    bindings::tflite::testdata::add_dynamic_c
+    bindings::tflite::testdata::add_multi_c
+    bindings::tflite::testdata::add_static_c
     iree::testing::gtest
     iree::testing::gtest_main
 )

@@ -32,7 +32,7 @@
 namespace {
 
 struct TestParams {
-  const iree::iree_file_toc_t& module_file;
+  const struct iree_file_toc_t& module_file;
   std::string function_name;
 };
 
@@ -47,8 +47,9 @@ std::vector<TestParams> GetModuleTestParams() {
 
   IREE_CHECK_OK(iree_vm_register_builtin_types());
 
-  auto* module_file_toc = iree::vm::test::all_bytecode_modules_cc_create();
-  for (size_t i = 0; i < iree::vm::test::all_bytecode_modules_cc_size(); ++i) {
+  const struct iree_file_toc_t* module_file_toc =
+      all_bytecode_modules_c_create();
+  for (size_t i = 0; i < all_bytecode_modules_c_size(); ++i) {
     const auto& module_file = module_file_toc[i];
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(

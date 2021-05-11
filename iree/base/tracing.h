@@ -38,6 +38,7 @@
 #include <stdlib.h>
 
 #include "iree/base/attributes.h"
+#include "iree/base/config.h"
 
 #ifndef IREE_BASE_TRACING_H_
 #define IREE_BASE_TRACING_H_
@@ -162,8 +163,9 @@
 // All our own usage of DbgHelp must be guarded with the same lock.
 #define TRACY_DBGHELP_LOCK IREEDbgHelp
 
-// TODO(#1926): upstream a TRACY_NO_FRAME_IMAGE flag to remove the frame
-// compression thread and dxt1 compression code.
+// Disable frame image capture to avoid the DXT compression code and the frame
+// capture worker thread.
+#define TRACY_NO_FRAME_IMAGE 1
 
 // We don't care about vsync events as they can pollute traces and don't have
 // much meaning in our workloads. If integrators still want them we can expose

@@ -51,9 +51,10 @@ class TensorListToVMConversionInterface : public VMConversionDialectInterface {
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
   OwningModuleRef parseVMImportModule() const override {
-    return mlir::parseSourceString(StringRef(tensorlist_imports_create()->data,
-                                             tensorlist_imports_create()->size),
-                                   getDialect()->getContext());
+    return mlir::parseSourceString(
+        StringRef(iree_tensorlist_imports_create()->data,
+                  iree_tensorlist_imports_create()->size),
+        getDialect()->getContext());
   }
 
   void populateVMConversionPatterns(

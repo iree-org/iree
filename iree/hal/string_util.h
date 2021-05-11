@@ -28,14 +28,14 @@ extern "C" {
 
 // Parses a serialized set of shape dimensions using the canonical shape format
 // (the same as produced by iree_hal_format_shape).
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
+IREE_API_EXPORT iree_status_t iree_hal_parse_shape(
     iree_string_view_t value, iree_host_size_t shape_capacity,
     iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank);
 
 // Converts shape dimensions into a `4x5x6` format.
 //
 // Follows the standard API string formatting rules. See iree/base/api.h.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
                       iree_host_size_t buffer_capacity, char* buffer,
                       iree_host_size_t* out_buffer_length);
@@ -43,7 +43,7 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
 // Parses a serialized iree_hal_element_type_t and sets |out_element_type| if
 // it is valid. The format is the same as produced by
 // iree_hal_format_element_type.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
+IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
     iree_string_view_t value, iree_hal_element_type_t* out_element_type);
 
 // Converts an iree_hal_element_type_t enum value to a canonical string
@@ -52,7 +52,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
 // |out_buffer_length| will return the string length in characters.
 //
 // Follows the standard API string formatting rules. See iree/base/api.h.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
+IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
     iree_hal_element_type_t element_type, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length);
 
@@ -60,7 +60,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
 // |data_ptr| must be at least large enough to contain the bytes of the element.
 // For example, "1.2" of type IREE_HAL_ELEMENT_TYPE_FLOAT32 will write the 4
 // byte float value of 1.2 to |data_ptr|.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element(
+IREE_API_EXPORT iree_status_t iree_hal_parse_element(
     iree_string_view_t data_str, iree_hal_element_type_t element_type,
     iree_byte_span_t data_ptr);
 
@@ -72,7 +72,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element(
 // formatted elements and |out_buffer_length| will contain the required size.
 //
 // Follows the standard API string formatting rules. See iree/base/api.h.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
+IREE_API_EXPORT iree_status_t iree_hal_format_element(
     iree_const_byte_span_t data, iree_hal_element_type_t element_type,
     iree_host_size_t buffer_capacity, char* buffer,
     iree_host_size_t* out_buffer_length);
@@ -82,7 +82,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
 // large enough to contain the parsed elements. The format is the same as
 // produced by iree_hal_format_buffer_elements. Supports additional inputs of
 // empty to denote a 0 fill and a single element to denote a splat.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
+IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
     iree_string_view_t data_str, iree_hal_element_type_t element_type,
     iree_byte_span_t data_ptr);
 
@@ -99,7 +99,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
 // formatted elements and |out_buffer_length| will contain the required size.
 //
 // Follows the standard API string formatting rules. See iree/base/api.h.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_buffer_elements(
+IREE_API_EXPORT iree_status_t iree_hal_format_buffer_elements(
     iree_const_byte_span_t data, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,

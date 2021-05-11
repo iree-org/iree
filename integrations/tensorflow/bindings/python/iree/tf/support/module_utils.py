@@ -293,7 +293,13 @@ class _IreeFunctionWrapper(_FunctionWrapper):
 
   def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
     """Get cxx serialized inputs and outputs for this function."""
-    return self._f.get_serialized_values()
+    if hasattr(self._f, "get_serialized_values"):
+      # TODO: The native ABI does not implement this, and if still needed,
+      # it should not be implemented this way (maybe a thread local trace
+      # listener).
+      return self._f.get_serialized_values()
+    else:
+      return ("",), ("",)
 
 
 class IreeCompiledModule(CompiledModule):
@@ -421,7 +427,7 @@ class IreeCompiledModule(CompiledModule):
     """Reinitializes all stateful variables."""
     # set_random_seed is not needed here because the model_class.__init__ is not
     # called.
-    self._context = iree.runtime.SystemContext(modules=[self._vm_module],
+    self._context = iree.runtime.SystemContext(vm_modules=[self._vm_module],
                                                config=self._config)
 
   def __getattr__(self, attr: str) -> _IreeFunctionWrapper:

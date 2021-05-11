@@ -23,7 +23,7 @@
 
 IREE_HAL_API_RETAIN_RELEASE(descriptor_set);
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
+IREE_API_EXPORT iree_status_t iree_hal_descriptor_set_create(
     iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings,

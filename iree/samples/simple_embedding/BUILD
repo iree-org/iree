@@ -42,17 +42,53 @@ c_embed_data(
     c_file_output = "simple_embedding_test_llvm_aot_rv64.c",
     flatten = True,
     h_file_output = "simple_embedding_test_llvm_aot_rv64.h",
+    identifier = "iree_samples_simple_embedding_rv64_test_module",
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  return()
+endif()
+""",
+    inline = True,
 )
 
 cc_binary(
-    name = "simple_embedding_run",
-    srcs = ["simple_embedding_run.c"],
+    name = "simple_embedding_dylib",
+    srcs = [
+        "device_dylib.c",
+        "simple_embedding.c",
+    ],
     deps = [
         ":simple_embedding_test_bytecode_module_c",
         ":simple_embedding_test_llvm_aot_rv64",
         "//iree/base",
         "//iree/hal",
-        "//iree/hal/drivers",
+        "//iree/hal/local",
+        "//iree/hal/local:task_driver",
+        "//iree/hal/local/loaders:embedded_library_loader",
+        "//iree/hal/local/loaders:legacy_library_loader",
+        "//iree/modules/hal",
+        "//iree/task:api",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+    ],
+)
+
+cc_binary(
+    name = "simple_embedding_vulkan",
+    srcs = [
+        "device_vulkan.c",
+        "simple_embedding.c",
+    ],
+    deps = [
+        ":simple_embedding_test_bytecode_module_c",
+        ":simple_embedding_test_llvm_aot_rv64",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/vulkan/registration",
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:bytecode_module",
@@ -60,8 +96,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "simple_embedding_run_local_sync",
-    srcs = ["simple_embedding_run_local_sync.c"],
+    name = "simple_embedding_local_sync",
+    srcs = [
+        "device_local_sync.c",
+        "simple_embedding.c",
+    ],
     deps = [
         ":simple_embedding_test_bytecode_module_c",
         ":simple_embedding_test_llvm_aot_rv64",
@@ -76,25 +115,15 @@ cc_binary(
     ],
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
-   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
-""",
-    inline = True,
-)
-
 iree_bytecode_module(
     name = "simple_embedding_test_bytecode_module",
     src = "simple_embedding_test.mlir",
-    c_output = True,
-    cc_namespace = "iree::samples",
+    c_identifier = "iree_samples_simple_embedding_test_module",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",
         "-iree-hal-target-backends=vulkan-spirv",
+        "-iree-llvm-debug-symbols=false",
     ],
 )
 
@@ -115,17 +144,15 @@ endif()
 
 run_binary_test(
     name = "simple_embedding_dylib_test",
-    args = ["dylib"],
-    test_binary = ":simple_embedding_run",
+    test_binary = ":simple_embedding_dylib",
 )
 
 run_binary_test(
-    name = "simple_embedding_run_local_sync_test",
-    test_binary = ":simple_embedding_run_local_sync",
+    name = "simple_embedding_local_sync_test",
+    test_binary = ":simple_embedding_local_sync",
 )
 
 run_binary_test(
     name = "simple_embedding_vulkan_test",
-    args = ["vulkan"],
-    test_binary = ":simple_embedding_run",
+    test_binary = ":simple_embedding_vulkan",
 )

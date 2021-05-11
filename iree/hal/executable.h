@@ -47,12 +47,12 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 typedef struct iree_hal_executable_s iree_hal_executable_t;
 
 // Retains the given |executable| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_executable_retain(iree_hal_executable_t* executable);
+IREE_API_EXPORT void iree_hal_executable_retain(
+    iree_hal_executable_t* executable);
 
 // Releases the given |executable| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_executable_release(iree_hal_executable_t* executable);
+IREE_API_EXPORT void iree_hal_executable_release(
+    iree_hal_executable_t* executable);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t implementation details
@@ -65,8 +65,8 @@ typedef struct {
   void(IREE_API_PTR* destroy)(iree_hal_executable_t* executable);
 } iree_hal_executable_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_executable_destroy(iree_hal_executable_t* executable);
+IREE_API_EXPORT void iree_hal_executable_destroy(
+    iree_hal_executable_t* executable);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -39,6 +39,8 @@
 #ifndef IREE_BASE_CONFIG_H_
 #define IREE_BASE_CONFIG_H_
 
+#include <stddef.h>
+
 #include "iree/base/target_platform.h"
 
 //===----------------------------------------------------------------------===//
@@ -89,18 +91,60 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
 typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 
 //===----------------------------------------------------------------------===//
+// iree_status_t configuration
+//===----------------------------------------------------------------------===//
+// Controls how much information an iree_status_t carries. When set to 0 all of
+// iree_status_t will be turned into just integer results that will never
+// allocate and all string messages will be stripped. Of course, this isn't
+// very useful and the higher modes should be preferred unless binary size is
+// a major concern.
+//
+// IREE_STATUS_MODE = 0: statuses are just integers
+// IREE_STATUS_MODE = 1: statuses have source location of error
+// IREE_STATUS_MODE = 2: statuses also have custom annotations
+// IREE_STATUS_MODE = 3: statuses also have stack traces of the error site
+
+// If no status mode override is provided we'll change the behavior based on
+// build configuration.
+#if !defined(IREE_STATUS_MODE)
+#ifdef NDEBUG
+// Release mode: just source location.
+#define IREE_STATUS_MODE 2
+#else
+// Debug mode: annotations and stack traces.
+#define IREE_STATUS_MODE 3
+#endif  // NDEBUG
+#endif  // !IREE_STATUS_MODE
+
+//===----------------------------------------------------------------------===//
 // Synchronization and threading
 //===----------------------------------------------------------------------===//
 // On ultra-tiny systems where there may only be a single core - or a single
 // core that is guaranteed to ever call an IREE API - all synchronization
 // primitives used throughout IREE can be turned into no-ops. Note that behavior
 // is undefined if there is use of any `iree_*` API call or memory that is
-// owned by IREE. Unless your target system is in a similar class to an Arduino
-// this is definitely not what you want.
+// owned by IREE from multiple threads concurrently or across threads without
+// proper barriers in place. Unless your target system is in a similar class to
+// an Arduino this is definitely not what you want.
 
 #if !defined(IREE_SYNCHRONIZATION_DISABLE_UNSAFE)
 #define IREE_SYNCHRONIZATION_DISABLE_UNSAFE 0
 #endif  // !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
+//===----------------------------------------------------------------------===//
+// IREE HAL configuration
+//===----------------------------------------------------------------------===//
+// Enables optional HAL features. Each of these may add several KB to the final
+// binary when linked dynamically.
+
+#if !defined(IREE_HAL_MODULE_STRING_UTIL_ENABLE)
+// Enables HAL module methods that perform string printing/parsing.
+// This functionality pulls in a large amount of string manipulation code that
+// can be elided if these ops will not be used at runtime. When disabled
+// applications can still call the parse/print routines directly but compiled
+// modules can not.
+#define IREE_HAL_MODULE_STRING_UTIL_ENABLE 1
+#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
 
 //===----------------------------------------------------------------------===//
 // IREE VM configuration

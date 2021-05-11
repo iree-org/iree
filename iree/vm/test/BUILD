@@ -14,7 +14,7 @@
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -31,8 +31,8 @@ endif()
     inline = True,
 )
 
-cc_embed_data(
-    name = "all_bytecode_modules_cc",
+c_embed_data(
+    name = "all_bytecode_modules_c",
     srcs = [
         ":arithmetic_ops.vmfb",
         ":arithmetic_ops_f32.vmfb",
@@ -40,11 +40,13 @@ cc_embed_data(
         ":assignment_ops.vmfb",
         ":assignment_ops_f32.vmfb",
         ":assignment_ops_i64.vmfb",
+        ":buffer_ops.vmfb",
         ":comparison_ops.vmfb",
         ":comparison_ops_f32.vmfb",
         ":comparison_ops_i64.vmfb",
         ":control_flow_ops.vmfb",
         ":conversion_ops.vmfb",
+        ":conversion_ops_f32.vmfb",
         ":conversion_ops_i64.vmfb",
         ":global_ops.vmfb",
         ":global_ops_f32.vmfb",
@@ -54,8 +56,7 @@ cc_embed_data(
         ":shift_ops.vmfb",
         ":shift_ops_i64.vmfb",
     ],
-    cc_file_output = "all_bytecode_modules.cc",
-    cpp_namespace = "iree::vm::test",
+    c_file_output = "all_bytecode_modules.c",
     flatten = True,
     h_file_output = "all_bytecode_modules.h",
 )
@@ -97,6 +98,12 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+    name = "buffer_ops",
+    src = "buffer_ops.mlir",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
     name = "comparison_ops",
     src = "comparison_ops.mlir",
     flags = ["-iree-vm-ir-to-bytecode-module"],
@@ -127,57 +134,55 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+    name = "conversion_ops_f32",
+    src = "conversion_ops_f32.mlir",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
     name = "conversion_ops_i64",
     src = "conversion_ops_i64.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 iree_bytecode_module(
     name = "global_ops",
     src = "global_ops.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 iree_bytecode_module(
     name = "global_ops_f32",
     src = "global_ops_f32.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 iree_bytecode_module(
     name = "global_ops_i64",
     src = "global_ops_i64.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 iree_bytecode_module(
     name = "list_ops",
     src = "list_ops.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 iree_bytecode_module(
     name = "list_variant_ops",
     src = "list_variant_ops.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 iree_bytecode_module(
     name = "shift_ops",
     src = "shift_ops.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 iree_bytecode_module(
     name = "shift_ops_i64",
     src = "shift_ops_i64.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )

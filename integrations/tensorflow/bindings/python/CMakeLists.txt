@@ -19,15 +19,15 @@ function(_add_overlay_subdirectory dir)
   add_subdirectory(${dir} "${_MAIN_PYTHON_DIR}/${dir}")
 endfunction()
 
-if(${IREE_BUILD_TENSORFLOW_COMPILER})
+if(${IREE_BUILD_TENSORFLOW_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
   _add_overlay_subdirectory(iree/tools/tf)
 endif()
 
-if(${IREE_BUILD_TFLITE_COMPILER})
+if(${IREE_BUILD_TFLITE_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
   _add_overlay_subdirectory(iree/tools/tflite)
 endif()
 
-if(${IREE_BUILD_XLA_COMPILER})
+if(${IREE_BUILD_XLA_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
   _add_overlay_subdirectory(iree/tools/xla)
 endif()
 

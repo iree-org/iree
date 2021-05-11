@@ -37,4 +37,26 @@ iree_lit_test_suite(
     "hostonly"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_linalg_ops_dylib-llvm-aot
+  SRCS
+    "linalg_ops.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_linalg_ops_vulkan-spirv
+  SRCS
+    "linalg_ops.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -25,7 +25,11 @@ iree_cc_library(
     "SinkDefiningOps.cpp"
   DEPS
     LLVMSupport
+    MLIRAffine
+    MLIRAffineToStandard
     MLIRIR
+    MLIRMath
+    MLIRMemRef
     MLIRPass
     MLIRSideEffectInterfaces
     MLIRSupport
@@ -36,6 +40,8 @@ iree_cc_library(
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::IREEToVM
+    iree::compiler::Dialect::VM::Conversion::MathToVM
+    iree::compiler::Dialect::VM::Conversion::MemRefToVM
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR
   PUBLIC

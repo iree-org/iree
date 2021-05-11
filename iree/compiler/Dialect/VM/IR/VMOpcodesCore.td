@@ -150,10 +150,41 @@ def VM_OPC_Print                 : VM_OPC<0x7D, "Print">;
 def VM_OPC_CondBreak             : VM_OPC<0x7E, "CondBreak">;
 def VM_OPC_Break                 : VM_OPC<0x7F, "Break">;
 
+// Buffer load/store:
+// NOTE: though not used today the opcodes are chosen to allow for bit magic to
+// reduce dispatch overhead:
+//                bit 3             bit 2          bit 1-0
+//        +------------+-----------------+----------------+
+//  0xB...| load/store | unsigned/signed | byte count - 1 |
+//        +------------+-----------------+----------------+
+def VM_OPC_BufferLoadI8U         : VM_OPC<0xB0, "BufferLoadI8U">;
+def VM_OPC_BufferLoadI8S         : VM_OPC<0xB4, "BufferLoadI8S">;
+def VM_OPC_BufferLoadI16U        : VM_OPC<0xB1, "BufferLoadI16U">;
+def VM_OPC_BufferLoadI16S        : VM_OPC<0xB5, "BufferLoadI16S">;
+def VM_OPC_BufferLoadI32         : VM_OPC<0xB3, "BufferLoadI32">;
+def VM_OPC_BufferStoreI8         : VM_OPC<0xB8, "BufferStoreI8">;
+def VM_OPC_BufferStoreI16        : VM_OPC<0xB9, "BufferStoreI16">;
+def VM_OPC_BufferStoreI32        : VM_OPC<0xBB, "BufferStoreI32">;
+
+// Buffer manipulation:
+def VM_OPC_BufferAlloc           : VM_OPC<0xC0, "BufferAlloc">;
+def VM_OPC_BufferClone           : VM_OPC<0xC1, "BufferClone">;
+def VM_OPC_BufferLength          : VM_OPC<0xC2, "BufferLength">;
+def VM_OPC_BufferCopy            : VM_OPC<0xC6, "BufferCopy">;
+def VM_OPC_BufferCompare         : VM_OPC<0xC7, "BufferCompare">;
+// NOTE: lower 2 bits are byte count - 1.
+//          b3  b2          bit 1-0
+//        +---+---+----------------+
+//  0xC...| 1 | 1 | byte count - 1 |
+//        +---+---+----------------+
+def VM_OPC_BufferFillI8          : VM_OPC<0xCC, "BufferFillI8">;
+def VM_OPC_BufferFillI16         : VM_OPC<0xCD, "BufferFillI16">;
+def VM_OPC_BufferFillI32         : VM_OPC<0xCF, "BufferFillI32">;
+
 // Extension prefixes:
-def VM_OPC_PrefixExtI64          : VM_OPC<0xA0, "PrefixExtI64">;
-def VM_OPC_PrefixExtF32          : VM_OPC<0xA1, "PrefixExtF32">;
-def VM_OPC_PrefixExtF64          : VM_OPC<0xA2, "PrefixExtF64">;
+def VM_OPC_PrefixExtI64          : VM_OPC<0xE0, "PrefixExtI64">;
+def VM_OPC_PrefixExtF32          : VM_OPC<0xE1, "PrefixExtF32">;
+def VM_OPC_PrefixExtF64          : VM_OPC<0xE2, "PrefixExtF64">;
 
 // Runtime enum iree_vm_core_op_t:
 def VM_CoreOpcodeAttr :
@@ -227,7 +258,25 @@ def VM_CoreOpcodeAttr :
     VM_OPC_CondBreak,
     VM_OPC_Break,
 
-    // Extension opcodes (0xA0-0xFF):
+    VM_OPC_BufferLoadI8U,
+    VM_OPC_BufferLoadI8S,
+    VM_OPC_BufferLoadI16U,
+    VM_OPC_BufferLoadI16S,
+    VM_OPC_BufferLoadI32,
+    VM_OPC_BufferStoreI8,
+    VM_OPC_BufferStoreI16,
+    VM_OPC_BufferStoreI32,
+
+    VM_OPC_BufferAlloc,
+    VM_OPC_BufferClone,
+    VM_OPC_BufferLength,
+    VM_OPC_BufferFillI8,
+    VM_OPC_BufferFillI16,
+    VM_OPC_BufferFillI32,
+    VM_OPC_BufferCopy,
+    VM_OPC_BufferCompare,
+
+    // Extension opcodes (0xE0-0xFF):
     VM_OPC_PrefixExtI64,  // VM_ExtI64OpcodeAttr
     VM_OPC_PrefixExtF32,  // VM_ExtF32OpcodeAttr
     VM_OPC_PrefixExtF64,  // VM_ExtF64OpcodeAttr

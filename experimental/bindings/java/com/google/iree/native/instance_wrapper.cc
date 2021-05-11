@@ -34,7 +34,7 @@ void SetupVm() {
   char* argv[] = {binname};
   char** aargv = argv;
   int argc = 1;
-  iree_flags_parse_checked(&argc, &aargv);
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &aargv);
 
   // TODO(jennik): register all available drivers
   IREE_CHECK_OK(iree_hal_vmla_driver_module_register(

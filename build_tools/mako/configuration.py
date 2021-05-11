@@ -135,7 +135,8 @@ def get_pixel4_default_target_list(skipped_target=None,
           compilation_flags=[
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10",
               "--iree-flow-inline-constants-max-byte-length=2048",
-              "--iree-flow-dispatch-formation-enable-operand-fusion"
+              "--iree-flow-dispatch-formation-enable-operand-fusion",
+              "--iree-enable-fusion-with-reduction-ops",
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -236,12 +237,10 @@ MODEL_BENCHMARKS = [
                     skipped_target=["vlk2"],
                     compilation_flags={
                         'cpu': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
-                            "-iree-llvm-loop-unrolling=true"
+                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
                         ],
                         'cpu3t': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
-                            "-iree-llvm-loop-unrolling=true"
+                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
                         ]
                     })),
             PhoneBenchmarkInfo(
@@ -250,12 +249,10 @@ MODEL_BENCHMARKS = [
                 targets=get_s20_default_target_list(
                     compilation_flags={
                         'cpu': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
-                            "-iree-llvm-loop-unrolling=true"
+                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
                         ],
                         'cpu3t': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
-                            "-iree-llvm-loop-unrolling=true"
+                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
                         ]
                     })),
         ]),

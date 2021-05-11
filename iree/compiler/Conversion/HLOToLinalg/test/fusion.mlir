@@ -6,7 +6,7 @@ module {
   func @fuse_load_reshape() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @io::@arg0, offset = %c0 : tensor<4x25xf32>
-    %1 = linalg.tensor_reshape %0 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<4x25xf32> into tensor<100xf32>
+    %1 = linalg.tensor_reshape %0 [[0, 1]] : tensor<4x25xf32> into tensor<100xf32>
     %2 = linalg.init_tensor [100, 1] : tensor<100x1xf32>
     %3 = linalg.generic {indexing_maps = [#map0, #map1],
            iterator_types = ["parallel", "parallel"]}
@@ -34,7 +34,7 @@ module {
 module {
   func @fuse_store_reshape(%arg0: tensor<100xi32>) {
     %c0 = constant 0 : index
-    %0 = linalg.tensor_reshape %arg0 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<100xi32> into tensor<4x25xi32>
+    %0 = linalg.tensor_reshape %arg0 [[0, 1]] : tensor<100xi32> into tensor<4x25xi32>
     hal.interface.store.tensor %0, @io::@ret0, offset = %c0 : tensor<4x25xi32>
     return
   }
@@ -50,9 +50,6 @@ module {
 // -----
 
 #map0 = affine_map<(d0) -> (d0)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-#map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
 module {
   func @example2() {
     %c0 = constant 0 : index
@@ -64,7 +61,7 @@ module {
       ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
         linalg.yield %arg0 : f32
       } -> tensor<1000xf32>
-    %4 = linalg.tensor_reshape %0 [#map1] : tensor<1x1x1x1000xf32> into tensor<1000xf32>
+    %4 = linalg.tensor_reshape %0 [[0, 1, 2, 3]] : tensor<1x1x1x1000xf32> into tensor<1000xf32>
     %5 = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel"]}
       ins(%4, %3 : tensor<1000xf32>, tensor<1000xf32>)
       outs(%2 : tensor<1000xf32>){
@@ -72,8 +69,8 @@ module {
         %7 = addf %arg0, %arg1 : f32
         linalg.yield %7 : f32
       } -> tensor<1000xf32>
-    %6 = linalg.tensor_reshape %5 [#map1] : tensor<1000xf32> into tensor<1x1x1x1000xf32>
-    %7 = linalg.tensor_reshape %6 [#map2, #map3] : tensor<1x1x1x1000xf32> into tensor<1x1000xf32>
+    %6 = linalg.tensor_reshape %5 [[0, 1, 2, 3]] : tensor<1000xf32> into tensor<1x1x1x1000xf32>
+    %7 = linalg.tensor_reshape %6 [[0, 1, 2], [3]] : tensor<1x1x1x1000xf32> into tensor<1x1000xf32>
     hal.interface.store.tensor %6, @io::@ret0, offset = %c0 : tensor<1x1x1x1000xf32>
     hal.interface.store.tensor %7, @io::@ret1, offset = %c0 : tensor<1x1000xf32>
     return
@@ -109,8 +106,7 @@ module {
         linalg.yield %arg0 : f32
       } -> tensor<384x128xf32>
     %3 = hal.interface.load.tensor @io::@arg0, offset = %c0 : tensor<384x4x32xf32>
-    %4 = linalg.tensor_reshape %2
-      [affine_map<(d0, d1, d2) -> (d0)>, affine_map<(d0, d1, d2) -> (d1, d2)>]
+    %4 = linalg.tensor_reshape %2 [[0], [1, 2]]
       : tensor<384x128xf32> into tensor<384x4x32xf32>
     %5 = linalg.init_tensor [4, 384, 32] : tensor<4x384x32xf32>
     %6 = linalg.generic

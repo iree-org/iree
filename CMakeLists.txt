@@ -46,6 +46,7 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
 
+option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
@@ -64,7 +65,8 @@ set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision informat
 # Note that this is a normal CMake variable used to gate build features (not
 # a cache variable that is user-settable).
 set(IREE_ENABLE_TENSORFLOW OFF)
-if(${IREE_BUILD_TENSORFLOW_COMPILER} OR
+if(${IREE_BUILD_TENSORFLOW_ALL} OR
+   ${IREE_BUILD_TENSORFLOW_COMPILER} OR
    ${IREE_BUILD_TFLITE_COMPILER} OR
    ${IREE_BUILD_XLA_COMPILER})
   set(IREE_ENABLE_TENSORFLOW ON)
@@ -84,7 +86,6 @@ endif()
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
-option(IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER "Builds experimental Model-Builder sub-project." OFF)
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
 
@@ -92,7 +93,7 @@ option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindi
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
+if(${IREE_BUILD_SAMPLES})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
 endif()
 
@@ -219,7 +220,6 @@ include(iree_cc_library)
 include(iree_cc_test)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
-include(iree_cc_embed_data)
 include(iree_c_embed_data)
 include(iree_bytecode_module)
 include(iree_c_module)
@@ -299,11 +299,6 @@ endfunction()
 function(add_iree_mlir_src_dep llvm_monorepo_path)
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
-
-  # experimental model builder uses vulkan runner.
-  if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
-    set(MLIR_VULKAN_RUNNER_ENABLED ON)
-  endif()
 
   add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
@@ -446,6 +441,7 @@ add_subdirectory(build_tools/embed_data/)
 add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/modules)
+add_subdirectory(iree/runtime)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
@@ -474,10 +470,6 @@ endif()
 
 if(${IREE_BUILD_EMBEDDING_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples/simple_embedding)
-endif()
-
-if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
-  add_subdirectory(experimental/ModelBuilder)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_REMOTING})

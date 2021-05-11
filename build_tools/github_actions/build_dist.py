@@ -77,6 +77,7 @@ THIS_DIR = os.path.realpath(os.path.dirname(__file__))
 CMAKE_CI_SCRIPT = os.path.join(THIS_DIR, "cmake_ci.py")
 BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "bindings", "python",
                                       "build_requirements.txt")
+CI_REQUIREMENTS_TXT = os.path.join(THIS_DIR, "ci_requirements.txt")
 CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
 INSTALL_TARGET = ("install"
                   if platform.system() == "Windows" else "install/strip")
@@ -111,6 +112,8 @@ def install_python_requirements():
   print("Installing python requirements...")
   subprocess.check_call(
       [sys.executable, "-m", "pip", "install", "-r", BUILD_REQUIREMENTS_TXT])
+  subprocess.check_call(
+      [sys.executable, "-m", "pip", "install", "-r", CI_REQUIREMENTS_TXT])
 
 
 def configure_bazel():

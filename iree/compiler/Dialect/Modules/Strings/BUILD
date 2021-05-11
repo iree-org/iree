@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,11 +20,11 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_embed_data(
+c_embed_data(
     name = "strings_imports",
     srcs = ["strings.imports.mlir"],
-    cc_file_output = "strings.imports.cc",
-    cpp_namespace = "mlir::iree_compiler::IREE::Strings",
+    c_file_output = "strings.imports.c",
     flatten = True,
     h_file_output = "strings.imports.h",
+    identifier = "iree_strings_imports",
 )

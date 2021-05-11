@@ -38,16 +38,14 @@ typedef struct iree_vm_instance iree_vm_instance_t;
 // application to ensure that resources are tracked properly and threads are
 // managed correctly.
 // |out_instance| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
+IREE_API_EXPORT iree_status_t iree_vm_instance_create(
     iree_allocator_t allocator, iree_vm_instance_t** out_instance);
 
 // Retains the given |instance| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_instance_retain(iree_vm_instance_t* instance);
+IREE_API_EXPORT void iree_vm_instance_retain(iree_vm_instance_t* instance);
 
 // Releases the given |instance| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_instance_release(iree_vm_instance_t* instance);
+IREE_API_EXPORT void iree_vm_instance_release(iree_vm_instance_t* instance);
 
 #ifdef __cplusplus
 }  // extern "C"

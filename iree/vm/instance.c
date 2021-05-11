@@ -23,7 +23,7 @@ struct iree_vm_instance {
   iree_allocator_t allocator;
 };
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
+IREE_API_EXPORT iree_status_t iree_vm_instance_create(
     iree_allocator_t allocator, iree_vm_instance_t** out_instance) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_instance);
@@ -50,15 +50,13 @@ static void iree_vm_instance_destroy(iree_vm_instance_t* instance) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_instance_retain(iree_vm_instance_t* instance) {
+IREE_API_EXPORT void iree_vm_instance_retain(iree_vm_instance_t* instance) {
   if (instance) {
     iree_atomic_ref_count_inc(&instance->ref_count);
   }
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_instance_release(iree_vm_instance_t* instance) {
+IREE_API_EXPORT void iree_vm_instance_release(iree_vm_instance_t* instance) {
   if (instance && iree_atomic_ref_count_dec(&instance->ref_count) == 1) {
     iree_vm_instance_destroy(instance);
   }

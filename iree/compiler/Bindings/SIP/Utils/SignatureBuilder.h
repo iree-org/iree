@@ -81,7 +81,7 @@ class SignatureBuilder {
 // -----------------------------------------------------------------------------
 
 // Mangles raw function signatures.
-// See docs/design_docs/function_abi.md.
+// See docs/developers/design_docs/function_abi.md.
 class RawSignatureMangler {
  public:
   static SignatureBuilder ToFunctionSignature(const SignatureBuilder& inputs,
@@ -122,8 +122,8 @@ class RawSignatureMangler {
 // Mangles function signatures according to the Sip (Structured Index Path) V1
 // scheme.
 //
-// Mangler for the 'sip' ABI. See docs/design_docs/function_abi.md in the
-// documentation.
+// Mangler for the 'sip' ABI. See docs/developers/design_docs/function_abi.md
+// in the documentation.
 class SipSignatureMangler {
  public:
   enum class IndexMode {

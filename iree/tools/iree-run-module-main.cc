@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
 #include <iostream>
 
-#include "absl/strings/string_view.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
@@ -69,20 +69,19 @@ IREE_FLAG_CALLBACK(
 namespace iree {
 namespace {
 
-Status GetModuleContentsFromFlags(std::string* out_contents) {
+iree_status_t GetModuleContentsFromFlags(std::string* out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
     *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
                                 std::istreambuf_iterator<char>()};
   } else {
-    IREE_RETURN_IF_ERROR(
-        file_io::GetFileContents(module_file.c_str(), out_contents));
+    IREE_RETURN_IF_ERROR(GetFileContents(module_file.c_str(), out_contents));
   }
-  return OkStatus();
+  return iree_ok_status();
 }
 
-Status Run() {
+iree_status_t Run() {
   IREE_TRACE_SCOPE0("iree-run-module");
 
   IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
@@ -98,7 +97,7 @@ Status Run() {
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(std::string(FLAG_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
@@ -124,20 +123,12 @@ Status Run() {
         "looking up function '%s'", function_name.c_str());
   }
 
-  IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-  std::vector<RawSignatureParser::Description> input_descs;
-  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-
   vm::ref<iree_vm_list_t> inputs;
-  IREE_CHECK_OK(ParseToVariantList(input_descs,
-                                   iree_hal_device_allocator(device),
+  IREE_CHECK_OK(ParseToVariantList(iree_hal_device_allocator(device),
                                    FLAG_function_inputs, &inputs));
 
-  std::vector<RawSignatureParser::Description> output_descs;
-  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                           output_descs.size(),
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            iree_allocator_system(), &outputs));
 
   std::cout << "EXEC @" << function_name << "\n";
@@ -146,8 +137,7 @@ Status Run() {
                      outputs.get(), iree_allocator_system()),
       "invoking function '%s'", function_name.c_str());
 
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()),
-                       "printing results");
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()), "printing results");
 
   inputs.reset();
   outputs.reset();
@@ -156,7 +146,7 @@ Status Run() {
   iree_hal_device_release(device);
   iree_vm_context_release(context);
   iree_vm_instance_release(instance);
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace

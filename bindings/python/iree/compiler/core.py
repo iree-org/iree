@@ -81,6 +81,8 @@ class CompilerOptions:
       returned MLIR.
     output_generic_mlir: Use the generic (and more portable) MLIR formatting for
       any saved or returned MLIR instead of the per-dialect custom assembly.
+    extended_diagnostics: Outputs extended information on diagnostics,
+      potentially outputting very verbosely (defaults to False).
     strip_debug_ops: Whether to strip high level operations used to aid
       debugging.
     strip_source_map: Whether to strip source map information (used to generate
@@ -104,6 +106,7 @@ class CompilerOptions:
                optimize: bool = True,
                output_mlir_debuginfo: bool = True,
                output_generic_mlir: bool = False,
+               extended_diagnostics: bool = False,
                strip_debug_ops: bool = False,
                strip_source_map: bool = False,
                strip_symbols: bool = False,
@@ -117,6 +120,7 @@ class CompilerOptions:
     self.optimize = optimize
     self.output_mlir_debuginfo = output_mlir_debuginfo
     self.output_generic_mlir = output_generic_mlir
+    self.extended_diagnostics = extended_diagnostics
     self.strip_debug_ops = strip_debug_ops
     self.strip_source_map = strip_source_map
     self.strip_symbols = strip_symbols
@@ -159,6 +163,11 @@ def build_compile_command_line(input_file: str,
     cl.append("--mlir-print-debuginfo")
   if options.output_generic_mlir:
     cl.append("--mlir-print-op-generic")
+  if options.extended_diagnostics:
+    # Note that different tools have different defaults, so be explicit.
+    cl.append("--mlir-print-op-on-diagnostic=true")
+  else:
+    cl.append("--mlir-print-op-on-diagnostic=false")
 
   # Other options to set if specified.
   if options.strip_debug_ops:

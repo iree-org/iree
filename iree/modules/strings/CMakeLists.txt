@@ -43,7 +43,7 @@ iree_cc_test(
     "strings_module_test.cc"
   DEPS
     ::strings_module
-    ::strings_module_test_module_cc
+    ::strings_module_test_module_c
     absl::span
     benchmark
     iree::base
@@ -63,8 +63,8 @@ iree_bytecode_module(
     strings_module_test_module
   SRC
     "strings_module_test.mlir"
-  CC_NAMESPACE
-    "iree::strings_module_test"
+  C_IDENTIFIER
+    "iree_strings_module_test_module"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=dylib-llvm-aot"

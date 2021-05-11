@@ -318,9 +318,11 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
       // Add the binary to the parent hal.executable.
       auto executableFormatAttr = executableBuilder.getStringAttr("EX_ELF");
-      executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+      auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
           targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
           bufferAttr);
+      binaryOp.mime_typeAttr(
+          executableBuilder.getStringAttr("application/x-elf"));
     } else {
       FlatbufferBuilder builder;
       iree_DyLibExecutableDef_start_as_root(builder);
@@ -359,9 +361,11 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                       : executableBuilder.getStringAttr("DLIB");
 
       // Add the binary data to the target executable.
-      executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+      auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
           targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
           builder.getBufferAttr(executableBuilder.getContext()));
+      binaryOp.mime_typeAttr(
+          executableBuilder.getStringAttr("application/x-flatbuffers"));
     }
     return success();
   }

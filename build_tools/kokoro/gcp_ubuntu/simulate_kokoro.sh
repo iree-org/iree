@@ -22,7 +22,8 @@
 # Just does the part of the Kokoro setup that we care about and invokes the
 # given build script.
 # An optional second parameter can be used to specify a different repo to clone
-# from. Especially useful for cloning the current git repo.
+# from. Especially useful for cloning the current git repo. If there's any local
+# change, be sure to commit it before running this simulation.
 #   ./build_tools/kokoro/gcp_ubuntu/simulate_kokoro.sh \
 #     build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh \
 #     "${PWD?}/.git"

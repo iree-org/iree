@@ -20,7 +20,7 @@ include(iree_installed_test)
 # CMake function to imitate Bazel's cc_test rule.
 #
 # Parameters:
-# NAME: name of target (see Usage below)
+# NAME: name of target. This name is used for the generated executable and
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
@@ -31,8 +31,9 @@ include(iree_installed_test)
 #     automatically.
 #
 # Note:
-# By default, iree_cc_test will always create a binary named iree_${NAME}.
-# This will also add it to ctest list as iree_${NAME}.
+# iree_cc_test will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
+# iree_base_foo_test.
+#
 #
 # Usage:
 # iree_cc_library(
@@ -72,12 +73,7 @@ function(iree_cc_test)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_executable(${_NAME} "")
-  add_executable(${_RULE_NAME} ALIAS ${_NAME})
-  if(_RULE_OUT)
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_OUT}")
-  else()
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
-  endif()
+  set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   target_sources(${_NAME}
     PRIVATE
       ${_RULE_SRCS}

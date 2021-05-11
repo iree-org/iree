@@ -58,7 +58,7 @@ class SystemApiTest(absltest.TestCase):
     self.assertEqual(ctx.modules.hal.name, "hal")
 
   def test_empty_static(self):
-    ctx = iree.runtime.SystemContext(modules=())
+    ctx = iree.runtime.SystemContext(vm_modules=())
     self.assertFalse(ctx.is_dynamic)
     self.assertIn("hal", ctx.modules)
     self.assertEqual(ctx.modules.hal.name, "hal")
@@ -66,7 +66,7 @@ class SystemApiTest(absltest.TestCase):
   def test_custom_dynamic(self):
     ctx = iree.runtime.SystemContext()
     self.assertTrue(ctx.is_dynamic)
-    ctx.add_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module())
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
     f = ctx.modules.arithmetic["simple_mul"]
     f_repr = repr(f)
@@ -79,14 +79,14 @@ class SystemApiTest(absltest.TestCase):
   def test_duplicate_module(self):
     ctx = iree.runtime.SystemContext()
     self.assertTrue(ctx.is_dynamic)
-    ctx.add_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module())
     with self.assertRaisesRegex(ValueError, "arithmetic"):
-      ctx.add_module(create_simple_mul_module())
+      ctx.add_vm_module(create_simple_mul_module())
 
   def test_static_invoke(self):
     ctx = iree.runtime.SystemContext()
     self.assertTrue(ctx.is_dynamic)
-    ctx.add_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module())
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
     f = ctx.modules.arithmetic["simple_mul"]
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
@@ -97,7 +97,7 @@ class SystemApiTest(absltest.TestCase):
   def test_serialize_values(self):
     ctx = iree.runtime.SystemContext()
     self.assertTrue(ctx.is_dynamic)
-    ctx.add_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module())
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
     f = ctx.modules.arithmetic["simple_mul"]
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
@@ -107,8 +107,8 @@ class SystemApiTest(absltest.TestCase):
     self.assertEqual(inputs, ("4xf32=1 2 3 4", "4xf32=4 5 6 7"))
     self.assertEqual(outputs, ("4xf32=4 10 18 28",))
 
-  def test_load_module(self):
-    arithmetic = iree.runtime.load_module(create_simple_mul_module())
+  def test_load_vm_module(self):
+    arithmetic = iree.runtime.load_vm_module(create_simple_mul_module())
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     results = arithmetic.simple_mul(arg0, arg1)

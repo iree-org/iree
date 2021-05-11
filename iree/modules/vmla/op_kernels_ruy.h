@@ -97,8 +97,9 @@ void MakeRuyMulParams(
 }
 
 template <typename LhsEl, typename RhsEl, typename AccumEl, typename DstEl>
-Status MatMul::Execute(RuntimeState* runtime_state,
-                       const Buffers<LhsEl, RhsEl, AccumEl, DstEl>& buffers) {
+iree_status_t MatMul::Execute(
+    RuntimeState* runtime_state,
+    const Buffers<LhsEl, RhsEl, AccumEl, DstEl>& buffers) {
   ruy::Matrix<LhsEl> lhs;
   lhs.set_data(buffers.lhs_buffer.data());
   ruy::MakeSimpleLayout(buffers.lhs_shape[0], buffers.lhs_shape[1],
@@ -119,7 +120,7 @@ Status MatMul::Execute(RuntimeState* runtime_state,
 
   ruy::Mul(lhs, rhs, mul_params, &runtime_state->context, &dst);
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace kernels

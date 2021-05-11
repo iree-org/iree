@@ -24,8 +24,9 @@ iree_bytecode_module(
     name = "add_dynamic",
     testonly = True,
     src = "add_dynamic.mlir",
-    cc_namespace = "iree::bindings::tflite::testdata",
+    c_identifier = "iree_tflite_testdata_add_dynamic",
     flags = [
+        "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=vmla",
@@ -36,8 +37,9 @@ iree_bytecode_module(
     name = "add_multi",
     testonly = True,
     src = "add_multi.mlir",
-    cc_namespace = "iree::bindings::tflite::testdata",
+    c_identifier = "iree_tflite_testdata_add_multi",
     flags = [
+        "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=vmla",
@@ -48,8 +50,9 @@ iree_bytecode_module(
     name = "add_static",
     testonly = True,
     src = "add_static.mlir",
-    cc_namespace = "iree::bindings::tflite::testdata",
+    c_identifier = "iree_tflite_testdata_add_static",
     flags = [
+        "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=vmla",

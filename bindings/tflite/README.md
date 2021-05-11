@@ -67,15 +67,15 @@ ability to directly execute pages from the memory.
 
 ## Support
 
-|   | Glossary
-| - | --------
-| ✔️ | Supported and expected to match tflite semantics
-| ⚠️ | Supported with compatibility caveats (avoid if possible)
-| 🐢 | Supported with performance caveats (prefer the IREE C API)
-| 🚫 | Unimplemented but supportable if needed
-| ⛔ | Unsupported and unlikely to ever be (see notes below)
-| 🔒 | Not part of the tflite public API
-| ❔ | Unknown; not yet studied
+|     | Glossary
+| --- | --------
+|  ✔️  | Supported and expected to match tflite semantics
+|  ⚠️  | Supported with compatibility caveats (avoid if possible)
+|  🐢 | Supported with performance caveats (prefer the IREE C API)
+|  🚫 | Unimplemented but supportable if needed
+|  ⛔ | Unsupported and unlikely to ever be (see notes below)
+|  🔒 | Not part of the tflite public API
+|  ❔ | Unknown; not yet studied
 
 ### Op Coverage
 
@@ -86,61 +86,61 @@ ability to directly execute pages from the memory.
 Only the public C API functions are supported. The contents of internal
 structures like `TfLiteTensor` and `TfLiteContext` are undefined.
 
-|   | TFLite API |  Notes |
-| - | -------- | ----- |
-| ✔️ | `TfLiteVersion` | returns an IREE version string
-|  |  |
-| 🔒 | `TfLiteModel struct` | _implementation detail_
-| ✔️ | `TfLiteModelCreate` |
-| ✔️ | `TfLiteModelCreateFromFile` |
-| ✔️ | `TfLiteModelDelete` |
-|  |  |
-| 🔒 | `TfLiteInterpreterOptions struct` | _implementation detail_
-| ✔️ | `TfLiteInterpreterOptionsCreate` |
-| ✔️ | `TfLiteInterpreterOptionsDelete` |
-| 🐢 | `TfLiteInterpreterOptionsSetNumThreads` | interpreters will not share thread pools; see [external contexts](#-external-contexts)
-| ✔️ | `TfLiteInterpreterOptionsSetErrorReporter` |
-| ⛔ | `TfLiteInterpreterOptionsAddBuiltinOp` | IREE's compiler generates code
-| 🚫 | `TfLiteInterpreterOptionsAddCustomOp` | [not yet implemented](#-custom-ops)
-| 🚫 | `TfLiteInterpreterOptionsSetOpResolver` | [not yet implemented](#-custom-ops)
-| ⚠️ | `TfLiteInterpreterOptionsAddDelegate` | available but a no-op; [not needed in IREE](#-delegates)
-| ⚠️ | `TfLiteInterpreterOptionsSetUseNNAPI` | available but a no-op; NNAPI not supported
-|  |  |
-| 🔒 | `TfLiteInterpreter struct` | _implementation detail_
-| ✔️ | `TfLiteInterpreterCreate` |
-| ✔️ | `TfLiteInterpreterCreateWithSelectedOps` | alias to `TfLiteInterpreterCreate`
-| ✔️ | `TfLiteInterpreterDelete` |
-| ✔️ | `TfLiteInterpreterResetVariableTensors` |
-| ✔️ | `TfLiteInterpreterGetInputTensorCount` |
-| ✔️ | `TfLiteInterpreterGetInputTensor` |
-| ✔️ | `TfLiteInterpreterResizeInputTensor` |
-| ✔️ | `TfLiteInterpreterAllocateTensors` |
-| ✔️ | `TfLiteInterpreterInvoke` |
-| ✔️ | `TfLiteInterpreterGetOutputTensorCount` |
-| ✔️ | `TfLiteInterpreterGetOutputTensor` |
-|  |  |
-| 🚫 | `TfLiteTensor struct` | currently opaque; could be exposed with caveats
-| ✔️ | `TfLiteTensorType` |
-| ✔️ | `TfLiteTensorNumDims` |
-| ✔️ | `TfLiteTensorDim` |
-| ✔️ | `TfLiteTensorByteSize` |
-| ✔️ | `TfLiteTensorData` |
-| ✔️ | `TfLiteTensorName` |
-| ✔️ | `TfLiteTensorQuantizationParams` |
-| ✔️ | `TfLiteTensorCopyFromBuffer` |
-| ✔️ | `TfLiteTensorCopyToBuffer` |
+|     | TFLite API                                 | Notes
+| --- | ------------------------------------------ | -----
+|  ✔️  | `TfLiteVersion`                            | returns an IREE version string
+|     |                                            |
+|  🔒 | `TfLiteModel struct`                       | _implementation detail_
+|  ✔️  | `TfLiteModelCreate`                        |
+|  ✔️  | `TfLiteModelCreateFromFile`                |
+|  ✔️  | `TfLiteModelDelete`                        |
+|     |                                            |
+|  🔒 | `TfLiteInterpreterOptions struct`          | _implementation detail_
+|  ✔️  | `TfLiteInterpreterOptionsCreate`           |
+|  ✔️  | `TfLiteInterpreterOptionsDelete`           |
+|  🐢 | `TfLiteInterpreterOptionsSetNumThreads`    | interpreters will not share thread pools; see [external contexts](#-external-contexts)
+|  ✔️  | `TfLiteInterpreterOptionsSetErrorReporter` |
+|  ⛔ | `TfLiteInterpreterOptionsAddBuiltinOp`     | IREE's compiler generates code
+|  🚫 | `TfLiteInterpreterOptionsAddCustomOp`      | [not yet implemented](#-custom-ops)
+|  🚫 | `TfLiteInterpreterOptionsSetOpResolver`    | [not yet implemented](#-custom-ops)
+|  ⚠️  | `TfLiteInterpreterOptionsAddDelegate`      | available but a no-op; [not needed in IREE](#-delegates)
+|  ⚠️  | `TfLiteInterpreterOptionsSetUseNNAPI`      | available but a no-op; NNAPI not supported
+|     |                                            |
+|  🔒 | `TfLiteInterpreter struct`                 | _implementation detail_
+|  ✔️  | `TfLiteInterpreterCreate`                  |
+|  ✔️  | `TfLiteInterpreterCreateWithSelectedOps`   | alias to `TfLiteInterpreterCreate`
+|  ✔️  | `TfLiteInterpreterDelete`                  |
+|  ✔️  | `TfLiteInterpreterResetVariableTensors`    |
+|  ✔️  | `TfLiteInterpreterGetInputTensorCount`     |
+|  ✔️  | `TfLiteInterpreterGetInputTensor`          |
+|  ✔️  | `TfLiteInterpreterResizeInputTensor`       |
+|  ✔️  | `TfLiteInterpreterAllocateTensors`         |
+|  ✔️  | `TfLiteInterpreterInvoke`                  |
+|  ✔️  | `TfLiteInterpreterGetOutputTensorCount`    |
+|  ✔️  | `TfLiteInterpreterGetOutputTensor`         |
+|     |                                            |
+|  🚫 | `TfLiteTensor struct`                      | currently opaque; could be exposed with caveats
+|  ✔️  | `TfLiteTensorType`                         |
+|  ✔️  | `TfLiteTensorNumDims`                      |
+|  ✔️  | `TfLiteTensorDim`                          |
+|  ✔️  | `TfLiteTensorByteSize`                     |
+|  ✔️  | `TfLiteTensorData`                         |
+|  ✔️  | `TfLiteTensorName`                         |
+|  ✔️  | `TfLiteTensorQuantizationParams`           |
+|  ✔️  | `TfLiteTensorCopyFromBuffer`               |
+|  ✔️  | `TfLiteTensorCopyToBuffer`                 |
 
 ### Features
 
-|   | TFLite Feature |  Notes |
-| - | -------- | ----- |
-| 🔒 | Sparsity | **API not public**; likely possible
-| 🔒 | Complex Numbers | **API not public**; likely possible
-| 🔒 | External Contexts | **API not public**; support possible but API inadequate for performance sensitive applications
-| 🚫 | Custom Ops | [not yet implemented](#-custom-ops); can be supported with performance caveats
-| 🚫 | Dynamic Model Creation | [avoid doing this and use a compiler](#-dynamic-model-creation); almost all use cases besides specialized tools like REPLs can compile their models offline
-| ⛔ | Delegates | concept mismatch; [not needed in IREE](#-delegates) due to its hardware abstraction layer (HAL)
-| ⛔ | TFLite Micro | concept mismatch; [compilers are much better at this scale](#-tflite-micro)
+|     | TFLite Feature         | Notes
+| --- | ---------------------- | ------
+| 🔒  | Sparsity               | **API not public**; likely possible
+| 🔒  | Complex Numbers        | **API not public**; likely possible
+| 🔒  | External Contexts      | **API not public**; support possible but API inadequate for performance sensitive applications
+| 🚫  | Custom Ops             | [not yet implemented](#-custom-ops); can be supported with performance caveats
+| 🚫  | Dynamic Model Creation | [avoid doing this and use a compiler](#-dynamic-model-creation); almost all use cases besides specialized tools like REPLs can compile their models offline
+| ⛔  | Delegates              | concept mismatch; [not needed in IREE](#-delegates) due to its hardware abstraction layer (HAL)
+| ⛔  | TFLite Micro           | concept mismatch; [compilers are much better at this scale](#-tflite-micro)
 
 #### 🧪 External Contexts
 
@@ -186,6 +186,7 @@ need for expensive interop and opportunities for the compiler to tightly
 optimize the custom behavior with the rest of the model.
 
 Relevant **unsupported** APIs:
+
 * [`TfLiteRegistration`](https://github.com/tensorflow/tensorflow/blob/4827424ac32433075bf1ec885aa4b38b1ede2d65/tensorflow/lite/c/common.h#L827-L884)
 * [`TfLiteInterpreterOptionsAddCustomOp`](https://github.com/tensorflow/tensorflow/blob/4827424ac32433075bf1ec885aa4b38b1ede2d65/tensorflow/lite/c/c_api_experimental.h#L51-L68)
 * [`TfLiteInterpreterOptionsSetOpResolver`](https://github.com/tensorflow/tensorflow/blob/4827424ac32433075bf1ec885aa4b38b1ede2d65/tensorflow/lite/c/c_api_experimental.h#L70-L91)
@@ -203,6 +204,7 @@ construct models on-demand there are almost no situations in which one should do
 so beyond tools like REPLs and it is not a supported IREE use case.
 
 Relevant **unsupported** APIs:
+
 * [`TfLite*Params` structures](https://github.com/tensorflow/tensorflow/blob/2d03c32d6299935ea74083c943c8d727ff50d4c8/tensorflow%2Flite%2Fc%2Fbuiltin_op_data.h)
 
 #### 🙅‍♀️ Delegates
@@ -227,6 +229,7 @@ and it's easy to map anything you can do with IREE artifacts to that mental
 model.
 
 Relevant **unsupported** APIs:
+
 * [`TfLiteDelegate`](https://github.com/tensorflow/tensorflow/blob/2d03c32d6299935ea74083c943c8d727ff50d4c8/tensorflow/lite/c/common.h#L919-L960)
 * [`TfLiteInterpreterOptionsAddDelegate`](https://github.com/tensorflow/tensorflow/blob/2d03c32d6299935ea74083c943c8d727ff50d4c8/tensorflow/lite/c/c_api.h#L109-L117)
 

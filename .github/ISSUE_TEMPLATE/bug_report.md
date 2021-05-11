@@ -14,7 +14,8 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
-If you believe this is an issue with IREE core (not integrations) please provide a reproduction (including artifacts) that does not require integrations ([Instructions for extracting artifacts from TF tests](https://google.github.io/iree/developing-iree/tensorflow-integrations#generated-artifacts))
+If you believe this is an issue with IREE core (not integrations) please provide a reproduction (including artifacts) that does not require integrations
+([Instructions for extracting artifacts from TF tests](https://github.com/google/iree/blob/main/docs/developers/developing_iree/e2e_benchmarking.md))
 
 1. Go to '...'
 2. Click on '....'

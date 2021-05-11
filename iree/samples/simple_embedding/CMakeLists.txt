@@ -19,21 +19,50 @@ iree_c_embed_data(
     "simple_embedding_test_llvm_aot_rv64.c"
   H_FILE_OUTPUT
     "simple_embedding_test_llvm_aot_rv64.h"
+  IDENTIFIER
+    "iree_samples_simple_embedding_rv64_test_module"
   FLATTEN
   PUBLIC
 )
 
+if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  return()
+endif()
+
 iree_cc_binary(
   NAME
-    simple_embedding_run
+    simple_embedding_dylib
   SRCS
-    "simple_embedding_run.c"
+    "device_dylib.c"
+    "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_c
     ::simple_embedding_test_llvm_aot_rv64
     iree::base
     iree::hal
-    iree::hal::drivers
+    iree::hal::local
+    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::loaders::legacy_library_loader
+    iree::hal::local::task_driver
+    iree::modules::hal
+    iree::task::api
+    iree::vm
+    iree::vm::bytecode_module
+)
+
+iree_cc_binary(
+  NAME
+    simple_embedding_vulkan
+  SRCS
+    "device_vulkan.c"
+    "simple_embedding.c"
+  DEPS
+    ::simple_embedding_test_bytecode_module_c
+    ::simple_embedding_test_llvm_aot_rv64
+    iree::base
+    iree::hal
+    iree::hal::vulkan::registration
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
@@ -41,9 +70,10 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
-    simple_embedding_run_local_sync
+    simple_embedding_local_sync
   SRCS
-    "simple_embedding_run_local_sync.c"
+    "device_local_sync.c"
+    "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_c
     ::simple_embedding_test_llvm_aot_rv64
@@ -57,23 +87,18 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
-if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
-   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
-
 iree_bytecode_module(
   NAME
     simple_embedding_test_bytecode_module
   SRC
     "simple_embedding_test.mlir"
-  CC_NAMESPACE
-    "iree::samples"
-  C_OUTPUT
+  C_IDENTIFIER
+    "iree_samples_simple_embedding_test_module"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=dylib-llvm-aot"
     "-iree-hal-target-backends=vulkan-spirv"
+    "-iree-llvm-debug-symbols=false"
   PUBLIC
 )
 
@@ -87,26 +112,22 @@ endif()
 iree_run_binary_test(
   NAME
     "simple_embedding_dylib_test"
-  ARGS
-    "dylib"
   TEST_BINARY
-    ::simple_embedding_run
+    ::simple_embedding_dylib
 )
 
 iree_run_binary_test(
   NAME
-    "simple_embedding_run_local_sync_test"
+    "simple_embedding_local_sync_test"
   TEST_BINARY
-    ::simple_embedding_run_local_sync
+    ::simple_embedding_local_sync
 )
 
 iree_run_binary_test(
   NAME
     "simple_embedding_vulkan_test"
-  ARGS
-    "vulkan"
   TEST_BINARY
-    ::simple_embedding_run
+    ::simple_embedding_vulkan
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

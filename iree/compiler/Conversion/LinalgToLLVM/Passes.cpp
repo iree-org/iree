@@ -29,9 +29,13 @@ namespace iree_compiler {
 void addLinalgToLLVMPasses(OpPassManager &passManager,
                            LLVMCodegenOptions options) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+
+  // Tile and vectorize linalg ops.
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(
       createLinalgTileAndVectorizeWorkgroupsPass());
+  nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
   nestedModulePM.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
 

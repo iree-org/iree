@@ -121,3 +121,21 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I]], %[[OFFSET]]]
 //      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]
+
+// -----
+
+memref.global "private" constant @constant_3x3x1x1xf32 : memref<3x3x1x1xf32> = dense<[[[[-1.000000e+00]], [[0.000000e+00]], [[1.000000e+00]]], [[[-2.000000e+00]], [[0.000000e+00]], [[2.000000e+00]]], [[[-1.000000e+00]], [[0.000000e+00]], [[1.000000e+00]]]]>
+func @load_global_with_offset(%i0: index, %i1: index, %i2: index, %i3: index) -> f32 {
+  %global = memref.get_global @constant_3x3x1x1xf32 : memref<3x3x1x1xf32>
+  %val = memref.load %global[%i0, %i1, %i2, %i3] : memref<3x3x1x1xf32>
+  return %val: f32
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s1 + s2 + s3 * 3)>
+//      CHECK: memref.global "private" constant @constant_3x3x1x1xf32 : memref<9xf32> = dense<[-1.000000e+00, 0.000000e+00, 1.000000e+00, -2.000000e+00, 0.000000e+00, 2.000000e+00, -1.000000e+00, 0.000000e+00, 1.000000e+00]>
+//      CHECK: func @load_global_with_offset
+// CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
+//      CHECK:   %[[GLOBAL:.+]] = memref.get_global @constant_3x3x1x1xf32 : memref<9xf32>
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I3]], %[[I2]], %[[I1]], %[[I0]]]
+//      CHECK:   %[[LOAD:.+]] = memref.load %[[GLOBAL]][%[[INDEX]]]
+//      CHECK:   return %[[LOAD]]

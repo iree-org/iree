@@ -39,9 +39,10 @@ class StringsToVMConversionInterface : public VMConversionDialectInterface {
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
   OwningModuleRef parseVMImportModule() const override {
-    return mlir::parseSourceString(StringRef(strings_imports_create()->data,
-                                             strings_imports_create()->size),
-                                   getDialect()->getContext());
+    return mlir::parseSourceString(
+        StringRef(iree_strings_imports_create()->data,
+                  iree_strings_imports_create()->size),
+        getDialect()->getContext());
   }
 
   void populateVMConversionPatterns(

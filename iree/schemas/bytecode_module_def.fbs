@@ -14,9 +14,9 @@
 
 namespace iree.vm;
 
-// 'Bytecode MODule'.
-file_identifier "BMOD";
-file_extension "module";
+// IREE bytecode module.
+file_identifier "IREE";
+file_extension "vmfb";
 
 // Arbitrary key/value reflection attribute.
 table ReflectionAttrDef {
@@ -50,7 +50,7 @@ table FunctionSignatureDef {
   // Function level reflection attributes.
   // These are typically used to communicate additional ABI metadata needed
   // for dynamic invocation and host language mapping.
-  // See: docs/design_docs/function_abi.md
+  // See: docs/developers/design_docs/function_abi.md
   reflection_attrs:[ReflectionAttrDef];
 }
 

@@ -96,7 +96,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(
         buffer.get(), 0, contents.data(), contents.size() * sizeof(int32_t)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_SINT_32, shape.data(), shape.size(),
+        buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_SINT_32,
         &*out_buffer_view));
   }
 
@@ -119,8 +119,8 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(
         buffer.get(), 0, contents.data(), contents.size() * sizeof(uint16_t)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_FLOAT_16, shape.data(),
-        shape.size(), &*out_buffer_view));
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_16, &*out_buffer_view));
   }
 
   void CreateFloat32BufferView(absl::Span<const float> contents,
@@ -141,8 +141,8 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer.get(), 0, contents.data(),
                                               contents.size() * sizeof(float)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape.data(),
-        shape.size(), &*out_buffer_view));
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, &*out_buffer_view));
   }
 
   void CreateFloat64BufferView(absl::Span<const double> contents,
@@ -163,11 +163,11 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(
         buffer.get(), 0, contents.data(), contents.size() * sizeof(double)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_FLOAT_64, shape.data(),
-        shape.size(), &*out_buffer_view));
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_64, &*out_buffer_view));
   }
 
-  Status Invoke(const char* function_name) {
+  iree_status_t Invoke(const char* function_name) {
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(
         check_module_->lookup_function(
@@ -180,7 +180,8 @@ class CheckTest : public ::testing::Test {
                           /*outputs=*/nullptr, iree_allocator_system());
   }
 
-  Status Invoke(const char* function_name, std::vector<iree_vm_value> args) {
+  iree_status_t Invoke(const char* function_name,
+                       std::vector<iree_vm_value> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, args.size(),
                             iree_allocator_system(), &inputs_));
@@ -190,8 +191,8 @@ class CheckTest : public ::testing::Test {
     return Invoke(function_name);
   }
 
-  Status Invoke(const char* function_name,
-                std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
+  iree_status_t Invoke(const char* function_name,
+                       std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, args.size(),
                             iree_allocator_system(), &inputs_));

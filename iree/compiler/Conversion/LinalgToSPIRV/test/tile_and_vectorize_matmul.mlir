@@ -55,7 +55,7 @@ hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} 
 //  CHECK-COUNT-8:   vector.transfer_read
 //          CHECK:   %[[FOR_RES:.+]]:8 = scf.for
 // CHECK-COUNT-12:     vector.transfer_read
-// CHECK-COUNT-32:     vector.contract
+// CHECK-COUNT-32:     vector.fma
 //      CHECK:         scf.yield
 //  CHECK-COUNT-8:    vector.transfer_write %[[FOR_RES]]
 //          CHECK:    return
@@ -117,7 +117,7 @@ hal.executable @matmul_static_shape_f32 attributes {sym_visibility = "private"} 
 //  CHECK-COUNT-8:   vector.transfer_read
 //          CHECK:   %[[FOR_RES:.+]]:8 = scf.for
 // CHECK-COUNT-12:     vector.transfer_read
-// CHECK-COUNT-32:     vector.contract
+// CHECK-COUNT-32:     vector.fma
 //      CHECK:         scf.yield
 //  CHECK-COUNT-8:    vector.transfer_write %[[FOR_RES]]
 //          CHECK:    return

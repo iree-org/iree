@@ -54,9 +54,9 @@
 // NOTE: this exact form is confirmed to be recognized by the compilers we care
 // about; do not modify: https://godbolt.org/z/xzof9d
 static inline uint64_t iree_math_rotl_u64(const uint64_t n, uint32_t c) {
-  if (!c) return n;
   const uint32_t mask = 8 * sizeof(n) - 1;
   c &= mask;
+  if (!c) return n;
   return (n << c) | (n >> (64 - c));
 }
 
@@ -66,9 +66,9 @@ static inline uint64_t iree_math_rotl_u64(const uint64_t n, uint32_t c) {
 // NOTE: this exact form is confirmed to be recognized by the compilers we care
 // about **except MSVC**; do not modify: https://godbolt.org/z/xzof9d
 static inline uint64_t iree_math_rotr_u64(const uint64_t n, uint32_t c) {
-  if (!c) return n;
   const uint32_t mask = 8 * sizeof(n) - 1;
   c &= mask;
+  if (!c) return n;
   return (n >> c) | (n << ((-c) & mask));
 }
 

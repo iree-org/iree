@@ -23,7 +23,7 @@
 #include "iree/hal/vmla/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/tensorlist/native_module.h"
-#include "iree/modules/tensorlist/tensorlist_test_module.h"
+#include "iree/modules/tensorlist/tensorlist_test_module_c.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
@@ -62,8 +62,7 @@ class TensorListModulesTest : public ::testing::Test {
         iree_tensorlist_module_create(iree_allocator_system(), &native_module_))
         << "Native module failed to init";
 
-    const auto* module_file_toc =
-        iree::modules::tensorlist::tensorlist_test_module_create();
+    const auto* module_file_toc = iree_tensorlist_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
@@ -171,8 +170,8 @@ class TensorListModulesTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer.get(), 0, contents.data(),
                                               contents.size() * sizeof(float)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape.data(),
-        shape.size(), &*out_buffer_view));
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, &*out_buffer_view));
   }
 
   iree_hal_device_t* device_ = nullptr;

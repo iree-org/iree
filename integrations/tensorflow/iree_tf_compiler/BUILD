@@ -18,6 +18,23 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+filegroup(
+    name = "importer-binaries",
+    srcs = [
+        ":iree-import-tflite",
+        ":iree-import-xla",
+        ":iree-tf-import",
+    ],
+)
+
+filegroup(
+    name = "opt-binaries",
+    srcs = [
+        ":iree-opt-tflite",
+        ":iree-tf-opt",
+    ],
+)
+
 cc_binary(
     name = "iree-tf-opt",
     srcs = ["iree-tf-opt-main.cpp"],

@@ -50,9 +50,8 @@ func @buffer_view_compute_offset(%arg0 : !hal.buffer_view) -> index {
   // CHECK: %[[T1:.+]] = addi %[[T0]], %[[INDICES]]#1 : index
   // CHECK: %[[T2:.+]] = index_cast %[[TYPE]] : i32 to index
   // CHECK: %[[T3:.+]] = and %[[T2]], %c255 : index
-  // CHECK: %[[T4:.+]] = addi %[[T3]], %c8 : index
-  // CHECK: %[[T5:.+]] = subi %[[T4]], %c1 : index
-  // CHECK: %[[T6:.+]] = divi_unsigned %[[T5]], %c8 : index
+  // CHECK: %[[T4:.+]] = addi %[[T3]], %c7 : index
+  // CHECK: %[[T6:.+]] = divi_unsigned %[[T4]], %c8 : index
   // CHECK: %[[T7:.+]] = muli %[[T1]], %[[T6]] : index
   %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1] : index
   // CHECK: return %[[T7]]

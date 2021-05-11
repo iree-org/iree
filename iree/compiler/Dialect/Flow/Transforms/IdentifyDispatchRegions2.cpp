@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DispatchConfig.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Utils/WorkloadUtils.h"
 #include "llvm/ADT/MapVector.h"
@@ -397,24 +398,25 @@ LogicalResult processBlock(Block &block, OpDispatchPolicy &policy) {
 // Identifies dispatchable ops and moves them into dispatch regions.
 // Some ops, such as call, will be deferred until following passes.
 class IdentifyDispatchRegions2Pass
-    : public PassWrapper<IdentifyDispatchRegions2Pass, FunctionPass> {
+    : public IdentifyDispatchRegions2Base<IdentifyDispatchRegions2Pass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect>();
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     // NOTE: we require the DispatchabilityAnalysisPass to have run first.
     auto dispatchability = getCachedParentAnalysis<Dispatchability>();
+    FuncOp func = getOperation();
     if (!dispatchability.hasValue()) {
-      getFunction().emitError()
+      func.emitError()
           << "dispatchability analysis not performed "
              "on module; run -iree-flow-dispatchability-analysis first";
       return signalPassFailure();
     }
 
     OpDispatchPolicy policy(*dispatchability);
-    for (auto &block : getFunction()) {
+    for (auto &block : getOperation()) {
       if (failed(processBlock(block, policy))) {
         return signalPassFailure();
       }
@@ -427,10 +429,6 @@ class IdentifyDispatchRegions2Pass
 std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegions2Pass() {
   return std::make_unique<IdentifyDispatchRegions2Pass>();
 }
-
-static PassRegistration<IdentifyDispatchRegions2Pass> pass(
-    "iree-flow-identify-dispatch-regions2",
-    "Conservatively identifies dispatch regions in functions (v2)");
 
 }  // namespace Flow
 }  // namespace IREE

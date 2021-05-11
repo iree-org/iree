@@ -29,9 +29,13 @@ extern "C" {
 
 #if defined(TRACY_ENABLE) && defined(IREE_PLATFORM_WINDOWS)
 static HANDLE iree_dbghelp_mutex;
-void IREEDbgHelpInit() { iree_dbghelp_mutex = CreateMutex(NULL, FALSE, NULL); }
-void IREEDbgHelpLock() { WaitForSingleObject(iree_dbghelp_mutex, INFINITE); }
-void IREEDbgHelpUnlock() { ReleaseMutex(iree_dbghelp_mutex); }
+void IREEDbgHelpInit(void) {
+  iree_dbghelp_mutex = CreateMutex(NULL, FALSE, NULL);
+}
+void IREEDbgHelpLock(void) {
+  WaitForSingleObject(iree_dbghelp_mutex, INFINITE);
+}
+void IREEDbgHelpUnlock(void) { ReleaseMutex(iree_dbghelp_mutex); }
 #endif  // TRACY_ENABLE && IREE_PLATFORM_WINDOWS
 
 #if IREE_TRACING_FEATURES != 0

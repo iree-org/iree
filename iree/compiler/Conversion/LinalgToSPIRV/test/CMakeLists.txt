@@ -20,7 +20,6 @@ iree_lit_test_suite(
     "convert_to_spirv.mlir"
     "dead_alloc.mlir"
     "fold-gpu-procid-uses.mlir"
-    "forop_canonicalization.mlir"
     "materialize_launch_configuration.mlir"
     "materialize_launch_configuration2.mlir"
     "pipeline_matmul_cooperative_matrix.mlir"

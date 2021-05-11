@@ -43,6 +43,7 @@ iree_cc_library(
   NAME
     impl
   HDRS
+    "buffer.h"
     "builtin_types.h"
     "context.h"
     "instance.h"
@@ -56,6 +57,7 @@ iree_cc_library(
     "type_def.h"
     "value.h"
   SRCS
+    "buffer.c"
     "builtin_types.c"
     "context.c"
     "instance.c"
@@ -72,6 +74,19 @@ iree_cc_library(
     iree::base::internal
     iree::base::tracing
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    buffer_test
+  SRCS
+    "buffer_test.cc"
+  DEPS
+    ::cc
+    ::impl
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -192,7 +207,10 @@ iree_cc_test(
     iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
-    iree::vm::test::all_bytecode_modules_cc
+    iree::vm::test::all_bytecode_modules_c
+  LABELS
+    "notap"
+    "manual"
 )
 
 iree_cc_binary(
@@ -202,7 +220,7 @@ iree_cc_binary(
     "bytecode_module_benchmark.cc"
   DEPS
     ::bytecode_module
-    ::bytecode_module_benchmark_module_cc
+    ::bytecode_module_benchmark_module_c
     ::vm
     benchmark
     iree::base
@@ -225,8 +243,8 @@ iree_bytecode_module(
     bytecode_module_benchmark_module
   SRC
     "bytecode_module_benchmark.mlir"
-  CC_NAMESPACE
-    "iree::vm"
+  C_IDENTIFIER
+    "iree_vm_bytecode_module_benchmark_module"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   TESTONLY
@@ -240,7 +258,7 @@ iree_cc_test(
     "bytecode_module_size_benchmark.cc"
   DEPS
     ::bytecode_module
-    ::bytecode_module_size_benchmark_module_cc
+    ::bytecode_module_size_benchmark_module_c
     ::vm
     iree::base
 )
@@ -250,8 +268,8 @@ iree_bytecode_module(
     bytecode_module_size_benchmark_module
   SRC
     "bytecode_module_size_benchmark.mlir"
-  CC_NAMESPACE
-    "iree::vm"
+  C_IDENTIFIER
+    "iree_vm_bytecode_module_size_benchmark_module"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   TESTONLY

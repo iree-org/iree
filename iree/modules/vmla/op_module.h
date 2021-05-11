@@ -119,7 +119,7 @@ class Interface final : public iree::vm::RefObject<Interface> {
   StatusOr<uint32_t> GetConstant(uint32_t offset) const;
 
   // Sets the push constant block contents to the given values.
-  Status SetConstants(absl::Span<const uint32_t> values);
+  Status SetConstants(const uint32_t* values, iree_host_size_t value_count);
 
   // Gets the binding within a set. Note that the buffer may be null.
   StatusOr<const Binding> GetBinding(uint32_t set, uint32_t binding) const;

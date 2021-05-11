@@ -58,12 +58,9 @@ endif()
 iree_cc_binary(
   NAME
     iree-benchmark-module
-  OUT
-    iree-benchmark-module
   SRCS
     "iree-benchmark-module-main.cc"
   DEPS
-    absl::strings
     benchmark
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -79,8 +76,6 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
-    iree-check-module
-  OUT
     iree-check-module
   SRCS
     "iree-check-module-main.cc"
@@ -104,8 +99,6 @@ iree_cc_binary(
 iree_cc_binary(
   NAME
     iree-dump-module
-  OUT
-    iree-dump-module
   SRCS
     "iree-dump-module-main.cc"
   DEPS
@@ -113,17 +106,15 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::status
     iree::schemas::bytecode_module_def_c_fbs
+    iree::tools::utils::vm_util
 )
 
 iree_cc_binary(
   NAME
     iree-run-module
-  OUT
-    iree-run-module
   SRCS
     "iree-run-module-main.cc"
   DEPS
-    absl::strings
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::status
@@ -328,8 +319,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-translate
-    OUT
-      iree-translate
     DEPS
       ::iree_translate_main
     HOSTONLY
@@ -338,8 +327,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-opt
-    OUT
-      iree-opt
     DEPS
       ::iree_opt_main
     HOSTONLY
@@ -347,8 +334,6 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
-      iree-run-mlir
-    OUT
       iree-run-mlir
     SRCS
       "iree-run-mlir-main.cc"
@@ -362,7 +347,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRSupport
       MLIRTargetLLVMIRExport
       absl::span
-      absl::strings
       iree::base
       iree::base::internal::flags
       iree::base::status

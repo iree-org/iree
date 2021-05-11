@@ -28,6 +28,11 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+static llvm::cl::opt<bool> clEnableFusionWithReductionOps(
+    "iree-enable-fusion-with-reduction-ops",
+    llvm::cl::desc("Allow fusing generic ops with reductions"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -90,14 +95,16 @@ struct FusionOfTensorOpsPass
     // will be computed anyway, so the consumers can just use that value.
     linalg::ControlElementwiseOpsFusionFn controlFn =
         [](const OpResult &producer, const OpOperand &consumer) {
-          // TODO(GH-5045): Enable fusion with reduction consumer. Currently
-          // vectorization doesn't handle generic ops with reduction iterators
-          // we will disable for now to allow vectorizing producer pointwise
-          // ops.
-          auto consumerOp = consumer.getOwner();
-          if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
-              dyn_cast<linalg::LinalgOp>(consumerOp).getNumReductionLoops()) {
-            return false;
+          // TODO(GH-5611): Enable fusion with reduction consumer for all
+          // targets. Currently vectorization doesn't handle generic ops with
+          // reduction iterators we will disable for now to allow vectorizing
+          // producer pointwise ops to avoid performance regressions on CPU.
+          if (!clEnableFusionWithReductionOps) {
+            auto consumerOp = consumer.getOwner();
+            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
+                dyn_cast<linalg::LinalgOp>(consumerOp).getNumReductionLoops()) {
+              return false;
+            }
           }
 
           llvm::SmallDenseSet<Operation *, 4> numUsers;
@@ -108,11 +115,20 @@ struct FusionOfTensorOpsPass
           }
           return numUsers.empty();
         };
-
+    // Simple heuristic to decide if reshaope should be folded in the linalg.
+    // If the source of the reshape is a linalg op fold to potentially allow the
+    // two linalg ops to be fused. Otherwise leave it to avoid adding dimensions
+    // to the consumer linalg op.
+    linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
+        [](const OpResult &producer, const OpOperand &consumer) {
+          auto reshapeOp = producer.getDefiningOp<linalg::TensorReshapeOp>();
+          return reshapeOp.src().getDefiningOp<linalg::LinalgOp>() != nullptr;
+        };
     linalg::populateElementwiseOpsFusionPatterns(
-        fusionPatterns, linalg::LinalgElementwiseFusionOptions()
-                            .setAllowFoldingUnitDimReshapes(true)
-                            .setControlElementwiseOpsFusionFn(controlFn));
+        fusionPatterns,
+        linalg::LinalgElementwiseFusionOptions()
+            .setControlFoldingReshapes(foldReshapeBetweenLinalgFn)
+            .setControlElementwiseOpsFusionFn(controlFn));
 
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));

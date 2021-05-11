@@ -16,7 +16,7 @@
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
+IREE_API_EXPORT iree_status_t iree_allocator_malloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
   if (!allocator.alloc) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -26,7 +26,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
                          byte_length, out_ptr);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
+IREE_API_EXPORT iree_status_t iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
   if (!allocator.alloc) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -37,7 +37,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
                          out_ptr);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_allocator_clone(iree_allocator_t allocator,
                      iree_const_byte_span_t source_bytes, void** out_ptr) {
   IREE_RETURN_IF_ERROR(
@@ -46,14 +46,14 @@ iree_allocator_clone(iree_allocator_t allocator,
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_allocator_free(iree_allocator_t allocator, void* ptr) {
+IREE_API_EXPORT void iree_allocator_free(iree_allocator_t allocator,
+                                         void* ptr) {
   if (ptr && allocator.free) {
     allocator.free(allocator.self, ptr);
   }
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
                                iree_host_size_t byte_length, void** out_ptr) {
   IREE_ASSERT_ARGUMENT(out_ptr);
@@ -94,8 +94,7 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
-                                                              void* ptr) {
+IREE_API_EXPORT void iree_allocator_system_free(void* self, void* ptr) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_FREE(ptr);
   if (ptr) {

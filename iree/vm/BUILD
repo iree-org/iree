@@ -63,6 +63,7 @@ cc_library(
 cc_library(
     name = "impl",
     srcs = [
+        "buffer.c",
         "builtin_types.c",
         "context.c",
         "instance.c",
@@ -75,6 +76,7 @@ cc_library(
         "stack.c",
     ],
     hdrs = [
+        "buffer.h",
         "builtin_types.h",
         "context.h",
         "instance.h",
@@ -93,6 +95,18 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
+    ],
+)
+
+cc_test(
+    name = "buffer_test",
+    srcs = ["buffer_test.cc"],
+    deps = [
+        ":cc",
+        ":impl",
+        "//iree/base",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -229,6 +243,11 @@ cc_test(
         "bytecode_dispatch_test.cc",
         "bytecode_module_test.cc",
     ],
+    tags = [
+        # TODO(benvanik): Fix type casting errors for --config=android_arm*.
+        "notap",
+        "manual",
+    ],
     deps = [
         ":bytecode_module",
         ":vm",
@@ -236,7 +255,7 @@ cc_test(
         "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "//iree/vm/test:all_bytecode_modules_cc",
+        "//iree/vm/test:all_bytecode_modules_c",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
@@ -248,7 +267,7 @@ cc_binary(
     srcs = ["bytecode_module_benchmark.cc"],
     deps = [
         ":bytecode_module",
-        ":bytecode_module_benchmark_module_cc",
+        ":bytecode_module_benchmark_module_c",
         ":vm",
         "//iree/base",
         "//iree/base:logging",
@@ -267,7 +286,7 @@ iree_bytecode_module(
     name = "bytecode_module_benchmark_module",
     testonly = True,
     src = "bytecode_module_benchmark.mlir",
-    cc_namespace = "iree::vm",
+    c_identifier = "iree_vm_bytecode_module_benchmark_module",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
@@ -276,7 +295,7 @@ cc_test(
     srcs = ["bytecode_module_size_benchmark.cc"],
     deps = [
         ":bytecode_module",
-        ":bytecode_module_size_benchmark_module_cc",
+        ":bytecode_module_size_benchmark_module_c",
         ":vm",
         "//iree/base",
     ],
@@ -286,7 +305,7 @@ iree_bytecode_module(
     name = "bytecode_module_size_benchmark_module",
     testonly = True,
     src = "bytecode_module_size_benchmark.mlir",
-    cc_namespace = "iree::vm",
+    c_identifier = "iree_vm_bytecode_module_size_benchmark_module",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 

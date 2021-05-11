@@ -329,25 +329,25 @@ class BuildFileFunctions(object):
                  hdrs=None,
                  textual_hdrs=None,
                  srcs=None,
+                 copts=None,
+                 defines=None,
                  data=None,
                  deps=None,
-                 defines=None,
                  testonly=None,
                  linkopts=None,
-                 copts=None,
                  **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
-    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
     textual_hdrs_block = _convert_string_list_block("TEXTUAL_HDRS",
                                                     textual_hdrs,
                                                     sort=True)
     srcs_block = _convert_srcs_block(srcs)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
-    defines_block = _convert_string_list_block("DEFINES", defines)
     testonly_block = _convert_option_block("TESTONLY", testonly)
 
     self.converter.body += (f"iree_cc_library(\n"
@@ -366,6 +366,8 @@ class BuildFileFunctions(object):
               name,
               hdrs=None,
               srcs=None,
+              copts=None,
+              defines=None,
               data=None,
               deps=None,
               tags=None,
@@ -373,6 +375,8 @@ class BuildFileFunctions(object):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
     srcs_block = _convert_srcs_block(srcs)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
     labels_block = _convert_string_list_block("LABELS", tags)
@@ -381,6 +385,8 @@ class BuildFileFunctions(object):
                             f"{name_block}"
                             f"{hdrs_block}"
                             f"{srcs_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
                             f"{data_block}"
                             f"{deps_block}"
                             f"{labels_block}"
@@ -391,12 +397,16 @@ class BuildFileFunctions(object):
                 srcs=None,
                 data=None,
                 deps=None,
+                copts=None,
+                defines=None,
                 linkopts=None,
                 testonly=None,
                 **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
@@ -405,6 +415,8 @@ class BuildFileFunctions(object):
     self.converter.body += (f"iree_cc_binary(\n"
                             f"{name_block}"
                             f"{srcs_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
                             f"{data_block}"
                             f"{deps_block}"
                             f"{testonly_block}"
@@ -412,40 +424,6 @@ class BuildFileFunctions(object):
 
   # Effectively an alias in IREE code.
   iree_cc_binary = cc_binary
-
-  def cc_embed_data(self,
-                    name,
-                    srcs,
-                    cc_file_output,
-                    h_file_output,
-                    testonly=None,
-                    cpp_namespace=None,
-                    strip_prefix=None,
-                    flatten=None,
-                    identifier=None,
-                    **kwargs):
-    if identifier:
-      self._convert_unimplemented_function("cc_embed_data",
-                                           name + " has identifier")
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    cc_file_output_block = _convert_string_arg_block("CC_FILE_OUTPUT",
-                                                     cc_file_output)
-    h_file_output_block = _convert_string_arg_block("H_FILE_OUTPUT",
-                                                    h_file_output)
-    testonly_block = _convert_option_block("TESTONLY", testonly)
-    namespace_block = _convert_string_arg_block("CPP_NAMESPACE", cpp_namespace)
-    flatten_block = _convert_option_block("FLATTEN", flatten)
-
-    self.converter.body += (f"iree_cc_embed_data(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{cc_file_output_block}"
-                            f"{h_file_output_block}"
-                            f"{testonly_block}"
-                            f"{namespace_block}"
-                            f"{flatten_block}"
-                            f"  PUBLIC\n)\n\n")
 
   def c_embed_data(self,
                    name,
@@ -457,9 +435,6 @@ class BuildFileFunctions(object):
                    flatten=None,
                    identifier=None,
                    **kwargs):
-    if identifier:
-      self._convert_unimplemented_function("c_embed_data",
-                                           name + " has identifier")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     c_file_output_block = _convert_string_arg_block("C_FILE_OUTPUT",
@@ -467,6 +442,7 @@ class BuildFileFunctions(object):
     h_file_output_block = _convert_string_arg_block("H_FILE_OUTPUT",
                                                     h_file_output)
     testonly_block = _convert_option_block("TESTONLY", testonly)
+    identifier_block = _convert_string_arg_block("IDENTIFIER", identifier)
     flatten_block = _convert_option_block("FLATTEN", flatten)
 
     self.converter.body += (f"iree_c_embed_data(\n"
@@ -474,6 +450,7 @@ class BuildFileFunctions(object):
                             f"{srcs_block}"
                             f"{c_file_output_block}"
                             f"{h_file_output_block}"
+                            f"{identifier_block}"
                             f"{testonly_block}"
                             f"{flatten_block}"
                             f"  PUBLIC\n)\n\n")
@@ -492,13 +469,11 @@ class BuildFileFunctions(object):
                            src,
                            flags=None,
                            translate_tool=None,
-                           cc_namespace=None,
-                           c_output=None,
+                           c_identifier=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
-    namespace_block = _convert_string_arg_block("CC_NAMESPACE", cc_namespace)
-    c_output_block = _convert_option_block("C_OUTPUT", c_output)
+    c_identifier_block = _convert_string_arg_block("C_IDENTIFIER", c_identifier)
     translate_tool_block = _convert_translate_tool_block(translate_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
     testonly_block = _convert_option_block("TESTONLY", testonly)
@@ -506,8 +481,7 @@ class BuildFileFunctions(object):
     self.converter.body += (f"iree_bytecode_module(\n"
                             f"{name_block}"
                             f"{src_block}"
-                            f"{namespace_block}"
-                            f"{c_output_block}"
+                            f"{c_identifier_block}"
                             f"{translate_tool_block}"
                             f"{flags_block}"
                             f"{testonly_block}"

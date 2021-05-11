@@ -14,14 +14,19 @@
 
 iree_add_all_subdirs()
 
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+
 iree_bytecode_module(
   NAME
     add_dynamic
   SRC
     "add_dynamic.mlir"
-  CC_NAMESPACE
-    "iree::bindings::tflite::testdata"
+  C_IDENTIFIER
+    "iree_tflite_testdata_add_dynamic"
   FLAGS
+    "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=vmla"
@@ -34,9 +39,10 @@ iree_bytecode_module(
     add_multi
   SRC
     "add_multi.mlir"
-  CC_NAMESPACE
-    "iree::bindings::tflite::testdata"
+  C_IDENTIFIER
+    "iree_tflite_testdata_add_multi"
   FLAGS
+    "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=vmla"
@@ -49,9 +55,10 @@ iree_bytecode_module(
     add_static
   SRC
     "add_static.mlir"
-  CC_NAMESPACE
-    "iree::bindings::tflite::testdata"
+  C_IDENTIFIER
+    "iree_tflite_testdata_add_static"
   FLAGS
+    "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=vmla"

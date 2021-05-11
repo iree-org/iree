@@ -5,7 +5,7 @@
 > Note:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;The TensorFlow integrations are currently being
   refactored. The `bazel` build is deprecated. Refer to
-  https://google.github.io/iree/get-started/getting-started-python for a general
+  https://google.github.io/iree/building-from-source/optional-features/ for a general
   overview of how to build and execute the e2e tests.
 
 This is a collection of e2e tests that compile a TensorFlow model with IREE (and
@@ -24,7 +24,7 @@ instructions.
 ## Vulkan Setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
-[this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)),
+[this doc](https://google.github.io/iree/deployment-configurations/gpu-vulkan/)),
 then you can run the manual test targets with
 `--target_backends=tf,iree_vmla,iree_llvmaot` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
@@ -344,7 +344,8 @@ We use our end-to-end TensorFlow integrations tests to generate tested
 compilation and benchmarking artifacts. This allows us to validate that our
 benchmarks are behaving as we expect them to, and to run them using valid inputs
 for each model. An overview of how to run benchmarks on IREE and TFLite can be
-found in [this doc](https://google.github.io/iree/developing-iree/e2e-benchmarking).
+found in
+[this doc](https://github.com/google/iree/blob/main/docs/developers/developing_iree/e2e_benchmarking.md).
 
 ## Debugging Tests
 
