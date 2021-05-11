@@ -224,15 +224,14 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
           rewriter.create<ConstantOp>(loc, rewriter.getZeroAttr(elementType));
       auto filledStaticResult =
           rewriter.create<linalg::FillOp>(loc, staticResult, zero);
-      auto newOp = rewriter.create<linalg::MatmulOp>(
+      auto paddedMatmulOp = rewriter.create<linalg::MatmulOp>(
           loc, resultType, ArrayRef<Value>{paddedLhs, paddedrhs},
           ArrayRef<Value>{filledStaticResult.result()});
-      newOp.getOperation()->setAttr("__internal_linalg_transform__",
-                                    rewriter.getStringAttr("workgroup"));
+      cloneAttributes(matmulOp.getOperation(), paddedMatmulOp.getOperation());
       SmallVector<OpFoldResult> offsets(2, rewriter.getI64IntegerAttr(0));
       SmallVector<OpFoldResult> strides(2, rewriter.getI64IntegerAttr(1));
-      auto subtensorOp = rewriter.replaceOpWithNewOp<SubTensorOp>(
-          matmulOp, newOp.getResults()[0], offsets, sizes, strides);
+      rewriter.replaceOpWithNewOp<SubTensorOp>(
+          matmulOp, paddedMatmulOp.getResults()[0], offsets, sizes, strides);
     }
     return success();
   }
