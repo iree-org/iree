@@ -93,11 +93,13 @@ static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
 static inline float vm_floor_f32(float operand) { return floorf(operand); }
 
 static inline float vm_cast_si32f32(int32_t operand) { return (float)operand; }
-static inline float vm_cast_ui32f32(uint32_t operand) { return (float)operand; }
+static inline float vm_cast_ui32f32(int32_t operand) {
+  return (float)(uint32_t)operand;
+}
 static inline int32_t vm_cast_f32si32(float operand) {
   return (int32_t)roundf(operand);
 }
-static inline uint32_t vm_cast_f32ui32(float operand) {
+static inline int32_t vm_cast_f32ui32(float operand) {
   return (uint32_t)roundf(operand);
 }
 
