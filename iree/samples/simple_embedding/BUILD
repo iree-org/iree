@@ -42,6 +42,7 @@ c_embed_data(
     c_file_output = "simple_embedding_test_llvm_aot_rv64.c",
     flatten = True,
     h_file_output = "simple_embedding_test_llvm_aot_rv64.h",
+    identifier = "iree_samples_simple_embedding_rv64_test_module",
 )
 
 iree_cmake_extra_content(
@@ -117,7 +118,7 @@ cc_binary(
 iree_bytecode_module(
     name = "simple_embedding_test_bytecode_module",
     src = "simple_embedding_test.mlir",
-    c_output = True,
+    c_identifier = "iree_samples_simple_embedding_test_module",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",

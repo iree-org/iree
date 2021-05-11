@@ -243,7 +243,8 @@ iree_bytecode_module(
     bytecode_module_benchmark_module
   SRC
     "bytecode_module_benchmark.mlir"
-  C_OUTPUT
+  C_IDENTIFIER
+    "iree_vm_bytecode_module_benchmark_module"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   TESTONLY
@@ -267,7 +268,8 @@ iree_bytecode_module(
     bytecode_module_size_benchmark_module
   SRC
     "bytecode_module_size_benchmark.mlir"
-  C_OUTPUT
+  C_IDENTIFIER
+    "iree_vm_bytecode_module_size_benchmark_module"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   TESTONLY

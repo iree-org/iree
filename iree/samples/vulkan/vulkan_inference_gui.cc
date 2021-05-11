@@ -235,7 +235,7 @@ extern "C" int iree_main(int argc, char** argv) {
   // Load bytecode module from embedded data.
   IREE_LOG(INFO) << "Loading simple_mul.mlir...";
   const struct iree_file_toc_t* module_file_toc =
-      simple_mul_bytecode_module_c_create();
+      iree_samples_vulkan_simple_mul_bytecode_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{

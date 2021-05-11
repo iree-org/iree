@@ -22,7 +22,7 @@ def iree_bytecode_module(
         src,
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
-        c_output = False,
+        c_identifier = "",
         **kwargs):
     native.genrule(
         name = name,
@@ -45,10 +45,10 @@ def iree_bytecode_module(
     )
 
     # Embed the module for use in C.
-    if c_output:
+    if c_identifier:
         c_embed_data(
             name = "%s_c" % (name),
-            identifier = "%s_c" % (name),
+            identifier = c_identifier,
             srcs = ["%s.vmfb" % (name)],
             c_file_output = "%s_c.c" % (name),
             h_file_output = "%s_c.h" % (name),

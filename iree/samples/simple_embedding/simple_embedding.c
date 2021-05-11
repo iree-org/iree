@@ -53,13 +53,13 @@ iree_status_t Run() {
   // Load bytecode module from the embedded data.
 #if IREE_ARCH_RISCV_64
   const struct iree_file_toc_t* module_file_toc =
-      simple_embedding_test_llvm_aot_rv64_create();
+      iree_samples_simple_embedding_rv64_test_module_create();
 #else
   // Note the setup here only supports native build. The bytecode is not built
   // for the cross-compile execution. The code can be compiled but it will
   // hit runtime error in a cross-compile environment.
   const struct iree_file_toc_t* module_file_toc =
-      simple_embedding_test_bytecode_module_c_create();
+      iree_samples_simple_embedding_test_module_create();
 #endif
 
   iree_vm_module_t* bytecode_module = NULL;
