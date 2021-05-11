@@ -1,0 +1,44 @@
+// Copyright 2021 Nod Labs
+// Copyright 2021 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+#pragma once
+
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Pass/Pass.h"
+
+namespace mlir {
+namespace iree_compiler {
+
+void registerLinalgToROCDLPipeline();
+void registerHLOToROCDLPipeline();
+
+/// Performs the final conversion to ROCDL+LLVM dialect.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
+
+/// Convert Linalg ops to Vector.
+std::unique_ptr<OperationPass<FuncOp>> createVectorizationPass();
+
+/// Perform tiling and distribution to threads.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createTileAndDistributeToThreads();
+
+std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
+
+/// Populates passes needed to lower a XLA HLO op to ROCDL dialect via the
+/// structured ops path. The pass manager `pm` in here should operate on the
+/// module within the IREE::HAL::ExecutableOp.
+void buildROCDLTransformPassPipeline(OpPassManager &pm);
+
+}  // namespace iree_compiler
+}  // namespace mlir

@@ -88,6 +88,7 @@ endif()
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
+option(IREE_BUILD_EXPERIMENTAL_ROCM_BACKEND "Builds the experimental ROCM backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -486,6 +487,10 @@ endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS})
   add_subdirectory(experimental/bindings/java)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL_ROCM_BACKEND})
+  add_subdirectory(experimental/rocm)
 endif()
 
 if(${IREE_ENABLE_TENSORFLOW})
