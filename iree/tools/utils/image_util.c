@@ -26,6 +26,7 @@ iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
     float* out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
   if (range_length != 2) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "range defined as 2-element [min, max] array.");
   }
@@ -45,8 +46,10 @@ iree_status_t iree_tools_utils_load_pixel_data(
     const iree_string_view_t filename, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     uint8_t** out_pixel_data, iree_host_size_t* out_buffer_length) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   int img_dims[3];
   if (stbi_info(filename.data, img_dims, &(img_dims[1]), &(img_dims[2])) == 0) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_NOT_FOUND, "can't load image %.*s",
                             (int)filename.size, filename.data);
   }
@@ -56,6 +59,7 @@ iree_status_t iree_tools_utils_load_pixel_data(
     char element_type_str[16];
     IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
         element_type, sizeof(element_type_str), element_type_str, NULL));
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "element type %s not supported", element_type_str);
   }
@@ -63,6 +67,7 @@ iree_status_t iree_tools_utils_load_pixel_data(
     case 2: {  // Assume tensor <height x width>
       if (img_dims[2] != 1 || (shape[0] != img_dims[1]) ||
           (shape[1] != img_dims[0])) {
+        IREE_TRACE_ZONE_END(z0);
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "image size: %dx%dx%d, expected: %dx%d",
                                 img_dims[0], img_dims[1], img_dims[2], shape[1],
@@ -73,6 +78,7 @@ iree_status_t iree_tools_utils_load_pixel_data(
     case 3: {  // Assume tensor <height x width x channel>
       if (shape[0] != img_dims[1] || shape[1] != img_dims[0] ||
           shape[2] != img_dims[2]) {
+        IREE_TRACE_ZONE_END(z0);
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "image size: %dx%dx%d, expected: %dx%dx%d",
                                 img_dims[0], img_dims[1], img_dims[2], shape[1],
@@ -83,6 +89,7 @@ iree_status_t iree_tools_utils_load_pixel_data(
     case 4: {  // Assume tensor <batch x height x width x channel>
       if (shape[1] != img_dims[1] || shape[2] != img_dims[0] ||
           shape[3] != img_dims[2]) {
+        IREE_TRACE_ZONE_END(z0);
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "image size: %dx%dx%d, expected: %dx%dx%d",
                                 img_dims[0], img_dims[1], img_dims[2], shape[2],
@@ -91,6 +98,7 @@ iree_status_t iree_tools_utils_load_pixel_data(
       break;
     }
     default:
+      IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "Input buffer shape rank %lu not supported",
                               shape_rank);
@@ -100,11 +108,13 @@ iree_status_t iree_tools_utils_load_pixel_data(
   *out_pixel_data = stbi_load(filename.data, img_dims, &(img_dims[1]),
                               &(img_dims[2]), req_ch);
   if (*out_pixel_data == NULL) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_NOT_FOUND, "can't load image %.*s",
                             (int)filename.size, filename.data);
   }
   *out_buffer_length =
       img_dims[0] * img_dims[1] * (img_dims[2] > 3 ? 3 : img_dims[2]);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -112,9 +122,11 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
     const iree_string_view_t filename, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_hal_allocator_t* allocator, iree_hal_buffer_view_t** out_buffer_view) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   *out_buffer_view = NULL;
   if (element_type != IREE_HAL_ELEMENT_TYPE_SINT_8 &&
       element_type != IREE_HAL_ELEMENT_TYPE_UINT_8) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "element type should be i8 or u8");
   }
@@ -125,6 +137,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
   result = iree_tools_utils_load_pixel_data(
       filename, shape, shape_rank, element_type, &pixel_data, &buffer_length);
   if (!iree_status_is_ok(result)) {
+    IREE_TRACE_ZONE_END(z0);
     return result;
   }
 
@@ -138,6 +151,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
       iree_allocator_null(), out_buffer_view);
 
   stbi_image_free(pixel_data);
+  IREE_TRACE_ZONE_END(z0);
   return result;
 }
 
@@ -146,9 +160,10 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_hal_allocator_t* allocator, const float* input_range,
     iree_host_size_t range_length, iree_hal_buffer_view_t** out_buffer_view) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   *out_buffer_view = NULL;
-
   if (element_type != IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "element type should be f32");
   }
@@ -159,6 +174,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
   result = iree_tools_utils_load_pixel_data(
       filename, shape, shape_rank, element_type, &pixel_data, &buffer_length);
   if (!iree_status_is_ok(result)) {
+    IREE_TRACE_ZONE_END(z0);
     return result;
   }
 
@@ -170,6 +186,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
       IREE_HAL_BUFFER_USAGE_ALL, element_byte * buffer_length, &buffer);
   if (!iree_status_is_ok(result)) {
     stbi_image_free((void*)pixel_data);
+    IREE_TRACE_ZONE_END(z0);
     return result;
   }
   // Need to normalize to the expected input range.
@@ -180,6 +197,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
   if (!iree_status_is_ok(result)) {
     iree_hal_buffer_release(buffer);
     stbi_image_free((void*)pixel_data);
+    IREE_TRACE_ZONE_END(z0);
     return result;
   }
   result = iree_tools_utils_pixel_rescaled_to_buffer(
@@ -188,6 +206,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
   if (!iree_status_is_ok(result)) {
     iree_hal_buffer_release(buffer);
     stbi_image_free((void*)pixel_data);
+    IREE_TRACE_ZONE_END(z0);
     return result;
   }
   iree_hal_buffer_unmap_range(&mapped_memory);
@@ -196,5 +215,6 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
 
   iree_hal_buffer_release(buffer);
   stbi_image_free(pixel_data);
+  IREE_TRACE_ZONE_END(z0);
   return result;
 }
