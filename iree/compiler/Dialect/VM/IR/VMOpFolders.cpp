@@ -1324,7 +1324,7 @@ OpFoldResult CastSI32F32Op::fold(ArrayRef<Attribute> operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float32Type::get(getContext()), operands, [&](const APInt &a) {
         APFloat b = APFloat(0.0f);
-        b.convertFromAPInt(a, /*signed=*/true, APFloat::rmTowardZero);
+        b.convertFromAPInt(a, /*IsSigned=*/true, APFloat::rmTowardZero);
         return b;
       });
 }
@@ -1333,7 +1333,7 @@ OpFoldResult CastUI32F32Op::fold(ArrayRef<Attribute> operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float32Type::get(getContext()), operands, [&](const APInt &a) {
         APFloat b = APFloat(0.0f);
-        b.convertFromAPInt(a, /*signed=*/false, APFloat::rmTowardZero);
+        b.convertFromAPInt(a, /*IsSigned=*/false, APFloat::rmTowardZero);
         return b;
       });
 }
