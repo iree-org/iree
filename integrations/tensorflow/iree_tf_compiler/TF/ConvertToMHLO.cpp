@@ -92,6 +92,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<shape::ShapeDialect>();
+    target.addLegalDialect<tensor::TensorDialect>();
     target.addLegalOp<mlir::CallOp>();
     target.addLegalOp<mlir::tensor::CastOp>();
 
