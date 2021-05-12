@@ -107,3 +107,77 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 // CHECK-COUNT-8:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //         CHECK:   llvm.br
 // CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+
+// -----
+
+hal.executable @conv2d_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable.target @cuda, filter="cuda" {
+  hal.interface @io {
+    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.entry_point @conv2d_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1x4x4x2xf32>, !flow.dispatch.tensor<readonly:3x2x2x1xf32>, !flow.dispatch.tensor<writeonly:1x2x3x1xf32>) -> ()}
+  module  {
+    func @conv2d_dispatch_0() {
+      %c0 = constant 0 : index
+      %cst = constant 0.000000e+00 : f32
+      %c2 = constant 2 : index
+      %c3 = constant 3 : index
+      %c1 = constant 1 : index
+      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x4x4x2xf32>
+      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x2x2x1xf32>
+      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x2x3x1xf32>
+      %workgroup_size_x = hal.interface.workgroup.size[0] : index
+      %workgroup_size_y = hal.interface.workgroup.size[1] : index
+      %workgroup_size_z = hal.interface.workgroup.size[2] : index
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_count_x = hal.interface.workgroup.count[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %workgroup_count_y = hal.interface.workgroup.count[1] : index
+      %workgroup_id_z = hal.interface.workgroup.id[2] : index
+      %workgroup_count_z = hal.interface.workgroup.count[2] : index
+      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_z, %workgroup_size_z]
+      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_z, %workgroup_size_z]
+      scf.for %arg0 = %3 to %c2 step %4 {
+        %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+        %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+        scf.for %arg1 = %5 to %c3 step %6 {
+          %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+          %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+          scf.for %arg2 = %7 to %c1 step %8 {
+            %9 = affine.min affine_map<(d0)[s0] -> (s0 + 2, -d0 + 4)>(%arg0)[%workgroup_size_z]
+            %10 = affine.min affine_map<(d0)[s0] -> (s0 + 1, -d0 + 4)>(%arg1)[%workgroup_size_y]
+            %11 = flow.dispatch.tensor.load %0, offsets = [0, %arg0, %arg1, 0], sizes = [1, %9, %10, 2], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x4x4x2xf32> -> tensor<1x?x?x2xf32>
+            %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1)>(%arg2)[%workgroup_size_x]
+            %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 2, 2, %12], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x2x2x1xf32> -> tensor<3x2x2x?xf32>
+            %14 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 2)>(%arg0)[%workgroup_size_z]
+            %15 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 3)>(%arg1)[%workgroup_size_y]
+            %16 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1)>(%arg2)[%workgroup_size_x]
+            %17 = affine.min affine_map<(d0)[s0] -> (-d0 + 2, s0)>(%arg0)[%workgroup_size_z]
+            %18 = affine.min affine_map<(d0)[s0] -> (-d0 + 3, s0)>(%arg1)[%workgroup_size_y]
+            %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 1, s0)>(%arg2)[%workgroup_size_x]
+            %20 = linalg.init_tensor [1, %17, %18, %19] : tensor<1x?x?x?xf32>
+            %21 = linalg.fill(%20, %cst) : tensor<1x?x?x?xf32>, f32 -> tensor<1x?x?x?xf32>
+            %22 = linalg.conv_2d_input_nhwc_filter_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%11, %13 : tensor<1x?x?x2xf32>, tensor<3x2x2x?xf32>) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+            flow.dispatch.tensor.store %22, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %14, %15, %16], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x2x3x1xf32>
+          }
+        }
+      }
+      return
+    }
+    hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    }
+  }
+}
+}
+
+//   CHECK-LABEL: hal.executable @conv2d_dispatch_0
+//         CHECK:   hal.executable.target @cuda, filter="cuda" {
+// CHECK-COUNT-3:   llvm.load %{{.*}} : !llvm.ptr<f32>
+//         CHECK:   lvm.fmul %{{.*}}, %{{.*}}  : f32
+//         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : f32
+//         CHECK:   llvm.store {{.*}} : !llvm.ptr<f32>
