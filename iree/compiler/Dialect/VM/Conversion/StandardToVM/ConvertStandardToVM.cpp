@@ -154,15 +154,15 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   }
 };
 
-class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
-  using OpConversionPattern::OpConversionPattern;
+struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
+  ConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  TypeConverter &typeConverter;
 
   LogicalResult matchAndRewrite(
       ConstantOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    // TODO(#2878): use getTypeConverter() when we pass it upon creation.
-    IREE::VM::TypeConverter typeConverter(
-        IREE::VM::getTargetOptionsFromFlags());
     auto targetType = typeConverter.convertType(srcOp.getType());
     if (targetType.isa<IntegerType>()) {
       auto integerAttr = srcOp.getValue().dyn_cast<IntegerAttr>();
@@ -215,6 +215,8 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
           return srcOp.emitRemark()
                  << "unsupported const floating-point bit width for dialect";
       }
+    } else {
+      return rewriter.notifyMatchFailure(srcOp, "unsupported type");
     }
     return success();
   }
@@ -382,7 +384,7 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
             srcOp, srcAdaptor.operand().getType(), srcAdaptor.operand());
         break;
       default:
-        llvm_unreachable("invalid target type");
+        return rewriter.notifyMatchFailure(srcOp, "unsupported type");
     }
     return success();
   }
@@ -408,7 +410,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
             srcAdaptor.rhs());
         break;
       default:
-        llvm_unreachable("invalid target type");
+        return rewriter.notifyMatchFailure(srcOp, "unsupported type");
     }
     return success();
   }
@@ -452,6 +454,133 @@ class CastingOpConversion : public OpConversionPattern<StdOp> {
       StdOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(srcOp, operands);
+    return success();
+  }
+};
+
+class IndexCastOpConversion : public OpConversionPattern<IndexCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IndexCastOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    IndexCastOpAdaptor operands(rawOperands);
+    auto srcType = operands.in().getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType == dstType) {
+      rewriter.replaceOp(srcOp, rawOperands);
+    } else if (srcType.getIntOrFloatBitWidth() <
+               dstType.getIntOrFloatBitWidth()) {
+      rewriter.replaceOpWithNewOp<ZeroExtendIOp>(srcOp, dstType, operands.in());
+    } else {
+      rewriter.replaceOpWithNewOp<TruncateIOp>(srcOp, dstType, operands.in());
+    }
+    return success();
+  }
+};
+
+class ZeroExtendIOpConversion : public OpConversionPattern<ZeroExtendIOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      ZeroExtendIOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    ZeroExtendIOpAdaptor operands(rawOperands);
+    auto srcType = srcOp.value().getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType.isInteger(1) && dstType.isInteger(32)) {
+      // This may not be needed but ensures that the input was treated as a
+      // single bit.
+      // NOTE: this may not be required - if we know that the i1 is never able
+      // to have more than bit 0 manipulated then this is wasted work.
+      rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
+          srcOp, dstType, operands.value(),
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+    } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32UOp>(srcOp, dstType,
+                                                         operands.value());
+    } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32UOp>(srcOp, dstType,
+                                                          operands.value());
+    } else if (srcType.isInteger(32) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64UOp>(srcOp, dstType,
+                                                          operands.value());
+    } else {
+      // TODO(benvanik): we should be building a sequence of extensions for
+      // things like i8 -> i64.
+      return rewriter.notifyMatchFailure(srcOp, "unsupported zero extension");
+    }
+    return success();
+  }
+};
+
+class SignExtendIOpConversion : public OpConversionPattern<SignExtendIOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      SignExtendIOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    SignExtendIOpAdaptor operands(rawOperands);
+    auto srcType = srcOp.value().getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType.isInteger(8) && dstType.isInteger(32)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32SOp>(srcOp, dstType,
+                                                         operands.value());
+    } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32SOp>(srcOp, dstType,
+                                                          operands.value());
+    } else if (srcType.isInteger(32) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64SOp>(srcOp, dstType,
+                                                          operands.value());
+    } else {
+      // TODO(benvanik): we should be building a sequence of extensions for
+      // things like i8 -> i64.
+      return rewriter.notifyMatchFailure(srcOp, "unsupported sign extension");
+    }
+    return success();
+  }
+};
+
+class TruncateIOpConversion : public OpConversionPattern<TruncateIOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      TruncateIOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    TruncateIOpAdaptor operands(rawOperands);
+    auto srcType = srcOp.value().getType();
+    auto resultType = srcOp.getResult().getType();
+    auto dstType = getTypeConverter()->convertType(resultType);
+    if (resultType.isInteger(1)) {
+      // i1 is represented as i32, so just mask off the bit and truncate as
+      // normal. Note that if we started as i64 we need to first get that into
+      // an i32 that we can work with.
+      auto value = operands.value();
+      if (srcType.isInteger(64)) {
+        value = rewriter.createOrFold<IREE::VM::TruncI64I32Op>(srcOp.getLoc(),
+                                                               dstType, value);
+      }
+      rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
+          srcOp, dstType, value,
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+    } else if (srcType.isInteger(32) && resultType.isInteger(8)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::TruncI32I8Op>(srcOp, dstType,
+                                                          operands.value());
+    } else if (srcType.isInteger(32) && resultType.isInteger(16)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::TruncI32I16Op>(srcOp, dstType,
+                                                           operands.value());
+    } else if (srcType.isInteger(64) && resultType.isInteger(8)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::TruncI64I8Op>(srcOp, dstType,
+                                                          operands.value());
+    } else if (srcType.isInteger(64) && resultType.isInteger(16)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::TruncI64I16Op>(srcOp, dstType,
+                                                           operands.value());
+    } else if (srcType.isInteger(64) && resultType.isInteger(32)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::TruncI64I32Op>(srcOp, dstType,
+                                                           operands.value());
+    } else {
+      return rewriter.notifyMatchFailure(srcOp, "unsupported truncation");
+    }
     return success();
   }
 };
@@ -633,13 +762,18 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                   OwningRewritePatternList &patterns) {
   patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
                   CmpFOpConversion, CondBranchOpConversion, ModuleOpConversion,
-                  FuncOpConversion, ReturnOpConversion,
-                  CastingOpConversion<IndexCastOp>,
-                  CastingOpConversion<TruncateIOp>,
-                  CastingOpConversion<ZeroExtendIOp>, SelectOpConversion>(
+                  FuncOpConversion, ReturnOpConversion, SelectOpConversion>(
       typeConverter, context);
-  // TODO(#2878): pass typeConverter here.
-  patterns.insert<ConstantOpConversion>(context);
+
+  // TODO(#2878): figure out how to pass the type converter in a supported way.
+  // Right now if we pass the type converter as the first argument - triggering
+  // the ConversionPattern stuff - it'll do weird things.
+  patterns.insert<ConstantOpConversion>(context, typeConverter);
+
+  patterns.insert<CastingOpConversion<UnrealizedConversionCastOp>,
+                  IndexCastOpConversion, ZeroExtendIOpConversion,
+                  SignExtendIOpConversion, TruncateIOpConversion>(typeConverter,
+                                                                  context);
 
   // Integer arithmetic ops.
   patterns.insert<
@@ -664,12 +798,20 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                    IREE::VM::XorI64Op>>(typeConverter, context);
 
   // Floating-point arithmetic ops.
-  patterns.insert<BinaryArithmeticOpConversion<AddFOp, IREE::VM::AddF32Op,
+  patterns.insert<UnaryArithmeticOpConversion<AbsFOp, IREE::VM::AbsF32Op,
+                                              IREE::VM::AbsF64Op>,
+                  BinaryArithmeticOpConversion<AddFOp, IREE::VM::AddF32Op,
                                                IREE::VM::AddF64Op>,
+                  UnaryArithmeticOpConversion<CeilFOp, IREE::VM::CeilF32Op,
+                                              IREE::VM::CeilF64Op>,
+                  UnaryArithmeticOpConversion<FloorFOp, IREE::VM::FloorF32Op,
+                                              IREE::VM::FloorF64Op>,
                   BinaryArithmeticOpConversion<DivFOp, IREE::VM::DivF32Op,
                                                IREE::VM::DivF64Op>,
                   BinaryArithmeticOpConversion<MulFOp, IREE::VM::MulF32Op,
                                                IREE::VM::MulF64Op>,
+                  UnaryArithmeticOpConversion<NegFOp, IREE::VM::NegF32Op,
+                                              IREE::VM::NegF64Op>,
                   BinaryArithmeticOpConversion<RemFOp, IREE::VM::RemF32Op,
                                                IREE::VM::RemF64Op>,
                   BinaryArithmeticOpConversion<SubFOp, IREE::VM::SubF32Op,
@@ -677,7 +819,7 @@ void populateStandardToVMPatterns(MLIRContext *context,
       typeConverter, context);
 
   // Floating-point conversion ops.
-  patterns.insert<SIToFPOpConversion, UIToFPOpConversion, FPToUIOpConversion,
+  patterns.insert<SIToFPOpConversion, UIToFPOpConversion, FPToSIOpConversion,
                   FPToUIOpConversion>(typeConverter, context);
 
   // Shift ops.
