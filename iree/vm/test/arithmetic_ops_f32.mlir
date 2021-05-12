@@ -60,6 +60,20 @@ vm.module @arithmetic_ops_f32 {
     vm.return
   }
 
+  vm.export @test_fma_f32
+  vm.func @test_fma_f32() {
+    %c2 = vm.const.f32 2.0 : f32
+    %c2dno = iree.do_not_optimize(%c2) : f32
+    %c3 = vm.const.f32 3.0 : f32
+    %c3dno = iree.do_not_optimize(%c3) : f32
+    %c5 = vm.const.f32 5.0 : f32
+    %c5dno = iree.do_not_optimize(%c5) : f32
+    %v = vm.fma.f32 %c2dno, %c3dno, %c5dno : f32
+    %c11 = vm.const.f32 11.0 : f32
+    vm.check.eq %v, %c11, "2.0*3.0+5.0=11.0" : f32
+    vm.return
+  }
+
   vm.export @test_abs_f32
   vm.func @test_abs_f32() {
     %c1 = vm.const.f32 -1.0 : f32

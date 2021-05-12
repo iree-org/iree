@@ -592,6 +592,57 @@ static Attribute constFoldBinaryOp(ArrayRef<Attribute> operands,
   return {};
 }
 
+/// Performs const folding `calculate` with element-wise behavior on the three
+/// attributes in `operands` and returns the result if possible.
+template <class AttrElementT,
+          class ElementValueT = typename AttrElementT::ValueType,
+          class CalculationT =
+              std::function<ElementValueT(ElementValueT, ElementValueT)>>
+static Attribute constFoldTernaryOp(ArrayRef<Attribute> operands,
+                                    const CalculationT &calculate) {
+  assert(operands.size() == 3 && "ternary op takes two operands");
+  if (auto a = operands[0].dyn_cast_or_null<AttrElementT>()) {
+    auto b = operands[1].dyn_cast_or_null<AttrElementT>();
+    auto c = operands[2].dyn_cast_or_null<AttrElementT>();
+    if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
+      return {};
+    }
+    return AttrElementT::get(
+        a.getType(), calculate(a.getValue(), b.getValue(), c.getValue()));
+  } else if (auto a = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+    // TODO(benvanik): handle splat/otherwise.
+    auto b = operands[1].dyn_cast_or_null<SplatElementsAttr>();
+    auto c = operands[2].dyn_cast_or_null<SplatElementsAttr>();
+    if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
+      return {};
+    }
+    auto elementResult = constFoldTernaryOp<AttrElementT>(
+        {a.getSplatValue(), b.getSplatValue(), c.getSplatValue()}, calculate);
+    if (!elementResult) return {};
+    return DenseElementsAttr::get(a.getType(), elementResult);
+  } else if (auto a = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+    auto b = operands[1].dyn_cast_or_null<ElementsAttr>();
+    auto c = operands[2].dyn_cast_or_null<ElementsAttr>();
+    if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
+      return {};
+    }
+    auto aIt = a.getValues<AttrElementT>().begin();
+    auto bIt = b.getValues<AttrElementT>().begin();
+    auto cIt = c.getValues<AttrElementT>().begin();
+    SmallVector<Attribute, 4> resultAttrs(a.getNumElements());
+    for (int64_t i = 0; i < a.getNumElements(); ++i) {
+      resultAttrs[i] =
+          constFoldTernaryOp<AttrElementT>({*aIt, *bIt, *cIt}, calculate);
+      if (!resultAttrs[i]) return {};
+      ++aIt;
+      ++bIt;
+      ++cIt;
+    }
+    return DenseElementsAttr::get(a.getType(), resultAttrs);
+  }
+  return {};
+}
+
 template <class AttrElementT, typename ADD, typename SUB,
           class ElementValueT = typename AttrElementT::ValueType>
 static OpFoldResult foldAddOp(ADD op, ArrayRef<Attribute> operands) {
@@ -804,6 +855,64 @@ OpFoldResult RemI64UOp::fold(ArrayRef<Attribute> operands) {
   return foldRemUOp(*this, operands);
 }
 
+template <typename T>
+static OpFoldResult foldFMAOp(T op, ArrayRef<Attribute> operands) {
+  // a * b + c
+  if (matchPattern(op.a(), m_Zero()) || matchPattern(op.b(), m_Zero())) {
+    return op.c();
+  }
+  return constFoldTernaryOp<IntegerAttr>(
+      operands, [](const APInt &a, const APInt &b, const APInt &c) {
+        return APInt(a.getBitWidth(),
+                     a.getSExtValue() * b.getSExtValue() + c.getSExtValue());
+      });
+}
+
+template <typename FMAOp, typename MulOp, typename AddOp>
+struct CanonicalizeFMA final : public OpRewritePattern<FMAOp> {
+  using OpRewritePattern<FMAOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(FMAOp fmaOp,
+                                PatternRewriter &rewriter) const override {
+    // a * b + c
+    if (matchPattern(fmaOp.a(), m_One())) {
+      // 1 * b + c = b + c
+      rewriter.replaceOpWithNewOp<AddOp>(fmaOp, fmaOp.getType(), fmaOp.b(),
+                                         fmaOp.c());
+      return success();
+    } else if (matchPattern(fmaOp.b(), m_One())) {
+      // a * 1 + c = a + c
+      rewriter.replaceOpWithNewOp<AddOp>(fmaOp, fmaOp.getType(), fmaOp.a(),
+                                         fmaOp.c());
+      return success();
+    } else if (matchPattern(fmaOp.c(), m_Zero())) {
+      // a * b + 0 = a * b
+      rewriter.replaceOpWithNewOp<MulOp>(fmaOp, fmaOp.getType(), fmaOp.a(),
+                                         fmaOp.b());
+      return success();
+    }
+    return failure();
+  }
+};
+
+OpFoldResult FMAI32Op::fold(ArrayRef<Attribute> operands) {
+  return foldFMAOp(*this, operands);
+}
+
+OpFoldResult FMAI64Op::fold(ArrayRef<Attribute> operands) {
+  return foldFMAOp(*this, operands);
+}
+
+void FMAI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                           MLIRContext *context) {
+  results.insert<CanonicalizeFMA<FMAI32Op, MulI32Op, AddI32Op>>(context);
+}
+
+void FMAI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                           MLIRContext *context) {
+  results.insert<CanonicalizeFMA<FMAI64Op, MulI64Op, AddI64Op>>(context);
+}
+
 //===----------------------------------------------------------------------===//
 // Floating-point arithmetic
 //===----------------------------------------------------------------------===//
@@ -899,6 +1008,38 @@ OpFoldResult RemF32Op::fold(ArrayRef<Attribute> operands) {
 
 OpFoldResult RemF64Op::fold(ArrayRef<Attribute> operands) {
   return foldRemFOp(*this, operands);
+}
+
+template <typename T>
+static OpFoldResult foldFMAFOp(T op, ArrayRef<Attribute> operands) {
+  // a * b + c
+  if (matchPattern(op.a(), m_Zero()) || matchPattern(op.b(), m_Zero())) {
+    return op.c();
+  }
+  return constFoldTernaryOp<FloatAttr>(
+      operands, [](const APFloat &a, const APFloat &b, const APFloat &c) {
+        APFloat d = a;
+        d.fusedMultiplyAdd(b, c, APFloat::rmTowardZero);
+        return d;
+      });
+}
+
+OpFoldResult FMAF32Op::fold(ArrayRef<Attribute> operands) {
+  return foldFMAFOp(*this, operands);
+}
+
+OpFoldResult FMAF64Op::fold(ArrayRef<Attribute> operands) {
+  return foldFMAFOp(*this, operands);
+}
+
+void FMAF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                           MLIRContext *context) {
+  results.insert<CanonicalizeFMA<FMAF32Op, MulF32Op, AddF32Op>>(context);
+}
+
+void FMAF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                           MLIRContext *context) {
+  results.insert<CanonicalizeFMA<FMAF64Op, MulF64Op, AddF64Op>>(context);
 }
 
 OpFoldResult AbsF32Op::fold(ArrayRef<Attribute> operands) {

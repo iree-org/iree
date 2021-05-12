@@ -1985,6 +1985,20 @@ def VM_RemI64UOp :
   let hasFolder = 1;
 }
 
+def VM_FMAI32Op :
+    VM_TernaryArithmeticOp<I32, "fma.i32", VM_OPC_FMAI32> {
+  let summary = [{integer fused-multiply add operation (a*b+c)}];
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def VM_FMAI64Op :
+    VM_TernaryArithmeticOp<I64, "fma.i64", VM_OPC_FMAI64, [VM_ExtI64]> {
+  let summary = [{integer fused-multiply add operation (a*b+c)}];
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Floating-point arithmetic
 //===----------------------------------------------------------------------===//
@@ -2059,6 +2073,20 @@ def VM_RemF64Op :
                           [VM_ExtF64]> {
   let summary = [{floating point remainder operation}];
   let hasFolder = 1;
+}
+
+def VM_FMAF32Op :
+    VM_TernaryArithmeticOp<F32, "fma.f32", VM_OPC_FMAF32, [VM_ExtF32]> {
+  let summary = [{floating point fused multiply-add operation (a*b+c)}];
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def VM_FMAF64Op :
+    VM_TernaryArithmeticOp<F64, "fma.f64", VM_OPC_FMAF64, [VM_ExtF64]> {
+  let summary = [{floating point fused multiply-add operation (a*b+c)}];
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_AbsF32Op :

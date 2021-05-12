@@ -431,3 +431,36 @@ vm.module @shr_i32_u_folds {
     vm.return %0 : i32
   }
 }
+
+// -----
+
+// CHECK-LABEL: @fma_i32_folds
+vm.module @fma_i32_folds {
+  // CHECK-LABEL: @fma_i32_0_b_c
+  vm.func @fma_i32_0_b_c(%b: i32, %c: i32) -> i32 {
+    %c0 = vm.const.i32.zero : i32
+    %d = vm.fma.i32 %c0, %b, %c : i32
+    vm.return %d : i32
+  }
+
+  // CHECK-LABEL: @fma_i32_1_b_c
+  vm.func @fma_i32_1_b_c(%b: i32, %c: i32) -> i32 {
+    %c1 = vm.const.i32 1 : i32
+    %d = vm.fma.i32 %c1, %b, %c : i32
+    vm.return %d : i32
+  }
+
+  // CHECK-LABEL: @fma_i32_a_1_c
+  vm.func @fma_i32_a_1_c(%a: i32, %c: i32) -> i32 {
+    %c1 = vm.const.i32 1 : i32
+    %d = vm.fma.i32 %a, %c1, %c : i32
+    vm.return %d : i32
+  }
+
+  // CHECK-LABEL: @fma_i32_a_b_0
+  vm.func @fma_i32_a_b_0(%a: i32, %b: i32) -> i32 {
+    %c0 = vm.const.i32.zero : i32
+    %d = vm.fma.i32 %a, %b, %c0 : i32
+    vm.return %d : i32
+  }
+}

@@ -414,6 +414,15 @@ static const int kRegSize = sizeof(uint16_t);
     *result = op_func(lhs, rhs);                      \
   });
 
+#define DISPATCH_OP_CORE_TERNARY_I32(op_name, op_func) \
+  DISPATCH_OP(CORE, op_name, {                         \
+    int32_t a = VM_DecOperandRegI32("a");              \
+    int32_t b = VM_DecOperandRegI32("b");              \
+    int32_t c = VM_DecOperandRegI32("c");              \
+    int32_t* result = VM_DecResultRegI32("result");    \
+    *result = op_func(a, b, c);                        \
+  });
+
 #define DISPATCH_OP_EXT_I64_UNARY_I64(op_name, op_func) \
   DISPATCH_OP(EXT_I64, op_name, {                       \
     int64_t operand = VM_DecOperandRegI64("operand");   \
@@ -427,6 +436,15 @@ static const int kRegSize = sizeof(uint16_t);
     int64_t rhs = VM_DecOperandRegI64("rhs");            \
     int64_t* result = VM_DecResultRegI64("result");      \
     *result = op_func(lhs, rhs);                         \
+  });
+
+#define DISPATCH_OP_EXT_I64_TERNARY_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                         \
+    int64_t a = VM_DecOperandRegI64("a");                 \
+    int64_t b = VM_DecOperandRegI64("b");                 \
+    int64_t c = VM_DecOperandRegI64("c");                 \
+    int64_t* result = VM_DecResultRegI64("result");       \
+    *result = op_func(a, b, c);                           \
   });
 
 #define DISPATCH_OP_EXT_F32_UNARY_F32(op_name, op_func) \
@@ -444,6 +462,15 @@ static const int kRegSize = sizeof(uint16_t);
     *result = op_func(lhs, rhs);                         \
   });
 
+#define DISPATCH_OP_EXT_F32_TERNARY_F32(op_name, op_func) \
+  DISPATCH_OP(EXT_F32, op_name, {                         \
+    float a = VM_DecOperandRegF32("a");                   \
+    float b = VM_DecOperandRegF32("b");                   \
+    float c = VM_DecOperandRegF32("c");                   \
+    float* result = VM_DecResultRegF32("result");         \
+    *result = op_func(a, b, c);                           \
+  });
+
 #define DISPATCH_OP_EXT_F64_UNARY_F64(op_name, op_func) \
   DISPATCH_OP(EXT_F64, op_name, {                       \
     double operand = VM_DecOperandRegF64("operand");    \
@@ -457,6 +484,15 @@ static const int kRegSize = sizeof(uint16_t);
     double rhs = VM_DecOperandRegF64("rhs");             \
     double* result = VM_DecResultRegF64("result");       \
     *result = op_func(lhs, rhs);                         \
+  });
+
+#define DISPATCH_OP_EXT_F64_TERNARY_F64(op_name, op_func) \
+  DISPATCH_OP(EXT_F64, op_name, {                         \
+    double a = VM_DecOperandRegF64("a");                  \
+    double b = VM_DecOperandRegF64("b");                  \
+    double c = VM_DecOperandRegF64("c");                  \
+    double* result = VM_DecResultRegF64("result");        \
+    *result = op_func(a, b, c);                           \
   });
 
 #endif  // IREE_VM_BYTECODE_DISPATCH_UTIL_H_
