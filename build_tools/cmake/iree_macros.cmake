@@ -110,7 +110,10 @@ endfunction()
 #
 # Paramters:
 # - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
-# - EXECUTABLE: the executable to get its path.
+# - EXECUTABLE: the executable to get its path. Note that this needs to be the
+#     name of the executable target when not cross compiling and the basename of
+#     the binary when importing a binary from a host build. Thus this should be
+#     the global unqualified name of the binary, not the fully-specified name.
 function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
   if (NOT CMAKE_CROSSCOMPILING OR TARGET "${EXECUTABLE}")
     # We can either expect the target to be defined as part of this CMake
