@@ -22,6 +22,7 @@ cc_library(
     name = "TF",
     srcs = [
         "ConvertToMHLO.cpp",
+        "EmitDefaultIREEABI.cpp",
         "FlattenTuplesInCFG.cpp",
         "LowerExportedFunctions.cpp",
         "LowerGlobalTensors.cpp",

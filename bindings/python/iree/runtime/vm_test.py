@@ -85,6 +85,32 @@ class VmTest(absltest.TestCase):
     logging.info("variant_list: %s", l)
     self.assertEqual(l.size, 0)
 
+  def test_variant_list_buffers(self):
+    ET = iree.runtime.HalElementType
+    for dt, et in ((np.int8, ET.SINT_8), (np.int16, ET.SINT_16),
+                   (np.int32, ET.SINT_32), (np.int64, ET.SINT_64),
+                   (np.uint8, ET.UINT_8), (np.uint16, ET.UINT_16),
+                   (np.uint32, ET.UINT_32), (np.uint64, ET.UINT_64),
+                   (np.float32, ET.FLOAT_32), (np.float64, ET.FLOAT_64)):
+      # TODO: Unimplemented: (np.float16, ET.FLOAT_16)
+      lst = iree.runtime.VmVariantList(5)
+      ary1 = np.asarray([1, 2, 3, 4], dtype=dt)
+      lst.push_buffer_view(self.device, ary1, et)
+      ary2 = lst.get_as_ndarray(0)
+      np.testing.assert_array_equal(ary1, ary2)
+      with self.assertRaises(IndexError):
+        lst.get_as_ndarray(1)
+
+  def test_variant_list_list(self):
+    lst1 = iree.runtime.VmVariantList(5)
+    lst2 = iree.runtime.VmVariantList(5)
+    lst1.push_list(lst2)
+    self.assertEqual("<VmVariantList(1): [List[]]>", str(lst1))
+    lstout = lst1.get_as_list(0)
+    self.assertEqual("<VmVariantList(0): []>", str(lstout))
+    with self.assertRaises(IndexError):
+      lst1.get_as_list(1)
+
   def test_context_id(self):
     instance = iree.runtime.VmInstance()
     context1 = iree.runtime.VmContext(instance)
