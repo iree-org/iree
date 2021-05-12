@@ -722,6 +722,26 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<ConstOpConversion<IREE::VM::ConstF32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstF32ZeroOp>>(context);
 
+  // ExtF32: Comparison ops
+  patterns.insert<CallOpConversion<IREE::VM::CmpEQF32OOp>>(context,
+                                                           "vm_cmp_eq_f32o");
+  patterns.insert<CallOpConversion<IREE::VM::CmpEQF32UOp>>(context,
+                                                           "vm_cmp_eq_f32u");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNEF32OOp>>(context,
+                                                           "vm_cmp_ne_f32o");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNEF32UOp>>(context,
+                                                           "vm_cmp_ne_f32u");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTF32OOp>>(context,
+                                                           "vm_cmp_lt_f32o");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTF32UOp>>(context,
+                                                           "vm_cmp_lt_f32u");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTEF32OOp>>(context,
+                                                            "vm_cmp_lte_f32o");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTEF32UOp>>(context,
+                                                            "vm_cmp_lte_f32u");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNaNF32Op>>(context,
+                                                           "vm_cmp_nan_f32");
+
   // ExtI64: Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI64Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI64ZeroOp>>(context);
