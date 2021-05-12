@@ -121,10 +121,10 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
   using OpConversionPattern<CmpOpTy>::OpConversionPattern;
 
   CompareRefOpConversion(MLIRContext *context, StringRef funcName,
-                         ValueLivenessCache &valueLivenessCache)
+                         VMAnalysisCache &vmAnalysisCache)
       : OpConversionPattern<CmpOpTy>(context),
         funcName(funcName),
-        valueLivenessCache(valueLivenessCache) {}
+        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -135,11 +135,11 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
 
     auto funcOp =
         cmpOp.getOperation()->template getParentOfType<IREE::VM::FuncOp>();
-    auto ptr = valueLivenessCache.find(funcOp.getOperation());
-    if (ptr == valueLivenessCache.end()) {
+    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+    if (ptr == vmAnalysisCache.end()) {
       return cmpOp.emitError() << "parent func op not found in cache.";
     }
-    ValueLiveness &valueLiveness = ptr->second;
+    ValueLiveness &valueLiveness = ptr->second.valueLiveness;
 
     bool moveLhs =
         valueLiveness.isLastValueUse(cmpOp.lhs(), cmpOp.getOperation());
@@ -178,7 +178,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
   }
 
   StringRef funcName;
-  ValueLivenessCache &valueLivenessCache;
+  VMAnalysisCache &vmAnalysisCache;
 };
 
 class CompareRefNotZeroOpConversion
@@ -187,9 +187,9 @@ class CompareRefNotZeroOpConversion
 
  public:
   CompareRefNotZeroOpConversion(MLIRContext *context,
-                                ValueLivenessCache &valueLivenessCache)
+                                VMAnalysisCache &vmAnalysisCache)
       : OpConversionPattern<IREE::VM::CmpNZRefOp>(context),
-        valueLivenessCache(valueLivenessCache) {}
+        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -199,11 +199,11 @@ class CompareRefNotZeroOpConversion
     auto loc = cmpOp.getLoc();
 
     auto funcOp = cmpOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
-    auto ptr = valueLivenessCache.find(funcOp.getOperation());
-    if (ptr == valueLivenessCache.end()) {
+    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+    if (ptr == vmAnalysisCache.end()) {
       return cmpOp.emitError() << "parent func op not found in cache.";
     }
-    ValueLiveness &valueLiveness = ptr->second;
+    ValueLiveness &valueLiveness = ptr->second.valueLiveness;
 
     bool move =
         valueLiveness.isLastValueUse(cmpOp.operand(), cmpOp.getOperation());
@@ -229,7 +229,7 @@ class CompareRefNotZeroOpConversion
     return success();
   }
 
-  ValueLivenessCache &valueLivenessCache;
+  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename ConstOpTy>
@@ -274,9 +274,9 @@ class ConstRefZeroOpConversion
   using OpRewritePattern<IREE::VM::ConstRefZeroOp>::OpRewritePattern;
 
   ConstRefZeroOpConversion(MLIRContext *context,
-                           RegisterAllocationCache &registerAllocationCache)
+                           VMAnalysisCache &vmAnalysisCache)
       : OpRewritePattern<IREE::VM::ConstRefZeroOp>(context),
-        registerAllocationCache(registerAllocationCache) {}
+        vmAnalysisCache(vmAnalysisCache) {}
 
   LogicalResult matchAndRewrite(IREE::VM::ConstRefZeroOp constRefZeroOp,
                                 PatternRewriter &rewriter) const final {
@@ -286,11 +286,11 @@ class ConstRefZeroOpConversion
     auto funcOp =
         constRefZeroOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
 
-    auto ptr = registerAllocationCache.find(funcOp.getOperation());
-    if (ptr == registerAllocationCache.end()) {
+    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+    if (ptr == vmAnalysisCache.end()) {
       return constRefZeroOp.emitError() << "parent func op not found in cache.";
     }
-    RegisterAllocation &registerAllocation = ptr->second;
+    RegisterAllocation &registerAllocation = ptr->second.registerAllocation;
 
     int32_t ordinal =
         registerAllocation.mapToRegister(constRefZeroOp.getResult()).ordinal();
@@ -315,7 +315,7 @@ class ConstRefZeroOpConversion
     return success();
   }
 
-  RegisterAllocationCache &registerAllocationCache;
+  VMAnalysisCache &vmAnalysisCache;
 };
 
 class ConstRefRodataOpConversion
@@ -324,9 +324,9 @@ class ConstRefRodataOpConversion
   using OpConversionPattern<IREE::VM::ConstRefRodataOp>::OpConversionPattern;
 
   ConstRefRodataOpConversion(MLIRContext *context,
-                             RegisterAllocationCache &registerAllocationCache)
+                             VMAnalysisCache &vmAnalysisCache)
       : OpConversionPattern<IREE::VM::ConstRefRodataOp>(context),
-        registerAllocationCache(registerAllocationCache) {}
+        vmAnalysisCache(vmAnalysisCache) {}
 
   LogicalResult matchAndRewrite(
       IREE::VM::ConstRefRodataOp constRefRodataOp, ArrayRef<Value> operands,
@@ -367,12 +367,12 @@ class ConstRefRodataOpConversion
     auto funcOp =
         constRefRodataOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
 
-    auto ptr = registerAllocationCache.find(funcOp.getOperation());
-    if (ptr == registerAllocationCache.end()) {
+    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+    if (ptr == vmAnalysisCache.end()) {
       return constRefRodataOp.emitError()
              << "parent func op not found in cache.";
     }
-    RegisterAllocation &registerAllocation = ptr->second;
+    RegisterAllocation &registerAllocation = ptr->second.registerAllocation;
 
     int32_t ordinal =
         registerAllocation.mapToRegister(constRefRodataOp.getResult())
@@ -403,7 +403,7 @@ class ConstRefRodataOpConversion
     return success();
   }
 
-  RegisterAllocationCache &registerAllocationCache;
+  VMAnalysisCache &vmAnalysisCache;
 };
 
 class DoNotOptimizeConversion
@@ -605,9 +605,9 @@ class ListAllocOpConversion
   using OpConversionPattern<IREE::VM::ListAllocOp>::OpConversionPattern;
 
   ListAllocOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                        RegisterAllocationCache &registerAllocationCache)
+                        VMAnalysisCache &vmAnalysisCache)
       : OpConversionPattern<IREE::VM::ListAllocOp>(typeConverter, context),
-        registerAllocationCache(registerAllocationCache) {}
+        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -710,11 +710,11 @@ class ListAllocOpConversion
 
     auto funcOp = allocOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
 
-    auto ptr = registerAllocationCache.find(funcOp.getOperation());
-    if (ptr == registerAllocationCache.end()) {
+    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+    if (ptr == vmAnalysisCache.end()) {
       return allocOp.emitError() << "parent func op not found in cache.";
     }
-    RegisterAllocation &registerAllocation = ptr->second;
+    RegisterAllocation &registerAllocation = ptr->second.registerAllocation;
 
     int32_t ordinal =
         registerAllocation.mapToRegister(allocOp.getResult()).ordinal();
@@ -751,7 +751,7 @@ class ListAllocOpConversion
     return success();
   }
 
-  RegisterAllocationCache &registerAllocationCache;
+  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename GetOpTy>
@@ -852,10 +852,9 @@ class ListGetRefOpConversion
  public:
   using OpConversionPattern<IREE::VM::ListGetRefOp>::OpConversionPattern;
 
-  ListGetRefOpConversion(MLIRContext *context,
-                         RegisterAllocationCache &registerAllocationCache)
+  ListGetRefOpConversion(MLIRContext *context, VMAnalysisCache &vmAnalysisCache)
       : OpConversionPattern<IREE::VM::ListGetRefOp>(context),
-        registerAllocationCache(registerAllocationCache) {}
+        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -892,11 +891,11 @@ class ListGetRefOpConversion
 
     auto funcOp = getOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
 
-    auto ptr = registerAllocationCache.find(funcOp.getOperation());
-    if (ptr == registerAllocationCache.end()) {
+    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+    if (ptr == vmAnalysisCache.end()) {
       return getOp.emitError() << "parent func op not found in cache.";
     }
-    RegisterAllocation &registerAllocation = ptr->second;
+    RegisterAllocation &registerAllocation = ptr->second.registerAllocation;
 
     int32_t ordinal =
         registerAllocation.mapToRegister(getOp.getResult()).ordinal();
@@ -978,7 +977,7 @@ class ListGetRefOpConversion
     return success();
   }
 
-  RegisterAllocationCache &registerAllocationCache;
+  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename SetOpTy>
@@ -1063,10 +1062,9 @@ class ListSetRefOpConversion
  public:
   using OpConversionPattern<IREE::VM::ListSetRefOp>::OpConversionPattern;
 
-  ListSetRefOpConversion(MLIRContext *context,
-                         ValueLivenessCache &valueLivenessCache)
+  ListSetRefOpConversion(MLIRContext *context, VMAnalysisCache &vmAnalysisCache)
       : OpConversionPattern<IREE::VM::ListSetRefOp>(context),
-        valueLivenessCache(valueLivenessCache) {}
+        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -1102,11 +1100,11 @@ class ListSetRefOpConversion
         /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
 
     auto funcOp = setOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
-    auto ptr = valueLivenessCache.find(funcOp.getOperation());
-    if (ptr == valueLivenessCache.end()) {
+    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+    if (ptr == vmAnalysisCache.end()) {
       return setOp.emitError() << "parent func op not found in cache.";
     }
-    ValueLiveness &valueLiveness = ptr->second;
+    ValueLiveness &valueLiveness = ptr->second.valueLiveness;
 
     bool move =
         valueLiveness.isLastValueUse(setOp.value(), setOp.getOperation());
@@ -1125,15 +1123,14 @@ class ListSetRefOpConversion
     return success();
   }
 
-  ValueLivenessCache &valueLivenessCache;
+  VMAnalysisCache &vmAnalysisCache;
 };
 }  // namespace
 
 void populateVMToEmitCPatterns(MLIRContext *context,
                                IREE::VM::EmitCTypeConverter &typeConverter,
                                OwningRewritePatternList &patterns,
-                               RegisterAllocationCache &registerAllocationCache,
-                               ValueLivenessCache &valueLivenessCache) {
+                               VMAnalysisCache &vmAnalysisCache) {
   patterns.insert<DoNotOptimizeConversion>(typeConverter, context);
 
   // Globals
@@ -1147,12 +1144,12 @@ void populateVMToEmitCPatterns(MLIRContext *context,
   // Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI32ZeroOp>>(context);
-  patterns.insert<ConstRefZeroOpConversion>(context, registerAllocationCache);
-  patterns.insert<ConstRefRodataOpConversion>(context, registerAllocationCache);
+  patterns.insert<ConstRefZeroOpConversion>(context, vmAnalysisCache);
+  patterns.insert<ConstRefRodataOpConversion>(context, vmAnalysisCache);
 
   // List ops
   patterns.insert<ListAllocOpConversion>(typeConverter, context,
-                                         registerAllocationCache);
+                                         vmAnalysisCache);
   patterns.insert<ListOpConversion<IREE::VM::ListReserveOp>>(
       context, "iree_vm_list_reserve", 0, true);
   patterns.insert<ListOpConversion<IREE::VM::ListResizeOp>>(
@@ -1160,9 +1157,9 @@ void populateVMToEmitCPatterns(MLIRContext *context,
   patterns.insert<ListOpConversion<IREE::VM::ListSizeOp>>(
       context, "iree_vm_list_size", 0, false);
   patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(context);
-  patterns.insert<ListGetRefOpConversion>(context, registerAllocationCache);
+  patterns.insert<ListGetRefOpConversion>(context, vmAnalysisCache);
   patterns.insert<ListSetOpConversion<IREE::VM::ListSetI32Op>>(context);
-  patterns.insert<ListSetRefOpConversion>(context, valueLivenessCache);
+  patterns.insert<ListSetRefOpConversion>(context, vmAnalysisCache);
 
   // Conditional assignment ops
   patterns.insert<CallOpConversion<IREE::VM::SelectI32Op>>(context,
@@ -1219,10 +1216,10 @@ void populateVMToEmitCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::CmpNZI32Op>>(context,
                                                           "vm_cmp_nz_i32");
   patterns.insert<CompareRefOpConversion<IREE::VM::CmpEQRefOp>>(
-      context, "vm_cmp_eq_ref", valueLivenessCache);
+      context, "vm_cmp_eq_ref", vmAnalysisCache);
   patterns.insert<CompareRefOpConversion<IREE::VM::CmpNERefOp>>(
-      context, "vm_cmp_ne_ref", valueLivenessCache);
-  patterns.insert<CompareRefNotZeroOpConversion>(context, valueLivenessCache);
+      context, "vm_cmp_ne_ref", vmAnalysisCache);
+  patterns.insert<CompareRefNotZeroOpConversion>(context, vmAnalysisCache);
 
   // ExtF32: Native floating-point constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstF32Op>>(context);
@@ -1362,19 +1359,17 @@ class ConvertVMToEmitCPass
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter;
 
-    RegisterAllocationCache registerAllocationCache;
-    ValueLivenessCache valueLivenessCache;
+    VMAnalysisCache vmAnalysisCache;
 
     for (auto funcOp : getOperation().getOps<IREE::VM::FuncOp>()) {
       Operation *op = funcOp.getOperation();
-      registerAllocationCache.insert(
-          std::make_pair(op, RegisterAllocation(op)));
-      valueLivenessCache.insert(std::make_pair(op, ValueLiveness(op)));
+      vmAnalysisCache.insert(std::make_pair(
+          op, VMAnalysis{RegisterAllocation(op), ValueLiveness(op)}));
     }
 
     OwningRewritePatternList patterns(&getContext());
     populateVMToEmitCPatterns(&getContext(), typeConverter, patterns,
-                              registerAllocationCache, valueLivenessCache);
+                              vmAnalysisCache);
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
 

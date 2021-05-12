@@ -16,14 +16,17 @@
 namespace mlir {
 namespace iree_compiler {
 
-using RegisterAllocationCache = DenseMap<Operation *, RegisterAllocation>;
-using ValueLivenessCache = DenseMap<Operation *, ValueLiveness>;
+struct VMAnalysis {
+  RegisterAllocation registerAllocation;
+  ValueLiveness valueLiveness;
+};
+
+using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
 
 void populateVMToEmitCPatterns(MLIRContext *context,
                                IREE::VM::EmitCTypeConverter &typeConverter,
                                OwningRewritePatternList &patterns,
-                               RegisterAllocationCache &registerAllocationCache,
-                               ValueLivenessCache &valueLivenessCache);
+                               VMAnalysisCache &vmAnalysisCache);
 
 namespace IREE {
 namespace VM {
