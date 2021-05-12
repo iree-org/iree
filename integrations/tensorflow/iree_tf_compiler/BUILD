@@ -23,7 +23,7 @@ filegroup(
     srcs = [
         ":iree-import-tflite",
         ":iree-import-xla",
-        ":iree-tf-import",
+        ":iree-import-tf",
     ],
 )
 
