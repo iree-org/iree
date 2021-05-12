@@ -48,8 +48,8 @@ class ELFModuleTest : public ::testing::Test {
 #endif  // IREE_ARCH_*
 
     if (!iree_string_view_is_empty(pattern)) {
-      for (size_t i = 0; i < iree::elf::simple_mul_dispatch_size(); ++i) {
-        const auto* file_toc = &iree::elf::simple_mul_dispatch_create()[i];
+      for (size_t i = 0; i < simple_mul_dispatch_size(); ++i) {
+        const auto* file_toc = &simple_mul_dispatch_create()[i];
         if (iree_string_view_match_pattern(
                 iree_make_cstring_view(file_toc->name), pattern)) {
           return iree_make_const_byte_span(file_toc->data, file_toc->size);

@@ -164,7 +164,8 @@ def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
 // new SSA values. This would make optimizing the list usage much easier and
 // enable hoisting/CSE of list access/mutation.
 
-def IREE_ListCreateOp : IREE_PureOp<"list.create"> {
+def IREE_ListCreateOp : IREE_PureOp<
+    "list.create", [MemoryEffects<[MemAlloc]>]> {
   let summary = [{creates a new empty list}];
   let description = [{
     Creates a new empty list with an optional initial capacity.
@@ -180,7 +181,7 @@ def IREE_ListCreateOp : IREE_PureOp<"list.create"> {
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` type($result)";
 }
 
-def IREE_ListSizeOp : IREE_Op<"list.size"> {
+def IREE_ListSizeOp : IREE_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   let summary = [{the size of the list in elements}];
   let description = [{
     Returns the current size of the list in elements.
@@ -196,7 +197,7 @@ def IREE_ListSizeOp : IREE_Op<"list.size"> {
   let assemblyFormat = "operands attr-dict `:` type($list)";
 }
 
-def IREE_ListResizeOp : IREE_Op<"list.resize"> {
+def IREE_ListResizeOp : IREE_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   let summary = [{resizes the list to a new count in elements}];
   let description = [{
     Resizes the list to contain `new_size` elements. This will either truncate
@@ -212,7 +213,7 @@ def IREE_ListResizeOp : IREE_Op<"list.resize"> {
   let assemblyFormat = "operands attr-dict `:` type($list)";
 }
 
-def IREE_ListGetOp : IREE_Op<"list.get"> {
+def IREE_ListGetOp : IREE_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   let summary = [{element accessor}];
   let description = [{
     Returns the value of the element at the given index. Note that the value
@@ -232,7 +233,7 @@ def IREE_ListGetOp : IREE_Op<"list.get"> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-def IREE_ListSetOp : IREE_Op<"list.set"> {
+def IREE_ListSetOp : IREE_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let summary = [{element mutator}];
   let description = [{
     Sets the element at the given index to the new value.

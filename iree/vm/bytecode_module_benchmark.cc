@@ -20,7 +20,7 @@
 #include "iree/base/logging.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/bytecode_module_benchmark_module.h"
+#include "iree/vm/bytecode_module_benchmark_module_c.h"
 
 namespace {
 
@@ -86,7 +86,7 @@ static iree_status_t RunFunction(benchmark::State& state,
       native_import_module_create(iree_allocator_system(), &import_module));
 
   const auto* module_file_toc =
-      iree::vm::bytecode_module_benchmark_module_create();
+      iree_vm_bytecode_module_benchmark_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
@@ -138,7 +138,7 @@ static iree_status_t RunFunction(benchmark::State& state,
 static void BM_ModuleCreate(benchmark::State& state) {
   while (state.KeepRunning()) {
     const auto* module_file_toc =
-        iree::vm::bytecode_module_benchmark_module_create();
+        iree_vm_bytecode_module_benchmark_module_create();
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
@@ -156,7 +156,7 @@ BENCHMARK(BM_ModuleCreate);
 
 static void BM_ModuleCreateState(benchmark::State& state) {
   const auto* module_file_toc =
-      iree::vm::bytecode_module_benchmark_module_create();
+      iree_vm_bytecode_module_benchmark_module_create();
   iree_vm_module_t* module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
@@ -182,7 +182,7 @@ BENCHMARK(BM_ModuleCreateState);
 static void BM_FullModuleInit(benchmark::State& state) {
   while (state.KeepRunning()) {
     const auto* module_file_toc =
-        iree::vm::bytecode_module_benchmark_module_create();
+        iree_vm_bytecode_module_benchmark_module_create();
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{

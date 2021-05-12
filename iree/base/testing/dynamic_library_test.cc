@@ -48,8 +48,8 @@ class DynamicLibraryTest : public ::testing::Test {
   static void SetUpTestCase() {
     // Making files available to tests, particularly across operating systems
     // and build tools (Bazel/CMake) is complicated. Rather than include a test
-    // dynamic library as a "testdata" file, we use cc_embed_data to package
-    // the file so it's embedded in a C++ module, then write that embedded file
+    // dynamic library as a "testdata" file, we use c_embed_data to package
+    // the file so it's embedded in a C module, then write that embedded file
     // to a platform/test-environment specific temp file for loading.
 
     // System APIs for loading dynamic libraries typically require an extension.
@@ -60,7 +60,8 @@ class DynamicLibraryTest : public ::testing::Test {
 #endif
     library_temp_path_ = GetTempFilename(ext);
 
-    const auto* file_toc = dynamic_library_test_library_create();
+    const struct iree_file_toc_t* file_toc =
+        dynamic_library_test_library_create();
     IREE_ASSERT_OK(iree_file_write_contents(
         library_temp_path_.c_str(),
         iree_make_const_byte_span(file_toc->data, file_toc->size)));
