@@ -780,7 +780,7 @@ or stored in the <code>SavedModel</code>
 <h2 id="importing-models">Importing models<a class="headerlink" href="#importing-models" title="Permanent link">&para;</a></h2>
 <p>IREE compilers transform a model into its final deployable format in several
 sequential steps. The first step for a TensorFlow model is to use either the
-<code>iree-tf-import</code> command-line tool or IREE's Python APIs to import the model
+<code>iree-import-tf</code> command-line tool or IREE's Python APIs to import the model
 into a format (i.e., <a href="https://mlir.llvm.org/">MLIR</a>) compatible with the generic
 IREE compilers.</p>
 <h3 id="from-savedmodel-on-tensorflow-hub">From SavedModel on TensorFlow Hub<a class="headerlink" href="#from-savedmodel-on-tensorflow-hub" title="Permanent link">&para;</a></h3>
@@ -799,17 +799,17 @@ is used as the entry point for IREE compilation flow:</p>
 them by yourself by following
 <a href="#missing-serving-signature-in-savedmodel">"Missing serving signature in SavedModel"</a>.</p>
 </div>
-<p>Then you can import the model with <code>iree-tf-import</code>. You can read the options
-supported via <code>iree-tf-import -help</code>. Using <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>
+<p>Then you can import the model with <code>iree-import-tf</code>. You can read the options
+supported via <code>iree-import-tf -help</code>. Using <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>
 as an example and assuming the serving signature is <code>predict</code>:</p>
-<div class="highlight"><pre><span></span><code>iree-tf-import
+<div class="highlight"><pre><span></span><code>iree-import-tf
   -tf-import-type<span class="o">=</span>savedmodel_v1 <span class="se">\</span>
   -tf-savedmodel-exported-names<span class="o">=</span>predict <span class="se">\</span>
   /path/to/savedmodel -o iree_input.mlir
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p><code>iree-tf-import</code> is installed as <code>/path/to/python/site-packages/iree/tools/tf/iree-tf-import</code>.
+<p><code>iree-import-tf</code> is installed as <code>/path/to/python/site-packages/iree/tools/tf/iree-import-tf</code>.
 You can find out the full path to the <code>site-packages</code> directory via the
 <code>python -m site</code> command.</p>
 <p><code>-tf-import-type</code> needs to match the SavedModel version. You can try both v1

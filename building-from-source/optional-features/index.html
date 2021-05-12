@@ -827,7 +827,7 @@ cmake -DIREE_BUILD_TENSORFLOW_ALL<span class="o">=</span>ON .
 cmake --build .
 
 <span class="c1"># Validate.</span>
-python -c <span class="s2">&quot;import iree.tools.tf as _; print(_.get_tool(&#39;iree-tf-import&#39;))&quot;</span>
+python -c <span class="s2">&quot;import iree.tools.tf as _; print(_.get_tool(&#39;iree-import-tf&#39;))&quot;</span>
 python -c <span class="s2">&quot;import iree.tools.tflite as _; print(_.get_tool(&#39;iree-import-tflite&#39;))&quot;</span>
 python -c <span class="s2">&quot;import iree.tools.xla as _; print(_.get_tool(&#39;iree-import-xla&#39;))&quot;</span>
 </code></pre></div>
