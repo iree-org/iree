@@ -150,9 +150,9 @@ class FunctionInvoker:
           f"Malformed function reflection metadata structure: {reflection}")
 
     # See if kwargs are expected.
-    if self._ret_descs:
-      maybe_kwargs_desc = self._ret_descs[-1]
-      if maybe_kwargs_desc and maybe_kwargs_desc[0] == "kwargs_sdict":
+    if self._arg_descs:
+      maybe_kwargs_desc = self._arg_descs[-1]
+      if maybe_kwargs_desc and maybe_kwargs_desc[0] == "sdict_kwargs":
         self._has_kwargs = True
 
   def __repr__(self):
@@ -171,10 +171,21 @@ def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 
 
 def _int_to_vm(inv: Invocation, t: VmVariantList, x, desc):
+  # Implicit conversion to a 0d tensor.
+  if _is_0d_ndarray_descriptor(desc):
+    casted = _cast_scalar_to_ndarray(inv, x, desc)
+    _ndarray_to_vm(inv, t, casted, desc)
+    return
+
   _raise_argument_error(inv, "Python int arguments not yet supported")
 
 
 def _float_to_vm(inv: Invocation, t: VmVariantList, x, desc):
+  # Implicit conversion to a 0d tensor.
+  if _is_0d_ndarray_descriptor(desc):
+    casted = _cast_scalar_to_ndarray(inv, x, desc)
+    _ndarray_to_vm(inv, t, casted, desc)
+    return
   _raise_argument_error(inv, "Python float arguments not yet supported")
 
 
@@ -198,7 +209,7 @@ def _list_or_tuple_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 
 def _dict_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   desc_type = desc[0]
-  if desc_type != "sdict" and desc_type != "kwargs_sdict":
+  if desc_type != "sdict" and desc_type != "sdict_kwargs":
     _raise_argument_error(inv, f"passed a dict but expected {desc_type}")
   # When decoding a dict, the desc object is like:
   # ['sdict', ['key0', [...value_type_0...]], ['key1', [...value_type_1...]]]]
@@ -277,8 +288,37 @@ def _vm_to_ndarray(inv: Invocation, vm_list: VmVariantList, vm_index: int,
   return vm_list.get_as_ndarray(vm_index)
 
 
+def _vm_to_sdict(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
+  # The descriptor for an sdict is like:
+  #   ['sdict', ['key1', value1], ...]
+  sub_vm_list = vm_list.get_as_list(vm_index)
+  item_keys = []
+  item_descs = []
+  for k, d in desc[1:]:
+    item_keys.append(k)
+    item_descs.append(d)
+  py_items = _extract_vm_sequence_to_python(inv, sub_vm_list, item_descs)
+  return dict(zip(item_keys, py_items))
+
+
+def _vm_to_slist(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
+  # The descriptor for an slist is like:
+  #   ['slist, item1, ...]
+  sub_vm_list = vm_list.get_as_list(vm_index)
+  item_descs = desc[1:]
+  py_items = _extract_vm_sequence_to_python(inv, sub_vm_list, item_descs)
+  return py_items
+
+
+def _vm_to_stuple(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
+  return tuple(_vm_to_slist(inv, vm_list, vm_index, desc))
+
+
 VM_TO_PYTHON_CONVERTERS = {
     "ndarray": _vm_to_ndarray,
+    "sdict": _vm_to_sdict,
+    "slist": _vm_to_slist,
+    "stuple": _vm_to_stuple,
 }
 
 ABI_TYPE_TO_DTYPE = {
@@ -304,6 +344,21 @@ DTYPE_TO_HAL_ELEMENT_TYPE = (
     (np.uint16, HalElementType.UINT_16),
     (np.uint8, HalElementType.UINT_8),
 )
+
+
+def _is_0d_ndarray_descriptor(desc):
+  # Example: ["ndarray", "f32", 0]
+  return desc[0] == "ndarray" and desc[2] == 0
+
+
+def _cast_scalar_to_ndarray(inv: Invocation, x, desc):
+  # Example descriptor: ["ndarray", "f32", 0]
+  dtype_str = desc[1]
+  try:
+    dtype = ABI_TYPE_TO_DTYPE[dtype_str]
+  except KeyError:
+    _raise_argument_error(inv, f"unrecognized dtype '{dtype_str}'")
+  return dtype(x)
 
 
 def _raise_argument_error(inv: Invocation, summary: str, e: Exception = None):

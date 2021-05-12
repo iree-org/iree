@@ -46,6 +46,11 @@ void registerMHLOImportPassPipeline();
 // Converts the TF dialect to the XLA MHLO dialect.
 std::unique_ptr<FunctionPass> createConvertToMHLOPass();
 
+// Annotates an appropriate iree.abi attribute on public functions that
+// operate exclusively on tensor types. This corresponds to the expectations
+// of MHLO and is suitable for such programs.
+std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass();
+
 // Flattens tuple values in function signatures and blocks.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 
@@ -93,6 +98,7 @@ inline void registerAllPasses() {
   registerMHLOImportPassPipeline();
 
   createConvertToMHLOPass();
+  createEmitDefaultIREEABIPass();
   createFlattenTuplesInCFGPass();
   createLowerGlobalTensorsPass();
   createLowerExportedFunctionsPass();
