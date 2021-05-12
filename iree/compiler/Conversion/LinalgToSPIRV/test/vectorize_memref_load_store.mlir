@@ -156,33 +156,28 @@ hal.interface @io attributes {sym_visibility = "private"} {
 
 // -----
 
-// CHECK-LABEL: func @scalarize_vector_transfer_read
-func @scalarize_vector_transfer_read() {
+// CHECK-LABEL: func @scalarize_vector_transfer_op
+func @scalarize_vector_transfer_op() {
   %c0 = constant 0: index
+  %c3 = constant 3: index
   %f0 = constant 0.0 : f32
-  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<3xf32>
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<20xf32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<f32>
-  // CHECK-DAG: %[[INDEX0:.+]] = constant 0 : index
-  // CHECK-DAG: %[[INDEX1:.+]] = constant 1 : index
-  // CHECK-DAG: %[[INDEX2:.+]] = constant 2 : index
-  // CHECK-DAG: %[[C0:.+]] = constant 0 : i32
-  // CHECK-DAG: %[[C1:.+]] = constant 1 : i32
-  // CHECK-DAG: %[[C2:.+]] = constant 2 : i32
-  // CHECK-DAG: %[[INIT:.+]] = constant dense<0.000000e+00> : vector<3xf32>
+  %2 = hal.interface.binding.subspan @io::@ret1[%c0] : memref<20xf32>
+  // CHECK-DAG: %[[INDEX0:.+]] = constant 3 : index
+  // CHECK-DAG: %[[INDEX1:.+]] = constant 4 : index
+  // CHECK-DAG: %[[INDEX2:.+]] = constant 5 : index
   // CHECK: %[[ELEM0:.+]] = memref.load %{{.+}}[%[[INDEX0]]]
   // CHECK: %[[ELEM1:.+]] = memref.load %{{.+}}[%[[INDEX1]]]
   // CHECK: %[[ELEM2:.+]] = memref.load %{{.+}}[%[[INDEX2]]]
-  // CHECK: %[[INSERT0:.+]] = vector.insertelement %[[ELEM0]], %[[INIT]][%[[C0]] : i32]
-  // CHECK: %[[INSERT1:.+]] = vector.insertelement %[[ELEM1]], %[[INSERT0]][%[[C1]] : i32]
-  // CHECK: %[[INSERT2:.+]] = vector.insertelement %[[ELEM2]], %[[INSERT1]][%[[C2]] : i32]
-  // CHECK: vector.extract %[[INSERT2]]
-  %2 = vector.transfer_read %0[%c0], %f0 : memref<3xf32>, vector<3xf32>
-  %3 = vector.extract %2[0]: vector<3xf32>
-  memref.store %3, %1[] : memref<f32>
+  // CHECK: memref.store %[[ELEM0]], %{{.*}}[] : memref<f32>
+  // CHECK: memref.store %[[ELEM0]], %{{.*}}[%[[INDEX0]]] : memref<20xf32>
+  // CHECK: memref.store %[[ELEM1]], %{{.*}}[%[[INDEX1]]] : memref<20xf32>
+  // CHECK: memref.store %[[ELEM2]], %{{.*}}[%[[INDEX2]]] : memref<20xf32>
+  %3 = vector.transfer_read %0[%c3], %f0 : memref<20xf32>, vector<3xf32>
+  %4 = vector.extract %3[0]: vector<3xf32>
+  memref.store %4, %1[] : memref<f32>
+  vector.transfer_write %3, %2[%c3] : vector<3xf32>, memref<20xf32>
   return
 }
 
-hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write|Discard"
-}
