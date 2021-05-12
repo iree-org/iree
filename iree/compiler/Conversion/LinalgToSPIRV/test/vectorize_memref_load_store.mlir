@@ -157,7 +157,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 // -----
 
 // CHECK-LABEL: func @scalarize_vector_transfer_op
-func @scalarize_vector_transfer_op() {
+func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) {
   %c0 = constant 0: index
   %c3 = constant 3: index
   %f0 = constant 0.0 : f32
@@ -167,17 +167,24 @@ func @scalarize_vector_transfer_op() {
   // CHECK-DAG: %[[INDEX0:.+]] = constant 3 : index
   // CHECK-DAG: %[[INDEX1:.+]] = constant 4 : index
   // CHECK-DAG: %[[INDEX2:.+]] = constant 5 : index
+  // CHECK-DAG: %[[CST:.+]] = constant dense<0.000000e+00> : vector<3xf32>
+
   // CHECK: %[[ELEM0:.+]] = memref.load %{{.+}}[%[[INDEX0]]]
+  // CHECK: %[[V0:.+]] = vector.insert %[[ELEM0]], %[[CST]] [0] : f32 into vector<3xf32>
   // CHECK: %[[ELEM1:.+]] = memref.load %{{.+}}[%[[INDEX1]]]
+  // CHECK: %[[V1:.+]] = vector.insert %[[ELEM1]], %[[V0]] [1] : f32 into vector<3xf32>
   // CHECK: %[[ELEM2:.+]] = memref.load %{{.+}}[%[[INDEX2]]]
-  // CHECK: memref.store %[[ELEM0]], %{{.*}}[] : memref<f32>
-  // CHECK: memref.store %[[ELEM0]], %{{.*}}[%[[INDEX0]]] : memref<20xf32>
-  // CHECK: memref.store %[[ELEM1]], %{{.*}}[%[[INDEX1]]] : memref<20xf32>
-  // CHECK: memref.store %[[ELEM2]], %{{.*}}[%[[INDEX2]]] : memref<20xf32>
+  // CHECK: %[[V2:.+]] = vector.insert %[[ELEM2]], %[[V1]] [2] : f32 into vector<3xf32>
+  // CHECK: %[[EXT_0:.+]] = vector.extract %{{.*}}[0] : vector<3xf32>
+  // CHECK: memref.store %[[EXT_0]], %{{.*}}[%[[INDEX0]]] : memref<20xf32>
+  // CHECK: %[[EXT_1:.+]] = vector.extract %{{.*}}[1] : vector<3xf32>
+  // CHECK: memref.store %[[EXT_1]], %{{.*}}[%[[INDEX1]]] : memref<20xf32>
+  // CHECK: %[[EXT_2:.+]] = vector.extract %{{.*}}[2] : vector<3xf32>
+  // CHECK: memref.store %[[EXT_2]], %{{.*}}[%[[INDEX2]]] : memref<20xf32>
+  // CHECK: return %[[V2]] : vector<3xf32>
   %3 = vector.transfer_read %0[%c3], %f0 : memref<20xf32>, vector<3xf32>
-  %4 = vector.extract %3[0]: vector<3xf32>
-  memref.store %4, %1[] : memref<f32>
-  vector.transfer_write %3, %2[%c3] : vector<3xf32>, memref<20xf32>
-  return
+  vector.transfer_write %arg, %2[%c3] : vector<3xf32>, memref<20xf32>
+  return %3: vector<3xf32>
 }
+
 
