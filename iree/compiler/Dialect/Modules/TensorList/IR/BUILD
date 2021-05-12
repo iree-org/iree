@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -81,11 +81,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "TensorListOpsGen",
     tbl_outs = [
-        ("-gen-op-decls", "TensorListOps.h.inc"),
-        ("-gen-op-defs", "TensorListOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "TensorListOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "TensorListOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "TensorListOps.td",
@@ -100,7 +106,10 @@ gentbl(
 iree_tablegen_doc(
     name = "TensorListDialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "TensorListDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "TensorListDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "TensorListOps.td",

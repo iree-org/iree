@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -69,11 +69,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "check_ops_gen",
     tbl_outs = [
-        ("-gen-op-decls", "CheckOps.h.inc"),
-        ("-gen-op-defs", "CheckOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "CheckOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "CheckOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CheckOps.td",
@@ -88,7 +94,10 @@ gentbl(
 iree_tablegen_doc(
     name = "CheckDialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "CheckDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "CheckDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CheckOps.td",

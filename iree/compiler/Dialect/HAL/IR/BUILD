@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -100,13 +100,25 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "HALInterfacesGen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "HALOpInterfaces.h.inc"),
-        ("-gen-op-interface-defs", "HALOpInterfaces.cpp.inc"),
-        ("-gen-type-interface-decls", "HALTypeInterfaces.h.inc"),
-        ("-gen-type-interface-defs", "HALTypeInterfaces.cpp.inc"),
+        (
+            ["-gen-op-interface-decls"],
+            "HALOpInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "HALOpInterfaces.cpp.inc",
+        ),
+        (
+            ["-gen-type-interface-decls"],
+            "HALTypeInterfaces.h.inc",
+        ),
+        (
+            ["-gen-type-interface-defs"],
+            "HALTypeInterfaces.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "HALInterfaces.td",
@@ -118,11 +130,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "HALOpsGen",
     tbl_outs = [
-        ("-gen-op-decls", "HALOps.h.inc"),
-        ("-gen-op-defs", "HALOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "HALOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "HALOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "HALOps.td",
@@ -136,11 +154,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "HALStructsGen",
     tbl_outs = [
-        ("-gen-iree-struct-attr-decls", "HALStructs.h.inc"),
-        ("-gen-iree-struct-attr-defs", "HALStructs.cpp.inc"),
+        (
+            ["-gen-iree-struct-attr-decls"],
+            "HALStructs.h.inc",
+        ),
+        (
+            ["-gen-iree-struct-attr-defs"],
+            "HALStructs.cpp.inc",
+        ),
     ],
     tblgen = "//iree/tools:iree-tblgen",
     td_file = "HALBase.td",
@@ -151,11 +175,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "HALTypesGen",
     tbl_outs = [
-        ("-gen-enum-decls", "HALEnums.h.inc"),
-        ("-gen-enum-defs", "HALEnums.cpp.inc"),
+        (
+            ["-gen-enum-decls"],
+            "HALEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "HALEnums.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "HALBase.td",
@@ -170,7 +200,10 @@ gentbl(
 iree_tablegen_doc(
     name = "HALDialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "HALDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "HALDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "HALOps.td",
