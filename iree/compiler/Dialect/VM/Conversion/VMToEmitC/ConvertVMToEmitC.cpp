@@ -21,6 +21,61 @@ namespace iree_compiler {
 
 namespace {
 
+template <typename SrcOpTy>
+Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
+                                            SrcOpTy srcOp, Type elementType) {
+  auto ctx = srcOp.getContext();
+  auto loc = srcOp.getLoc();
+
+  // TODO(simon-camp): Cleanup this up
+  StringRef elementTypeConstructor;
+  std::string elementTypeConstructorArg;
+  if (auto intType = elementType.template dyn_cast<IntegerType>()) {
+    unsigned int bitWidth = intType.getIntOrFloatBitWidth();
+    elementTypeConstructor = "iree_vm_type_def_make_value_type";
+    elementTypeConstructorArg =
+        std::string("IREE_VM_VALUE_TYPE_I") + std::to_string(bitWidth);
+  } else if (auto refType =
+                 elementType.template dyn_cast<IREE::VM::RefType>()) {
+    auto objType = refType.getObjectType();
+
+    elementTypeConstructor = "iree_vm_type_def_make_ref_type";
+    if (objType.template isa<IREE::VM::BufferType>()) {
+      elementTypeConstructorArg = "iree_vm_buffer_type_id()";
+    } else if (objType.template isa<IREE::VM::ListType>()) {
+      elementTypeConstructorArg = "iree_vm_list_type_id()";
+    } else {
+      srcOp.emitError() << "Unhandled ref object type " << objType;
+      return None;
+    }
+  } else if (auto opaqueType =
+                 elementType.template dyn_cast<IREE::VM::OpaqueType>()) {
+    elementTypeConstructor = "iree_vm_type_def_make_variant_type";
+    elementTypeConstructorArg = "";
+  } else {
+    srcOp.emitError() << "Unhandled element type " << elementType;
+    return None;
+  }
+
+  auto elementTypeOp = rewriter.template create<emitc::CallOp>(
+      /*location=*/loc,
+      /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
+      /*callee=*/StringAttr::get(ctx, elementTypeConstructor),
+      /*args=*/
+      ArrayAttr::get(ctx,
+                     {emitc::OpaqueAttr::get(ctx, elementTypeConstructorArg)}),
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/ArrayRef<Value>{});
+
+  auto elementTypePtrOp = rewriter.template create<emitc::ApplyOp>(
+      /*location=*/loc,
+      /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t*"),
+      /*applicableOperator=*/StringAttr::get(ctx, "&"),
+      /*operand=*/elementTypeOp.getResult(0));
+
+  return elementTypePtrOp;
+}
+
 /// Generate two calls which resemble the IREE_RETURN_IF_ERROR macro. We need
 /// to split it here becasue we cannot produce a macro invocation with a
 /// function call as argument in emitc.
@@ -636,53 +691,18 @@ class ListAllocOpConversion
       return allocOp.emitOpError() << "type conversion failed";
     }
 
-    auto listType = allocOp.getType()
-                        .cast<IREE::VM::RefType>()
-                        .getObjectType()
-                        .cast<IREE::VM::ListType>();
-    auto elementType = listType.getElementType();
+    auto elementType = allocOp.getType()
+                           .cast<IREE::VM::RefType>()
+                           .getObjectType()
+                           .cast<IREE::VM::ListType>()
+                           .getElementType();
 
-    // TODO(simon-camp): Cleanup this up
-    StringRef elementTypeConstructor;
-    std::string elementTypeConstructorArg;
-    if (elementType.isa<IntegerType>()) {
-      unsigned int bitWidth = elementType.getIntOrFloatBitWidth();
-      elementTypeConstructor = "iree_vm_type_def_make_value_type";
-      elementTypeConstructorArg =
-          std::string("IREE_VM_VALUE_TYPE_I") + std::to_string(bitWidth);
-    } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
-      auto objType = refType.getObjectType();
+    Optional<emitc::ApplyOp> elementTypePtrOp =
+        createVmTypeDefPtr(rewriter, allocOp, elementType);
 
-      elementTypeConstructor = "iree_vm_type_def_make_ref_type";
-      if (objType.isa<IREE::VM::BufferType>()) {
-        elementTypeConstructorArg = "iree_vm_buffer_type_id()";
-      } else if (objType.isa<IREE::VM::ListType>()) {
-        elementTypeConstructorArg = "iree_vm_list_type_id()";
-      } else {
-        return allocOp.emitError() << "Unhandled ref object type " << objType;
-      }
-    } else if (auto opaqueType = elementType.dyn_cast<IREE::VM::OpaqueType>()) {
-      elementTypeConstructor = "iree_vm_type_def_make_variant_type";
-      elementTypeConstructorArg = "";
-    } else {
-      return allocOp.emitError() << "Unhandled element type " << elementType;
+    if (!elementTypePtrOp.hasValue()) {
+      return failure();
     }
-
-    auto elementTypeOp = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
-        /*callee=*/StringAttr::get(ctx, elementTypeConstructor),
-        /*args=*/
-        ArrayAttr::get(
-            ctx, {emitc::OpaqueAttr::get(ctx, elementTypeConstructorArg)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
-
-    auto elementTypePtrOp = rewriter.create<emitc::ApplyOp>(
-        /*location=*/loc,
-        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t*"),
-        /*applicableOperator=*/StringAttr::get(ctx, "&"),
-        /*operand=*/elementTypeOp.getResult(0));
 
     auto listOp = rewriter.create<emitc::ConstOp>(
         /*location=*/loc,
@@ -705,7 +725,7 @@ class ListAllocOpConversion
                              rewriter.getIndexAttr(2)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{elementTypePtrOp.getResult(), operands[0],
+        ArrayRef<Value>{elementTypePtrOp.getValue().getResult(), operands[0],
                         listPtrOp.getResult()});
 
     auto funcOp = allocOp.getOperation()->getParentOfType<IREE::VM::FuncOp>();
@@ -920,49 +940,13 @@ class ListGetRefOpConversion
         ArrayRef<Value>{listDerefOp.getResult(0), getOp.index(),
                         refPtrOp.getResult(0)});
 
-    auto elementType = getOp.getResult().getType();
+    Type elementType = getOp.getResult().getType();
 
-    // TODO(simon-camp): Cleanup this up
-    StringRef elementTypeConstructor;
-    std::string elementTypeConstructorArg;
-    if (auto intType = elementType.dyn_cast<IntegerType>()) {
-      unsigned int bitWidth = intType.getIntOrFloatBitWidth();
-      elementTypeConstructor = "iree_vm_type_def_make_value_type";
-      elementTypeConstructorArg =
-          std::string("IREE_VM_VALUE_TYPE_I") + std::to_string(bitWidth);
-    } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
-      auto objType = refType.getObjectType();
+    auto elementTypePtrOp = createVmTypeDefPtr(rewriter, getOp, elementType);
 
-      elementTypeConstructor = "iree_vm_type_def_make_ref_type";
-      if (objType.isa<IREE::VM::BufferType>()) {
-        elementTypeConstructorArg = "iree_vm_buffer_type_id()";
-      } else if (objType.isa<IREE::VM::ListType>()) {
-        elementTypeConstructorArg = "iree_vm_list_type_id()";
-      } else {
-        return getOp.emitError() << "Unhandled ref object type " << objType;
-      }
-    } else if (auto opaqueType = elementType.dyn_cast<IREE::VM::OpaqueType>()) {
-      elementTypeConstructor = "iree_vm_type_def_make_variant_type";
-      elementTypeConstructorArg = "";
-    } else {
-      return getOp.emitError() << "Unhandled element type " << elementType;
+    if (!elementTypePtrOp.hasValue()) {
+      return failure();
     }
-
-    auto elementTypeOp = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
-        /*callee=*/StringAttr::get(ctx, elementTypeConstructor),
-        /*args=*/
-        ArrayAttr::get(
-            ctx, {emitc::OpaqueAttr::get(ctx, elementTypeConstructorArg)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
-
-    auto elementTypePtrOp = rewriter.create<emitc::ApplyOp>(
-        /*location=*/loc,
-        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t*"),
-        /*applicableOperator=*/StringAttr::get(ctx, "&"),
-        /*operand=*/elementTypeOp.getResult(0));
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -972,7 +956,8 @@ class ListGetRefOpConversion
         ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{refPtrOp.getResult(0), elementTypePtrOp.getResult()});
+        ArrayRef<Value>{refPtrOp.getResult(0),
+                        elementTypePtrOp.getValue().getResult()});
 
     return success();
   }
