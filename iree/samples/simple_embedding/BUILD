@@ -42,6 +42,17 @@ c_embed_data(
     c_file_output = "simple_embedding_test_llvm_aot_rv64.c",
     flatten = True,
     h_file_output = "simple_embedding_test_llvm_aot_rv64.h",
+    identifier = "iree_samples_simple_embedding_rv64_test_module",
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  return()
+endif()
+""",
+    inline = True,
 )
 
 cc_binary(
@@ -104,21 +115,10 @@ cc_binary(
     ],
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
-   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
-""",
-    inline = True,
-)
-
 iree_bytecode_module(
     name = "simple_embedding_test_bytecode_module",
     src = "simple_embedding_test.mlir",
-    c_output = True,
-    cc_namespace = "iree::samples",
+    c_identifier = "iree_samples_simple_embedding_test_module",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",

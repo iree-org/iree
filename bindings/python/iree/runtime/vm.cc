@@ -291,6 +291,17 @@ void VmVariantList::PushBufferView(HalDevice& device,
                  "Error moving buffer view");
 }
 
+VmVariantList VmVariantList::GetAsList(int index) {
+  iree_vm_ref_t ref = {0};
+  CheckApiStatus(iree_vm_list_get_ref_assign(raw_ptr(), index, &ref),
+                 "Could not access list element");
+  iree_vm_list_t* sub_list = NULL;
+  CheckApiStatus(iree_vm_list_check_deref(ref, &sub_list),
+                 "Could not deref list (wrong type?)");
+  iree_vm_list_retain(sub_list);
+  return VmVariantList(sub_list);
+}
+
 py::object VmVariantList::GetAsNdarray(int index) {
   iree_vm_variant_t v = iree_vm_variant_empty();
   CheckApiStatus(iree_vm_list_get_variant(raw_ptr(), index, &v),
@@ -468,6 +479,7 @@ void SetupVmBindings(pybind11::module m) {
       .def_property_readonly("size", &VmVariantList::size)
       .def("__len__", &VmVariantList::size)
       .def("get_as_ndarray", &VmVariantList::GetAsNdarray)
+      .def("get_as_list", &VmVariantList::GetAsList)
       .def("push_list", &VmVariantList::PushList)
       .def("push_buffer_view", &VmVariantList::PushBufferView)
       .def("__repr__", &VmVariantList::DebugString);

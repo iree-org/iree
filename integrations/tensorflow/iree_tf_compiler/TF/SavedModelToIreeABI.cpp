@@ -258,6 +258,8 @@ struct StructureLevel {
                                      builder.getIndexAttr(getNeededListSize()));
       Value listValue = builder.create<iree_compiler::IREE::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
+      builder.create<iree_compiler::IREE::ListResizeOp>(loc, listValue,
+                                                        listSizeValue);
       for (StructureLevel &child : children) {
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
@@ -275,6 +277,8 @@ struct StructureLevel {
                                      builder.getIndexAttr(getNeededListSize()));
       Value listValue = builder.create<iree_compiler::IREE::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
+      builder.create<iree_compiler::IREE::ListResizeOp>(loc, listValue,
+                                                        listSizeValue);
       for (auto it : llvm::enumerate(children)) {
         StructureLevel &child = it.value();
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
@@ -323,7 +327,7 @@ struct StructureLevel {
   }
 
   StructureLevel *bindValue(Location loc, int newValueIndex, Type valueType,
-                            ArrayAttr indexPathAttr) {
+                            ArrayAttr indexPathAttr, bool bindTuple = false) {
     StructureLevel *current = this;
     // Move forward through non terminal path segments.
     for (Attribute indexAttr : indexPathAttr) {
@@ -333,7 +337,8 @@ struct StructureLevel {
         if (!current) return nullptr;
       } else if (auto intAttr = indexAttr.dyn_cast<IntegerAttr>()) {
         int childIndex = intAttr.getInt();
-        current = current->allocateChild(loc, childIndex);
+        current =
+            current->allocateChild(loc, childIndex, /*asTuple=*/bindTuple);
         if (!current) return nullptr;
       } else {
         emitError(loc)
@@ -376,8 +381,10 @@ struct StructureLevel {
     return &children.back();
   }
 
-  StructureLevel *allocateChild(Location loc, int childIndex) {
-    if (type == LevelType::None) type = LevelType::List;
+  StructureLevel *allocateChild(Location loc, int childIndex,
+                                bool asTuple = false) {
+    if (type == LevelType::None)
+      type = asTuple ? LevelType::Tuple : LevelType::List;
     if (type != LevelType::List && type != LevelType::Tuple) {
       emitError(loc) << "structure path mismatch: dereference a non-sequence "
                      << "with a sequence key " << childIndex;
@@ -435,8 +442,12 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
              << " on result " << i;
     }
     internalFunc.removeResultAttr(i, savedModelIndexPathIdent);
+    // TODO: The TensorFlow SavedModel attribute system does not distinguish
+    // lists from tuples, but TensorFlow internally does. Until this is
+    // plumbed through somehow, arbitrarily emit results as tuples as that
+    // was determined by someone at some point to be more canonical.
     if (!resultsRoot.bindValue(loc, i, internalFuncType.getResult(i),
-                               indexPathAttr)) {
+                               indexPathAttr, /*bindTuple=*/true)) {
       return failure();
     }
   }
@@ -445,7 +456,7 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // towards multi-return safe by converting to tuple.
   // TODO: Investigate upstream whether there are additional signals to be
   // plumbed.
-  bool isMultiResult = resultsRoot.type == LevelType::List;
+  bool isMultiResult = resultsRoot.type == LevelType::Tuple;
 
   // Build the wrapper function type.
   SmallVector<Type> wrapperArgTypes;

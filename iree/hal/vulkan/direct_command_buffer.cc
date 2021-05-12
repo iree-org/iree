@@ -14,8 +14,7 @@
 
 #include "iree/hal/vulkan/direct_command_buffer.h"
 
-#include <vector>
-
+#include "iree/base/internal/inline_array.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/descriptor_set_arena.h"
@@ -277,45 +276,52 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_execution_barrier(
     const iree_hal_buffer_barrier_t* buffer_barriers) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+  iree_allocator_t host_allocator =
+      command_buffer->logical_device->host_allocator();
 
-  std::vector<VkMemoryBarrier> memory_barrier_infos(memory_barrier_count);
+  iree_inline_array(VkMemoryBarrier, memory_barrier_infos, memory_barrier_count,
+                    host_allocator);
   for (int i = 0; i < memory_barrier_count; ++i) {
     const auto& memory_barrier = memory_barriers[i];
-    auto& info = memory_barrier_infos[i];
-    info.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    info.pNext = NULL;
-    info.srcAccessMask =
+    VkMemoryBarrier* info = iree_inline_array_at(memory_barrier_infos, i);
+    info->sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    info->pNext = NULL;
+    info->srcAccessMask =
         iree_hal_vulkan_convert_access_mask(memory_barrier.source_scope);
-    info.dstAccessMask =
+    info->dstAccessMask =
         iree_hal_vulkan_convert_access_mask(memory_barrier.target_scope);
   }
 
-  std::vector<VkBufferMemoryBarrier> buffer_barrier_infos(buffer_barrier_count);
+  iree_inline_array(VkBufferMemoryBarrier, buffer_barrier_infos,
+                    buffer_barrier_count, host_allocator);
   for (int i = 0; i < buffer_barrier_count; ++i) {
     const auto& buffer_barrier = buffer_barriers[i];
-    auto& info = buffer_barrier_infos[i];
-    info.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    info.pNext = NULL;
-    info.srcAccessMask =
+    VkBufferMemoryBarrier* info = iree_inline_array_at(buffer_barrier_infos, i);
+    info->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    info->pNext = NULL;
+    info->srcAccessMask =
         iree_hal_vulkan_convert_access_mask(buffer_barrier.source_scope);
-    info.dstAccessMask =
+    info->dstAccessMask =
         iree_hal_vulkan_convert_access_mask(buffer_barrier.target_scope);
-    info.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    info.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    info.buffer = iree_hal_vulkan_vma_buffer_handle(
+    info->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    info->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    info->buffer = iree_hal_vulkan_vma_buffer_handle(
         iree_hal_buffer_allocated_buffer(buffer_barrier.buffer));
-    info.offset = buffer_barrier.offset;
-    info.size = buffer_barrier.length;
+    info->offset = buffer_barrier.offset;
+    info->size = buffer_barrier.length;
   }
 
   command_buffer->syms->vkCmdPipelineBarrier(
       command_buffer->handle,
       iree_hal_vulkan_convert_pipeline_stage_flags(source_stage_mask),
       iree_hal_vulkan_convert_pipeline_stage_flags(target_stage_mask),
-      /*dependencyFlags=*/0, static_cast<uint32_t>(memory_barrier_infos.size()),
-      memory_barrier_infos.data(),
-      static_cast<uint32_t>(buffer_barrier_infos.size()),
-      buffer_barrier_infos.data(), 0, NULL);
+      /*dependencyFlags=*/0, (uint32_t)memory_barrier_count,
+      iree_inline_array_data(memory_barrier_infos),
+      (uint32_t)buffer_barrier_count,
+      iree_inline_array_data(buffer_barrier_infos), 0, NULL);
+
+  iree_inline_array_deinitialize(memory_barrier_infos);
+  iree_inline_array_deinitialize(buffer_barrier_infos);
 
   return iree_ok_status();
 }
@@ -357,48 +363,60 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_wait_events(
     const iree_hal_buffer_barrier_t* buffer_barriers) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+  iree_allocator_t host_allocator =
+      command_buffer->logical_device->host_allocator();
 
-  std::vector<VkEvent> event_handles(event_count);
+  iree_inline_array(VkEvent, event_handles, event_count, host_allocator);
   for (int i = 0; i < event_count; ++i) {
-    event_handles[i] = iree_hal_vulkan_native_event_handle(events[i]);
+    *iree_inline_array_at(event_handles, i) =
+        iree_hal_vulkan_native_event_handle(events[i]);
   }
 
-  std::vector<VkMemoryBarrier> memory_barrier_infos(memory_barrier_count);
+  iree_inline_array(VkMemoryBarrier, memory_barrier_infos, memory_barrier_count,
+                    host_allocator);
   for (int i = 0; i < memory_barrier_count; ++i) {
     const auto& memory_barrier = memory_barriers[i];
-    auto& info = memory_barrier_infos[i];
-    info.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    info.pNext = NULL;
-    info.srcAccessMask =
+    VkMemoryBarrier* info = iree_inline_array_at(memory_barrier_infos, i);
+    info->sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    info->pNext = NULL;
+    info->srcAccessMask =
         iree_hal_vulkan_convert_access_mask(memory_barrier.source_scope);
-    info.dstAccessMask =
+    info->dstAccessMask =
         iree_hal_vulkan_convert_access_mask(memory_barrier.target_scope);
   }
 
-  std::vector<VkBufferMemoryBarrier> buffer_barrier_infos(buffer_barrier_count);
+  iree_inline_array(VkBufferMemoryBarrier, buffer_barrier_infos,
+                    buffer_barrier_count, host_allocator);
   for (int i = 0; i < buffer_barrier_count; ++i) {
     const auto& buffer_barrier = buffer_barriers[i];
-    auto& info = buffer_barrier_infos[i];
-    info.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    info.pNext = NULL;
-    info.srcAccessMask =
+    VkBufferMemoryBarrier* info = iree_inline_array_at(buffer_barrier_infos, i);
+    info->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    info->pNext = NULL;
+    info->srcAccessMask =
         iree_hal_vulkan_convert_access_mask(buffer_barrier.source_scope);
-    info.dstAccessMask =
+    info->dstAccessMask =
         iree_hal_vulkan_convert_access_mask(buffer_barrier.target_scope);
-    info.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    info.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    info.buffer = iree_hal_vulkan_vma_buffer_handle(
+    info->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    info->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    info->buffer = iree_hal_vulkan_vma_buffer_handle(
         iree_hal_buffer_allocated_buffer(buffer_barrier.buffer));
-    info.offset = buffer_barrier.offset;
-    info.size = buffer_barrier.length;
+    info->offset = buffer_barrier.offset;
+    info->size = buffer_barrier.length;
   }
 
   command_buffer->syms->vkCmdWaitEvents(
-      command_buffer->handle, (uint32_t)event_count, event_handles.data(),
+      command_buffer->handle, (uint32_t)event_count,
+      iree_inline_array_data(event_handles),
       iree_hal_vulkan_convert_pipeline_stage_flags(source_stage_mask),
       iree_hal_vulkan_convert_pipeline_stage_flags(target_stage_mask),
-      (uint32_t)memory_barrier_count, memory_barrier_infos.data(),
-      (uint32_t)buffer_barrier_count, buffer_barrier_infos.data(), 0, NULL);
+      (uint32_t)memory_barrier_count,
+      iree_inline_array_data(memory_barrier_infos),
+      (uint32_t)buffer_barrier_count,
+      iree_inline_array_data(buffer_barrier_infos), 0, NULL);
+
+  iree_inline_array_deinitialize(event_handles);
+  iree_inline_array_deinitialize(memory_barrier_infos);
+  iree_inline_array_deinitialize(buffer_barrier_infos);
 
   return iree_ok_status();
 }
@@ -544,11 +562,15 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_bind_descriptor_set(
     const iree_device_size_t* dynamic_offsets) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+  iree_allocator_t host_allocator =
+      command_buffer->logical_device->host_allocator();
 
   // Vulkan takes uint32_t as the size here, unlike everywhere else.
-  std::vector<uint32_t> dynamic_offsets_i32(dynamic_offset_count);
+  iree_inline_array(uint32_t, dynamic_offsets_i32, dynamic_offset_count,
+                    host_allocator);
   for (int i = 0; i < dynamic_offset_count; ++i) {
-    dynamic_offsets_i32[i] = static_cast<uint32_t>(dynamic_offsets[i]);
+    *iree_inline_array_at(dynamic_offsets_i32, i) =
+        (uint32_t)dynamic_offsets[i];
   }
 
   VkDescriptorSet descriptor_sets[1] = {
@@ -558,8 +580,10 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_bind_descriptor_set(
       command_buffer->handle, VK_PIPELINE_BIND_POINT_COMPUTE,
       iree_hal_vulkan_native_executable_layout_handle(executable_layout), set,
       (uint32_t)IREE_ARRAYSIZE(descriptor_sets), descriptor_sets,
-      static_cast<uint32_t>(dynamic_offsets_i32.size()),
-      dynamic_offsets_i32.data());
+      (uint32_t)dynamic_offset_count,
+      iree_inline_array_data(dynamic_offsets_i32));
+
+  iree_inline_array_deinitialize(dynamic_offsets_i32);
 
   return iree_ok_status();
 }
@@ -571,14 +595,16 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
 
-  iree_hal_vulkan_source_location_t source_location;
-  iree_hal_vulkan_native_executable_entry_point_source_location(
-      executable, entry_point, &source_location);
-  IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context, command_buffer->handle,
-      source_location.file_name.data, source_location.file_name.size,
-      source_location.line, source_location.func_name.data,
-      source_location.func_name.size, NULL, 0);
+  IREE_TRACE({
+    iree_hal_vulkan_source_location_t source_location;
+    iree_hal_vulkan_native_executable_entry_point_source_location(
+        executable, entry_point, &source_location);
+    IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
+        command_buffer->tracing_context, command_buffer->handle,
+        source_location.file_name.data, source_location.file_name.size,
+        source_location.line, source_location.func_name.data,
+        source_location.func_name.size, NULL, 0);
+  });
 
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.

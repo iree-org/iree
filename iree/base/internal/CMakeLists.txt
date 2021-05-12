@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "atomics.h"
     "debugging.h"
+    "inline_array.h"
     "math.h"
   SRCS
     "atomics_clang.h"

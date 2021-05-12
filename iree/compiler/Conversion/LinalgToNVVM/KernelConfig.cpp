@@ -61,8 +61,21 @@ static LaunchConfig getOpLaunchConfig(linalg::MatmulOp op) {
   return config;
 }
 
-static LaunchConfig getOpLaunchConfig(linalg::BatchMatmulOp op) {
+// Basic default properties for linalg ops that haven't been tuned.
+static LaunchConfig getDefaultOpLaunchConfig(linalg::LinalgOp op) {
   LaunchConfig config;
+  size_t numLoops = getNumOuterParallelLoops(op);
+  if (numLoops == 0) return config;
+
+  config.setWorkgroupSize({cudaWarpSize, 1, 1});
+  int64_t lowerTs = 4 * cudaWarpSize;
+  SmallVector<int64_t, 4> ts;
+  ts.resize(numLoops, 1);
+  ts.back() = lowerTs;
+  config.setTileSizes(op, ts, 0);  // Workgroup level.
+  config.setTileSizes(op, {}, 1);  // Subgroup level.
+  ts.back() = lowerTs / cudaWarpSize;
+  config.setTileSizes(op, ts, 2);  // Thread level.
   return config;
 }
 
@@ -71,7 +84,7 @@ static LaunchConfig getOpLaunchConfig(linalg::LinalgOp linalgOp) {
     return getOpLaunchConfig(genericOp);
   if (auto matmul = dyn_cast<linalg::MatmulOp>(linalgOp.getOperation()))
     return getOpLaunchConfig(matmul);
-  return LaunchConfig();
+  return getDefaultOpLaunchConfig(linalgOp);
 }
 
 namespace mlir {
@@ -87,7 +100,12 @@ Optional<LaunchConfig> getCUDALaunchConfig(
   if (linalgOps.size() == 1) rootOperation = *linalgOps.begin();
   // if there is more than one linalg op, look for the root one.
   for (linalg::LinalgOp op : linalgOps) {
-    if (isa<linalg::BatchMatmulOp, linalg::MatmulOp>(op.getOperation())) {
+    if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
+            linalg::ConvInputNHWCFilterHWCFOp,
+            linalg::DepthwiseConvInputNHWCFilterHWCOp,
+            linalg::ConvInputNHWCFilterHWCFOp,
+            linalg::DepthwiseConvInputNHWCFilterHWCFOp,
+            linalg::DepthwiseConvInputNHWCFilterHWCOp>(op.getOperation())) {
       rootOperation = op;
       break;
     }

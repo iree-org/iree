@@ -235,13 +235,20 @@ class ConvertBroadcastOp : public OpConversionPattern<shape::BroadcastOp> {
                                        rhsType.getAllDims(), resultShape);
     auto resultType = RankedShapeType::get(resultShape, rewriter.getContext());
     auto iota = llvm::to_vector<4>(llvm::seq<int64_t>(0, rhsType.getRank()));
-    rewriter.replaceOpWithNewOp<RankedBroadcastShapeOp>(
+    Value broadcasted = rewriter.replaceOpWithNewOp<RankedBroadcastShapeOp>(
         op, resultType, lhs, rhs,
         /*lhs_broadcast_dimensions=*/
         rewriter.getI64TensorAttr(makeArrayRef(iota).drop_front(
             rhsType.getRank() - lhsType.getRank())),
         /*rhs_broadcast_dimensions=*/
         rewriter.getI64TensorAttr(iota));
+
+    // For FromExtentTensorOp users, just forward the RankedShapeType result.
+    for (Operation *user : op.getResult().getUsers()) {
+      if (isa<Shape::FromExtentTensorOp>(user)) {
+        rewriter.replaceOp(user, ValueRange{broadcasted});
+      }
+    }
     return success();
   }
 };

@@ -114,7 +114,7 @@ or `INSTALLED`. Defaults to `BUNDLED`. If set to `INSTALLED`, the variable
 Enables building of the TensorFlow to IREE compiler under
 `integrations/tensorflow`, including some native binaries and Python packages.
 Note that TensorFlow's build system is bazel and this will require having
-previously built (or installed) the iree-tf-import at the path specified by
+previously built (or installed) the iree-import-tf at the path specified by
 `IREE_TF_TOOLS_ROOT`.
 
 #### `IREE_BUILD_TFLITE_COMPILER`:BOOL
@@ -122,14 +122,14 @@ previously built (or installed) the iree-tf-import at the path specified by
 Enables building of the TFLite to IREE compiler under `integrations/tensorflow`,
 including some native binaries and Python packages. Note that TensorFlow's build
 system is bazel and this will require having previously built (or installed) the
-iree-tf-import at the path specified by `IREE_TF_TOOLS_ROOT`.
+iree-import-tf at the path specified by `IREE_TF_TOOLS_ROOT`.
 
 #### `IREE_BUILD_XLA_COMPILER`:BOOL
 
 Enables building of the XLA to IREE compiler under `integrations/tensorflow`,
 including some native binaries and Python packages. Note that TensorFlow's build
 system is bazel and this will require having previously built (or installed) the
-iree-tf-import at the path specified by `IREE_TF_TOOLS_ROOT`.
+iree-import-tf at the path specified by `IREE_TF_TOOLS_ROOT`.
 
 #### `IREE_TF_TOOLS_ROOT`:STRING
 
@@ -138,6 +138,12 @@ bindings. Defaults to
 "${CMAKE_SOURCE_DIR}/integrations/tensorflow/bazel-bin/iree_tf_compiler", which
 is where they would be placed by a `bazel build` invocation.
 
+#### `IREE_BUILD_EMBEDDING_SAMPLES`:STRING
+
+Enables building the simple embedding example code under
+`iree/samples/simple_embedding`. Default to `OFF`. Note
+`IREE_BUILD_EMBEDDING_SAMPLES` and `IREE_BUILD_SAMPLES` can not be set to `ON`
+at the same time.
 
 ## MLIR-specific CMake Options and Variables
 

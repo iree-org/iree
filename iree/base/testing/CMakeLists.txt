@@ -24,18 +24,16 @@ iree_cc_library(
   SHARED
 )
 
-iree_cc_embed_data(
+iree_c_embed_data(
   NAME
     dynamic_library_test_library
   GENERATED_SRCS
     "$<TARGET_FILE:iree::base::testing::dynamic_library_test_library.so>"
-  CC_FILE_OUTPUT
-    "dynamic_library_test_library_embed.cc"
+  C_FILE_OUTPUT
+    "dynamic_library_test_library_embed.c"
   H_FILE_OUTPUT
     "dynamic_library_test_library_embed.h"
   TESTONLY
-  CPP_NAMESPACE
-    "iree"
   FLATTEN
   PUBLIC
 )

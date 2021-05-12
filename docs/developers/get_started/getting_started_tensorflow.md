@@ -17,7 +17,7 @@ $ python -m pip install tf-nightly
 
 IREE's compiler integrations into TensorFlow are mediated by standalone binaries
 that can be built individually or installed from a distribution. These binaries
-are: `iree-tf-import`, `iree-import-tflite`, and `iree-import-xla`. They are
+are: `iree-import-tf`, `iree-import-tflite`, and `iree-import-xla`. They are
 configured in the
 [iree_tf_compiler BUILD file](https://github.com/google/iree/blob/main/integrations/tensorflow/iree_tf_compiler/BUILD).
 You have a few options for how to obtain these binaries
@@ -36,20 +36,20 @@ information.
 
 For example to run TensorFlow-based tests, you can build `iree-import-tf`
 
-TODO(4979): Rename iree-tf-import to iree-import-tf
+TODO(4979): Rename iree-import-tf to iree-import-tf
 
 ```shell
 python3 configure_bazel.py
 cd integrations/tensorflow
 bazel build \
-  //iree_tf_compiler:iree-tf-import \
+  //iree_tf_compiler:iree-import-tf \
   //iree_tf_compiler:iree-import-tflite \
   //iree_tf_compiler:iree-import-xla
 
 ```
 
 The directory containing the binary will be printed (i.e.
-`bazel-bin/iree_tf_compiler/iree-tf-import`) and the parent directory must be
+`bazel-bin/iree_tf_compiler/iree-import-tf`) and the parent directory must be
 passed to `-DIREE_TF_TOOLS_ROOT=` in a subsequent CMake invocation.
 
 ### Option 2. Install from a release

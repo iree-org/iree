@@ -189,7 +189,7 @@ APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
     cmake --build .
 
     # Validate.
-    python -c "import iree.tools.tf as _; print(_.get_tool('iree-tf-import'))"
+    python -c "import iree.tools.tf as _; print(_.get_tool('iree-import-tf'))"
     python -c "import iree.tools.tflite as _; print(_.get_tool('iree-import-tflite'))"
     python -c "import iree.tools.xla as _; print(_.get_tool('iree-import-xla'))"
     ```

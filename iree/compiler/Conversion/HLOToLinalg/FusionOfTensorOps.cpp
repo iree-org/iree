@@ -28,6 +28,11 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+static llvm::cl::opt<bool> clEnableFusionWithReductionOps(
+    "iree-enable-fusion-with-reduction-ops",
+    llvm::cl::desc("Allow fusing generic ops with reductions"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -90,14 +95,16 @@ struct FusionOfTensorOpsPass
     // will be computed anyway, so the consumers can just use that value.
     linalg::ControlElementwiseOpsFusionFn controlFn =
         [](const OpResult &producer, const OpOperand &consumer) {
-          // TODO(GH-5045): Enable fusion with reduction consumer. Currently
-          // vectorization doesn't handle generic ops with reduction iterators
-          // we will disable for now to allow vectorizing producer pointwise
-          // ops.
-          auto consumerOp = consumer.getOwner();
-          if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
-              dyn_cast<linalg::LinalgOp>(consumerOp).getNumReductionLoops()) {
-            return false;
+          // TODO(GH-5611): Enable fusion with reduction consumer for all
+          // targets. Currently vectorization doesn't handle generic ops with
+          // reduction iterators we will disable for now to allow vectorizing
+          // producer pointwise ops to avoid performance regressions on CPU.
+          if (!clEnableFusionWithReductionOps) {
+            auto consumerOp = consumer.getOwner();
+            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
+                dyn_cast<linalg::LinalgOp>(consumerOp).getNumReductionLoops()) {
+              return false;
+            }
           }
 
           llvm::SmallDenseSet<Operation *, 4> numUsers;

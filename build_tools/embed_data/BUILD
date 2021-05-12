@@ -14,7 +14,7 @@
 
 # Generates source files with embedded file contents.
 
-load(":build_defs.bzl", "c_embed_data", "cc_embed_data")
+load(":build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -32,58 +32,34 @@ cc_binary(
     ],
 )
 
-cc_embed_data(
+c_embed_data(
     name = "testembed1",
     # do not sort
     srcs = [
         "file1.bin",
         "data/file2.bin",
     ],
-    cc_file_output = "testembed1.cc",
-    cpp_namespace = "foobar",
+    c_file_output = "testembed1.c",
     flatten = True,
     h_file_output = "testembed1.h",
 )
 
-cc_embed_data(
+c_embed_data(
     name = "testembed2",
     srcs = [
         "data/file3.bin",
     ],
-    cc_file_output = "testembed2.cc",
-    cpp_namespace = "foobar",
+    c_file_output = "testembed2.c",
     flatten = True,
     h_file_output = "testembed2.h",
-)
-
-cc_test(
-    name = "cc_embed_data_test",
-    srcs = ["cc_embed_data_test.cc"],
-    deps = [
-        ":testembed1",
-        ":testembed2",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-c_embed_data(
-    name = "testembed1_c",
-    # do not sort
-    srcs = [
-        "file1.bin",
-        "data/file2.bin",
-    ],
-    c_file_output = "testembed1_c.c",
-    flatten = True,
-    h_file_output = "testembed1_c.h",
 )
 
 cc_test(
     name = "c_embed_data_test",
     srcs = ["c_embed_data_test.cc"],
     deps = [
-        ":testembed1_c",
+        ":testembed1",
+        ":testembed2",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

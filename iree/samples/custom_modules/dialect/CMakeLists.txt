@@ -46,17 +46,17 @@ iree_tablegen_library(
     -gen-op-defs custom_ops.cc.inc
 )
 
-iree_cc_embed_data(
+iree_c_embed_data(
   NAME
     custom_imports
   SRCS
     "custom.imports.mlir"
-  CC_FILE_OUTPUT
-    "custom.imports.cc"
+  C_FILE_OUTPUT
+    "custom.imports.c"
   H_FILE_OUTPUT
     "custom.imports.h"
-  CPP_NAMESPACE
-    "mlir::iree_compiler::IREE::Custom"
+  IDENTIFIER
+    "iree_custom_imports"
   FLATTEN
   PUBLIC
 )
