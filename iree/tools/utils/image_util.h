@@ -41,7 +41,7 @@ iree_status_t iree_tools_utils_load_pixel_data(
 // |shape_rank|, and |element_type|, while being allocated by |allocator|.
 //
 // The |element_type| has to be SINT_8 or UINT_8. For FLOAT_32, use
-// |iree_tools_utils_buffer_biew_from_image_rescaled| instead.
+// |iree_tools_utils_buffer_view_from_image_rescaled| instead.
 //
 // The returned |out_buffer_view| must be released by the caller.
 iree_status_t iree_tools_utils_buffer_view_from_image(
@@ -55,7 +55,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
 // The value in |out_buffer_view| is rescaled with |input_range|.
 //
 // The |element_type| has to be FLOAT_32, For SINT_8 or UINT_8, use
-// |iree_tools_utils_buffer_biew_from_image| instead.
+// |iree_tools_utils_buffer_view_from_image| instead.
 //
 // The returned |out_buffer_view| must be released by the caller.
 iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
