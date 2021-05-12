@@ -21,9 +21,9 @@ package(
 filegroup(
     name = "importer-binaries",
     srcs = [
-        ":iree-import-tflite",
         ":iree-import-xla",
         ":iree-import-tf",
+        ":iree-import-tflite",
     ],
 )
 
