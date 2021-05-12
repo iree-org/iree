@@ -331,25 +331,19 @@ LogicalResult getGenericOpLaunchConfig(linalg::LinalgOp linalgOp,
                                        const SPIRVCodegenOptions &options,
                                        TileSizesListType &tileSizes,
                                        LaunchConfigInfo &config) {
-  // Skip vectorization for non-minor identity inputs and non-identity osutput
-  // as it generates transfer_read ops with permutation maps that we currently
-  // cannot lower.
+  // Skip vectorization for non-minor identity inputs as it generates
+  // transfer_read ops with permutation maps that we currently cannot lower.
   // TODO: Remove this restriction once the lowering of the permutation map is
   // supported in core.
-  bool vectorize =
-      !linalgOp.hasIndexSemantics() &&
-      llvm::all_of(linalgOp.getInputIndexingMaps(),
-                   [](AffineMap &map) { return map.isMinorIdentity(); }) &&
-      llvm::all_of(linalgOp.getOutputIndexingMaps(),
-                   [](AffineMap &map) { return map.isIdentity(); });
+  bool vectorize = llvm::all_of(linalgOp.getIndexingMaps(), [](AffineMap &map) {
+    return map.isMinorIdentity();
+  });
   int64_t subgroupSize =
       targetEnv.getResourceLimits().subgroup_size().getValue().getSExtValue();
   config.workgroupSize[0] = subgroupSize;
   config.workgroupSize[1] = 1;
   config.workgroupSize[2] = 1;
-  SmallVector<ShapedType> inputTypes, outputTypes;
-  std::tie(inputTypes, outputTypes) = getInputOutputTypes(linalgOp);
-  ShapedType outputShape = outputTypes[0];
+  ShapedType outputShape = linalgOp.getOutputShapedType(0);
 
   SmallVector<int64_t, 4> candidateTileSizes;
   // When Vectororization is not enabled we skil the second level of tiling and

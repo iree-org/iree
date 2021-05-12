@@ -258,6 +258,8 @@ struct StructureLevel {
                                      builder.getIndexAttr(getNeededListSize()));
       Value listValue = builder.create<iree_compiler::IREE::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
+      builder.create<iree_compiler::IREE::ListResizeOp>(loc, listValue,
+                                                        listSizeValue);
       for (StructureLevel &child : children) {
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
@@ -275,6 +277,8 @@ struct StructureLevel {
                                      builder.getIndexAttr(getNeededListSize()));
       Value listValue = builder.create<iree_compiler::IREE::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
+      builder.create<iree_compiler::IREE::ListResizeOp>(loc, listValue,
+                                                        listSizeValue);
       for (auto it : llvm::enumerate(children)) {
         StructureLevel &child = it.value();
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
