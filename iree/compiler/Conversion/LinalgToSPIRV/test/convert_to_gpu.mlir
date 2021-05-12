@@ -229,18 +229,19 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<40x50x75xf32>
         %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<f32>
         %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<40xf32>
-        linalg.indexed_generic {
+        linalg.generic {
           indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                            affine_map<(d0, d1, d2) -> ()>,
                            affine_map<(d0, d1, d2) -> (d0)>],
           iterator_types = ["parallel", "reduction", "reduction"]}
           ins(%arg0, %arg1 : memref<40x50x75xf32>, memref<f32>)
           outs(%arg2 : memref<40xf32>) {
-        ^bb0(%arg3: index, %arg4: index, %arg5: index,
-          %arg6: f32, %arg7: f32, %arg8: f32):   // no predecessors
+        ^bb0(%arg6: f32, %arg7: f32, %arg8: f32):   // no predecessors
+          %idx1 = linalg.index 1 : index
+          %idx2 = linalg.index 2 : index
           %zero = constant 0 : index
-          %0 = cmpi eq, %arg5, %zero : index
-          %1 = cmpi eq, %arg4, %zero : index
+          %0 = cmpi eq, %idx2, %zero : index
+          %1 = cmpi eq, %idx1, %zero : index
           %2 = and %0, %1 : i1
           %3 = select %2, %arg7, %arg8 : f32
           %4 = addf %arg6, %3 : f32
