@@ -98,13 +98,15 @@ iree_e2e_cartesian_product_test_suite(
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 iree_python_benchmark_suite(
+  CONFIGURATION_NAME
+    "whole-inference"
   MODELS
     MobileBERT
   MODEL_SCRIPT
     mobile_bert_squad_benchmark.py
   TARGET_BACKEND
     iree_vulkan
-  CONFIGURATION_NAME
+  TARGET_ARCH
     "GPU-Mali-Valhall"
   COMPILATION_FLAGS
     "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
@@ -114,13 +116,15 @@ iree_python_benchmark_suite(
 )
 
 iree_python_benchmark_suite(
+  CONFIGURATION_NAME
+    "whole-inference"
   MODELS
     MobileBERT
   MODEL_SCRIPT
     mobile_bert_squad_benchmark.py
   TARGET_BACKEND
     iree_llvmaot
-  CONFIGURATION_NAME
+  TARGET_ARCH
     "CPU-ARM-v8.2-A"
   COMPILATION_FLAGS
     "--iree-llvm-target-triple=aarch64-none-linux-android29"

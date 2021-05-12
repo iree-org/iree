@@ -72,7 +72,7 @@ if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)
 endif()
 
-if(${IREE_BUILD_TESTS} AND ${IREE_BUILD_PYTHON_BINDINGS})
+if((${IREE_BUILD_TESTS} OR ${IREE_BUILD_BENCHMARKS}) AND ${IREE_BUILD_PYTHON_BINDINGS})
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/e2e/")
   include(iree_e2e_cartesian_product_test_suite)
   include(iree_python_benchmark_suite)

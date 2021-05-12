@@ -1,5 +1,5 @@
 # Lint as: python3
-# Copyright 2019 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,10 +17,6 @@
 # pylint: disable=missing-docstring
 # pylint: disable=protected-access
 # pylint: disable=unsupported-assignment-operation
-
-# This file uses the following abbreviations:
-#   ref: reference – for the reference CompiledModule
-#   tar: target - for one of the target CompiledModules
 
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
@@ -107,7 +103,7 @@ def get_target_backend_configs() -> Sequence[module_utils.BackendInfo]:
     logging.info(f"compilation flags: {cflags}")
     logging.info(f"runtime flags: {rflags}")
 
-    backend_id = f"{FLAGS.target_backend}_{name}"
+    backend_id = f"{FLAGS.target_backend}__{name}"
     configs.append(
         module_utils.BackendInfo(FLAGS.target_backend, backend_id, cflags,
                                  rflags))
@@ -125,16 +121,17 @@ def compose_and_write_flagfile(
       f"--module_file=compiled.vmfb",
       f"--driver={driver}",
       f"--entry_function={entry_function}",
-  ] + [f"--function_input={input}" for input in function_inputs
-      ] + additional_args
+  ]
+  flagfile.extend([f"--function_input={input}" for input in function_inputs])
+  flagfile.extend(additional_args)
 
   with open(os.path.join(path, "flagfile"), "w") as f:
     f.writelines(line + "\n" for line in flagfile)
 
 
-def get_mlir_tensor_type(shape: Sequence[int], dtype: str):
+def get_mlir_tensor_type(shape: Sequence[int], dtype: tf.dtypes.DType):
 
-  def convert_dtype(dtype: str):
+  def convert_dtype(dtype: tf.dtypes.DType):
     if dtype.name.startswith("float"):
       return "f" + dtype.name[5:]
     if dtype.name.startswith("int"):
@@ -145,12 +142,13 @@ def get_mlir_tensor_type(shape: Sequence[int], dtype: str):
 
 
 # TODO(#4131) python>=3.7: Consider using a (frozen) dataclass.
-Modules = collections.namedtuple("Modules", ["tar_modules", "artifacts_dir"])
+Modules = collections.namedtuple("Modules", ["target_modules", "artifacts_dir"])
 
 
 def compile_tf_module(module_class: Type[tf.Module],
                       exported_name: str,
-                      input_shapes_dtypes: Sequence[tuple[Sequence[int], str]],
+                      input_shapes_dtypes: Sequence[tuple[Sequence[int],
+                                                          tf.dtypes.DType]],
                       relative_artifacts_dir: str = None) -> Modules:
   """Compiles module_class to each backend that we test.
 
@@ -172,14 +170,14 @@ def compile_tf_module(module_class: Type[tf.Module],
     relative_artifacts_dir = module_class.__name__
   artifacts_dir = _setup_artifacts_dir(relative_artifacts_dir)
 
-  tar_backend_configs = get_target_backend_configs()
+  target_backend_configs = get_target_backend_configs()
 
   compile_backend = lambda backend_info: backend_info.compile_from_class(
       module_class, [exported_name], artifacts_dir)
 
-  tar_modules = []
-  for config in tar_backend_configs:
-    tar_modules.append(compile_backend(config))
+  target_modules = []
+  for config in target_backend_configs:
+    target_modules.append(compile_backend(config))
     flagfile_path = os.path.join(artifacts_dir, config.backend_id)
     function_inputs = [
         get_mlir_tensor_type(shape, dtype)
@@ -188,13 +186,13 @@ def compile_tf_module(module_class: Type[tf.Module],
     compose_and_write_flagfile(flagfile_path, config.driver, exported_name,
                                function_inputs, config.runtime_flags)
 
-  return Modules(tar_modules, artifacts_dir)
+  return Modules(target_modules, artifacts_dir)
 
 
 def compile_tf_signature_def_saved_model(
     saved_model_dir: str, saved_model_tags: Set[str], module_name: str,
     exported_name: str, input_names: Sequence[str],
-    input_shapes_dtypes: Sequence[tuple[Sequence[int], str]],
+    input_shapes_dtypes: Sequence[tuple[Sequence[int], tf.dtypes.DType]],
     output_names: Sequence[str]) -> Modules:
   """Compiles a SignatureDef SavedModel to each backend that we test.
 
@@ -206,6 +204,7 @@ def compile_tf_signature_def_saved_model(
     exported_name: A str representing the signature on the saved model to
       compile.
     input_names: A sequence of kwargs to feed to the saved model.
+    input_shapes_dtypes: a sequence of input tensors' shapes and dtypes.
     output_names: A sequence of named outputs to extract from the saved model.
 
   Returns:
@@ -215,16 +214,16 @@ def compile_tf_signature_def_saved_model(
   # Setup the directory for saving compilation artifacts and traces.
   artifacts_dir = _setup_artifacts_dir(module_name)
 
-  tar_backend_configs = get_target_backend_configs()
+  target_backend_configs = get_target_backend_configs()
 
   compile_backend = (
       lambda backend_info: backend_info.compile_signature_def_saved_model(
           saved_model_dir, saved_model_tags, module_name, exported_name,
           input_names, output_names, artifacts_dir))
 
-  tar_modules = []
-  for config in tar_backend_configs:
-    tar_modules.append(compile_backend(config))
+  target_modules = []
+  for config in target_backend_configs:
+    target_modules.append(compile_backend(config))
     flagfile_path = os.path.join(artifacts_dir, config.backend_id)
     function_inputs = [
         get_mlir_tensor_type(shape, dtype)
@@ -233,4 +232,4 @@ def compile_tf_signature_def_saved_model(
     compose_and_write_flagfile(flagfile_path, config.driver, exported_name,
                                function_inputs, config.runtime_flags)
 
-  return Modules(tar_modules, artifacts_dir)
+  return Modules(target_modules, artifacts_dir)

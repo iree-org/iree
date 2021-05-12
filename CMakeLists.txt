@@ -42,6 +42,7 @@ option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
@@ -425,8 +426,12 @@ endif()
 # IREE top-level targets
 #-------------------------------------------------------------------------------
 
-# Add a top-level custom target to drive generating benchmark suites.
-add_custom_target(iree-generate-benchmark-suites)
+if(${IREE_BUILD_BENCHMARKS})
+  # Add a top-level custom target to drive generating benchmark suites.
+  # Register it to the default target given that IREE_BUILD_BENCHMARKS is
+  # explicitly requested.
+  add_custom_target(iree-benchmark-suites ALL)
+endif()
 
 if(${IREE_BUILD_DOCS})
   # Add a top-level custom target to drive generating all documentation.

@@ -921,9 +921,9 @@ class BackendInfo:
         'tf', 'tflite', 'iree_vmla', 'iree_vulkan', 'iree_llvmaot'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
-      compilation_flags: an optional list of flags to pass to the compiler
+      compilation_flags: an optional sequence of flags to pass to the compiler
         when compiling artifacts for the backend.
-      runtime_flags: an optional list of flags to pass to the runtime when
+      runtime_flags: an optional sequence of flags to pass to the runtime when
         running the generated artifacts for the backend.
 
     Raises:
