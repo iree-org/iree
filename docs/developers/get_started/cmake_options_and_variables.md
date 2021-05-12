@@ -114,7 +114,7 @@ or `INSTALLED`. Defaults to `BUNDLED`. If set to `INSTALLED`, the variable
 Enables building of the TensorFlow to IREE compiler under
 `integrations/tensorflow`, including some native binaries and Python packages.
 Note that TensorFlow's build system is bazel and this will require having
-previously built (or installed) the iree-tf-import at the path specified by
+previously built (or installed) the iree-import-tf at the path specified by
 `IREE_TF_TOOLS_ROOT`.
 
 #### `IREE_BUILD_TFLITE_COMPILER`:BOOL
@@ -122,14 +122,14 @@ previously built (or installed) the iree-tf-import at the path specified by
 Enables building of the TFLite to IREE compiler under `integrations/tensorflow`,
 including some native binaries and Python packages. Note that TensorFlow's build
 system is bazel and this will require having previously built (or installed) the
-iree-tf-import at the path specified by `IREE_TF_TOOLS_ROOT`.
+iree-import-tf at the path specified by `IREE_TF_TOOLS_ROOT`.
 
 #### `IREE_BUILD_XLA_COMPILER`:BOOL
 
 Enables building of the XLA to IREE compiler under `integrations/tensorflow`,
 including some native binaries and Python packages. Note that TensorFlow's build
 system is bazel and this will require having previously built (or installed) the
-iree-tf-import at the path specified by `IREE_TF_TOOLS_ROOT`.
+iree-import-tf at the path specified by `IREE_TF_TOOLS_ROOT`.
 
 #### `IREE_TF_TOOLS_ROOT`:STRING
 

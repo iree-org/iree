@@ -168,7 +168,7 @@ void registerMHLOImportPassPipeline() {
 
 void registerTFImportPassPipeline() {
   mlir::PassPipelineRegistration<> pipeline(
-      "iree-tf-import-pipeline",
+      "iree-import-tf-pipeline",
       "Run IREE-specific passes for importing TF code into IREE",
       [](OpPassManager &passManager) {
         buildTFImportPassPipeline(passManager);

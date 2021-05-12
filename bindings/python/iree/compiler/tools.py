@@ -39,7 +39,7 @@ __all__ = [
 _TOOL_MODULE_MAP = {
     "iree-import-tflite": "iree.tools.tflite",
     "iree-import-xla": "iree.tools.xla",
-    "iree-tf-import": "iree.tools.tf",
+    "iree-import-tf": "iree.tools.tf",
     "iree-translate": "iree.tools.core",
 }
 
