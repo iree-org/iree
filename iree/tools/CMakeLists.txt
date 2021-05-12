@@ -392,9 +392,10 @@ if(${IREE_BUILD_COMPILER})
     "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck"
   )
   add_dependencies(iree_tools_IreeFileCheck iree_tools_IreeFileCheck_Driver)
-  # Finally do our normal aliasing trick to make this accessible as a qualified
-  # target name throughout the project.
+  # Finally do our normal aliasing tricks to make this accessible as a qualified
+  # and unqualified target name throughout the project.
   add_executable(iree::tools::IreeFileCheck ALIAS iree_tools_IreeFileCheck)
+  add_executable(IreeFileCheck ALIAS iree_tools_IreeFileCheck)
 
   if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
     add_custom_target(BundledLLVMFileCheck ALL

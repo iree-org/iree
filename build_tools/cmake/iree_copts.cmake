@@ -456,7 +456,7 @@ endif()
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
 # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
 # tools in LLVM.
-iree_get_executable_path(IREE_TABLEGEN_EXE iree::tools::iree-tblgen)
+iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
 
 #-------------------------------------------------------------------------------
 # Third party: mlir-emitc

@@ -31,7 +31,9 @@ include(CMakeParseArguments)
 #
 # Note:
 # iree_cc_binary will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
-# iree_base_foo with an alias (readonly) target called ${NAME}.
+# iree_base_foo with two alias (readonly) targets, a qualified
+# ${PACKAGE_NS}::${NAME} and an unqualified ${NAME}. Thus NAME must be globally
+# unique in the project.
 #
 # Usage:
 # iree_cc_library(
@@ -79,11 +81,17 @@ function(iree_cc_binary)
   # If the binary name matches the package then treat it as a default. For
   # example, foo/bar/ library 'bar' would end up as 'foo::bar'. This isn't
   # likely to be common for binaries, but is consistent with the behavior for
-  # libraries.
+  # libraries and in Bazel.
   iree_package_dir(_PACKAGE_DIR)
   if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
     add_executable(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
+
+  # Finally, since we have so few binaries and we also want to support
+  # installing from a separate host build, binaries get an unqualified global
+  # alias. This means binary names must be unique across the whole project.
+  # (We could consider making this configurable).
+  add_executable(${_RULE_NAME} ALIAS ${_NAME})
 
   set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   if(_RULE_SRCS)
