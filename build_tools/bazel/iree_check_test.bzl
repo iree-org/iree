@@ -54,7 +54,7 @@ def iree_check_test(
         flags = [
             "-iree-mlir-to-vm-bytecode-module",
             "-mlir-print-op-on-diagnostic=false",
-            "--iree-hal-target-backends=%s" % target_backend,
+            "-iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
         visibility = ["//visibility:private"],
     )
