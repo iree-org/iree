@@ -239,11 +239,17 @@ static bool isRootOp(Operation *op) {
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
-  if (isa<linalg::InitTensorOp, tensor::ExtractOp>(op)) {
+  if (isa<IndexCastOp, linalg::InitTensorOp, tensor::ExtractOp>(op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<ConstantOp>(op)) {
     return constantOp.getResult().getType().isIntOrIndexOrFloat();
+  }
+  if (llvm::all_of(op->getOperands(),
+                   [&](Value v) { return v.getType().isIntOrFloat(); }) &&
+      llvm::all_of(op->getResults(),
+                   [&](Value v) { return v.getType().isIntOrFloat(); })) {
+    return true;
   }
   return false;
 }
