@@ -20,44 +20,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-filegroup(
-    name = "td_files",
-    srcs = ["LoweringConfig.td"],
-)
-
-gentbl(
-    name = "LoweringConfigGen",
-    tbl_outs = [
-        ("-gen-struct-attr-decls", "LoweringConfig.h.inc"),
-        ("-gen-struct-attr-defs", "LoweringConfig.cpp.inc"),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "LoweringConfig.td",
-    td_srcs = [
-        ":td_files",
-        "//iree/compiler/Dialect/HAL/IR/HALBase.td",
-        "@llvm-project//mlir::OpBaseTdFiles",
-    ],
-)
-
-cc_library(
-    name = "LoweringConfig",
-    srcs = [
-        "LoweringConfig.cpp",
-        "LoweringConfig.cpp.inc",
-    ],
-    hdrs = [
-        "LoweringConfig.h",
-        "LoweringConfig.h.inc",
-    ],
-    deps = [
-        ":LoweringConfigGen",
-        "//iree/compiler/Dialect/HAL/IR",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:StandardOps",
-    ],
-)
-
 cc_library(
     name = "Common",
     srcs = [
@@ -78,7 +40,6 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Conversion/CodegenUtils",
-        "//iree/compiler/Conversion/Common:LoweringConfig",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",

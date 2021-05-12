@@ -10,32 +10,6 @@
 
 iree_add_all_subdirs()
 
-iree_tablegen_library(
-  NAME
-    LoweringConfigGen
-  TD_FILE
-    "LoweringConfig.td"
-  OUTS
-    -gen-struct-attr-decls LoweringConfig.h.inc
-    -gen-struct-attr-defs LoweringConfig.cpp.inc
-)
-
-iree_cc_library(
-  NAME
-    LoweringConfig
-  HDRS
-    "LoweringConfig.h"
-    "LoweringConfig.h.inc"
-  SRCS
-    "LoweringConfig.cpp"
-    "LoweringConfig.cpp.inc"
-  DEPS
-    MLIRIR
-    MLIRStandard
-    iree::compiler::Dialect::HAL::IR
-  PUBLIC
-)
-
 iree_cc_library(
   NAME
     Common
@@ -71,7 +45,6 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     iree::compiler::Conversion::CodegenUtils
-    iree::compiler::Conversion::Common::LoweringConfig
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR

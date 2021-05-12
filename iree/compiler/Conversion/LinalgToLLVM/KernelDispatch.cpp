@@ -16,6 +16,7 @@
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -175,6 +176,7 @@ static FailureOr<linalg::LinalgOp> setRootConfig(
   // First iterate over all operations to find the root operations and set its
   // lowering configuration (that are not linalg.generic).
   for (auto linalgOp : linalgOps) {
+    if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
     auto status =
         TypeSwitch<Operation *, LogicalResult>(linalgOp.getOperation())
             .Case<linalg::ContractionOpInterface>(
@@ -193,6 +195,7 @@ static FailureOr<linalg::LinalgOp> setRootConfig(
   // generic op and set its configuration.
   if (!rootOperation) {
     for (auto linalgOp : linalgOps) {
+      if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
       auto status =
           TypeSwitch<Operation *, LogicalResult>(linalgOp.getOperation())
               .Case<linalg::GenericOp>(
@@ -220,7 +223,7 @@ LogicalResult initCPULaunchConfig(ArrayRef<linalg::LinalgOp> linalgOps) {
     auto rootOperation = setRootConfig(linalgOps);
     if (failed(rootOperation)) return failure();
     // If root operation is null. Nothing to do.
-    if (rootOperation.getValue()) return success();
+    if (!rootOperation.getValue()) return success();
     firstLevelTileSizes = getTileSizes(*rootOperation, 0);
   }
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Conversion/Common/LoweringConfig.h"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -20,7 +20,7 @@
 static const char kConfigAttrName[] = "lowering.config";
 static const char kPipelineNameAttrName[] = "lowering.pipeline";
 
-#include "iree/compiler/Conversion/Common/LoweringConfig.cpp.inc"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.cpp.inc"
 
 namespace mlir {
 namespace iree_compiler {

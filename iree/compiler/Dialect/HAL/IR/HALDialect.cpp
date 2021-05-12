@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
@@ -87,13 +88,24 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
   }
 };
 
+class LoweringConfigAsmDialectInterface : public OpAsmDialectInterface {
+  using OpAsmDialectInterface::OpAsmDialectInterface;
+
+  LogicalResult getAlias(Attribute attr, raw_ostream &os) const override {
+    if (attr.isa<LoweringConfig>()) {
+      os << "config";
+      return success();
+    }
+    return failure();
+  }
+};
+
 }  // namespace
 
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<HALDialect>()) {
   context->loadDialect<IREEDialect>();
 
-  addInterfaces<HALInlinerInterface, HALToVMConversionInterface>();
   registerAttributes();
   registerTypes();
 
@@ -101,6 +113,8 @@ HALDialect::HALDialect(MLIRContext *context)
   addOperations<
 #include "iree/compiler/Dialect/HAL/IR/HALOps.cpp.inc"
       >();
+  addInterfaces<HALInlinerInterface, HALToVMConversionInterface,
+                LoweringConfigAsmDialectInterface>();
 }
 
 //===----------------------------------------------------------------------===//

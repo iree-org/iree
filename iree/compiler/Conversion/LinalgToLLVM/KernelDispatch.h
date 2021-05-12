@@ -14,7 +14,7 @@
 
 #include <cstdint>
 
-#include "iree/compiler/Conversion/Common/LoweringConfig.h"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"

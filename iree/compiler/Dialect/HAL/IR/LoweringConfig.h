@@ -23,12 +23,10 @@
 #ifndef IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
 #define IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
 
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h.inc"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
-
-// Include the table-gened file.
-#include "iree/compiler/Conversion/Common/LoweringConfig.h.inc"
 
 namespace mlir {
 namespace iree_compiler {
