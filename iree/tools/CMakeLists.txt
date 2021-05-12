@@ -370,16 +370,16 @@ if(${IREE_BUILD_COMPILER})
   # Symlink the shell script into the build tree as the expected executable name
   add_custom_command(
     OUTPUT
-      IreeFileCheck.sh
+      IreeFileCheck
     COMMAND
       ${CMAKE_COMMAND} -E create_symlink
       ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh
-      IreeFileCheck.sh
+      IreeFileCheck
   )
 
   # CMake always needs to custom targets to drive custom commands. We have to
   # give it a different name.
-  add_custom_target(iree_tools_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck.sh)
+  add_custom_target(iree_tools_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck)
 
   # But custom target doesn't have the TARGET_FILE property, which we need, so
   # wrap it yet again in an executable. This is marked as an imported executable
@@ -389,13 +389,14 @@ if(${IREE_BUILD_COMPILER})
     TARGET
     iree_tools_IreeFileCheck
     PROPERTY IMPORTED_LOCATION
-    "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck.sh"
+    "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck"
   )
   add_dependencies(iree_tools_IreeFileCheck iree_tools_IreeFileCheck_Driver)
   # Finally do our normal aliasing tricks to make this accessible as a qualified
-  # and unqualified target name throughout the project.
+  # target name throughout the project. Accessing this as an unqualified target
+  # is not supported as the name would conflict with the file name, which CMake
+  # does not support (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
   add_executable(iree::tools::IreeFileCheck ALIAS iree_tools_IreeFileCheck)
-  add_executable(IreeFileCheck ALIAS iree_tools_IreeFileCheck)
 
   if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
     add_custom_target(BundledLLVMFileCheck ALL
