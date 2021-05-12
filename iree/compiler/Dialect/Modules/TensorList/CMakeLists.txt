@@ -10,17 +10,17 @@
 
 iree_add_all_subdirs()
 
-iree_cc_embed_data(
+iree_c_embed_data(
   NAME
     tensorlist_imports
   SRCS
     "tensorlist.imports.mlir"
-  CC_FILE_OUTPUT
-    "tensorlist.imports.cc"
+  C_FILE_OUTPUT
+    "tensorlist.imports.c"
   H_FILE_OUTPUT
     "tensorlist.imports.h"
-  CPP_NAMESPACE
-    "mlir::iree_compiler::IREE::TensorList"
+  IDENTIFIER
+    "iree_tensorlist_imports"
   FLATTEN
   PUBLIC
 )

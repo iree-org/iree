@@ -184,6 +184,7 @@ iree_check_single_backend_test_suite(
     "clamp.mlir"
     "compare.mlir"
     "constant.mlir"
+    "convolution.mlir"
     "divide.mlir"
     "iota.mlir"
     "multiply.mlir"

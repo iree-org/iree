@@ -10,17 +10,17 @@
 
 iree_add_all_subdirs()
 
-iree_cc_embed_data(
+iree_c_embed_data(
   NAME
     vmla_imports
   SRCS
     "vmla.imports.mlir"
-  CC_FILE_OUTPUT
-    "vmla.imports.cc"
+  C_FILE_OUTPUT
+    "vmla.imports.c"
   H_FILE_OUTPUT
     "vmla.imports.h"
-  CPP_NAMESPACE
-    "mlir::iree_compiler"
+  IDENTIFIER
+    "iree_vmla_imports"
   FLATTEN
   PUBLIC
 )

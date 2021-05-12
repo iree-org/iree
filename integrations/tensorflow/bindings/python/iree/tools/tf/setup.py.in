@@ -83,7 +83,7 @@ setup(
         "iree.tf.support",
     ]),
     package_data={
-        "iree.tools.tf": [f"iree-tf-import{exe_suffix}",],
+        "iree.tools.tf": [f"iree-import-tf{exe_suffix}",],
     },
     cmdclass={
         'bdist_wheel': bdist_wheel,

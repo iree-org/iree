@@ -356,14 +356,11 @@ class ProcessInterfaceBinding final
   }
 };
 
-/// Translates vector.transfer_read with less than 4 scalars into reading each
-/// scalar and then compose the vector.
-///
-/// This is a very specific pattern for handling corner cases and boundary
-/// cases. For example, in vision models we can have the initial image with
-/// three channels. We cannot perform the native load4 there; by performing
-/// scalar read we lose some benefits of load4 but we can still make sure the
-/// overall vectorization does not fail.
+/// Scalarizes remaining vector transfer that couldn't be converted to
+/// vevtor load operations.
+
+/// This is very specific to SPIR-V as pointer cannot be casted to vector type
+/// if any of the memory access is not vector.
 struct ScalarizeVectorTransferRead final
     : public OpRewritePattern<vector::TransferReadOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -371,31 +368,49 @@ struct ScalarizeVectorTransferRead final
                                 PatternRewriter &rewriter) const override {
     VectorType vectorType = readOp.getType();
     Type scalarType = vectorType.getElementType();
-    if (vectorType.getRank() != 1 || vectorType.getDimSize(0) >= 4)
+    if (vectorType.getRank() != 1 ||
+        !readOp.permutation_map().isMinorIdentity())
       return failure();
 
     Location loc = readOp.getLoc();
-
-    SmallVector<Value, 4> scalars;
-    SmallVector<Value, 4> indices(readOp.indices().begin(),
-                                  readOp.indices().end());
-    for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      indices.back() = rewriter.createOrFold<ConstantIndexOp>(loc, i);
-      scalars.push_back(rewriter.create<memref::LoadOp>(
-          loc, scalarType, readOp.source(), indices));
-    }
-
     Value newVector = rewriter.create<ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      Value index = rewriter.createOrFold<ConstantOp>(
-          loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(i));
-      newVector = rewriter.create<vector::InsertElementOp>(loc, scalars[i],
-                                                           newVector, index);
+      SmallVector<Value, 4> indices(readOp.indices().begin(),
+                                    readOp.indices().end());
+      indices.back() = rewriter.createOrFold<AddIOp>(
+          loc, indices.back(), rewriter.createOrFold<ConstantIndexOp>(loc, i));
+      Value scalar = rewriter.create<memref::LoadOp>(loc, scalarType,
+                                                     readOp.source(), indices);
+      newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
     }
-
     rewriter.replaceOp(readOp, newVector);
+    return success();
+  }
+};
 
+struct ScalarizeVectorTransferWrite final
+    : public OpRewritePattern<vector::TransferWriteOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
+                                PatternRewriter &rewriter) const override {
+    VectorType vectorType = writeOp.getVectorType();
+    if (vectorType.getRank() != 1 ||
+        !writeOp.permutation_map().isMinorIdentity())
+      return failure();
+
+    Location loc = writeOp.getLoc();
+
+    for (int i = 0; i < vectorType.getDimSize(0); ++i) {
+      SmallVector<Value, 4> indices(writeOp.indices().begin(),
+                                    writeOp.indices().end());
+      indices.back() = rewriter.createOrFold<AddIOp>(
+          loc, indices.back(), rewriter.createOrFold<ConstantIndexOp>(loc, i));
+      Value scalar =
+          rewriter.create<vector::ExtractOp>(loc, writeOp.vector(), i);
+      rewriter.create<memref::StoreOp>(loc, scalar, writeOp.source(), indices);
+    }
+    rewriter.eraseOp(writeOp);
     return success();
   }
 };
@@ -476,7 +491,9 @@ void VectorizeMemRefLoadStorePass::runOnOperation() {
 
   for (FuncOp func : module.getOps<FuncOp>()) {
     RewritePatternSet rewritingPatterns(context);
-    rewritingPatterns.add<ScalarizeVectorTransferRead>(context);
+    rewritingPatterns
+        .add<ScalarizeVectorTransferRead, ScalarizeVectorTransferWrite>(
+            context);
 
     (void)applyPatternsAndFoldGreedily(func, std::move(rewritingPatterns));
   }

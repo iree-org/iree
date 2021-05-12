@@ -31,7 +31,7 @@ python -m pip install \
 
 IREE compilers transform a model into its final deployable format in several
 sequential steps. The first step for a TensorFlow model is to use either the
-`iree-tf-import` command-line tool or IREE's Python APIs to import the model
+`iree-import-tf` command-line tool or IREE's Python APIs to import the model
 into a format (i.e., [MLIR](https://mlir.llvm.org/)) compatible with the generic
 IREE compilers.
 
@@ -56,12 +56,12 @@ print(list(imported_with_signatures.signatures.keys()))
     them by yourself by following
     ["Missing serving signature in SavedModel"](#missing-serving-signature-in-savedmodel).
 
-Then you can import the model with `iree-tf-import`. You can read the options
-supported via `iree-tf-import -help`. Using [MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
+Then you can import the model with `iree-import-tf`. You can read the options
+supported via `iree-import-tf -help`. Using [MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 as an example and assuming the serving signature is `predict`:
 
 ``` shell
-iree-tf-import
+iree-import-tf
   -tf-import-type=savedmodel_v1 \
   -tf-savedmodel-exported-names=predict \
   /path/to/savedmodel -o iree_input.mlir
@@ -69,7 +69,7 @@ iree-tf-import
 
 !!! tip
 
-    `iree-tf-import` is installed as `/path/to/python/site-packages/iree/tools/tf/iree-tf-import`.
+    `iree-import-tf` is installed as `/path/to/python/site-packages/iree/tools/tf/iree-import-tf`.
     You can find out the full path to the `site-packages` directory via the
     `python -m site` command.
 

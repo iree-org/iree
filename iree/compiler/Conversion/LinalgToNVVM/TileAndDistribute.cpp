@@ -106,11 +106,17 @@ static void populateTilingToInvocationPatterns(
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::CopyOp>,
-                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
+  patterns.insert<
+      linalg::LinalgTilingPattern<linalg::MatmulOp>,
+      linalg::LinalgTilingPattern<linalg::FillOp>,
+      linalg::LinalgTilingPattern<linalg::CopyOp>,
+      linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+      linalg::LinalgTilingPattern<linalg::GenericOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions,
       linalg::LinalgTransformationFilter(
           {Identifier::get(getWorkgroupMarker(), context),

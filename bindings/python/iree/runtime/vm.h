@@ -101,6 +101,7 @@ class VmVariantList {
   void PushList(VmVariantList& other);
   void PushBufferView(HalDevice& device, py::object py_buffer_object,
                       iree_hal_element_type_e element_type);
+  VmVariantList GetAsList(int index);
   py::object GetAsNdarray(int index);
 
  private:

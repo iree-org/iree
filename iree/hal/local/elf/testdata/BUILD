@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,12 +20,11 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_embed_data(
+c_embed_data(
     name = "simple_mul_dispatch",
     testonly = True,
     srcs = glob(["simple_mul_dispatch_*.so"]),
-    cc_file_output = "simple_mul_dispatch.cc",
-    cpp_namespace = "iree::elf",
+    c_file_output = "simple_mul_dispatch.c",
     flatten = True,
     h_file_output = "simple_mul_dispatch.h",
 )

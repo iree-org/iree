@@ -34,7 +34,7 @@ __all__ = [
     "ImportType",
 ]
 
-_TF_IMPORT_TOOL = "iree-tf-import"
+_TF_IMPORT_TOOL = "iree-import-tf"
 
 
 def is_available():
@@ -105,7 +105,7 @@ class ImportOptions(CompilerOptions):
       import_type: Type of import to perform. See ImportType enum.
       saved_model_tags: Set of tags to export (signature def/v1 saved models
         only).
-      import_extra_args: Extra arguments to pass to the iree-tf-import tool.
+      import_extra_args: Extra arguments to pass to the iree-import-tf tool.
       save_temp_tf_input: Optionally save the IR that is input to the
         TensorFlow pipeline.
       save_temp_iree_input: Optionally save the IR that is the result of the

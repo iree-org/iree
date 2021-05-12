@@ -31,10 +31,10 @@ set(IREE_TF_TOOLS_ROOT
 
 
 if(${IREE_BUILD_TENSORFLOW_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
-  add_executable(iree_tf_compiler_iree-tf-import IMPORTED GLOBAL)
-  set_property(TARGET iree_tf_compiler_iree-tf-import
+  add_executable(iree_tf_compiler_iree-import-tf IMPORTED GLOBAL)
+  set_property(TARGET iree_tf_compiler_iree-import-tf
     PROPERTY IMPORTED_LOCATION
-        "${IREE_TF_TOOLS_ROOT}/iree-tf-import"
+        "${IREE_TF_TOOLS_ROOT}/iree-import-tf"
   )
 endif()
 

@@ -35,6 +35,7 @@ iree_cc_test(
     ::assignment_ops
     ::assignment_ops_i64
     ::comparison_ops
+    ::comparison_ops_f32
     ::comparison_ops_i64
     ::control_flow_ops
     ::conversion_ops
@@ -88,6 +89,15 @@ iree_c_module(
     "../comparison_ops.mlir"
   H_FILE_OUTPUT
     "comparison_ops.h"
+)
+
+iree_c_module(
+  NAME
+    comparison_ops_f32
+  SRC
+    "../comparison_ops_f32.mlir"
+  H_FILE_OUTPUT
+    "comparison_ops_f32.h"
 )
 
 iree_c_module(

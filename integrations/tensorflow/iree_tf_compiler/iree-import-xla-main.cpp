@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  // Find the entry function an annotate it as exported.
+  // Find the entry function and annotate it as exported.
   // Note that the XLA importer always produced an MLIR module with a @main
   // function.
   std::string entryName = "main";
@@ -221,6 +221,13 @@ int main(int argc, char **argv) {
   applyPassManagerCLOptions(pm);
 
   iree_integrations::TF::buildMHLOImportPassPipeline(pm);
+
+  // Note that we emit the ABI last since any needed function-level
+  // transformations (i.e. de-tupling, etc) should have been done.
+  // TODO: Uncomment this to enable IREE native bindings.
+  // pm.addNestedPass<FuncOp>(
+  //     iree_integrations::TF::createEmitDefaultIREEABIPass());
+
   if (failed(pm.run(*module))) {
     llvm::errs()
         << "Running iree-xla-import pass pipeline failed (see diagnostics)\n";

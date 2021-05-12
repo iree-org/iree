@@ -21,9 +21,9 @@ package(
 filegroup(
     name = "importer-binaries",
     srcs = [
+        ":iree-import-tf",
         ":iree-import-tflite",
         ":iree-import-xla",
-        ":iree-tf-import",
     ],
 )
 
@@ -71,8 +71,8 @@ cc_binary(
 )
 
 cc_binary(
-    name = "iree-tf-import",
-    srcs = ["iree-tf-import-main.cpp"],
+    name = "iree-import-tf",
+    srcs = ["iree-import-tf-main.cpp"],
     deps = [
         "//iree_tf_compiler/TF",
         "@llvm-project//llvm:Support",
