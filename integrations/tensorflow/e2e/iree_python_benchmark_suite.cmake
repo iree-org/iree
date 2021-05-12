@@ -76,4 +76,3 @@ function(iree_python_benchmark_suite)
   endforeach()
 
 endfunction()
-

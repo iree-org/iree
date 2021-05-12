@@ -907,14 +907,10 @@ class BackendInfo:
           "driver": "dylib",
           "compiler_targets": ["dylib-llvm-aot"]
       },
-      "iree_dylib_sync": {
-          "compiled_module_class": IreeCompiledModule,
-          "driver": "dylib-sync",
-          "compiler_targets": ["dylib-llvm-aot"]
-      },
   }
 
-  def __init__(self, backend_name: str,
+  def __init__(self,
+               backend_name: str,
                backend_id: str = None,
                compilation_flags: Sequence[str] = (),
                runtime_flags: Sequence[str] = ()):
@@ -927,7 +923,7 @@ class BackendInfo:
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
       compilation_flags: an optional list of flags to pass to the compiler
         when compiling artifacts for the backend.
-      runtime_flags: an optional list of flags to pas to the runtime when
+      runtime_flags: an optional list of flags to pass to the runtime when
         running the generated artifacts for the backend.
 
     Raises:
