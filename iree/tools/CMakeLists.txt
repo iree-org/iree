@@ -370,16 +370,16 @@ if(${IREE_BUILD_COMPILER})
   # Symlink the shell script into the build tree as the expected executable name
   add_custom_command(
     OUTPUT
-      IreeFileCheck
+      IreeFileCheck.sh
     COMMAND
       ${CMAKE_COMMAND} -E create_symlink
       ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh
-      IreeFileCheck
+      IreeFileCheck.sh
   )
 
   # CMake always needs to custom targets to drive custom commands. We have to
   # give it a different name.
-  add_custom_target(iree_tools_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck)
+  add_custom_target(iree_tools_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck.sh)
 
   # But custom target doesn't have the TARGET_FILE property, which we need, so
   # wrap it yet again in an executable. This is marked as an imported executable
@@ -389,7 +389,7 @@ if(${IREE_BUILD_COMPILER})
     TARGET
     iree_tools_IreeFileCheck
     PROPERTY IMPORTED_LOCATION
-    "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck"
+    "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck.sh"
   )
   add_dependencies(iree_tools_IreeFileCheck iree_tools_IreeFileCheck_Driver)
   # Finally do our normal aliasing tricks to make this accessible as a qualified
