@@ -75,13 +75,6 @@ std::pair<int, int> getWorkgroupPaddedTileSize(int dim, int workgoupSize,
   }
 }
 
-// Clones all attributes from src to dst Operation.
-static void cloneAttributes(mlir::Operation *src, mlir::Operation *dst) {
-  for (auto attr : src->getAttrs()) {
-    dst->setAttr(attr.first, attr.second);
-  }
-}
-
 // Returns static full-shape sizes of operand.
 ArrayRef<int64_t> getFullSize(Value operand) {
   auto defOp = operand.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
@@ -188,11 +181,11 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
 
     // Padding for K-dim only result doesn't change result size.
     if (paddingForM == 0 && paddingForN == 0) {
-      auto paddedMatmulOp = rewriter.create<linalg::MatmulOp>(
-          loc, resultType, ArrayRef<Value>{paddedLhs, paddedrhs},
-          ArrayRef<Value>{result});
-      cloneAttributes(matmulOp.getOperation(), paddedMatmulOp.getOperation());
-      rewriter.replaceOp(matmulOp, paddedMatmulOp.getResults());
+      auto paddedMatmulOp =
+          cast<linalg::LinalgOp>(matmulOp.getOperation())
+              .clone(rewriter, loc, {resultType},
+                     ArrayRef<Value>{paddedLhs, paddedrhs, result});
+      rewriter.replaceOp(matmulOp, paddedMatmulOp->getResults());
     } else {
       // Padding eather M or N requires changing the result size.
       auto getActualSizes = [](Value operand) {
@@ -224,14 +217,15 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
           rewriter.create<ConstantOp>(loc, rewriter.getZeroAttr(elementType));
       auto filledStaticResult =
           rewriter.create<linalg::FillOp>(loc, staticResult, zero);
-      auto paddedMatmulOp = rewriter.create<linalg::MatmulOp>(
-          loc, resultType, ArrayRef<Value>{paddedLhs, paddedrhs},
-          ArrayRef<Value>{filledStaticResult.result()});
-      cloneAttributes(matmulOp.getOperation(), paddedMatmulOp.getOperation());
+      auto paddedMatmulOp =
+          cast<linalg::LinalgOp>(matmulOp.getOperation())
+              .clone(rewriter, loc, {resultType},
+                     ArrayRef<Value>{paddedLhs, paddedrhs,
+                                     filledStaticResult.result()});
       SmallVector<OpFoldResult> offsets(2, rewriter.getI64IntegerAttr(0));
       SmallVector<OpFoldResult> strides(2, rewriter.getI64IntegerAttr(1));
       rewriter.replaceOpWithNewOp<SubTensorOp>(
-          matmulOp, paddedMatmulOp.getResults()[0], offsets, sizes, strides);
+          matmulOp, paddedMatmulOp->getResults()[0], offsets, sizes, strides);
     }
     return success();
   }
