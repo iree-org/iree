@@ -356,7 +356,7 @@ class ProcessInterfaceBinding final
   }
 };
 
-/// Scalarize remaining vector transfer that couldn't be converted to
+/// Scalarizes remaining vector transfer that couldn't be converted to
 /// vevtor load operations.
 
 /// This is very specific to SPIR-V as pointer cannot be casted to vector type
