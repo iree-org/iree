@@ -66,6 +66,8 @@ static int64_t getMinIfShapeStatic(int64_t shape, int64_t tileSize) {
 /// Sets the `tileSizes` and `workgroupSize` for an Linalg `op` to the default,
 /// where at most 3 inner parallel dimensions of `op` are tiled and distributed,
 /// and each invocation handles one scalar elements.
+// TODO(#5852): revisit the default here: they were chosen to get started and
+// not very good.
 static LogicalResult setDefaultTilingScheme(
     const spirv::TargetEnv &targetEnv, linalg::LinalgOp op,
     TileSizesListType &tileSizes, std::array<int64_t, 3> &workgroupSize) {
