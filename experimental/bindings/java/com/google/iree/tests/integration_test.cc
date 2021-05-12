@@ -18,7 +18,7 @@
 #include "experimental/bindings/java/com/google/iree/native/function_wrapper.h"
 #include "experimental/bindings/java/com/google/iree/native/instance_wrapper.h"
 #include "experimental/bindings/java/com/google/iree/native/module_wrapper.h"
-#include "experimental/bindings/java/com/google/iree/tests/simple_mul_bytecode_module.h"
+#include "experimental/bindings/java/com/google/iree/tests/simple_mul_bytecode_module_c.h"
 #include "iree/base/internal/flags.h"
 
 namespace iree {
@@ -35,7 +35,8 @@ extern "C" int main(int argc, char** argv) {
   IREE_LOG(INFO) << "Instance created";
 
   auto module = std::make_unique<ModuleWrapper>();
-  const auto* module_file = simple_mul_bytecode_module_create();
+  const struct iree_file_toc_t* module_file =
+      iree_java_testdata_simple_mul_bytecode_module_create();
   auto module_status = module->Create(
       reinterpret_cast<const uint8_t*>(module_file->data), module_file->size);
   if (!module_status.ok()) {

@@ -22,8 +22,8 @@ iree_bytecode_module(
     simple_mul_bytecode_module
   SRC
     "simple_mul.mlir"
-  CC_NAMESPACE
-    "iree::samples::vulkan"
+  C_IDENTIFIER
+    "iree_samples_vulkan_simple_mul_bytecode_module"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=vulkan-spirv"
@@ -48,7 +48,7 @@ iree_cc_binary(
     iree::base::internal::main
     iree::hal::vulkan::registration
     iree::modules::hal
-    iree::samples::vulkan::simple_mul_bytecode_module_cc
+    iree::samples::vulkan::simple_mul_bytecode_module_c
     iree::testing::vulkan::vulkan_gui_util
     iree::vm
     iree::vm::bytecode_module

@@ -60,7 +60,8 @@ int main(int argc, char** argv) { return iree_runtime_demo_main(); }
 // custom allocator can be provided to get a callback instead.
 static iree_status_t iree_runtime_demo_load_module(
     iree_runtime_session_t* session) {
-  const iree_file_toc_t* module_file = simple_mul_module_c_create();
+  const iree_file_toc_t* module_file =
+      iree_runtime_testdata_simple_mul_module_create();
   return iree_runtime_session_append_bytecode_module_from_memory(
       session, iree_make_const_byte_span(module_file->data, module_file->size),
       iree_allocator_null());

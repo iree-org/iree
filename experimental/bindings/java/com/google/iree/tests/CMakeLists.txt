@@ -18,8 +18,8 @@ if(${IREE_BUILD_COMPILER})
       simple_mul_bytecode_module
     SRC
       "simple_mul.mlir"
-    CC_NAMESPACE
-      "iree::java"
+    C_IDENTIFIER
+      "iree_java_testdata_simple_mul_bytecode_module"
     FLAGS
       "-iree-mlir-to-vm-bytecode-module"
       "-iree-hal-target-backends=vmla"
@@ -32,7 +32,7 @@ if(${IREE_BUILD_COMPILER})
       "integration_test.cc"
     DEPS
        experimental::bindings::java::com::google::iree::native::cc_wrappers
-       experimental::bindings::java::com::google::iree::tests::simple_mul_bytecode_module_cc
+       experimental::bindings::java::com::google::iree::tests::simple_mul_bytecode_module_c
        iree::base::status
   )
 endif()
