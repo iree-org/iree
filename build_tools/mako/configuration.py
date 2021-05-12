@@ -237,10 +237,12 @@ MODEL_BENCHMARKS = [
                     skipped_target=["vlk2"],
                     compilation_flags={
                         'cpu': [
-                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            "-iree-llvm-loop-unrolling=true"
                         ],
                         'cpu3t': [
-                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            "-iree-llvm-loop-unrolling=true"
                         ]
                     })),
             PhoneBenchmarkInfo(
@@ -249,10 +251,12 @@ MODEL_BENCHMARKS = [
                 targets=get_s20_default_target_list(
                     compilation_flags={
                         'cpu': [
-                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            "-iree-llvm-loop-unrolling=true"
                         ],
                         'cpu3t': [
-                            "-iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            "-iree-llvm-loop-unrolling=true"
                         ]
                     })),
         ]),
