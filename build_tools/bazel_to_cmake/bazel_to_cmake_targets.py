@@ -54,7 +54,7 @@ EXPLICIT_TARGET_MAPPING = {
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
     # Cuda
-    "@cuda_headers": ["cuda_headers"],
+    "@cuda//:cuda_headers": ["cuda_headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
     "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets

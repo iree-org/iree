@@ -16,6 +16,12 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "cuda_headers",
-    hdrs = ["cuda.h"],
+    hdrs = ["include/cuda.h"],
+    includes = ["include"],
+)
+
+filegroup(
+    name = "libdevice_root",
+    srcs = ["nvvm/libdevice/**"],
 )
 
