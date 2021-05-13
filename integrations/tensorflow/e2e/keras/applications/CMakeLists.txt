@@ -121,8 +121,6 @@ iree_e2e_cartesian_product_test_suite(
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 iree_python_benchmark_suite(
-  CONFIGURATION_NAME
-    "whole-inference"
   MODELS
     MobileNetV2
     MobileNetV3Small
@@ -132,6 +130,8 @@ iree_python_benchmark_suite(
     "--data=imagenet"
     "--use_external_weights=True"
   NEED_ARG_FOR_MODEL
+  BENCHMARK_KIND
+    "fp32-full-inference"
   TARGET_BACKEND
     iree_vulkan
   TARGET_ARCH
@@ -144,8 +144,6 @@ iree_python_benchmark_suite(
 )
 
 iree_python_benchmark_suite(
-  CONFIGURATION_NAME
-    "whole-inference"
   MODELS
     MobileNetV2
     MobileNetV3Small
@@ -155,6 +153,8 @@ iree_python_benchmark_suite(
     "--data=imagenet"
     "--use_external_weights=True"
   NEED_ARG_FOR_MODEL
+  BENCHMARK_KIND
+    "fp32-full-inference"
   TARGET_BACKEND
     iree_llvmaot
   TARGET_ARCH

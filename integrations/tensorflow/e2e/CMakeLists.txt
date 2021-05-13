@@ -98,12 +98,12 @@ iree_e2e_cartesian_product_test_suite(
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 iree_python_benchmark_suite(
-  CONFIGURATION_NAME
-    "whole-inference"
   MODELS
     MobileBERT
   MODEL_SCRIPT
     mobile_bert_squad_benchmark.py
+  BENCHMARK_KIND
+    "fp32-full-inference"
   TARGET_BACKEND
     iree_vulkan
   TARGET_ARCH
@@ -116,12 +116,12 @@ iree_python_benchmark_suite(
 )
 
 iree_python_benchmark_suite(
-  CONFIGURATION_NAME
-    "whole-inference"
   MODELS
     MobileBERT
   MODEL_SCRIPT
     mobile_bert_squad_benchmark.py
+  BENCHMARK_KIND
+    "fp32-full-inference"
   TARGET_BACKEND
     iree_llvmaot
   TARGET_ARCH

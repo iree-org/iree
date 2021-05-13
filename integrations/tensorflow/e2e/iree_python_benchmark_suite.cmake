@@ -20,7 +20,6 @@
 # it uses command-line options in that script.
 #
 # Parameters:
-#   CONFIGURATION_NAME: The name for this configuration.
 #   MODELS: A list of models to generate benchmark artifacts for.
 #   MODEL_SCRIPT: The Python script used to generate benchmark artifacts.
 #   MODEL_SCRIPT_ARGS: A list of command-line options and their values to the
@@ -33,6 +32,10 @@
 #       pass to the compiler for artifact generation.
 #   RUNTIME_FLAGS: A list of command-line options and their values to pass
 #       to the runtime when the benchmark is invoked.
+#   BENCHMARK_KIND: The kind of this benchmark suite. This does not need
+#       to be a unique identifier for this suite, which will also consider
+#       the model, target backend, and architecture. It is mainly used to
+#       differentiate suites on top of that.
 #
 function(iree_python_benchmark_suite)
   if(NOT IREE_BUILD_BENCHMARKS)
@@ -43,16 +46,20 @@ function(iree_python_benchmark_suite)
     PARSE_ARGV 0
     _RULE
     "NEED_ARG_FOR_MODEL"
-    "CONFIGURATION_NAME;MODEL_SCRIPT;TARGET_BACKEND;TARGET_ARCH"
+    "BENCHMARK_KIND;MODEL_SCRIPT;TARGET_BACKEND;TARGET_ARCH"
     "COMPILATION_FLAGS;MODELS;MODEL_SCRIPT_ARGS;RUNTIME_FLAGS"
   )
+
+  # Generate all benchmarks to the root build directory. This helps for
+  # discovering them and launch them on devices.
+  set(_ARTIFACTS_DIR "${CMAKE_BINARY_DIR}/benchmark_suites/models")
 
   foreach(_MODEL IN LISTS _RULE_MODELS)
     # Construct the benchmark generation target name, which is the model name
     # followed by target backend and configuration.
     set(_NAME_LIST "generate_benchmark_artifact")
     list(APPEND _NAME_LIST "${_MODEL}")
-    list(APPEND _NAME_LIST "${_RULE_CONFIGURATION_NAME}")
+    list(APPEND _NAME_LIST "${_RULE_BENCHMARK_KIND}")
     list(APPEND _NAME_LIST "${_RULE_TARGET_BACKEND}")
     list(APPEND _NAME_LIST "${_RULE_TARGET_ARCH}")
     list(JOIN _NAME_LIST "__" _NAME)
@@ -63,13 +70,13 @@ function(iree_python_benchmark_suite)
       set(_MODEL_CL "--model=${_MODEL}")
     endif()
 
-    # Add a command-line option to specify the runtime flags if needed.
+    # Add a command-line option to specify the runtime flags if specified.
     set(_RUNTIME_FLAGS_CL "")
     if(_RULE_RUNTIME_FLAGS)
       set(_RUNTIME_FLAGS_CL "--runtime_flags=\"${_RULE_RUNTIME_FLAGS}\"")
     endif()
 
-    set(_COMBINED_CONFG_NAME "${_RULE_TARGET_ARCH}__${_RULE_CONFIGURATION_NAME}")
+    set(_COMBINED_CONFG_NAME "${_RULE_TARGET_ARCH}__${_RULE_BENCHMARK_KIND}")
 
     add_custom_target("${_NAME}"
       COMMAND
@@ -81,8 +88,9 @@ function(iree_python_benchmark_suite)
           "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_MODEL_SCRIPT}"
           ${_RULE_MODEL_SCRIPT_ARGS}
           "${_MODEL_CL}"
-          "--target_backend=${_RULE_TARGET_BACKEND}"
+          "--artifacts_dir=${_ARTIFACTS_DIR}"
           "--configuration_names=${_COMBINED_CONFG_NAME}"
+          "--target_backend=${_RULE_TARGET_BACKEND}"
           "--compilation_flags=\"${_RULE_COMPILATION_FLAGS}\""
           "${_RUNTIME_FLAGS_CL}"
       DEPENDS
@@ -96,7 +104,8 @@ function(iree_python_benchmark_suite)
         "${_NAME}"
     )
 
-    add_dependencies(iree-benchmark-suites "${_NAME}")
+    # Mark dependency so that we have one target to drive them all.
+    add_dependencies(iree-generate-benchmark-suites "${_NAME}")
   endforeach()
 
 endfunction()

@@ -65,6 +65,8 @@ echo "Configuring CMake"
 
 echo "Building with Ninja"
 cd "${CMAKE_BUILD_DIR?}"
+
+ninja iree-generate-benchmark-suites
 ninja
 
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
