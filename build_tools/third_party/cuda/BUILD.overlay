@@ -22,5 +22,5 @@ cc_library(
 
 filegroup(
     name = "libdevice_root",
-    srcs = ["nvvm/libdevice/**"],
+    srcs = ["nvvm/libdevice/libdevice.10.bc"],
 )

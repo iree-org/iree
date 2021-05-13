@@ -18,7 +18,7 @@ iree_c_embed_data(
   NAME
     cuda_libdevice
   SRCS
-    "libdevice.10.bc"
+    "../../../../../../third_party/cuda/nvvm/libdevice/libdevice.10.bc"
   C_FILE_OUTPUT
     "libdevice.c"
   H_FILE_OUTPUT
