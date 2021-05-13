@@ -22,7 +22,8 @@ iree_bytecode_module(
     mnist_bytecode_module
   SRC
     "mnist.mlir"
-  C_OUTPUT
+  C_IDENTIFIER
+    "mnist_bytecode_module_c"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=dylib-llvm-aot"
