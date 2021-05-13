@@ -11,17 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(default_visibility = ["//visibility:public"])
+
+c_embed_data(
+    name = "cuda_libdevice",
+    srcs = ["nvvm/libdevice/libdevice.10.bc"],
+    c_file_output = "libdevice.c",
+    h_file_output = "libdevice.h",
+)
 
 cc_library(
     name = "cuda_headers",
     hdrs = ["include/cuda.h"],
     includes = ["include"],
 )
-
-filegroup(
-    name = "libdevice_root",
-    srcs = ["nvvm/libdevice/**"],
-)
-

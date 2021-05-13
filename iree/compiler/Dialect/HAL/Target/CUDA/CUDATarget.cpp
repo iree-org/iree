@@ -14,10 +14,12 @@
 
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
+#include "build_tools/third_party/cuda/libdevice.h"
 #include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
+#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -77,7 +79,12 @@ class CUDATargetBackend final : public TargetBackend {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
-
+    const iree_file_toc_t *libdevice = cuda_libdevice_create();
+    llvm::MemoryBufferRef bitcode_ref(
+        llvm::StringRef(libdevice->data, libdevice->size), "clone bitcode");
+    auto mo = llvm::parseBitcodeFile(bitcode_ref, context);
+    //(*mo)->print(llvm::errs(), nullptr);
+    (void)mo;
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
     // intermediate code/binary files), and at runtime (loaded

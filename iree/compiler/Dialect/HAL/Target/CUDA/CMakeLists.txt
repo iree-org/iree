@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "CUDATarget.cpp"
   DEPS
+    LLVMBitReader
     LLVMCore
     LLVMNVPTXCodeGen
     LLVMSupport
@@ -33,6 +34,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport
+    build_tools::third_party::cuda::cuda_libdevice
     iree::base::internal::flatcc
     iree::compiler::Conversion::LinalgToNVVM
     iree::compiler::Dialect::HAL::Target

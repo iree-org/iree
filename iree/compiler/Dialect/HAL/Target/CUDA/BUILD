@@ -42,6 +42,8 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
         "//iree/schemas:cuda_executable_def_c_fbs",
+        "@cuda//:cuda_libdevice",
+        "@llvm-project//llvm:BitReader",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:NVPTXCodeGen",
         "@llvm-project//llvm:Support",
