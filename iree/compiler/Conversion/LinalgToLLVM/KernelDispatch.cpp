@@ -19,6 +19,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Operation.h"
@@ -55,8 +56,8 @@ static llvm::cl::opt<int> batchMatmulWorkgroupTileSize(
     llvm::cl::init(32));
 static llvm::cl::opt<int> batchMatmulL1TileSize(
     "iree-codegen-llvm-batch-matmul-l1-size",
-    llvm::cl::desc(
-        "linalg.batch_matmul tile size for L1 spliting of M, N, K dimensions"),
+    llvm::cl::desc("linalg.batch_matmul tile size for L1 spliting of M, N, K "
+                   "dimensions"),
     llvm::cl::init(16));
 static llvm::cl::opt<int> batchMatmulL2TileSize(
     "iree-codegen-llvm-batch-matmul-vector-size",
@@ -68,7 +69,6 @@ static llvm::cl::opt<int> genericOpsWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(128));
 
-namespace {
 template <TilingLevel tilingLevel>
 llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) {
   if (auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op)) {
@@ -185,7 +185,6 @@ llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) {
 
   return {1, 1, 1};
 }
-}  // namespace
 
 #define DEFINE_TILE_SIZE_FN(tilingLevel)                                      \
   template <>                                                                 \
@@ -215,7 +214,11 @@ bool isDispatchOp(Operation *op) {
       return true;
     }
   }
-  if (isa<linalg::GenericOp>(op)) return true;
+  if (auto genOp = dyn_cast<linalg::GenericOp>(op)) {
+    if (genOp.getOperation()->hasAttr(
+            linalg::LinalgTransforms::kLinalgTransformMarker))
+      return true;
+  }
   return false;
 }
 

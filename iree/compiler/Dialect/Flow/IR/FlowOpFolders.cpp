@@ -477,6 +477,33 @@ OpFoldResult DispatchTensorLoadOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tensor.store
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct FoldCastOpIntoDispatchStoreOp
+    : public OpRewritePattern<DispatchTensorStoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    if (!storeOp.value().getDefiningOp<tensor::CastOp>()) return failure();
+    auto parentOp = storeOp.value().getDefiningOp<tensor::CastOp>();
+    rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
+        storeOp, parentOp.source(), storeOp.target(), storeOp.offsets(),
+        storeOp.sizes(), storeOp.strides(), storeOp.static_offsets(),
+        storeOp.static_sizes(), storeOp.static_strides());
+    return success();
+  }
+};
+}  // namespace
+
+void DispatchTensorStoreOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldCastOpIntoDispatchStoreOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.workgroup.*
 //===----------------------------------------------------------------------===//
 
