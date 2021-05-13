@@ -133,11 +133,35 @@ iree_python_benchmark_suite(
   BENCHMARK_KIND
     "fp32-full-inference"
   TARGET_BACKEND
+    iree_llvmaot
+  TARGET_ARCH
+    "CPU-ARM64-v8A"
+  COMPILATION_FLAGS
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=3"
+)
+
+iree_python_benchmark_suite(
+  MODELS
+    MobileNetV2
+    MobileNetV3Small
+  MODEL_SCRIPT
+    applications_benchmark.py
+  MODEL_SCRIPT_ARGS
+    "--data=imagenet"
+    "--use_external_weights=True"
+  NEED_ARG_FOR_MODEL
+  BENCHMARK_KIND
+    "fp32-full-inference"
+  TARGET_BACKEND
     iree_vulkan
   TARGET_ARCH
-    "GPU-Mali-Valhall"
+    "GPU-Adreno"
   COMPILATION_FLAGS
-    "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
+    "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
     "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-enable-fusion-with-reduction-ops"
@@ -156,13 +180,12 @@ iree_python_benchmark_suite(
   BENCHMARK_KIND
     "fp32-full-inference"
   TARGET_BACKEND
-    iree_llvmaot
+    iree_vulkan
   TARGET_ARCH
-    "CPU-ARM64-v8A"
+    "GPU-Mali-Valhall"
   COMPILATION_FLAGS
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
-  RUNTIME_FLAGS
-    "--task_topology_group_count=3"
+    "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
 )
