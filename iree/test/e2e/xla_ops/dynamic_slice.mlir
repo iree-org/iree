@@ -28,3 +28,13 @@ func @dynamic_unit_slice() attributes { iree.module.export } {
       [7, 8]]> : tensor<1x2xi32>) : tensor<1x2xi32>
   return
 }
+
+func @dynamic_1d_slice() attributes { iree.module.export } {
+  %input = iree.unfoldable_constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+  %start1 = iree.unfoldable_constant dense<1> : tensor<i64>
+  %result = "mhlo.dynamic-slice"(%input, %start1) {
+    slice_sizes = dense<[2]> : tensor<1xi64>
+  } : (tensor<4xi32>, tensor<i64>) -> tensor<2xi32>
+  check.expect_eq_const(%result, dense<[2, 3]> : tensor<2xi32>) : tensor<2xi32>
+  return
+}
