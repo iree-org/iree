@@ -726,3 +726,46 @@ func @multi_result_fallback(%arg0: tensor<?x10xi32>, %arg1: tensor<?x10xi32>)
 //   CHECK-DAG:     flow.dispatch.tensor.store %[[OP_RESULT]]#0, %[[ARG5]]
 //   CHECK-DAG:     flow.dispatch.tensor.store %[[OP_RESULT]]#1, %[[ARG6]]
 //       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i32>, %arg3 : index) -> tensor<1x?xi32> {
+  %c1_i32 = constant 1 : i32
+  %c0_i32 = constant 0 : i32
+  %0 = tensor.extract %arg1[] : tensor<i32>
+  %1 = cmpi slt, %0, %c1_i32 : i32
+  %2 = select %1, %0, %c1_i32 : i32
+  %3 = cmpi sgt, %2, %c0_i32 : i32
+  %4 = select %3, %2, %c0_i32 : i32
+  %5 = index_cast %4 : i32 to index
+  %6 = tensor.extract %arg2[] : tensor<i32>
+  %7 = cmpi slt, %6, %c0_i32 : i32
+  %8 = select %7, %6, %c0_i32 : i32
+  %9 = cmpi sgt, %8, %c0_i32 : i32
+  %10 = select %9, %8, %c0_i32 : i32
+  %11 = index_cast %10 : i32 to index
+  %12 = subtensor %arg0[%5, %11] [1, %arg3] [1, 1] : tensor<?x?xi32> to tensor<1x?xi32>
+  return %12 : tensor<1x?xi32>
+}
+// CHECK-LABEL: func @dynamic_slice(
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xi32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<i32>
+//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<i32>
+//  CHECK-SAME:   %[[ARG3:.+]]: index
+//       CHECK:   %[[C1:.+]] = constant 1 : index
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+//  CHECK-SAME:     [%[[ARG3]], %[[C1]], %[[C1]]]
+//  CHECK-SAME:     (%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]])
+//   CHECK-DAG:     cmpi
+//   CHECK-DAG:     select
+//   CHECK-DAG:     cmpi
+//   CHECK-DAG:     select
+//   CHECK-DAG:     cmpi
+//   CHECK-DAG:     cmpi
+//   CHECK-DAG:     select
+//   CHECK-DAG:     select
+//   CHECK-DAG:     index_cast
+//   CHECK-DAG:     index_cast
+//       CHECK:     subtensor
+//       CHECK:     flow.return
+//       CHECK:   return %[[RESULT]]
