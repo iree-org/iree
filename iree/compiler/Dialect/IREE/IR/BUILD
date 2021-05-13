@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -65,11 +65,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "IREEInterfacesGen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "IREEOpInterfaces.h.inc"),
-        ("-gen-op-interface-defs", "IREEOpInterfaces.cpp.inc"),
+        (
+            ["-gen-op-interface-decls"],
+            "IREEOpInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "IREEOpInterfaces.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEInterfaces.td",
@@ -79,11 +85,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "IREEOpsGen",
     tbl_outs = [
-        ("-gen-op-decls", "IREEOps.h.inc"),
-        ("-gen-op-defs", "IREEOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "IREEOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "IREEOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEOps.td",
@@ -97,7 +109,10 @@ gentbl(
 iree_tablegen_doc(
     name = "IREEDialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "IREEDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "IREEDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEOps.td",

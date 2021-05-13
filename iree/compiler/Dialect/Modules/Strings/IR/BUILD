@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -81,11 +81,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "Ops_gen",
     tbl_outs = [
-        ("-gen-op-decls", "Ops.h.inc"),
-        ("-gen-op-defs", "Ops.cc.inc"),
+        (
+            ["-gen-op-decls"],
+            "Ops.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "Ops.cc.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "Ops.td",
@@ -100,7 +106,10 @@ gentbl(
 iree_tablegen_doc(
     name = "DialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "StringsDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "StringsDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "Ops.td",

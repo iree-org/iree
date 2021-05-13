@@ -12,18 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(CUDA_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/cuda_headers/")
+set(STBLIB_ROOT "${IREE_ROOT_DIR}/third_party/stblib/")
+
 
 external_cc_library(
   PACKAGE
-    cuda_headers
+    stblib
   NAME
-    cuda_headers
+    stb_image
   ROOT
-    ${CUDA_HEADERS_API_ROOT}
-  HDRS
-    "cuda.h"
+    "${IREE_ROOT_DIR}/build_tools/third_party/stblib/"
+  SRCS
+    "stb_image.c"
+  COPTS
+    "-Wno-implicit-fallthrough"
   INCLUDES
-    ${CUDA_HEADERS_API_ROOT}
+    ${STBLIB_ROOT}
 )
-

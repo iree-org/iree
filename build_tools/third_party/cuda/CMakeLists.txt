@@ -12,10 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(default_visibility = ["//visibility:public"])
+set(CUDA_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/cuda/include")
 
-cc_library(
-    name = "cuda_headers",
-    hdrs = ["cuda.h"],
+external_cc_library(
+  PACKAGE
+    cuda_headers
+  NAME
+    cuda_headers
+  ROOT
+    ${CUDA_HEADERS_API_ROOT}
+  HDRS
+    "cuda.h"
+  INCLUDES
+    ${CUDA_HEADERS_API_ROOT}
 )
 

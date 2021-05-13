@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@iree//build_tools/bazel:tblgen.bzl", "gentbl")
+load("@iree//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("@iree//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -32,11 +32,17 @@ filegroup(
     ),
 )
 
-gentbl(
+gentbl_cc_library(
     name = "ops_gen",
     tbl_outs = [
-        ("-gen-op-decls", "ops.h.inc"),
-        ("-gen-op-defs", "ops.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "ops.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "ops.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ops.td",
@@ -47,11 +53,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "op_interface_gen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "op_interface.h.inc"),
-        ("-gen-op-interface-defs", "op_interface.cpp.inc"),
+        (
+            ["-gen-op-interface-decls"],
+            "op_interface.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "op_interface.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "base.td",
