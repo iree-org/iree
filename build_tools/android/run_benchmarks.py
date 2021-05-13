@@ -406,13 +406,11 @@ def main(args):
     print(device_info)
 
   if device_info.cpu_abi.lower() not in CPU_ABI_TO_TARGET_ARCH_MAP:
-    raise ValueError(
-        f"Unrecognized CPU ABI: '{device_info.cpu_abi}'; "
-        "need to update the map")
+    raise ValueError(f"Unrecognized CPU ABI: '{device_info.cpu_abi}'; "
+                     "need to update the map")
   if device_info.gpu_name.lower() not in GPU_NAME_TO_TARGET_ARCH_MAP:
-    raise ValueError(
-        f"Unrecognized GPU name: '{device_info.gpu_name}'; "
-        "need to update the map")
+    raise ValueError(f"Unrecognized GPU name: '{device_info.gpu_name}'; "
+                     "need to update the map")
 
   benchmarks = filter_python_model_benchmark_suite(device_info, args.build_dir,
                                                    args.verbose)
