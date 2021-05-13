@@ -65,7 +65,11 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createMaterializeCPULaunchConfigurationPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<FuncOp>(createPadLinalgWorkgroupTilesPass());
+
+  // TODO(ataei): This causes segmentation fault on Android. Fix it and
+  // re-enable.
+  // nestedModulePM.addNestedPass<FuncOp>(createPadLinalgWorkgroupTilesPass());
+
   // TODO(ataei): We want to enable when tensor -> vector pass is fully
   // supported which requires first moving vector-tiling before this step.
   if (options.useLinalgOnTensorsToVectors) {
