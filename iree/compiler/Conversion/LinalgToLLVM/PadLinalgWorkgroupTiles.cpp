@@ -76,6 +76,7 @@ std::pair<int, int> getWorkgroupPaddedTileSize(int dim, int workgoupSize,
 }
 
 // Returns static full-shape sizes of operand.
+// TODO(ravishankarm): Simplify this as part of #5842.
 ArrayRef<int64_t> getFullSize(Value operand) {
   auto defOp = operand.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
   if (!defOp) return {};
@@ -113,19 +114,23 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
     int problemSizeN = rhsFullSize[1];
     int problemSizeK = lhsFullSize[1];
 
+    // TODO(ravishankarm): Use tiling attributes as part of #5842.
     auto workgroupTileSizes =
         getTileSizes<TilingLevel::WorkGroupTiles>(matmulOp);
     auto vectorTileSizes = getTileSizes<TilingLevel::Level2Tiles>(matmulOp);
 
     int paddedMSize, paddedNSize, paddedKSize;
     int paddingForM, paddingForN, paddingForK;
-
     std::tie(paddedMSize, paddingForM) = getWorkgroupPaddedTileSize(
         problemSizeM, workgroupTileSizes[0], vectorTileSizes[0]);
     std::tie(paddedNSize, paddingForN) = getWorkgroupPaddedTileSize(
         problemSizeN, workgroupTileSizes[1], vectorTileSizes[1]);
     std::tie(paddedKSize, paddingForK) =
         getVectorPaddingSize(problemSizeK, vectorTileSizes[2]);
+
+    // No padding.
+    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0)
+      return failure();
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       auto l1TileSizes = getTileSizes<TilingLevel::Level1Tiles>(matmulOp);
@@ -142,15 +147,19 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
       llvm::dbgs() << "Vector-tile-sizes:"
                    << "[" << vectorTileSizes[0] << ", " << vectorTileSizes[1]
                    << ", " << vectorTileSizes[2] << "]\n";
+      auto lhsStackSize = paddedMSize * paddedKSize * 4;
+      auto rhsStackSize = paddedKSize * paddedNSize * 4;
+      auto outputStackSize = paddedMSize * paddedNSize * 4;
       llvm::dbgs() << "LHS after padding:"
-                   << "[" << paddedMSize << "," << paddedKSize << "]\n";
+                   << "[" << paddedMSize << "," << paddedKSize
+                   << "], size_in_bytes = " << lhsStackSize << "\n";
       llvm::dbgs() << "RHS after padding:"
-                   << "[" << paddedKSize << "," << problemSizeN << "]\n";
+                   << "[" << paddedKSize << "," << paddedNSize
+                   << "], size_in_bytes = " << rhsStackSize << "\n";
+      llvm::dbgs() << "Result after padding:"
+                   << "[" << paddedMSize << "," << paddedNSize
+                   << "], size_in_bytes = " << outputStackSize << "\n";
     });
-
-    // No padding.
-    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0)
-      return failure();
 
     auto getPaddedOperand = [&](Value operand, ArrayRef<int64_t> shape,
                                 ArrayRef<int64_t> highPadding) -> Value {
