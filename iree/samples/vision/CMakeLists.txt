@@ -44,3 +44,15 @@ iree_cc_binary(
     iree::runtime
     iree::tools::utils::image_util
 )
+
+iree_lit_test(
+  NAME
+    iree_run_mnist_module_test
+  TEST_FILE
+    "mnist_test.txt"
+  DATA
+    ::iree-run-mnist-module
+    iree::tools::IreeFileCheck
+  LABELS
+    "hostonly"
+)
