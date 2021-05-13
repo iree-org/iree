@@ -74,12 +74,11 @@ def execute(args,
   if verbose:
     cmd = " ".join(args)
     print(f"cmd: {cmd}")
-  return subprocess.run(
-      args,
-      check=True,
-      capture_output=capture_output,
-      text=treat_io_as_text,
-      **kwargs)
+  return subprocess.run(args,
+                        check=True,
+                        capture_output=capture_output,
+                        text=treat_io_as_text,
+                        **kwargs)
 
 
 def get_android_device_model(verbose=False):
@@ -276,8 +275,8 @@ def filter_python_model_benchmark_suite(device_info,
     iree_driver, target_arch, bench_kind = segments
     target_arch = target_arch.lower()
     # We can choose this benchmark if it matches the CPU/GPU architecture.
-    should_choose = (
-        target_arch == cpu_target_arch or target_arch == gpu_target_arch)
+    should_choose = (target_arch == cpu_target_arch or
+                     target_arch == gpu_target_arch)
     if should_choose:
       matched_benchmarks.append(root)
 
@@ -308,8 +307,9 @@ def run_python_model_benchmark_suite(device_info,
   - A dictionary containing maps from benchmark names to the time (ms).
   """
   # Push the benchmark tool to the Android device first.
-  android_tool_path = adb_push_to_tmp_dir(
-      benchmark_tool, relative_dir="tools", verbose=verbose)
+  android_tool_path = adb_push_to_tmp_dir(benchmark_tool,
+                                          relative_dir="tools",
+                                          verbose=verbose)
 
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
                                 PYTON_MODEL_REL_PATH)
@@ -322,14 +322,13 @@ def run_python_model_benchmark_suite(device_info,
                                             model_benchmark_dir)
     print(f"--> benchmark: {benchmark_name} <--")
     android_relative_dir = os.path.relpath(model_benchmark_dir, model_root_dir)
-    adb_push_to_tmp_dir(
-        os.path.join(model_benchmark_dir, MODEL_VMFB_NAME),
-        android_relative_dir,
-        verbose=verbose)
-    android_flagfile_path = adb_push_to_tmp_dir(
-        os.path.join(model_benchmark_dir, MODEL_FLAGFILE_NAME),
-        android_relative_dir,
-        verbose=verbose)
+    adb_push_to_tmp_dir(os.path.join(model_benchmark_dir, MODEL_VMFB_NAME),
+                        android_relative_dir,
+                        verbose=verbose)
+    android_flagfile_path = adb_push_to_tmp_dir(os.path.join(
+        model_benchmark_dir, MODEL_FLAGFILE_NAME),
+                                                android_relative_dir,
+                                                verbose=verbose)
 
     cmd = [
         android_tool_path,
@@ -382,16 +381,14 @@ def parse_arguments():
       metavar="<build-dir>",
       type=check_dir_path,
       help="Path to the build directory containing benchmark suites")
-  parser.add_argument(
-      "--benchmark_tool",
-      type=check_exe_path,
-      default=None,
-      help="Path to the iree-benchmark-module tool (default to "
-      "iree/tools/iree-benchmark-module under <build-dir>)")
-  parser.add_argument(
-      "--verbose",
-      action="store_true",
-      help="Print internal information during execution")
+  parser.add_argument("--benchmark_tool",
+                      type=check_exe_path,
+                      default=None,
+                      help="Path to the iree-benchmark-module tool (default to "
+                      "iree/tools/iree-benchmark-module under <build-dir>)")
+  parser.add_argument("--verbose",
+                      action="store_true",
+                      help="Print internal information during execution")
 
   args = parser.parse_args()
 
@@ -417,12 +414,11 @@ def main(args):
 
   benchmarks = filter_python_model_benchmark_suite(device_info, args.build_dir,
                                                    args.verbose)
-  results = run_python_model_benchmark_suite(
-      device_info,
-      args.build_dir,
-      benchmarks,
-      args.benchmark_tool,
-      verbose=args.verbose)
+  results = run_python_model_benchmark_suite(device_info,
+                                             args.build_dir,
+                                             benchmarks,
+                                             args.benchmark_tool,
+                                             verbose=args.verbose)
   print(results)
 
 
