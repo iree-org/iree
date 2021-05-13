@@ -30,7 +30,7 @@ extern "C" {
 // Increasing this number will decrease initial allocation storms in cases of
 // extremely wide concurrency regions (many dispatches running at the same time)
 // at the cost of a higher minimum memory consumption.
-#define IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER (4)
+#define IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER (16)
 
 // Maximum number of simultaneous waits an executor may perform as part of a
 // wait-any operation. A larger value may enable better wake coalescing by the
@@ -108,7 +108,7 @@ extern "C" {
 // destroying behavior where multiple workers all stomp on the same cache lines
 // (as say worker 0 and worker 1 both fight over sequential tiles adjacent in
 // memory).
-#define IREE_TASK_DISPATCH_MAX_TILES_PER_SHARD_RESERVATION (8)
+#define IREE_TASK_DISPATCH_MAX_TILES_PER_SHARD_RESERVATION (16)
 
 // Whether to enable per-tile colors for each tile tracing zone based on the
 // tile grid xyz. Not cheap and can be disabled to reduce tracing overhead.

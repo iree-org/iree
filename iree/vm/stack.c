@@ -419,7 +419,6 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
   IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, function_name.data,
                                       function_name.size);
   callee_frame->trace_zone = z0;
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, frame_size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   if (out_callee_frame) *out_callee_frame = callee_frame;
