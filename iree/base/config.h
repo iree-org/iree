@@ -154,23 +154,23 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // available extensions in order to ensure that the compiled modules only use
 // features available on the target they are to run on.
 //
-// See the `-iree-vm-target-extensions=` compiler option for more information.
+// See the `-iree-vm-target-extension=` compiler option for more information.
 
 #if !defined(IREE_VM_EXT_I64_ENABLE)
 // Enables the 64-bit integer instruction extension.
-// Targeted from the compiler with `-iree-vm-target-extensions=i64`.
+// Targeted from the compiler with `-iree-vm-target-extension=i64`.
 #define IREE_VM_EXT_I64_ENABLE 1
 #endif  // !IREE_VM_EXT_I64_ENABLE
 
 #if !defined(IREE_VM_EXT_F32_ENABLE)
 // Enables the 32-bit floating-point instruction extension.
-// Targeted from the compiler with `-iree-vm-target-extensions=f32`.
+// Targeted from the compiler with `-iree-vm-target-extension=f32`.
 #define IREE_VM_EXT_F32_ENABLE 1
 #endif  // !IREE_VM_EXT_F32_ENABLE
 
 #if !defined(IREE_VM_EXT_F64_ENABLE)
 // Enables the 64-bit floating-point instruction extension.
-// Targeted from the compiler with `-iree-vm-target-extensions=f64`.
+// Targeted from the compiler with `-iree-vm-target-extension=f64`.
 #define IREE_VM_EXT_F64_ENABLE 0
 #endif  // !IREE_VM_EXT_F64_ENABLE
 

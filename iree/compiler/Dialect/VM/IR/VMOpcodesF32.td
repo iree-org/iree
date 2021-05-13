@@ -42,10 +42,11 @@ def VM_OPC_SubF32                : VM_OPC<0x23, "SubF32">;
 def VM_OPC_MulF32                : VM_OPC<0x24, "MulF32">;
 def VM_OPC_DivF32                : VM_OPC<0x25, "DivF32">;
 def VM_OPC_RemF32                : VM_OPC<0x26, "RemF32">;
-def VM_OPC_AbsF32                : VM_OPC<0x27, "AbsF32">;
-def VM_OPC_NegF32                : VM_OPC<0x28, "NegF32">;
-def VM_OPC_CeilF32               : VM_OPC<0x29, "CeilF32">;
-def VM_OPC_FloorF32              : VM_OPC<0x2A, "FloorF32">;
+def VM_OPC_FMAF32                : VM_OPC<0x27, "FMAF32">;
+def VM_OPC_AbsF32                : VM_OPC<0x28, "AbsF32">;
+def VM_OPC_NegF32                : VM_OPC<0x29, "NegF32">;
+def VM_OPC_CeilF32               : VM_OPC<0x2A, "CeilF32">;
+def VM_OPC_FloorF32              : VM_OPC<0x2B, "FloorF32">;
 
 def VM_OPC_CastSI32F32           : VM_OPC<0x30, "CastSI32F32">;
 def VM_OPC_CastUI32F32           : VM_OPC<0x31, "CastUI32F32">;
@@ -108,6 +109,7 @@ def VM_ExtF32OpcodeAttr :
     VM_OPC_MulF32,
     VM_OPC_DivF32,
     VM_OPC_RemF32,
+    VM_OPC_FMAF32,
     VM_OPC_AbsF32,
     VM_OPC_NegF32,
     VM_OPC_CeilF32,
