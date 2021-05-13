@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -74,11 +74,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "FlowEnumsGen",
     tbl_outs = [
-        ("-gen-enum-decls", "FlowEnums.h.inc"),
-        ("-gen-enum-defs", "FlowEnums.cpp.inc"),
+        (
+            ["-gen-enum-decls"],
+            "FlowEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "FlowEnums.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowBase.td",
@@ -92,11 +98,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "FlowInterfacesGen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "FlowInterfaces.h.inc"),
-        ("-gen-op-interface-defs", "FlowInterfaces.cpp.inc"),
+        (
+            ["-gen-op-interface-decls"],
+            "FlowInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "FlowInterfaces.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowInterfaces.td",
@@ -110,11 +122,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "FlowOpsGen",
     tbl_outs = [
-        ("-gen-op-decls", "FlowOps.h.inc"),
-        ("-gen-op-defs", "FlowOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "FlowOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "FlowOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowOps.td",
@@ -132,7 +150,10 @@ gentbl(
 iree_tablegen_doc(
     name = "FlowDialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "FlowDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "FlowDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowOps.td",

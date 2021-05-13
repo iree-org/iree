@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
@@ -21,11 +21,11 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-gentbl(
+gentbl_cc_library(
     name = "Passes_inc_gen",
     tbl_outs = [
         (
-            "-gen-pass-decls",
+            ["-gen-pass-decls"],
             "Passes.h.inc",
         ),
     ],

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -89,11 +89,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VMLAEnumsGen",
     tbl_outs = [
-        ("-gen-enum-decls", "VMLAEnums.h.inc"),
-        ("-gen-enum-defs", "VMLAEnums.cpp.inc"),
+        (
+            ["-gen-enum-decls"],
+            "VMLAEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "VMLAEnums.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMLABase.td",
@@ -106,11 +112,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VMLAOpsGen",
     tbl_outs = [
-        ("-gen-op-decls", "VMLAOps.h.inc"),
-        ("-gen-op-defs", "VMLAOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "VMLAOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "VMLAOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMLAOps.td",
@@ -123,11 +135,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VMLAOpInterfaceGen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "VMLAOpInterface.h.inc"),
-        ("-gen-op-interface-defs", "VMLAOpInterface.cpp.inc"),
+        (
+            ["-gen-op-interface-decls"],
+            "VMLAOpInterface.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "VMLAOpInterface.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMLABase.td",
@@ -142,7 +160,10 @@ gentbl(
 iree_tablegen_doc(
     name = "VMLADialecDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "VMLADialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "VMLADialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMLAOps.td",
