@@ -312,6 +312,12 @@ void registerFlowTransformPassPipeline() {
       [](OpPassManager &passManager) {
         buildFlowTransformPassPipeline(passManager, false);
       });
+  PassPipelineRegistration<> tensorTransformPassPipeline(
+      "iree-flow-transformation-pipeline-tensors",
+      "Runs the full IREE flow dialect transformation pipeline",
+      [](OpPassManager &passManager) {
+        buildFlowTransformPassPipeline(passManager, true);
+      });
 }
 
 namespace {

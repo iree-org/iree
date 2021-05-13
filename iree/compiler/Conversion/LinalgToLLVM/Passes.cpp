@@ -79,7 +79,9 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager,
         return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
       };
   addLinalgBufferizePasses(nestedModulePM, allocationFn);
-  nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
+  nestedModulePM.addPass(createPromoteBuffersToStackPass(
+      /*maxAllocSizeInBytes=*/1 << 10, /*bitwidthOfIndexType=*/64,
+      /*maxRankOfAllocatedMemRef=*/10));
 
   // Linalg -> LLVM passes.
   addLinalgToLLVMPasses(passManager, options);

@@ -14,21 +14,24 @@
 
 #include "iree/tools/init_targets.h"
 
-#ifdef IREE_HAVE_LLVMAOT_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
-#endif
-#ifdef IREE_HAVE_VMLA_TARGET
-#include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"
-#endif
-#ifdef IREE_HAVE_METALSPIRV_TARGET
-#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
-#endif
-#ifdef IREE_HAVE_VULKANSPIRV_TARGET
-#include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
-#endif
 #ifdef IREE_HAVE_CUDA_TARGET
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
-#endif
+#endif  // IREE_HAVE_CUDA_TARGET
+#ifdef IREE_HAVE_LLVMAOT_TARGET
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
+#endif  // IREE_HAVE_LLVMAOT_TARGET
+#ifdef IREE_HAVE_METALSPIRV_TARGET
+#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
+#endif  // IREE_HAVE_METALSPIRV_TARGET
+#ifdef IREE_HAVE_VMLA_TARGET
+#include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"
+#endif  // IREE_HAVE_VMLA_TARGET
+#ifdef IREE_HAVE_VMVX_TARGET
+#include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
+#endif  // IREE_HAVE_VMVX_TARGET
+#ifdef IREE_HAVE_VULKANSPIRV_TARGET
+#include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
+#endif  // IREE_HAVE_VULKANSPIRV_TARGET
 
 namespace mlir {
 namespace iree_compiler {
@@ -40,26 +43,30 @@ namespace iree_compiler {
 void registerHALTargetBackends() {
   static bool init_once = []() {
 
-#ifdef IREE_HAVE_LLVMAOT_TARGET
-    IREE::HAL::registerLLVMAOTTargetBackends(
-        []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
-#endif
-#ifdef IREE_HAVE_VMLA_TARGET
-    IREE::HAL::registerVMLATargetBackends(
-        []() { return IREE::HAL::getVMLATargetOptionsFromFlags(); });
-#endif
-#ifdef IREE_HAVE_METALSPIRV_TARGET
-    IREE::HAL::registerMetalSPIRVTargetBackends(
-        []() { return IREE::HAL::getMetalSPIRVTargetOptionsFromFlags(); });
-#endif
-#ifdef IREE_HAVE_VULKANSPIRV_TARGET
-    IREE::HAL::registerVulkanSPIRVTargetBackends(
-        []() { return IREE::HAL::getVulkanSPIRVTargetOptionsFromFlags(); });
-#endif
 #ifdef IREE_HAVE_CUDA_TARGET
     IREE::HAL::registerCUDATargetBackends(
         []() { return IREE::HAL::getCUDATargetOptionsFromFlags(); });
-#endif
+#endif  // IREE_HAVE_CUDA_TARGET
+#ifdef IREE_HAVE_LLVMAOT_TARGET
+    IREE::HAL::registerLLVMAOTTargetBackends(
+        []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
+#endif  // IREE_HAVE_LLVMAOT_TARGET
+#ifdef IREE_HAVE_METALSPIRV_TARGET
+    IREE::HAL::registerMetalSPIRVTargetBackends(
+        []() { return IREE::HAL::getMetalSPIRVTargetOptionsFromFlags(); });
+#endif  // IREE_HAVE_METALSPIRV_TARGET
+#ifdef IREE_HAVE_VMLA_TARGET
+    IREE::HAL::registerVMLATargetBackends(
+        []() { return IREE::HAL::getVMLATargetOptionsFromFlags(); });
+#endif  // IREE_HAVE_VMLA_TARGET
+#ifdef IREE_HAVE_VMVX_TARGET
+    IREE::HAL::registerVMVXTargetBackends(
+        []() { return IREE::HAL::getVMVXTargetOptionsFromFlags(); });
+#endif  // IREE_HAVE_VMVX_TARGET
+#ifdef IREE_HAVE_VULKANSPIRV_TARGET
+    IREE::HAL::registerVulkanSPIRVTargetBackends(
+        []() { return IREE::HAL::getVulkanSPIRVTargetOptionsFromFlags(); });
+#endif  // IREE_HAVE_VULKANSPIRV_TARGET
     return true;
   }();
   (void)init_once;

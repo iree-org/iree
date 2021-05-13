@@ -27,7 +27,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-DYLIB_AND_VULKAN_CHECK_TESTS = [
+NON_VMLA_CHECK_TESTS = [
     "abs.mlir",
     "add.mlir",
     "batch_norm_inference.mlir",
@@ -134,20 +134,6 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_vulkan-spirv_vulkan",
-    srcs = DYLIB_AND_VULKAN_CHECK_TESTS,
-    driver = "vulkan",
-    target_backend = "vulkan-spirv",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_dylib-llvm-aot_dylib",
-    srcs = DYLIB_AND_VULKAN_CHECK_TESTS + ["fft.mlir"],  #TODO(hanchung): clean this up, like VMLA test suite.
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
-)
-
-iree_check_single_backend_test_suite(
     name = "check_cuda",
     srcs = [
         "add.mlir",
@@ -176,11 +162,33 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_dylib-llvm-aot_dylib",
+    srcs = NON_VMLA_CHECK_TESTS + ["fft.mlir"],  #TODO(hanchung): clean this up, like VMLA test suite.
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_vmvx",
+    srcs = NON_VMLA_CHECK_TESTS + ["fft.mlir"],  #TODO(hanchung): clean this up, like VMLA test suite.
+    driver = "vmvx",
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan",
+    srcs = NON_VMLA_CHECK_TESTS,
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
 test_suite(
     name = "check",
     tests = [
         ":check_dylib-llvm-aot_dylib",
         ":check_vmla_vmla",
+        ":check_vmvx_vmvx",
         ":check_vulkan-spirv_vulkan",
     ],
 )
