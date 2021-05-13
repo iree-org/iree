@@ -31,7 +31,7 @@ endif()
 
 c_embed_data(
     name = "cuda_libdevice",
-    srcs = ["libdevice.10.bc"],
+    srcs = ["@cuda//:libdevice_root"],
     c_file_output = "libdevice.c",
     h_file_output = "libdevice.h",
 )

@@ -20,3 +20,7 @@ cc_library(
     includes = ["include"],
 )
 
+filegroup(
+    name = "libdevice_root",
+    srcs = ["nvvm/libdevice/**"],
+)
