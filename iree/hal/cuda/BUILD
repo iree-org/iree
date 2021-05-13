@@ -92,7 +92,7 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal:dynamic_library",
-        "@cuda_headers",
+        "@cuda//:cuda_headers",
     ],
 )
 

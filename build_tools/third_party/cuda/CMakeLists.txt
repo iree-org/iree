@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(CUDA_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/cuda/")
+set(CUDA_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/cuda/include")
 
 external_cc_library(
   PACKAGE
@@ -22,7 +22,7 @@ external_cc_library(
   ROOT
     ${CUDA_HEADERS_API_ROOT}
   HDRS
-    "include/cuda.h"
+    "cuda.h"
   INCLUDES
     ${CUDA_HEADERS_API_ROOT}
 )
