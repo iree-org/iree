@@ -129,7 +129,7 @@ class FunctionInvoker:
     if abi_json is None:
       # It is valid to have no reflection data, and rely on pure dynamic
       # dispatch.
-      logging.warning(
+      logging.debug(
           "Function lacks reflection data. Interop will be limited: %r",
           vm_function)
       return
@@ -172,21 +172,20 @@ def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 
 def _int_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   # Implicit conversion to a 0d tensor.
-  if _is_0d_ndarray_descriptor(desc):
+  if desc and _is_0d_ndarray_descriptor(desc):
     casted = _cast_scalar_to_ndarray(inv, x, desc)
     _ndarray_to_vm(inv, t, casted, desc)
     return
-
-  _raise_argument_error(inv, "Python int arguments not yet supported")
+  t.push_int(x)
 
 
 def _float_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   # Implicit conversion to a 0d tensor.
-  if _is_0d_ndarray_descriptor(desc):
+  if desc and _is_0d_ndarray_descriptor(desc):
     casted = _cast_scalar_to_ndarray(inv, x, desc)
     _ndarray_to_vm(inv, t, casted, desc)
     return
-  _raise_argument_error(inv, "Python float arguments not yet supported")
+  t.push_float(x)
 
 
 def _list_or_tuple_to_vm(inv: Invocation, t: VmVariantList, x, desc):
@@ -325,6 +324,9 @@ ABI_TYPE_TO_DTYPE = {
     # TODO: Others.
     "f32": np.float32,
     "i32": np.int32,
+    "i64": np.int64,
+    "f64": np.float64,
+    "i1": np.bool_,
 }
 
 # NOTE: Numpy dtypes are not hashable and exist in a hierarchy that should
@@ -343,6 +345,7 @@ DTYPE_TO_HAL_ELEMENT_TYPE = (
     (np.uint64, HalElementType.UINT_64),
     (np.uint16, HalElementType.UINT_16),
     (np.uint8, HalElementType.UINT_8),
+    (np.bool_, HalElementType.BOOL_8),
 )
 
 
@@ -416,17 +419,18 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
     inv.current_desc = desc
     if desc is None:
       # Dynamic (non reflection mode).
-      _raise_return_error(
-          inv, "function has no reflection data, which is not yet supported")
-    vm_type = desc[0]
-    try:
-      converter = VM_TO_PYTHON_CONVERTERS[vm_type]
-    except KeyError:
-      _raise_return_error(inv, f"cannot map VM type to Python: {vm_type}")
-    try:
-      converted = converter(inv, vm_list, vm_index, desc)
-    except Exception as e:
-      _raise_return_error(inv, f"exception converting from VM type to Python",
-                          e)
+      converted = vm_list.get_variant(vm_index)
+    else:
+      # Known type descriptor.
+      vm_type = desc[0]
+      try:
+        converter = VM_TO_PYTHON_CONVERTERS[vm_type]
+      except KeyError:
+        _raise_return_error(inv, f"cannot map VM type to Python: {vm_type}")
+      try:
+        converted = converter(inv, vm_list, vm_index, desc)
+      except Exception as e:
+        _raise_return_error(inv, f"exception converting from VM type to Python",
+                            e)
     results.append(converted)
   return results
