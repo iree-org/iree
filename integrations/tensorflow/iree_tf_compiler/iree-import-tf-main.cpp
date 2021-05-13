@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Main entry function for the iree-tf-import tool (and derived binaries).
+// Main entry function for the iree-import-tf tool (and derived binaries).
 // Note that this is not an e2e tool: it is purely the first stage of the
 // pipeline intended to lower TensorFlow GraphDefs and SavedModels to a form
 // suitable for input to the IREE compiler.
@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
   iree_integrations::TF::buildTFImportPassPipeline(pm);
   if (failed(pm.run(*module))) {
     llvm::errs()
-        << "Running iree-tf-import pass pipeline failed (see diagnostics)\n";
+        << "Running iree-import-tf pass pipeline failed (see diagnostics)\n";
     return 2;
   }
 

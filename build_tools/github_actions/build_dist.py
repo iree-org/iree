@@ -336,7 +336,7 @@ def build_py_tf_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building TF import tool with Bazel ***")
-  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-tf-import")
+  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-tf")
 
   # CMake configure.
   print("*** Configuring ***")

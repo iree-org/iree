@@ -64,6 +64,8 @@ static void addLinalgToNVVMPasses(OpPassManager &pm) {
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
 
+  pm.addNestedPass<ModuleOp>(createLowerAffinePass());
+
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addNestedPass<ModuleOp>(createStripDebugInfoPass());

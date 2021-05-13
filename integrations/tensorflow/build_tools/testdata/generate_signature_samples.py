@@ -17,13 +17,13 @@
 Usage:
   generate_signature_samples.py /tmp/sigs.sm
 
-This can then be fed into iree-tf-import to process it:
+This can then be fed into iree-import-tf to process it:
 
 Fully convert to IREE input (run all import passes):
-  iree-tf-import /tmp/sigs.sm
+  iree-import-tf /tmp/sigs.sm
 
 Import only (useful for crafting test cases for the import pipeline):
-  iree-tf-import -o /dev/null -save-temp-tf-input=- /tmp/sigs.sm
+  iree-import-tf -o /dev/null -save-temp-tf-input=- /tmp/sigs.sm
 
 Can be further lightly pre-processed via:
   | iree-tf-opt --tf-standard-pipeline

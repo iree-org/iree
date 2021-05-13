@@ -188,7 +188,12 @@ function(external_cc_library)
   endif()
 
   add_library(${_RULE_PACKAGE}::${_RULE_NAME} ALIAS ${_NAME})
-  if(${_RULE_PACKAGE} STREQUAL ${_RULE_NAME})
+  # If the library name matches the final component of the package then treat it
+  # as a default. For example, 'foo::bar' library 'bar' would end up as
+  # 'foo::bar'.
+  string(REGEX REPLACE "^.*::" "" _PACKAGE_DIR ${_RULE_PACKAGE})
+  if(${_PACKAGE_DIR} STREQUAL ${_RULE_NAME})
+
     add_library(${_RULE_PACKAGE} ALIAS ${_NAME})
   endif()
 endfunction()

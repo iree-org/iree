@@ -71,7 +71,7 @@ class ImportOptions(CompilerOptions):
         bytes-like output is returned. Note that if the output_file= is
         specified and import_only=True, then the MLIR form will be written to
         the output file.
-      import_extra_args: Extra arguments to pass to the iree-tf-import tool.
+      import_extra_args: Extra arguments to pass to the iree-import-tf tool.
       save_temp_tfl_input: Optionally save the IR that results from importing
         the flatbuffer (prior to any further transformations).
       save_temp_iree_input: Optionally save the IR that is the result of the

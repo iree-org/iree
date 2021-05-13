@@ -1967,18 +1967,18 @@ iree_status_t iree_vm_bytecode_dispatch(
         *result = vm_cast_si32f32(operand);
       });
       DISPATCH_OP(EXT_F32, CastUI32F32, {
-        uint32_t operand = (uint32_t)VM_DecOperandRegI32("operand");
+        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
         float* result = VM_DecResultRegF32("result");
         *result = vm_cast_ui32f32(operand);
       });
       DISPATCH_OP(EXT_F32, CastF32SI32, {
         float operand = VM_DecOperandRegF32("operand");
-        int32_t* result = (int32_t*)VM_DecResultRegI32("result");
+        int32_t* result = VM_DecResultRegI32("result");
         *result = vm_cast_f32si32(operand);
       });
       DISPATCH_OP(EXT_F32, CastF32UI32, {
         float operand = VM_DecOperandRegF32("operand");
-        uint32_t* result = (uint32_t*)VM_DecResultRegI32("result");
+        int32_t* result = VM_DecResultRegI32("result");
         *result = vm_cast_f32ui32(operand);
       });
 
