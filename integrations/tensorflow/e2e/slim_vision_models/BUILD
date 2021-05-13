@@ -56,14 +56,6 @@ iree_e2e_cartesian_product_test_suite(
             "model": "amoebanet_a_n18_f448",
         },
         {
-            # Failing on vmla with negative inputs.
-            "model": [
-                "nasnet_large",
-                "nasnet_mobile",
-            ],
-            "target_backends": "iree_vmla",
-        },
-        {
             # Failing llvmjit and vulkan:
             "model": [
                 "nasnet_mobile",
@@ -158,7 +150,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_vulkan",
         ],
     },
