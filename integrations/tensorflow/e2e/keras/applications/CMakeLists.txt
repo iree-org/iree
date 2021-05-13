@@ -158,7 +158,7 @@ iree_python_benchmark_suite(
   TARGET_BACKEND
     iree_llvmaot
   TARGET_ARCH
-    "CPU-ARM-v8.2-A"
+    "CPU-ARM64-v8A"
   COMPILATION_FLAGS
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
