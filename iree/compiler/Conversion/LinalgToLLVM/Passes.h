@@ -28,7 +28,7 @@ std::unique_ptr<FunctionPass> createPlanConvLoopOrderPass();
 
 /// Pad linalg ops workgroup tiles into the next integer multiple of the target
 /// vector size.
-std::unique_ptr<FunctionPass> createPadLinalgWorkgroupTilesPass();
+std::unique_ptr<OperationPass<FuncOp>> createPadLinalgWorkgroupTilesPass();
 
 /// Distributes linalg ops among hal.interface.workgroup logical threads.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
