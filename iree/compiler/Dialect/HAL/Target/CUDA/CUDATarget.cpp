@@ -14,8 +14,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
-#include "build_tools/third_party/cuda/libdevice.h"
 #include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"

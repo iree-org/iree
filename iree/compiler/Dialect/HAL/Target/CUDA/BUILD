@@ -13,6 +13,7 @@
 # limitations under the License.
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -28,6 +29,13 @@ endif()
 """,
 )
 
+c_embed_data(
+    name = "cuda_libdevice",
+    srcs = ["libdevice.10.bc"],
+    c_file_output = "libdevice.c",
+    h_file_output = "libdevice.h",
+)
+
 cc_library(
     name = "CUDA",
     srcs = [
@@ -37,12 +45,12 @@ cc_library(
         "CUDATarget.h",
     ],
     deps = [
+        ":cuda_libdevice",
         "//iree/base/internal:flatcc",
         "//iree/compiler/Conversion/LinalgToNVVM",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
         "//iree/schemas:cuda_executable_def_c_fbs",
-        "@cuda//:cuda_libdevice",
         "@llvm-project//llvm:BitReader",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:NVPTXCodeGen",

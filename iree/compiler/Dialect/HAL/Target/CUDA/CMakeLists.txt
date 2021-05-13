@@ -14,6 +14,18 @@ endif()
 
 iree_add_all_subdirs()
 
+iree_c_embed_data(
+  NAME
+    cuda_libdevice
+  SRCS
+    "libdevice.10.bc"
+  C_FILE_OUTPUT
+    "libdevice.c"
+  H_FILE_OUTPUT
+    "libdevice.h"
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     CUDA
@@ -22,6 +34,7 @@ iree_cc_library(
   SRCS
     "CUDATarget.cpp"
   DEPS
+    ::cuda_libdevice
     LLVMBitReader
     LLVMCore
     LLVMNVPTXCodeGen
@@ -34,7 +47,6 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport
-    build_tools::third_party::cuda::cuda_libdevice
     iree::base::internal::flatcc
     iree::compiler::Conversion::LinalgToNVVM
     iree::compiler::Dialect::HAL::Target

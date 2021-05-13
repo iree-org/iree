@@ -14,18 +14,6 @@
 
 set(CUDA_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/cuda/include")
 
-iree_c_embed_data(
-  NAME
-    cuda_libdevice
-  SRCS
-    "../../../third_party/cuda/nvvm/libdevice/libdevice.10.bc"
-  C_FILE_OUTPUT
-    "libdevice.c"
-  H_FILE_OUTPUT
-    "libdevice.h"
-  PUBLIC
-)
-
 external_cc_library(
   PACKAGE
     cuda_headers
