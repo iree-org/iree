@@ -89,14 +89,6 @@ iree_e2e_cartesian_product_test_suite(
     name = "keyword_spotting_tests",
     failing_configurations = [
         {
-            # TODO(#4065): VMLA raises INVALID_ARGUMENT errors after DeviceQueue failure.
-            "model": [
-                "att_mh_rnn",
-                "att_rnn",
-            ],
-            "target_backends": "iree_vmla",
-        },
-        {
             "model": [
                 # Timing out on SwiftShader
                 "att_mh_rnn",
@@ -127,7 +119,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -168,7 +159,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -198,7 +188,6 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": [
                 "tf",
                 "tflite",
-                "iree_vmla",
                 "iree_llvmaot",
                 "iree_vulkan",
             ],
@@ -216,7 +205,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],

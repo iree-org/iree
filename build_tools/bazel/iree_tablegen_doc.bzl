@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 
 def iree_tablegen_doc(*args, **kwargs):
     """iree_tablegen_doc() generates documentation from a table definition file.
@@ -20,4 +20,6 @@ def iree_tablegen_doc(*args, **kwargs):
     This is a simple wrapper over gentbl() so we can differentiate between
     documentation and others. See gentbl() for details regarding arguments.
     """
-    gentbl(*args, **kwargs)
+
+    # TODO(gcmn): consider using gentbl_filegroup instead
+    gentbl_cc_library(*args, **kwargs)

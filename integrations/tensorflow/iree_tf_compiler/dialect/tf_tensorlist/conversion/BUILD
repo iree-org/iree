@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@iree//build_tools/bazel:tblgen.bzl", "gentbl")
+load("@iree//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -40,11 +40,11 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "convert_tf_to_tf_tensorlist_rewriter_gen",
     tbl_outs = [
         (
-            "-gen-rewriters",
+            ["-gen-rewriters"],
             "convert_tf_to_tf_tensorlist.inc",
         ),
     ],

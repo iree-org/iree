@@ -125,6 +125,7 @@ set(IREE_ALL_HAL_DRIVERS
   Cuda
   DyLib
   VMLA
+  VMVX
   Vulkan
 )
 
@@ -163,10 +164,11 @@ set(IREE_ALL_TARGET_BACKENDS
   Metal-SPIRV
   Vulkan-SPIRV
   VMLA
+  VMVX
 )
 
-if( IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all" )
-  set( IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS} )
+if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
+  set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
 endif()
 message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
 
@@ -383,11 +385,12 @@ include(external_cc_library)
 include(flatbuffer_c_library)
 
 add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/cuda_headers EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)

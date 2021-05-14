@@ -35,10 +35,8 @@ namespace Flow {
 
 /// An operation that uses `offsets`, `sizes` and `strides` (i.e. implements the
 /// `OffsetSizeAndStrideInterface`) can be mapped to flow operations that
-/// eventually map to DMA operations if
-/// - all offsets apart from the first one are 0
-/// - all the sizes apart from the first match the sizes of the source
-/// - all strides are 1.
+/// eventually map to DMA operations if the offsets/sizes/strides represent a
+/// contiguous memory.
 static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
                                                 ArrayRef<OpFoldResult> sizes,
                                                 ArrayRef<OpFoldResult> strides,
@@ -47,15 +45,39 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     // Unhanded rank-reducing case.
     return false;
   }
-  auto matchVal = [](OpFoldResult valueOrAttr, int64_t val) -> bool {
+  auto getVal = [](OpFoldResult valueOrAttr, int64_t dynamicVal) -> int64_t {
     auto attr = valueOrAttr.dyn_cast<Attribute>();
-    return attr && attr.cast<IntegerAttr>().getInt() == val;
+    return attr ? attr.cast<IntegerAttr>().getInt() : dynamicVal;
   };
-  for (auto dim : llvm::seq<unsigned>(0, offsets.size())) {
-    if ((dim != 0 && (!matchVal(offsets[dim], 0) ||
-                      !matchVal(sizes[dim], baseShape[dim]))) ||
-        !matchVal(strides[dim], 1)) {
-      return false;
+  /// To ensure contiguity, start from the least signficant dimension. As long
+  /// as the inner slices are "full slices", the current slice can be any offset
+  /// and size. If the inner slices are not "full slices", the current slice
+  /// must be of size 1. All strides must be one.
+
+  bool fullSlices = true;
+  for (size_t dim = offsets.size(); dim > 0; dim--) {
+    int64_t staticOffset =
+        getVal(offsets[dim - 1], ShapedType::kDynamicStrideOrOffset);
+    int64_t staticSize = getVal(sizes[dim - 1], ShapedType::kDynamicSize);
+    int64_t staticStride =
+        getVal(strides[dim - 1], ShapedType::kDynamicStrideOrOffset);
+
+    if (staticStride != 1) return false;
+    // The offsets and sizes dont have to be static for all dimensions. When
+    // `fullSlices` is true, the offset and sizes can be dynamic. But many
+    // cases, the dynamic offset/size value is obtained by computing from
+    // another tensor which lives on the device. To avoid host-round tripping
+    // enforce that offset/size is also static.
+    if (staticSize == ShapedType::kDynamicSize) return false;
+    if (staticOffset == ShapedType::kDynamicStrideOrOffset) return false;
+
+    if (fullSlices == false) {
+      if (staticSize != 1) return false;
+    } else {
+      if (!(staticOffset == 0 && staticSize != ShapedType::kDynamicSize &&
+            baseShape[dim - 1] != ShapedType::kDynamicSize &&
+            staticSize == baseShape[dim - 1]))
+        fullSlices = false;
     }
   }
   return true;

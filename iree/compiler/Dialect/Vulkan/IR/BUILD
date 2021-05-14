@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -59,11 +59,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VulkanAttrsGen",
     tbl_outs = [
-        ("-gen-struct-attr-decls", "VulkanAttributes.h.inc"),
-        ("-gen-struct-attr-defs", "VulkanAttributes.cpp.inc"),
+        (
+            ["-gen-struct-attr-decls"],
+            "VulkanAttributes.h.inc",
+        ),
+        (
+            ["-gen-struct-attr-defs"],
+            "VulkanAttributes.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VulkanAttributes.td",
@@ -73,11 +79,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VulkanEnumsGen",
     tbl_outs = [
-        ("-gen-enum-decls", "VulkanEnums.h.inc"),
-        ("-gen-enum-defs", "VulkanEnums.cpp.inc"),
+        (
+            ["-gen-enum-decls"],
+            "VulkanEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "VulkanEnums.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VulkanBase.td",

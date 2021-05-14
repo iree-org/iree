@@ -105,7 +105,7 @@ hal.executable @add attributes {sym_visibility = "private"} {
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>
-        linalg.generic {
+        linalg.generic {__internal_linalg_transform__ = "workgroup"} {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                            affine_map<(d0, d1) -> (d1)>,
                            affine_map<(d0, d1) -> (d0, d1)>],

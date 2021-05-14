@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -76,11 +76,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "ShapeInterfacesGen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "ShapeInterfaces.h.inc"),
-        ("-gen-op-interface-defs", "ShapeInterfaces.cpp.inc"),
+        (
+            ["-gen-op-interface-decls"],
+            "ShapeInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "ShapeInterfaces.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ShapeInterfaces.td",
@@ -92,11 +98,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "ShapeOpsGen",
     tbl_outs = [
-        ("-gen-op-decls", "ShapeOps.h.inc"),
-        ("-gen-op-defs", "ShapeOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "ShapeOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "ShapeOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ShapeOps.td",
@@ -114,7 +126,10 @@ gentbl(
 iree_tablegen_doc(
     name = "ShapeDialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "ShapeDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "ShapeDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ShapeOps.td",

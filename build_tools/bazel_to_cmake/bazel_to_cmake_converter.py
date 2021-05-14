@@ -118,7 +118,8 @@ def _convert_td_file_block(td_file):
 
 
 def _convert_tbl_outs_block(tbl_outs):
-  outs_list = "\n".join([f"    {flag} {value}" for flag, value in tbl_outs])
+  outs_list = "\n".join(
+      [f"    {' '.join(flags)} {value}" for flags, value in tbl_outs])
   return f"  OUTS\n{outs_list}\n"
 
 
@@ -498,15 +499,15 @@ class BuildFileFunctions(object):
                             f"{flatcc_args_block}"
                             f"  PUBLIC\n)\n\n")
 
-  def gentbl(self,
-             name,
-             tblgen,
-             td_file,
-             tbl_outs,
-             td_srcs=None,
-             td_includes=None,
-             strip_include_prefix=None,
-             test=None):
+  def gentbl_cc_library(self,
+                        name,
+                        tblgen,
+                        td_file,
+                        tbl_outs,
+                        td_srcs=None,
+                        td_includes=None,
+                        strip_include_prefix=None,
+                        test=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     tblgen_block = _convert_tblgen_block(tblgen)
     td_file_block = _convert_td_file_block(td_file)

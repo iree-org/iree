@@ -28,13 +28,13 @@ TargetOptions getTargetOptionsFromFlags() {
   static auto *indexBitsFlag = new llvm::cl::opt<int>{
       "iree-vm-target-index-bits",
       llvm::cl::init(32),
-      llvm::cl::desc("Bit width of index types"),
+      llvm::cl::desc("Bit width of index types."),
       llvm::cl::cat(vmTargetOptionsCategory),
   };
   static auto *extensionsFlag = new llvm::cl::list<OpcodeExtension>{
-      "iree-vm-target-extensions",
+      "iree-vm-target-extension",
       llvm::cl::ZeroOrMore,
-      llvm::cl::desc("Supported target opcode extensions"),
+      llvm::cl::desc("Supported target opcode extensions."),
       llvm::cl::cat(vmTargetOptionsCategory),
       llvm::cl::values(
           clEnumValN(OpcodeExtension::kI64, "i64", "i64 type support"),
@@ -44,13 +44,13 @@ TargetOptions getTargetOptionsFromFlags() {
   static auto *truncateUnsupportedIntegersFlag = new llvm::cl::opt<bool>{
       "iree-vm-target-truncate-unsupported-integers",
       llvm::cl::init(true),
-      llvm::cl::desc("Truncate i64 to i32 when unsupported"),
+      llvm::cl::desc("Truncate i64 to i32 when unsupported."),
       llvm::cl::cat(vmTargetOptionsCategory),
   };
   static auto *truncateUnsupportedFloatsFlag = new llvm::cl::opt<bool>{
       "iree-vm-target-truncate-unsupported-floats",
       llvm::cl::init(true),
-      llvm::cl::desc("Truncate f64 to f32 when unsupported"),
+      llvm::cl::desc("Truncate f64 to f32 when unsupported."),
       llvm::cl::cat(vmTargetOptionsCategory),
   };
 

@@ -42,12 +42,13 @@ def VM_OPC_SubF64                : VM_OPC<0x23, "SubF64">;
 def VM_OPC_MulF64                : VM_OPC<0x24, "MulF64">;
 def VM_OPC_DivF64                : VM_OPC<0x25, "DivF64">;
 def VM_OPC_RemF64                : VM_OPC<0x26, "RemF64">;
-def VM_OPC_AbsF64                : VM_OPC<0x27, "AbsF64">;
-def VM_OPC_NegF64                : VM_OPC<0x28, "NegF64">;
-def VM_OPC_CeilF64               : VM_OPC<0x29, "CeilF64">;
-def VM_OPC_FloorF64              : VM_OPC<0x2A, "FloorF64">;
-def VM_OPC_TruncF64F32           : VM_OPC<0x2B, "TruncF64F32">;
-def VM_OPC_ExtF32F64             : VM_OPC<0x2C, "ExtF32F64">;
+def VM_OPC_FMAF64                : VM_OPC<0x27, "FMAF64">;
+def VM_OPC_AbsF64                : VM_OPC<0x28, "AbsF64">;
+def VM_OPC_NegF64                : VM_OPC<0x29, "NegF64">;
+def VM_OPC_CeilF64               : VM_OPC<0x2A, "CeilF64">;
+def VM_OPC_FloorF64              : VM_OPC<0x2B, "FloorF64">;
+def VM_OPC_TruncF64F32           : VM_OPC<0x2C, "TruncF64F32">;
+def VM_OPC_ExtF32F64             : VM_OPC<0x2D, "ExtF32F64">;
 
 def VM_OPC_CastSI32F64           : VM_OPC<0x30, "CastSI32F64">;
 def VM_OPC_CastUI32F64           : VM_OPC<0x31, "CastUI32F64">;
@@ -115,6 +116,7 @@ def VM_ExtF64OpcodeAttr :
     VM_OPC_MulF64,
     VM_OPC_DivF64,
     VM_OPC_RemF64,
+    VM_OPC_FMAF64,
     VM_OPC_AbsF64,
     VM_OPC_NegF64,
     VM_OPC_CeilF64,

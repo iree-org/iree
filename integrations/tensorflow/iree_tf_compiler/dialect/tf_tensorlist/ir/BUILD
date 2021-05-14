@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@iree//build_tools/bazel:tblgen.bzl", "gentbl")
+load("@iree//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("@iree//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -70,11 +70,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "tf_tensorlist_ops_gen",
     tbl_outs = [
-        ("-gen-op-decls", "tf_tensorlist_ops.h.inc"),
-        ("-gen-op-defs", "tf_tensorlist_ops.cc.inc"),
+        (
+            ["-gen-op-decls"],
+            "tf_tensorlist_ops.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "tf_tensorlist_ops.cc.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "tf_tensorlist_ops.td",

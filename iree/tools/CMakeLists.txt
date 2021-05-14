@@ -33,6 +33,10 @@ if("${IREE_TARGET_BACKEND_VMLA}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMLA)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMLA_TARGET")
 endif()
+if("${IREE_TARGET_BACKEND_VMVX}")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMVX)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMVX_TARGET")
+endif()
 if("${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
@@ -160,6 +164,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
+      iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
+      iree::compiler::Dialect::Modules::VMVX::Transforms
       iree::compiler::Dialect::Shape::Conversion
       iree::compiler::Dialect::Shape::IR
       iree::compiler::Dialect::Shape::Transforms
@@ -379,24 +385,24 @@ if(${IREE_BUILD_COMPILER})
 
   # CMake always needs to custom targets to drive custom commands. We have to
   # give it a different name.
-  add_custom_target(_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck)
+  add_custom_target(iree_tools_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck)
 
   # But custom target doesn't have the TARGET_FILE property, which we need, so
-  # wrap it yet again in an executable. This is marke as an imported executable
-  # because otherwise CMake would try to compile it as C++. The executable
-  # target has to have a different name than the output file of the custom
-  # command... (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
-  add_executable(IreeFileCheck_exe IMPORTED GLOBAL)
+  # wrap it yet again in an executable. This is marked as an imported executable
+  # because otherwise CMake would try to compile it as C++.
+  add_executable(iree_tools_IreeFileCheck IMPORTED GLOBAL)
   set_property(
     TARGET
-    IreeFileCheck_exe
+    iree_tools_IreeFileCheck
     PROPERTY IMPORTED_LOCATION
     "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck"
   )
-  add_dependencies(IreeFileCheck_exe _IreeFileCheck_Driver)
-  # Finally do our normal aliasing trick to make this accessible as a qualified
-  # target name throughout the project.
-  add_executable(iree_tools_IreeFileCheck ALIAS IreeFileCheck_exe)
+  add_dependencies(iree_tools_IreeFileCheck iree_tools_IreeFileCheck_Driver)
+  # Finally do our normal aliasing tricks to make this accessible as a qualified
+  # target name throughout the project. Accessing this as an unqualified target
+  # is not supported as the name would conflict with the file name, which CMake
+  # does not support (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
+  add_executable(iree::tools::IreeFileCheck ALIAS iree_tools_IreeFileCheck)
 
   if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
     add_custom_target(BundledLLVMFileCheck ALL

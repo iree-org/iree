@@ -342,14 +342,16 @@ vm.module @shl_i32_folds {
     // CHECK: %zero = vm.const.i32.zero : i32
     // CHECK-NEXT: vm.return %zero : i32
     %zero = vm.const.i32.zero : i32
-    %0 = vm.shl.i32 %zero, 4 : i32
+    %c4 = vm.const.i32 4 : i32
+    %0 = vm.shl.i32 %zero, %c4 : i32
     vm.return %0 : i32
   }
 
   // CHECK-LABEL: @shl_i32_x_by_0
   vm.func @shl_i32_x_by_0(%arg0 : i32) -> i32 {
     // CHECK: vm.return %arg0 : i32
-    %0 = vm.shl.i32 %arg0, 0 : i32
+    %c0 = vm.const.i32 0 : i32
+    %0 = vm.shl.i32 %arg0, %c0 : i32
     vm.return %0 : i32
   }
 
@@ -358,7 +360,8 @@ vm.module @shl_i32_folds {
     // CHECK: %c16 = vm.const.i32 16 : i32
     // CHECK-NEXT: vm.return %c16 : i32
     %c1 = vm.const.i32 1 : i32
-    %0 = vm.shl.i32 %c1, 4 : i32
+    %c4 = vm.const.i32 4 : i32
+    %0 = vm.shl.i32 %c1, %c4 : i32
     vm.return %0 : i32
   }
 }
@@ -371,24 +374,27 @@ vm.module @shr_i32_s_folds {
   vm.func @shr_i32_s_0_by_y() -> i32 {
     // CHECK: %zero = vm.const.i32.zero : i32
     // CHECK-NEXT: vm.return %zero : i32
-    %zero = vm.const.i32.zero : i32
-    %0 = vm.shr.i32.s %zero, 4 : i32
+    %c0 = vm.const.i32.zero : i32
+    %c4 = vm.const.i32 4 : i32
+    %0 = vm.shr.i32.s %c0, %c4 : i32
     vm.return %0 : i32
   }
 
   // CHECK-LABEL: @shr_i32_s_x_by_0
   vm.func @shr_i32_s_x_by_0(%arg0 : i32) -> i32 {
     // CHECK: vm.return %arg0 : i32
-    %0 = vm.shr.i32.s %arg0, 0 : i32
+    %c0 = vm.const.i32.zero : i32
+    %0 = vm.shr.i32.s %arg0, %c0 : i32
     vm.return %0 : i32
   }
 
   // CHECK-LABEL: @shr_i32_s_const
   vm.func @shr_i32_s_const() -> i32 {
-    // CHECK: vm.const.i32 -134217728 : i32
-    // CHECK-NEXT: vm.return %c
+    // CHECK: %[[C:.+]] = vm.const.i32 -134217728 : i32
+    // CHECK-NEXT: vm.return %[[C]]
     %c = vm.const.i32 0x80000000 : i32
-    %0 = vm.shr.i32.s %c, 4 : i32
+    %c4 = vm.const.i32 4 : i32
+    %0 = vm.shr.i32.s %c, %c4 : i32
     vm.return %0 : i32
   }
 }
@@ -402,23 +408,59 @@ vm.module @shr_i32_u_folds {
     // CHECK: %zero = vm.const.i32.zero : i32
     // CHECK-NEXT: vm.return %zero : i32
     %zero = vm.const.i32.zero : i32
-    %0 = vm.shr.i32.u %zero, 4 : i32
+    %c4 = vm.const.i32 4 : i32
+    %0 = vm.shr.i32.u %zero, %c4 : i32
     vm.return %0 : i32
   }
 
   // CHECK-LABEL: @shr_i32_u_x_by_0
   vm.func @shr_i32_u_x_by_0(%arg0 : i32) -> i32 {
     // CHECK: vm.return %arg0 : i32
-    %0 = vm.shr.i32.u %arg0, 0 : i32
+    %c0 = vm.const.i32 0 : i32
+    %0 = vm.shr.i32.u %arg0, %c0 : i32
     vm.return %0 : i32
   }
 
   // CHECK-LABEL: @shr_i32_u_const
   vm.func @shr_i32_u_const() -> i32 {
-    // CHECK: vm.const.i32 134217728 : i32
-    // CHECK-NEXT: vm.return %c
+    // CHECK: %[[C:.+]] = vm.const.i32 134217728 : i32
+    // CHECK-NEXT: vm.return %[[C]]
     %c = vm.const.i32 0x80000000 : i32
-    %0 = vm.shr.i32.u %c, 4 : i32
+    %c4 = vm.const.i32 4 : i32
+    %0 = vm.shr.i32.u %c, %c4 : i32
     vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @fma_i32_folds
+vm.module @fma_i32_folds {
+  // CHECK-LABEL: @fma_i32_0_b_c
+  vm.func @fma_i32_0_b_c(%b: i32, %c: i32) -> i32 {
+    %c0 = vm.const.i32.zero : i32
+    %d = vm.fma.i32 %c0, %b, %c : i32
+    vm.return %d : i32
+  }
+
+  // CHECK-LABEL: @fma_i32_1_b_c
+  vm.func @fma_i32_1_b_c(%b: i32, %c: i32) -> i32 {
+    %c1 = vm.const.i32 1 : i32
+    %d = vm.fma.i32 %c1, %b, %c : i32
+    vm.return %d : i32
+  }
+
+  // CHECK-LABEL: @fma_i32_a_1_c
+  vm.func @fma_i32_a_1_c(%a: i32, %c: i32) -> i32 {
+    %c1 = vm.const.i32 1 : i32
+    %d = vm.fma.i32 %a, %c1, %c : i32
+    vm.return %d : i32
+  }
+
+  // CHECK-LABEL: @fma_i32_a_b_0
+  vm.func @fma_i32_a_b_0(%a: i32, %b: i32) -> i32 {
+    %c0 = vm.const.i32.zero : i32
+    %d = vm.fma.i32 %a, %b, %c0 : i32
+    vm.return %d : i32
   }
 }

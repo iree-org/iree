@@ -12,10 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(default_visibility = ["//visibility:public"])
+set(STBLIB_ROOT "${IREE_ROOT_DIR}/third_party/stblib/")
 
-cc_library(
-    name = "cuda_headers",
-    hdrs = ["cuda.h"],
+
+external_cc_library(
+  PACKAGE
+    stblib
+  NAME
+    stb_image
+  ROOT
+    "${IREE_ROOT_DIR}/build_tools/third_party/stblib/"
+  SRCS
+    "stb_image.c"
+  COPTS
+    "-Wno-implicit-fallthrough"
+  INCLUDES
+    ${STBLIB_ROOT}
 )
-

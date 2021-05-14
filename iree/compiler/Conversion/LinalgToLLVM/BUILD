@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,11 +20,11 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-gentbl(
+gentbl_cc_library(
     name = "FoldTensorExtractOpIncGen",
     tbl_outs = [
         (
-            "-gen-rewriters",
+            ["-gen-rewriters"],
             "FoldTensorExtractOp.cpp.inc",
         ),
     ],
@@ -47,6 +47,7 @@ cc_library(
         "LinalgTileAndVectorizePass.cpp",
         "LinalgVectorizePass.cpp",
         "MaterializeCPULaunchConfigurationPass.cpp",
+        "PadLinalgWorkgroupTiles.cpp",
         "Passes.cpp",
         "PlanConvLoopOrder.cpp",
         "UnfuseFMAOps.cpp",

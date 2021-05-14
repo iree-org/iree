@@ -48,3 +48,20 @@ iree_cc_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# image utility library based on stb_image.h in https://github.com/nothings/stb
+
+iree_cc_library(
+  NAME
+    image_util
+  HDRS
+    "image_util.h"
+  SRCS
+    "image_util.c"
+  DEPS
+    iree::base
+    iree::base::tracing
+    iree::hal
+    stblib::stb_image
+  PUBLIC
+)

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -81,11 +81,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VMEnumsGen",
     tbl_outs = [
-        ("-gen-enum-decls", "VMEnums.h.inc"),
-        ("-gen-enum-defs", "VMEnums.cpp.inc"),
+        (
+            ["-gen-enum-decls"],
+            "VMEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "VMEnums.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMBase.td",
@@ -97,11 +103,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VMOpsGen",
     tbl_outs = [
-        ("-gen-op-decls", "VMOps.h.inc"),
-        ("-gen-op-defs", "VMOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "VMOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "VMOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMOps.td",
@@ -116,10 +128,13 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VMOpEncoderGen",
     tbl_outs = [
-        ("-gen-iree-vm-op-encoder-defs", "VMOpEncoder.cpp.inc"),
+        (
+            ["-gen-iree-vm-op-encoder-defs"],
+            "VMOpEncoder.cpp.inc",
+        ),
     ],
     tblgen = "//iree/tools:iree-tblgen",
     td_file = "VMOps.td",
@@ -134,11 +149,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VMOpInterfaceGen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "VMOpInterface.h.inc"),
-        ("-gen-op-interface-defs", "VMOpInterface.cpp.inc"),
+        (
+            ["-gen-op-interface-decls"],
+            "VMOpInterface.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "VMOpInterface.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMBase.td",
@@ -149,11 +170,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "VMStructsGen",
     tbl_outs = [
-        ("-gen-iree-struct-attr-decls", "VMStructs.h.inc"),
-        ("-gen-iree-struct-attr-defs", "VMStructs.cpp.inc"),
+        (
+            ["-gen-iree-struct-attr-decls"],
+            "VMStructs.h.inc",
+        ),
+        (
+            ["-gen-iree-struct-attr-defs"],
+            "VMStructs.cpp.inc",
+        ),
     ],
     tblgen = "//iree/tools:iree-tblgen",
     td_file = "VMBase.td",
@@ -167,7 +194,10 @@ gentbl(
 iree_tablegen_doc(
     name = "VMDialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "VMDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "VMDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMOps.td",

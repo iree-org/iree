@@ -1291,6 +1291,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CORE_BINARY_I32(DivI32U, vm_div_i32u);
     DISPATCH_OP_CORE_BINARY_I32(RemI32S, vm_rem_i32s);
     DISPATCH_OP_CORE_BINARY_I32(RemI32U, vm_rem_i32u);
+    DISPATCH_OP_CORE_TERNARY_I32(FMAI32, vm_fma_i32);
     DISPATCH_OP_CORE_UNARY_I32(NotI32, vm_not_i32);
     DISPATCH_OP_CORE_BINARY_I32(AndI32, vm_and_i32);
     DISPATCH_OP_CORE_BINARY_I32(OrI32, vm_or_i32);
@@ -1314,7 +1315,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 #define DISPATCH_OP_CORE_SHIFT_I32(op_name, op_func)  \
   DISPATCH_OP(CORE, op_name, {                        \
     int32_t operand = VM_DecOperandRegI32("operand"); \
-    int8_t amount = VM_DecConstI8("amount");          \
+    int32_t amount = VM_DecOperandRegI32("amount");   \
     int32_t* result = VM_DecResultRegI32("result");   \
     *result = op_func(operand, amount);               \
   });
@@ -1688,6 +1689,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_I64_BINARY_I64(DivI64U, vm_div_i64u);
       DISPATCH_OP_EXT_I64_BINARY_I64(RemI64S, vm_rem_i64s);
       DISPATCH_OP_EXT_I64_BINARY_I64(RemI64U, vm_rem_i64u);
+      DISPATCH_OP_EXT_I64_TERNARY_I64(FMAI64, vm_fma_i64);
       DISPATCH_OP_EXT_I64_UNARY_I64(NotI64, vm_not_i64);
       DISPATCH_OP_EXT_I64_BINARY_I64(AndI64, vm_and_i64);
       DISPATCH_OP_EXT_I64_BINARY_I64(OrI64, vm_or_i64);
@@ -1720,7 +1722,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 #define DISPATCH_OP_EXT_I64_SHIFT_I64(op_name, op_func) \
   DISPATCH_OP(EXT_I64, op_name, {                       \
     int64_t operand = VM_DecOperandRegI64("operand");   \
-    int8_t amount = VM_DecConstI8("amount");            \
+    int32_t amount = VM_DecOperandRegI32("amount");     \
     int64_t* result = VM_DecResultRegI64("result");     \
     *result = op_func(operand, amount);                 \
   });
@@ -1956,6 +1958,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_BINARY_F32(MulF32, vm_mul_f32);
       DISPATCH_OP_EXT_F32_BINARY_F32(DivF32, vm_div_f32);
       DISPATCH_OP_EXT_F32_BINARY_F32(RemF32, vm_rem_f32);
+      DISPATCH_OP_EXT_F32_TERNARY_F32(FMAF32, vm_fma_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(AbsF32, vm_abs_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(NegF32, vm_neg_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);

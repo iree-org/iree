@@ -69,6 +69,9 @@ static inline int32_t vm_rem_i32s(int32_t lhs, int32_t rhs) {
 static inline int32_t vm_rem_i32u(int32_t lhs, int32_t rhs) {
   return (int32_t)(((uint32_t)lhs) % ((uint32_t)rhs));
 }
+static inline int32_t vm_fma_i32(int32_t a, int32_t b, int32_t c) {
+  return a * b + c;
+}
 static inline int32_t vm_not_i32(int32_t operand) {
   return (int32_t)(~((uint32_t)operand));
 }
@@ -86,6 +89,13 @@ static inline float vm_mul_f32(float lhs, float rhs) { return lhs * rhs; }
 static inline float vm_div_f32(float lhs, float rhs) { return lhs / rhs; }
 static inline float vm_rem_f32(float lhs, float rhs) {
   return remainderf(lhs, rhs);
+}
+static inline float vm_fma_f32(float a, float b, float c) {
+#ifdef FP_FAST_FMAF
+  return fmaf(a, b, c);
+#else
+  return a * b + c;
+#endif  // FP_FAST_FMAF
 }
 static inline float vm_abs_f32(float operand) { return fabsf(operand); }
 static inline float vm_neg_f32(float operand) { return -operand; }
@@ -148,13 +158,16 @@ static inline int32_t vm_ext_i16i32u(int32_t operand) {
 // Native bitwise shifts and rotates
 //===------------------------------------------------------------------===//
 
-static inline int32_t vm_shl_i32(int32_t operand, int8_t amount) {
+static inline int32_t vm_shl_i32(int32_t operand, int32_t amount) {
+  amount &= 0x1F;
   return (int32_t)(operand << amount);
 }
-static inline int32_t vm_shr_i32s(int32_t operand, int8_t amount) {
+static inline int32_t vm_shr_i32s(int32_t operand, int32_t amount) {
+  amount &= 0x1F;
   return (int32_t)(operand >> amount);
 }
-static inline int32_t vm_shr_i32u(int32_t operand, int8_t amount) {
+static inline int32_t vm_shr_i32u(int32_t operand, int32_t amount) {
+  amount &= 0x1F;
   return (int32_t)(((uint32_t)operand) >> amount);
 }
 
@@ -245,6 +258,9 @@ static inline int64_t vm_rem_i64s(int64_t lhs, int64_t rhs) {
 static inline int64_t vm_rem_i64u(int64_t lhs, int64_t rhs) {
   return (int64_t)(((uint64_t)lhs) % ((uint64_t)rhs));
 }
+static inline int64_t vm_fma_i64(int64_t a, int64_t b, int64_t c) {
+  return a * b + c;
+}
 static inline int64_t vm_not_i64(int64_t operand) {
   return (int64_t)(~((uint64_t)operand));
 }
@@ -270,13 +286,16 @@ static inline int64_t vm_ext_i32i64u(int32_t operand) {
 // ExtI64: Native bitwise shifts and rotates
 //===------------------------------------------------------------------===//
 
-static inline int64_t vm_shl_i64(int64_t operand, int8_t amount) {
+static inline int64_t vm_shl_i64(int64_t operand, int32_t amount) {
+  amount &= 0x3F;
   return (int64_t)(operand << amount);
 }
-static inline int64_t vm_shr_i64s(int64_t operand, int8_t amount) {
+static inline int64_t vm_shr_i64s(int64_t operand, int32_t amount) {
+  amount &= 0x3F;
   return (int64_t)(operand >> amount);
 }
-static inline int64_t vm_shr_i64u(int64_t operand, int8_t amount) {
+static inline int64_t vm_shr_i64u(int64_t operand, int32_t amount) {
+  amount &= 0x3F;
   return (int64_t)(((uint64_t)operand) >> amount);
 }
 

@@ -31,6 +31,7 @@ iree_cc_library(
     MLIRMath
     MLIRMemRef
     MLIRPass
+    MLIRSCFToStandard
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils
