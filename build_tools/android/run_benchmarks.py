@@ -213,7 +213,7 @@ def compose_benchmark_name(device_info, root_build_dir, model_benchmark_dir):
 
     Returns:
     - A string of the format:
-      "<model-name> <benchmark-kind> @ <device-model> (<target-arch>)"
+      "<model-name> <benchmark-mode> @ <device-model> (<target-arch>)"
   """
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
                                 PYTON_MODEL_REL_PATH)
@@ -225,9 +225,9 @@ def compose_benchmark_name(device_info, root_build_dir, model_benchmark_dir):
   model_name = f"{model_name[0]} ({model_name[1]})"
 
   # Extract benchmark info from the directory path following convention:
-  #   <iree-driver>__<target-architecture>__<benchmark_kind>
+  #   <iree-driver>__<target-architecture>__<benchmark_mode>
   root_immediate_dir = os.path.basename(model_benchmark_dir)
-  iree_driver, target_arch, bench_kind = root_immediate_dir.split("__")
+  iree_driver, target_arch, bench_mode = root_immediate_dir.split("__")
 
   # Get the target architecture depending on the IREE driver.
   target_arch = ""
@@ -238,7 +238,7 @@ def compose_benchmark_name(device_info, root_build_dir, model_benchmark_dir):
   else:
     raise ValueError("Unrecognized IREE driver; need to update the list")
 
-  return f"{model_name} {bench_kind} @ {device_info.model} ({target_arch})"
+  return f"{model_name} {bench_mode} @ {device_info.model} ({target_arch})"
 
 
 def filter_python_model_benchmark_suite(device_info,
@@ -266,13 +266,13 @@ def filter_python_model_benchmark_suite(device_info,
     # Take the immediate directory name and try to see if it contains compiled
     # models and flagfiles. This replies on the following directory naming
     # convention:
-    #   <iree-driver>__<target-architecture>__<benchmark_kind>
+    #   <iree-driver>__<target-architecture>__<benchmark_mode>
     root_immediate_dir = os.path.basename(root)
     segments = root_immediate_dir.split("__")
     if len(segments) != 3 or not segments[0].startswith("iree_"):
       continue
 
-    iree_driver, target_arch, bench_kind = segments
+    iree_driver, target_arch, bench_mode = segments
     target_arch = target_arch.lower()
     # We can choose this benchmark if it matches the CPU/GPU architecture.
     should_choose = (target_arch == cpu_target_arch or
@@ -284,7 +284,7 @@ def filter_python_model_benchmark_suite(device_info,
       print(f"dir: {root}")
       print(f"  iree_driver: {iree_driver}")
       print(f"  target_arch: {target_arch}")
-      print(f"  bench_kind: {bench_kind}")
+      print(f"  bench_mode: {bench_mode}")
       print(f"  chosen: {should_choose}")
 
   return matched_benchmarks

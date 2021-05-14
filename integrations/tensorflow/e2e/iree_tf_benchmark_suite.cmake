@@ -14,7 +14,7 @@
 
 # iree_tf_benchmark_suite()
 #
-# Generates benchmark suites for Python models/layers.
+# Generates benchmark suites for TensorFlow Python models/layers.
 #
 # Note that this CMake function works closely with tf_benchmark_utils.py;
 # it uses command-line options in that script.
@@ -32,7 +32,7 @@
 #       pass to the compiler for artifact generation.
 #   RUNTIME_FLAGS: A list of command-line options and their values to pass
 #       to the runtime when the benchmark is invoked.
-#   BENCHMARK_KIND: The kind of this benchmark suite. This does not need
+#   BENCHMARK_MODE: The mode of this benchmark suite. This does not need
 #       to be a unique identifier for this suite, which will also consider
 #       the model, target backend, and architecture. It is mainly used to
 #       differentiate suites on top of that.
@@ -46,7 +46,7 @@ function(iree_tf_benchmark_suite)
     PARSE_ARGV 0
     _RULE
     "NEED_ARG_FOR_MODEL"
-    "BENCHMARK_KIND;MODEL_SCRIPT;TARGET_BACKEND;TARGET_ARCH"
+    "BENCHMARK_MODE;MODEL_SCRIPT;TARGET_BACKEND;TARGET_ARCH"
     "COMPILATION_FLAGS;MODELS;MODEL_SCRIPT_ARGS;RUNTIME_FLAGS"
   )
 
@@ -59,7 +59,7 @@ function(iree_tf_benchmark_suite)
     # followed by target backend and configuration.
     set(_NAME_LIST "generate_benchmark_artifact")
     list(APPEND _NAME_LIST "${_MODEL}")
-    list(APPEND _NAME_LIST "${_RULE_BENCHMARK_KIND}")
+    list(APPEND _NAME_LIST "${_RULE_BENCHMARK_MODE}")
     list(APPEND _NAME_LIST "${_RULE_TARGET_BACKEND}")
     list(APPEND _NAME_LIST "${_RULE_TARGET_ARCH}")
     list(JOIN _NAME_LIST "__" _NAME)
@@ -76,7 +76,7 @@ function(iree_tf_benchmark_suite)
       set(_RUNTIME_FLAGS_CL "--runtime_flags=\"${_RULE_RUNTIME_FLAGS}\"")
     endif()
 
-    set(_COMBINED_CONFG_NAME "${_RULE_TARGET_ARCH}__${_RULE_BENCHMARK_KIND}")
+    set(_COMBINED_CONFG_NAME "${_RULE_TARGET_ARCH}__${_RULE_BENCHMARK_MODE}")
 
     add_custom_target("${_NAME}"
       COMMAND

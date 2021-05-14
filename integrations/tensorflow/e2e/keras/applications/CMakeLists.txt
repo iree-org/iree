@@ -130,7 +130,7 @@ iree_tf_benchmark_suite(
     "--data=imagenet"
     "--use_external_weights=True"
   NEED_ARG_FOR_MODEL
-  BENCHMARK_KIND
+  BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND
     iree_llvmaot
@@ -154,7 +154,7 @@ iree_tf_benchmark_suite(
     "--data=imagenet"
     "--use_external_weights=True"
   NEED_ARG_FOR_MODEL
-  BENCHMARK_KIND
+  BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND
     iree_vulkan
@@ -177,7 +177,7 @@ iree_tf_benchmark_suite(
     "--data=imagenet"
     "--use_external_weights=True"
   NEED_ARG_FOR_MODEL
-  BENCHMARK_KIND
+  BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND
     iree_vulkan

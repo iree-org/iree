@@ -97,7 +97,7 @@ iree_tf_benchmark_suite(
     MobileBERT
   MODEL_SCRIPT
     mobile_bert_squad_benchmark.py
-  BENCHMARK_KIND
+  BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND
     iree_llvmaot
@@ -116,7 +116,7 @@ iree_tf_benchmark_suite(
     MobileBERT
   MODEL_SCRIPT
     mobile_bert_squad_benchmark.py
-  BENCHMARK_KIND
+  BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND
     iree_vulkan
@@ -134,7 +134,7 @@ iree_tf_benchmark_suite(
     MobileBERT
   MODEL_SCRIPT
     mobile_bert_squad_benchmark.py
-  BENCHMARK_KIND
+  BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND
     iree_vulkan
