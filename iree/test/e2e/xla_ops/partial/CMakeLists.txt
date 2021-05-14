@@ -22,6 +22,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "-iree-vulkan-target-triple=valhall-g77-unknown-android10"
+    "--iree-input-type=mhlo"
   LABELS
     "notap"
     "vulkan_uses_vk_khr_shader_float16_int8"

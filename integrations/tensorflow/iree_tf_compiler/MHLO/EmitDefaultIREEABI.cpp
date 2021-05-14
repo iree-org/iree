@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree_tf_compiler/TF/Passes.h"
+#include "iree_tf_compiler/MHLO/Passes.h"
 #include "llvm/Support/JSON.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
@@ -24,7 +25,7 @@ namespace json = llvm::json;
 
 namespace mlir {
 namespace iree_integrations {
-namespace TF {
+namespace MHLO {
 
 class EmitDefaultIREEABIPass
     : public PassWrapper<EmitDefaultIREEABIPass, OperationPass<FuncOp>> {
@@ -116,8 +117,8 @@ std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass() {
 }
 
 static PassRegistration<EmitDefaultIREEABIPass> funcPass(
-    "iree-tf-emit-default-iree-abi", "Emits simple default ABI metadata");
+    "iree-mhlo-emit-default-iree-abi", "Emits simple default ABI metadata");
 
-}  // namespace TF
+}  // namespace MHLO
 }  // namespace iree_integrations
 }  // namespace mlir

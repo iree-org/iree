@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -306,6 +307,8 @@ struct ConvertHLOToLinalgOnTensorsPass
     MLIRContext *context = &getContext();
 
     auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
+    chlo::PopulateDecomposeChloPatterns(context, &patterns);
+    populateHLOBroadcastingToLinalgPatterns(context, *typeConverter, patterns);
     populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
                                                    patterns);
     if (useLinalgOnTensorsPath) {
@@ -313,6 +316,7 @@ struct ConvertHLOToLinalgOnTensorsPass
     }
 
     ConversionTarget target(getContext());
+    target.addIllegalDialect<chlo::HloClientDialect>();
     target.addIllegalDialect<mhlo::MhloDialect>();
 
     // TODO(hanchung): Do it in a cleaner way.

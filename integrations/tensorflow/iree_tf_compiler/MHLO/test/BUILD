@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tests for end-to-end IREE support specific to the LLVM lowering.
-# TODO(ravishankarm): Reorganize these tests.
-
-load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+load("@iree//iree:lit_test.bzl", "iree_lit_test_suite")
+load("@iree//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -23,15 +21,17 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_check_single_backend_test_suite(
-    name = "check_llvm-aot-conv_img2col",
-    srcs = [
-        "conv.mlir",
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        [
+            "emit_default_iree_abi.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+    data = [
+        "//iree_tf_compiler:iree-tf-opt",
+        "@iree//iree/tools:IreeFileCheck",
     ],
-    compiler_flags = [
-        "--iree-input-type=mhlo",
-        "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true",
-    ],
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
+    driver = "@iree//iree/tools:run_lit.sh",
 )

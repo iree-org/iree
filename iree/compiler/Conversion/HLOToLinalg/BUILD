@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "HLOToLinalgOnTensors",
     srcs = [
+        "BroadcastingToLinalgPatterns.cpp",
         "FusionOfTensorOps.cpp",
         "HLOToLinalgOnTensors.cpp",
     ],

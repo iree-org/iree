@@ -41,6 +41,14 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     OwningRewritePatternList &patterns);
 
+/// Populates IREE specific patterns to convert HLO broadcasting ops to Linalg.
+/// These are being maintained separately because they are a standalone unit
+/// that is both intricate and possible to upstream, should there be alignment
+/// to do so.
+void populateHLOBroadcastingToLinalgPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    OwningRewritePatternList &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

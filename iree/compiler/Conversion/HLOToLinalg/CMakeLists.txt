@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "HLOToLinalgOnTensorPasses.h"
   SRCS
+    "BroadcastingToLinalgPatterns.cpp"
     "FusionOfTensorOps.cpp"
     "HLOToLinalgOnTensors.cpp"
   DEPS

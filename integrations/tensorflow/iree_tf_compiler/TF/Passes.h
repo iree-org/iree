@@ -32,12 +32,7 @@ namespace TF {
 // Create a single pipeline that will run all the needed IREE-specific TF import
 // passes in the right order.
 void buildTFImportPassPipeline(OpPassManager &pm);
-
-void buildMHLOImportPassPipeline(OpPassManager &pm);
-
 void registerTFImportPassPipeline();
-
-void registerMHLOImportPassPipeline();
 
 //===----------------------------------------------------------------------===//
 // IREE-specific Passes For TensorFlow Import
@@ -45,14 +40,6 @@ void registerMHLOImportPassPipeline();
 
 // Converts the TF dialect to the XLA MHLO dialect.
 std::unique_ptr<FunctionPass> createConvertToMHLOPass();
-
-// Annotates an appropriate iree.abi attribute on public functions that
-// operate exclusively on tensor types. This corresponds to the expectations
-// of MHLO and is suitable for such programs.
-std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass();
-
-// Flattens tuple values in function signatures and blocks.
-std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 
 // In a module tagged with `tf_saved_model.semantics`, lowers
 // `tf_saved_model.global_variable`'s to `flow.variable`'s.
@@ -95,11 +82,8 @@ void registerAllDialects(mlir::DialectRegistry &registry);
 
 inline void registerAllPasses() {
   registerTFImportPassPipeline();
-  registerMHLOImportPassPipeline();
 
   createConvertToMHLOPass();
-  createEmitDefaultIREEABIPass();
-  createFlattenTuplesInCFGPass();
   createLowerGlobalTensorsPass();
   createLowerExportedFunctionsPass();
   createPrettifyDebugInfoPass();

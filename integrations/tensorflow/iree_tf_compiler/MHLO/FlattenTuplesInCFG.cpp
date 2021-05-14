@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree_tf_compiler/TF/Passes.h"
+#include "iree_tf_compiler/MHLO/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
@@ -27,7 +27,7 @@
 
 namespace mlir {
 namespace iree_integrations {
-namespace TF {
+namespace MHLO {
 
 namespace {
 
@@ -329,9 +329,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass() {
 }
 
 static PassRegistration<FlattenTuplesInCFGPass> pass(
-    "iree-tf-flatten-tuples-in-cfg",
+    "iree-mhlo-flatten-tuples-in-cfg",
     "Convert functions to remove tuples from method signatures and blocks");
 
-}  // namespace TF
+}  // namespace MHLO
 }  // namespace iree_integrations
 }  // namespace mlir

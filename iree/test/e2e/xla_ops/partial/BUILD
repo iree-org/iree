@@ -39,6 +39,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "-iree-vulkan-target-triple=valhall-g77-unknown-android10",
+        "--iree-input-type=mhlo",
     ],
     driver = "vulkan",
     tags = [
