@@ -77,10 +77,7 @@ static LogicalResult setDefaultTilingScheme(
   const int64_t tileSizeX = 32;
   const int64_t tileSizeY = maxWorkgroupSize.getInt() / tileSizeX;
 
-  ArrayRef<Attribute> iterators = op.iterator_types().getValue();
-  ArrayRef<Attribute> parallels = iterators.take_while(
-      [](Attribute attr) { return linalg::isParallelIteratorType(attr); });
-  unsigned numParallelDims = parallels.size();
+  unsigned numParallelDims = getNumOuterParallelLoops(op);
 
   SmallVector<int64_t, 4> workgroupLevel(numParallelDims, 0);
   SmallVector<int64_t, 4> invocationLevel(numParallelDims, 0);
