@@ -27,7 +27,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "conv1x12dot.mlir",
             "f32Tof16.mlir",
         ],
         include = ["*.mlir"],

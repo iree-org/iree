@@ -75,17 +75,4 @@ flatbuffer_c_library(
   PUBLIC
 )
 
-flatbuffer_c_library(
-  NAME
-    vmla_executable_def_c_fbs
-  SRCS
-    "vmla_executable_def.fbs"
-  FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
-  PUBLIC
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

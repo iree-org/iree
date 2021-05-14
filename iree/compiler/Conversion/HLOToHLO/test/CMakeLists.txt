@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "conv1x12dot.mlir"
     "f32Tof16.mlir"
   DATA
     iree::tools::IreeFileCheck
