@@ -153,7 +153,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRIR
       iree::compiler::Bindings::Native::Transforms
       iree::compiler::Bindings::TFLite::Transforms
-      iree::compiler::Dialect::Flow::Analysis
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect

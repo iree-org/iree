@@ -21,22 +21,16 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
-        "DispatchUtils.cpp",
         "WorkloadUtils.cpp",
     ],
     hdrs = [
-        "DispatchUtils.h",
         "WorkloadUtils.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TosaDialect",
-        "@mlir-hlo//:hlo",
     ],
 )

@@ -53,13 +53,6 @@ void eraseRegionResults(Region &region,
 // performed on the op. Returns true if the op was optimized.
 bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
                            PatternRewriter *rewriter = nullptr);
-template <typename T>
-inline bool optimizeClosureOp(T &op, PatternRewriter *rewriter = nullptr) {
-  auto closureOp = cast<ClosureOpInterface>(op.getOperation());
-  bool didOptimize = optimizeClosureLikeOp(closureOp, rewriter);
-  op = dyn_cast_or_null<DispatchRegionOp>(closureOp.getOperation());
-  return didOptimize;
-}
 
 // A pattern that optimizes the given region-containing op T (CSE, DCE, etc).
 // Duplicate operands will be combined and unused operands and results will be

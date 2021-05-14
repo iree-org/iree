@@ -15,7 +15,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "concatenate.mlir"
-    "decompose_hlo_clamp.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
     "fusion.mlir"

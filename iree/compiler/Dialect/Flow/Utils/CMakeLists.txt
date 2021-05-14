@@ -14,21 +14,15 @@ iree_cc_library(
   NAME
     Utils
   HDRS
-    "DispatchUtils.h"
     "WorkloadUtils.h"
   SRCS
-    "DispatchUtils.cpp"
     "WorkloadUtils.cpp"
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRLinalg
     MLIRStandard
     MLIRSupport
-    MLIRTosa
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )
 
