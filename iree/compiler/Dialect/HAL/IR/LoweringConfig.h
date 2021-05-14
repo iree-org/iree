@@ -23,10 +23,13 @@
 #ifndef IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
 #define IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
 
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h.inc"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+
+// clang-format off
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h.inc"
+// clang-format on
 
 namespace mlir {
 namespace iree_compiler {
