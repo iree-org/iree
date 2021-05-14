@@ -89,6 +89,12 @@ def execute(args,
                         **kwargs)
 
 
+def get_git_commit_hash(commit):
+   return execute(['git', 'rev-parse', commit],
+                   cwd=os.path.dirname(os.path.realpath(__file__)),
+                   capture_output=True).stdout.strip()
+
+
 def get_android_device_model(verbose=False):
   """Returns the Android device model."""
   model = execute(["adb", "shell", "getprop", "ro.product.model"],
@@ -232,10 +238,10 @@ def compose_benchmark_name(device_info, root_build_dir, model_benchmark_dir):
   # path under the root model directory. If there are multiple segments,
   # additional ones will be placed in parentheses.
   model_name = os.path.relpath(model_benchmark_dir, model_root_dir)
-  model_name = os.path.dirname(model_name) # Remove IREE driver segment
+  model_name = os.path.dirname(model_name)  # Remove IREE driver segment
   main, rest = os.path.split(model_name)
   rest = re.sub(r"\W+", "-", rest)
-  model_name = f"{main} ({rest})"
+  model_name = f"{main} ({rest})" if main else f"{rest}"
 
   # Extract benchmark info from the directory path following convention:
   #   <iree-driver>__<target-architecture>__<benchmark_mode>
@@ -404,6 +410,10 @@ def parse_arguments():
                       default=None,
                       help="Path to the iree-benchmark-module tool (default to "
                       "iree/tools/iree-benchmark-module under <build-dir>)")
+  parser.add_argument("-o",
+                      dest="output",
+                      default=None,
+                      help="Path to the ouput file")
   parser.add_argument("--verbose",
                       action="store_true",
                       help="Print internal information during execution")
@@ -419,9 +429,7 @@ def parse_arguments():
 
 def main(args):
   device_info = AndroidDeviceInfo()
-
-  if args.verbose:
-    print(device_info)
+  print(device_info)
 
   if device_info.cpu_abi.lower() not in CPU_ABI_TO_TARGET_ARCH_MAP:
     raise ValueError(f"Unrecognized CPU ABI: '{device_info.cpu_abi}'; "
@@ -437,6 +445,14 @@ def main(args):
                                              benchmarks,
                                              args.benchmark_tool,
                                              verbose=args.verbose)
+
+  # Attach commit information.
+  head_commit = get_git_commit_hash("HEAD")
+  results = {"commit": head_commit, "benchmarks": results}
+
+  if args.output is not None:
+    with open(args.output, "w") as f:
+      json.dump(results, f)
   print(results)
 
 

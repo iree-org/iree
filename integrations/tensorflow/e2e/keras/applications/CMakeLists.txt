@@ -139,7 +139,7 @@ iree_tf_benchmark_suite(
   COMPILATION_FLAGS
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-codegen-llvm-promote-workgroup-to-full-tiles=true"
+    "-iree-llvm-loop-unrolling=true"
   RUNTIME_FLAGS
     "--task_topology_group_count=3"
 )
@@ -162,7 +162,7 @@ iree_tf_benchmark_suite(
     "GPU-Adreno"
   COMPILATION_FLAGS
     "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
-    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-enable-fusion-with-reduction-ops"
 )
