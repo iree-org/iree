@@ -104,10 +104,6 @@ def get_pixel4_default_target_list(skipped_target=None,
   if compilation_flags is None:
     compilation_flags = []
   targets = [
-      TargetInfo(driver="vmla",
-                 hal_target_backend="vmla",
-                 taskset="80",
-                 mako_tag="vmla"),
       TargetInfo(driver="dylib-sync",
                  hal_target_backend="dylib-llvm-aot",
                  taskset="80",
@@ -122,6 +118,16 @@ def get_pixel4_default_target_list(skipped_target=None,
                  mako_tag="cpu3t",
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                 ],
+                 runtime_flags=[
+                     "--task_topology_group_count=3",
+                 ]),
+      TargetInfo(driver="vmvx",
+                 hal_target_backend="vmvx",
+                 taskset="f0",
+                 mako_tag="vmvx3t",
+                 compilation_flags=[
                      "--iree-flow-inline-constants-max-byte-length=2048",
                  ],
                  runtime_flags=[
@@ -158,10 +164,6 @@ def get_s20_default_target_list(skipped_target=None,
   if compilation_flags is None:
     compilation_flags = []
   targets = [
-      TargetInfo(driver="vmla",
-                 hal_target_backend="vmla",
-                 taskset="80",
-                 mako_tag="vmla"),
       TargetInfo(driver="dylib-sync",
                  hal_target_backend="dylib-llvm-aot",
                  taskset="80",
@@ -176,6 +178,16 @@ def get_s20_default_target_list(skipped_target=None,
                  mako_tag="cpu3t",
                  compilation_flags=[
                      "--iree-llvm-target-triple=aarch64-none-linux-android29",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                 ],
+                 runtime_flags=[
+                     "--task_topology_group_count=3",
+                 ]),
+      TargetInfo(driver="vmvx",
+                 hal_target_backend="vmvx",
+                 taskset="f0",
+                 mako_tag="vmvx3t",
+                 compilation_flags=[
                      "--iree-flow-inline-constants-max-byte-length=2048",
                  ],
                  runtime_flags=[
@@ -218,11 +230,11 @@ MODEL_BENCHMARKS = [
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="5538704950034432",
                                targets=get_pixel4_default_target_list(
-                                   skipped_target=["cpu2", "vlk2"],)),
+                                   skipped_target=["cpu2", "vmvx3t", "vlk2"],)),
             PhoneBenchmarkInfo(name="S20",
                                benchmark_key="4699630718681088",
                                targets=get_s20_default_target_list(
-                                   skipped_target=["cpu2", "vlk2"],)),
+                                   skipped_target=["cpu2", "vmvx3t", "vlk2"],)),
         ]),
     ModelBenchmarkInfo(
         name="mobilenet-v2",
@@ -270,7 +282,7 @@ MODEL_BENCHMARKS = [
                 name="S20",
                 benchmark_key="4636549841944576",
                 targets=get_s20_default_target_list(
-                    skipped_target=['cpu', 'vmla', 'cpu2', 'vlk2'])),
+                    skipped_target=['cpu', 'vmvx3t', 'cpu2', 'vlk2'])),
         ])
 ]
 
