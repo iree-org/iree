@@ -89,8 +89,7 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   });
   target->markUnknownOpDynamicallyLegal([](Operation *) { return true; });
   OwningRewritePatternList tileAndDistributePattern(&getContext());
-  populateTileAndDistributeLinalgCopyPatterns(context,
-                                              tileAndDistributePattern);
+  populateLinalgTileAndDistributePatterns(context, tileAndDistributePattern);
   if (failed(applyPartialConversion(funcOp, *target,
                                     std::move(tileAndDistributePattern)))) {
     return signalPassFailure();

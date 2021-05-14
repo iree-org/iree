@@ -101,7 +101,7 @@ IREE::HAL::ReturnOp getEntryPointReturnOp(Operation *op) {
       break;
     }
   }
-  if (!entryPointOp || !entryPointOp.getBody()) return {};
+  if (!entryPointOp) return {};
 
   Operation *terminator = entryPointOp.getBlock()->getTerminator();
   auto retOp = dyn_cast<IREE::HAL::ReturnOp>(terminator);
