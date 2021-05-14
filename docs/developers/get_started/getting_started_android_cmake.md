@@ -145,9 +145,9 @@ Translate a source MLIR into IREE module:
 # Assuming in IREE source root
 $ ../iree-build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmvx \
   $PWD/iree/tools/test/iree-run-module.mlir \
-  -o /tmp/simple-vmla.vmfb
+  -o /tmp/simple-vmvx.vmfb
 ```
 
 Then push the IREE runtime executable and module to the device:
@@ -155,7 +155,7 @@ Then push the IREE runtime executable and module to the device:
 ```shell
 $ adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
 $ adb shell chmod +x /data/local/tmp/iree-run-module
-$ adb push /tmp/simple-vmla.vmfb /data/local/tmp/
+$ adb push /tmp/simple-vmvx.vmfb /data/local/tmp/
 ```
 
 Log into Android:
@@ -165,8 +165,8 @@ $ adb shell
 
 android $ cd /data/local/tmp/
 android $ ./iree-run-module \
-          --driver=vmla \
-          --module_file=simple-vmla.vmfb \
+          --driver=vmvx \
+          --module_file=simple-vmvx.vmfb \
           --entry_function=abs \
           --function_input=i32=-5
 

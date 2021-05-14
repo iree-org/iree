@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "iree/compiler/Conversion/Common/Passes.h"
+#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
@@ -68,6 +69,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
       /*maxAllocSizeInBytes=*/1 << 10, /*bitwidthOfIndexType=*/32,
       /*maxRankOfAllocatedMemRef=*/10));
 
+  nestedModulePM.addNestedPass<FuncOp>(createResolveShapeOpsPass());
   nestedModulePM.addNestedPass<FuncOp>(
       Shape::createCleanupShapePlaceholdersPass());
 
@@ -89,7 +91,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
 
   // Flatten and cleanup memrefs.
   nestedModulePM.addNestedPass<FuncOp>(memref::createFoldSubViewOpsPass());
-  passManager.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());
   nestedModulePM.addPass(createNormalizeMemRefsPass());

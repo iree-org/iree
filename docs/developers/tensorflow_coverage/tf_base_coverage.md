@@ -4,14 +4,14 @@ Tests of the `tf` , `tf.math` , `tf.nn` , `tf.signal` and `tf.strings` APIs.
 
 IREE has three main backend
 [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target):
-`vmla` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
+`vmvx` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
 for benchmarking purposes.
 
 *Last Updated: 2020/12/8*
 
 ## End to end TensorFlow tests
 
-|                                                           target                                                           |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                           target                                                           |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:--------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |         [batch_norm_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/batch_norm_test.py)         | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 |  [batch_to_space_nd_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/batch_to_space_nd_test.py)  | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
@@ -55,7 +55,7 @@ where TensorFlow allows them to be used. Both of these choices
 disproportionately affect TFLite coverage, and don't represent coverage for
 simple use cases.
 
-|                                                       target                                                      |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                       target                                                      |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:-----------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |           [abs](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/math/math_test.py)           | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 |       [accumulate_n](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/math/math_test.py)      | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
@@ -185,7 +185,7 @@ simple use cases.
 
 ## End to end tests of tf.math functions with dynamic dimensions
 
-|                                                       target                                                      |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                       target                                                      |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:-----------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |           [abs](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/math/math_test.py)           | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> |
 |       [accumulate_n](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/math/math_test.py)      | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> |
@@ -315,7 +315,7 @@ simple use cases.
 
 ## End to end tests of tf.math functions with complex numbers
 
-|                                                      target                                                     |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                      target                                                     |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:---------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |          [abs](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/math/math_test.py)          | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 |          [add](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/math/math_test.py)          | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |

@@ -95,6 +95,8 @@ class ConversionPass
   }
 
   void runOnOperation() override {
+    if (getOperation().getBody()->empty()) return;
+
     auto *context = &getContext();
     VMConversionTarget conversionTarget(context);
     IREE::VM::TypeConverter typeConverter(targetOptions_);

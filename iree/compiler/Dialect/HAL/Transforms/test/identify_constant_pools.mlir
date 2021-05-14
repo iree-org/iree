@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-identify-constant-pools -iree-hal-target-backends=vmla -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-identify-constant-pools -iree-hal-target-backends=vmvx -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s
 
 //      CHECK: hal.constant_pool @_const_pool attributes
 // CHECK-SAME:     buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 256, max_buffer_range = 134217728, min_buffer_range_alignment = 16>

@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces2 -iree-hal-target-backends=vmla %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces2 -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
 
 // CHECK-LABEL: hal.executable @static_tiled_dispatch
 //  CHECK-NEXT: hal.interface @[[IO:.+]] {
@@ -6,7 +6,7 @@
 //  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @static_tiled_dispatch {
-  // CHECK-NEXT: hal.executable.target @vmla, filter="vmla" {
+  // CHECK-NEXT: hal.executable.target @vmvx, filter="vmvx" {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index,
@@ -56,7 +56,7 @@ func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
 //  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @dynamic_tiled_dispatch {
-  // CHECK-NEXT: hal.executable.target @vmla, filter="vmla" {
+  // CHECK-NEXT: hal.executable.target @vmvx, filter="vmvx" {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index,
@@ -131,7 +131,7 @@ func @usage(%func_arg: tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
 //  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @workgroup_infos {
-  // CHECK-NEXT: hal.executable.target @vmla, filter="vmla" {
+  // CHECK-NEXT: hal.executable.target @vmvx, filter="vmvx" {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index,
@@ -172,7 +172,7 @@ flow.executable @workgroup_infos {
 //  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read|Write"
 //  CHECK-NEXT: }
 flow.executable @static_tied_result {
-  // CHECK-NEXT: hal.executable.target @vmla, filter="vmla" {
+  // CHECK-NEXT: hal.executable.target @vmvx, filter="vmvx" {
   // CHECK-NEXT:   hal.executable.entry_point @entry
   flow.dispatch.entry @entry attributes {
     signature = (tensor<8x4xf32>) -> tensor<4x8xf32>,
@@ -221,7 +221,7 @@ func @usage(%func_arg: tensor<8x4xf32>, %func_ret: tensor<4x8xf32>) -> tensor<4x
 //  CHECK-NEXT:   hal.interface.binding @[[S0B4:.+]], set=0, binding=4, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @constant_dispatch {
-  // CHECK-NEXT: hal.executable.target @vmla, filter="vmla" {
+  // CHECK-NEXT: hal.executable.target @vmvx, filter="vmvx" {
   // CHECK-NEXT:   hal.executable.entry_point @entry
   flow.dispatch.entry @entry attributes {
     signature = (tensor<8x4xf32>) -> tensor<4x8xf32>,

@@ -39,7 +39,7 @@
 #define IREE_FORCE_BINARY_STDIN()
 #endif  // IREE_PLATFORM_WINDOWS
 
-IREE_FLAG(string, driver, "vmla", "Backend driver to use.");
+IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 IREE_FLAG(
     bool, expect_failure, false,

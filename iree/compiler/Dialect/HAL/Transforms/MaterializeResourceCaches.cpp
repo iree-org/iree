@@ -42,6 +42,7 @@ class MaterializeResourceCachesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
+    if (moduleOp.getBody()->empty()) return;
     moduleBuilder = OpBuilder(&moduleOp.getBody()->front());
 
     auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());

@@ -23,7 +23,7 @@ iree_bytecode_module(
     "iree_runtime_testdata_simple_mul_module"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vmla"
+    "-iree-hal-target-backends=vmvx"
   PUBLIC
 )
 

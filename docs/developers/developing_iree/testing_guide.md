@@ -199,13 +199,13 @@ drivers).
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R iree/test/e2e/xla_ops/check_vmla_vmla_floor.mlir
+$ ctest -R iree/test/e2e/xla_ops/check_vmvx_vmvx_floor.mlir
 ```
 
 With Bazel, run this from the repo root:
 
 ```shell
-$ bazel test iree/test/e2e/xla_ops:check_vmla_vmla_floor.mlir
+$ bazel test iree/test/e2e/xla_ops:check_vmvx_vmvx_floor.mlir
 ```
 
 ### Setting test environments
@@ -316,15 +316,15 @@ A single `.mlir` source file can be turned into a test target with the
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_test")
 
 iree_check_test(
-    name = "check_vmla_vmla_floor.mlir",
+    name = "check_vmvx_vmvx_floor.mlir",
     src = "floor.mlir",
-    driver = "vmla",
-    target_backend = "vmla",
+    driver = "vmvx",
+    target_backend = "vmvx",
 )
 ```
 
 The target naming convention is "check_backend_driver_src". The generated test
-will automatically be tagged with a "driver=vmla" tag, which can help filter
+will automatically be tagged with a "driver=vmvx" tag, which can help filter
 tests by backend (especially when many tests are generated, as below).
 
 Usually we want to create a suite of tests across many backends and drivers.
@@ -335,17 +335,17 @@ pair:
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 iree_check_single_backend_test_suite(
-    name = "check_vmla_vmla",
+    name = "check_vmvx_vmvx",
     srcs = glob(["*.mlir"]),
-    driver = "vmla",
-    target_backend = "vmla",
+    driver = "vmvx",
+    target_backend = "vmvx",
 )
 ```
 
 This will generate a separate test target for each file in `srcs` with a name
 following the convention above as well as a Bazel
 [test_suite](https://docs.bazel.build/versions/master/be/general.html#test_suite)
-called "check_vmla_vmla" that will run all the generated tests.
+called "check_vmvx_vmvx" that will run all the generated tests.
 
 You can also generate suites across multiple pairs:
 
@@ -357,7 +357,7 @@ iree_check_test_suite(
     srcs = ["success.mlir"],
     # Leave this argument off to run on all supported backend/driver pairs.
     target_backends_and_drivers = [
-        ("vmla", "vmla"),
+        ("vmvx", "vmvx"),
         ("vulkan-spirv", "vulkan"),
     ],
 )

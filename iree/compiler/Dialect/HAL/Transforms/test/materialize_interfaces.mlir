@@ -1,11 +1,11 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces -iree-hal-target-backends=vmla %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
 
 // CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
 //   CHECK-DAG: hal.interface @legacy_io {
 //  CHECK-NEXT:   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
-//   CHECK-DAG: hal.executable.target @vmla, filter="vmla" {
+//   CHECK-DAG: hal.executable.target @vmvx, filter="vmvx" {
 //   CHECK-DAG:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {
 //  CHECK-SAME:     interface = @legacy_io,
 //  CHECK-SAME:     ordinal = 0 : index,
@@ -41,7 +41,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 //  CHECK-NEXT:   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
-//   CHECK-DAG: hal.executable.target @vmla, filter="vmla" {
+//   CHECK-DAG: hal.executable.target @vmvx, filter="vmvx" {
 //   CHECK-DAG:   hal.executable.entry_point @bools_rgn_dispatch_0 attributes {
 //  CHECK-SAME:     interface = @legacy_io,
 //  CHECK-SAME:     ordinal = 0 : index,
