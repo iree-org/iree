@@ -132,6 +132,10 @@ function(iree_pyext_module)
     ${ARG_SRCS}
   )
 
+  # Alias the iree_package_name library to iree::package::name so that we can
+  # refer to this target with the namespaced format.
+  add_library(${_PACKAGE_NS}::${ARG_NAME} ALIAS ${_NAME})
+
   target_link_libraries(
     ${_NAME}
     PRIVATE ${ARG_DEPS}
@@ -228,11 +232,10 @@ function(iree_py_library)
     )
   endforeach()
 
-  # Add PYEXT_DEPS.
-  if(${ARG_PYEXT_DEPS})
-    foreach(V ${IREE_MULTIPY_VERSIONS_EFFECTIVE})
-      add_dependencies(${_NAME} ${ARG_PYEXT_DEPS})
-    endforeach()
+  # Add PYEXT_DEPS if any.
+  if(ARG_PYEXT_DEPS)
+    list(TRANSFORM ARG_PYEXT_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+    add_dependencies(${_NAME} ${ARG_PYEXT_DEPS})
   endif()
 endfunction()
 
