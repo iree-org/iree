@@ -98,7 +98,6 @@ VMVX_SRCS = enforce_glob(
         "mul.mlir",
         "negate.mlir",
         "pad.mlir",
-        "reduce.mlir",
         "reluN.mlir",
         "reshape.mlir",
         "rsqrt.mlir",
@@ -111,6 +110,7 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],
 )
 
