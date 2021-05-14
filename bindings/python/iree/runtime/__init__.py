@@ -31,3 +31,5 @@ from .binding import HostTypeFactory
 from .binding import create_hal_module, Linkage, VmVariantList, VmFunction, VmInstance, VmContext, VmModule
 # SystemApi
 from .system_api import *
+# Function
+from .function import *

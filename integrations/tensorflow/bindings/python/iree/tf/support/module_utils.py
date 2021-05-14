@@ -283,8 +283,7 @@ class CompiledModule(object):
 class _IreeFunctionWrapper(_FunctionWrapper):
   """Wraps an IREE function, making it callable."""
 
-  def __init__(self, context: iree.runtime.SystemContext,
-               f: iree.runtime.system_api.BoundFunction):
+  def __init__(self, context: iree.runtime.SystemContext, f):
     self._context = context
     self._f = f
 

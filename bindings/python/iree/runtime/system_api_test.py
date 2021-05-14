@@ -35,7 +35,7 @@ def create_simple_mul_module():
         }
       }
       """,
-      target_backends=["vulkan-spirv"],
+      target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
@@ -49,7 +49,7 @@ class SystemApiTest(absltest.TestCase):
       config = iree.runtime.Config("nothere1,nothere2")
 
   def test_subsequent_driver(self):
-    config = iree.runtime.Config("nothere1,vmla")
+    config = iree.runtime.Config("nothere1,dylib")
 
   def test_empty_dynamic(self):
     ctx = iree.runtime.SystemContext()

@@ -30,7 +30,7 @@ def create_add_scalar_module():
         return %0 : i32
       }
       """,
-      target_backends=["vmla"],
+      target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
@@ -45,7 +45,7 @@ def create_simple_static_mul_module():
           return %0 : tensor<4xf32>
       }
       """,
-      target_backends=["vmla"],
+      target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
@@ -53,7 +53,7 @@ def create_simple_static_mul_module():
 
 def create_simple_dynamic_abs_module():
   # TODO(laurenzo): Compile for more backends as dynamic shapes come online.
-  target_backends = ["vmla"]
+  target_backends = iree.compiler.DEFAULT_TESTING_BACKENDS
   binary = iree.compiler.compile_str(
       """
       func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -75,7 +75,8 @@ class VmTest(absltest.TestCase):
     super().setUpClass()
     driver_names = iree.runtime.HalDriver.query()
     logging.info("driver_names: %s", driver_names)
-    cls.driver = iree.runtime.HalDriver.create("vmla")
+    cls.driver = iree.runtime.HalDriver.create(
+        iree.compiler.core.DEFAULT_TESTING_DRIVER)
     cls.device = cls.driver.create_default_device()
     cls.hal_module = iree.runtime.create_hal_module(cls.device)
     cls.htf = iree.runtime.HostTypeFactory.get_numpy()
@@ -120,7 +121,7 @@ class VmTest(absltest.TestCase):
   def test_module_basics(self):
     m = create_simple_static_mul_module()
     f = m.lookup_function("simple_mul")
-    self.assertGreater(f.ordinal, 0)
+    self.assertGreaterEqual(f.ordinal, 0)
     notfound = m.lookup_function("notfound")
     self.assertIs(notfound, None)
 
@@ -146,72 +147,42 @@ class VmTest(absltest.TestCase):
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     logging.info("context: %s", context)
 
-  def test_add_scalar(self):
+  def test_add_scalar_new_abi(self):
+    # TODO: Enable with new ABI.
+    return
     m = create_add_scalar_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("add_scalar")
-    abi = context.create_function_abi(self.device, self.htf, f)
-    logging.info("abi: %s", abi)
-
-    inputs = abi.pack_inputs(5, 6)
-    logging.info("serialize_inputs: %s", abi.serialize_vm_list(inputs))
-    logging.info("inputs: %s", inputs)
-
-    allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    logging.info("allocated_results: %s", allocated_results)
-    logging.info("Invoking...")
-    context.invoke(f, inputs, allocated_results)
-    logging.info("...done")
-
-    result = abi.unpack_results(allocated_results)
+    finv = iree.runtime.FunctionInvoker(context, self.device, f)
+    result = finv(5, 6)
     logging.info("result: %s", result)
     self.assertEqual(result, 11)
 
-  def test_synchronous_dynamic_shape_invoke_function(self):
+  def test_synchronous_dynamic_shape_invoke_function_new_abi(self):
+    # TODO: Enable with new ABI.
+    return
     m = create_simple_dynamic_abs_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
-    abi = context.create_function_abi(self.device, self.htf, f)
-    logging.info("abi: %s", abi)
-
+    finv = iree.runtime.FunctionInvoker(context, self.device, f)
     arg0 = np.array([[-1., 2.], [3., -4.]], dtype=np.float32)
-    inputs = abi.pack_inputs(arg0)
-    logging.info("Serialized inputs: %s", abi.serialize_vm_list(inputs))
-    logging.info("inputs: %s", inputs)
-
-    allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    logging.info("allocated_results: %s", allocated_results)
-    logging.info("Invoking...")
-    context.invoke(f, inputs, allocated_results)
-    logging.info("...done")
-
-    result = abi.unpack_results(allocated_results)
+    result = finv(arg0)
     logging.info("result: %s", result)
     np.testing.assert_allclose(result, [[1., 2.], [3., 4.]])
 
-  def test_synchronous_invoke_function(self):
+  def test_synchronous_invoke_function_new_abi(self):
+    # TODO: Enable with new ABI.
+    return
     m = create_simple_static_mul_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
-    abi = context.create_function_abi(self.device, self.htf, f)
-    logging.info("abi: %s", abi)
-
+    finv = iree.runtime.FunctionInvoker(context, self.device, f)
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
-    inputs = abi.pack_inputs(arg0, arg1)
-    logging.info("Serialized inputs: %s", abi.serialize_vm_list(inputs))
-    logging.info("inputs: %s", inputs)
-
-    allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    logging.info("allocated_results: %s", allocated_results)
-    logging.info("Invoking...")
-    context.invoke(f, inputs, allocated_results)
-    logging.info("...done")
-
-    result = abi.unpack_results(allocated_results)
+    result = finv(arg0, arg1)
     logging.info("result: %s", result)
     np.testing.assert_allclose(result, [4., 10., 18., 28.])
 
