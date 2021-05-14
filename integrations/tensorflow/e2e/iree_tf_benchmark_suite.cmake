@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# iree_python_benchmark_suite()
+# iree_tf_benchmark_suite()
 #
 # Generates benchmark suites for Python models/layers.
 #
@@ -37,7 +37,7 @@
 #       the model, target backend, and architecture. It is mainly used to
 #       differentiate suites on top of that.
 #
-function(iree_python_benchmark_suite)
+function(iree_tf_benchmark_suite)
   if(NOT IREE_BUILD_BENCHMARKS)
     return()
   endif()

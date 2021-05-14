@@ -120,7 +120,7 @@ iree_e2e_cartesian_product_test_suite(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-iree_python_benchmark_suite(
+iree_tf_benchmark_suite(
   MODELS
     MobileNetV2
     MobileNetV3Small
@@ -144,7 +144,7 @@ iree_python_benchmark_suite(
     "--task_topology_group_count=3"
 )
 
-iree_python_benchmark_suite(
+iree_tf_benchmark_suite(
   MODELS
     MobileNetV2
     MobileNetV3Small
@@ -167,7 +167,7 @@ iree_python_benchmark_suite(
     "--iree-enable-fusion-with-reduction-ops"
 )
 
-iree_python_benchmark_suite(
+iree_tf_benchmark_suite(
   MODELS
     MobileNetV2
     MobileNetV3Small
