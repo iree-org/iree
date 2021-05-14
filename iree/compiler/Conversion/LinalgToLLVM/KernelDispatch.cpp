@@ -224,8 +224,8 @@ LogicalResult initCPULaunchConfig(ArrayRef<linalg::LinalgOp> linalgOps) {
     if (failed(rootOperation)) return failure();
     // If root operation is null. Nothing to do.
     if (!rootOperation.getValue()) return success();
-    firstLevelTileSizes =
-        getTileSizes(*rootOperation, TilingLevel::WorkGroupTiles);
+    firstLevelTileSizes = getTileSizes(
+        *rootOperation, static_cast<unsigned>(TilingLevel::WorkGroupTiles));
   }
 
   // Set the configuration of all other linalg operations that are not the root

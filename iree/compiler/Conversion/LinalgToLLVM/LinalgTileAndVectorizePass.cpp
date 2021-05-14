@@ -166,7 +166,9 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
                Operation *operation) -> SmallVector<Value, 4> {
-              return getTileSizes(builder, operation, TilingLevel::Level1Tiles);
+              return getTileSizes(
+                  builder, operation,
+                  static_cast<unsigned>(TilingLevel::Level1Tiles));
             }),
         linalg::LinalgTransformationFilter(
             Identifier::get(clEnablePromoteWorkgroupToFullTiles
@@ -188,7 +190,9 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
                Operation *operation) -> SmallVector<Value, 4> {
-              return getTileSizes(builder, operation, TilingLevel::Level2Tiles);
+              return getTileSizes(
+                  builder, operation,
+                  static_cast<unsigned>(TilingLevel::Level2Tiles));
             }),
         linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupL1TileMarker(), context),
