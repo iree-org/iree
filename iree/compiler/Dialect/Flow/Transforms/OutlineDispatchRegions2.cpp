@@ -14,11 +14,9 @@
 
 #include <utility>
 
-#include "iree/compiler/Dialect/Flow/Analysis/Dispatchability.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
@@ -38,6 +36,38 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 namespace {
+
+// Creates a flow.executable out of a set of functions, pulling in all other
+// functions reachable by the provided functions.
+static ExecutableOp createExecutable(Location loc, StringRef executableName,
+                                     ArrayRef<FuncOp> funcOps,
+                                     ModuleOp parentModuleOp) {
+  assert(!funcOps.empty() && "must have at least one entry function");
+
+  // Create the executable that will contain the outlined region.
+  // NOTE: this will get uniquified if we have multiple in the same block.
+  OpBuilder parentModuleBuilder(&parentModuleOp.getBody()->back());
+  auto executableOp =
+      parentModuleBuilder.create<IREE::Flow::ExecutableOp>(loc, executableName);
+
+  // Create the inner ModuleOp that contains the original functions. We need
+  // to provide this shim as some ops (like std.call) look for the
+  // containing module to provide symbol resolution.
+  OpBuilder executableBuilder(executableOp);
+  executableBuilder.setInsertionPointToStart(&executableOp.getBlock());
+  auto innerModule = executableBuilder.create<ModuleOp>(loc);
+  for (auto funcOp : funcOps) {
+    innerModule.push_back(funcOp);
+  }
+
+  // Copy all reachable functions into the executable.
+  // Linker passes may dedupe these later on.
+  OpBuilder innerModuleBuilder = OpBuilder::atBlockEnd(innerModule.getBody());
+  innerModuleBuilder.setInsertionPoint(innerModule.getBody(),
+                                       ++innerModule.getBody()->begin());
+
+  return executableOp;
+}
 
 // Converts a dispatch region op into a dispatch op to the outlined region.
 static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
@@ -173,8 +203,7 @@ static FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
 // Outlines a dispatch region into a flow.executable and replaces the region op
 // with a dispatch to that outlined executable.
 static LogicalResult outlineDispatchWorkgroupsOp(
-    std::string namePrefix, DispatchWorkgroupsOp regionOp,
-    llvm::StringMap<FuncOp> &dispatchableFuncOps) {
+    std::string namePrefix, DispatchWorkgroupsOp regionOp) {
   // Convert the region to a free-floating function.
   auto workgroupFuncOp =
       createWorkgroupFunc(regionOp.getLoc(), namePrefix, regionOp.body());
@@ -184,9 +213,9 @@ static LogicalResult outlineDispatchWorkgroupsOp(
 
   // Create the executable with the region cloned into it.
   auto parentFuncOp = regionOp->getParentOfType<FuncOp>();
-  auto executableOp = createExecutable(
-      regionOp.getLoc(), namePrefix, {workgroupFuncOp},
-      parentFuncOp->getParentOfType<ModuleOp>(), dispatchableFuncOps);
+  auto executableOp =
+      createExecutable(regionOp.getLoc(), namePrefix, {workgroupFuncOp},
+                       parentFuncOp->getParentOfType<ModuleOp>());
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
 
@@ -210,14 +239,6 @@ class OutlineDispatchRegions2Pass
   OutlineDispatchRegions2Pass() = default;
 
   void runOnOperation() override {
-    // Mark all functions that are dispatchable and can be moved into dispatch
-    // executables when they are called. A dispatch region using a
-    // non-dispatchable function is considered an error.
-    auto &dispatchability = getAnalysis<Dispatchability>();
-    llvm::StringMap<FuncOp> dispatchableFuncOps;
-    dispatchability.walkDispatchableOps(
-        [&](FuncOp funcOp) { dispatchableFuncOps[funcOp.getName()] = funcOp; });
-
     // Convert each dispatch region into a flow.executable + dispatch op.
     for (auto funcOp : getOperation().getOps<FuncOp>()) {
       // Outline all of the dispatch regions ops in this function.
@@ -226,8 +247,8 @@ class OutlineDispatchRegions2Pass
       for (int i = 0; i < dispatchWorkgroupsOps.size(); ++i) {
         std::string namePrefix =
             funcOp.getName().str() + "_dispatch_" + std::to_string(i);
-        if (failed(outlineDispatchWorkgroupsOp(
-                namePrefix, dispatchWorkgroupsOps[i], dispatchableFuncOps))) {
+        if (failed(outlineDispatchWorkgroupsOp(namePrefix,
+                                               dispatchWorkgroupsOps[i]))) {
           return signalPassFailure();
         }
       }

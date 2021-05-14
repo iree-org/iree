@@ -29,12 +29,6 @@ def DeduplicateExecutables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDeduplicateExecutablesPass()";
 }
 
-def DispatchabilityAnalysis :
-    Pass<"iree-flow-dispatchability-analysis", "ModuleOp"> {
-  let summary = "Analyzes functions to determine their dispatchability";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchabilityAnalysisPass()";
-}
-
 def DispatchLinalgOnTensors :
     Pass<"iree-flow-dispatch-linalg-on-tensors-pass", "FuncOp"> {
   let summary = "Dispatch Linalg operations on tensors by using tile and distribute";
@@ -51,12 +45,6 @@ def ExportBenchmarkFuncs :
     Pass<"iree-flow-export-benchmark-funcs-pass", "ModuleOp"> {
   let summary = "Exports benchmark functions";
   let constructor = "mlir::iree_compiler::IREE::Flow::createExportBenchmarkFuncsPass()";
-}
-
-def FoldCompatibleDispatchRegions :
-    Pass<"iree-flow-fold-compatible-dispatch-regions", "FuncOp"> {
-  let summary = "Folds dispatch regions that have compatible workloads";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createFoldCompatibleDispatchRegionsPass()";
 }
 
 def FormStreams :
@@ -77,12 +65,6 @@ def HLOToHLOPreprocessing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createHLOToHLOPreprocessingPass()";
 }
 
-def IdentifyDispatchRegions2 :
-    Pass<"iree-flow-identify-dispatch-regions2", "FuncOp"> {
-  let summary = "Conservatively identifies dispatch regions in functions (v2)";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createIdentifyDispatchRegions2Pass()";
-}
-
 def InjectDispatchTracing :
     Pass<"iree-flow-inject-dispatch-tracing", "FuncOp"> {
   let summary = "Injects dispatch region tracing";
@@ -93,12 +75,6 @@ def LegalizeInputTypes :
     Pass<"iree-flow-legalize-input-types", "ModuleOp"> {
   let summary = "Legalizes input types to ones supported by the IREE flow dialect";
   let constructor = "mlir::iree_compiler::IREE::Flow::createLegalizeInputTypesPass()";
-}
-
-def OutlineDispatchRegions :
-    Pass<"iree-flow-outline-dispatch-regions", "ModuleOp"> {
-  let summary = "Outlines dispatch regions into standalone functions";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }
 
 def OutlineDispatchRegions2 :

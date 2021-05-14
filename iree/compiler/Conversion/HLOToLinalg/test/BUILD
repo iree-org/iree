@@ -28,7 +28,6 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "concatenate.mlir",
-            "decompose_hlo_clamp.mlir",
             "dynamic_shape.mlir",
             "fft.mlir",
             "fusion.mlir",

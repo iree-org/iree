@@ -30,9 +30,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Creates a pass to decompose XLA-HLO clamp ops into primitive ops.
-std::unique_ptr<OperationPass<FuncOp>> createDecomposeHLOClampPass();
-
 /// Create a pass to convert a model using f32 type to the equivalent one
 /// using 16.
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();

@@ -7,25 +7,6 @@ module {
     return %0, %1 : tensor<5x5xf32>, tensor<3x5xf32>
   }
 }
-// CHECK-DAG: flow.variable @[[IN0_0:.+]] dense<{{.*}}> : tensor<5x3xf32>
-// CHECK-DAG: flow.variable @[[IN0_1:.+]] dense<{{.*}}> : tensor<3x5xf32>
-//     CHECK: func @two_dispatch_ex_dispatch_0_benchmark
-//     CHECK: %[[RES:.+]] = flow.ex.stream.fragment() : () -> tensor<5x5xf32> =
-// CHECK-DAG:   %{{.+}} = flow.variable.load @[[IN0_0]] : tensor<5x3xf32>
-// CHECK-DAG:   %{{.+}} = flow.variable.load @[[IN0_1]] : tensor<3x5xf32>
-//     CHECK:   %[[DISPATCH_RES:.+]] = flow.dispatch @two_dispatch_ex_dispatch_0::@two_dispatch_ex_dispatch_0[%{{.+}}](%{{.+}}, %{{.+}}) : (tensor<5x3xf32>, tensor<3x5xf32>) -> tensor<5x5xf32>
-//     CHECK:   flow.return %[[DISPATCH_RES]] : tensor<5x5xf32>
-//     CHECK: iree.do_not_optimize(%[[RES]]) : tensor<5x5xf32>
-
-// CHECK-DAG: flow.variable @[[IN1_0:.+]] dense<{{.*}}> : tensor<3x5xf32>
-// CHECK-DAG: flow.variable @[[IN1_1:.+]] dense<{{.*}}> : tensor<5x5xf32>
-//     CHECK: func @two_dispatch_ex_dispatch_1_benchmark
-//     CHECK: %[[RES:.+]] = flow.ex.stream.fragment() : () -> tensor<3x5xf32>
-// CHECK-DAG:   %{{.+}} = flow.variable.load @[[IN1_0]] : tensor<3x5xf32>
-// CHECK-DAG:   %{{.+}} = flow.variable.load @[[IN1_1]] : tensor<5x5xf32>
-//     CHECK:   %[[DISPATCH_RES:.+]] = flow.dispatch @two_dispatch_ex_dispatch_1::@two_dispatch_ex_dispatch_1[%{{.+}}](%{{.+}}, %{{.+}}) : (tensor<3x5xf32>, tensor<5x5xf32>) -> tensor<3x5xf32>
-//     CHECK:   flow.return %[[DISPATCH_RES]] : tensor<3x5xf32>
-//     CHECK: iree.do_not_optimize(%[[RES]]) : tensor<3x5xf32>
 
 // CHECK-DAG: flow.variable @[[MAIN_IN_0:.+]] dense<{{.*}}> : tensor<5x3xf32>
 // CHECK-DAG: flow.variable @[[MAIN_IN_1:.+]] dense<{{.*}}> : tensor<3x5xf32>

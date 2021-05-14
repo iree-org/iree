@@ -24,7 +24,6 @@
 
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Flow/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
@@ -47,7 +46,6 @@ inline void registerAllIreePasses() {
   IREE::TFLite::registerTransformPassPipeline();
 
   IREE::Flow::registerFlowPasses();
-  IREE::Flow::registerFlowAnalysisTestPasses();
   IREE::HAL::registerHALPasses();
   IREE::registerTransformPasses();
   Shape::registerShapeConversionPasses();

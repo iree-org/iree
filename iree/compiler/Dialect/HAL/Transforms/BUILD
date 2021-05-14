@@ -28,7 +28,6 @@ cc_library(
         "InlineDeviceSwitches.cpp",
         "LinkExecutables.cpp",
         "MaterializeConstantPoolBuffers.cpp",
-        "MaterializeInterfaces.cpp",
         "MaterializeInterfaces2.cpp",
         "MaterializeResourceCaches.cpp",
         "MemoizeDeviceQueries.cpp",

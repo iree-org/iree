@@ -44,7 +44,6 @@ inline void registerCommonConversionPasses() {
 
 inline void registerHLOToLinalgPasses() {
   static bool init_once = []() {
-    createDecomposeHLOClampPass();
     createHLOToLinalgOnTensorsPass();
     createDemoteF32ToF16Pass();
     return true;

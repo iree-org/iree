@@ -66,7 +66,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Each executable needs a hal.interface to specify how the host and device
   // comminucate across the ABI boundary.
   passManager.addPass(createMaterializeInterfaces2Pass(targetOptions));
-  passManager.addPass(createMaterializeInterfacesPass(targetOptions));
 
   passManager.nest<ExecutableOp>().addNestedPass<ExecutableTargetOp>(
       createPropagateConstantWorkgroupInfoPass());

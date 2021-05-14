@@ -21,7 +21,6 @@ package(
 cc_library(
     name = "HLOToHLO",
     srcs = [
-        "DecomposeHLOClamp.cpp",
         "DemoteF32ToF16.cpp",
     ],
     hdrs = [
@@ -35,6 +34,5 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
-        "@mlir-hlo//:hlo",
     ],
 )

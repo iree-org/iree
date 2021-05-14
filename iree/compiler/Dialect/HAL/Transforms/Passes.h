@@ -72,8 +72,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // Defines hal.executables and hal.interfaces for flow.executable ops based on
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
-    TargetOptions targetOptions);
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass(
     TargetOptions targetOptions);
 
@@ -152,7 +150,6 @@ inline void registerHALPasses() {
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
-  createMaterializeInterfacesPass(targetOptions);
   createTranslateExecutablesPass(targetOptions);
   createLinkExecutablesPass(targetOptions);
   createResolveEntryPointOrdinalsPass();
