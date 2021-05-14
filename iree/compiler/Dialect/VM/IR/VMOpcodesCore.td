@@ -101,25 +101,26 @@ def VM_OPC_DivI32S               : VM_OPC<0x25, "DivI32S">;
 def VM_OPC_DivI32U               : VM_OPC<0x26, "DivI32U">;
 def VM_OPC_RemI32S               : VM_OPC<0x27, "RemI32S">;
 def VM_OPC_RemI32U               : VM_OPC<0x28, "RemI32U">;
+def VM_OPC_FMAI32                : VM_OPC<0x29, "FMAI32">;
 
 // Integer bit manipulation:
-def VM_OPC_NotI32                : VM_OPC<0x29, "NotI32">;
-def VM_OPC_AndI32                : VM_OPC<0x2A, "AndI32">;
-def VM_OPC_OrI32                 : VM_OPC<0x2B, "OrI32">;
-def VM_OPC_XorI32                : VM_OPC<0x2C, "XorI32">;
+def VM_OPC_NotI32                : VM_OPC<0x30, "NotI32">;
+def VM_OPC_AndI32                : VM_OPC<0x31, "AndI32">;
+def VM_OPC_OrI32                 : VM_OPC<0x32, "OrI32">;
+def VM_OPC_XorI32                : VM_OPC<0x33, "XorI32">;
 
 // Bitwise shifts and rotates:
-def VM_OPC_ShlI32                : VM_OPC<0x2D, "ShlI32">;
-def VM_OPC_ShrI32S               : VM_OPC<0x2E, "ShrI32S">;
-def VM_OPC_ShrI32U               : VM_OPC<0x2F, "ShrI32U">;
+def VM_OPC_ShlI32                : VM_OPC<0x34, "ShlI32">;
+def VM_OPC_ShrI32S               : VM_OPC<0x35, "ShrI32S">;
+def VM_OPC_ShrI32U               : VM_OPC<0x36, "ShrI32U">;
 
 // Casting and type conversion/emulation:
-def VM_OPC_TruncI32I8            : VM_OPC<0x31, "TruncI32I8">;
-def VM_OPC_TruncI32I16           : VM_OPC<0x32, "TruncI32I16">;
-def VM_OPC_ExtI8I32S             : VM_OPC<0x33, "ExtI8I32S">;
-def VM_OPC_ExtI8I32U             : VM_OPC<0x34, "ExtI8I32U">;
-def VM_OPC_ExtI16I32S            : VM_OPC<0x35, "ExtI16I32S">;
-def VM_OPC_ExtI16I32U            : VM_OPC<0x36, "ExtI16I32U">;
+def VM_OPC_TruncI32I8            : VM_OPC<0x37, "TruncI32I8">;
+def VM_OPC_TruncI32I16           : VM_OPC<0x38, "TruncI32I16">;
+def VM_OPC_ExtI8I32S             : VM_OPC<0x39, "ExtI8I32S">;
+def VM_OPC_ExtI8I32U             : VM_OPC<0x3A, "ExtI8I32U">;
+def VM_OPC_ExtI16I32S            : VM_OPC<0x3B, "ExtI16I32S">;
+def VM_OPC_ExtI16I32U            : VM_OPC<0x3C, "ExtI16I32U">;
 
 // Reduction arithmetic:
 
@@ -202,10 +203,12 @@ def VM_CoreOpcodeAttr :
     VM_OPC_GlobalStoreRef,
     VM_OPC_GlobalLoadIndirectRef,
     VM_OPC_GlobalStoreIndirectRef,
+
     VM_OPC_ConstI32Zero,
     VM_OPC_ConstI32,
     VM_OPC_ConstRefZero,
     VM_OPC_ConstRefRodata,
+
     VM_OPC_ListAlloc,
     VM_OPC_ListReserve,
     VM_OPC_ListSize,
@@ -214,10 +217,12 @@ def VM_CoreOpcodeAttr :
     VM_OPC_ListSetI32,
     VM_OPC_ListGetRef,
     VM_OPC_ListSetRef,
+
     VM_OPC_SelectI32,
     VM_OPC_SelectRef,
     VM_OPC_SwitchI32,
     VM_OPC_SwitchRef,
+
     VM_OPC_AddI32,
     VM_OPC_SubI32,
     VM_OPC_MulI32,
@@ -225,6 +230,8 @@ def VM_CoreOpcodeAttr :
     VM_OPC_DivI32U,
     VM_OPC_RemI32S,
     VM_OPC_RemI32U,
+    VM_OPC_FMAI32,
+
     VM_OPC_NotI32,
     VM_OPC_AndI32,
     VM_OPC_OrI32,
@@ -238,6 +245,7 @@ def VM_CoreOpcodeAttr :
     VM_OPC_ExtI8I32U,
     VM_OPC_ExtI16I32S,
     VM_OPC_ExtI16I32U,
+
     VM_OPC_CmpEQI32,
     VM_OPC_CmpNEI32,
     VM_OPC_CmpLTI32S,
@@ -246,6 +254,7 @@ def VM_CoreOpcodeAttr :
     VM_OPC_CmpEQRef,
     VM_OPC_CmpNERef,
     VM_OPC_CmpNZRef,
+
     VM_OPC_Branch,
     VM_OPC_CondBranch,
     VM_OPC_Call,

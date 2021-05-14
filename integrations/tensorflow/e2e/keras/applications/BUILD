@@ -34,13 +34,13 @@ DOC = """
 applications_test_manual is for manual testing of all keras vision models.
 Test will run only manually with all parameters specified manually, for example:
 bazel run -c opt integrations/tensorflow/e2e/keras/applications:applications_test_manual -- \
---target_backends=tf,iree_vmla \
+--target_backends=tf,iree_llvmaot \
 --data=imagenet \
 --url=https://storage.googleapis.com/iree_models/ \
 --model=ResNet50
 
 Command arguments description:
---target_backends: can be combination of these: tf,iree_vmla
+--target_backends: can be combination of these: tf,iree_llvmaot
 --data: can be 'imagenet' or 'cifar10'.
     imagenet - input image size (1, 224, 224, 3)
     cifar10 - input image size (1, 32, 32, 3) - it is used for quick tests
@@ -130,7 +130,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -168,7 +167,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -207,7 +205,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -259,7 +256,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],

@@ -84,6 +84,20 @@ vm.module @arithmetic_ops {
     vm.return
   }
 
+  vm.export @test_fma_i32
+  vm.func @test_fma_i32() {
+    %c2 = vm.const.i32 2 : i32
+    %c2dno = iree.do_not_optimize(%c2) : i32
+    %c3 = vm.const.i32 3 : i32
+    %c3dno = iree.do_not_optimize(%c3) : i32
+    %c5 = vm.const.i32 5 : i32
+    %c5dno = iree.do_not_optimize(%c5) : i32
+    %v = vm.fma.i32 %c2dno, %c3dno, %c5dno : i32
+    %c11 = vm.const.i32 11 : i32
+    vm.check.eq %v, %c11, "2*3+5=11" : i32
+    vm.return
+  }
+
   vm.export @test_not_i32
   vm.func @test_not_i32() {
     %c1 = vm.const.i32 0 : i32

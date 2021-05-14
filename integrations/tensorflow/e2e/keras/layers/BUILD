@@ -153,18 +153,9 @@ FAILING_STATIC = [
             "UpSampling2D",
         ],
         "target_backends": [
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
-    },
-    {
-        # Failing on VMLA
-        "layer": [
-            "Conv3DTranspose",
-            "Conv3D",
-        ],
-        "target_backends": "iree_vmla",
     },
     {
         # Failing on LLVM and Vulkan
@@ -207,7 +198,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -291,14 +281,9 @@ FAILING_FULL_API = [
             "SimpleRNN",
         ],
         "target_backends": [
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
-    },
-    {
-        "layer": "Conv3D",
-        "target_backends": "iree_vmla",
     },
     {
         # Failing on LLVM and Vulakn
@@ -344,7 +329,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -435,7 +419,6 @@ FAILING_DYNAMIC = [
             "ZeroPadding3D",
         ],
         "target_backends": [
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -491,7 +474,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -561,7 +543,6 @@ FAILING_TRAINING = [
             "SpatialDropout3D",
         ],
         "target_backends": [
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -581,7 +562,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],

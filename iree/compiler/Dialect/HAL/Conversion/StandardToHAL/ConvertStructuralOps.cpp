@@ -115,7 +115,7 @@ class CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
                                       op.getOperation()->getAttrDictionary());
     rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
         op, adaptor.condition(), op.trueDest(), adaptor.trueDestOperands(),
-        op.falseDest(), op.falseDestOperands());
+        op.falseDest(), adaptor.falseDestOperands());
     return success();
   }
 };

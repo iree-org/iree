@@ -65,8 +65,6 @@ iree_e2e_cartesian_product_test_suite(
                 "sgd",
             ],
             "target_backends": [
-                # TODO(b/157581521)
-                "iree_vmla",
                 "iree_llvmaot",
                 "iree_vulkan",
             ],
@@ -91,7 +89,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],

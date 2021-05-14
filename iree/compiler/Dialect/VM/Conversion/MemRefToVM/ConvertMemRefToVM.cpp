@@ -148,8 +148,8 @@ class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
     auto byteOffset = getBufferOffset(loadOp.getLoc(), loadOp.memref(),
                                       operands.indices(), rewriter);
     if (auto integerType = oldType.dyn_cast<IntegerType>()) {
-      if (integerType.isInteger(8)) {
-        if (integerType.isSigned()) {
+      if (integerType.isInteger(1) || integerType.isInteger(8)) {
+        if (integerType.isSigned() || integerType.isSignless()) {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI8SOp>(
               loadOp, newType, operands.memref(), byteOffset);
         } else {
@@ -157,7 +157,7 @@ class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
               loadOp, newType, operands.memref(), byteOffset);
         }
       } else if (integerType.isInteger(16)) {
-        if (integerType.isSigned()) {
+        if (integerType.isSigned() || integerType.isSignless()) {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI16SOp>(
               loadOp, newType, operands.memref(), byteOffset);
         } else {
@@ -204,7 +204,7 @@ class ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
     auto oldType = storeOp.value().getType();
     auto byteOffset = getBufferOffset(storeOp.getLoc(), storeOp.memref(),
                                       operands.indices(), rewriter);
-    if (oldType.isInteger(8)) {
+    if (oldType.isInteger(1) || oldType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI8Op>(
           storeOp, operands.memref(), byteOffset, operands.value());
     } else if (oldType.isInteger(16)) {
