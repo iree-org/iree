@@ -32,7 +32,7 @@ android {
             cmake {
                 arguments "-DIREE_BUILD_BINDINGS_TFLITE=ON",
                         "-DIREE_BUILD_BINDINGS_TFLITE_JAVA=ON",
-                        "-DIREE_HAL_DRIVERS_TO_BUILD=VMLA",
+                        "-DIREE_HAL_DRIVERS_TO_BUILD=VMVX",
 
                         // Disable all but the runtime components needed for the
                         // java bindings.
