@@ -4,20 +4,20 @@ Tests of MobileBert and streamable Keyword Spotting models.
 
 IREE has three main backend
 [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target):
-`vmla` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
+`vmvx` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
 for benchmarking purposes.
 
 *Last Updated: 2020/12/8*
 
 ## End to end test of MobileBert on SQuAD
 
-|                                                          target                                                          |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                          target                                                          |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 | [mobile_bert_squad_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/mobile_bert_squad_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 
 ## End to end tests of [Keyword Spotting Streaming](https://github.com/google-research/google-research/tree/master/kws_streaming) models
 
-|                                                               target                                                              |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                               target                                                              |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:---------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |    [att_mh_rnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py)    | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> |
 |      [att_rnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py)     | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> |
@@ -40,7 +40,7 @@ for benchmarking purposes.
 
 ## End to end tests of [Keyword Spotting Streaming](https://github.com/google-research/google-research/tree/master/kws_streaming) models in internal streaming mode
 
-|                                                             target                                                            |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                             target                                                            |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:-----------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |      [cnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py)     | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 |  [cnn_stride](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py)  | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |

@@ -57,7 +57,7 @@ class RandomInitModule(tf.Module):
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
   def test_artifact_saving(self):
-    backend_info = module_utils.BackendInfo('iree_vmla')
+    backend_info = module_utils.BackendInfo('iree_vmvx')
     with tempfile.TemporaryDirectory() as artifacts_dir:
       tf_module = ConstantModule()
       iree_module_utils, compiled_path = (
@@ -77,7 +77,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters([
       ('tensorflow', 'tf'),
-      ('vmla', 'iree_vmla'),
+      ('vmvx', 'iree_vmvx'),
   ])
   def test_unaltered_state(self, backend_name):
     backend_info = module_utils.BackendInfo(backend_name)
@@ -94,7 +94,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters([
       ('tensorflow', 'tf'),
-      ('vmla', 'iree_vmla'),
+      ('vmvx', 'iree_vmvx'),
   ])
   def test_random_initialization(self, backend_name):
     backend_info = module_utils.BackendInfo(backend_name)

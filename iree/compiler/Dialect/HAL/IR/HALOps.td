@@ -1821,7 +1821,7 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [IsolatedFromAbove]> {
       #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
         hal.return %c1a : i32
       },
-      #hal.match.any<[#hal.device.match.id<"vmla">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
+      #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
         hal.return %c2a : i32
       },
       #hal.match.always(%c0a = %c0 : i32) {

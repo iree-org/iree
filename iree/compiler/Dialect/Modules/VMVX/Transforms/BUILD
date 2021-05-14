@@ -29,6 +29,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Conversion/Common",
+        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Transforms",

@@ -47,7 +47,7 @@ static void iree_runtime_demo_run_session(iree_runtime_instance_t* instance) {
   // TODO(#5724): move device selection into the compiled modules.
   iree_hal_device_t* device = NULL;
   IREE_CHECK_OK(iree_runtime_instance_try_create_default_device(
-      instance, iree_make_cstring_view("vmla"), &device));
+      instance, iree_make_cstring_view("vmvx"), &device));
 
   // Create one session per loaded module to hold the module state.
   iree_runtime_session_options_t session_options;

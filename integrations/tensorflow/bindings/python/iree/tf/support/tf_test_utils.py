@@ -80,8 +80,8 @@ def _parse_target_backends() -> Tuple[Sequence[str], Sequence[str]]:
   backend_ids = []
 
   # If there are multiple copies of the same backend_name, index them. e.g.
-  # backend_names = ["tf", "iree_vmla", "tf"]
-  # --> backend_ids = ["tf_0", "iree_vmla", "tf_1"]
+  # backend_names = ["tf", "iree_vmvx", "tf"]
+  # --> backend_ids = ["tf_0", "iree_vmvx", "tf_1"]
   for backend_name in backend_names:
     if backend_name in backend_to_index:
       backend_ids.append(f"{backend_name}_{backend_to_index[backend_name]}")

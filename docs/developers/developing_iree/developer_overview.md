@@ -95,7 +95,7 @@ model file:
 ```shell
 $ ../iree-build/iree/tools/iree-opt \
   -iree-transformation-pipeline \
-  -iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmvx \
   $PWD/iree/test/e2e/models/fullyconnected.mlir
 ```
 
@@ -117,7 +117,7 @@ For example, to translate `simple.mlir` to an IREE module:
 ```shell
 $ ../iree-build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmvx \
   $PWD/iree/tools/test/iree-run-module.mlir \
   -o /tmp/simple.vmfb
 ```
@@ -139,7 +139,7 @@ IREE's VMLA driver:
 ```shell
 $ ../iree-build/iree/tools/iree-run-module \
   --module_file=/tmp/simple.vmfb \
-  --driver=vmla \
+  --driver=vmvx \
   --entry_function=abs \
   --function_input=i32=-2
 ```
@@ -155,7 +155,7 @@ runner for the IREE
 ```shell
 $ ../iree-build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmvx \
   $PWD/iree/test/e2e/xla_ops/abs.mlir \
   -o /tmp/abs.vmfb
 ```
@@ -163,7 +163,7 @@ $ ../iree-build/iree/tools/iree-translate \
 ```shell
 $ ../iree-build/iree/tools/iree-check-module \
   /tmp/abs.vmfb \
-  --driver=vmla
+  --driver=vmvx
 ```
 
 ### iree-run-mlir
@@ -182,7 +182,7 @@ For example, to execute the contents of
 $ ../iree-build/iree/tools/iree-run-mlir \
   $PWD/iree/tools/test/iree-run-mlir.mlir \
   -function-input="i32=-2" \
-  -iree-hal-target-backends=vmla
+  -iree-hal-target-backends=vmvx
 ```
 
 ### iree-dump-module

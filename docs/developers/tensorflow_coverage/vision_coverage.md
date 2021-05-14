@@ -4,14 +4,14 @@ Tests of Keras and Slim vision models.
 
 IREE has three main backend
 [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target):
-`vmla` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
+`vmvx` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
 for benchmarking purposes.
 
 *Last Updated: 2020/12/8*
 
 ## End to end tests of tf.keras.applications vision models on Imagenet
 
-|                                                               target                                                              |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                               target                                                              |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:---------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |    [DenseNet121](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/applications/vision_model_test.py)    | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 |    [DenseNet169](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/applications/vision_model_test.py)    | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
@@ -43,7 +43,7 @@ for benchmarking purposes.
 
 ## End to end tests of TensorFlow slim vision models
 
-|                                                                  target                                                                  |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                                  target                                                                  |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:----------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 | [inception_resnet_v2](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/slim_vision_models/slim_vision_model_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> |
 |     [inception_v1](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/slim_vision_models/slim_vision_model_test.py)    | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> |

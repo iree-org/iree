@@ -29,7 +29,7 @@ if(${IREE_HAL_DRIVER_VMLA})
       iree::base::logging
       iree::base::status
       iree::hal
-      iree::hal::vmla::registration
+      iree::hal::vmvx::registration
       iree::modules::hal
       iree::testing::gtest
       iree::testing::gtest_main

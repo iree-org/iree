@@ -18,7 +18,7 @@ load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 ALL_TARGET_BACKENDS_AND_DRIVERS = [
-    ("vmla", "vmla"),
+    ("vmvx", "vmvx"),
     ("vulkan-spirv", "vulkan"),
     ("dylib-llvm-aot", "dylib"),
 ]

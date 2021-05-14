@@ -191,11 +191,16 @@ class ConvertHALInterfaceLoadConstantOp
     auto constantsArg =
         op->getParentOfType<mlir::FuncOp>().getArgument(kEntryArgConstants);
     assert(constantsArg && "entry point not conforming to requirements");
+    auto constantType =
+        constantsArg.getType().cast<MemRefType>().getElementType();
+
+    auto resultType = getTypeConverter()->convertType(op.result().getType());
 
     auto constantOrdinal = rewriter.createOrFold<ConstantIndexOp>(
         op.getLoc(), op.offset().getZExtValue());
-    rewriter.replaceOpWithNewOp<memref::LoadOp>(
-        op, op.result().getType(), constantsArg, ValueRange{constantOrdinal});
+    auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
+        op.getLoc(), constantType, constantsArg, ValueRange{constantOrdinal});
+    rewriter.replaceOpWithNewOp<IndexCastOp>(op, loadedValue, resultType);
     return success();
   }
 };

@@ -41,7 +41,7 @@ IREE_FLAG(string, entry_function, "",
           "to run. If this is not set, all the exported functions will be "
           "benchmarked and they are expected to not have input arguments.");
 
-IREE_FLAG(string, driver, "vmla", "Backend driver to use.");
+IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 static iree_status_t parse_function_input(iree_string_view_t flag_name,
                                           void* storage,
