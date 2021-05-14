@@ -50,12 +50,12 @@ import numpy as np
 PREFERRED_DRIVER_ENV_KEY = "IREE_DEFAULT_DRIVER"
 
 # Default value for IREE_DRIVER
-DEFAULT_IREE_DRIVER_VALUE = "dylib,vulkan,vmla"
+DEFAULT_IREE_DRIVER_VALUE = "dylib,vulkan,vmvx"
 
 # Mapping from IREE target backends to their corresponding drivers.
 TARGET_BACKEND_TO_DRIVER = {
-    "vmla": "vmla",
     "dylib-llvm-aot": "dylib",
+    "vmvx": "vmvx",
     "vulkan-*": "vulkan",
 }
 
