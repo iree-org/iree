@@ -79,7 +79,6 @@ def c_embed_data(
         h_file_output,
         c_file_output,
     )
-    flags += " --c_output=true"
     flags += " --identifier='%s'" % (identifier,)
     if strip_prefix != None:
         flags += " --strip_prefix='%s'" % (strip_prefix,)

@@ -19,7 +19,7 @@
 #include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -31,13 +31,13 @@ namespace {
 class VmUtilTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+    IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(
         iree_hal_driver_registry_default()));
   }
 
   virtual void SetUp() {
     IREE_ASSERT_OK(iree_hal_module_register_types());
-    IREE_ASSERT_OK(CreateDevice("vmla", &device_));
+    IREE_ASSERT_OK(CreateDevice("vmvx", &device_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 

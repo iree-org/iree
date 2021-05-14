@@ -32,7 +32,10 @@ __all__ = [
 ]
 
 # Default testing backend for invoking the compiler.
-DEFAULT_TESTING_BACKENDS = ["vmla"]
+# TODO: Remove these. In the absence of default profiles, though, it is better
+# to centralize.
+DEFAULT_TESTING_BACKENDS = ["dylib-llvm-aot"]
+DEFAULT_TESTING_DRIVER = "dylib"
 
 
 class OutputFormat(Enum):

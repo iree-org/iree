@@ -112,4 +112,28 @@ iree_cc_library(
 
 endif()
 
+if(${IREE_HAL_DRIVER_VMVX})
+
+iree_cc_library(
+  NAME
+    vmvx_module_loader
+  HDRS
+    "vmvx_module_loader.h"
+  SRCS
+    "vmvx_module_loader.c"
+  DEPS
+    iree::base
+    iree::base::tracing
+    iree::hal
+    iree::hal::local
+    iree::modules::vmvx
+    iree::vm
+    iree::vm::bytecode_module
+  DEFINES
+    "IREE_HAL_HAVE_VMVX_MODULE_LOADER=1"
+  PUBLIC
+)
+
+endif()
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

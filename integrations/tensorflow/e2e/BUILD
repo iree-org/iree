@@ -105,15 +105,6 @@ TFLITE_FAILING = [
 ]
 
 # keep sorted
-VMLA_FAILING = [
-    "einsum_dynamic_test.py",
-    "einsum_static_test.py",
-    "einsum_vector_test.py",
-    "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
-    "ring_buffer_test.py",  # TODO(b/148747011)
-]
-
-# keep sorted
 LLVM_FAILING = [
     "broadcast_to_test.py",
     "broadcasting_test.py",
@@ -161,10 +152,6 @@ iree_e2e_cartesian_product_test_suite(
             "src": TFLITE_FAILING,
         },
         {
-            "target_backends": "iree_vmla",
-            "src": VMLA_FAILING,
-        },
-        {
             "target_backends": "iree_llvmaot",
             "src": LLVM_FAILING,
         },
@@ -182,7 +169,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -207,7 +193,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],

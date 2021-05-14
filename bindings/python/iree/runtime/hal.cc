@@ -104,6 +104,9 @@ void SetupHalBindings(pybind11::module m) {
       .value("FLOAT_16", IREE_HAL_ELEMENT_TYPE_FLOAT_16)
       .value("FLOAT_32", IREE_HAL_ELEMENT_TYPE_FLOAT_32)
       .value("FLOAT_64", IREE_HAL_ELEMENT_TYPE_FLOAT_64)
+      .value("BOOL_8", static_cast<enum iree_hal_element_type_e>(
+                           IREE_HAL_ELEMENT_TYPE_VALUE(
+                               IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1)))
       .export_values();
 
   py::class_<HalDevice>(m, "HalDevice");

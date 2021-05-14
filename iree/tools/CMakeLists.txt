@@ -33,6 +33,10 @@ if("${IREE_TARGET_BACKEND_VMLA}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMLA)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMLA_TARGET")
 endif()
+if("${IREE_TARGET_BACKEND_VMVX}")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMVX)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMVX_TARGET")
+endif()
 if("${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
@@ -160,6 +164,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
+      iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
+      iree::compiler::Dialect::Modules::VMVX::Transforms
       iree::compiler::Dialect::Shape::Conversion
       iree::compiler::Dialect::Shape::IR
       iree::compiler::Dialect::Shape::Transforms

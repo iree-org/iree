@@ -4,7 +4,7 @@ Tests of `tf.keras.layers` compiled with static shapes, dynamic shapes and train
 
 IREE has three main backend
 [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target):
-`vmla` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
+`vmvx` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
 for benchmarking purposes.
 
 *Last Updated: 2020/12/8*
@@ -18,7 +18,7 @@ the coverage of these layers during training.**
 These tests also only modify required `tf.keras.layers` arguments. See the full
 API tests below for coverage on of non-default layer configurations.
 
-|                                                           target                                                           |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                           target                                                           |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:--------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |       [Activation](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py)       | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 | [ActivityRegularization](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
@@ -94,7 +94,7 @@ API tests below for coverage on of non-default layer configurations.
 
 ## End to end tests of tf.keras layers with dynamic dimensions (with default configuration in inference mode)
 
-|                                                           target                                                           |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                           target                                                           |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:--------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |       [Activation](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py)       | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> |
 | [ActivityRegularization](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
@@ -170,7 +170,7 @@ API tests below for coverage on of non-default layer configurations.
 
 ## End to end tests of tf.keras layers in training mode (with default configuration and static dimensions)
 
-|                                                         target                                                         |                    tflite                    |                     vmla                     |                 vulkan-spirv                 |
+|                                                         target                                                         |                    tflite                    |                     vmvx                     |                 vulkan-spirv                 |
 |:----------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|:--------------------------------------------:|
 |  [AdditiveAttention](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> |
 |    [AlphaDropout](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py)    | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> |

@@ -83,7 +83,7 @@ class TestUtilsTests(tf.test.TestCase, parameterized.TestCase):
       module.increment()
       module.increment()
 
-    def vmla_function(module):
+    def vmvx_function(module):
       module.increment()
       module.decrement()
 
@@ -92,20 +92,20 @@ class TestUtilsTests(tf.test.TestCase, parameterized.TestCase):
     tf_trace = trace_utils.Trace(tf_module, tf_function)
     tf_function(trace_utils.TracedModule(tf_module, tf_trace))
 
-    vmla_module = module_utils.IreeCompiledModule.create_from_class(
-        StatefulCountingModule, module_utils.BackendInfo('iree_vmla'))
-    vmla_trace = trace_utils.Trace(vmla_module, vmla_function)
-    vmla_function(trace_utils.TracedModule(vmla_module, vmla_trace))
+    vmvx_module = module_utils.IreeCompiledModule.create_from_class(
+        StatefulCountingModule, module_utils.BackendInfo('iree_vmvx'))
+    vmvx_trace = trace_utils.Trace(vmvx_module, vmvx_function)
+    vmvx_function(trace_utils.TracedModule(vmvx_module, vmvx_trace))
 
     with self.assertRaises(ValueError):
-      trace_utils.compare_traces(tf_trace, vmla_trace)
+      trace_utils.compare_traces(tf_trace, vmvx_trace)
 
   def test_nonmatching_inputs(self):
 
     def tf_function(module):
       module.increment_by(np.array([42.], dtype=np.float32))
 
-    def vmla_function(module):
+    def vmvx_function(module):
       module.increment_by(np.array([22.], dtype=np.float32))
 
     tf_module = module_utils.TfCompiledModule.create_from_class(
@@ -113,12 +113,12 @@ class TestUtilsTests(tf.test.TestCase, parameterized.TestCase):
     tf_trace = trace_utils.Trace(tf_module, tf_function)
     tf_function(trace_utils.TracedModule(tf_module, tf_trace))
 
-    vmla_module = module_utils.IreeCompiledModule.create_from_class(
-        StatefulCountingModule, module_utils.BackendInfo('iree_vmla'))
-    vmla_trace = trace_utils.Trace(vmla_module, vmla_function)
-    vmla_function(trace_utils.TracedModule(vmla_module, vmla_trace))
+    vmvx_module = module_utils.IreeCompiledModule.create_from_class(
+        StatefulCountingModule, module_utils.BackendInfo('iree_vmvx'))
+    vmvx_trace = trace_utils.Trace(vmvx_module, vmvx_function)
+    vmvx_function(trace_utils.TracedModule(vmvx_module, vmvx_trace))
 
-    same, error_messages = trace_utils.compare_traces(tf_trace, vmla_trace)
+    same, error_messages = trace_utils.compare_traces(tf_trace, vmvx_trace)
     self.assertFalse(same)
 
   def test_trace_serialize_and_load(self):
@@ -131,7 +131,7 @@ class TestUtilsTests(tf.test.TestCase, parameterized.TestCase):
       module.get_count()
 
     module = module_utils.IreeCompiledModule.create_from_class(
-        StatefulCountingModule, module_utils.BackendInfo('iree_vmla'))
+        StatefulCountingModule, module_utils.BackendInfo('iree_vmvx'))
     trace = trace_utils.Trace(module, trace_function)
     trace_function(trace_utils.TracedModule(module, trace))
 

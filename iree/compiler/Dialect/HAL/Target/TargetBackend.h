@@ -125,7 +125,7 @@ class TargetBackend {
   // Returns a name for the backend used to differentiate between other targets.
   virtual std::string name() const = 0;
   // Returns a filter pattern for the backend as expected to be matched with a
-  // call to matchPattern. For example, 'vulkan-v1.1' or 'vmla*'.
+  // call to matchPattern. For example, 'vulkan-v1.1' or 'vmvx*'.
   virtual std::string filter_pattern() const = 0;
 
   // Queries for compile-time known buffer constraints.

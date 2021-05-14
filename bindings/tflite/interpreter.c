@@ -51,8 +51,8 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
   // TODO(benvanik): figure out how we want to emulate device selection; may
   // just say "whatever is first" on a query.
   // iree_string_view_t driver_name = driver_infos[0].driver_name;
-  // NOTE: currently the sample file is compiled only with vmla.
-  iree_string_view_t driver_name = iree_make_cstring_view("vmla");
+  // NOTE: currently the sample file is compiled only with vmvx.
+  iree_string_view_t driver_name = iree_make_cstring_view("vmvx");
 
   // TODO(benvanik): switch to iree_hal_driver_registry_try_create when
   // implemented.

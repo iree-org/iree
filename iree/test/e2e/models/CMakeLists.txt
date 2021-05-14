@@ -31,14 +31,14 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vmla_vmla
+    check_linalg_on_tensors_dylib-llvm-aot_dylib
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
     "mobilenetv3_fake_weights.mlir"
   TARGET_BACKEND
-    "vmla"
+    "dylib-llvm-aot"
   DRIVER
-    "vmla"
+    "dylib"
 )
 
 iree_check_single_backend_test_suite(
@@ -51,18 +51,6 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_linalg_on_tensors_dylib-llvm-aot_dylib
-  SRCS
-    "bert_encoder_unrolled_fake_weights.mlir"
-    "mobilenetv3_fake_weights.mlir"
-  TARGET_BACKEND
-    "dylib-llvm-aot"
-  DRIVER
-    "dylib"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

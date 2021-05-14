@@ -225,6 +225,10 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
 
     Value linearIndex = linearizeIndices(
         loadOp.getMemRefType(), loadOp.getIndices(), loadOp.getLoc(), rewriter);
+    if (!linearIndex) {
+      return loadOp.emitOpError() << "failed to linearize index";
+    }
+
     rewriter.replaceOpWithNewOp<memref::LoadOp>(loadOp, adaptor.memref(),
                                                 linearIndex);
     return success();
@@ -248,6 +252,10 @@ struct LinearizeStoreIndices final
     Value linearIndex =
         linearizeIndices(storeOp.getMemRefType(), storeOp.getIndices(),
                          storeOp.getLoc(), rewriter);
+    if (!linearIndex) {
+      return storeOp.emitOpError() << "failed to linearize index";
+    }
+
     rewriter.replaceOpWithNewOp<memref::StoreOp>(storeOp, adaptor.value(),
                                                  adaptor.memref(), linearIndex);
     return success();

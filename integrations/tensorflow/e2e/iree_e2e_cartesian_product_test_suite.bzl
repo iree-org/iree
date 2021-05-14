@@ -75,7 +75,7 @@ def iree_e2e_cartesian_product_test_suite(
             ],
             "target_backends": [
                 "tf",
-                "iree_vmla"
+                "iree_vmvx"
                 "iree_vulkan",
             ]
         }
@@ -92,11 +92,11 @@ def iree_e2e_cartesian_product_test_suite(
     the following passing and failing configurations would be generated:
         # Passing
         {src: application_test.py, use_exernal_weights: True, model: MobileBert, target_backends: tf}
-        {src: application_test.py, use_exernal_weights: True, model: MobileBert, target_backends: iree_vmla}
+        {src: application_test.py, use_exernal_weights: True, model: MobileBert, target_backends: iree_vmvx}
 
         # Failing
         {src: application_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: tf}
-        {src: application_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: iree_vmla}
+        {src: application_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: iree_vmvx}
         {src: application_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: iree_vulkan}
         {src: application_test.py, use_exernal_weights: True, model: MobileBert, target_backends: iree_vulkan}
 

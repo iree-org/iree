@@ -33,7 +33,7 @@ IREE_FLAG(string, entry_function, "",
           "Name of a function contained in the module specified by module_file "
           "to run.");
 
-IREE_FLAG(string, driver, "vmla", "Backend driver to use.");
+IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 static iree_status_t parse_function_input(iree_string_view_t flag_name,
                                           void* storage,

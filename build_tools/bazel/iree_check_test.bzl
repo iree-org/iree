@@ -18,7 +18,7 @@ load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 ALL_TARGET_BACKENDS_AND_DRIVERS = [
-    ("vmla", "vmla"),
+    ("vmvx", "vmvx"),
     ("vulkan-spirv", "vulkan"),
     ("dylib-llvm-aot", "dylib"),
 ]
@@ -54,7 +54,7 @@ def iree_check_test(
         flags = [
             "-iree-mlir-to-vm-bytecode-module",
             "-mlir-print-op-on-diagnostic=false",
-            "--iree-hal-target-backends=%s" % target_backend,
+            "-iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
         visibility = ["//visibility:private"],
     )

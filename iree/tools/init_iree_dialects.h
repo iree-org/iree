@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
@@ -41,6 +42,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREEDialect,
                   IREE::VM::VMDialect,
                   IREE::VMLA::VMLADialect,
+                  IREE::VMVX::VMVXDialect,
                   IREE::Vulkan::VulkanDialect>();
   // clang-format on
 }

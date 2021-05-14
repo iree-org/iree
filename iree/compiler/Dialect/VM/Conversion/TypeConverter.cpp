@@ -85,14 +85,14 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
       if (targetOptions_.f32Extension) {
         // Promote f16 -> f32.
         return FloatType::getF32(floatType.getContext());
-      } else if (targetOptions_.truncateUnsupportedIntegers) {
+      } else {
         // f32 is not supported; can't compile.
         return llvm::None;
       }
     } else if (floatType.isF32()) {
       if (targetOptions_.f32Extension) {
         return floatType;
-      } else if (targetOptions_.truncateUnsupportedIntegers) {
+      } else {
         // f32 is not supported; can't compile.
         return llvm::None;
       }

@@ -77,6 +77,7 @@ class OutlineLargeConstantsPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
+    if (moduleOp.getBody()->empty()) return;
 
     // For name uniquing.
     SymbolTable moduleSymbols(moduleOp);

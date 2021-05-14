@@ -84,6 +84,20 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_fma_i64
+  vm.func @test_fma_i64() {
+    %c2 = vm.const.i64 2 : i64
+    %c2dno = iree.do_not_optimize(%c2) : i64
+    %c3 = vm.const.i64 3 : i64
+    %c3dno = iree.do_not_optimize(%c3) : i64
+    %c5 = vm.const.i64 5 : i64
+    %c5dno = iree.do_not_optimize(%c5) : i64
+    %v = vm.fma.i64 %c2dno, %c3dno, %c5dno : i64
+    %c11 = vm.const.i64 11 : i64
+    vm.check.eq %v, %c11, "2*3+5=11" : i64
+    vm.return
+  }
+
   vm.export @test_not_i64
   vm.func @test_not_i64() {
     %c1 = vm.const.i64 0 : i64

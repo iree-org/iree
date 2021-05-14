@@ -27,8 +27,8 @@ func @device_switch(%device: !hal.device) -> i32 {
       hal.return %c1a : i32
       // CHECK-NEXT: },
     },
-    // CHECK-NEXT: #hal.match.any<[#hal.device.match.id<"vmla">, #hal.device.match.id<"vulkan-*">]>(%[[C2A:.+]] = %[[C2]] : i32) {
-    #hal.match.any<[#hal.device.match.id<"vmla">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
+    // CHECK-NEXT: #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]>(%[[C2A:.+]] = %[[C2]] : i32) {
+    #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
       // CHECK-NEXT: hal.return %[[C2A]] : i32
       hal.return %c2a : i32
       // CHECK-NEXT: },

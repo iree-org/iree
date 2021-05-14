@@ -1,59 +1,113 @@
 // RUN: iree-opt -iree-flow-convert-to-flow-tensor-ops-pass -canonicalize -cse -split-input-file %s | IreeFileCheck %s
 
-func @subtensor_convert(%arg0 : tensor<?x24x48xf32>, %arg1 : index) ->
-    (tensor<?x12x12xf32>, tensor<?x12x24xf32>, tensor<?x?x48xf32>) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %0 = subtensor %arg0[0, 0, 0] [%arg1, 24, 48] [1, 1, 1]
-      : tensor<?x24x48xf32> to tensor<?x24x48xf32>
-  %2 = memref.dim %arg0, %c0 : tensor<?x24x48xf32>
-  %3 = subi %2, %arg1 : index
-  %4 = subtensor %arg0[%arg1, 0, 0] [%3, 24, 48] [1, 1, 1]
-      : tensor<?x24x48xf32> to tensor<?x24x48xf32>
-  %5 = subtensor %0[0, 0, 0] [%arg1, 12, 12] [1, 1, 1]
-      : tensor<?x24x48xf32> to tensor<?x12x12xf32>
-  %6 = subtensor %4[0, 0, 0] [%3, 12, 24] [1, 2, 2]
-      : tensor<?x24x48xf32> to tensor<?x12x24xf32>
-  %7 = memref.dim %arg0, %c1 : tensor<?x24x48xf32>
-  %8 = subi %7, %arg1 : index
-  %9 = subtensor %arg0[0, %arg1, 0] [%2, %8, 48] [1, 1, 1]
-      : tensor<?x24x48xf32> to tensor<?x?x48xf32>
-  return %5, %6, %9 : tensor<?x12x12xf32>, tensor<?x12x24xf32>, tensor<?x?x48xf32>
+func @subtensor1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
+  %0 = subtensor %arg0[2, 3, 4] [1, 1, 4] [1, 1, 1]
+      : tensor<5x24x48xf32> to tensor<4xf32>
+  return %0 : tensor<4xf32>
 }
-// CHECK-LABEL: func @subtensor_convert
-//  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x24x48xf32>
-//  CHECK-SAME:   %[[ARG1:.+]]: index
-//   CHECK-DAG:   %[[C24:.+]] = constant 24
-//   CHECK-DAG:   %[[C48:.+]] = constant 48
-//   CHECK-DAG:   %[[C0:.+]] = constant 0
-//       CHECK:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
-//       CHECK:   %[[SLICE1:.+]] = flow.tensor.slice %[[ARG0]]
-//  CHECK-SAME:       [%[[C0]], %[[C0]], %[[C0]] for %[[ARG1]], %[[C24]], %[[C48]]]
-//  CHECK-SAME:       : tensor<?x24x48xf32>{%[[D0]]} -> tensor<?x24x48xf32>{%[[ARG1]]}
-//       CHECK:   %[[D1:.+]] = subi %[[D0]], %[[ARG1]]
-//       CHECK:   %[[SLICE2:.+]] = flow.tensor.slice %[[ARG0]]
-//  CHECK-SAME:       [%[[ARG1]], %[[C0]], %[[C0]] for %[[D1]], %[[C24]], %[[C48]]]
-//  CHECK-SAME:       : tensor<?x24x48xf32>{%[[D0]]} -> tensor<?x24x48xf32>{%[[D1]]}
-//   CHECK-DAG:   %[[UNMODIFIED1:.+]] = subtensor %[[SLICE1]][0, 0, 0] [%[[ARG1]], 12, 12] [1, 1, 1]
-//   CHECK-DAG:   %[[UNMODIFIED2:.+]] = subtensor %[[SLICE2]][0, 0, 0] [%[[D1]], 12, 24] [1, 2, 2]
-//   CHECK-DAG:   %[[UNMODIFIED3:.+]] = subtensor %[[ARG0]][0, %[[ARG1]], 0]
-//       CHECK:   return %[[UNMODIFIED1]], %[[UNMODIFIED2]], %[[UNMODIFIED3]]
+// CHECK-LABEL: func @subtensor1(
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
+//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//   CHECK-DAG:   %[[C3:.+]] = constant 3 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = constant 4 : index
+//       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C4]] for %[[C1]], %[[C1]], %[[C4]]]
+//       CHECK:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
+//       CHECK:   return %[[RESULT]]
 
 // -----
 
-func @rank_reducing_subtensor(%arg0: tensor<?x513xi32>, %arg1: index) -> tensor<513xi32> {
-  %0 = subtensor %arg0[%arg1, 0] [1, 513] [1, 1] : tensor<?x513xi32> to tensor<513xi32>
+func @subtensor2(%arg0 : tensor<5x24x48xf32>) -> tensor<2x48xf32> {
+  %0 = subtensor %arg0[2, 3, 0] [1, 2, 48] [1, 1, 1]
+      : tensor<5x24x48xf32> to tensor<2x48xf32>
+  return %0 : tensor<2x48xf32>
+}
+// CHECK-LABEL: func @subtensor2
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
+//   CHECK-DAG:   %[[C3:.+]] = constant 3 : index
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//   CHECK-DAG:   %[[C48:.+]] = constant 48 : index
+//       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C0]] for %[[C1]], %[[C2]], %[[C48]]]
+//       CHECK:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func @subtensor3(%arg0 : tensor<5x24x48xf32>) -> tensor<2x24xf32> {
+  %0 = subtensor %arg0[2, 3, 0] [1, 2, 24] [1, 1, 1]
+      : tensor<5x24x48xf32> to tensor<2x24xf32>
+  return %0 : tensor<2x24xf32>
+}
+// CHECK-LABEL: func @subtensor3
+//       CHECK:   subtensor
+
+// -----
+
+func @subtensor4(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<2x24xf32> {
+  %0 = subtensor %arg0[2, 3, 0] [1, 2, 24] [1, %arg1, 1]
+      : tensor<5x24x48xf32> to tensor<2x24xf32>
+  return %0 : tensor<2x24xf32>
+}
+// CHECK-LABEL: func @subtensor4
+//       CHECK:   subtensor
+
+// -----
+
+func @subtensor5(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<2x48xf32> {
+  %0 = subtensor %arg0[2, %arg1, 0] [1, 2, 48] [1, 1, 1]
+      : tensor<5x24x48xf32> to tensor<2x48xf32>
+  return %0 : tensor<2x48xf32>
+}
+// CHECK-LABEL: func @subtensor5
+//       CHECK:   subtensor
+
+// -----
+
+func @subtensor6(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<?x48xf32> {
+  %0 = subtensor %arg0[2, 3, 0] [1, %arg1, 48] [1, 1, 1]
+      : tensor<5x24x48xf32> to tensor<?x48xf32>
+  return %0 : tensor<?x48xf32>
+}
+// CHECK-LABEL: func @subtensor6
+//       CHECK:   subtensor
+
+// -----
+
+func @subtensor7(%arg0 : tensor<5x?x48xf32>, %arg1 : index) -> tensor<2x48xf32> {
+  %0 = subtensor %arg0[2, 3, 0] [1, 2, 48] [1, 1, 1]
+      : tensor<5x?x48xf32> to tensor<2x48xf32>
+  return %0 : tensor<2x48xf32>
+}
+// CHECK-LABEL: func @subtensor7(
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x?x48xf32>
+//  CHECK-SAME:   %[[ARG1:.+]]: index)
+//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//   CHECK-DAG:   %[[C3:.+]] = constant 3 : index
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C48:.+]] = constant 48 : index
+//   CHECK-DAG:   %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C1]] : tensor<5x?x48xf32>
+//       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C0]] for %[[C1]], %[[C2]], %[[C48]]]
+//       CHECK:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func @rank_reducing_subtensor(%arg0: tensor<?x513xi32>) -> tensor<513xi32> {
+  %0 = subtensor %arg0[4, 0] [1, 513] [1, 1] : tensor<?x513xi32> to tensor<513xi32>
   return %0 : tensor<513xi32>
 }
 // CHECK-LABEL: func @rank_reducing_subtensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
-//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = constant 4 : index
 //   CHECK-DAG:   %[[C513:.+]] = constant 513 : index
 //       CHECK:   %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]]
-//  CHECK-SAME:       [%[[ARG1]], %[[C0]] for %[[C1]], %[[C513]]]
+//  CHECK-SAME:       [%[[C4]], %[[C0]] for %[[C1]], %[[C513]]]
 //  CHECK-SAME:       : tensor<?x513xi32>{%[[DIM]]} -> tensor<1x513xi32>
 //       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[SLICE]] : tensor<1x513xi32> -> tensor<513xi32>
 //       CHECK:   return %[[RESHAPE]] : tensor<513xi32>
@@ -79,40 +133,40 @@ func @tensor_reshape(%arg0 : tensor<?x4x?x5x?x6xf32>, %arg1 : tensor<20x?x40xf32
 // -----
 
 func @subtensor_insert_convert
-    (%arg0 : tensor<?x24x48xf32>, %arg1 : tensor<?x24x48xf32>, %arg2 : index) ->
+    (%arg0 : tensor<?x24x48xf32>, %arg1 : tensor<1x4x48xf32>) ->
     tensor<?x24x48xf32> {
   %c0 = constant 0 : index
-  %0 = memref.dim %arg1, %c0 : tensor<?x24x48xf32>
-  %1 = subtensor_insert %arg1 into %arg0[%arg2, 0, 0] [%0, 24, 48] [1, 1, 1] :
-      tensor<?x24x48xf32> into tensor<?x24x48xf32>
-  return %1 : tensor<?x24x48xf32>
+  %0 = subtensor_insert %arg1 into %arg0[4, 2, 0] [1, 4, 48] [1, 1, 1] :
+      tensor<1x4x48xf32> into tensor<?x24x48xf32>
+  return %0 : tensor<?x24x48xf32>
 }
 // CHECK-LABEL: func @subtensor_insert_convert
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]
-//       CHECK:   %[[C0:.+]] = constant 0
-//   CHECK-DAG:   %[[DIM0:.+]] = memref.dim %[[ARG1]], %[[C0]]
-//   CHECK-DAG:   %[[DIM1:.+]] = memref.dim %[[ARG0]], %[[C0]]
-//       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[ARG1]], %[[ARG0]][%[[ARG2]], %[[C0]], %[[C0]]]
-//  CHECK-SAME:     : tensor<?x24x48xf32>{%[[DIM0]]} -> tensor<?x24x48xf32>{%[[DIM1]]}
+//   CHECK-DAG:   %[[C0:.+]] = constant 0
+//   CHECK-DAG:   %[[C2:.+]] = constant 2
+//   CHECK-DAG:   %[[C4:.+]] = constant 4
+//   CHECK-DAG:   %[[DIM0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[ARG1]], %[[ARG0]][%[[C4]], %[[C2]], %[[C0]]]
+//  CHECK-SAME:     : tensor<1x4x48xf32> -> tensor<?x24x48xf32>{%[[DIM0]]}
 
 // -----
 
 func @subtensor_insert_convert_rank_reducing
-    (%arg0 : tensor<?x24x48xf32>, %arg1 : tensor<24x48xf32>, %arg2 : index) ->
+    (%arg0 : tensor<?x24x48xf32>, %arg1 : tensor<4x48xf32>) ->
     tensor<?x24x48xf32> {
   %c0 = constant 0 : index
-  %0 = subtensor_insert %arg1 into %arg0[%arg2, 0, 0] [1, 24, 48] [1, 1, 1] :
-      tensor<24x48xf32> into tensor<?x24x48xf32>
+  %0 = subtensor_insert %arg1 into %arg0[4, 2, 0] [1, 4, 48] [1, 1, 1] :
+      tensor<4x48xf32> into tensor<?x24x48xf32>
   return %0 : tensor<?x24x48xf32>
 }
 // CHECK-LABEL: func @subtensor_insert_convert_rank_reducing
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]
-//       CHECK:   %[[C0:.+]] = constant 0
-//   CHECK-DAG:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[ARG1]] : tensor<24x48xf32> -> tensor<1x24x48xf32>
+//   CHECK-DAG:   %[[C0:.+]] = constant 0
+//   CHECK-DAG:   %[[C2:.+]] = constant 2
+//   CHECK-DAG:   %[[C4:.+]] = constant 4
+//   CHECK-DAG:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[ARG1]] : tensor<4x48xf32> -> tensor<1x4x48xf32>
 //   CHECK-DAG:   %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C0]]
-//       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[RESHAPE]], %[[ARG0]][%[[ARG2]], %[[C0]], %[[C0]]]
-//  CHECK-SAME:     : tensor<1x24x48xf32> -> tensor<?x24x48xf32>{%[[DIM]]}
+//       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[RESHAPE]], %[[ARG0]][%[[C4]], %[[C2]], %[[C0]]]
+//  CHECK-SAME:     : tensor<1x4x48xf32> -> tensor<?x24x48xf32>{%[[DIM]]}

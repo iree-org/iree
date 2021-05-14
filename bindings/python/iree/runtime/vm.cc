@@ -222,6 +222,21 @@ absl::optional<iree_vm_function_t> VmModule::LookupFunction(
 // VmVariantList
 //------------------------------------------------------------------------------
 
+void VmVariantList::PushFloat(double fvalue) {
+  // Note that Python floats are f64.
+  iree_vm_value_t value = iree_vm_value_make_f64(fvalue);
+  CheckApiStatus(iree_vm_list_push_value(raw_ptr(), &value),
+                 "Could not push float");
+}
+
+void VmVariantList::PushInt(int64_t ivalue) {
+  // Note that Python ints are unbounded, so just use the largest type we
+  // have.
+  iree_vm_value_t value = iree_vm_value_make_i64(ivalue);
+  CheckApiStatus(iree_vm_list_push_value(raw_ptr(), &value),
+                 "Could not push int");
+}
+
 void VmVariantList::PushList(VmVariantList& other) {
   iree_vm_ref_t retained = iree_vm_list_retain_ref(other.raw_ptr());
   iree_vm_list_push_ref_move(raw_ptr(), &retained);
@@ -291,7 +306,7 @@ void VmVariantList::PushBufferView(HalDevice& device,
                  "Error moving buffer view");
 }
 
-VmVariantList VmVariantList::GetAsList(int index) {
+py::object VmVariantList::GetAsList(int index) {
   iree_vm_ref_t ref = {0};
   CheckApiStatus(iree_vm_list_get_ref_assign(raw_ptr(), index, &ref),
                  "Could not access list element");
@@ -299,7 +314,43 @@ VmVariantList VmVariantList::GetAsList(int index) {
   CheckApiStatus(iree_vm_list_check_deref(ref, &sub_list),
                  "Could not deref list (wrong type?)");
   iree_vm_list_retain(sub_list);
-  return VmVariantList(sub_list);
+  return py::cast(VmVariantList(sub_list));
+}
+
+py::object VmVariantList::GetVariant(int index) {
+  iree_vm_variant_t v = iree_vm_variant_empty();
+  CheckApiStatus(iree_vm_list_get_variant(raw_ptr(), index, &v),
+                 "Could not access list element");
+  if (iree_vm_type_def_is_value(&v.type)) {
+    // Convert a value type.
+    switch (v.type.value_type) {
+      case IREE_VM_VALUE_TYPE_I8:
+        return py::cast(v.i8);
+      case IREE_VM_VALUE_TYPE_I16:
+        return py::cast(v.i16);
+      case IREE_VM_VALUE_TYPE_I32:
+        return py::cast(v.i32);
+      case IREE_VM_VALUE_TYPE_I64:
+        return py::cast(v.i64);
+      case IREE_VM_VALUE_TYPE_F32:
+        return py::cast(v.f32);
+      case IREE_VM_VALUE_TYPE_F64:
+        return py::cast(v.f64);
+      default:
+        throw RaiseValueError("Unsupported VM value type conversion");
+    }
+  } else if (v.type.ref_type == IREE_VM_REF_TYPE_NULL) {
+    return py::none();
+  } else if (iree_vm_type_def_is_ref(&v.type)) {
+    // Convert reference type.
+    if (iree_vm_list_isa(v.ref)) {
+      return GetAsList(index);
+    } else if (iree_hal_buffer_view_isa(v.ref)) {
+      return GetAsNdarray(index);
+    }
+  }
+
+  throw RaiseValueError("Unsupported VM to Python Type Conversion");
 }
 
 py::object VmVariantList::GetAsNdarray(int index) {
@@ -480,6 +531,9 @@ void SetupVmBindings(pybind11::module m) {
       .def("__len__", &VmVariantList::size)
       .def("get_as_ndarray", &VmVariantList::GetAsNdarray)
       .def("get_as_list", &VmVariantList::GetAsList)
+      .def("get_variant", &VmVariantList::GetVariant)
+      .def("push_float", &VmVariantList::PushFloat)
+      .def("push_int", &VmVariantList::PushInt)
       .def("push_list", &VmVariantList::PushList)
       .def("push_buffer_view", &VmVariantList::PushBufferView)
       .def("__repr__", &VmVariantList::DebugString);
