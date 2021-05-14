@@ -4,7 +4,7 @@ endif()
 
 iree_add_all_subdirs()
 
-# Issue-5893: iree_c_embed_data requires a relative path and we need it to be
+# TODO(#5893): iree_c_embed_data requires a relative path and we need it to be
 # here to keep the path consistent with bazel build file. Fix it by making cmake
 # target more flexible.
 iree_c_embed_data(
