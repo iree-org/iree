@@ -72,6 +72,8 @@ namespace Flow {
 // dialects like linalg.
 static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createStandardToHLOPreprocessingPass());
+  passManager.addNestedPass<FuncOp>(
       IREE::Flow::createHLOToHLOPreprocessingPass());
   // TODO(ataei): This should run as part of createHLOToHLOPreprocessingPass
   // which will break VMLA backend.

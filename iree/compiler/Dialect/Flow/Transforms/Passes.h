@@ -77,6 +77,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
 /// backends.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass();
 
+/// Creates a pass to convert some std ops to mhlo ops. This provides more
+/// opportunities for fusion. It could prevent unnecessary host readback of
+/// device memory because most of std ops are run on host side.
+std::unique_ptr<OperationPass<FuncOp>> createStandardToHLOPreprocessingPass();
+
 // Runs pre-partitioning conversion passes to convert to the flow dialect.
 // This converts some input ops directly to flow ops when doing so has a
 // benefit. Other ops are left unmodified and will be outlined later on.

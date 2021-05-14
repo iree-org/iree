@@ -126,4 +126,10 @@ def StripAndSplatConstantVariables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
 }
 
+def StandardToHLOPreprocessing :
+    Pass<"iree-flow-std-to-hlo-preprocessing", "FuncOp"> {
+  let summary = "Apply std to hlo transformations for some std ops";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createStandardToHLOPreprocessingPass()";
+}
+
 #endif  // IREE_DIALECT_FLOW_PASSES

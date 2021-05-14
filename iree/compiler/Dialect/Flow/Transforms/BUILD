@@ -60,6 +60,7 @@ cc_library(
         "PassDetail.h",
         "Passes.cpp",
         "PrePostPartitioningConversion.cpp",
+        "StandardToHLOPreprocessing.cpp",
         "StripAndSplatConstantVariables.cpp",
     ],
     hdrs = [
