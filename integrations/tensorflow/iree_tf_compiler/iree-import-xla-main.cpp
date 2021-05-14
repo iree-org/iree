@@ -119,6 +119,7 @@ int main(int argc, char **argv) {
   // Register any command line options.
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
+  registerDefaultTimingManagerCLOptions();
   cl::ParseCommandLineOptions(argc, argv);
 
   DialectRegistry registry;
@@ -219,6 +220,7 @@ int main(int argc, char **argv) {
   // Run passes.
   PassManager pm(&context, PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
+  applyDefaultTimingPassManagerCLOptions(pm);
 
   iree_integrations::TF::buildMHLOImportPassPipeline(pm);
 
