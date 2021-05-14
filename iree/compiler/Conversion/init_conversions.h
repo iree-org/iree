@@ -36,6 +36,7 @@ inline void registerCommonConversionPasses() {
     createFlattenMemRefSubspanPass();
     createForOpCanonicalizationPass();
     createLinalgBufferizePass();
+    createSetNumWorkgroupsPass();
     return true;
   }();
   (void)init_once;
@@ -73,9 +74,9 @@ inline void registerLinalgToSPIRVPasses() {
 
 inline void registerLinalgToLLVMPasses() {
   static bool init_once = []() {
+    createLowerExecutableTargetPass(LLVMCodegenOptions());
     // LinalgToLLVM
     createLinalgTileAndVectorizeWorkgroupsPass();
-    createMaterializeCPULaunchConfigurationPass();
     createUnfusedFMAOpsPass();
     createPadLinalgWorkgroupTilesPass();
     return true;

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -64,6 +65,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 /// Create a pass to convert a model using f32 type to the equivalent one
 /// using 16.
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
+
+/// Sets the number of workgroups to use for each entry point in the dispatch
+/// region.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 
 }  // namespace iree_compiler
 }  // namespace mlir

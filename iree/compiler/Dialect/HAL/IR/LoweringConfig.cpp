@@ -18,9 +18,9 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 static const char kConfigAttrName[] = "lowering.config";
-static const char kPipelineNameAttrName[] = "lowering.pipeline";
 
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.cpp.inc"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfigEnums.cpp.inc"
 
 namespace mlir {
 namespace iree_compiler {
@@ -44,24 +44,7 @@ bool setLoweringConfig(Operation *op, IREE::HAL::LoweringConfig config) {
   return true;
 }
 
-StringRef getPipelineName(Operation *op) {
-  auto targetOp = op->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  if (!targetOp) return "";
-  auto attr = targetOp->getAttrOfType<StringAttr>(kPipelineNameAttrName);
-  if (!attr) return "";
-  return attr.getValue();
-}
-
-bool setPipelineName(Operation *op, StringRef name) {
-  auto targetOp = op->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  if (!targetOp) return false;
-  if (targetOp->hasAttrOfType<StringAttr>(kPipelineNameAttrName)) {
-    return false;
-  }
-  targetOp->setAttr(kPipelineNameAttrName,
-                    StringAttr::get(op->getContext(), name));
-  return true;
-}
+void eraseLoweringConfig(Operation *op) { op->removeAttr(kConfigAttrName); }
 
 //===----------------------------------------------------------------------===//
 // Helpers for accessing values from the LoweringConfig attribute.

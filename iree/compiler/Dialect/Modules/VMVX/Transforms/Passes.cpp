@@ -50,7 +50,10 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Configuration
   // ---------------------------------------------------------------------------
 
-  passManager.addPass(createMaterializeCPULaunchConfigurationPass());
+  // TODO(#5925): This can also be modified to just use the dynamic pass
+  // pipeline like the CPU side.
+  // passManager.addPass(createMaterializeCPULaunchConfigurationPass());
+  passManager.addPass(createSetNumWorkgroupsPass());
 
   // ---------------------------------------------------------------------------
   // Linalg -> Vectors
@@ -76,6 +79,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
 
   // Tiling and distribution.
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
+  // TODO(#5925): This can also be modified to just use the dynamic pass
+  // pipeline like the CPU side.
   // nestedModulePM.addNestedPass<FuncOp>(
   //     createLinalgTileAndVectorizeWorkgroupsPass());
 

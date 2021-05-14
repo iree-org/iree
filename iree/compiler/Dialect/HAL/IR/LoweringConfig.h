@@ -29,6 +29,7 @@
 
 // clang-format off
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h.inc"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfigEnums.h.inc"
 // clang-format on
 
 namespace mlir {
@@ -49,16 +50,8 @@ bool hasLoweringConfig(Operation *op);
 /// true. Returns false if a configuration already exists.
 bool setLoweringConfig(Operation *op, IREE::HAL::LoweringConfig config);
 
-/// Returns the StringAttr that identifies the lowering pipeline to use. Returns
-/// an empty-string if the pipeline hasnt been set.
-StringRef getPipelineName(Operation *op);
-
-/// Sets the name of the pipeline to use for the `hal.executable.target` if not
-/// set. Note that this modifies the `hal.executable.target` operation, so
-/// calling this method from within a pipeline nested within this op would be
-/// illegal. Returns false if the name wasnt set (possibly due to the name being
-/// already set)
-bool setPipelineName(Operation *op, StringRef name);
+/// Removes the lowering configuration on the operation if it exists.
+void eraseLoweringConfig(Operation *op);
 
 //===----------------------------------------------------------------------===//
 // Helpers for accessing values from the LoweringConfig attribute.

@@ -25,9 +25,30 @@
 namespace mlir {
 namespace iree_compiler {
 
-void addLinalgToLLVMPasses(OpPassManager &passManager,
-                           LLVMCodegenOptions options) {
+static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
+                                   ArrayRef<int64_t> staticShape,
+                                   Type elementType,
+                                   ArrayRef<Value> dynamicSizes) {
+  MemRefType allocType = MemRefType::get(staticShape, elementType);
+  return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
+}
+
+void addCPUVectorizationPassPipeline(OpPassManager &passManager,
+                                     LLVMCodegenOptions options) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addPass(createCanonicalizerPass());
+
+  // TODO(ataei): This causes segmentation fault on Android. Fix it and
+  // re-enable.
+  // nestedModulePM.addNestedPass<FuncOp>(createPadLinalgWorkgroupTilesPass());
+
+  // TODO(ataei): We want to enable when tensor -> vector pass is fully
+  // supported which requires first moving vector-tiling before this step.
+  if (options.useLinalgOnTensorsToVectors) {
+    nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
+  }
+  // Use stack allocation on CPU side.
+  addLinalgBufferizePasses(nestedModulePM, cpuAllocationFunction);
 
   // Tile and vectorize linalg ops.
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -37,7 +58,20 @@ void addLinalgToLLVMPasses(OpPassManager &passManager,
   nestedModulePM.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
   nestedModulePM.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
+}
 
+void addCPUDefaultPassPipeline(OpPassManager &passManager,
+                               LLVMCodegenOptions options) {
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addPass(createCanonicalizerPass());
+  // Use stack allocation on CPU side.
+  addLinalgBufferizePasses(nestedModulePM, cpuAllocationFunction);
+  nestedModulePM.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
+}
+
+void addLowerToLLVMPasses(OpPassManager &passManager,
+                          LLVMCodegenOptions options) {
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   // Linalg -> SCF
   nestedModulePM.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -61,46 +95,12 @@ void addLinalgToLLVMPasses(OpPassManager &passManager,
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager,
                                     LLVMCodegenOptions options) {
-  passManager.addPass(createMaterializeCPULaunchConfigurationPass());
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addPass(createCanonicalizerPass());
-
-  // TODO(ataei): This causes segmentation fault on Android. Fix it and
-  // re-enable.
-  // nestedModulePM.addNestedPass<FuncOp>(createPadLinalgWorkgroupTilesPass());
-
-  // TODO(ataei): We want to enable when tensor -> vector pass is fully
-  // supported which requires first moving vector-tiling before this step.
-  if (options.useLinalgOnTensorsToVectors) {
-    nestedModulePM.addNestedPass<FuncOp>(createLinalgVectorizePass());
-  }
-  // Use stack allocation on CPU side.
-  WorkgroupMemoryAllocationFn allocationFn =
-      [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
-         Type elementType, ArrayRef<Value> dynamicSizes) {
-        MemRefType allocType = MemRefType::get(staticShape, elementType);
-        return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
-      };
-  addLinalgBufferizePasses(nestedModulePM, allocationFn);
-  nestedModulePM.addPass(createPromoteBuffersToStackPass(
-      /*maxAllocSizeInBytes=*/1 << 10, /*bitwidthOfIndexType=*/64,
-      /*maxRankOfAllocatedMemRef=*/10));
-
-  // Linalg -> LLVM passes.
-  addLinalgToLLVMPasses(passManager, options);
+  passManager.addPass(createLowerExecutableTargetPass(options));
 }
 
 static PassPipelineRegistration<> linalgLLVMVPipeline(
     "iree-codegen-linalg-to-llvm-pipeline",
     "Runs the progressive lowering pipeline from Linalg to LLVM",
-    [](OpPassManager &passManager) {
-      buildLLVMTransformPassPipeline(passManager,
-                                     getLLVMCodegenOptionsFromClOptions());
-    });
-
-static PassPipelineRegistration<> hloToLinalgLLVMVPipeline(
-    "iree-codegen-hlo-to-llvm-pipeline",
-    "Runs the progressive lowering pipeline from XLA HLO to Linalg to LLVM",
     [](OpPassManager &passManager) {
       buildLLVMTransformPassPipeline(passManager,
                                      getLLVMCodegenOptionsFromClOptions());

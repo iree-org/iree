@@ -25,6 +25,7 @@ iree_cc_library(
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
     "Passes.cpp"
+    "SetNumWorkgroupsPass.cpp"
     "Transforms.cpp"
     "VectorTransferOptimization.cpp"
   DEPS
