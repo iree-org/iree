@@ -40,7 +40,6 @@ iree_lit_test_suite(
             "promote_workgroup_memory.mlir",
             "tile_and_vectorize_batch_matmul.mlir",
             "tile_and_vectorize_conv.mlir",
-            "tile_and_vectorize_in_one_workgroup.mlir",
             "tile_and_vectorize_matmul.mlir",
             "vector_to_cooperative_matrix.mlir",
             "vector_to_gpu.mlir",
