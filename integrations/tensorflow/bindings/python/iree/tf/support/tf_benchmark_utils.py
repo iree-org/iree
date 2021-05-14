@@ -147,8 +147,8 @@ Modules = collections.namedtuple("Modules", ["target_modules", "artifacts_dir"])
 
 def compile_tf_module(module_class: Type[tf.Module],
                       exported_name: str,
-                      input_shapes_dtypes: Sequence[tuple[
-                          Sequence[int], tf.dtypes.DType]],
+                      input_shapes_dtypes: Sequence[tuple[Sequence[int],
+                                                          tf.dtypes.DType]],
                       relative_artifacts_dir: str = None) -> Modules:
   """Compiles module_class to each backend that we test.
 
