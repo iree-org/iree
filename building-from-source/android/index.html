@@ -832,18 +832,18 @@ run the tests, then report the status back to your host machine.</p>
 <p>Invoke the host compiler tools produce input files:</p>
 <div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-translate <span class="se">\</span>
   -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
-  -iree-hal-target-backends<span class="o">=</span>vmla <span class="se">\</span>
+  -iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
   iree/tools/test/iree-run-module.mlir <span class="se">\</span>
-  -o /tmp/iree-run-module-vmla.vmfb
+  -o /tmp/iree-run-module-vmvx.vmfb
 </code></pre></div>
 <p>Push the Android runtime tools to the device, along with any input files:</p>
 <div class="highlight"><pre><span></span><code>adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
 adb shell chmod +x /data/local/tmp/iree-run-module
-adb push /tmp/iree-run-module-vmla.vmfb /data/local/tmp/
+adb push /tmp/iree-run-module-vmvx.vmfb /data/local/tmp/
 </code></pre></div>
 <p>Run the tool:</p>
-<div class="highlight"><pre><span></span><code>adb shell /data/local/tmp/iree-run-module -driver<span class="o">=</span>vmla <span class="se">\</span>
-  -module_file<span class="o">=</span>/data/local/tmp/iree-run-module-vmla.vmfb <span class="se">\</span>
+<div class="highlight"><pre><span></span><code>adb shell /data/local/tmp/iree-run-module -driver<span class="o">=</span>vmvx <span class="se">\</span>
+  -module_file<span class="o">=</span>/data/local/tmp/iree-run-module-vmvx.vmfb <span class="se">\</span>
   -entry_function<span class="o">=</span>abs <span class="se">\</span>
   -function_inputs<span class="o">=</span><span class="s2">&quot;i32=-5&quot;</span>
 </code></pre></div>
