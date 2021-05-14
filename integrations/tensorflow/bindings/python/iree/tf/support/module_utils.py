@@ -218,7 +218,8 @@ class CompiledModule(object):
                         module_class: Type[tf.Module],
                         backend_info: "BackendInfo",
                         exported_names: Sequence[str] = (),
-                        artifacts_dir: str = None):
+                        artifacts_dir: str = None,
+                        create_runtime: bool = True):
     """Compile a tf.Module subclass to the target backend in backend_info.
 
     Args:
@@ -228,6 +229,8 @@ class CompiledModule(object):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     raise NotImplementedError()
 
@@ -260,7 +263,8 @@ class CompiledModule(object):
                                             exported_name: str,
                                             input_names: Sequence[str],
                                             output_names: Sequence[str],
-                                            artifacts_dir: str = None):
+                                            artifacts_dir: str = None,
+                                            create_runtime: bool = True):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -275,6 +279,8 @@ class CompiledModule(object):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     raise NotImplementedError()
 
@@ -319,7 +325,7 @@ class IreeCompiledModule(CompiledModule):
       backend_info: "BackendInfo",
       compiled_paths: Dict[str, str],
       vm_module: iree.runtime.VmModule,
-      config: iree.runtime.Config,
+      config: Optional[iree.runtime.Config],
   ):
     """Base constructor – Use one of the named constructors instead.
 
@@ -330,18 +336,22 @@ class IreeCompiledModule(CompiledModule):
       compiled_paths: A dictionary mapping compiled method names to file paths
         corresponding to their serialized representations.
       vm_module: A iree.runtime.VmModule containing compilation info to wrap.
-      config: A iree.runtime.Config containing compilation info to wrap.
+      config: An optional iree.runtime.Config containing runtime VM instance,
+              drivers, and modules.
     """
     super().__init__(module_name, backend_info, compiled_paths)
     self._vm_module = vm_module
     self._config = config
+    if self._config is not None:
+      self.reinitialize()
 
   @classmethod
   def create_from_class(cls,
                         module_class: Type[tf.Module],
                         backend_info: "BackendInfo",
                         exported_names: Sequence[str] = (),
-                        artifacts_dir: str = None):
+                        artifacts_dir: str = None,
+                        create_runtime: bool = True):
     """Compile a tf.Module subclass to the target backend in backend_info.
 
     Args:
@@ -351,18 +361,22 @@ class IreeCompiledModule(CompiledModule):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     tf_utils.set_random_seed()
     module_instance = module_class()
     return cls.create_from_instance(module_instance, backend_info,
-                                    exported_names, artifacts_dir)
+                                    exported_names, artifacts_dir,
+                                    create_runtime)
 
   @classmethod
   def create_from_instance(cls,
                            module_instance: tf.Module,
                            backend_info: "BackendInfo",
                            exported_names: Sequence[str] = (),
-                           artifacts_dir: str = None):
+                           artifacts_dir: str = None,
+                           create_runtime: bool = True):
     """Compile a tf.Module instance to the target backend in backend_info.
 
     Args:
@@ -372,6 +386,8 @@ class IreeCompiledModule(CompiledModule):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     module_blob, compiled_path = _incrementally_compile_tf_module(
         module=module_instance,
@@ -379,7 +395,9 @@ class IreeCompiledModule(CompiledModule):
         exported_names=exported_names,
         artifacts_dir=artifacts_dir)
     vm_module = iree.runtime.VmModule.from_flatbuffer(module_blob)
-    config = iree.runtime.Config(driver_name=backend_info.driver)
+    config = None
+    if create_runtime:
+      config = iree.runtime.Config(driver_name=backend_info.driver)
 
     compiled_paths = None
     if compiled_path is not None:
@@ -399,7 +417,8 @@ class IreeCompiledModule(CompiledModule):
                                             exported_name: str,
                                             input_names: Sequence[str],
                                             output_names: Sequence[str],
-                                            artifacts_dir: str = None):
+                                            artifacts_dir: str = None,
+                                            create_runtime: bool = True):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -414,6 +433,8 @@ class IreeCompiledModule(CompiledModule):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     del input_names  # Unused.
     del output_names  # Unused.
@@ -421,7 +442,9 @@ class IreeCompiledModule(CompiledModule):
         saved_model_dir, saved_model_tags, backend_info, exported_name,
         artifacts_dir)
     vm_module = iree.runtime.VmModule.from_flatbuffer(module_blob)
-    config = iree.runtime.Config(driver_name=backend_info.driver)
+    config = None
+    if create_runtime:
+      config = iree.runtime.Config(driver_name=backend_info.driver)
 
     compiled_paths = None
     if compiled_path is not None:
@@ -517,7 +540,8 @@ class TfCompiledModule(CompiledModule):
                         module_class: Type[tf.Module],
                         backend_info: "BackendInfo",
                         exported_names: Sequence[str] = (),
-                        artifacts_dir: str = None):
+                        artifacts_dir: str = None,
+                        create_runtime: bool = True):
     """Compile a tf.Module subclass to the target backend in backend_info.
 
     Args:
@@ -527,6 +551,8 @@ class TfCompiledModule(CompiledModule):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     module_name = module_class.__name__
     constructor = module_class
@@ -541,7 +567,8 @@ class TfCompiledModule(CompiledModule):
                                             exported_name: str,
                                             input_names: Sequence[str],
                                             output_names: Sequence[str],
-                                            artifacts_dir: str = None):
+                                            artifacts_dir: str = None,
+                                            create_runtime: bool = True):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -556,6 +583,8 @@ class TfCompiledModule(CompiledModule):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     constructor = lambda: SignatureDefSavedModelWrapper(
         saved_model_dir, saved_model_tags, exported_name)
@@ -810,7 +839,8 @@ class TfLiteCompiledModule(CompiledModule):
                         module_class: Type[tf.Module],
                         backend_info: "BackendInfo",
                         exported_names: Sequence[str] = (),
-                        artifacts_dir: str = None):
+                        artifacts_dir: str = None,
+                        create_runtime: bool = True):
     """Compile a tf.Module subclass to the target backend in backend_info.
 
     Args:
@@ -820,6 +850,8 @@ class TfLiteCompiledModule(CompiledModule):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     tf_utils.set_random_seed()
     tflite_module_bytes = tf_module_to_tflite_module_bytes(
@@ -838,7 +870,8 @@ class TfLiteCompiledModule(CompiledModule):
                                             exported_name: str,
                                             input_names: Sequence[str],
                                             output_names: Sequence[str],
-                                            artifacts_dir: str = None):
+                                            artifacts_dir: str = None,
+                                            create_runtime: bool = True):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -853,6 +886,8 @@ class TfLiteCompiledModule(CompiledModule):
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
+      create_runtime: Whether to create and bundle runtime for executing the
+        compiled module.
     """
     tflite_module_bytes = tf_signature_def_saved_model_to_tflite_module_bytes(
         saved_model_dir, saved_model_tags, exported_name, input_names,
@@ -952,10 +987,11 @@ class BackendInfo:
   def compile_from_class(self,
                          module_class: Type[tf.Module],
                          exported_names: Sequence[str] = (),
-                         artifacts_dir: str = None) -> CompiledModule:
+                         artifacts_dir: str = None,
+                         create_runtime: bool = True) -> CompiledModule:
     """Creates a 'CompiledModule' for this backend."""
     return self._compiled_module_class.create_from_class(
-        module_class, self, exported_names, artifacts_dir)
+        module_class, self, exported_names, artifacts_dir, create_runtime)
 
   def compile_signature_def_saved_model(
       self,
@@ -965,10 +1001,11 @@ class BackendInfo:
       exported_name: str,
       input_names: Sequence[str],
       output_names: Sequence[str],
-      artifacts_dir: str = None) -> CompiledModule:
+      artifacts_dir: str = None,
+      create_runtime: bool = True) -> CompiledModule:
     return self._compiled_module_class.create_from_signature_def_saved_model(
         saved_model_dir, saved_model_tags, module_name, self, exported_name,
-        input_names, output_names, artifacts_dir)
+        input_names, output_names, artifacts_dir, create_runtime)
 
   @classmethod
   def get_all_backends(cls) -> Sequence["BackendInfo"]:

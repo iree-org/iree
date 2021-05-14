@@ -173,7 +173,7 @@ def compile_tf_module(module_class: Type[tf.Module],
   target_backend_configs = get_target_backend_configs()
 
   compile_backend = lambda backend_info: backend_info.compile_from_class(
-      module_class, [exported_name], artifacts_dir)
+      module_class, [exported_name], artifacts_dir, create_runtime=False)
 
   target_modules = []
   for config in target_backend_configs:
@@ -216,10 +216,15 @@ def compile_tf_signature_def_saved_model(
 
   target_backend_configs = get_target_backend_configs()
 
-  compile_backend = (
-      lambda backend_info: backend_info.compile_signature_def_saved_model(
-          saved_model_dir, saved_model_tags, module_name, exported_name,
-          input_names, output_names, artifacts_dir))
+  compile_backend = (lambda backend_info: backend_info.
+                     compile_signature_def_saved_model(saved_model_dir,
+                                                       saved_model_tags,
+                                                       module_name,
+                                                       exported_name,
+                                                       input_names,
+                                                       output_names,
+                                                       artifacts_dir,
+                                                       create_runtime=False))
 
   target_modules = []
   for config in target_backend_configs:
