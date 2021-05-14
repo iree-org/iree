@@ -34,6 +34,7 @@ iree_cc_library(
     "LinalgTileAndVectorizePass.cpp"
     "LinalgVectorizePass.cpp"
     "MaterializeCPULaunchConfigurationPass.cpp"
+    "PadLinalgWorkgroupTiles.cpp"
     "Passes.cpp"
     "PlanConvLoopOrder.cpp"
     "UnfuseFMAOps.cpp"

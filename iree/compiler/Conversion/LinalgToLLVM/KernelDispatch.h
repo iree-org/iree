@@ -39,6 +39,9 @@ struct TileSizeFn {
                                          Operation *operation);
 };
 
+template <TilingLevel tilingLevel>
+llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op);
+
 Optional<LaunchConfig> initCPULaunchConfig(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     ArrayRef<linalg::LinalgOp> linalgOps);

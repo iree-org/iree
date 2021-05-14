@@ -630,6 +630,8 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// and `strides` operands.
     static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 2; }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {

@@ -119,7 +119,7 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.new_local_repository,
-        name = "cuda_headers",
-        build_file = iree_repo_alias + "//:build_tools/third_party/cuda_headers/BUILD.overlay",
-        path = paths.join(iree_path, "third_party/cuda_headers"),
+        name = "cuda",
+        build_file = iree_repo_alias + "//:build_tools/third_party/cuda/BUILD.overlay",
+        path = paths.join(iree_path, "third_party/cuda"),
     )
