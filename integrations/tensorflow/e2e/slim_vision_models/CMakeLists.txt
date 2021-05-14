@@ -24,11 +24,9 @@ iree_e2e_cartesian_product_test_suite(
     "tf"
     "https://tfhub.dev/google/imagenet/"
     "amoebanet_a_n18_f448;inception_resnet_v2;inception_v1;inception_v2;inception_v3;mobilenet_v1_025_128;mobilenet_v1_025_160;mobilenet_v1_025_192;mobilenet_v1_025_224;mobilenet_v1_050_128;mobilenet_v1_050_160;mobilenet_v1_050_192;mobilenet_v1_050_224;mobilenet_v1_075_128;mobilenet_v1_075_160;mobilenet_v1_075_192;mobilenet_v1_075_224;mobilenet_v1_100_128;mobilenet_v1_100_160;mobilenet_v1_100_192;mobilenet_v1_100_224;mobilenet_v2_035_96;mobilenet_v2_035_128;mobilenet_v2_035_160;mobilenet_v2_035_192;mobilenet_v2_035_224;mobilenet_v2_050_96;mobilenet_v2_050_128;mobilenet_v2_050_160;mobilenet_v2_050_192;mobilenet_v2_050_224;mobilenet_v2_075_96;mobilenet_v2_075_128;mobilenet_v2_075_160;mobilenet_v2_075_192;mobilenet_v2_075_224;mobilenet_v2_100_96;mobilenet_v2_100_128;mobilenet_v2_100_160;mobilenet_v2_100_192;mobilenet_v2_100_224;mobilenet_v2_130_224;mobilenet_v2_140_224;mobilenet_v3_large_100_224;nasnet_mobile;nasnet_large;pnasnet_large;resnet_v1_50;resnet_v1_101;resnet_v1_152;resnet_v2_50;resnet_v2_101;resnet_v2_152"
-    "tf;tflite;iree_vmla;iree_vulkan"
+    "tf;tflite;iree_vulkan"
   FAILING_CONFIGURATIONS
     ",,,amoebanet_a_n18_f448,"
-    ",,,nasnet_large,iree_vmla"
-    ",,,nasnet_mobile,iree_vmla"
     ",,,nasnet_mobile,iree_vulkan"
     ",,,nasnet_large,iree_vulkan"
     ",,,pnasnet_large,iree_vulkan"
