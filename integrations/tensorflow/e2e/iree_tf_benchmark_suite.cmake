@@ -52,7 +52,7 @@ function(iree_tf_benchmark_suite)
 
   # Generate all benchmarks to the root build directory. This helps for
   # discovering them and launch them on devices.
-  set(_ARTIFACTS_DIR "${CMAKE_BINARY_DIR}/benchmark_suites/models")
+  set(_ARTIFACTS_DIR "${CMAKE_BINARY_DIR}/benchmark_suites/tf_models")
 
   foreach(_MODEL IN LISTS _RULE_MODELS)
     # Construct the benchmark generation target name, which is the model name

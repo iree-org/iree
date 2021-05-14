@@ -25,7 +25,7 @@ are generated using `ninja iree-generate-benchmark-suites`.
 Example usages:
 
   python3 run_benchmarks.py \
-    --benchmark_tool=/path/to/android/target/iree-benchmark_module
+    --benchmark_tool=/path/to/android/target/iree-benchmark_module \
     /path/to/host/build/dir
 """
 
@@ -38,7 +38,7 @@ import subprocess
 # Relative path against build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 # Relative path against root benchmark suit directory.
-PYTON_MODEL_REL_PATH = "models"
+PYTON_MODEL_REL_PATH = "tf_models"
 
 # The artifact's filename for compiled Python models.
 MODEL_FLAGFILE_NAME = "flagfile"
@@ -64,6 +64,14 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "mali-g78": "gpu-mali-valhall",
 }
 
+# A map for IREE driver names. This allows us to normalize driver names like
+# mapping to more friendly ones and detach to keep driver names used in
+# benchmark presentation stable.
+IREE_DRIVER_NAME_MAP = {
+    "iree_llvmaot": "IREE-Dylib",
+    "iree_vulkan": "IREE-Vulkan",
+}
+
 
 def execute(args,
             capture_output=False,
@@ -83,9 +91,11 @@ def execute(args,
 
 def get_android_device_model(verbose=False):
   """Returns the Android device model."""
-  return execute(["adb", "shell", "getprop", "ro.product.model"],
-                 capture_output=True,
-                 verbose=verbose).stdout.strip()
+  model = execute(["adb", "shell", "getprop", "ro.product.model"],
+                  capture_output=True,
+                  verbose=verbose).stdout.strip()
+  model = re.sub(r"\W+", "-", model)
+  return model
 
 
 def get_android_cpu_abi(verbose=False):
@@ -121,9 +131,8 @@ def get_android_gpu_name(verbose=False):
   # - Adreno GPUs have raw names like "Adreno (TM) 650".
   name = name.replace("(TM)", "")
 
-  # Replace all consecutive whitespace characters with a single hypen.
-  whitespace = re.compile(r"\W+")
-  name = whitespace.sub("-", name)
+  # Replace all consecutive non-word characters with a single hypen.
+  name = re.sub(r"\W+", "-", name)
 
   return name
 
@@ -213,16 +222,20 @@ def compose_benchmark_name(device_info, root_build_dir, model_benchmark_dir):
 
     Returns:
     - A string of the format:
-      "<model-name> <benchmark-mode> @ <device-model> (<target-arch>)"
+      "<model-name> [<source>] <benchmark-mode> with <iree-driver>"
+      " @ <device-model> (<target-arch>)"
   """
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
                                 PYTON_MODEL_REL_PATH)
 
-  # Extract the model name from the directory path.
+  # Extract the model name from the directory path. This uses the relative
+  # path under the root model directory. If there are multiple segments,
+  # additional ones will be placed in parentheses.
   model_name = os.path.relpath(model_benchmark_dir, model_root_dir)
-  model_name = os.path.dirname(model_name)
-  model_name = os.path.split(model_name)
-  model_name = f"{model_name[0]} ({model_name[1]})"
+  model_name = os.path.dirname(model_name) # Remove IREE driver segment
+  main, rest = os.path.split(model_name)
+  rest = re.sub(r"\W+", "-", rest)
+  model_name = f"{main} ({rest})"
 
   # Extract benchmark info from the directory path following convention:
   #   <iree-driver>__<target-architecture>__<benchmark_mode>
@@ -231,14 +244,19 @@ def compose_benchmark_name(device_info, root_build_dir, model_benchmark_dir):
 
   # Get the target architecture depending on the IREE driver.
   target_arch = ""
+  driver = ""
   if iree_driver == "iree_vulkan":
     target_arch = "GPU-" + device_info.gpu_name
+    driver = IREE_DRIVER_NAME_MAP[iree_driver]
   elif iree_driver == "iree_llvmaot":
     target_arch = "CPU-" + device_info.get_arm_arch_revision()
+    driver = IREE_DRIVER_NAME_MAP[iree_driver]
   else:
     raise ValueError("Unrecognized IREE driver; need to update the list")
 
-  return f"{model_name} {bench_mode} @ {device_info.model} ({target_arch})"
+  model_driver = f"{model_name} [TensorFlow] {bench_mode} with {driver}"
+  device_arch = f"{device_info.model} ({target_arch})"
+  return model_driver + " @ " + device_arch
 
 
 def filter_python_model_benchmark_suite(device_info,
