@@ -78,7 +78,6 @@ iree_check_single_backend_test_suite(
     "mul.mlir"
     "negate.mlir"
     "pad.mlir"
-    "reduce.mlir"
     "reluN.mlir"
     "reshape.mlir"
     "rsqrt.mlir"
