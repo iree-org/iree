@@ -20,7 +20,7 @@ to filter and run suitable benchmarks on it.
 
 It expects that `adb` is installed, and there is an `iree-benchmark-module`
 tool cross-compiled towards Android. It also expects the benchmark artifacts
-are generated using `ninja iree-generate-benchmark-suites`.
+are generated using `ninja iree-benchmark-suites`.
 
 Example usages:
 

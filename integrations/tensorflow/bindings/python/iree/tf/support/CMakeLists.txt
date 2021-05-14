@@ -18,8 +18,8 @@ iree_py_library(
   SRCS
     "__init__.py"
     "module_utils.py"
-    "tf_test_driver.py"
     "tf_benchmark_utils.py"
+    "tf_test_driver.py"
     "tf_test_utils.py"
     "tf_utils.py"
     "trace_utils.py"

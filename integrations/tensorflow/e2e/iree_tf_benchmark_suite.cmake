@@ -94,10 +94,11 @@ function(iree_tf_benchmark_suite)
           "--compilation_flags=\"${_RULE_COMPILATION_FLAGS}\""
           "${_RUNTIME_FLAGS_CL}"
       DEPENDS
-        bindings_python_iree_tools_core_core
         bindings_python_iree_compiler_compiler
         bindings_python_iree_runtime_runtime
+        bindings_python_iree_tools_core_core
         integrations_tensorflow_bindings_python_iree_tools_tf_tf
+        integrations_tensorflow_bindings_python_iree_tf_support_support
       WORKING_DIRECTORY
         "${CMAKE_CURRENT_BINARY_DIR}"
       COMMENT
@@ -105,7 +106,7 @@ function(iree_tf_benchmark_suite)
     )
 
     # Mark dependency so that we have one target to drive them all.
-    add_dependencies(iree-generate-benchmark-suites "${_NAME}")
+    add_dependencies(iree-benchmark-suites "${_NAME}")
   endforeach()
 
 endfunction()

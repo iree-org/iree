@@ -431,7 +431,7 @@ endif()
 
 if(${IREE_BUILD_BENCHMARKS})
   # Add a top-level custom target to drive generating benchmark suites.
-  add_custom_target(iree-generate-benchmark-suites)
+  add_custom_target(iree-benchmark-suites)
 endif()
 
 if(${IREE_BUILD_DOCS})
