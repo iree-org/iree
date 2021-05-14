@@ -1,1 +1,0 @@
-This folder contains a subset of CUDA SDK headers needed to build IREE.
