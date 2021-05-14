@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
-    "Convert1x1ConvToDot.cpp"
     "DecomposeHLOClamp.cpp"
     "DemoteF32ToF16.cpp"
   DEPS
