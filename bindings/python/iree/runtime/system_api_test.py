@@ -49,7 +49,7 @@ class SystemApiTest(absltest.TestCase):
       config = iree.runtime.Config("nothere1,nothere2")
 
   def test_subsequent_driver(self):
-    config = iree.runtime.Config("nothere1,iree-llvm-aot")
+    config = iree.runtime.Config("nothere1,dylib")
 
   def test_empty_dynamic(self):
     ctx = iree.runtime.SystemContext()
