@@ -90,9 +90,9 @@ def execute(args,
 
 
 def get_git_commit_hash(commit):
-   return execute(['git', 'rev-parse', commit],
-                   cwd=os.path.dirname(os.path.realpath(__file__)),
-                   capture_output=True).stdout.strip()
+  return execute(['git', 'rev-parse', commit],
+                 cwd=os.path.dirname(os.path.realpath(__file__)),
+                 capture_output=True).stdout.strip()
 
 
 def get_android_device_model(verbose=False):
