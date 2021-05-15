@@ -125,8 +125,5 @@ def convert_external_target(target):
   if target.startswith("@mlir-hlo//"):
     # All Bazel targets map to a single CMake target.
     return ["tensorflow::mlir_hlo"]
-  if target.startswith("@com_google_ruy//ruy"):
-    # All Bazel targets map to a single CMake target.
-    return ["ruy"]
 
   raise KeyError(f"No conversion found for target '{target}'")

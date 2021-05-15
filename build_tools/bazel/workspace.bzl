@@ -38,12 +38,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.local_repository,
-        name = "com_google_ruy",
-        path = paths.join(iree_path, "third_party/ruy"),
-    )
-
-    maybe(
-        native.local_repository,
         name = "com_google_googletest",
         path = paths.join(iree_path, "third_party/googletest"),
     )
