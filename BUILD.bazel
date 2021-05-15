@@ -27,7 +27,6 @@
 #  "@com_google_googletest//"
 #  "@llvm-project//"
 #  "@mlir-hlo//"
-#  "@pffft//"
 #  "@iree_pybind11//"
 #  "@renderdoc_api//"
 #  "@spirv_cross//"
