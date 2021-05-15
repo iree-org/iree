@@ -63,7 +63,6 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
     iree::compiler::Conversion::LinalgToLinalg
     iree::compiler::Dialect::Flow::Conversion

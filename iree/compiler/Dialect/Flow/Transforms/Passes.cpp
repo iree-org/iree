@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"

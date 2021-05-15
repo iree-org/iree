@@ -52,14 +52,18 @@ std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 /// scf.for.
 std::unique_ptr<FunctionPass> createForOpCanonicalizationPass();
 
-// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
-// allocations and view operations.
+/// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
+/// allocations and view operations.
 std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass();
 
-// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
-// subspan ops to the consumer load/store ops, in preparation for lowering to
-// backends that require linearized access.
+/// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
+/// subspan ops to the consumer load/store ops, in preparation for lowering to
+/// backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
+
+/// Create a pass to convert a model using f32 type to the equivalent one
+/// using 16.
+std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
 
 }  // namespace iree_compiler
 }  // namespace mlir
