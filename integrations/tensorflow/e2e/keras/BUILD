@@ -150,6 +150,12 @@ iree_e2e_cartesian_product_test_suite(
             # These models do not currently support streaming.
             "model": NON_STREAMING_KEYWORD_SPOTTING_MODELS,
         },
+        {
+            "model": [
+                "crnn",  # TODO(b/188221333): Get this test working.
+            ],
+            "target_backends": "iree_vulkan",
+        },
     ],
     matrix = {
         "src": "keyword_spotting_streaming_test.py",

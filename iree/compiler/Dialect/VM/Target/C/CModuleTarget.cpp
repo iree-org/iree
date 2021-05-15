@@ -640,6 +640,7 @@ static LogicalResult canonicalizeModule(
 
   PassManager passManager(context);
   mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
 
   if (targetOptions.optimize) {

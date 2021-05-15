@@ -125,14 +125,14 @@ class CompilerTest(unittest.TestCase):
     self.assertIn("vm.module", text)
 
   def testExtraArgsStderr(self):
-    # pass-timing is not special: it just does something and emits to stderr.
+    # mlir-timing is not special: it just does something and emits to stderr.
     with io.StringIO() as buf, contextlib.redirect_stderr(buf):
       iree.compiler.compile_str(
           SIMPLE_MUL_ASM,
-          extra_args=["--pass-timing"],
+          extra_args=["--mlir-timing"],
           target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
       stderr = buf.getvalue()
-    self.assertIn("Pass execution timing report", stderr)
+    self.assertIn("Execution time report", stderr)
 
   def testAllOptions(self):
     binary = iree.compiler.compile_str(

@@ -88,6 +88,7 @@ int main(int argc, char **argv) {
   mlir::registerAsmPrinterCLOptions();
   // Register pass manager command-line options like -print-ir-*.
   mlir::registerPassManagerCLOptions();
+  mlir::registerDefaultTimingManagerCLOptions();
 
   // Add flags for all the registered translations.
   llvm::cl::opt<const mlir::TranslateFunction *, false, mlir::TranslationParser>

@@ -353,6 +353,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
 
   PassManager passManager(context);
   mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
 
