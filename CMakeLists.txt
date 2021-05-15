@@ -395,8 +395,6 @@ add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
-# ruy must come after cpuinfo so it uses already-defined targets.
-add_subdirectory(third_party/ruy EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if (NOT CMAKE_CROSSCOMPILING)
