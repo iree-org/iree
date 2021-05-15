@@ -71,7 +71,6 @@ cc_library(
         "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",
         "//iree/compiler/Dialect/Flow/Conversion/StandardToFlow",
         "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/Flow/Utils",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/Conversion",
