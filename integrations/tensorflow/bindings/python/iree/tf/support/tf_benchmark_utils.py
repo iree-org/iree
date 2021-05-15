@@ -23,7 +23,7 @@
 import collections
 import os
 import tempfile
-from typing import Sequence, Set, Type
+from typing import Sequence, Set, Tuple, Type
 
 from absl import flags
 from absl import logging
@@ -147,7 +147,7 @@ Modules = collections.namedtuple("Modules", ["target_modules", "artifacts_dir"])
 
 def compile_tf_module(module_class: Type[tf.Module],
                       exported_name: str,
-                      input_shapes_dtypes: Sequence[tuple[Sequence[int],
+                      input_shapes_dtypes: Sequence[Tuple[Sequence[int],
                                                           tf.dtypes.DType]],
                       relative_artifacts_dir: str = None) -> Modules:
   """Compiles module_class to each backend that we test.
@@ -192,7 +192,7 @@ def compile_tf_module(module_class: Type[tf.Module],
 def compile_tf_signature_def_saved_model(
     saved_model_dir: str, saved_model_tags: Set[str], module_name: str,
     exported_name: str, input_names: Sequence[str],
-    input_shapes_dtypes: Sequence[tuple[Sequence[int], tf.dtypes.DType]],
+    input_shapes_dtypes: Sequence[Tuple[Sequence[int], tf.dtypes.DType]],
     output_names: Sequence[str]) -> Modules:
   """Compiles a SignatureDef SavedModel to each backend that we test.
 
