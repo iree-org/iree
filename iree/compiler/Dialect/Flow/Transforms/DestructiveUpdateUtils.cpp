@@ -202,7 +202,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
 }
 
 /// Convert `subtensor %t [offsets][sizes][strides] -> %st` to a
-/// hal.interface.load.tensor.tile.
+/// flow.dispatch.tensor.load.
 static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);

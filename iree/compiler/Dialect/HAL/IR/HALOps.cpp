@@ -1675,24 +1675,6 @@ InterfaceBindingOp InterfaceStoreTensorOp::queryBindingOp() {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.interface.load.tensor.tile
-//===----------------------------------------------------------------------===//
-
-InterfaceBindingOp InterfaceLoadTensorTileOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
-//===----------------------------------------------------------------------===//
-// hal.interface.store.tensor.tile
-//===----------------------------------------------------------------------===//
-
-InterfaceBindingOp InterfaceStoreTensorTileOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
-//===----------------------------------------------------------------------===//
 // hal.executable_layout.create
 //===----------------------------------------------------------------------===//
 
