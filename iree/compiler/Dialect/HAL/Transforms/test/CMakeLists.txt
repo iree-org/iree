@@ -19,7 +19,7 @@ iree_lit_test_suite(
     "identify_constant_pools.mlir"
     "inline_device_switches.mlir"
     "materialize_constant_pool_buffers.mlir"
-    "materialize_interfaces2.mlir"
+    "materialize_interfaces.mlir"
     "materialize_resource_caches.mlir"
     "memoize_device_queries.mlir"
     "pack_allocations.mlir"

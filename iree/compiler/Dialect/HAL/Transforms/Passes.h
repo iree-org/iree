@@ -72,7 +72,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // Defines hal.executables and hal.interfaces for flow.executable ops based on
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass(
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions targetOptions);
 
 // Propagates hal.interface.workload.* information when constant.

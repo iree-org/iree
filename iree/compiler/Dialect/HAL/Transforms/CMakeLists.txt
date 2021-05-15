@@ -23,7 +23,7 @@ iree_cc_library(
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
     "MaterializeConstantPoolBuffers.cpp"
-    "MaterializeInterfaces2.cpp"
+    "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
     "PackAllocations.cpp"
@@ -58,7 +58,6 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
-    tensorflow::mlir_hlo
   PUBLIC
 )
 
