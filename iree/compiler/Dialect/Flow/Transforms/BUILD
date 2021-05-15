@@ -50,7 +50,7 @@ cc_library(
         "HoistUnstreamableOps.cpp",
         "InjectDispatchTracing.cpp",
         "LegalizeInputTypes.cpp",
-        "OutlineDispatchRegions2.cpp",
+        "OutlineDispatchRegions.cpp",
         "OutlineLargeConstants.cpp",
         "PassDetail.h",
         "Passes.cpp",

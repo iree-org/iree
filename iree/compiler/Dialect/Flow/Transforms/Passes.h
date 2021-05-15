@@ -93,7 +93,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
 std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass();
 
 // Outlines dispatch regions into executables.
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegions2Pass();
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
 
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass();
