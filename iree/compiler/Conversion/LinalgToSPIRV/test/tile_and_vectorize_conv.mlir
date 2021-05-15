@@ -8,8 +8,9 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @conv_static_shape_f32 attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:1x225x225x16xf32>, !flow.dispatch.tensor<readonly:3x3x16x32xf32>, !flow.dispatch.tensor<writeonly:1x112x112x32xf32>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
@@ -96,8 +97,9 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:1x225x225x16xf32>, !flow.dispatch.tensor<readonly:3x3x16x32xf32>, !flow.dispatch.tensor<writeonly:1x112x112x32xf32>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @depthwise_conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32

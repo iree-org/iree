@@ -2055,7 +2055,6 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     StrAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
     FlatSymbolRefAttr:$interface,
-    TypeAttr:$signature,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size
   );
 
@@ -2066,20 +2065,18 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::llvm::StringRef":$sym_name,
       "::llvm::APInt":$ordinal,
       "::llvm::StringRef":$interface,
-      "::mlir::Type":$signature,
       "::mlir::ArrayAttr":$workgroup_size
     ), [{
-      build($_builder, $_state, sym_name, ordinal, interface, signature,
+      build($_builder, $_state, sym_name, ordinal, interface,
             workgroup_size, 0);
     }]>,
     OpBuilder<(ins
       "::mlir::StringAttr":$sym_name,
       "::mlir::IntegerAttr":$ordinal,
       "::mlir::FlatSymbolRefAttr":$interface,
-      "::mlir::TypeAttr":$signature,
       "::mlir::ArrayAttr":$workgroup_size
     ), [{
-      build($_builder, $_state, sym_name, ordinal, interface, signature,
+      build($_builder, $_state, sym_name, ordinal, interface,
             workgroup_size, 0);
     }]>
   ];

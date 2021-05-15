@@ -31,8 +31,7 @@ flow.executable @add_dispatch_0 {
 //  CHECK-NEXT:   hal.executable.target @vmvx, filter="vmvx" {
 //  CHECK-NEXT:     hal.executable.entry_point @entry attributes {
 //  CHECK-SAME:       interface = @io,
-//  CHECK-SAME:       ordinal = 0 : index,
-//  CHECK-SAME:       signature = (!flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<writeonly:16xf32>) -> ()
+//  CHECK-SAME:       ordinal = 0 : index
 //  CHECK-SAME:     }
 //       CHECK:     module {
 //  CHECK-NEXT:       vm.module @module {

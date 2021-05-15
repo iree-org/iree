@@ -245,8 +245,7 @@ class TargetBackend {
   //     hal.executable.target @target, filter="target-backend" {
   //       hal.executable.entry_point @main attributes {
   //         interface = @main_io,
-  //         ordinal = 0 : index,
-  //         signature = (tensor<4xf32>) -> tensor<4xf32>
+  //         ordinal = 0 : index
   //       }
   //       module { ... }
   //     }

@@ -9,8 +9,7 @@ flow.executable @static_tiled_dispatch {
   // CHECK-NEXT: hal.executable.target @vmvx, filter="vmvx" {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
-  // CHECK-SAME:     ordinal = 0 : index,
-  // CHECK-SAME:     signature = (!flow.dispatch.tensor<readonly:8x4xf32>, !flow.dispatch.tensor<writeonly:4x8xf32>) -> ()
+  // CHECK-SAME:     ordinal = 0 : index
   // CHECK-SAME:   }
   flow.dispatch.entry @entry attributes {
     signature = (tensor<8x4xf32>) -> tensor<4x8xf32>,
@@ -59,8 +58,7 @@ flow.executable @dynamic_tiled_dispatch {
   // CHECK-NEXT: hal.executable.target @vmvx, filter="vmvx" {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
-  // CHECK-SAME:     ordinal = 0 : index,
-  // CHECK-SAME:     signature = (!flow.dispatch.tensor<readonly:7x?x24x?xf32>, !flow.dispatch.tensor<writeonly:?x?x1024xf32>, index, index, index, index) -> ()
+  // CHECK-SAME:     ordinal = 0 : index
   // CHECK-SAME:   }
   flow.dispatch.entry @entry attributes {
     signature = (tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32>,
@@ -134,8 +132,7 @@ flow.executable @workgroup_infos {
   // CHECK-NEXT: hal.executable.target @vmvx, filter="vmvx" {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
-  // CHECK-SAME:     ordinal = 0 : index,
-  // CHECK-SAME:     signature = (!flow.dispatch.tensor<readonly:8x4xf32>, !flow.dispatch.tensor<writeonly:4x8xf32>) -> ()
+  // CHECK-SAME:     ordinal = 0 : index
   // CHECK-SAME:   }
   flow.dispatch.entry @entry attributes {
     signature = (tensor<8x4xf32>) -> tensor<4x8xf32>,

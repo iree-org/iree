@@ -8,8 +8,9 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:4096x4096xf32>, !flow.dispatch.tensor<readonly:4096x4096xf32>, !flow.dispatch.tensor<writeonly:4096x4096xf32>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @fuse_and_vectorize_fill_matmul() {
         %c0 = constant 0 : index
@@ -73,8 +74,9 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:1024x256xf32>, !flow.dispatch.tensor<readonly:1024x512xf32>, !flow.dispatch.tensor<readonly:512x256xf32>, !flow.dispatch.tensor<writeonly:1024x256xf32>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @fuse_and_vectorize_matmul_add() {
         %c0 = constant 0 : index
