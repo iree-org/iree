@@ -3,7 +3,6 @@
 #map = affine_map<(d0) -> (d0)>
 flow.executable @add_dispatch_0 {
   flow.dispatch.entry @entry attributes {
-    signature = (tensor<16xf32>, tensor<16xf32>) -> tensor<16xf32>,
     workgroup_rank = 3 : index
   }
   module  {
