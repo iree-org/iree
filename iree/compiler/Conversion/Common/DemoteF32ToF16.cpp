@@ -15,6 +15,7 @@
 #include <memory>
 #include <utility>
 
+#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/APFloat.h"
@@ -33,12 +34,6 @@
 namespace mlir {
 namespace iree_compiler {
 namespace {
-struct ConvertF32ToF16Pass
-    : public PassWrapper<ConvertF32ToF16Pass, OperationPass<ModuleOp>> {
-  void runOnOperation() override;
-
- private:
-};
 
 /// Any fp32 derived type is illegal.
 static bool isIllegalType(Type type) {
@@ -166,30 +161,33 @@ class GenericTypeConvert : public ConversionPattern {
   }
 };
 
-void ConvertF32ToF16Pass::runOnOperation() {
-  MLIRContext *context = &getContext();
-  ModuleOp moduleOp = getOperation();
+struct ConvertF32ToF16Pass
+    : public PassWrapper<ConvertF32ToF16Pass, OperationPass<ModuleOp>> {
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    ModuleOp moduleOp = getOperation();
 
-  FloatTypeConverter converter;
-  OwningRewritePatternList patterns(&getContext());
-  patterns.insert<GenericTypeConvert>(context, converter);
-  populateFuncOpTypeConversionPattern(patterns, converter);
-  F32ToF16ConversionTarget target(*context);
-  target.markUnknownOpDynamicallyLegal();
-  if (failed(applyFullConversion(moduleOp, target, std::move(patterns))))
-    return signalPassFailure();
-}
+    FloatTypeConverter converter;
+    OwningRewritePatternList patterns(&getContext());
+    patterns.insert<GenericTypeConvert>(context, converter);
+    populateFuncOpTypeConversionPattern(patterns, converter);
+    F32ToF16ConversionTarget target(*context);
+    target.markUnknownOpDynamicallyLegal();
+    if (failed(applyFullConversion(moduleOp, target, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+};
+
 }  // namespace
 
-//===----------------------------------------------------------------------===//
-// Pass entry point and registration
-//===----------------------------------------------------------------------===//
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass() {
   return std::make_unique<ConvertF32ToF16Pass>();
 }
 
 static PassRegistration<ConvertF32ToF16Pass> pass(
     "iree-convert-f32-to-f16",
-    "Convert f32 operations and values into equivalent f16 ones");
+    "Convert f32 operations and values into equivalent f16 ones.");
+
 }  // namespace iree_compiler
 }  // namespace mlir

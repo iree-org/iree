@@ -77,10 +77,10 @@ def LegalizeInputTypes :
   let constructor = "mlir::iree_compiler::IREE::Flow::createLegalizeInputTypesPass()";
 }
 
-def OutlineDispatchRegions2 :
+def OutlineDispatchRegions :
     Pass<"iree-flow-outline-dispatch-regions2", "ModuleOp"> {
   let summary = "Outlines dispatch regions into executables";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegions2Pass()";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }
 
 def OutlineLargeConstants :

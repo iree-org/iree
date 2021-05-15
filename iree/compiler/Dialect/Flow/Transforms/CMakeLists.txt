@@ -38,7 +38,7 @@ iree_cc_library(
     "HoistUnstreamableOps.cpp"
     "InjectDispatchTracing.cpp"
     "LegalizeInputTypes.cpp"
-    "OutlineDispatchRegions2.cpp"
+    "OutlineDispatchRegions.cpp"
     "OutlineLargeConstants.cpp"
     "PassDetail.h"
     "Passes.cpp"
@@ -63,14 +63,12 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
     iree::compiler::Conversion::LinalgToLinalg
     iree::compiler::Dialect::Flow::Conversion
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Utils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::Conversion

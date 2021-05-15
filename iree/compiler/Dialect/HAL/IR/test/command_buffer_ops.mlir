@@ -136,7 +136,8 @@ func @command_buffer_bind_descriptor_set(
 hal.executable @ex {
   hal.executable.target @backend, filter="backend" {
     hal.executable.entry_point @entry0 attributes {
-      interface = @interface, ordinal = 0 : index, signature = (tensor<f32>) -> tensor<f32>
+      interface = @interface,
+      ordinal = 0 : index
     }
   }
 }
@@ -164,7 +165,8 @@ func @command_buffer_dispatch(
 hal.executable @ex {
   hal.executable.target @backend, filter="backend" {
     hal.executable.entry_point @entry0 attributes {
-      interface = @interface, ordinal = 0 : index, signature = (tensor<f32>) -> tensor<f32>
+      interface = @interface,
+      ordinal = 0 : index
     }
   }
 }

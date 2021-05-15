@@ -8,8 +8,7 @@ hal.executable @ex0 {
   hal.executable.target @vmvx, filter="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
-      ordinal = 0 : index,
-      signature = (tensor<128xf32>) -> tensor<128xf32>
+      ordinal = 0 : index
     }
     module {}
   }
@@ -143,8 +142,7 @@ hal.executable @ex0 {
   hal.executable.target @vmvx, filter="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
-      ordinal = 0 : index,
-      signature = (tensor<4x4x1x2xf32>) -> tensor<4x4x1x2xf32>
+      ordinal = 0 : index
     }
     module {}
   }
@@ -246,8 +244,7 @@ hal.executable @ex0 {
   hal.executable.target @vmvx, filter="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
-      ordinal = 0 : index,
-      signature = (tensor<?x128xf32>, index) -> tensor<?x128xf32>
+      ordinal = 0 : index
     }
     module {}
   }
@@ -288,8 +285,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
       interface = @io,
-      ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:7x4x24xf32>, !flow.dispatch.tensor<writeonly:4x7x1024xf32>) -> ()
+      ordinal = 0 : index
     }
     module {}
   }
@@ -328,8 +324,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
       interface = @io,
-      ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:7x?x24x?xf32>, !flow.dispatch.tensor<writeonly:?x?x1024xf32>, index, index, index, index) -> ()
+      ordinal = 0 : index
     }
     module {}
   }
@@ -380,8 +375,7 @@ hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @pad_dispatch_0 attributes {
       interface = @interface_io,
-      ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:i32>, !flow.dispatch.tensor<writeonly:3x9xi32>) -> ()
+      ordinal = 0 : index
     }
     module {}
   }
@@ -395,8 +389,7 @@ hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @pad_dispatch_1 attributes {
       interface = @interface_io,
-      ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:2x3xi32>, !flow.dispatch.tensor<readwrite:3x9xi32>) -> ()
+      ordinal = 0 : index
     }
     module {}
   }

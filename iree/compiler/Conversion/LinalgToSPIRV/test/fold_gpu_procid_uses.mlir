@@ -5,8 +5,9 @@ hal.executable @fold_block_id attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_block_id attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = () -> ()} {
+      interface = @io,
+      ordinal = 0 : index
+    } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = constant 112: index
       %y = constant 42: index
@@ -39,8 +40,9 @@ hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "privat
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_interface_workgroup_id attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = () -> ()} {
+      interface = @io,
+      ordinal = 0 : index
+    } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = constant 112: index
       %y = constant 42: index
@@ -73,8 +75,9 @@ hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_thread_id attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = () -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module {
       func @fold_thread_id() -> (index, index, index)
         attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
@@ -102,8 +105,9 @@ hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_mod attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = () -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module {
       func @does_not_fold_mod() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
         %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
@@ -123,8 +127,9 @@ hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_div attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = () -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module {
       func @does_not_fold_div() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
         %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
@@ -144,8 +149,9 @@ hal.executable @does_not_fold_symbol_mul_symbol attributes {sym_visibility = "pr
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_symbol_mul_symbol attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = () -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module {
       func @does_not_fold_symbol_mul_symbol() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
         // 5 is in %0's range of [0,7] so we cannot fold the following into 5 or 0.

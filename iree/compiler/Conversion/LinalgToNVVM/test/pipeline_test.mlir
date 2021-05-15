@@ -9,7 +9,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @cuda, filter="cuda" {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<writeonly:16xf32>) -> ()}
+  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
@@ -52,7 +52,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @cuda, filter="cuda" {
-    hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<writeonly:1024x1024xf32>) -> ()}
+    hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
     module  {
       func @dot_dispatch_0() {
         %cst = constant 0.000000e+00 : f32
@@ -117,7 +117,7 @@ hal.executable.target @cuda, filter="cuda" {
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.entry_point @conv2d_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1x4x4x2xf32>, !flow.dispatch.tensor<readonly:3x2x2x1xf32>, !flow.dispatch.tensor<writeonly:1x2x3x1xf32>) -> ()}
+  hal.executable.entry_point @conv2d_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   module  {
     func @conv2d_dispatch_0() {
       %c0 = constant 0 : index

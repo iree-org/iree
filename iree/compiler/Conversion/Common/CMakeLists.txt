@@ -19,6 +19,7 @@ iree_cc_library(
     "Transforms.h"
   SRCS
     "BufferAllocViewCleanUpPass.cpp"
+    "DemoteF32ToF16.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "LaunchConfig.cpp"
@@ -40,6 +41,7 @@ iree_cc_library(
     MLIRSCFToStandard
     MLIRSideEffectInterfaces
     MLIRStandard
+    MLIRSupport
     MLIRTransforms
     MLIRVector
     iree::compiler::Conversion::CodegenUtils
@@ -47,7 +49,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )
 

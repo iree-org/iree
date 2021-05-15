@@ -30,7 +30,6 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/Flow/Utils",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/Conversion",
         "//iree/compiler/Dialect/Shape/IR",

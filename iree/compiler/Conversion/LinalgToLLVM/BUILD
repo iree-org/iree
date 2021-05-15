@@ -60,7 +60,6 @@ cc_library(
     deps = [
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
-        "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/LinalgToLLVM:FoldTensorExtractOpIncGen",
         "//iree/compiler/Conversion/VectorToLLVM",
         "//iree/compiler/Dialect/Flow/IR",

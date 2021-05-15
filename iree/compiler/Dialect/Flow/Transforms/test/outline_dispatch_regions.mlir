@@ -2,7 +2,6 @@
 
 //      CHECK: flow.executable @staticShapeDispatch_dispatch_0
 // CHECK-NEXT:   flow.dispatch.entry @staticShapeDispatch_dispatch_0 attributes {
-// CHECK-SAME:       signature = (tensor<8x4xf32>) -> tensor<4x8xf32>,
 // CHECK-SAME:       workgroup_rank = 2 : index}
 //      CHECK: func @staticShapeDispatch_dispatch_0(
 // CHECK-SAME:     %[[ARG:.+]]: !flow.dispatch.tensor<readonly:8x4xf32>,
@@ -43,13 +42,11 @@ func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 
 //      CHECK: flow.executable @dispatchFnMuli_dispatch_0
 // CHECK-NEXT:   flow.dispatch.entry @dispatchFnMuli_dispatch_0 attributes {
-// CHECK-SAME:       signature = (tensor<8x4xf32>) -> tensor<4x8xf32>,
 // CHECK-SAME:       workgroup_rank = 2 : index}
 //      CHECK: func @dispatchFnMuli_dispatch_0(
 
 //      CHECK: flow.executable @dispatchFnMuli_dispatch_1
 // CHECK-NEXT:   flow.dispatch.entry @dispatchFnMuli_dispatch_1 attributes {
-// CHECK-SAME:       signature = (tensor<4x8xf32>) -> tensor<8x4xf32>,
 // CHECK-SAME:       workgroup_rank = 2 : index}
 //      CHECK: func @dispatchFnMuli_dispatch_1(
 
@@ -126,7 +123,6 @@ func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 
 //      CHECK: flow.executable @dynamicShapeDispatch_dispatch_0
 // CHECK-NEXT:   flow.dispatch.entry @dynamicShapeDispatch_dispatch_0 attributes {
-// CHECK-SAME:       signature = (tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32>,
 // CHECK-SAME:       workgroup_rank = 2 : index}
 //      CHECK: func @dynamicShapeDispatch_dispatch_0(
 // CHECK-SAME:     %[[ARG:.+]]: !flow.dispatch.tensor<readonly:7x?x24x?xf32>,

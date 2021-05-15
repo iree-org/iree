@@ -645,7 +645,6 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
   let arguments = (ins
     StrAttr:$sym_name,
     FlatSymbolRefAttr:$function_ref,
-    OptionalAttr<TypeAttr>:$signature,
     OptionalAttr<IndexAttr>:$workgroup_rank
   );
 }

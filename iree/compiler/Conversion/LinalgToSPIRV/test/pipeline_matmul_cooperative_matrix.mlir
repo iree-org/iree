@@ -9,8 +9,9 @@ hal.executable @matmul_cooperative_matrix attributes {sym_visibility = "private"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @matmul_cooperative_matrix attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:256x256xf16>, !flow.dispatch.tensor<readonly:256x256xf16>, !flow.dispatch.tensor<writeonly:256x256xf16>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,

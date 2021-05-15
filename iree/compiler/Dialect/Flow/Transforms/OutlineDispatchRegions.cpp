@@ -224,7 +224,6 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   auto entryPointOp = builder.create<DispatchEntryOp>(
       regionOp.getLoc(), builder.getStringAttr(workgroupFuncOp.getName()),
       builder.getSymbolRefAttr(workgroupFuncOp),
-      TypeAttr::get(regionOp.getDispatchType()),
       builder.getIndexAttr(regionOp.getWorkgroupRank()));
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
@@ -233,10 +232,10 @@ static LogicalResult outlineDispatchWorkgroupsOp(
 
 }  // namespace
 
-class OutlineDispatchRegions2Pass
-    : public OutlineDispatchRegions2Base<OutlineDispatchRegions2Pass> {
+class OutlineDispatchRegionsPass
+    : public OutlineDispatchRegionsBase<OutlineDispatchRegionsPass> {
  public:
-  OutlineDispatchRegions2Pass() = default;
+  OutlineDispatchRegionsPass() = default;
 
   void runOnOperation() override {
     // Convert each dispatch region into a flow.executable + dispatch op.
@@ -256,8 +255,8 @@ class OutlineDispatchRegions2Pass
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegions2Pass() {
-  return std::make_unique<OutlineDispatchRegions2Pass>();
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass() {
+  return std::make_unique<OutlineDispatchRegionsPass>();
 }
 
 }  // namespace Flow

@@ -24,7 +24,6 @@
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -1080,8 +1079,7 @@ static LogicalResult declareEntryPointOps(
           dispatchEntryOp.getLoc(),
           targetBuilder.getStringAttr(dispatchEntryOp.function_ref()),
           targetBuilder.getIndexAttr(ordinal),
-          targetBuilder.getSymbolRefAttr(interfaceOp),
-          TypeAttr::get(sourceFuncOp.getType()), ArrayAttr{});
+          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
@@ -1116,10 +1114,10 @@ class ConverterDispatchWorkgroupInfoPattern final
 
 }  // namespace
 
-class MaterializeInterfaces2Pass
-    : public PassWrapper<MaterializeInterfaces2Pass, OperationPass<ModuleOp>> {
+class MaterializeInterfacesPass
+    : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
-  explicit MaterializeInterfaces2Pass(TargetOptions targetOptions)
+  explicit MaterializeInterfacesPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -1193,16 +1191,16 @@ class MaterializeInterfaces2Pass
   TargetOptions targetOptions_;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass(
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions executableOptions) {
-  return std::make_unique<MaterializeInterfaces2Pass>(executableOptions);
+  return std::make_unique<MaterializeInterfacesPass>(executableOptions);
 }
 
-static PassRegistration<MaterializeInterfaces2Pass> pass(
+static PassRegistration<MaterializeInterfacesPass> pass(
     "iree-hal-materialize-interfaces2",
     "Materializes hal.executable ops from flow.executable ops", [] {
       auto options = getTargetOptionsFromFlags();
-      return std::make_unique<MaterializeInterfaces2Pass>(options);
+      return std::make_unique<MaterializeInterfacesPass>(options);
     });
 
 }  // namespace HAL

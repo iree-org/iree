@@ -424,11 +424,6 @@ def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<
   let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
 }
 
-def HAL_HostBuffer : AnyTypeOf<[
-  ByteBufferType,
-  MutableByteBufferType,
-]>;
-
 def HAL_CommandQueueAffinityAttr : SignlessIntElementsAttr<32> {
   // TODO(b/143184519): add typeDescription support to other things.
   // let description = [{

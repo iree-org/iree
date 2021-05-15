@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
@@ -230,7 +229,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Outline the dispatch regions into their own functions wrapped in
   // executables.
-  passManager.addPass(IREE::Flow::createOutlineDispatchRegions2Pass());
+  passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
