@@ -32,16 +32,12 @@ import tensorflow.compat.v2 as tf
 
 flags.DEFINE_string("target_backend", None,
                     "The target backend to benchmark against.")
-flags.DEFINE_list("configuration_names", None,
-                  "A comma-separated list of configuration names")
-flags.DEFINE_list(
-    "compilation_flags", None,
-    "A comma-separated list of semicolon-separated compilation flags for "
-    "each configuration")
-flags.DEFINE_list(
-    "runtime_flags", None,
-    "A comma-separated list of semicolon-separated runtime flags for "
-    "each configuration")
+flags.DEFINE_list("configuration_name", None,
+                  "The benchmark configuration's name")
+flags.DEFINE_list("compilation_flags", None,
+                  "A semicolon-separated list of compilation flags")
+flags.DEFINE_list("runtime_flags", None,
+                  "A semicolon-separated list of runtime flags")
 flags.DEFINE_string(
     "artifacts_dir", None,
     "Specifies a directory to dump compilation artifacts and traces to. "
@@ -66,49 +62,40 @@ def _setup_artifacts_dir(relative_artifacts_dir: str) -> str:
   return artifacts_dir
 
 
-def get_target_backend_configs() -> Sequence[module_utils.BackendInfo]:
-  """Gets the BackendInfo instances for each target backend configuration.
+def get_target_backend_config() -> module_utils.BackendInfo:
+  """Gets the BackendInfo instance for the benchmark configuration specified
+  via command-line options.
 
   Returns:
-    Sequence of BackendInfo that should be used.
+    A BackendInfo that should be used.
   """
   if FLAGS.target_backend is None:
     raise ValueError("--target_backend must be specified")
 
-  if FLAGS.configuration_names is None:
-    raise ValueError("--configuration_names must be specified")
-  configuration_names = FLAGS.configuration_names
+  if FLAGS.configuration_name is None:
+    raise ValueError("--configuration_name must be specified")
+  name = FLAGS.configuration_name
 
-  compilation_flags = FLAGS.compilation_flags
-  if compilation_flags is None:
-    compilation_flags = [""] * len(configuration_names)
-
-  runtime_flags = FLAGS.runtime_flags
-  if runtime_flags is None:
-    runtime_flags = [""] * len(configuration_names)
-
-  if len(configuration_names) != len(compilation_flags) or len(
-      configuration_names) != len(runtime_flags):
-    raise ValueError(
-        "--configuration_names, --compilation_flags, and --runtime_flags "
-        "must have the same number of elements")
-
-  configs = []
-  for name, cflags, rflags in zip(configuration_names, compilation_flags,
-                                  runtime_flags):
+  cflags = FLAGS.compilation_flags
+  if cflags is None:
+    cflags = []
+  else:
     cflags = cflags.split(";")
+
+  rflags = FLAGS.runtime_flags
+  if rflags is None:
+    rflags = []
+  else:
     rflags = rflags.split(";")
 
-    logging.info(f"configuration: {name}")
-    logging.info(f"compilation flags: {cflags}")
-    logging.info(f"runtime flags: {rflags}")
+  logging.info(f"configuration: {name}")
+  logging.info(f"compilation flags: {cflags}")
+  logging.info(f"runtime flags: {rflags}")
 
-    backend_id = f"{FLAGS.target_backend}__{name}"
-    configs.append(
-        module_utils.BackendInfo(FLAGS.target_backend, backend_id, cflags,
-                                 rflags))
+  backend_id = f"{FLAGS.target_backend}__{name}"
 
-  return configs
+  return module_utils.BackendInfo(FLAGS.target_backend, backend_id, cflags,
+                                  rflags)
 
 
 def compose_and_write_flagfile(
@@ -170,21 +157,18 @@ def compile_tf_module(module_class: Type[tf.Module],
     relative_artifacts_dir = module_class.__name__
   artifacts_dir = _setup_artifacts_dir(relative_artifacts_dir)
 
-  target_backend_configs = get_target_backend_configs()
+  config = get_target_backend_config()
 
   compile_backend = lambda backend_info: backend_info.compile_from_class(
       module_class, [exported_name], artifacts_dir, create_runtime=False)
 
-  target_modules = []
-  for config in target_backend_configs:
-    target_modules.append(compile_backend(config))
-    flagfile_path = os.path.join(artifacts_dir, config.backend_id)
-    function_inputs = [
-        get_mlir_tensor_type(shape, dtype)
-        for shape, dtype in input_shapes_dtypes
-    ]
-    compose_and_write_flagfile(flagfile_path, config.driver, exported_name,
-                               function_inputs, config.runtime_flags)
+  target_modules = [compile_backend(config)]
+  flagfile_path = os.path.join(artifacts_dir, config.backend_id)
+  function_inputs = [
+      get_mlir_tensor_type(shape, dtype) for shape, dtype in input_shapes_dtypes
+  ]
+  compose_and_write_flagfile(flagfile_path, config.driver, exported_name,
+                             function_inputs, config.runtime_flags)
 
   return Modules(target_modules, artifacts_dir)
 
@@ -214,7 +198,7 @@ def compile_tf_signature_def_saved_model(
   # Setup the directory for saving compilation artifacts and traces.
   artifacts_dir = _setup_artifacts_dir(module_name)
 
-  target_backend_configs = get_target_backend_configs()
+  config = get_target_backend_config()
 
   compile_backend = (lambda backend_info: backend_info.
                      compile_signature_def_saved_model(saved_model_dir,
@@ -226,15 +210,12 @@ def compile_tf_signature_def_saved_model(
                                                        artifacts_dir,
                                                        create_runtime=False))
 
-  target_modules = []
-  for config in target_backend_configs:
-    target_modules.append(compile_backend(config))
-    flagfile_path = os.path.join(artifacts_dir, config.backend_id)
-    function_inputs = [
-        get_mlir_tensor_type(shape, dtype)
-        for shape, dtype in input_shapes_dtypes
-    ]
-    compose_and_write_flagfile(flagfile_path, config.driver, exported_name,
-                               function_inputs, config.runtime_flags)
+  target_modules = [compile_backend(config)]
+  flagfile_path = os.path.join(artifacts_dir, config.backend_id)
+  function_inputs = [
+      get_mlir_tensor_type(shape, dtype) for shape, dtype in input_shapes_dtypes
+  ]
+  compose_and_write_flagfile(flagfile_path, config.driver, exported_name,
+                             function_inputs, config.runtime_flags)
 
   return Modules(target_modules, artifacts_dir)
