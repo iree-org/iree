@@ -88,7 +88,8 @@ static FailureOr<SmallVector<int64_t, 4>> getDistributedWorkgroupSize(
           "ops in the dispatch region"));
     }
   }
-  return distributedWorkgroupSize ? *distributedWorkgroupSize : SmallVector<int64_t, 4>{};
+  return distributedWorkgroupSize ? *distributedWorkgroupSize
+                                  : SmallVector<int64_t, 4>{};
 }
 
 void MaterializeCPULaunchConfigurationPass::runOnOperation() {

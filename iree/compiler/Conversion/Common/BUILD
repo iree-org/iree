@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
