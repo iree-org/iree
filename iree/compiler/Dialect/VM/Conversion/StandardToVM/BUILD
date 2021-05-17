@@ -28,6 +28,7 @@ cc_library(
         "ConvertStandardToVM.h",
     ],
     deps = [
+        "//iree/base",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/IR",

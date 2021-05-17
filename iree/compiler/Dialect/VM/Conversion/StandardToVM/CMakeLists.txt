@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRStandard
     MLIRTransformUtils
     MLIRTransforms
+    iree::base
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR
