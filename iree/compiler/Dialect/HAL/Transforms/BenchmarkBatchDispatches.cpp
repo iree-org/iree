@@ -48,7 +48,8 @@ class BenchmarkBatchDispatchesPass
         // problem size, simply duplicating without barrier will increase the
         // number of subgroups and thus "help" filling the GPU. In the end we
         // will have an over optimistic result. Inserting barriers avoids that,
-        // but it assumes the input model is linear.
+        // but it assumes that the command buffer has a linear dispatch
+        // structure.
         builder.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
             op.getLoc(), op.command_buffer(),
             IREE::HAL::ExecutionStageBitfield::CommandRetire |
