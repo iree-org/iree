@@ -29,7 +29,10 @@ iree_cc_library(
     "CUDATarget.cpp"
   DEPS
     ::cuda_libdevice
+    LLVMBitReader
     LLVMCore
+    LLVMipo
+    LLVMLinker
     LLVMNVPTXCodeGen
     LLVMSupport
     LLVMTarget

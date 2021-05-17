@@ -77,6 +77,17 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @fma_i64
+vm.module @my_module {
+  vm.func @fma_i64(%arg0: i64, %arg1: i64, %arg2: i64) {
+    // CHECK: %0 = emitc.call "vm_fma_i64"(%arg0, %arg1, %arg2) : (i64, i64, i64) -> i64
+    %0 = vm.fma.i64 %arg0, %arg1, %arg2 : i64
+    vm.return %0 : i64
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @not_i64
 vm.module @my_module {
   vm.func @not_i64(%arg0 : i64) -> i64 {
