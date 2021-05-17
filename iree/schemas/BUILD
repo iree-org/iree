@@ -41,6 +41,12 @@ iree_flatbuffer_c_library(
 )
 
 iree_flatbuffer_c_library(
+    name = "rocm_executable_def_c_fbs",
+    srcs = ["rocm_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
+)
+
+iree_flatbuffer_c_library(
     name = "dylib_executable_def_c_fbs",
     srcs = ["dylib_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,

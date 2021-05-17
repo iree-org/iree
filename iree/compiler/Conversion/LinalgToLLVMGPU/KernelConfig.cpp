@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Conversion/LinalgToNVVM/KernelConfig.h"
+#include "iree/compiler/Conversion/LinalgToLLVMGPU/KernelConfig.h"
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/Common/LaunchConfig.h"
@@ -90,7 +90,7 @@ static LaunchConfig getOpLaunchConfig(linalg::LinalgOp linalgOp) {
 namespace mlir {
 namespace iree_compiler {
 
-Optional<LaunchConfig> getCUDALaunchConfig(
+Optional<LaunchConfig> getLLVMGPULaunchConfig(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     ArrayRef<linalg::LinalgOp> linalgOps) {
   LaunchConfig launchConfig;

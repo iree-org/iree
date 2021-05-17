@@ -19,9 +19,11 @@ package(
 )
 
 cc_library(
-    name = "LinalgToNVVM",
+    name = "LinalgToLLVMGPU",
     srcs = [
+        "ConvertToLLVM.cpp",
         "ConvertToNVVM.cpp",
+        "ConvertToROCDL.cpp",
         "KernelConfig.cpp",
         "Passes.cpp",
         "RemoveTrivialLoops.cpp",
@@ -29,6 +31,7 @@ cc_library(
         "VectorizationPass.cpp",
     ],
     hdrs = [
+        "ConvertToLLVM.h",
         "KernelConfig.h",
         "Passes.h",
     ],
@@ -40,6 +43,7 @@ cc_library(
         "//iree/compiler/Dialect/Shape/Transforms",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:GPUToNVVMTransforms",
+        "@llvm-project//mlir:GPUToROCDLTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMTransforms",
@@ -49,6 +53,7 @@ cc_library(
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:NVVMDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:ROCDLDialect",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardToSPIRV",
