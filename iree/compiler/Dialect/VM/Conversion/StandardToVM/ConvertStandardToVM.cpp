@@ -717,7 +717,6 @@ class AssertOpConversion : public OpConversionPattern<AssertOp> {
     // Start by splitting the block containing the assert into two. The part
     // before will contain the condition, and the part after will contain
     // the continuation point.
-    // rewriter.setInsertionPointAfter(srcOp);
     Block *condBlock = rewriter.getInsertionBlock();
     Block::iterator opPosition = rewriter.getInsertionPoint();
     Block *continuationBlock = rewriter.splitBlock(condBlock, opPosition);
