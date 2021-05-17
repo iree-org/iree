@@ -238,6 +238,7 @@ gentbl_cc_library(
     td_file = "LoweringConfig.td",
     td_srcs = [
         ":td_files",
-        "@llvm-project//mlir::OpBaseTdFiles",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )

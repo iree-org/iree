@@ -103,6 +103,7 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
 
     auto lhsFullSize = getUntiledShape(lhs);
     auto rhsFullSize = getUntiledShape(rhs);
+    if (lhsFullSize.empty() || rhsFullSize.empty()) return failure();
 
     int problemSizeM = lhsFullSize[0];
     int problemSizeN = rhsFullSize[1];

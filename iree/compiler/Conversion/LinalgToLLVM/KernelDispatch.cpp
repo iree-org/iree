@@ -233,6 +233,9 @@ LogicalResult initCPULaunchConfig(ArrayRef<linalg::LinalgOp> linalgOps) {
   for (auto linalgOp : linalgOps) {
     if (hasLoweringConfig(linalgOp)) continue;
     auto status = setNonRootConfig(linalgOp, firstLevelTileSizes);
+    if (failed(status)) {
+      return failure();
+    }
   }
   return success();
 }
