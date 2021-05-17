@@ -153,11 +153,11 @@ class AndroidDeviceInfo(object):
   - gpu_name: the GPU name, e.g., 'Mali-G77'
   """
 
-  def __init__(self, verbose=False):
+  def __init__(self, model, cpu_abi, cpu_features, gpu_name, verbose=False):
     self.model = get_android_device_model(verbose)
     self.cpu_abi = get_android_cpu_abi(verbose)
-    self.gpu_name = get_android_gpu_name(verbose)
     self.cpu_features = get_android_cpu_features(verbose)
+    self.gpu_name = get_android_gpu_name(verbose)
 
   def __str__(self):
     features = ", ".join(self.cpu_features)
@@ -188,6 +188,27 @@ class AndroidDeviceInfo(object):
     if any([f in self.cpu_features for f in rev2_features]):
       rev = "ARMv8.2-A"
     return rev
+
+  def to_json_object(self):
+    return {
+        "model": self.model,
+        "cpu_abi": self.cpu_abi,
+        "cpu_features": self.cpu_features,
+        "gpu_name": self.gpu_name,
+    }
+
+  @staticmethod
+  def from_json_object(json_object):
+    return AndroidDeviceInfo(json_object["model"], json_object["cpu_abi"],
+                             json_object["cpu_features"],
+                             json_object["gpu_name"])
+
+  @staticmethod
+  def from_adb(verbose=False):
+    return AndroidDeviceInfo(get_android_device_model(verbose),
+                             get_android_cpu_abi(verbose),
+                             get_android_gpu_name(verbose),
+                             get_android_cpu_features(verbose))
 
 
 def adb_push_to_tmp_dir(content, relative_dir, verbose=False):
@@ -268,6 +289,22 @@ class BenchmarkInfo(object):
 
     return f"{model_part} with {driver} @ {phone_part}"
 
+  def to_json_object(self):
+    return {
+        "model_name": self.model_name,
+        "model_tags": self.model_tags,
+        "model_source": self.model_source,
+        "runner": self.runner,
+        "device_info": self.device_info.to_json_object(),
+    }
+
+  @staticmethod
+  def from_json_object(json_object):
+    return BenchmarkInfo(
+        json_object["model_name"], json_object["model_tags"],
+        json_object["model_source"], json_object["runner"],
+        AndroidDeviceInfo.from_json_object(json_object["device_info"]))
+
 
 def compose_benchmark_info_object(device_info, root_build_dir,
                                   model_benchmark_dir):
@@ -292,7 +329,7 @@ def compose_benchmark_info_object(device_info, root_build_dir,
   main, rest = os.path.split(model_name)
   if main:
     model_name = main
-    model_tags = re.sub(r"\W+", "-", rest)
+    model_tags = [re.sub(r"\W+", "-", rest)]
   else:
     model_name = re.sub(r"\W+", "-", rest)
     model_tags = []
@@ -410,7 +447,11 @@ def run_python_model_benchmark_suite(device_info,
       if previous_result["benchmark"] == benchmark_info:
         raise ValueError(f"Duplicated benchmark: {benchmark_info}")
 
-    result = {"benchmark": benchmark_info, "results": resultjson["benchmarks"]}
+    result = {
+        "benchmark": benchmark_info,
+        "results": resultjson["benchmarks"],
+        "context": resultjson["context"],
+    }
     results.append(result)
 
   return results
@@ -460,7 +501,7 @@ def parse_arguments():
 
 
 def main(args):
-  device_info = AndroidDeviceInfo()
+  device_info = AndroidDeviceInfo.from_adb()
   if args.verbose:
     print(device_info)
 
@@ -478,6 +519,12 @@ def main(args):
                                              benchmarks,
                                              args.benchmark_tool,
                                              verbose=args.verbose)
+  # Convert all classes into normal dictionaries becuase the JSON library
+  # cannot handle our custom classes. There might be a better way but this
+  # should suffice right now.
+  for i in range(len(results)):
+    benchmark = results[i]["benchmark"].to_json_object()
+    results[i]["benchmark"] = benchmark
 
   # Attach commit information.
   head_commit = get_git_commit_hash("HEAD")
