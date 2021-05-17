@@ -20,6 +20,7 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -163,6 +164,68 @@ struct HALInterfaceWorkgroupOpsConverter final
   }
 };
 
+/// Scalarize math ops. It is needed to lower vector operation that don't have
+/// vector support in CUDA device library.
+template <typename MathOpTy>
+struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
+  using OpRewritePattern<MathOpTy>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(MathOpTy mathOp,
+                                PatternRewriter &rewriter) const override {
+    auto vecType = mathOp.getType().template dyn_cast<VectorType>();
+    if (!vecType) return failure();
+    Location loc = mathOp.getLoc();
+    Value newVector = rewriter.create<ConstantOp>(
+        loc, vecType, rewriter.getZeroAttr(vecType));
+
+    for (int64_t element : llvm::seq(int64_t(0), vecType.getNumElements())) {
+      llvm::SmallVector<int64_t> indices;
+      int64_t projectIndex = element;
+      for (int64_t dim : llvm::seq(int64_t(0), vecType.getRank())) {
+        int64_t index = projectIndex % vecType.getDimSize(dim);
+        projectIndex = projectIndex / vecType.getDimSize(dim);
+        indices.push_back(index);
+      }
+      SmallVector<Value> newOperands;
+      for (Value operand : mathOp->getOperands()) {
+        newOperands.push_back(
+            rewriter.create<vector::ExtractOp>(loc, operand, indices));
+      }
+      Value scalarOp = rewriter.create<MathOpTy>(loc, newOperands);
+      newVector =
+          rewriter.create<vector::InsertOp>(loc, scalarOp, newVector, indices);
+    }
+    rewriter.replaceOp(mathOp, newVector);
+    return success();
+  }
+};
+
+void populateScalarizeMathOps(RewritePatternSet &patterns) {
+  patterns.add<ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<AbsFOp>,
+               ScalarizeMathOp<math::AtanOp>, ScalarizeMathOp<math::Atan2Op>,
+               ScalarizeMathOp<CeilFOp>, ScalarizeMathOp<math::CosOp>,
+               ScalarizeMathOp<math::ExpOp>, ScalarizeMathOp<math::ExpM1Op>,
+               ScalarizeMathOp<FloorFOp>, ScalarizeMathOp<math::LogOp>,
+               ScalarizeMathOp<math::Log1pOp>, ScalarizeMathOp<math::Log10Op>,
+               ScalarizeMathOp<math::Log2Op>, ScalarizeMathOp<math::PowFOp>,
+               ScalarizeMathOp<math::RsqrtOp>, ScalarizeMathOp<math::SinOp>,
+               ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<math::TanhOp>>(
+      patterns.getContext());
+}
+
+/// Pass to test scalarization pattern.
+class ScalarizationTestPass
+    : public PassWrapper<ScalarizationTestPass, OperationPass<FuncOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<vector::VectorDialect, NVVM::NVVMDialect>();
+  }
+  void runOnOperation() override {
+    OwningRewritePatternList patterns(&getContext());
+    populateScalarizeMathOps(patterns);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+  }
+};
+
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding NVVM equivalent.
 ///
@@ -186,6 +249,7 @@ struct ConvertToNVVMPass
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       OwningRewritePatternList patterns(&getContext());
+      populateScalarizeMathOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorSlicesLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
@@ -240,6 +304,9 @@ static PassRegistration<ConvertToNVVMPass> pass(
     "iree-codegen-convert-to-nvvm",
     "Perform final conversion from builtin/GPU/HAL/standard dialect to LLVM "
     "and NVVM dialects");
+
+static PassRegistration<ScalarizationTestPass> scalarization_test_pass(
+    "iree-cuda-scalarize-math-op", "Test pass for scalarization patterns.");
 
 }  // namespace iree_compiler
 }  // namespace mlir
