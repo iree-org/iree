@@ -244,19 +244,18 @@ class BenchmarkInfo(object):
     self.model_tags = model_tags
     self.model_source = model_source
     self.runner = runner
-    self.phone_model = phone_model
     self.device_info = device_info
 
   def __str__(self):
     # Get the target architecture and better driver name depending on the runner.
     target_arch = ""
     driver = ""
-    if runner == "iree_vulkan":
-      target_arch = "GPU-" + device_info.gpu_name
-      driver = IREE_DRIVER_NAME_MAP[runner]
-    elif runner == "iree_llvmaot" or runner == "iree_vmvx":
-      target_arch = "CPU-" + device_info.get_arm_arch_revision()
-      driver = IREE_DRIVER_NAME_MAP[runner]
+    if self.runner == "iree_vulkan":
+      target_arch = "GPU-" + self.device_info.gpu_name
+      driver = IREE_DRIVER_NAME_MAP[self.runner]
+    elif self.runner == "iree_llvmaot" or self.runner == "iree_vmvx":
+      target_arch = "CPU-" + self.device_info.get_arm_arch_revision()
+      driver = IREE_DRIVER_NAME_MAP[self.runner]
     else:
       raise ValueError("Unrecognized runner; need to update the list")
 
