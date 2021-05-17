@@ -30,6 +30,8 @@
 
 #define DEBUG_TYPE "iree-linalg-to-llvm-tile-and-distribute"
 
+static const unsigned kNumMaxParallelDims = 3;
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -50,30 +52,43 @@ class MaterializeCPULaunchConfigurationPass
 };
 }  // namespace
 
-/// Gets the tile sizes to use for the distributed dimensions of the first-level
-/// of tiling. This is obtained by taking the tile sizes for the outer parallel
-/// loops and filtering out the tile sizes set to 0. If there are multiple
-/// linalg ops, verifies all of them are consistent. This is a required property
-/// for a dispatch region.
-static Optional<SmallVector<int64_t, 4>> getDistributedDimsTileSizes(
+/// Returns the workgroup size to use for the flow.dispatch.workgroups
+/// operation, the `linalgOp` is in. This is obtained from the tile size for the
+/// operation at the distributed level.
+static SmallVector<int64_t, 4> getDistributedWorkgroupSize(
+    linalg::LinalgOp linalgOp, ArrayRef<int64_t> tileSizes) {
+  if (tileSizes.empty()) return {};
+  tileSizes = tileSizes.take_front(getNumOuterParallelLoops(linalgOp));
+  // For now we only distribute the inner-parallel loops.
+  if (tileSizes.size() > kNumMaxParallelDims) {
+    tileSizes = tileSizes.take_back(kNumMaxParallelDims);
+  }
+  auto workgroupSize = llvm::to_vector<4>(llvm::reverse(tileSizes));
+  workgroupSize.resize(kNumMaxParallelDims, 1);
+  return workgroupSize;
+}
+
+/// Gets the workgroup size to use based on the workgroups sizes set for each
+/// operation in `linalgOps`. Checks that all the ops return a consistent
+/// value.
+static FailureOr<SmallVector<int64_t, 4>> getDistributedWorkgroupSize(
     ArrayRef<linalg::LinalgOp> linalgOps) {
-  Optional<SmallVector<int64_t, 4>> distributedTileSizes;
+  Optional<SmallVector<int64_t, 4>> distributedWorkgroupSize;
   for (auto linalgOp : linalgOps) {
-    SmallVector<int64_t, 4> opTileSizes = getTileSizes(linalgOp, 0);
-    ArrayRef<int64_t> opTileSizesRef(opTileSizes);
-    opTileSizes = llvm::to_vector<4>(llvm::make_filter_range(
-        opTileSizesRef.take_front(getNumOuterParallelLoops(linalgOp)),
-        [](int64_t t) -> bool { return t; }));
-    if (!distributedTileSizes) {
-      distributedTileSizes = std::move(opTileSizes);
+    SmallVector<int64_t, 4> opTileSizes = getTileSizes(
+        linalgOp, static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+    auto opWorkgroupSize = getDistributedWorkgroupSize(linalgOp, opTileSizes);
+    if (!distributedWorkgroupSize) {
+      distributedWorkgroupSize = std::move(opWorkgroupSize);
       continue;
     }
-    if (*distributedTileSizes != opTileSizes) {
-      return llvm::None;
+    if (*distributedWorkgroupSize != opWorkgroupSize) {
+      return static_cast<LogicalResult>(linalgOp.emitError(
+          "mismatch in workgroup size for this op as compared to other linalg "
+          "ops in the dispatch region"));
     }
   }
-  if (!distributedTileSizes) return SmallVector<int64_t, 4>{};
-  return distributedTileSizes;
+  return distributedWorkgroupSize ? *distributedWorkgroupSize : SmallVector<int64_t, 4>{};
 }
 
 void MaterializeCPULaunchConfigurationPass::runOnOperation() {
@@ -93,14 +108,32 @@ void MaterializeCPULaunchConfigurationPass::runOnOperation() {
     if (failed(initCPULaunchConfig(linalgOps))) {
       return signalPassFailure();
     }
-    auto distributedTileSizes = getDistributedDimsTileSizes(linalgOps);
-    if (!distributedTileSizes) {
+
+    // Get the workgroup size to use.
+    auto distributedWorkgroupSize = getDistributedWorkgroupSize(linalgOps);
+    if (failed(distributedWorkgroupSize)) {
       return signalPassFailure();
     }
 
+    // If workgroup size is empty, serialize the operation by setting the number
+    // of workgroups to {1, 1, 1}.
+    if (distributedWorkgroupSize->empty()) {
+      WorkgroupCountRegionBuilder regionBuilder =
+          [](OpBuilder &b, Location loc,
+             std::array<Value, 3> workload) -> std::array<Value, 3> {
+        Value one = b.create<ConstantIndexOp>(loc, 1);
+        return {one, one, one};
+      };
+      OpBuilder builder(context);
+      if (failed(defineWorkgroupCountRegion(builder, funcOp, regionBuilder))) {
+        return signalPassFailure();
+      }
+      return;
+    }
+
+    // Materialize the computed workgroup size.
     if (failed(materializeStaticLaunchInformation(
-            funcOp, llvm::to_vector<4>(
-                        llvm::reverse(distributedTileSizes.getValue()))))) {
+            funcOp, distributedWorkgroupSize.getValue()))) {
       funcOp.emitOpError("failed to materialize static launch information");
       return signalPassFailure();
     }

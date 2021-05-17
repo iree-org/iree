@@ -82,7 +82,7 @@ hal.executable @add_no_config attributes {sym_visibility = "private"} {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
-    hal.executable.entry_point @add attributes {
+    hal.executable.entry_point @add_no_config attributes {
       interface = @io,
       ordinal = 0 : index
     }

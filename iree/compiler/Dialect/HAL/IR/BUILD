@@ -222,11 +222,17 @@ iree_tablegen_doc(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "LoweringConfigGen",
     tbl_outs = [
-        ("-gen-struct-attr-decls", "LoweringConfig.h.inc"),
-        ("-gen-struct-attr-defs", "LoweringConfig.cpp.inc"),
+        (
+            ["-gen-struct-attr-decls"],
+            "LoweringConfig.h.inc",
+        ),
+        (
+            ["-gen-struct-attr-defs"],
+            "LoweringConfig.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LoweringConfig.td",
