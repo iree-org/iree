@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 _BACKEND_TO_TARGETS = {
-    "vmla": "vmla",
+    "vmvx": "vmvx",
     "llvmaot": "dylib-llvm-aot",
     "vulkan": "vulkan-*",
 }

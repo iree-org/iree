@@ -86,32 +86,6 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${IREE_HAL_DRIVER_VMLA})
-
-iree_cc_library(
-  NAME
-    vmla_module_loader
-  HDRS
-    "vmla_module_loader.h"
-  SRCS
-    "vmla_module_loader.cc"
-  DEPS
-    iree::base
-    iree::base::internal::flatcc
-    iree::base::tracing
-    iree::hal
-    iree::hal::local
-    iree::modules::vmla::op_module
-    iree::schemas::vmla_executable_def_c_fbs
-    iree::vm
-    iree::vm::bytecode_module
-  DEFINES
-    "IREE_HAL_HAVE_VMLA_MODULE_LOADER=1"
-  PUBLIC
-)
-
-endif()
-
 if(${IREE_HAL_DRIVER_VMVX})
 
 iree_cc_library(

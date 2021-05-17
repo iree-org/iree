@@ -64,6 +64,7 @@ int main(int argc, char **argv) {
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
   registerPassManagerCLOptions();
+  registerDefaultTimingManagerCLOptions();
   cl::ParseCommandLineOptions(argc, argv);
 
   // Initialize dialects.
@@ -128,6 +129,7 @@ int main(int argc, char **argv) {
   // Run transformations.
   PassManager pm(&context, PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
+  applyDefaultTimingPassManagerCLOptions(pm);
   mlir::iree_integrations::TFL::buildTFLImportPassPipeline(pm);
   if (failed(pm.run(*module))) {
     llvm::errs() << "Running iree-import-tflite pass pipeline failed (see "

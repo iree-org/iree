@@ -63,7 +63,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
-    "@pffft": ["pffft"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
     "@cpuinfo": ["cpuinfo"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
@@ -125,8 +124,5 @@ def convert_external_target(target):
   if target.startswith("@mlir-hlo//"):
     # All Bazel targets map to a single CMake target.
     return ["tensorflow::mlir_hlo"]
-  if target.startswith("@com_google_ruy//ruy"):
-    # All Bazel targets map to a single CMake target.
-    return ["ruy"]
 
   raise KeyError(f"No conversion found for target '{target}'")

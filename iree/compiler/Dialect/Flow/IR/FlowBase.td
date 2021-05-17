@@ -94,13 +94,6 @@ def FLOW_ExecutableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariablePtr : AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 
-def FLOW_Workload : AnyTypeOf<[Index]> {
-  let description = [{
-    Describes the total untiled invocations along one or more dimensions.
-    Tiling may later divide this value for workgroup sizes.
-  }];
-}
-
 def FLOW_TensorAccessCanReadPred : CPred<[{
   $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
       IREE::Flow::TensorAccess::ReadOnly ||
@@ -152,21 +145,6 @@ def FLOW_WritableDispatchTensor : DialectType<
     to query the metadata about the tensor (such as its shape) as well as store
     to the backing tensor representation.
   }];
-}
-
-// Use no padding and clamp the window to the valid area, possibly stopping
-// early prior to having covered all data.
-def FLOW_PM_ClampWindowToFit : I32EnumAttrCase<"ClampWindowToFit", 0>;
-// Use initial values for padding when windows cross dimension boundaries.
-def FLOW_PM_PadBorder : I32EnumAttrCase<"PadBorder", 1>;
-// Describes the padding applied for a windowed operation like convolution,
-// where a window is placed inside a base area.
-def FLOW_PaddingModeAttr :
-    I32EnumAttr<"PaddingMode", "Padding mode", [
-      FLOW_PM_ClampWindowToFit,
-      FLOW_PM_PadBorder,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
 }
 
 #endif  // IREE_DIALECT_FLOW_BASE

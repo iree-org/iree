@@ -88,6 +88,7 @@ static BindingOptions getBindingOptionsFromFlags() {
 static LogicalResult convertToFlowModule(ModuleOp moduleOp) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   IREE::Flow::buildInputTransformPassPipeline(passManager);
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
@@ -104,6 +105,7 @@ static LogicalResult convertToHALModule(
     ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   if (failed(passManager.run(moduleOp))) {
@@ -120,6 +122,7 @@ static LogicalResult convertToVMModule(ModuleOp moduleOp,
                                        IREE::VM::TargetOptions targetOptions) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   if (failed(passManager.run(moduleOp))) {
@@ -142,15 +145,7 @@ static void buildIREEVMTransformPassPipeline(
     IREE::TFLite::buildTransformPassPipeline(passManager);
   }
   IREE::Flow::buildInputTransformPassPipeline(passManager);
-  // VMLA must go with legacy path.
-  bool dispatchLinalgOnTensors = true;
-  if (std::find(executableOptions.targets.begin(),
-                executableOptions.targets.end(),
-                "vmla") != executableOptions.targets.end()) {
-    dispatchLinalgOnTensors = false;
-  }
-  IREE::Flow::buildFlowTransformPassPipeline(passManager,
-                                             dispatchLinalgOnTensors);
+  IREE::Flow::buildFlowTransformPassPipeline(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
@@ -180,6 +175,7 @@ static LogicalResult translateFromMLIRToVM(
     IREE::VM::TargetOptions targetOptions) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   buildIREEVMTransformPassPipeline(bindingOptions, executableOptions,
                                    targetOptions, passManager);

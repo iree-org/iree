@@ -14,8 +14,8 @@
 
 iree_add_all_subdirs()
 
-# Doesn't use bazel_to_cmake because IREE_HAL_DRIVER_VMLA filtering is custom logic
-if(${IREE_HAL_DRIVER_VMLA})
+# Doesn't use bazel_to_cmake because IREE_HAL_DRIVER_VMVX filtering is custom logic
+if(${IREE_HAL_DRIVER_VMVX})
   iree_cc_test(
     NAME
       check_test
@@ -29,7 +29,7 @@ if(${IREE_HAL_DRIVER_VMLA})
       iree::base::logging
       iree::base::status
       iree::hal
-      iree::hal::vmla::registration
+      iree::hal::vmvx::registration
       iree::modules::hal
       iree::testing::gtest
       iree::testing::gtest_main

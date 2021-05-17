@@ -73,7 +73,6 @@ iree_cc_library(
     MLIRVectorToSPIRV
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToVector
     iree::compiler::Dialect::Flow::IR

@@ -57,8 +57,8 @@ void PlanConvLoopOrderPass::runOnFunction() {
 
   OwningRewritePatternList patterns(&getContext());
   linalg::populateLinalgConvGeneralizationPatterns(patterns, firstStepMarker);
-  patterns.insert<linalg::LinalgInterchangePattern<linalg::GenericOp>>(
-      context, loopOrder, secondStepMarker);
+  patterns.insert<linalg::GenericOpInterchangePattern>(context, loopOrder,
+                                                       secondStepMarker);
 
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }

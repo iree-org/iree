@@ -1,0 +1,3 @@
+// RUN: (iree-run-mnist-module) | IreeFileCheck %s
+// CHECK-LABEL: Detected number
+// CHECK: 4

@@ -104,7 +104,7 @@ and execute a function in the compiled module:
 
 ```shell
 $ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/iree-run-mlir.mlir \
-  -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+  -function-input="i32=-2" -iree-hal-target-backends=vmvx -print-mlir
 ```
 
 ### Further Reading

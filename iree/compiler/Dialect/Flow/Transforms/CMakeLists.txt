@@ -24,27 +24,21 @@ iree_cc_library(
     Transforms
   HDRS
     "DestructiveUpdateUtils.h"
-    "DispatchConfig.h"
     "Passes.h"
     "Passes.h.inc"
   SRCS
     "ConvertToFlowTensorOps.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
-    "DispatchConfig.cpp"
     "DispatchLinalgOnTensors.cpp"
-    "DispatchabilityAnalysis.cpp"
     "ExpandVariableDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
-    "FoldCompatibleDispatchRegions.cpp"
     "FormStreams.cpp"
     "HLOToHLOPreprocessing.cpp"
     "HoistUnstreamableOps.cpp"
-    "IdentifyDispatchRegions2.cpp"
     "InjectDispatchTracing.cpp"
     "LegalizeInputTypes.cpp"
     "OutlineDispatchRegions.cpp"
-    "OutlineDispatchRegions2.cpp"
     "OutlineLargeConstants.cpp"
     "PassDetail.h"
     "Passes.cpp"
@@ -69,15 +63,12 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
     iree::compiler::Conversion::LinalgToLinalg
-    iree::compiler::Dialect::Flow::Analysis
     iree::compiler::Dialect::Flow::Conversion
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Utils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::Conversion

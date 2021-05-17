@@ -57,7 +57,7 @@
 #       "magic_flag"
 #     MATRIX_VALUES
 #       "concat_test.py;range_test.py"
-#       "tf;tflite;iree_vmla;iree_llvmaot;iree_vulkan"
+#       "tf;tflite;iree_vmvx;iree_llvmaot;iree_vulkan"
 #       "tf"
 #       "true;false"
 #    FAILING_CONFIGURATIONS
@@ -68,22 +68,22 @@
 # Would expand to the following tests:
 #   DISABLED: python concat_test.py --target_backend=tf           --reference_backend=tf --magic_flag=true
 #   DISABLED: python concat_test.py --target_backend=tflite       --reference_backend=tf --magic_flag=true
-#   DISABLED: python concat_test.py --target_backend=iree_vmla    --reference_backend=tf --magic_flag=true
+#   DISABLED: python concat_test.py --target_backend=iree_vmvx    --reference_backend=tf --magic_flag=true
 #   DISABLED: python concat_test.py --target_backend=iree_llvmaot --reference_backend=tf --magic_flag=true
 #   DISABLED: python concat_test.py --target_backend=iree_vulkan  --reference_backend=tf --magic_flag=true
 #             python range_test.py  --target_backend=tf           --reference_backend=tf --magic_flag=true
 #             python range_test.py  --target_backend=tflite       --reference_backend=tf --magic_flag=true
-#             python range_test.py  --target_backend=iree_vmla    --reference_backend=tf --magic_flag=true
+#             python range_test.py  --target_backend=iree_vmvx    --reference_backend=tf --magic_flag=true
 #             python range_test.py  --target_backend=iree_llvmaot --reference_backend=tf --magic_flag=true
 #   DISABLED: python range_test.py  --target_backend=iree_vulkan  --reference_backend=tf --magic_flag=true
 #             python concat_test.py --target_backend=tf           --reference_backend=tf --magic_flag=false
 #             python concat_test.py --target_backend=tflite       --reference_backend=tf --magic_flag=false
-#             python concat_test.py --target_backend=iree_vmla    --reference_backend=tf --magic_flag=false
+#             python concat_test.py --target_backend=iree_vmvx    --reference_backend=tf --magic_flag=false
 #             python concat_test.py --target_backend=iree_llvmaot --reference_backend=tf --magic_flag=false
 #             python concat_test.py --target_backend=iree_vulkan  --reference_backend=tf --magic_flag=false
 #             python range_test.py  --target_backend=tf           --reference_backend=tf --magic_flag=false
 #             python range_test.py  --target_backend=tflite       --reference_backend=tf --magic_flag=false
-#             python range_test.py  --target_backend=iree_vmla    --reference_backend=tf --magic_flag=false
+#             python range_test.py  --target_backend=iree_vmvx    --reference_backend=tf --magic_flag=false
 #             python range_test.py  --target_backend=iree_llvmaot --reference_backend=tf --magic_flag=false
 #   DISABLED: python range_test.py  --target_backend=iree_vulkan  --reference_backend=tf --magic_flag=false
 #

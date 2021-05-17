@@ -2,7 +2,7 @@
 
 hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.target @cuda, filter="cuda" {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<readonly:1024xf32>, !flow.dispatch.tensor<writeonly:1024xf32>) -> ()}
+  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
@@ -42,7 +42,7 @@ hal.executable.target @cuda, filter="cuda" {
 
 hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.target @cuda, filter="cuda" {
-  hal.executable.entry_point @dot_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<writeonly:1024x1024xf32>) -> ()}
+  hal.executable.entry_point @dot_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index}
   module  {
     func @dot_dispatch_0() {
       %cst = constant 0.000000e+00 : f32
@@ -68,7 +68,7 @@ hal.executable.target @cuda, filter="cuda" {
           %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg1)[%workgroup_size_x]
           %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x1024xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
           %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<1024x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, f32 
+          linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, f32
           linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
         }
       }
@@ -99,14 +99,14 @@ hal.executable.target @cuda, filter="cuda" {
 //         CHECK:  scf.for %[[IND:.+]] = %[[TIDX]] to %[[C2]] step %[[C2]] {
 //     CHECK-DAG:    %[[SRC:.+]] = memref.subview %{{.*}}[%[[IND]], 0] [1, 4] [1, 1] : memref<2x4xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
 //     CHECK-DAG:    %[[DST:.+]] = memref.subview %{{.*}}[%[[IND]], 0] [1, 4] [1, 1] : memref<2x4xf32, #{{.*}}, 3> to memref<1x4xf32, #{{.*}}, 3>
-//         CHECK:    linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x4xf32, #{{.*}}>, memref<1x4xf32, #{{.*}}, 3> 
+//         CHECK:    linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x4xf32, #{{.*}}>, memref<1x4xf32, #{{.*}}, 3>
 //         CHECK:    }
 //         CHECK:  %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
 //         CHECK:  scf.for %[[IND0:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {
 //         CHECK:    scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
 //     CHECK-DAG:      %[[SRC:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 4] [1, 1] : memref<4x256xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
 //     CHECK-DAG:      %[[DST:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 4] [1, 1] : memref<4x256xf32, #{{.*}}, 3> to memref<1x4xf32, #{{.*}}, 3>
-//         CHECK:      linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x4xf32, #{{.*}}>, memref<1x4xf32, #{{.*}}, 3> 
+//         CHECK:      linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x4xf32, #{{.*}}>, memref<1x4xf32, #{{.*}}, 3>
 //         CHECK:    }
 //         CHECK:  }
 //         CHECK:  gpu.barrier

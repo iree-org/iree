@@ -29,7 +29,7 @@ iree_bytecode_module(
         "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=vmla",
+        "-iree-hal-target-backends=vmvx",
     ],
 )
 
@@ -42,7 +42,7 @@ iree_bytecode_module(
         "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=vmla",
+        "-iree-hal-target-backends=vmvx",
     ],
 )
 
@@ -55,6 +55,6 @@ iree_bytecode_module(
         "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=vmla",
+        "-iree-hal-target-backends=vmvx",
     ],
 )

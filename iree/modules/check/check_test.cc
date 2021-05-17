@@ -20,7 +20,7 @@
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
@@ -35,14 +35,14 @@ namespace {
 class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+    IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(
         iree_hal_driver_registry_default()));
     // TODO(benvanik): move to instance-based registration.
     IREE_ASSERT_OK(iree_hal_module_register_types());
 
     iree_hal_driver_t* hal_driver = nullptr;
     IREE_ASSERT_OK(iree_hal_driver_registry_try_create_by_name(
-        iree_hal_driver_registry_default(), iree_make_cstring_view("vmla"),
+        iree_hal_driver_registry_default(), iree_make_cstring_view("vmvx"),
         iree_allocator_system(), &hal_driver));
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));

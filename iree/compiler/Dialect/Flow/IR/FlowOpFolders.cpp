@@ -350,11 +350,6 @@ void VariableStoreIndirectOp::getCanonicalizationPatterns(
 // Dispatch ops
 //===----------------------------------------------------------------------===//
 
-void DispatchRegionOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ClosureOptimizationPattern<DispatchRegionOp>>(context);
-}
-
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>>(context);

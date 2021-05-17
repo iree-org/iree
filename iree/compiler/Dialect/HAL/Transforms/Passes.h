@@ -74,8 +74,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // device placements are made.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions targetOptions);
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass(
-    TargetOptions targetOptions);
 
 // Propagates hal.interface.workload.* information when constant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
@@ -152,7 +150,6 @@ inline void registerHALPasses() {
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
-  createMaterializeInterfacesPass(targetOptions);
   createTranslateExecutablesPass(targetOptions);
   createLinkExecutablesPass(targetOptions);
   createResolveEntryPointOrdinalsPass();

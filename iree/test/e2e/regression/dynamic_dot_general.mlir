@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir -export-all %s -iree-hal-target-backends=vmla -function-input="2x2xf32=[[1.0,0.0],[0.0,1.0]]" -function-input="2x3xf32=[[1.0,2.0,3.0],[4.0,5.0,6.0]]" -function-input="2x2x2xf32=[[[1.0,0.0],[0.0,1.0]],[[2.0,0.0],[0.0,2.0]]]" -function-input="2x2x3xf32=[[[1.5,2.5,3.5],[4.5,5.5,6.5]],[[1.0,2.0,3.0],[4.0,5.0,6.0]]]" | IreeFileCheck %s
+// RUN: iree-run-mlir -export-all %s -iree-hal-target-backends=vmvx -function-input="2x2xf32=[[1.0,0.0],[0.0,1.0]]" -function-input="2x3xf32=[[1.0,2.0,3.0],[4.0,5.0,6.0]]" -function-input="2x2x2xf32=[[[1.0,0.0],[0.0,1.0]],[[2.0,0.0],[0.0,2.0]]]" -function-input="2x2x3xf32=[[[1.5,2.5,3.5],[4.5,5.5,6.5]],[[1.0,2.0,3.0],[4.0,5.0,6.0]]]" | IreeFileCheck %s
 
 // TODO(silvasean): Extent xla_ops directory test infra to support
 // testing dynamic shapes.

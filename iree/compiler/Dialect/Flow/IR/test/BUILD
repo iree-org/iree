@@ -26,8 +26,6 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "dispatch_ops.mlir",
-            "dispatch_region_folding.mlir",
-            "dispatch_regions.mlir",
             "dispatch_tensor_folding.mlir",
             "dispatch_workgroups.mlir",
             "dispatch_workgroups_folding.mlir",

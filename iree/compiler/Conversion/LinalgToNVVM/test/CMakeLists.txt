@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "distribute_to_thread.mlir"
     "pipeline_test.mlir"
     "remove_loops.mlir"
+    "scalarize.mlir"
     "vectorization.mlir"
   DATA
     iree::tools::IreeFileCheck

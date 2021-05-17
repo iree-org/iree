@@ -180,6 +180,7 @@ test_suite(
     name = "check",
     tests = [
         ":check_dylib-llvm-aot_dylib",
+        ":check_vmvx_vmvx",
         ":check_vulkan-spirv_vulkan",
     ],
 )

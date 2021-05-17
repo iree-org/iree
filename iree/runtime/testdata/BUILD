@@ -36,6 +36,6 @@ iree_bytecode_module(
     c_identifier = "iree_runtime_testdata_simple_mul_module",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=vmla",
+        "-iree-hal-target-backends=vmvx",
     ],
 )

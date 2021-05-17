@@ -297,8 +297,7 @@ class CompiledModule(object):
 class _IreeFunctionWrapper(_FunctionWrapper):
   """Wraps an IREE function, making it callable."""
 
-  def __init__(self, context: iree.runtime.SystemContext,
-               f: iree.runtime.system_api.BoundFunction):
+  def __init__(self, context: iree.runtime.SystemContext, f):
     self._context = context
     self._f = f
 
@@ -927,10 +926,10 @@ class BackendInfo:
           "driver": None,
           "compiler_targets": None,
       },
-      "iree_vmla": {
+      "iree_vmvx": {
           "compiled_module_class": IreeCompiledModule,
-          "driver": "vmla",
-          "compiler_targets": ["vmla"]
+          "driver": "vmvx",
+          "compiler_targets": ["vmvx"]
       },
       "iree_vulkan": {
           "compiled_module_class": IreeCompiledModule,
@@ -953,7 +952,7 @@ class BackendInfo:
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
-        'tf', 'tflite', 'iree_vmla', 'iree_vulkan', 'iree_llvmaot'.
+        'tf', 'tflite', 'iree_vmvx', 'iree_vulkan', 'iree_llvmaot'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
       compilation_flags: an optional sequence of flags to pass to the compiler
@@ -962,7 +961,7 @@ class BackendInfo:
         running the generated artifacts for the backend.
 
     Raises:
-      KeyError: if backend_name is not one of ['tf', 'tflite', 'iree_vmla',
+      KeyError: if backend_name is not one of ['tf', 'tflite', 'iree_vmvx',
         'iree_vulkan', 'iree_llvmaot'].
       ValueError: if backend_id doesn't start with backend_name.
     """

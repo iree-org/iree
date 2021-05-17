@@ -231,8 +231,9 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   iree_vm_buffer_t constants_buffer;
   iree_vm_buffer_initialize(
       IREE_VM_BUFFER_ACCESS_ORIGIN_HOST,
-      iree_make_byte_span((void*)dispatch_state->push_constants,
-                          dispatch_state->push_constant_count),
+      iree_make_byte_span(
+          (void*)dispatch_state->push_constants,
+          sizeof(uint32_t) * dispatch_state->push_constant_count),
       iree_allocator_null(), &constants_buffer);
   iree_vm_buffer_retain(&constants_buffer);  // for call
 

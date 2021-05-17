@@ -198,6 +198,7 @@ Status PrepareModule(std::string target_backend,
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verifyPasses);
   mlir::applyPassManagerCLOptions(pass_manager);
+  mlir::applyDefaultTimingPassManagerCLOptions(pass_manager);
   mlir::iree_compiler::buildDefaultIREEVMTransformPassPipeline(pass_manager);
   if (failed(pass_manager.run(mlir_module.get()))) {
     return iree_make_status(IREE_STATUS_INTERNAL,

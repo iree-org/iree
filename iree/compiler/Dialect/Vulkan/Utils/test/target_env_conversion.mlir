@@ -14,7 +14,7 @@
 #map0 = affine_map<(d0) -> (d0)>
 module  {
   flow.executable @simpleMath_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @simpleMath_dispatch_0 attributes {signature = (tensor<4xf32>) -> tensor<4xf32>, workgroup_rank = 3 : index}
+    flow.dispatch.entry @simpleMath_dispatch_0 attributes {workgroup_rank = 3 : index}
     module  {
       func @simpleMath_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4xf32>) {
         %c4 = constant 4 : index

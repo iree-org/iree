@@ -13,10 +13,9 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
   }
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @elementwise_static_shape attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:?xf32>,
-        !flow.dispatch.tensor<readonly:?xf32>,
-        !flow.dispatch.tensor<writeonly:?xf32>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
@@ -66,10 +65,9 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @elementwise_transpose attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:?x?xf32>,
-        !flow.dispatch.tensor<readonly:?xf32>,
-        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,

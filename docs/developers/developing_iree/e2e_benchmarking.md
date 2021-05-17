@@ -42,7 +42,7 @@ $ export PYTHONPATH=$(pwd)/bindings/python
 # This is a Python 3 program. On some systems, such as Debian derivatives,
 # use 'python3' instead of 'python'.
 $ python ../iree/integrations/tensorflow/e2e/matrix_ops_static_test.py \
-    --target_backends=iree_vmla
+    --target_backends=iree_vmvx
 # View the generated artifacts:
 $ tree /tmp/iree/modules/MatrixOpsStaticModule/
 ```
@@ -52,7 +52,7 @@ $ tree /tmp/iree/modules/MatrixOpsStaticModule/
 # --model: the tf.keras.applications model to test
 # --data: the dataset (and corresponding image shapes) to create the model for
 $ python ../iree/integrations/tensorflow/e2e/keras/applications/applications_test.py \
-    --target_backends=iree_vmla \
+    --target_backends=iree_vmvx \
     --model=MobileNetV3Small \
     --data=imagenet
 # View the generated artifacts:
@@ -65,7 +65,7 @@ include those relevant for benchmarking):
 ```shell
 # Example for a generic module `ModuleName`:
 /tmp/iree/modules/ModuleName
-  ├── iree_vmla  # Or any other IREE backend.
+  ├── iree_vmvx  # Or any other IREE backend.
   │   ├── compiled.vmfb
   │   │   # A flatbuffer containing IREE's compiled code.
   │   └── traces
@@ -106,7 +106,7 @@ include those relevant for benchmarking):
   │       │   └── flagfile
   │       └── matmul_rhs_batch
   │           └── flagfile
-  ├── iree_vmla
+  ├── iree_vmvx
   │   ├── compiled.vmfb
   │   └── traces  # ...same as iree_llvmaot/traces above.
   ├── iree_vulkan
@@ -168,7 +168,7 @@ using `MatrixOpsStaticModule` on VMLA we would run the following command:
 
 ```shell
 $ ./bazel-bin/iree/tools/iree-benchmark-module \
-  --flagfile="/tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile"
+  --flagfile="/tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/traces/matmul_lhs_batch/flagfile"
 ```
 
 If you ran `applications_test.py` then you'll be able to benchmark
@@ -176,7 +176,7 @@ If you ran `applications_test.py` then you'll be able to benchmark
 
 ```shell
 $ ./bazel-bin/iree/tools/iree-benchmark-module \
-  --flagfile="/tmp/iree/modules/MobileNetV3Small/imagenet/iree_vmla/traces/predict/flagfile"
+  --flagfile="/tmp/iree/modules/MobileNetV3Small/imagenet/iree_vmvx/traces/predict/flagfile"
 ```
 
 ## 3. Benchmarking TFLite on desktop
@@ -254,19 +254,19 @@ example:
 
 ```shell
 # Make a directory for the module/backend pair we want to benchmark.
-$ adb shell mkdir -p /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
+$ adb shell mkdir -p /data/local/tmp/MatrixOpsStaticModule/iree_vmvx/
 
 # Transfer the files.
-$ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/* \
-  /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
+$ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/* \
+  /data/local/tmp/MatrixOpsStaticModule/iree_vmvx/
 ```
 
 ### 4.3 Benchmark the module
 
 ```shell
 $ adb shell /data/local/tmp/iree-benchmark-module \
-  --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile" \
-  --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/compiled.vmfb"
+  --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/traces/matmul_lhs_batch/flagfile" \
+  --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb"
 ```
 
 Note: Because the flagfile uses absolute paths, the `--module_file` flag must be
