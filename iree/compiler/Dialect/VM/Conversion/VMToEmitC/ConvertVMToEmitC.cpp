@@ -680,6 +680,7 @@ void populateVMToCPatterns(MLIRContext *context,
                                                          "vm_rem_i32s");
   patterns.insert<CallOpConversion<IREE::VM::RemI32UOp>>(context,
                                                          "vm_rem_i32u");
+  patterns.insert<CallOpConversion<IREE::VM::FMAI32Op>>(context, "vm_fma_i32");
   patterns.insert<CallOpConversion<IREE::VM::NotI32Op>>(context, "vm_not_i32");
   patterns.insert<CallOpConversion<IREE::VM::AndI32Op>>(context, "vm_and_i32");
   patterns.insert<CallOpConversion<IREE::VM::OrI32Op>>(context, "vm_or_i32");
@@ -765,6 +766,7 @@ void populateVMToCPatterns(MLIRContext *context,
                                                          "vm_rem_i64s");
   patterns.insert<CallOpConversion<IREE::VM::RemI64UOp>>(context,
                                                          "vm_rem_i64u");
+  patterns.insert<CallOpConversion<IREE::VM::FMAI64Op>>(context, "vm_fma_i64");
   patterns.insert<CallOpConversion<IREE::VM::NotI64Op>>(context, "vm_not_i64");
   patterns.insert<CallOpConversion<IREE::VM::AndI64Op>>(context, "vm_and_i64");
   patterns.insert<CallOpConversion<IREE::VM::OrI64Op>>(context, "vm_or_i64");
