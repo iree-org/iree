@@ -12,18 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG NDK_VERSION=r21d
-
-FROM gcr.io/iree-oss/util@sha256:40846b4aea5886af3250399d6adfdb3e1195a8b0177706bb0375e812d62dc49c AS install-ndk
-ARG NDK_VERSION
-WORKDIR /install-ndk
-
-RUN wget "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION?}-linux-x86_64.zip"
-
-RUN unzip "android-ndk-${NDK_VERSION?}-linux-x86_64.zip" -d /usr/src/
-
 FROM gcr.io/iree-oss/cmake-bazel-frontends@sha256:699f6470e618c151f36cb4769ccaf2cfbf334ddb2fc2b6e69eb60732fe69bb6b AS final
-ARG NDK_VERSION
-COPY --from=install-ndk "/usr/src/android-ndk-${NDK_VERSION}" "/usr/src/android-ndk-${NDK_VERSION}"
+
+# Note that NDK_VERSION should be kept in sync with the one in cmake-android.
+# That actually means this isn't really an ARG because we cannot build this
+# image with a different NDK version.
+ARG NDK_VERSION=r21d
+COPY --from=gcr.io/iree-oss/cmake-android@sha256:15d3266ae4865f7642a4ef4d76e5181f0dc3482a7cfba9021b6b55be524208ec "/usr/src/android-ndk-${NDK_VERSION}" "/usr/src/android-ndk-${NDK_VERSION}"
 ENV ANDROID_NDK "/usr/src/android-ndk-${NDK_VERSION}"
 
