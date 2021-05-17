@@ -45,7 +45,7 @@ git submodule update --init
 Configure then build all targets using CMake:
 
 ``` shell
-cmake -B ../iree-build/ .
+cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo .
 cmake --build ../iree-build/
 ```
 
