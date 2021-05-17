@@ -70,6 +70,7 @@ iree_e2e_cartesian_product_test_suite(
     ",,,svdf_resnet,"
     ",,,tc_resnet,"
     ",,,xception,"
+    ",,,crnn,iree_vulkan"
   LABELS
     "nokokoro"
 )
