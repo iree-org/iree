@@ -96,7 +96,7 @@ iree_tf_benchmark_suite(
   MODELS
     MobileBERT
   MODEL_SCRIPT
-    mobile_bert_squad_benchmark.py
+    mobile_bert_squad_benchmark_artifacts.py
   BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND
@@ -115,7 +115,7 @@ iree_tf_benchmark_suite(
   MODELS
     MobileBERT
   MODEL_SCRIPT
-    mobile_bert_squad_benchmark.py
+    mobile_bert_squad_benchmark_artifacts.py
   BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND
@@ -133,7 +133,7 @@ iree_tf_benchmark_suite(
   MODELS
     MobileBERT
   MODEL_SCRIPT
-    mobile_bert_squad_benchmark.py
+    mobile_bert_squad_benchmark_artifacts.py
   BENCHMARK_MODE
     "fp32-full-inference"
   TARGET_BACKEND

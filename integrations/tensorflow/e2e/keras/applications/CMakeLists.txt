@@ -125,7 +125,7 @@ iree_tf_benchmark_suite(
     MobileNetV2
     MobileNetV3Small
   MODEL_SCRIPT
-    applications_benchmark.py
+    applications_benchmark_artifacts.py
   MODEL_SCRIPT_ARGS
     "--data=imagenet"
     "--use_external_weights=True"
@@ -149,7 +149,7 @@ iree_tf_benchmark_suite(
     MobileNetV2
     MobileNetV3Small
   MODEL_SCRIPT
-    applications_benchmark.py
+    applications_benchmark_artifacts.py
   MODEL_SCRIPT_ARGS
     "--data=imagenet"
     "--use_external_weights=True"
@@ -172,7 +172,7 @@ iree_tf_benchmark_suite(
     MobileNetV2
     MobileNetV3Small
   MODEL_SCRIPT
-    applications_benchmark.py
+    applications_benchmark_artifacts.py
   MODEL_SCRIPT_ARGS
     "--data=imagenet"
     "--use_external_weights=True"
