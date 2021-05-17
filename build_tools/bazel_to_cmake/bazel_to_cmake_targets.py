@@ -122,7 +122,7 @@ def convert_external_target(target):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
-  if target.startswith("@mlir-hlo//:hlo"):
+  if target.startswith("@mlir-hlo//"):
     # All Bazel targets map to a single CMake target.
     return ["tensorflow::mlir_hlo"]
 
