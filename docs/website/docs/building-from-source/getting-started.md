@@ -7,7 +7,7 @@
 You will need to install [CMake](https://cmake.org/), along with a C/C++
 compiler:
 
-=== "Linux"
+=== "Linux and MacOS"
 
     <!-- TODO(scotttodd): annotation about gcc vs clang -->
 

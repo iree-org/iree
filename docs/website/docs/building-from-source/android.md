@@ -50,7 +50,7 @@ cmake --build ../iree-build/ --target install
 
 Build the runtime using the Android NDK toolchain:
 
-=== "Linux"
+=== "Linux and MacOS"
 
     ``` shell
     cmake -B ../iree-build-android/ \
