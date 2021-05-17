@@ -405,7 +405,7 @@ class ConstRefRodataOpConversion
         /*callee=*/StringAttr::get(ctx, "VM_ARRAY_ELEMENT_ADDRESS"),
         /*args=*/
         ArrayAttr::get(ctx,
-                       {emitc::OpaqueAttr::get(ctx, "state->rodata_refs"),
+                       {emitc::OpaqueAttr::get(ctx, "state->rodata_buffers"),
                         rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
                             rodataOp.ordinal().getValue().getZExtValue()))}),
         /*templateArgs=*/ArrayAttr{},

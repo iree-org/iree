@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
+#include "iree/compiler/Dialect/VM/Target/ConstantEncodingUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -48,7 +49,46 @@ static void printSeparatingComment(llvm::raw_ostream &output) {
             "//"
          << std::string(77, '=') << "\n";
 }
+static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
+                                        mlir::emitc::CppEmitter &emitter) {
+  llvm::raw_ostream &output = emitter.ostream();
+  std::string moduleName = moduleOp.getName().str();
 
+  for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
+    ElementsAttr value = rodataOp.value();
+    auto bitwidth = value.getType().getElementTypeBitWidth();
+    size_t size = value.getNumElements() * (bitwidth / 8);
+    SmallVector<uint8_t, 32> byteBuffer;
+    byteBuffer.resize(size);
+
+    constexpr size_t kDefaultRodataAlignment = 16;
+
+    size_t alignment =
+        rodataOp.alignment()
+            ? static_cast<size_t>(rodataOp.alignment().getValue())
+            : 0;
+    if (alignment == 0) alignment = kDefaultRodataAlignment;
+
+    if (failed(serializeConstantArray(rodataOp.getLoc(), value, alignment,
+                                      byteBuffer.data()))) {
+      return rodataOp.emitError() << "error during serialization";
+    }
+
+    std::string buffer_name =
+        moduleOp.getName().str() + "_" + rodataOp.getName().str();
+
+    output << "iree_alignas(" << alignment << ") static const uint8_t "
+           << buffer_name << "[] = {";
+    llvm::interleaveComma(byteBuffer, output, [&](uint8_t value) {
+      output << static_cast<unsigned int>(value);
+    });
+    output << "};\n";
+  }
+
+  output << "\n";
+
+  return success();
+}
 static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
                                             mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
@@ -62,7 +102,7 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
          << moduleOp.ordinal_counts().getValue().global_bytes() << "];\n";
   output << "iree_vm_ref_t refs["
          << moduleOp.ordinal_counts().getValue().global_refs() << "];\n";
-  output << "iree_vm_buffer_t rodata_refs["
+  output << "iree_vm_buffer_t rodata_buffers["
          << moduleOp.ordinal_counts().getValue().rodatas() << "];\n";
   output << "};\n";
 
@@ -137,10 +177,18 @@ static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
              << "Initializers for globals not supported yet";
     }
   }
-  // TODO(simon-camp): Support vm.global.i64 and vm.global.ref
+  // TODO(simon-camp): Support globals with different element type
 
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-    rodataOp.emitRemark("Initialization of rodata ops not supported yet.");
+    std::string buffer_name =
+        moduleOp.getName().str() + "_" + rodataOp.getName().str();
+    output << "iree_vm_buffer_initialize("
+           << "IREE_VM_BUFFER_ACCESS_ORIGIN_HOST, "
+           << "iree_make_byte_span("
+           << "(void*)" << buffer_name << ", sizeof(" << buffer_name << ")), "
+           << "iree_allocator_null(), "
+           << "&state->rodata_buffers[" << rodataOp.ordinal() << "]"
+           << ");\n";
   }
 
   return success();
@@ -705,6 +753,10 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   mlir::emitc::CppEmitter emitter(output, /*restrictToC=*/true,
                                   /*forwardDeclareVariables=*/true);
   mlir::emitc::CppEmitter::Scope scope(emitter);
+
+  if (failed(printRodataBuffers(moduleOp, emitter))) {
+    return failure();
+  }
 
   // build struct definitions
   if (failed(printStructDefinitions(moduleOp, emitter))) {
