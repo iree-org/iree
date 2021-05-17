@@ -12,20 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_CONVERSION_LINALGTONVVM_KERNELCONFIG_H_
-#define IREE_COMPILER_CONVERSION_LINALGTONVVM_KERNELCONFIG_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_ROCM_ROCMTARGET_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_ROCM_ROCMTARGET_H_
 
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
-#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace HAL {
 
-Optional<LaunchConfig> getCUDALaunchConfig(
-    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    ArrayRef<linalg::LinalgOp> linalgOps);
+struct ROCMTargetOptions {};
 
+ROCMTargetOptions getROCMTargetOptionsFromFlags();
+
+// Registers the ROCM backend.
+void registerROCMTargetBackends(
+    std::function<ROCMTargetOptions()> queryOptions);
+
+}  // namespace HAL
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
-#endif  // IREE_COMPILER_CONVERSION_LINALGTONVVM_KERNELCONFIG_H_
+
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_ROCM_ROCMTARGET_H_

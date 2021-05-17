@@ -16,7 +16,7 @@
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
-#include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
+#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -151,7 +151,8 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorizationPass() {
 }
 
 static PassRegistration<VectorizationPass> pass(
-    "iree-codegen-cuda-vectorization", "Pass to convert linalg into Vector.");
+    "iree-codegen-llvmgpu-vectorization",
+    "Pass to convert linalg into Vector.");
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -51,6 +51,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
+    "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
     # Cuda
