@@ -23,9 +23,7 @@ import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS
 
-# Testing all applications models automatically can take time
-# so we test it one by one, with argument --model=MobileNet
-flags.DEFINE_string("model", "ResNet50", "model name")
+flags.DEFINE_string("model", "ResNet50", "The name of the model to benchmark")
 flags.DEFINE_string(
     "url", "", "url with model weights "
     "for example https://storage.googleapis.com/iree_models/")
