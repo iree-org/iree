@@ -27,6 +27,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Operation.h"
 
+static const unsigned kNumMaxParallelDims = 3;
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -139,9 +141,10 @@ LogicalResult setRootConfig(linalg::GenericOp genericOp) {
   SmallVector<int64_t, 4> workgroupTileSizes(numOuterParallelLoops,
                                              genericOpsWorkgroupTileSize);
   SmallVector<int64_t, 4> innerTileSizes(numOuterParallelLoops, 1);
-  // At the HAL level only the inner 3 parallel loops are tiled. Set the tile
-  // size as 0 for all the outer dimensions greater than 3.
-  for (int64_t i = 0; i < numOuterParallelLoops - 3; i++) {
+  // At the HAL level only the inner `kNumMaxParallelDims` parallel loops are
+  // tiled. Set the tile size as 0 for all the parallel loops that are not tiled
+  // at HAL level
+  for (int64_t i = 0; i < numOuterParallelLoops - kNumMaxParallelDims; i++) {
     workgroupTileSizes[i] = 0;
   }
   TileSizesListType tileSizes = {workgroupTileSizes};
