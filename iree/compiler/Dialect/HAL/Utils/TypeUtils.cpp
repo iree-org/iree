@@ -47,20 +47,10 @@ int32_t getRoundedElementByteWidth(Type type) {
   return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
 }
 
-TensorType convertTensorTypeToABIType(TensorType sourceType) {
-  assert(sourceType.hasRank() && "only ranked tensors are supported");
-  Type sourceElementType = sourceType.getElementType();
-  Type targetElementType = sourceElementType;
-  if (auto sourceIntType = sourceElementType.dyn_cast<IntegerType>()) {
-    int32_t targetByteWidth = getRoundedElementByteWidth(sourceElementType);
-    targetElementType =
-        IntegerType::get(sourceElementType.getContext(), targetByteWidth * 8);
-  }
-  return RankedTensorType::get(sourceType.getShape(), targetElementType);
-}
-
-SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
-                                         OpBuilder &builder) {
+// Returns an array of i32 values representing the shape of the |shapedType|.
+static SmallVector<Value, 4> getStaticShapeDims(Location loc,
+                                                ShapedType shapedType,
+                                                OpBuilder &builder) {
   SmallVector<Value, 4> shape;
   if (shapedType.getRank() >= 1) {
     for (auto dim : shapedType.getShape()) {
@@ -70,9 +60,10 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
   return shape;
 }
 
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
-                                                   Value shapedValue,
-                                                   OpBuilder &builder) {
+// Returns an array of i32 values representing the shape of the |shapedValue|.
+static llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
+                                                          Value shapedValue,
+                                                          OpBuilder &builder) {
   ShapedType shapedType = shapedValue.getType().cast<ShapedType>();
   if (shapedType.hasStaticShape()) {
     return getStaticShapeDims(loc, shapedType, builder);

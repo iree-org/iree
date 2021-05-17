@@ -22,6 +22,7 @@ cc_library(
     name = "Common",
     srcs = [
         "BufferAllocViewCleanUpPass.cpp",
+        "DemoteF32ToF16.cpp",
         "FlattenMemRefSubspanPass.cpp",
         "ForOpCanonicalizationPass.cpp",
         "LaunchConfig.cpp",
@@ -55,8 +56,8 @@ cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
-        "@mlir-hlo//:hlo",
     ],
 )

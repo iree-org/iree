@@ -35,7 +35,6 @@ cc_library(
     deps = [
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
-        "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
@@ -47,6 +46,7 @@ cc_library(
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:NVVMDialect",
         "@llvm-project//mlir:Pass",

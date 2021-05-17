@@ -15,21 +15,30 @@
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
 #include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
+#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/Internalize.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
+
+static llvm::cl::opt<bool> dumpPtx("iree-cuda-dump-ptx", llvm::cl::init(false),
+                                   llvm::cl::desc("Dump ptx"));
 
 namespace mlir {
 namespace iree_compiler {
@@ -54,6 +63,67 @@ static std::string translateModuleToISA(llvm::Module &module,
     codegenPasses.run(module);
   }
   return targetISA;
+}
+
+/// Return true if the moule contain any __nv function that require linking with
+/// libdevice module.
+static bool requiresDeviceLib(const llvm::Module &module) {
+  for (const llvm::Function &function : module.functions()) {
+    if (!function.isIntrinsic() && function.isDeclaration() &&
+        (function.getName().startswith("__nv_"))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Link libdevice with |module|.
+static void linkModule(llvm::Module &module) {
+  llvm::Linker linker(module);
+
+  llvm::MemoryBufferRef bitcode_ref(
+      llvm::StringRef(cuda_libdevice_create()->data,
+                      cuda_libdevice_create()->size),
+      "libdevice bitcode");
+  std::unique_ptr<llvm::Module> bitcode_module =
+      std::move(llvm::parseBitcodeFile(bitcode_ref, module.getContext()).get());
+  // Ignore the data layout of the module we're importing. This avoids a
+  // warning from the linker.
+  bitcode_module->setDataLayout(module.getDataLayout());
+  linker.linkInModule(
+      std::move(bitcode_module), llvm::Linker::Flags::LinkOnlyNeeded,
+      [](llvm::Module &M, const llvm::StringSet<> &GVS) {
+        llvm::internalizeModule(M, [&GVS](const llvm::GlobalValue &GV) {
+          return !GV.hasName() || (GVS.count(GV.getName()) == 0);
+        });
+      });
+}
+
+/// Resolve __nv function by linking libdevice module and run llvm optimization
+/// passes that will inline linked functions and optimize the module.
+static void linkAndOptimize(llvm::Module &module,
+                            llvm::TargetMachine &targetMachine) {
+  if (requiresDeviceLib(module)) linkModule(module);
+
+  llvm::legacy::FunctionPassManager FPM(&module);
+  llvm::legacy::PassManager MPM;
+  llvm::PassManagerBuilder builder;
+  builder.OptLevel = 2;
+  builder.SizeLevel = 0;
+  builder.Inliner = llvm::createFunctionInliningPass();
+  builder.LoopVectorize = false;
+
+  targetMachine.adjustPassManager(builder);
+
+  builder.populateFunctionPassManager(FPM);
+  builder.populateModulePassManager(MPM);
+
+  FPM.doInitialization();
+  for (llvm::Function &func : module) {
+    FPM.run(func);
+  }
+  FPM.doFinalization();
+  MPM.run(module);
 }
 
 class CUDATargetBackend final : public TargetBackend {
@@ -108,6 +178,7 @@ class CUDATargetBackend final : public TargetBackend {
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
+      if (llvmFunc->isDeclaration()) continue;
       std::array<int32_t, 3> workgroup_size;
       for (auto it : llvm::enumerate(func->getAttr("cuda_workgroup_size")
                                          .cast<DenseIntElementsAttr>()
@@ -146,12 +217,17 @@ class CUDATargetBackend final : public TargetBackend {
 
     llvmModule->setDataLayout(targetMachine->createDataLayout());
 
+    linkAndOptimize(*llvmModule, *targetMachine);
+
     FlatbufferBuilder builder;
     iree_CUDAExecutableDef_start_as_root(builder);
 
     // Serialize cuda kernel into the binary that we will embed in the
     // final flatbuffer.
     std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
+    if (dumpPtx) {
+      llvm::dbgs() << targetISA;
+    }
     auto ptxCudeRef = flatbuffers_uint8_vec_create(
         builder, reinterpret_cast<const uint8_t *>(targetISA.c_str()),
         targetISA.size());

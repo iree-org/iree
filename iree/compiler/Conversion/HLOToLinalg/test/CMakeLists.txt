@@ -14,11 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "concatenate.mlir"
-    "decompose_hlo_clamp.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
-    "fusion.mlir"
     "pad_tensor_to_tensor.mlir"
   DATA
     iree::tools::IreeFileCheck

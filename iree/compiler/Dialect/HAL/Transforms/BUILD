@@ -29,7 +29,6 @@ cc_library(
         "LinkExecutables.cpp",
         "MaterializeConstantPoolBuffers.cpp",
         "MaterializeInterfaces.cpp",
-        "MaterializeInterfaces2.cpp",
         "MaterializeResourceCaches.cpp",
         "MemoizeDeviceQueries.cpp",
         "PackAllocations.cpp",
@@ -68,6 +67,5 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@mlir-hlo//:hlo",
     ],
 )

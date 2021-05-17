@@ -27,12 +27,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// Exports two kind of benchmark functions:
-//   - Creates exported functions to invoke each executable op.
-//   - Clones each exported functions (including those just created) with
-//     placeholder constant inputs instead of arguments and removes the
-//     exported attribute from the old functions.
-// The input are provided using flow.variable and flow.lookup.
+// Clones each exported functions (including those just created) with
+// placeholder constant inputs instead of arguments and removes the exported
+// attribute from the old functions.
+// The input are provided using flow.variables.
 class ExportBenchmarkFuncsPass
     : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
  public:
@@ -50,11 +48,6 @@ class ExportBenchmarkFuncsPass
     }
     for (auto entryFuncOp : entryFuncOps) {
       createEntryPointBenchmarkFunc(moduleOp, entryFuncOp);
-    }
-
-    // Create one benchmark function per entry point in each flow.executable.
-    for (auto executableOp : moduleOp.getOps<IREE::Flow::ExecutableOp>()) {
-      createExecutableBenchmarkFunc(moduleOp, executableOp);
     }
   }
 
@@ -120,63 +113,6 @@ class ExportBenchmarkFuncsPass
     entryFuncOp->removeAttr("iree.module.export");
     entryFuncOp->removeAttr("iree.reflection");
     entryFuncOp.setPrivate();
-  }
-
-  void createExecutableBenchmarkFunc(ModuleOp moduleOp,
-                                     IREE::Flow::ExecutableOp executableOp) {
-    OpBuilder moduleBuilder(&getContext());
-    moduleBuilder.setInsertionPointAfter(executableOp);
-    for (auto& op : executableOp.getBlock()) {
-      auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op);
-      if (!dispatchEntryOp) continue;
-      auto execFuncOp = executableOp.getInnerModule().lookupSymbol<FuncOp>(
-          dispatchEntryOp.function_ref());
-      Location loc = execFuncOp.getLoc();
-
-      // Create one dummy input variable per input.
-      SmallVector<IREE::Flow::VariableOp, 4> dummyInputVariableOps;
-      for (auto inputType : execFuncOp.getType().getInputs()) {
-        dummyInputVariableOps.push_back(
-            createDummyInputVariableOp(loc, inputType, moduleBuilder));
-      }
-
-      // Create a `() -> ()` entry point op the benchmark tool can run.
-      std::string funcName = std::string(execFuncOp.getName()) + "_benchmark";
-      auto funcType = moduleBuilder.getFunctionType({}, {});
-      auto funcOp = moduleBuilder.create<FuncOp>(loc, funcName, funcType);
-      funcOp->setAttr("iree.module.export", moduleBuilder.getUnitAttr());
-      funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
-      SmallVector<NamedAttribute> reflectionAttrs = {
-          moduleBuilder.getNamedAttr("benchmark",
-                                     moduleBuilder.getStringAttr("dispatch")),
-      };
-      funcOp->setAttr("iree.reflection",
-                      moduleBuilder.getDictionaryAttr(reflectionAttrs));
-      Block* block = funcOp.addEntryBlock();
-
-      // Build the body of the FuncOp.
-      auto blockBuilder = OpBuilder(block, block->begin());
-      SmallVector<Value, 4> args;
-      for (auto variableOp : dummyInputVariableOps) {
-        args.push_back(blockBuilder.createOrFold<IREE::Flow::VariableLoadOp>(
-            loc, variableOp));
-      }
-
-      // TODO(hanchung): Use a real workload instead? We can probably
-      // calculate the workload from the results.
-      auto dummyWorkload = blockBuilder.create<ConstantIndexOp>(loc, 0);
-      auto dispatchOp = blockBuilder.create<DispatchOp>(
-          loc, dispatchEntryOp, ValueRange{dummyWorkload},
-          execFuncOp.getType().getResults(), ValueRange{}, args, ValueRange{},
-          ArrayRef<int64_t>{});
-
-      // Sink all results with do_not_optimize to ensure that DCE does not
-      // remove the dispatch.
-      for (auto result : dispatchOp.getResults()) {
-        blockBuilder.create<IREE::DoNotOptimizeOp>(loc, result);
-      }
-      blockBuilder.create<mlir::ReturnOp>(loc);
-    }
   }
 
   int uniqueId = 0;

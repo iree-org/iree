@@ -25,11 +25,13 @@ iree_cc_library(
     "VectorizationPass.cpp"
   DEPS
     MLIRAffine
+    MLIRAffineToStandard
     MLIRGPU
     MLIRGPUToNVVMTransforms
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMath
     MLIRMemRefTransforms
     MLIRNVVMIR
     MLIRPass
@@ -43,7 +45,6 @@ iree_cc_library(
     MLIRVectorToSCF
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToHLO
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::Transforms

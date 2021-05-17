@@ -561,316 +561,6 @@ static LogicalResult verifyVariableStoreIndirectOp(
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.region
-//===----------------------------------------------------------------------===//
-
-/// Inlines operation |op| into the |dispatchRegionOp| by making all operands,
-/// as well as values caputred implicitly by the regions of the operation, that
-/// are outside the dispatch region operands of the dispatch region as well.
-static Operation *inlineOpIntoDispatchRegion(OpBuilder &builder,
-                                             DispatchRegionOp dispatchRegionOp,
-                                             Operation *op,
-                                             BlockAndValueMapping &map) {
-  llvm::SetVector<Value> capturedInputs(op->getOperands().begin(),
-                                        op->getOperands().end());
-  getUsedValuesDefinedAbove(op->getRegions(), capturedInputs);
-  Block *block = builder.getInsertionBlock();
-  for (Value capturedInput : capturedInputs) {
-    if (map.contains(capturedInput)) continue;
-    dispatchRegionOp.getOperation()->insertOperands(
-        dispatchRegionOp.getOperation()->getNumOperands(), {capturedInput});
-    Value newBlockArgument = block->addArgument(capturedInput.getType());
-    map.map(capturedInput, newBlockArgument);
-  }
-
-  return builder.clone(*op, map);
-}
-
-llvm::Optional<std::pair<DispatchRegionOp, Operation *>>
-DispatchRegionOp::formFromAnchorOp(Value workload, Operation *anchorOp,
-                                   OpBuilder &builder) {
-  builder.setInsertionPoint(anchorOp);
-  auto loc = anchorOp->getLoc();
-  // Map anchor into new dispatch region.
-  auto drOp = builder.create<DispatchRegionOp>(
-      loc, llvm::to_vector<1>(anchorOp->getResultTypes()), workload,
-      ArrayRef<Value>());
-  auto *drBlock = new Block();
-  drOp.body().push_back(drBlock);
-  BlockAndValueMapping mapping;
-  builder.setInsertionPointToEnd(drBlock);
-  Operation *newAnchorOp =
-      inlineOpIntoDispatchRegion(builder, drOp, anchorOp, mapping);
-
-  // Insert terminator
-  builder.create<IREE::Flow::ReturnOp>(loc, newAnchorOp->getResults());
-
-  // Replace anchor uses with region result.
-  for (auto it : llvm::enumerate(anchorOp->getResults())) {
-    it.value().replaceAllUsesWith(drOp.getResult(it.index()));
-  }
-  anchorOp->erase();
-  return std::make_pair(drOp, newAnchorOp);
-}
-
-// Clones an operation with new result types.
-// The original operation will be erased and a new operation constructed
-// in its place.
-static Operation *cloneWithNewResultTypes(Operation *op,
-                                          TypeRange newResultTypes) {
-  OperationState state(op->getLoc(), op->getName());
-  state.addOperands(op->getOperands());
-  state.addTypes(newResultTypes);
-  state.addSuccessors(op->getSuccessors());
-  state.addAttributes(op->getAttrs());
-  for (unsigned i = 0, e = op->getNumRegions(); i < e; ++i) {
-    state.addRegion();
-  }
-  Operation *newOp = Operation::create(state);
-  for (unsigned i = 0, e = op->getNumRegions(); i < e; ++i) {
-    newOp->getRegion(i).takeBody(op->getRegion(i));
-  }
-  return newOp;
-}
-
-ResultRange DispatchRegionOp::appendResults(DispatchRegionOp &self,
-                                            ValueRange addlResults,
-                                            OpBuilder &builder) {
-  Block &block = self.body().front();
-
-  unsigned origNumResults = self.getNumResults();
-  llvm::SmallVector<Type, 4> newTypes(self.getResultTypes().begin(),
-                                      self.getResultTypes().end());
-  for (auto r : addlResults) newTypes.push_back(r.getType());
-
-  // Changing the arity of the results requires replacing the dispatch region.
-  builder.setInsertionPoint(self);
-  auto newDrOp = llvm::cast<DispatchRegionOp>(
-      builder.insert(cloneWithNewResultTypes(self, newTypes)));
-  self.replaceAllUsesWith(newDrOp->getResults().take_front(origNumResults));
-  self.erase();
-  self = newDrOp;
-
-  // Add results to the terminator.
-  auto terminator = block.getTerminator();
-  llvm::SmallVector<Value, 4> returns(terminator->getOperands());
-  returns.append(addlResults.begin(), addlResults.end());
-  terminator->setOperands(returns);
-
-  return self->getResults().slice(origNumResults, addlResults.size());
-}
-
-Operation *DispatchRegionOp::inlineOp(Operation *origOp, OpBuilder &builder,
-                                      bool positionAtEnd) {
-  Block &block = body().front();
-  if (positionAtEnd) {
-    builder.setInsertionPoint(block.getTerminator());
-  } else {
-    builder.setInsertionPointToStart(&block);
-  }
-  // Map existing dr args.
-  BlockAndValueMapping mapping;
-  for (unsigned i = 0, e = block.getNumArguments(); i < e; ++i) {
-    mapping.map(args()[i], block.getArgument(i));
-  }
-
-  // Also map any terminator operands to support inlining at the end.
-  for (auto it : llvm::enumerate(block.getTerminator()->getOperands())) {
-    mapping.map(getResult(it.index()), it.value());
-  }
-
-  // Remember the values corresponding to original op results.
-  llvm::SmallVector<Value, 4> origOpResultValues;
-  for (Value result : origOp->getResults()) {
-    origOpResultValues.push_back(mapping.lookupOrNull(result));
-  }
-
-  Operation *inlinedOp =
-      inlineOpIntoDispatchRegion(builder, *this, origOp, mapping);
-
-  // Replace any results from the orig with results from the clone.
-  for (unsigned i = 0, e = origOp->getNumResults(); i < e; ++i) {
-    Value resultTo = origOpResultValues[i];
-    if (resultTo) {
-      resultTo.replaceAllUsesWith(inlinedOp->getResult(i));
-    }
-  }
-
-  return inlinedOp;
-}
-
-void DispatchRegionOp::build(OpBuilder &builder, OperationState &state,
-                             ArrayRef<Type> resultTypes, Value workload,
-                             ValueRange args,
-                             ArrayRef<NamedAttribute> attributes) {
-  state.addTypes(resultTypes);
-  state.addOperands({workload});
-  state.addOperands(args);
-  state.addAttributes(attributes);
-  state.addRegion();
-}
-
-ParseResult parseDispatchRegionOp(OpAsmParser &parser, OperationState *result) {
-  // Parse required workload.
-  OpAsmParser::OperandType workloadArg;
-  Type workloadArgType;
-  if (failed(parser.parseLSquare()) ||
-      failed(parser.parseOperand(workloadArg)) ||
-      failed(parser.parseColonType(workloadArgType)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.resolveOperand(workloadArg, workloadArgType,
-                                   result->operands))) {
-    return failure();
-  }
-
-  // Parse (optional) args.
-  SmallVector<OpAsmParser::OperandType, 16> regionArgs;
-  SmallVector<Type, 16> regionArgTypes;
-  if (failed(parser.parseLParen())) {
-    return failure();
-  }
-  if (failed(parser.parseOptionalRParen())) {
-    SmallVector<OpAsmParser::OperandType, 16> regionOperands;
-    auto argsLoc = parser.getCurrentLocation();
-    do {
-      // Reserve entries in the lists.
-      regionArgs.emplace_back();
-      regionOperands.emplace_back();
-      regionArgTypes.emplace_back();
-      if (failed(parser.parseRegionArgument(regionArgs.back())) ||
-          failed(parser.parseEqual()) ||
-          failed(parser.parseOperand(regionOperands.back())) ||
-          failed(parser.parseColonType(regionArgTypes.back()))) {
-        return failure();
-      }
-    } while (succeeded(parser.parseOptionalComma()));
-    if (failed(parser.parseRParen()) ||
-        failed(parser.resolveOperands(regionOperands, regionArgTypes, argsLoc,
-                                      result->operands))) {
-      return failure();
-    }
-  }
-
-  // Parse (optional) results.
-  if (failed(parser.parseOptionalArrowTypeList(result->types))) {
-    return failure();
-  }
-
-  // Parse region body.
-  Region *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, regionArgs, regionArgTypes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
-  p << op.getOperationName();
-
-  // Print the workload argument.
-  p << "[";
-  p.printOperand(op.workload());
-  p << " : ";
-  p.printType(op.workload().getType());
-  p << "]";
-
-  // Print the data argument remapping.
-  p << "(";
-  interleaveComma(llvm::zip(op.body().getArguments(), op.args()), p,
-                  [&](std::tuple<BlockArgument, Value> it) {
-                    p << std::get<0>(it) << " = " << std::get<1>(it);
-                    p << " : ";
-                    p << std::get<1>(it).getType();
-                  });
-  p << ")";
-
-  // Print the result types, if any.
-  if (op.getNumResults() > 0) {
-    p << " -> (";
-    interleaveComma(op.getResultTypes(), p);
-    p << ")";
-  }
-
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
-  p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{});
-}
-
-Operation::operand_range DispatchRegionOp::getClosureOperands() {
-  return args();
-}
-
-Operation::result_range DispatchRegionOp::getClosureResults() {
-  return results();
-}
-
-// TODO(#4897): allow non-splat constants - current paths can't handle them.
-static bool canDispatchRegionContainOpIssue4897(Operation *op) {
-  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.getValue();
-    auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      return denseAttr.isSplat();
-    } else if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// Inline operations that the dispatch region can handle natively.
-static bool canDispatchRegionContainOp(Operation *op) {
-  // Inline constant operations that are splat or small constants.
-  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.getValue();
-    auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      // TODO(GH-4897): Non-splat constants seems to have an issue on the LLLVM
-      // side. Uncomment after that is fixed.
-      auto shapedType = constantOp.getType().cast<ShapedType>();
-      uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
-          8;
-      return denseAttr.isSplat() ||
-             estimatedByteLength <= clInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool DispatchRegionOp::canClosureContainOp(Operation *op) {
-  return canDispatchRegionContainOpIssue4897(op);
-}
-
-ClosureOpInterface
-DispatchRegionOp::cloneReplacementExcludingOperandsAndResults(
-    ArrayRef<unsigned> excludedOperandIndices,
-    ArrayRef<unsigned> excludedResultIndices) {
-  SmallVector<Type, 4> newResultTypes = llvm::to_vector<4>(getResultTypes());
-  SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(args());
-  excludeClosureOperandsAndResults(newOperandsValues, excludedOperandIndices,
-                                   newResultTypes, excludedResultIndices);
-  auto newOp = OpBuilder(getContext())
-                   .create<DispatchRegionOp>(getLoc(), newResultTypes,
-                                             workload(), newOperandsValues,
-                                             getOperation()->getAttrs());
-  auto &newBody = newOp.getClosureBodyRegion();
-  newBody.takeBody(getClosureBodyRegion());
-  eraseRegionResults(newBody, excludedResultIndices);
-  newBody.front().eraseArguments(excludedOperandIndices);
-  return newOp;
-}
-
-//===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
 
@@ -1090,6 +780,31 @@ Operation::operand_range DispatchWorkgroupsOp::getClosureOperands() {
 
 Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
   return results();
+}
+
+// Inline operations that the dispatch region can handle natively.
+static bool canDispatchRegionContainOp(Operation *op) {
+  // Inline constant operations that are splat or small constants.
+  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
+    auto constantValueAttr = constantOp.getValue();
+    auto constantType = constantOp.getType();
+    if (constantValueAttr.isa<SplatElementsAttr>()) {
+      return true;
+    } else if (auto denseAttr =
+                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
+      // TODO(GH-4897): Non-splat constants seems to have an issue on the LLVM
+      // side. Uncomment after that is fixed.
+      auto shapedType = constantOp.getType().cast<ShapedType>();
+      uint64_t estimatedByteLength =
+          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
+          8;
+      return denseAttr.isSplat() ||
+             estimatedByteLength <= clInlineConstantByteLength;
+    } else if (constantType.isIntOrIndexOrFloat()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {

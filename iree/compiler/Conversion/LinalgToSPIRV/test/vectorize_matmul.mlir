@@ -9,8 +9,9 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:4096x4096xf16>, !flow.dispatch.tensor<readonly:4096x4096xf16>, !flow.dispatch.tensor<writeonly:4096x4096xf16>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
@@ -268,8 +269,9 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:4096x4096xf16>, !flow.dispatch.tensor<readonly:4096x4096xf16>, !flow.dispatch.tensor<writeonly:4096x4096xf16>) -> ()}
+      interface = @io,
+      ordinal = 0 : index
+    }
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,

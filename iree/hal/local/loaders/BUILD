@@ -93,40 +93,6 @@ cc_library(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_VMLA})
-""",
-    inline = True,
-)
-
-cc_library(
-    name = "vmla_module_loader",
-    srcs = ["vmla_module_loader.cc"],
-    hdrs = ["vmla_module_loader.h"],
-    defines = [
-        "IREE_HAL_HAVE_VMLA_MODULE_LOADER=1",
-    ],
-    deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-        "//iree/base/internal:flatcc",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/modules/vmla:op_module",
-        "//iree/schemas:vmla_executable_def_c_fbs",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-    ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
-)
-
-iree_cmake_extra_content(
-    content = """
 if(${IREE_HAL_DRIVER_VMVX})
 """,
     inline = True,

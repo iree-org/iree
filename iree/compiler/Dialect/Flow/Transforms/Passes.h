@@ -52,8 +52,7 @@ void registerInputTransformPassPipeline();
 //   buildInputTransformPassPipeline
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager,
-                                    bool dispatchLinalgOnTensors = true);
+void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
 void registerFlowTransformPassPipeline();
 
@@ -86,29 +85,15 @@ std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
 
 //===----------------------------------------------------------------------===//
-// Dispatches (flow.dispatch.region)
+// Dispatches (flow.dispatch.workgroups)
 //===----------------------------------------------------------------------===//
 
 /// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
 /// A dispatch region is created for each tiled loop nest.
 std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass();
 
-// Analyzes a module to identify which functions are dispatchable.
-// This information is cached on the module and is used by other FuncOp-scoped
-// passes to quickly access the module-level dispatchability information.
-std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityAnalysisPass();
-
-// Identifies dispatchable regions of functions and wraps them in
-// flow.dispatch_regions (version 2).
-std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegions2Pass();
-
-// Folds multiple dispatch regions together that have compatible workloads.
-std::unique_ptr<OperationPass<FuncOp>>
-createFoldCompatibleDispatchRegionsPass();
-
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegions2Pass();
 
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass();

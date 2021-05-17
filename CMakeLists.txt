@@ -124,7 +124,6 @@ endif()
 set(IREE_ALL_HAL_DRIVERS
   Cuda
   DyLib
-  VMLA
   VMVX
   Vulkan
 )
@@ -163,7 +162,6 @@ set(IREE_ALL_TARGET_BACKENDS
   WASM-LLVM-AOT
   Metal-SPIRV
   Vulkan-SPIRV
-  VMLA
   VMVX
 )
 
@@ -387,7 +385,6 @@ include(flatbuffer_c_library)
 add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
@@ -397,8 +394,6 @@ add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
-# ruy must come after cpuinfo so it uses already-defined targets.
-add_subdirectory(third_party/ruy EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if (NOT CMAKE_CROSSCOMPILING)

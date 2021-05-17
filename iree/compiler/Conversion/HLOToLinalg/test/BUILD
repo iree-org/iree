@@ -27,11 +27,8 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "concatenate.mlir",
-            "decompose_hlo_clamp.mlir",
             "dynamic_shape.mlir",
             "fft.mlir",
-            "fusion.mlir",
             "pad_tensor_to_tensor.mlir",
         ],
         include = ["*.mlir"],
