@@ -70,6 +70,12 @@ function(iree_tf_benchmark_suite)
       set(_MODEL_CL "--model=${_MODEL}")
     endif()
 
+    # Add a command-line option to specify the compilation flags if specified.
+    set(_COMPILATION_FLAGS_CL "")
+    if(_RULE_COMPILATION_FLAGS)
+      set(_COMPILATION_FLAGS_CL "--compilation_flags=\"${_RULE_COMPILATION_FLAGS}\"")
+    endif()
+
     # Add a command-line option to specify the runtime flags if specified.
     set(_RUNTIME_FLAGS_CL "")
     if(_RULE_RUNTIME_FLAGS)
@@ -89,9 +95,9 @@ function(iree_tf_benchmark_suite)
           ${_RULE_MODEL_SCRIPT_ARGS}
           "${_MODEL_CL}"
           "--artifacts_dir=${_ARTIFACTS_DIR}"
-          "--configuration_names=${_COMBINED_CONFG_NAME}"
+          "--configuration_name=${_COMBINED_CONFG_NAME}"
           "--target_backend=${_RULE_TARGET_BACKEND}"
-          "--compilation_flags=\"${_RULE_COMPILATION_FLAGS}\""
+          "${_COMPILATION_FLAGS_CL}"
           "${_RUNTIME_FLAGS_CL}"
       DEPENDS
         bindings_python_iree_compiler_compiler

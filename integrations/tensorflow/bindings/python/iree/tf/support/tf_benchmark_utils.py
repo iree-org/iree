@@ -34,10 +34,10 @@ flags.DEFINE_string("target_backend", None,
                     "The target backend to benchmark against.")
 flags.DEFINE_list("configuration_name", None,
                   "The benchmark configuration's name")
-flags.DEFINE_list("compilation_flags", None,
-                  "A semicolon-separated list of compilation flags")
-flags.DEFINE_list("runtime_flags", None,
-                  "A semicolon-separated list of runtime flags")
+flags.DEFINE_string("compilation_flags", None,
+                    "A semicolon-separated list of compilation flags")
+flags.DEFINE_string("runtime_flags", None,
+                    "A semicolon-separated list of runtime flags")
 flags.DEFINE_string(
     "artifacts_dir", None,
     "Specifies a directory to dump compilation artifacts and traces to. "
