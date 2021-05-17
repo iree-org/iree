@@ -14,6 +14,10 @@
 
 set(STBLIB_ROOT "${IREE_ROOT_DIR}/third_party/stblib/")
 
+iree_select_compiler_opts(_STBLIB_COPTS
+  CLANG
+    "-Wno-implicit-fallthrough"
+)
 
 external_cc_library(
   PACKAGE
@@ -25,7 +29,7 @@ external_cc_library(
   SRCS
     "stb_image.c"
   COPTS
-    "-Wno-implicit-fallthrough"
+    ${_STBLIB_COPTS}
   INCLUDES
     ${STBLIB_ROOT}
 )
