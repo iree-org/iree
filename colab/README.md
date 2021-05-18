@@ -29,6 +29,14 @@ model and runs it using IREE
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/resnet.ipynb)
 
+### [tensorflow_hub_import\.ipynb](tensorflow_hub_import.ipynb)
+
+Downloads a pretrained
+[MobileNet V2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
+model, pre-processes it for import, then compiles it using IREE
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tensorflow_hub_import.ipynb)
+
 ## Working with GitHub
 
 Refer to
