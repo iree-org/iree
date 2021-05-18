@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-cuda-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -iree-codegen-llvmgpu-vectorization %s | IreeFileCheck %s
 
 func @add_dispatch_0() attributes {cuda_workgroup_size = dense<[32, 1, 1]> : vector<3xi64>} {
   %c128 = constant 128 : index

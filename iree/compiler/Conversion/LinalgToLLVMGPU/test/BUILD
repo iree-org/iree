@@ -28,9 +28,11 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "convert_to_nvvm.mlir",
+            "convert_to_rocdl.mlir",
             "distribute_to_thread.mlir",
-            "pipeline_test.mlir",
+            "nvvm_pipeline_test.mlir",
             "remove_loops.mlir",
+            "rocdl_pipeline_test.mlir",
             "scalarize.mlir",
             "vectorization.mlir",
         ],

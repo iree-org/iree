@@ -522,7 +522,7 @@ static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
   // across threads within a workgroup.
   if (!hasMarker(linalgOp)) return failure();
   Optional<linalg::LinalgLoops> loops =
-      linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
+      linalg::linalgOpToParallelLoops(rewriter, linalgOp);
   if (!loops) return failure();
   if (loops.getValue().empty()) return success();
 
@@ -570,7 +570,7 @@ LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
                  {getCopyToWorkgroupMemoryMarker(), getWorkgroupMarker()}))
     return failure();
   Optional<linalg::LinalgLoops> loops =
-      linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, copyOp);
+      linalg::linalgOpToParallelLoops(rewriter, copyOp);
   if (!loops) return failure();
   if (loops.getValue().empty()) return success();
 
@@ -643,7 +643,7 @@ struct MapLinalgOpToGlobalInvocationId
     FuncOp funcOp = linalgOp->template getParentOfType<FuncOp>();
     if (!funcOp) return failure();
     Optional<linalg::LinalgLoops> loops =
-        linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
+        linalg::linalgOpToParallelLoops(rewriter, linalgOp);
     if (!loops) return failure();
 
     SmallVector<int64_t, 3> workgroupSize(3, 1);

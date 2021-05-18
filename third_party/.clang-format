@@ -14,3 +14,4 @@
 
 # Disable formatting for any code under third_party/, since we don't control it.
 DisableFormat: true
+SortIncludes: false

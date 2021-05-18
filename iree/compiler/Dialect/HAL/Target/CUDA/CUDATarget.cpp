@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
-#include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
+#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -139,7 +139,7 @@ class CUDATargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    buildNVVMTransformPassPipeline(passManager);
+    buildLLVMGPUTransformPassPipeline(passManager, false);
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
@@ -180,7 +180,7 @@ class CUDATargetBackend final : public TargetBackend {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
       std::array<int32_t, 3> workgroup_size;
-      for (auto it : llvm::enumerate(func->getAttr("cuda_workgroup_size")
+      for (auto it : llvm::enumerate(func->getAttr("llvmgpu_workgroup_size")
                                          .cast<DenseIntElementsAttr>()
                                          .getIntValues())) {
         workgroup_size[it.index()] = it.value().getZExtValue();

@@ -7,7 +7,7 @@
 You will need to install [CMake](https://cmake.org/), along with a C/C++
 compiler:
 
-=== "Linux"
+=== "Linux and MacOS"
 
     <!-- TODO(scotttodd): annotation about gcc vs clang -->
 
@@ -45,9 +45,18 @@ git submodule update --init
 Configure then build all targets using CMake:
 
 ``` shell
-cmake -B ../iree-build/ .
+cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo .
 cmake --build ../iree-build/
 ```
+
+???+ Tip
+    We recommend using the `RelWithDebInfo` build type by default for a good
+    balance of debugging information and performance. The `Debug`, `Release`,
+    and `MinSizeRel` build types are useful in more specific scenarios.
+    In particular, note that several useful LLVM debugging features are only
+    available in `Debug` builds. See the
+    [official CMake documentation](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html)
+    for general details.
 
 ???+ Tip
     Most IREE Core devs use [Ninja](https://ninja-build.org/) as the CMake

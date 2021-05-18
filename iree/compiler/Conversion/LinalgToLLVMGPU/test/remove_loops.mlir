@@ -1,7 +1,7 @@
-// RUN: iree-opt -iree-cuda-remove-single-iteration-loop %s | IreeFileCheck %s
+// RUN: iree-opt -iree-llvmgpu-remove-single-iteration-loop %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @dispatch_0()
-func @dispatch_0() attributes {cuda_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
+func @dispatch_0() attributes {llvmgpu_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
   %c2 = constant 2 : index
   %c256 = constant 256 : index
   //     CHECK: %[[C250:.+]] = constant 250 : index

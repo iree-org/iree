@@ -31,6 +31,7 @@ iree_cc_test(
     iree::vm::ops
     iree::vm::shims_emitc
     ::arithmetic_ops
+    ::arithmetic_ops_f32
     ::arithmetic_ops_i64
     ::assignment_ops
     ::assignment_ops_i64
@@ -53,6 +54,15 @@ iree_c_module(
     "../arithmetic_ops.mlir"
   H_FILE_OUTPUT
     "arithmetic_ops.h"
+)
+
+iree_c_module(
+  NAME
+    arithmetic_ops_f32
+  SRC
+    "../arithmetic_ops_f32.mlir"
+  H_FILE_OUTPUT
+    "arithmetic_ops_f32.h"
 )
 
 iree_c_module(
