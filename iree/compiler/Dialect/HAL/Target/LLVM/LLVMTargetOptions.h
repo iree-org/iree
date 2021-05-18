@@ -59,6 +59,10 @@ struct LLVMTargetOptions {
 
   // True to keep linker artifacts for debugging.
   bool keepLinkerArtifacts = false;
+
+  // Path to produce static library ".o" file along with header ".h". Unused if
+  // empty.
+  std::string staticLibraryOutput;
 };
 
 // Returns LLVMTargetOptions struct intialized with the iree-llvm-* flags.

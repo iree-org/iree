@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/static/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/dylib_executable_def_builder.h"
@@ -38,6 +39,8 @@ namespace IREE {
 namespace HAL {
 
 namespace {
+
+constexpr char kQueryFunctionName[] = "iree_hal_executable_library_query";
 
 llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
@@ -85,6 +88,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto codeGenOptions = getLLVMCodegenOptionsFromClOptions();
     // Set target specific options.
     // TODO(ataei): This is temporary here, should move when target specific
+    // TODO(kooljblack): Update LLVM target tripple for "static" support.
+
     // overrides options grows.
     llvm::Triple triple(options_.targetTriple);
     if (triple.isWasm()) {
@@ -224,8 +229,14 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       llvmFunc->setDSOLocal(true);
       libraryBuilder.addEntryPoint(entryPointOp.getName(), "", llvmFunc);
     }
-    auto *queryLibraryFunc =
-        libraryBuilder.build("iree_hal_executable_library_query");
+
+    auto queryFunctionName = std::string(kQueryFunctionName);
+    if (!options_.staticLibraryOutput.empty()) {
+      // Static library query functions must be unique to support multiple
+      // libraries in the same namespace.
+      queryFunctionName = libraryName + "_library_query";
+    }
+    auto *queryLibraryFunc = libraryBuilder.build(queryFunctionName);
 
     // The query function must be exported for dynamic libraries.
     queryLibraryFunc->setVisibility(
@@ -287,6 +298,23 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       objectFiles.push_back(std::move(objectFile));
     }
 
+    if (!options_.staticLibraryOutput.empty()) {
+      if (objectFiles.size() != 1) {
+        // Static library output only supports single object libraries.
+        return targetOp.emitError() << "Static library generation unsupported "
+                                       "for multiple object files.";
+      }
+
+      // Copy the static object file to the specified output path.
+      // Generate a header at that output path.
+      const std::string &libraryPath = options_.staticLibraryOutput;
+      const auto library_name = objectFiles[0].path;
+      if (!OutputStaticLibrary(libraryName, queryFunctionName, libraryPath,
+                               objectFiles[0].path)) {
+        return targetOp.emitError() << "Static library generation failed.";
+      }
+    }
+
     // Link the generated object files into a dylib.
     auto linkArtifactsOr =
         linkerTool->linkDynamicLibrary(libraryName, objectFiles);
@@ -323,6 +351,18 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           bufferAttr);
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
+
+    } else if (!options_.staticLibraryOutput.empty()) {
+      // Embed the library name in the executable binary op. This informs the
+      // loader which static library to load for the target binary.
+      std::vector<uint8_t> libraryNameVector(libraryName.begin(),
+                                             libraryName.end());
+      auto executableFormatAttr = std::string("static");
+
+      auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+          targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
+          libraryNameVector);
+      binaryOp.mime_typeAttr(executableBuilder.getStringAttr("text/plain"));
     } else {
       FlatbufferBuilder builder;
       iree_DyLibExecutableDef_start_as_root(builder);

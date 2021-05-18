@@ -47,6 +47,7 @@ iree_cc_library(
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::LLVM::static::StaticLibraryGenerator
     iree::compiler::Utils
     iree::schemas::dylib_executable_def_c_fbs
   PUBLIC
