@@ -19,6 +19,9 @@ import json
 import re
 import subprocess
 
+from dataclasses import dataclass
+from typing import Any, Dict, Sequence
+
 __all__ = ["AndroidDeviceInfo", "BenchmarkInfo", "BenchmarkResults"]
 
 # A map for IREE driver names. This allows us to normalize driver names like
@@ -31,11 +34,11 @@ IREE_DRIVER_NAME_MAP = {
 }
 
 
-def execute(args,
-            capture_output=False,
-            treat_io_as_text=True,
-            verbose=False,
-            **kwargs):
+def execute(args: Sequence[str],
+            capture_output: bool = False,
+            treat_io_as_text: bool = True,
+            verbose: bool = False,
+            **kwargs) -> subprocess.CompletedProcess:
   """Executes a command."""
   if verbose:
     cmd = " ".join(args)
@@ -47,7 +50,7 @@ def execute(args,
                         **kwargs)
 
 
-def get_android_device_model(verbose=False):
+def get_android_device_model(verbose: bool = False) -> str:
   """Returns the Android device model."""
   model = execute(["adb", "shell", "getprop", "ro.product.model"],
                   capture_output=True,
@@ -56,14 +59,14 @@ def get_android_device_model(verbose=False):
   return model
 
 
-def get_android_cpu_abi(verbose=False):
+def get_android_cpu_abi(verbose: bool = False) -> str:
   """Returns the CPU ABI for the Android device."""
   return execute(["adb", "shell", "getprop", "ro.product.cpu.abi"],
                  capture_output=True,
                  verbose=verbose).stdout.strip()
 
 
-def get_android_cpu_features(verbose=False):
+def get_android_cpu_features(verbose: bool = False) -> Sequence[str]:
   """Returns the CPU features for the Android device."""
   cpuinfo = execute(["adb", "shell", "cat", "/proc/cpuinfo"],
                     capture_output=True,
@@ -76,7 +79,7 @@ def get_android_cpu_features(verbose=False):
   return features
 
 
-def get_android_gpu_name(verbose=False):
+def get_android_gpu_name(verbose: bool = False) -> str:
   """Returns the GPU name for the Android device."""
   vkjson = execute(["adb", "shell", "cmd", "gpu", "vkjson"],
                    capture_output=True,
@@ -95,7 +98,8 @@ def get_android_gpu_name(verbose=False):
   return name
 
 
-class AndroidDeviceInfo(object):
+@dataclass
+class AndroidDeviceInfo:
   """An object describing the current Android Device.
 
   It includes the following phone characteristics:
@@ -105,11 +109,10 @@ class AndroidDeviceInfo(object):
   - gpu_name: the GPU name, e.g., 'Mali-G77'
   """
 
-  def __init__(self, model, cpu_abi, cpu_features, gpu_name, verbose=False):
-    self.model = get_android_device_model(verbose)
-    self.cpu_abi = get_android_cpu_abi(verbose)
-    self.cpu_features = get_android_cpu_features(verbose)
-    self.gpu_name = get_android_gpu_name(verbose)
+  model: str
+  cpu_abi: str
+  cpu_features: list[str]
+  gpu_name: str
 
   def __str__(self):
     features = ", ".join(self.cpu_features)
@@ -122,7 +125,7 @@ class AndroidDeviceInfo(object):
     params = ", ".join(params)
     return f"Android device <{params}>"
 
-  def get_arm_arch_revision(self):
+  def get_arm_arch_revision(self) -> str:
     """Returns the ARM architecture revision."""
     if self.cpu_abi != "arm64-v8a":
       raise ValueError("Unrecognized ARM CPU ABI; need to update the list")
@@ -141,7 +144,7 @@ class AndroidDeviceInfo(object):
       rev = "ARMv8.2-A"
     return rev
 
-  def to_json_object(self):
+  def to_json_object(self) -> Dict[str, Any]:
     return {
         "model": self.model,
         "cpu_abi": self.cpu_abi,
@@ -150,20 +153,21 @@ class AndroidDeviceInfo(object):
     }
 
   @staticmethod
-  def from_json_object(json_object):
+  def from_json_object(json_object: Dict[str, Any]):
     return AndroidDeviceInfo(json_object["model"], json_object["cpu_abi"],
                              json_object["cpu_features"],
                              json_object["gpu_name"])
 
   @staticmethod
-  def from_adb(verbose=False):
+  def from_adb(verbose: bool = False):
     return AndroidDeviceInfo(get_android_device_model(verbose),
                              get_android_cpu_abi(verbose),
-                             get_android_gpu_name(verbose),
-                             get_android_cpu_features(verbose))
+                             get_android_cpu_features(verbose),
+                             get_android_gpu_name(verbose))
 
 
-class BenchmarkInfo(object):
+@dataclass
+class BenchmarkInfo:
   """An object describing the current benchmark.
 
   It includes the following benchmark characteristics:
@@ -176,12 +180,11 @@ class BenchmarkInfo(object):
       bnechmarks run
   """
 
-  def __init__(self, model_name, model_tags, model_source, runner, device_info):
-    self.model_name = model_name
-    self.model_tags = model_tags
-    self.model_source = model_source
-    self.runner = runner
-    self.device_info = device_info
+  model_name: str
+  model_tags: list[str]
+  model_source: str
+  runner: str
+  device_info: AndroidDeviceInfo
 
   def __str__(self):
     # Get the target architecture and better driver name depending on the runner.
@@ -205,7 +208,7 @@ class BenchmarkInfo(object):
 
     return f"{model_part} with {driver} @ {phone_part}"
 
-  def to_json_object(self):
+  def to_json_object(self) -> Dict[str, Any]:
     return {
         "model_name": self.model_name,
         "model_tags": self.model_tags,
@@ -215,7 +218,7 @@ class BenchmarkInfo(object):
     }
 
   @staticmethod
-  def from_json_object(json_object):
+  def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkInfo(
         json_object["model_name"], json_object["model_tags"],
         json_object["model_source"], json_object["runner"],
@@ -237,10 +240,12 @@ class BenchmarkResults(object):
     self.commit = "<unknown>"
     self.benchmarks = []
 
-  def set_commit(self, commit):
+  def set_commit(self, commit: str):
     self.commit = commit
 
-  def append_one_benchmark(self, benchmark_info, run_context, run_results):
+  def append_one_benchmark(self, benchmark_info: BenchmarkInfo,
+                           run_context: Dict[str, Any],
+                           run_results: Sequence[Dict[str, Any]]):
     """Appends the results for one benchmark."""
     self.benchmarks.append({
         "benchmark": benchmark_info,
@@ -248,7 +253,7 @@ class BenchmarkResults(object):
         "results": run_results,
     })
 
-  def to_json_str(self):
+  def to_json_str(self) -> str:
     json_object = {"commit": self.commit, "benchmarks": []}
     for benchmark in self.benchmarks:
       json_object["benchmarks"].append({
@@ -259,7 +264,7 @@ class BenchmarkResults(object):
     return json.dumps(json_object)
 
   @staticmethod
-  def from_json_str(json_str):
+  def from_json_str(json_str: str):
     json_object = json.loads(json_str)
     results = BenchmarkResults()
     results.set_commit(json_object["commit"])

@@ -157,8 +157,11 @@ def compose_benchmark_info_object(device_info, root_build_dir,
   root_immediate_dir = os.path.basename(model_benchmark_dir)
   iree_driver, target_arch, bench_mode = root_immediate_dir.split("__")
 
-  return BenchmarkInfo(model_name, model_tags, "TensorFlow", iree_driver,
-                       device_info)
+  return BenchmarkInfo(model_name=model_name,
+                       model_tags=model_tags,
+                       model_source="TensorFlow",
+                       runner=iree_driver,
+                       device_info=device_info)
 
 
 def filter_python_model_benchmark_suite(device_info,
@@ -346,7 +349,8 @@ def main(args):
     with open(args.output, "w") as f:
       f.write(results.to_json_str())
   if args.verbose:
-    print(results)
+    print(results.commit)
+    print(results.benchmarks)
 
 
 if __name__ == "__main__":
