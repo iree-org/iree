@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Disable formatting for any code under third_party/, since we don't control it.
-DisableFormat: true
-SortIncludes: false
+set(ROCM_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/rocm/include")
+
+external_cc_library(
+  PACKAGE
+    rocm_headers
+  NAME
+    rocm_headers
+  ROOT
+    ${ROCM_HEADERS_API_ROOT}
+  HDRS
+    "hip/hip_runtime.h"
+  INCLUDES
+    ${ROCM_HEADERS_API_ROOT}
+)
+
