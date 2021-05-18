@@ -50,6 +50,13 @@ cmake --build ../iree-build/
 ```
 
 ???+ Tip
+    We recommend using the `RelWithDebInfo` build type by default for a good
+    balance of debugging information and performance. The `Debug`, `Release`,
+    and `MinSizeRel` build types are useful in more specific scenarios. See the
+    [official CMake documentation](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html)
+    for more details.
+
+???+ Tip
     Most IREE Core devs use [Ninja](https://ninja-build.org/) as the CMake
     generator. The benefit is that it works the same across all platforms and
     automatically takes advantage of parallelism. to use it, add a `-GNinja`
