@@ -19,6 +19,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/test/emitc/arithmetic_ops.h"
+#include "iree/vm/test/emitc/arithmetic_ops_f32.h"
 #include "iree/vm/test/emitc/arithmetic_ops_i64.h"
 #include "iree/vm/test/emitc/assignment_ops.h"
 #include "iree/vm/test/emitc/assignment_ops_i64.h"
@@ -60,6 +61,7 @@ std::vector<TestParams> GetModuleTestParams() {
   // TODO(simon-camp): get these automatically
   std::vector<ModuleDescription> modules = {
       {arithmetic_ops_descriptor_, arithmetic_ops_create},
+      {arithmetic_ops_f32_descriptor_, arithmetic_ops_f32_create},
       {arithmetic_ops_i64_descriptor_, arithmetic_ops_i64_create},
       {assignment_ops_descriptor_, assignment_ops_create},
       {assignment_ops_i64_descriptor_, assignment_ops_i64_create},

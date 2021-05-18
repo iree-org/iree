@@ -723,6 +723,46 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<ConstOpConversion<IREE::VM::ConstF32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstF32ZeroOp>>(context);
 
+  // ExtF32: Native floating-point arithmetic
+  patterns.insert<CallOpConversion<IREE::VM::AddF32Op>>(context, "vm_add_f32");
+  patterns.insert<CallOpConversion<IREE::VM::SubF32Op>>(context, "vm_sub_f32");
+  patterns.insert<CallOpConversion<IREE::VM::MulF32Op>>(context, "vm_mul_f32");
+  patterns.insert<CallOpConversion<IREE::VM::DivF32Op>>(context, "vm_div_f32");
+  patterns.insert<CallOpConversion<IREE::VM::RemF32Op>>(context, "vm_rem_f32");
+  patterns.insert<CallOpConversion<IREE::VM::FMAF32Op>>(context, "vm_fma_f32");
+  patterns.insert<CallOpConversion<IREE::VM::AbsF32Op>>(context, "vm_abs_f32");
+  patterns.insert<CallOpConversion<IREE::VM::NegF32Op>>(context, "vm_neg_f32");
+  patterns.insert<CallOpConversion<IREE::VM::CeilF32Op>>(context,
+                                                         "vm_ceil_f32");
+  patterns.insert<CallOpConversion<IREE::VM::FloorF32Op>>(context,
+                                                          "vm_floor_f32");
+
+  patterns.insert<CallOpConversion<IREE::VM::AtanF32Op>>(context,
+                                                         "vm_atan_f32");
+  patterns.insert<CallOpConversion<IREE::VM::Atan2F32Op>>(context,
+                                                          "vm_atan2_f32");
+  patterns.insert<CallOpConversion<IREE::VM::CosF32Op>>(context, "vm_cos_f32");
+  patterns.insert<CallOpConversion<IREE::VM::SinF32Op>>(context, "vm_sin_f32");
+  patterns.insert<CallOpConversion<IREE::VM::ExpF32Op>>(context, "vm_exp_f32");
+  patterns.insert<CallOpConversion<IREE::VM::Exp2F32Op>>(context,
+                                                         "vm_exp2_f32");
+  patterns.insert<CallOpConversion<IREE::VM::ExpM1F32Op>>(context,
+                                                          "vm_expm1_f32");
+  patterns.insert<CallOpConversion<IREE::VM::LogF32Op>>(context, "vm_log_f32");
+  patterns.insert<CallOpConversion<IREE::VM::Log10F32Op>>(context,
+                                                          "vm_log10_f32");
+  patterns.insert<CallOpConversion<IREE::VM::Log1pF32Op>>(context,
+                                                          "vm_log1p_f32");
+  patterns.insert<CallOpConversion<IREE::VM::Log2F32Op>>(context,
+                                                         "vm_log2_f32");
+  patterns.insert<CallOpConversion<IREE::VM::PowF32Op>>(context, "vm_pow_f32");
+  patterns.insert<CallOpConversion<IREE::VM::RsqrtF32Op>>(context,
+                                                          "vm_rsqrt_f32");
+  patterns.insert<CallOpConversion<IREE::VM::SqrtF32Op>>(context,
+                                                         "vm_sqrt_f32");
+  patterns.insert<CallOpConversion<IREE::VM::TanhF32Op>>(context,
+                                                         "vm_tanh_f32");
+
   // ExtF32: Comparison ops
   patterns.insert<CallOpConversion<IREE::VM::CmpEQF32OOp>>(context,
                                                            "vm_cmp_eq_f32o");
