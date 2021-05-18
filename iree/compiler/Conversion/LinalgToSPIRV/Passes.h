@@ -90,8 +90,8 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
 // Patterns
 //===----------------------------------------------------------------------===//
 
-/// Populates patterns to tile and distribute linalg operations.
-void populateLinalgTileAndDistributePatterns(
+/// Populates patterns to tile and distribute linalg.copy operations.
+void populateTileAndDistributeLinalgCopyPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
 /// Populates patterns to fold processor ID uses by using processor counts
