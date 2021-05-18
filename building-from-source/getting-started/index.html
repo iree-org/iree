@@ -697,7 +697,7 @@
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>You will need to install <a href="https://cmake.org/">CMake</a>, along with a C/C++
 compiler:</p>
-<div class="tabbed-set" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux</label><div class="tabbed-content">
+<div class="tabbed-set" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux and MacOS</label><div class="tabbed-content">
 <!-- TODO(scotttodd): annotation about gcc vs clang -->
 <div class="highlight"><pre><span></span><code>sudo apt install cmake clang
 <span class="nb">export</span> <span class="nv">CC</span><span class="o">=</span>clang
@@ -732,9 +732,17 @@ submodules:</p>
 git submodule update --init
 </code></pre></div>
 <p>Configure then build all targets using CMake:</p>
-<div class="highlight"><pre><span></span><code>cmake -B ../iree-build/ .
+<div class="highlight"><pre><span></span><code>cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo .
 cmake --build ../iree-build/
 </code></pre></div>
+<details class="tip" open="open"><summary>Tip</summary><p>We recommend using the <code>RelWithDebInfo</code> build type by default for a good
+balance of debugging information and performance. The <code>Debug</code>, <code>Release</code>,
+and <code>MinSizeRel</code> build types are useful in more specific scenarios.
+In particular, note that several useful LLVM debugging features are only
+available in <code>Debug</code> builds. See the
+<a href="https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html">official CMake documentation</a>
+for general details.</p>
+</details>
 <details class="tip" open="open"><summary>Tip</summary><p>Most IREE Core devs use <a href="https://ninja-build.org/">Ninja</a> as the CMake
 generator. The benefit is that it works the same across all platforms and
 automatically takes advantage of parallelism. to use it, add a <code>-GNinja</code>

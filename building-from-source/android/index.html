@@ -779,12 +779,15 @@ devices from the command line. Install it following the
 <h2 id="configure-and-build">Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">&para;</a></h2>
 <h3 id="host-configuration">Host configuration<a class="headerlink" href="#host-configuration" title="Permanent link">&para;</a></h3>
 <p>Build and install on your host machine:</p>
-<div class="highlight"><pre><span></span><code>cmake  -B ../iree-build/ -DCMAKE_INSTALL_PREFIX<span class="o">=</span>../iree-build/install .
+<div class="highlight"><pre><span></span><code>cmake -B ../iree-build/ <span class="se">\</span>
+  -DCMAKE_INSTALL_PREFIX<span class="o">=</span>../iree-build/install <span class="se">\</span>
+  -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
+  .
 cmake --build ../iree-build/ --target install
 </code></pre></div>
 <h3 id="target-configuration">Target configuration<a class="headerlink" href="#target-configuration" title="Permanent link">&para;</a></h3>
 <p>Build the runtime using the Android NDK toolchain:</p>
-<div class="tabbed-set" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux</label><div class="tabbed-content">
+<div class="tabbed-set" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux and MacOS</label><div class="tabbed-content">
 <div class="highlight"><pre><span></span><code>cmake -B ../iree-build-android/ <span class="se">\</span>
   -DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">ANDROID_NDK</span><span class="p">?</span><span class="si">}</span><span class="s2">/build/cmake/android.toolchain.cmake&quot;</span> <span class="se">\</span>
   -DIREE_HOST_BINARY_ROOT<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/../iree-build/install&quot;</span> <span class="se">\</span>

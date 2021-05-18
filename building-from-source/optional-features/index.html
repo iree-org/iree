@@ -725,7 +725,11 @@ python -m pip install -r ./bindings/python/build_requirements.txt
 </details>
 <details class="usage" open="open"><summary>Usage</summary><p>From the <code>iree-build</code> directory:</p>
 <div class="tabbed-set" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><label for="__tabbed_2_1">Linux and MacOS</label><div class="tabbed-content">
-<div class="highlight"><pre><span></span><code>cmake -DIREE_BUILD_PYTHON_BINDINGS<span class="o">=</span>ON -DPython3_EXECUTABLE<span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>which python<span class="k">)</span><span class="s2">&quot;</span> .
+<div class="highlight"><pre><span></span><code>cmake <span class="se">\</span>
+  -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
+  -DIREE_BUILD_PYTHON_BINDINGS<span class="o">=</span>ON <span class="se">\</span>
+  -DPython3_EXECUTABLE<span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>which python<span class="k">)</span><span class="s2">&quot;</span> <span class="se">\</span>
+  .
 cmake --build .
 
 <span class="c1"># Add ./bindings/python to PYTHONPATH and use the API.</span>
@@ -735,7 +739,7 @@ python -c <span class="s2">&quot;import iree.runtime&quot;</span>
 </code></pre></div>
 </div>
 <input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><label for="__tabbed_2_2">Windows</label><div class="tabbed-content">
-<div class="highlight"><pre><span></span><code><span class="n">cmake</span> <span class="n">-DIREE_BUILD_PYTHON_BINDINGS</span><span class="p">=</span><span class="n">ON</span> <span class="p">.</span>
+<div class="highlight"><pre><span></span><code><span class="n">cmake</span> <span class="n">-DCMAKE_BUILD_TYPE</span><span class="p">=</span><span class="n">RelWithDebInfo</span> <span class="n">-DIREE_BUILD_PYTHON_BINDINGS</span><span class="p">=</span><span class="n">ON</span> <span class="p">.</span>
 <span class="n">cmake</span> <span class="p">-</span><span class="n">-build</span> <span class="p">.</span>
 
 <span class="c"># Add bindings\python to PYTHONPATH and use the API.</span>
