@@ -28,6 +28,7 @@ iree_cc_library(
     "VectorizationPass.cpp"
   DEPS
     MLIRAffine
+    MLIRAffineToStandard
     MLIRGPU
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
