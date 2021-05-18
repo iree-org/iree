@@ -64,7 +64,6 @@ static SmallVector<int64_t, 4> getDistributedWorkgroupSize(
     tileSizes = tileSizes.take_back(kNumMaxParallelDims);
   }
   auto workgroupSize = llvm::to_vector<4>(llvm::reverse(tileSizes));
-  workgroupSize.resize(kNumMaxParallelDims, 1);
   return workgroupSize;
 }
 
