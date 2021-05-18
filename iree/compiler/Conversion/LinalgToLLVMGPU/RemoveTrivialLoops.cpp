@@ -46,7 +46,7 @@ class RemoveSingleIterationLoopPass
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
     std::array<int32_t, 3> workgroupSize;
-    for (auto it : llvm::enumerate(funcOp->getAttr("cuda_workgroup_size")
+    for (auto it : llvm::enumerate(funcOp->getAttr("llvmgpu_workgroup_size")
                                        .cast<DenseIntElementsAttr>()
                                        .getIntValues())) {
       workgroupSize[it.index()] = it.value().getZExtValue();
@@ -70,7 +70,7 @@ std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass() {
 }
 
 static PassRegistration<RemoveSingleIterationLoopPass> pass(
-    "iree-cuda-remove-single-iteration-loop",
+    "iree-llvmgpu-remove-single-iteration-loop",
     "Remove distributed loop with single iteration.");
 
 }  // namespace iree_compiler

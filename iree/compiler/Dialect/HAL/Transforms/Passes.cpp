@@ -45,7 +45,10 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
     "iree-hal-benchmark-dispatch-repeat-count",
     llvm::cl::desc(
-        "The number of times to repeat each hal.command_buffer.dispatch op."),
+        "The number of times to repeat each hal.command_buffer.dispatch op. "
+        "(Not that this simply duplicates the dispatch op and inserts "
+        "barriers. It's meant for command buffers having linear dispatch "
+        "structures.)"),
     llvm::cl::init(1)};
 
 }  // namespace

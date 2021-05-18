@@ -23,8 +23,8 @@ IREE supports importing from a variety of ML frameworks:
 - [x] TensorFlow
 - [x] TensorFlow Lite
 - [x] JAX
-- [ ] PyTorch
-<!-- - [ ] ONNX -->
+- [ ] PyTorch (planned)
+- [ ] ONNX (hoped for)
 
 The IREE compiler tools run on :fontawesome-brands-linux: Linux,
 :fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS
@@ -32,11 +32,11 @@ and can generate efficient code for a variety of runtime platforms:
 
 - [x] Linux
 - [x] Windows
-- [x] macOS
-- [x] iOS
 - [x] Android
-- [x] Bare metal
-- [ ] WebAssembly
+- [ ] macOS (planned)
+- [ ] iOS (planned)
+- [ ] Bare metal (planned)
+- [ ] WebAssembly (planned)
 
 and architectures:
 
@@ -48,8 +48,8 @@ Support for hardware accelerators and APIs is also included:
 
 - [x] Vulkan
 - [x] CUDA
-- [ ] Metal
-- [ ] WebGPU
+- [ ] Metal (planned)
+- [ ] WebGPU (planned)
 
 ## Project architecture
 

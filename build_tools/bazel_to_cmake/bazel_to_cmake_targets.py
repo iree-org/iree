@@ -51,6 +51,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
+    "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
     # Cuda
@@ -121,7 +122,7 @@ def convert_external_target(target):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
-  if target.startswith("@mlir-hlo//:hlo"):
+  if target.startswith("@mlir-hlo//"):
     # All Bazel targets map to a single CMake target.
     return ["tensorflow::mlir_hlo"]
 

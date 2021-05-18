@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file  -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-cuda-tile-and-distribute))" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file  -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-llvmgpu-tile-and-distribute))" %s | IreeFileCheck %s
 
 hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.target @cuda, filter="cuda" {
@@ -33,7 +33,7 @@ hal.executable.target @cuda, filter="cuda" {
 }
 
 // CHECK-LABEL: func @add_dispatch_0()
-//  CHECK-SAME: cuda_workgroup_size = dense<[32, 1, 1]>
+//  CHECK-SAME: llvmgpu_workgroup_size = dense<[32, 1, 1]>
 //      CHECK:    "gpu.thread_id"() {dimension = "x"}
 //      CHECK:    scf.for
 //      CHECK:      linalg.generic
