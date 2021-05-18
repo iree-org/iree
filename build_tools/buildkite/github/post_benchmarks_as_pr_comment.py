@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Lint as: python3
 # Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +17,7 @@
 This script is meant to be used by Buildkite for automation. It requires the
 following environment to be set:
 
-- BUILDKITE_BUILD_URL: the link to the current buildkite build.
+- BUILDKITE_BUILD_URL: the link to the current Buildkite build.
 - BUILDKITE_COMMIT: the pull request HEAD commit.
 - BUILDKITE_PULL_REQUEST: the current pull request number.
 - GITHUB_TOKEN: personal access token to authenticate against GitHub API.
@@ -29,7 +28,7 @@ Example usage:
   # Export necessary environment variables:
   export ...
   # Then run the script:
-  python3 post_benchmarks_as_pr_comment.py <benchmark-json-file>..
+  python3 post_benchmarks_as_pr_comment.py <benchmark-json-file>...
   #   where each <benchmark-json-file> is expected to be of format:
   #   {"commit": <commit-sha>, "benchmarks": {<name>: <value>, ...}}
 """
@@ -67,12 +66,12 @@ def aggregate_all_benchmarks(benchmark_files):
   for benchmark_file in benchmark_files:
     with open(benchmark_file) as f:
       benchmarks = json.load(f)
-      if benchmarks["commit"] != pr_commit:
-        raise ValueError("Inconsistent pull request commit")
-      for name, value in benchmarks["benchmarks"].items():
-        if name in all_benchmarks:
-          raise ValueError(f"Duplicated benchmarks: {name}")
-        all_benchmarks.append((name, value))
+    if benchmarks["commit"] != pr_commit:
+      raise ValueError("Inconsistent pull request commit")
+    for name, value in benchmarks["benchmarks"].items():
+      if name in all_benchmarks:
+        raise ValueError(f"Duplicated benchmarks: {name}")
+      all_benchmarks.append((name, value))
 
   return sorted(all_benchmarks)
 
@@ -99,6 +98,8 @@ def get_benchmark_result_markdown(benchmark_files):
 def comment_on_pr(content):
   """Posts the given content as comments to the current pull request."""
   pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
+  # Buildkite sets this to "false" if not running on a PR:
+  # https://buildkite.com/docs/pipelines/environment-variables#bk-env-vars-buildkite-pull-request
   if pr_number == "false":
     raise ValueError("Not a pull request")
 
