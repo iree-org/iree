@@ -39,15 +39,19 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
     if (!resultTy) return failure();
 
     auto eTy = resultTy.getElementType();
-
     if (!eTy.isInteger(1)) return failure();
+
+    // Constant is never used, ignore.
+    if (op.getResult().use_empty()) return failure();
 
     DenseIntElementsAttr attr = op.value().dyn_cast<DenseIntElementsAttr>();
     if (!attr) return failure();
 
-    auto newConst = rewriter.create<ConstantOp>(
+    auto newConst = rewriter.createOrFold<ConstantOp>(
         loc, attr.mapValues(rewriter.getIntegerType(8),
                             [&](APInt src) { return src.zext(8); }));
+
+    rewriter.setInsertionPoint(*op.getResult().getUsers().begin());
 
     auto initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, ArrayRef<Value>({}), resultTy.getShape(),
@@ -57,8 +61,8 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
         rewriter.getMultiDimIdentityMap(resultTy.getRank()),
         rewriter.getMultiDimIdentityMap(resultTy.getRank())};
 
-    rewriter.replaceOpWithNewOp<linalg::GenericOp>(
-        op, TypeRange({resultTy}), ValueRange({newConst}),
+    Value genericOp = rewriter.create<linalg::GenericOp>(
+        loc, TypeRange({resultTy}), ValueRange({newConst}),
         ValueRange({initTensor}), indexingMaps,
         SmallVector<StringRef>(resultTy.getRank(),
                                getParallelIteratorTypeName()),
@@ -67,7 +71,9 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
           auto cast = rewriter.create<TruncateIOp>(
               nestedLoc, rewriter.getIntegerType(1), blockArgs[0]);
           rewriter.create<linalg::YieldOp>(nestedLoc, cast->getResult(0));
-        });
+        })->getResult(0);
+
+    rewriter.replaceOp(op, genericOp);
 
     return success();
   }
@@ -86,6 +92,8 @@ class LegalizeConstantsPass
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<ConvertBoolConstantPattern>(&getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+
+    getOperation()->dump();
   }
 };
 
