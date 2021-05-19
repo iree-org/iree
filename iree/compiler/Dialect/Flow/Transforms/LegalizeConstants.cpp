@@ -61,17 +61,21 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
         rewriter.getMultiDimIdentityMap(resultTy.getRank()),
         rewriter.getMultiDimIdentityMap(resultTy.getRank())};
 
-    Value genericOp = rewriter.create<linalg::GenericOp>(
-        loc, TypeRange({resultTy}), ValueRange({newConst}),
-        ValueRange({initTensor}), indexingMaps,
-        SmallVector<StringRef>(resultTy.getRank(),
-                               getParallelIteratorTypeName()),
-        [&](OpBuilder &nestedBuilder, Location nestedLoc,
-            ValueRange blockArgs) {
-          auto cast = rewriter.create<TruncateIOp>(
-              nestedLoc, rewriter.getIntegerType(1), blockArgs[0]);
-          rewriter.create<linalg::YieldOp>(nestedLoc, cast->getResult(0));
-        })->getResult(0);
+    Value genericOp =
+        rewriter
+            .create<linalg::GenericOp>(
+                loc, TypeRange({resultTy}), ValueRange({newConst}),
+                ValueRange({initTensor}), indexingMaps,
+                SmallVector<StringRef>(resultTy.getRank(),
+                                       getParallelIteratorTypeName()),
+                [&](OpBuilder &nestedBuilder, Location nestedLoc,
+                    ValueRange blockArgs) {
+                  auto cast = rewriter.create<TruncateIOp>(
+                      nestedLoc, rewriter.getIntegerType(1), blockArgs[0]);
+                  rewriter.create<linalg::YieldOp>(nestedLoc,
+                                                   cast->getResult(0));
+                })
+            ->getResult(0);
 
     rewriter.replaceOp(op, genericOp);
 
