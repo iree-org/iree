@@ -21,10 +21,12 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
-        "TargetEnvUtils.cpp",
+        "TargetEnvironment.cpp",
+        "TargetTriple.cpp",
     ],
     hdrs = [
-        "TargetEnvUtils.h",
+        "TargetEnvironment.h",
+        "TargetTriple.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Vulkan/IR",

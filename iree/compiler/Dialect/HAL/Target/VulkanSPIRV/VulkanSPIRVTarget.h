@@ -31,6 +31,8 @@ struct VulkanSPIRVTargetOptions {
   SPIRVCodegenOptions codegenOptions;
   // Vulkan target environment as #vk.target_env attribute assembly.
   std::string vulkanTargetEnv;
+  // Vulkan target triple.
+  std::string vulkanTargetTriple;
 };
 
 // Returns a VulkanSPIRVTargetOptions struct initialized with Vulkan/SPIR-V

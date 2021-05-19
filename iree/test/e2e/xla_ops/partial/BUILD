@@ -38,7 +38,7 @@ iree_check_single_backend_test_suite(
         "dot_f16.mlir",
     ],
     compiler_flags = [
-        "-iree-vulkan-target-triple=valhall-g77-unknown-android10",
+        "-iree-vulkan-target-triple=valhall-unknown-android11",
     ],
     driver = "vulkan",
     tags = [
