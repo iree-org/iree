@@ -88,6 +88,7 @@ endif()
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
+option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -446,6 +447,15 @@ add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
+if(${IREE_BUILD_EXPERIMENTAL_ROCM})
+  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
+  add_subdirectory(experimental/rocm)
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/iree/lib/cmake/lld")
+  list(APPEND LLD_INCLUDE_DIRS
+      ${CMAKE_CURRENT_SOURCE_DIR}/iree/third_party/llvm-project/lld/include
+      ${CMAKE_CURRENT_BINARY_DIR}/iree/third_party/llvm-project/llvm/tools/lld/include
+  )
+endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
