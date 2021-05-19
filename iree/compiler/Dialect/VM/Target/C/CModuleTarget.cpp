@@ -95,7 +95,7 @@ static LogicalResult printFuncOpArguments(IREE::VM::FuncOp &funcOp,
                                           mlir::emitc::CppEmitter &emitter) {
   return mlir::emitc::interleaveCommaWithError(
       funcOp.getArguments(), emitter.ostream(), [&](auto arg) -> LogicalResult {
-        if (failed(emitter.emitType(arg.getType()))) {
+        if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType()))) {
           return failure();
         }
         emitter.ostream() << " " << emitter.getOrCreateName(arg);
@@ -113,7 +113,7 @@ static LogicalResult printFuncOpResults(
         Type type = std::get<0>(tuple);
         std::string resultName = std::get<1>(tuple);
 
-        if (failed(emitter.emitType(type))) {
+        if (failed(emitter.emitType(*funcOp.getOperation(), type))) {
           return failure();
         }
         emitter.ostream() << " *" << resultName;
@@ -133,7 +133,8 @@ static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
       // the struct argument name here must not be changed.
       emitter.ostream() << "vm_global_store_i32(state->rwdata, "
                         << globalOp.ordinal() << ", ";
-      if (failed(emitter.emitAttribute(initialValue.getValue()))) {
+      if (failed(emitter.emitAttribute(*globalOp.getOperation(),
+                                       initialValue.getValue()))) {
         return globalOp.emitError() << "Unable to emit initial_value";
       }
       emitter.ostream() << ");\n";
@@ -348,7 +349,7 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
         // This shouldn't happen
         return failure();
       }
-      if (failed(emitter.emitType(arg.getType()))) {
+      if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType()))) {
         return failure();
       }
       output << " " << emitter.getOrCreateName(arg) << ";\n";
