@@ -29,6 +29,9 @@ endif()
 if(${IREE_HAL_DRIVER_VULKAN})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vulkan::registration)
 endif()
+if(${IREE_BUILD_EXPERIMENTAL_ROCM})
+  list(APPEND IREE_HAL_DRIVER_MODULES experimental::rocm::registration)
+endif()
 
 iree_cc_library(
   NAME

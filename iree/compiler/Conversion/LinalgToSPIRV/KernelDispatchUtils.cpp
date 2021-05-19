@@ -111,12 +111,12 @@ getInputOutputTypes(linalg::LinalgOp op) {
   SmallVector<ShapedType> inputTypes(op.getNumInputs()),
       outputTypes(op.getNumOutputs());
   for (auto operand : enumerate(op.getInputOpOperands())) {
-    Value source = getViewSource(operand.value().get());
-    inputTypes[operand.index()] = source.getType().dyn_cast<ShapedType>();
+    inputTypes[operand.index()] =
+        getUntiledType(operand.value().get()).dyn_cast<ShapedType>();
   }
   for (auto operand : enumerate(op.getOutputOpOperands())) {
-    Value source = getViewSource(operand.value().get());
-    outputTypes[operand.index()] = source.getType().dyn_cast<ShapedType>();
+    outputTypes[operand.index()] =
+        getUntiledType(operand.value().get()).dyn_cast<ShapedType>();
   }
   return std::make_tuple(std::move(inputTypes), std::move(outputTypes));
 }

@@ -33,6 +33,7 @@ cc_library(
         "TransformUtils.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Utils",

@@ -76,8 +76,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
 
   // Tiling and distribution.
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<FuncOp>(
-      createLinalgTileAndVectorizeWorkgroupsPass());
+  // nestedModulePM.addNestedPass<FuncOp>(
+  //     createLinalgTileAndVectorizeWorkgroupsPass());
 
   // Linalg -> SCF.
   nestedModulePM.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
