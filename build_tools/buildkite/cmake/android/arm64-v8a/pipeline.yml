@@ -40,7 +40,6 @@ steps:
     timeout_in_minutes: "15"
 
   - label: "test on Galaxy S10 (exynos-9820, mali-g76)"
-    skip: "Currently offline"
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
