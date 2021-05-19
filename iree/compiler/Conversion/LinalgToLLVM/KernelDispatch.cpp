@@ -15,7 +15,10 @@
 
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 
+#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -23,6 +26,8 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Operation.h"
+
+static const unsigned kNumMaxParallelDims = 3;
 
 namespace mlir {
 namespace iree_compiler {
@@ -69,189 +74,175 @@ static llvm::cl::opt<int> genericOpsWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(128));
 
-template <TilingLevel tilingLevel>
-llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) {
-  if (auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op)) {
-    if (contractionOp.isRowMajorMatmul()) {
-      int mWorkgroupSize = matmulWorkgroupTileSize;
-      int nWorkgroupSize = matmulWorkgroupTileSize;
-      int mL1TileSize = matmulL1TileSize;
-      int nL1TileSize = matmulL1TileSize;
-      int kL1TileSize = matmulL1TileSize;
-      if (auto matmulOp = dyn_cast<linalg::MatmulOp>(op)) {
-        // Returns the original problem size before tiling.
-        auto getOriginalOperandShape = [](Value operand) {
-          if (auto dispatchLoadOp =
-                  operand.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
-            return dispatchLoadOp.source()
-                .getType()
-                .cast<IREE::Flow::DispatchTensorType>()
-                .getShape();
+/// Sets the lowering configuration for dispatch region with root op that
+/// implements the contraction operation interface.
+static LogicalResult setRootConfig(
+    linalg::ContractionOpInterface contractionOp) {
+  if (hasLoweringConfig(contractionOp))
+    return contractionOp.emitError("overriding previously set configuration");
+  if (contractionOp.isRowMajorMatmul()) {
+    int mWorkgroupSize = matmulWorkgroupTileSize;
+    int nWorkgroupSize = matmulWorkgroupTileSize;
+    int mL1TileSize = matmulL1TileSize;
+    int nL1TileSize = matmulL1TileSize;
+    int kL1TileSize = matmulL1TileSize;
+    auto lhsShape = getUntiledShape(contractionOp.lhs());
+    auto rhsShape = getUntiledShape(contractionOp.rhs());
+    if (!lhsShape.empty() && !rhsShape.empty()) {
+      // Find largest tile size that is a multiple of the vector size.
+      auto getTileSize = [](int dim, int maxSize) {
+        if (dim == ShapedType::kDynamicSize) return maxSize;
+        if (dim < matmulVectorSize) return matmulVectorSize.getValue();
+        for (int i = std::min(maxSize, dim); i > 0; --i) {
+          if (dim % i == 0 && i % matmulVectorSize == 0) {
+            return i;
           }
-          if (auto operandParent = operand.getDefiningOp<memref::SubViewOp>()) {
-            return operandParent.source()
-                .getType()
-                .cast<ShapedType>()
-                .getShape();
-          }
-          if (auto operandParent = operand.getDefiningOp<SubTensorOp>()) {
-            return operandParent.source()
-                .getType()
-                .cast<ShapedType>()
-                .getShape();
-          }
-          if (auto operandParent = operand.getDefiningOp<memref::AllocaOp>()) {
-            return operandParent.getType().cast<ShapedType>().getShape();
-          }
-          return ArrayRef<int64_t>{};
-        };
-
-        auto lhsShape = getOriginalOperandShape(matmulOp.inputs()[0]);
-        auto rhsShape = getOriginalOperandShape(matmulOp.inputs()[1]);
-
-        if (!lhsShape.empty() && !rhsShape.empty()) {
-          // Find largest tile size that is a multiple of the vector size.
-          auto getTileSize = [](int dim, int maxSize) {
-            if (dim < matmulVectorSize) return matmulVectorSize.getValue();
-            for (int i = std::min(maxSize, dim); i > 0; --i) {
-              if (dim % i == 0 && i % matmulVectorSize == 0) {
-                return i;
-              }
-            }
-            return maxSize;
-          };
-          mWorkgroupSize = getTileSize(lhsShape[0], mWorkgroupSize);
-          nWorkgroupSize = getTileSize(rhsShape[1], nWorkgroupSize);
-          mL1TileSize = getTileSize(mWorkgroupSize, mL1TileSize);
-          nL1TileSize = getTileSize(nWorkgroupSize, nL1TileSize);
-          kL1TileSize = getTileSize(rhsShape[0], kL1TileSize);
         }
-      }
-
-      switch (tilingLevel) {
-        case TilingLevel::WorkGroupTiles: {
-          return {mWorkgroupSize, nWorkgroupSize};
-        }
-        case TilingLevel::Level1Tiles: {
-          return {mL1TileSize, nL1TileSize, kL1TileSize};
-        }
-        case TilingLevel::Level2Tiles: {
-          return {matmulVectorSize, matmulVectorSize, matmulVectorSize};
-        }
-      }
+        return maxSize;
+      };
+      mWorkgroupSize = getTileSize(lhsShape[0], mWorkgroupSize);
+      nWorkgroupSize = getTileSize(rhsShape[1], nWorkgroupSize);
+      mL1TileSize = getTileSize(mWorkgroupSize, mL1TileSize);
+      nL1TileSize = getTileSize(nWorkgroupSize, nL1TileSize);
+      kL1TileSize = getTileSize(rhsShape[0], kL1TileSize);
     }
-    if (contractionOp.isRowMajorBatchMatmul()) {
-      switch (tilingLevel) {
-        case TilingLevel::WorkGroupTiles: {
-          return {1, batchMatmulWorkgroupTileSize,
-                  batchMatmulWorkgroupTileSize};
-        }
-        case TilingLevel::Level1Tiles: {
-          return {1, batchMatmulL1TileSize, batchMatmulL1TileSize,
-                  batchMatmulL1TileSize};
-        }
-        case TilingLevel::Level2Tiles: {
-          return {1, batchMatmulL2TileSize, batchMatmulL2TileSize,
-                  batchMatmulL2TileSize};
-        }
-      }
-    }
+    TileSizesListType tileSizes = {
+        {mWorkgroupSize, nWorkgroupSize},
+        {mL1TileSize, nL1TileSize, kL1TileSize},
+        {matmulVectorSize, matmulVectorSize, matmulVectorSize}};
+    SmallVector<int64_t, 4> nativeVectorSize = {
+        matmulVectorSize, matmulVectorSize, matmulVectorSize};
+    IREE::HAL::LoweringConfig config =
+        getConfigAttr(tileSizes, nativeVectorSize, contractionOp->getContext());
+    setLoweringConfig(contractionOp, config);
+    return success();
   }
-
-  if (isa<linalg::GenericOp>(op)) {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    switch (tilingLevel) {
-      case TilingLevel::WorkGroupTiles: {
-        llvm::SmallVector<int64_t, 4> workgroupTileSizes;
-        int iterationRank = linalgOp.iterator_types().size();
-        for (int i = 0; i < std::min(iterationRank, 3); ++i) {
-          auto iteratorType = linalgOp.iterator_types()[i];
-          if (iteratorType.cast<StringAttr>().getValue() ==
-              getParallelIteratorTypeName()) {
-            workgroupTileSizes.push_back(genericOpsWorkgroupTileSize);
-          } else {
-            // Don't tile workgroup across reduction dimensions.
-            workgroupTileSizes.push_back(0);
-          }
-        }
-        return workgroupTileSizes;
-      }
-      // TODO(ataei): Set the parameters when we enable vectorization.
-      case TilingLevel::Level1Tiles:
-      case TilingLevel::Level2Tiles:
-        return {1, 1, 1};
-    }
+  if (contractionOp.isRowMajorBatchMatmul()) {
+    // TODO(ataei, ravishankarm): This should just use the configuration for
+    // matmul above. setting the tile size to 1 for all the batch dimensions.
+    TileSizesListType tileSizes = {
+        {1, batchMatmulWorkgroupTileSize, batchMatmulWorkgroupTileSize},
+        {1, batchMatmulL1TileSize, batchMatmulL1TileSize,
+         batchMatmulL1TileSize},
+        {1, batchMatmulL2TileSize, batchMatmulL2TileSize,
+         batchMatmulL2TileSize}};
+    SmallVector<int64_t, 4> nativeVectorSize = {
+        1, batchMatmulL2TileSize, batchMatmulL2TileSize, batchMatmulL2TileSize};
+    IREE::HAL::LoweringConfig config =
+        getConfigAttr(tileSizes, nativeVectorSize, contractionOp->getContext());
+    setLoweringConfig(contractionOp, config);
+    return success();
   }
-
-  return {1, 1, 1};
+  return failure();
 }
 
-#define DEFINE_TILE_SIZE_FN(tilingLevel)                                      \
-  template <>                                                                 \
-  SmallVector<Value, 4> TileSizeFn::get<tilingLevel>(OpBuilder & builder,     \
-                                                     Operation * operation) { \
-    auto tileSizes = getTileSizes<tilingLevel>(operation);                    \
-    if (tileSizes.empty()) return {};                                         \
-    SmallVector<Value, 4> tileSizesVal;                                       \
-    tileSizesVal.reserve(tileSizes.size());                                   \
-    for (auto val : tileSizes) {                                              \
-      tileSizesVal.push_back(                                                 \
-          builder.create<ConstantIndexOp>(operation->getLoc(), val));         \
-    }                                                                         \
-    return tileSizesVal;                                                      \
+/// Sets the lowering configuration for dispatch region with root op being a
+/// generic op.
+LogicalResult setRootConfig(linalg::GenericOp genericOp) {
+  int64_t numOuterParallelLoops = getNumOuterParallelLoops(genericOp);
+  SmallVector<int64_t, 4> workgroupTileSizes(numOuterParallelLoops,
+                                             genericOpsWorkgroupTileSize);
+  SmallVector<int64_t, 4> innerTileSizes(numOuterParallelLoops, 1);
+  // At the HAL level only the inner `kNumMaxParallelDims` parallel loops are
+  // tiled. Set the tile size as 0 for all the parallel loops that are not tiled
+  // at HAL level
+  for (int64_t i = 0; i < numOuterParallelLoops - kNumMaxParallelDims; i++) {
+    workgroupTileSizes[i] = 0;
   }
-
-DEFINE_TILE_SIZE_FN(TilingLevel::WorkGroupTiles)
-DEFINE_TILE_SIZE_FN(TilingLevel::Level1Tiles)
-DEFINE_TILE_SIZE_FN(TilingLevel::Level2Tiles)
-
-#undef DEFINE_TILE_SIZE_FN
-
-bool isDispatchOp(Operation *op) {
-  if (auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op)) {
-    if (contractionOp.isRowMajorMatmul() ||
-        contractionOp.isRowMajorBatchMatmul()) {
-      return true;
-    }
-  }
-  if (auto genOp = dyn_cast<linalg::GenericOp>(op)) {
-    if (genOp.getOperation()->hasAttr(
-            linalg::LinalgTransforms::kLinalgTransformMarker))
-      return true;
-  }
-  return false;
+  TileSizesListType tileSizes = {workgroupTileSizes};
+  IREE::HAL::LoweringConfig config =
+      getConfigAttr(tileSizes, ArrayRef<int64_t>{}, genericOp->getContext());
+  setLoweringConfig(genericOp, config);
+  return success();
 }
 
-Optional<LaunchConfig> initCPULaunchConfig(
-    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
+/// Sets the configuration for a linalg op that is not the root of the
+/// dispatch. The configuration should use the tile sizes of the first level of
+/// tiling passed in through `firstLevelTileSizes` for correctness.
+LogicalResult setNonRootConfig(linalg::LinalgOp linalgOp,
+                               ArrayRef<int64_t> firstLevelTileSizes) {
+  auto vec = llvm::to_vector<4>(firstLevelTileSizes);
+  int64_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
+  vec.resize(numOuterParallelLoops, 0);
+  // TODO(ravishankarm): For now just set the first level of tile-size, but need
+  // to extend this to make op-specific decision.
+  TileSizesListType tileSizes = {vec};
+  IREE::HAL::LoweringConfig config =
+      getConfigAttr(tileSizes, ArrayRef<int64_t>{}, linalgOp->getContext());
+  setLoweringConfig(linalgOp, config);
+  return success();
+}
+
+/// Finds the root operation in the given list of linalg operations and sets its
+/// configuration. Returns the root operation.
+static FailureOr<linalg::LinalgOp> setRootConfig(
     ArrayRef<linalg::LinalgOp> linalgOps) {
-  LaunchConfig config;
-
-  Optional<linalg::LinalgOp> rootOperation = llvm::None;
+  linalg::LinalgOp rootOperation = nullptr;
+  // First iterate over all operations to find the root operations and set its
+  // lowering configuration (that are not linalg.generic).
   for (auto linalgOp : linalgOps) {
-    if (!isDispatchOp(linalgOp)) continue;
-    if (rootOperation) {
-      linalgOp.emitError(
-          "unhandled multiple root operations in dispatch region");
-      return llvm::None;
+    if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
+    auto status =
+        TypeSwitch<Operation *, LogicalResult>(linalgOp.getOperation())
+            .Case<linalg::ContractionOpInterface>(
+                [&](auto op) { return setRootConfig(op); })
+            .Default([](Operation *) { return failure(); });
+    if (succeeded(status)) {
+      if (rootOperation) {
+        return static_cast<LogicalResult>(linalgOp.emitError(
+            "unhandled multiple root operations in dispatch region"));
+      }
+      rootOperation = linalgOp;
     }
-    rootOperation = linalgOp;
-    SmallVector<int64_t, 4> opTileSizes;
-    if (!clLLVMTileSizes.empty()) {
-      opTileSizes.assign(clLLVMTileSizes.begin(), clLLVMTileSizes.end());
-    } else {
-      opTileSizes = getTileSizes<TilingLevel::WorkGroupTiles>(linalgOp);
-    }
-    config.setTileSizes(linalgOp, opTileSizes, 0);
-    config.setRootOperation(linalgOp);
   }
+
+  // If no root operation found, check if the dispatch region contains a single
+  // generic op and set its configuration.
   if (!rootOperation) {
-    return config;
+    for (auto linalgOp : linalgOps) {
+      if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
+      auto status =
+          TypeSwitch<Operation *, LogicalResult>(linalgOp.getOperation())
+              .Case<linalg::GenericOp>(
+                  [&](auto op) { return setRootConfig(op); })
+              .Default([](Operation *) { return failure(); });
+      if (succeeded(status)) {
+        if (rootOperation) {
+          return static_cast<LogicalResult>(linalgOp.emitError(
+              "unhandled multiple root operations in dispatch region"));
+        }
+        rootOperation = linalgOp;
+      }
+    }
   }
-  if (failed(propogateRootOperationLaunchConfig(config, *rootOperation,
-                                                dependenceGraph)))
-    return llvm::None;
-  return config;
+  return rootOperation;
+}
+
+LogicalResult initCPULaunchConfig(ArrayRef<linalg::LinalgOp> linalgOps) {
+  if (linalgOps.empty()) return success();
+
+  SmallVector<int64_t, 4> firstLevelTileSizes;
+  if (!clLLVMTileSizes.empty()) {
+    firstLevelTileSizes.assign(clLLVMTileSizes.begin(), clLLVMTileSizes.end());
+  } else {
+    auto rootOperation = setRootConfig(linalgOps);
+    if (failed(rootOperation)) return failure();
+    // If root operation is null. Nothing to do.
+    if (!rootOperation.getValue()) return success();
+    firstLevelTileSizes = getTileSizes(
+        *rootOperation, static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+  }
+
+  // Set the configuration of all other linalg operations that are not the root
+  // operation.
+  for (auto linalgOp : linalgOps) {
+    if (hasLoweringConfig(linalgOp)) continue;
+    auto status = setNonRootConfig(linalgOp, firstLevelTileSizes);
+    if (failed(status)) {
+      return failure();
+    }
+  }
+  return success();
 }
 
 }  // namespace iree_compiler

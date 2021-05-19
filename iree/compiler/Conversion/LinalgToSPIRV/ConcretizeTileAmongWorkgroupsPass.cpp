@@ -103,76 +103,6 @@ static linalg::LinalgOp getRootLinalgOp(FuncOp funcOp,
   return rootOp;
 }
 
-/// Assuming the given `rootOp` is the tiled root Linalg op, returns the
-/// original input/output types for all tiles.
-///
-/// Note: After the abstract tiling and distribution in Flow dispatch region
-/// creation, the anchoring root op is already in a loop nest and works on a
-/// tile. The full type for all tiles in the IR is not explicit anymore after
-/// HAL interface is materialized. So go through the IR use chain to figure it
-/// out. Otherwise we need to make even more assumptions in the following.
-// TODO(antiagainst): This is quite fragile. We need a better way to pass the
-// information down from the upper layer, which readily has it. Probably via
-// linalg.tile op.
-static std::tuple<SmallVector<Type>, SmallVector<Type>> getInputOutputTypes(
-    linalg::LinalgOp rootOp) {
-  SmallVector<Type> inputTypes, outputTypes;
-  for (Value inputBuffer : rootOp.getInputBuffers()) {
-    if (auto subviewOp = inputBuffer.getDefiningOp<memref::SubViewOp>()) {
-      inputTypes.push_back(subviewOp.getViewSource().getType());
-    } else if (auto allocOp = inputBuffer.getDefiningOp<memref::AllocOp>()) {
-      inputTypes.push_back(allocOp.getType());
-    } else {
-      inputTypes.clear();
-      break;
-    }
-  }
-
-  for (Value outputBuffer : rootOp.getOutputBuffers()) {
-    auto subviewOp = outputBuffer.getDefiningOp<memref::SubViewOp>();
-    if (!subviewOp) {
-      outputTypes.clear();
-      break;
-    }
-    outputTypes.push_back(subviewOp.getViewSource().getType());
-  }
-  return std::make_tuple(std::move(inputTypes), std::move(outputTypes));
-}
-
-/// Assuming the given `rootOp` is the tiled root Linalg op, returns the
-/// tile sizes for distributing to workgroups and the workgroups size for the
-/// generated kernel.
-///
-/// TODO(antiagainst): This pass can be shared between CPU and GPU. But the
-/// following query scopes it to GPU for now.
-static LogicalResult getTileSizeAndWorkgroupSize(
-    Operation *rootOp, ArrayRef<Type> inputTypes, ArrayRef<Type> outputTypes,
-    SmallVector<int64_t, 4> &tileSize, SmallVector<int64_t, 4> &workgroupSize,
-    const SPIRVCodegenOptions &options) {
-  // Build necesary structures to query the tile sizes for distributing to
-  // workgroups.
-  linalg::Aliases aliases;
-  SmallVector<linalg::LinalgOp, 4> linalgOps;
-  auto ops = rootOp->getBlock()->getOps<linalg::LinalgOp>();
-  linalgOps.assign(ops.begin(), ops.end());
-  linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
-
-  Optional<LaunchConfig> launchConfig = initGPULaunchConfig(
-      rootOp->getContext(), dependenceGraph, options, linalgOps);
-  if (!launchConfig) {
-    return rootOp->emitError("unable to find launch configuration");
-  }
-
-  tileSize = llvm::to_vector<4>(launchConfig->getTileSizes(rootOp, 0));
-  workgroupSize = llvm::to_vector<4>(launchConfig->getWorkgroupSize());
-
-  // Clean up internal markers that are set during launch configuration
-  // preparation.
-  launchConfig->finalize(rootOp->getParentOfType<FuncOp>());
-
-  return success();
-}
-
 namespace {
 /// Replaces hal.interface.workgroup.count op with the constant value chosen
 /// from tiling scheme.
@@ -298,9 +228,7 @@ static void removeOneTripTiledLoops(MLIRContext *context, FuncOp funcOp,
   unsigned numTiledDims =
       std::min<size_t>(numParallelDims, kMaxWorkgroupDimCount);
 
-  Value untiledOutputOperand = getViewSource(rootLinalgOp.getOutput(0));
-  ArrayRef<int64_t> outputShape =
-      untiledOutputOperand.getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> outputShape = getUntiledShape(rootLinalgOp.getOutput(0));
   if (outputShape.size() < numParallelDims) return;
 
   // TODO(ravishankarm, antiagainst): Its pure co-incidence that the

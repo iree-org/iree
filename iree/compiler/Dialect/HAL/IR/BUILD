@@ -31,6 +31,7 @@ filegroup(
             "HALBase.td",
             "HALInterfaces.td",
             "HALOps.td",
+            "LoweringConfig.td",
         ],
         include = ["*.td"],
     ),
@@ -42,11 +43,13 @@ cc_library(
         "HALOpFolders.cpp",
         "HALOps.cpp",
         "HALTypes.cpp",
+        "LoweringConfig.cpp",
     ],
     hdrs = [
         "HALDialect.h",
         "HALOps.h",
         "HALTypes.h",
+        "LoweringConfig.h",
     ],
     textual_hdrs = [
         "HALEnums.cpp.inc",
@@ -59,12 +62,15 @@ cc_library(
         "HALStructs.h.inc",
         "HALTypeInterfaces.cpp.inc",
         "HALTypeInterfaces.h.inc",
+        "LoweringConfig.h.inc",
+        "LoweringConfig.cpp.inc",
     ],
     deps = [
         ":HALInterfacesGen",
         ":HALOpsGen",
         ":HALStructsGen",
         ":HALTypesGen",
+        ":LoweringConfigGen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
@@ -213,5 +219,26 @@ iree_tablegen_doc(
         "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "LoweringConfigGen",
+    tbl_outs = [
+        (
+            ["-gen-struct-attr-decls"],
+            "LoweringConfig.h.inc",
+        ),
+        (
+            ["-gen-struct-attr-defs"],
+            "LoweringConfig.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LoweringConfig.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )

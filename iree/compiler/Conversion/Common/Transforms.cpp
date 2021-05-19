@@ -40,6 +40,8 @@
 
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
+static unsigned kMaxNumParallelDims = 3;
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -120,9 +122,7 @@ class SetWorkgroupSizePattern
       PatternRewriter &rewriter) const override {
     int64_t dim = workgroupSizeOp.dimension().getSExtValue();
     if (dim >= workloadPerWorkgroup.size()) {
-      return workgroupSizeOp.emitRemark(
-          "expected at least as many static tile sizes as the workgroup "
-          "dimensionality");
+      return failure();
     }
     rewriter.replaceOpWithNewOp<ConstantIndexOp>(workgroupSizeOp,
                                                  workloadPerWorkgroup[dim]);
@@ -170,8 +170,8 @@ LogicalResult materializeStaticLaunchInformation(
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }
-  assert(workloadPerWorkgroup.size() <= 3 &&
-         "workloadPerWorkgroup size greater than 3 not handled");
+  assert(workloadPerWorkgroup.size() <= kMaxNumParallelDims &&
+         "workloadPerWorkgroup size greater than max num parallel dims");
   WorkgroupCountRegionBuilder regionBuilder =
       [&workloadPerWorkgroup](
           OpBuilder &b, Location loc,

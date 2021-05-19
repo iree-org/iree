@@ -31,9 +31,15 @@ unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
-/// Gets the source type of ops that implement ViewOpInterface recursively. Can
-/// be used to get the untiled operands from a tiled operation.
-Value getViewSource(Value view);
+/// Returns the untiled type of a tiled view for both tensor and memref
+/// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
+/// `subtensor` op chain (for tensors).
+Type getUntiledType(Value tiledView);
+
+/// Returns the untiled type of a tiled view for both tensor and memref
+/// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
+/// `subtensor` op chain (for tensors).
+ArrayRef<int64_t> getUntiledShape(Value tiledView);
 
 }  // namespace iree_compiler
 }  // namespace mlir

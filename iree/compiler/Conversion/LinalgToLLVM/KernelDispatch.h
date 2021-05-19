@@ -14,8 +14,10 @@
 
 #include <cstdint>
 
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
@@ -23,7 +25,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-enum class TilingLevel {
+enum class TilingLevel : unsigned {
   // Tile linalg operations to workgroup threads.
   WorkGroupTiles = 0,
   // Tile linalg operation on workgroup thread into L1 block tiles.
@@ -33,18 +35,7 @@ enum class TilingLevel {
   NumTileLevels = 3
 };
 
-struct TileSizeFn {
-  template <TilingLevel tilingLevel>
-  static llvm::SmallVector<Value, 4> get(OpBuilder &builder,
-                                         Operation *operation);
-};
-
-template <TilingLevel tilingLevel>
-llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op);
-
-Optional<LaunchConfig> initCPULaunchConfig(
-    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    ArrayRef<linalg::LinalgOp> linalgOps);
+LogicalResult initCPULaunchConfig(ArrayRef<linalg::LinalgOp> linalgOps);
 
 }  // namespace iree_compiler
 }  // namespace mlir
