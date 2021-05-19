@@ -60,7 +60,6 @@ class LowerExecutableTargetPass
 }  // namespace
 
 void LowerExecutableTargetPass::runOnOperation() {
-  MLIRContext *context = &getContext();
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp moduleOp = targetOp.getInnerModule();
 

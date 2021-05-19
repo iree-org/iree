@@ -96,9 +96,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp module = targetOp.getInnerModule();
-  auto funcOps = module.getOps<FuncOp>();
 
-  FuncOp funcOp = *funcOps.begin();
   for (auto funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
 
