@@ -33,12 +33,12 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
 /// Returns the untiled type of a tiled view for both tensor and memref
 /// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
-/// `subTensor` op chain (for tensors).
+/// `subtensor` op chain (for tensors).
 Type getUntiledType(Value tiledView);
 
 /// Returns the untiled type of a tiled view for both tensor and memref
 /// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
-/// `subTensor` op chain (for tensors).
+/// `subtensor` op chain (for tensors).
 ArrayRef<int64_t> getUntiledShape(Value tiledView);
 
 }  // namespace iree_compiler

@@ -122,10 +122,12 @@ static LogicalResult setRootConfig(
     // matmul above. setting the tile size to 1 for all the batch dimensions.
     TileSizesListType tileSizes = {
         {1, batchMatmulWorkgroupTileSize, batchMatmulWorkgroupTileSize},
-        {1, batchMatmulL1TileSize, batchMatmulL1TileSize},
-        {1, batchMatmulL2TileSize, batchMatmulL2TileSize}};
-    SmallVector<int64_t, 4> nativeVectorSize = {1, batchMatmulL2TileSize,
-                                                batchMatmulL2TileSize};
+        {1, batchMatmulL1TileSize, batchMatmulL1TileSize,
+         batchMatmulL1TileSize},
+        {1, batchMatmulL2TileSize, batchMatmulL2TileSize,
+         batchMatmulL2TileSize}};
+    SmallVector<int64_t, 4> nativeVectorSize = {
+        1, batchMatmulL2TileSize, batchMatmulL2TileSize, batchMatmulL2TileSize};
     IREE::HAL::LoweringConfig config =
         getConfigAttr(tileSizes, nativeVectorSize, contractionOp->getContext());
     setLoweringConfig(contractionOp, config);

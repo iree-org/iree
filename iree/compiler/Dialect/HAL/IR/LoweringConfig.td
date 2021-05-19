@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#ifndef IREE_CONVERSION_COMMON_LOWERINGCONFIG
-#define IREE_CONVERSION_COMMON_LOWERINGCONFIG
+#ifndef IREE_COMPILER_DIALECT_HAL_IR_LOWERINGCONFIG
+#define IREE_COMPILER_DIALECT_HAL_IR_LOWERINGCONFIG
 
 // Putting this in HAL dialect for now.
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
@@ -29,4 +29,4 @@ def HAL_LoweringConfigAttr :
         DefaultValuedAttr<I64ArrayAttr, "{}">>,
   ]>;
 
-#endif // IREE_CONVERSION_COMMON_LOWERINGCONFIG
+#endif // IREE_COMPILER_DIALECT_HAL_IR_LOWERINGCONFIG

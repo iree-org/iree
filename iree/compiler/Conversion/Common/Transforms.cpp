@@ -40,7 +40,7 @@
 
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
-static unsigned kNumMaxParallelDims = 3;
+static unsigned kMaxNumParallelDims = 3;
 
 namespace mlir {
 namespace iree_compiler {
@@ -170,7 +170,7 @@ LogicalResult materializeStaticLaunchInformation(
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }
-  assert(workloadPerWorkgroup.size() <= kNumMaxParallelDims &&
+  assert(workloadPerWorkgroup.size() <= kMaxNumParallelDims &&
          "workloadPerWorkgroup size greater than max num parallel dims");
   WorkgroupCountRegionBuilder regionBuilder =
       [&workloadPerWorkgroup](
