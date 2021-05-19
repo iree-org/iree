@@ -46,44 +46,38 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
     if (!attr) return failure();
 
     auto newConst = rewriter.create<ConstantOp>(
-        loc, attr.mapValues(rewriter.getIntegerType(8), [&](APInt src) {
-            return src.zext(8);
-            }));
+        loc, attr.mapValues(rewriter.getIntegerType(8),
+                            [&](APInt src) { return src.zext(8); }));
 
     auto initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, ArrayRef<Value>({}), resultTy.getShape(),
         resultTy.getElementType());
 
     SmallVector<AffineMap, 2> indexingMaps = {
-      rewriter.getMultiDimIdentityMap(resultTy.getRank()),
-      rewriter.getMultiDimIdentityMap(resultTy.getRank())
-    };
+        rewriter.getMultiDimIdentityMap(resultTy.getRank()),
+        rewriter.getMultiDimIdentityMap(resultTy.getRank())};
 
     rewriter.replaceOpWithNewOp<linalg::GenericOp>(
-        op,
-        TypeRange({resultTy}),
-        ValueRange({newConst}),
-        ValueRange({initTensor}),
-        indexingMaps,
-        SmallVector<StringRef>(resultTy.getRank(), getParallelIteratorTypeName()),
-        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
-            auto cast = rewriter.create<TruncateIOp>(nestedLoc, rewriter.getIntegerType(1), blockArgs[0]);
-            rewriter.create<linalg::YieldOp>(nestedLoc, cast->getResult(0));
-        }
-        );
+        op, TypeRange({resultTy}), ValueRange({newConst}),
+        ValueRange({initTensor}), indexingMaps,
+        SmallVector<StringRef>(resultTy.getRank(),
+                               getParallelIteratorTypeName()),
+        [&](OpBuilder &nestedBuilder, Location nestedLoc,
+            ValueRange blockArgs) {
+          auto cast = rewriter.create<TruncateIOp>(
+              nestedLoc, rewriter.getIntegerType(1), blockArgs[0]);
+          rewriter.create<linalg::YieldOp>(nestedLoc, cast->getResult(0));
+        });
 
     return success();
   }
 };
 
-
-
-} // namespace
+}  // namespace
 
 class LegalizeConstantsPass
     : public LegalizeConstantsBase<LegalizeConstantsPass> {
  public:
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, mlir::StandardOpsDialect>();
   }
@@ -103,4 +97,3 @@ std::unique_ptr<OperationPass<FuncOp>> createLegalizeConstantsPass() {
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
-
