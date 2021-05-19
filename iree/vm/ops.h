@@ -183,10 +183,10 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
   return (operand != 0) ? 1 : 0;
 }
 static inline int32_t vm_cmp_eq_ref(iree_vm_ref_t* lhs, iree_vm_ref_t* rhs) {
-  return iree_vm_ref_equal(lhs, rhs);
+  return iree_vm_ref_equal(lhs, rhs) ? 1 : 0;
 }
 static inline int32_t vm_cmp_ne_ref(iree_vm_ref_t* lhs, iree_vm_ref_t* rhs) {
-  return !iree_vm_ref_equal(lhs, rhs);
+  return (!iree_vm_ref_equal(lhs, rhs)) ? 1 : 0;
 }
 static inline int32_t vm_cmp_nz_ref(iree_vm_ref_t* operand) {
   return (operand->ptr != NULL) ? 1 : 0;
@@ -216,7 +216,9 @@ static inline int32_t vm_cmp_lte_f32o(float lhs, float rhs) {
 static inline int32_t vm_cmp_lte_f32u(float lhs, float rhs) {
   return (isunordered(lhs, rhs) || islessequal(lhs, rhs)) ? 1 : 0;
 }
-static inline int32_t vm_cmp_nan_f32(float operand) { return isnan(operand); }
+static inline int32_t vm_cmp_nan_f32(float operand) {
+  return isnan(operand) ? 1 : 0;
+}
 
 //===------------------------------------------------------------------===//
 // Control flow ops
