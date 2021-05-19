@@ -31,6 +31,7 @@ iree_lit_test_suite(
             "hoist_unstreamable_ops.mlir",
             "inject_dispatch_tracing.mlir",
             "legalize_input_types.mlir",
+            "legalize_constants.mlir",
             "outline_dispatch_regions.mlir",
             "outline_large_constants.mlir",
             "pre_partitioning_conversion.mlir",

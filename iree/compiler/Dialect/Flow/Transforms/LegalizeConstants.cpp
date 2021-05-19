@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,9 @@ namespace Flow {
 
 namespace {
 
+// Legalizes boolean (i1) constants to i8 with a linalg.generic operation
+// downcasting to i1. This occurs as IREE does not currently support tightly
+// packing and unpacking i1 buffers.
 class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
  public:
   using OpRewritePattern<mlir::ConstantOp>::OpRewritePattern;
@@ -47,10 +50,15 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
     DenseIntElementsAttr attr = op.value().dyn_cast<DenseIntElementsAttr>();
     if (!attr) return failure();
 
+    // Create a new ConstantOp that contains the same values as an int8.
     auto newConst = rewriter.createOrFold<ConstantOp>(
         loc, attr.mapValues(rewriter.getIntegerType(8),
                             [&](APInt src) { return src.zext(8); }));
 
+    // We need to move the insertion to just before its first use case. This is
+    // needed as it is possible we are reusing an existing ConstantOp
+    // containing the same values that occurs in a future line. Moving to the
+    // first use case avoids declaring out of order operations.
     rewriter.setInsertionPoint(*op.getResult().getUsers().begin());
 
     auto initTensor = rewriter.create<linalg::InitTensorOp>(
@@ -61,6 +69,8 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
         rewriter.getMultiDimIdentityMap(resultTy.getRank()),
         rewriter.getMultiDimIdentityMap(resultTy.getRank())};
 
+    // Insert a generic op that Truncates the new i8 values to i1 for use as
+    // the original value.
     Value genericOp =
         rewriter
             .create<linalg::GenericOp>(
@@ -78,7 +88,6 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
             ->getResult(0);
 
     rewriter.replaceOp(op, genericOp);
-
     return success();
   }
 };
@@ -96,8 +105,6 @@ class LegalizeConstantsPass
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<ConvertBoolConstantPattern>(&getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-
-    getOperation()->dump();
   }
 };
 
