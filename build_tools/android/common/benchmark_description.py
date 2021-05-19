@@ -111,7 +111,7 @@ class AndroidDeviceInfo:
 
   model: str
   cpu_abi: str
-  cpu_features: list[str]
+  cpu_features: Sequence[str]
   gpu_name: str
 
   def __str__(self):
@@ -181,7 +181,7 @@ class BenchmarkInfo:
   """
 
   model_name: str
-  model_tags: list[str]
+  model_tags: Sequence[str]
   model_source: str
   runner: str
   device_info: AndroidDeviceInfo

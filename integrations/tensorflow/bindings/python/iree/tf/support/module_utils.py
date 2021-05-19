@@ -89,12 +89,10 @@ def _get_tf_import_output_kwargs(artifacts_dir: str,
   return kwargs
 
 
-def _incrementally_compile_tf_module(
-    module: Type[tf.Module],
-    backend_info: "BackendInfo",
-    exported_names: Sequence[str] = (),
-    artifacts_dir: Optional[str] = None,
-) -> Tuple[bytes, Optional[str]]:
+def _incrementally_compile_tf_module(module: Type[tf.Module],
+                                     backend_info: "BackendInfo",
+                                     exported_names: Sequence[str] = (),
+                                     artifacts_dir: Optional[str] = None):
   """Compile a TensorFlow tf.Module and optionally save compilation artifacts.
 
   The module blob this creates is not callable. See IreeCompiledModule for an
