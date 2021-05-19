@@ -37,6 +37,7 @@ iree_cc_library(
     "HLOToHLOPreprocessing.cpp"
     "HoistUnstreamableOps.cpp"
     "InjectDispatchTracing.cpp"
+    "LegalizeConstants.cpp"
     "LegalizeInputTypes.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineLargeConstants.cpp"

@@ -63,6 +63,12 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def LegalizeConstants :
+    Pass<"iree-flow-legalize-constants", "FuncOp"> {
+  let summary = "Legalizes constantsto ones supported by the IREE flow dialect";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createLegalizeConstantsPass()";
+}
+
 def LegalizeInputTypes :
     Pass<"iree-flow-legalize-input-types", "ModuleOp"> {
   let summary = "Legalizes input types to ones supported by the IREE flow dialect";
