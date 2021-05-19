@@ -114,8 +114,8 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "greater.mlir", # Failing due to a known bug https://github.com/google/iree/issues/5946
-        "greater_equal.mlir", # Failing due to a known bug https://github.com/google/iree/issues/5946
+        "greater.mlir",  # Failing due to a known bug https://github.com/google/iree/issues/5946
+        "greater_equal.mlir",  # Failing due to a known bug https://github.com/google/iree/issues/5946
         "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],
 )
