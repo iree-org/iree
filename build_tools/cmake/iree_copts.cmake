@@ -316,6 +316,8 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     "-lm"
     ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
+  MSVC
+    "-natvis:${CMAKE_SOURCE_DIR}/iree/iree.natvis"
 )
 
 # Add to LINKOPTS on a binary to configure it for X/Wayland/Windows/etc
