@@ -676,7 +676,7 @@ static Value getReverseOfCastOp(OpBuilder &b, tensor::CastOp castOp,
 /// gets the buffer to use to compute the value in-place.
 static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
                                     BlockAndValueMapping &bvm) {
-  SmallVector<Operation *> traversedOps;
+  SmallVector<Value> traversedValues;
 
   // Traverse the use-def chains to get the `flow.dispatch.tensor.store`
   // operation keeping track of all the traversed operations. Note that the
@@ -688,10 +688,25 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     user = *(defVal.user_begin());
     // If the user is a store op, we are done.
     if (isa<IREE::Flow::DispatchTensorStoreOp>(user)) break;
-    // If user has more than one results, abort.
-    if (user->getNumResults() != 1) return nullptr;
-    traversedOps.push_back(user);
-    defVal = user->getResult(0);
+    // If user has more than one results, with a `LinalgOp` we can still follow
+    // the chain. For now use the `tiedOperands` cause that might result in
+    // better reuse tracking.
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(user)) {
+      auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp);
+      Value useResult = nullptr;
+      for (auto tiedOperand : llvm::enumerate(tiedOperands)) {
+        if (tiedOperand.value() == defVal) {
+          useResult = linalgOp->getResult(tiedOperand.index());
+          break;
+        }
+      }
+      if (!useResult) return nullptr;
+      defVal = useResult;
+    } else {
+      if (user->getNumResults() != 1) return nullptr;
+      defVal = user->getResult(0);
+    }
+    traversedValues.push_back(defVal);
   }
   auto storeOp = dyn_cast_or_null<IREE::Flow::DispatchTensorStoreOp>(user);
   if (!storeOp) return nullptr;
@@ -709,7 +724,8 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
 
   // Now replay the instructions that are essentially doing type-conversion, in
   // reverse, to get the type needed for the operation computing the value.
-  for (auto op : traversedOps) {
+  for (auto value : traversedValues) {
+    Operation *op = value.getDefiningOp();
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
             .Case<linalg::LinalgOp, SubTensorInsertOp, vector::TransferWriteOp>(
@@ -723,9 +739,10 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
             })
             .Default([&](Operation *) { return nullptr; });
     if (!resultBuffer) return nullptr;
-    bvm.map(op->getResult(0), resultBuffer);
+    unsigned resultNumber = value.cast<OpResult>().getResultNumber();
+    bvm.map(op->getResult(resultNumber), resultBuffer);
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "Pair :\n\tTensor :";
+      llvm::dbgs() << "Pair :\n\tTensor result " << resultNumber << " :";
       op->print(llvm::dbgs());
       llvm::dbgs() << "\nt\tMemref :";
       resultBuffer.print(llvm::dbgs());
@@ -853,7 +870,7 @@ static LogicalResult getOrAllocateResultBuffers(
     }
     bvm.map(result.value(), buffer);
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "Pair :\n\tTensor :";
+      llvm::dbgs() << "Pair :\n\tTensor result " << result.index() << ":";
       op->print(llvm::dbgs());
       llvm::dbgs() << "\nt\tMemref :";
       buffer.print(llvm::dbgs());
