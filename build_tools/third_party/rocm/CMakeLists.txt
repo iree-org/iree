@@ -11,8 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+if(NOT ${IREE_BUILD_EXPERIMENTAL_ROCM})
+  return()
+endif()
 
-set(ROCM_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/rocm/include")
+if(NOT ROCM_HEADERS_API_ROOT)
+  set(ROCM_HEADERS_API_ROOT "/opt/rocm/include")
+endif()
+
+if (EXISTS ${ROCM_HEADERS_API_ROOT})
+  message(STATUS "ROCm Header Path: ${ROCM_HEADERS_API_ROOT}")
+else()
+  message(SEND_ERROR "Could not locate ROCm: ${ROCM_HEADERS_API_ROOT}")
+endif()
 
 external_cc_library(
   PACKAGE
@@ -27,3 +38,4 @@ external_cc_library(
     ${ROCM_HEADERS_API_ROOT}
 )
 
+unset(ROCM_HEADERS_API_ROOT)

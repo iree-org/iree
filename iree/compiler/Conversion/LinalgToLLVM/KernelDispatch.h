@@ -12,15 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
-
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
-#include "llvm/ADT/SmallVector.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Operation.h"
-#include "mlir/IR/Value.h"
+#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -35,7 +28,8 @@ enum class TilingLevel : unsigned {
   NumTileLevels = 3
 };
 
-LogicalResult initCPULaunchConfig(ArrayRef<linalg::LinalgOp> linalgOps);
+FailureOr<IREE::HAL::DispatchLoweringPassPipeline> initCPULaunchConfig(
+    ModuleOp moduleOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir

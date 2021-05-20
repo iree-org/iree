@@ -1,5 +1,5 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-llvm-materialize-launch-configuration, module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file %s | IreeFileCheck %s
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-llvm-materialize-launch-configuration, module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file -iree-codegen-llvm-promote-workgroup-to-full-tiles -cse %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-lower-executable-target-pass{invoke-lowering-pipelines=false}, module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-lower-executable-target-pass{invoke-lowering-pipelines=false}, module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file -iree-codegen-llvm-promote-workgroup-to-full-tiles -cse %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
 hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
