@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// NOTE: must be first to ensure that we can define settings for all includes.
+// clang-format off: must be included before all other headers.
 #include "iree/base/internal/threading_impl.h"
+// clang-format on
 
 #if defined(IREE_PLATFORM_WINDOWS)
 

@@ -7,8 +7,8 @@
 #ifndef IREE_HAL_VULKAN_DYNAMIC_SYMBOLS_H_
 #define IREE_HAL_VULKAN_DYNAMIC_SYMBOLS_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format off: must be included before all other headers.
+#include "iree/hal/vulkan/vulkan_headers.h"  // IWYU pragma: export
 // clang-format on
 
 #include <cstdint>
@@ -17,7 +17,7 @@
 
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/status.h"
-#include "iree/hal/vulkan/dynamic_symbol_tables.h"
+#include "iree/hal/vulkan/dynamic_symbol_tables.h"  // IWYU pragma: export
 #include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
