@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "iree/base/logging.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/status_util.h"

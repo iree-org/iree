@@ -15,6 +15,7 @@
 #include <functional>
 #include <memory>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"  // IWYU pragma: export

@@ -6,6 +6,10 @@
 
 #include "iree/hal/cuda/nop_executable_cache.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/native_executable.h"
 

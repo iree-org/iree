@@ -6,9 +6,21 @@
 
 #include "iree/task/executor.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/internal/math.h"
+#include "iree/base/tracing.h"
+#include "iree/task/affinity_set.h"
 #include "iree/task/executor_impl.h"
+#include "iree/task/list.h"
+#include "iree/task/pool.h"
+#include "iree/task/post_batch.h"
+#include "iree/task/queue.h"
 #include "iree/task/task_impl.h"
+#include "iree/task/tuning.h"
+#include "iree/task/worker.h"
 
 static void iree_task_executor_destroy(iree_task_executor_t* executor);
 

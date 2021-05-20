@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_VULKAN_NATIVE_EVENT_H_
 #define IREE_HAL_VULKAN_NATIVE_EVENT_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/handle_util.h"
 

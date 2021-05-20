@@ -6,6 +6,7 @@
 
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
+#include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 

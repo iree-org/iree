@@ -21,21 +21,21 @@
 // NOTE: order matters for these includes so stop clang from messing with it:
 // clang-format off
 
-#include "flatcc/reflection/flatbuffers_common_reader.h"
-#include "iree/base/internal/flatcc_reader.h"
+#include "flatcc/reflection/flatbuffers_common_reader.h"  // IWYU pragma: export
+#include "iree/base/internal/flatcc_reader.h" // IWYU pragma: export
 
-#include "flatcc/flatcc_verifier.h"
-#include "iree/base/internal/flatcc_verifier.h"
+#include "flatcc/flatcc_verifier.h" // IWYU pragma: export
+#include "iree/base/internal/flatcc_verifier.h" // IWYU pragma: export
 
-#include "flatcc/flatcc_builder.h"
-#include "flatcc/reflection/flatbuffers_common_builder.h"
-#include "iree/base/internal/flatcc_builder.h"
+#include "flatcc/flatcc_builder.h" // IWYU pragma: export
+#include "flatcc/reflection/flatbuffers_common_builder.h" // IWYU pragma: export
+#include "iree/base/internal/flatcc_builder.h" // IWYU pragma: export
 
-#include "flatcc/flatcc_json_parser.h"
-#include "iree/base/internal/flatcc_json_parser.h"
+#include "flatcc/flatcc_json_parser.h" // IWYU pragma: export
+#include "iree/base/internal/flatcc_json_parser.h" // IWYU pragma: export
 
-#include "flatcc/flatcc_json_printer.h"
-#include "iree/base/internal/flatcc_json_printer.h"
+#include "flatcc/flatcc_json_printer.h" // IWYU pragma: export
+#include "iree/base/internal/flatcc_json_printer.h" // IWYU pragma: export
 
 // clang-format on
 

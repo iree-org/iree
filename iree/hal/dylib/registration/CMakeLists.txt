@@ -22,8 +22,10 @@ iree_cc_library(
   SRCS
     "driver_module.c"
   DEPS
+    iree::base
     iree::base::internal::flags
     iree::hal
+    iree::hal::local
     iree::hal::local::loaders::embedded_library_loader
     iree::hal::local::loaders::legacy_library_loader
     iree::hal::local::task_driver
@@ -41,7 +43,9 @@ iree_cc_library(
   SRCS
     "driver_module_sync.c"
   DEPS
+    iree::base
     iree::hal
+    iree::hal::local
     iree::hal::local::loaders::legacy_library_loader
     iree::hal::local::sync_driver
   DEFINES

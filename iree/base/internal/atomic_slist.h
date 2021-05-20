@@ -11,7 +11,9 @@
 #ifndef IREE_BASE_INTERNAL_ATOMIC_SLIST_H_
 #define IREE_BASE_INTERNAL_ATOMIC_SLIST_H_
 
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "iree/base/alignment.h"
 #include "iree/base/internal/atomics.h"

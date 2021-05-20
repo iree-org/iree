@@ -6,8 +6,15 @@
 
 #include "iree/hal/local/loaders/static_library_loader.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_static_executable_t

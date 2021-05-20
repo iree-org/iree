@@ -6,6 +6,9 @@
 
 #include "iree/hal/local/local_descriptor_set_layout.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
 
 static const iree_hal_descriptor_set_layout_vtable_t

@@ -10,11 +10,15 @@
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/threading.h"
-#include "iree/base/internal/threading_impl.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
 // Great documentation:

@@ -6,7 +6,8 @@
 
 #include "iree/task/queue.h"
 
-#include <assert.h>
+#include <stddef.h>
+#include <string.h>
 
 void iree_task_queue_initialize(iree_task_queue_t* out_queue) {
   memset(out_queue, 0, sizeof(*out_queue));

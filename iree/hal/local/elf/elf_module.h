@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_LOCAL_ELF_ELF_LINKER_H_
 #define IREE_HAL_LOCAL_ELF_ELF_LINKER_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/hal/local/elf/arch.h"       // IWYU pragma: export
 #include "iree/hal/local/elf/elf_types.h"  // IWYU pragma: export

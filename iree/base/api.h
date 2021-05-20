@@ -92,6 +92,7 @@
 #define IREE_BASE_API_H_
 
 #include <assert.h>
+#include <errno.h>
 #include <memory.h>
 #include <stdarg.h>
 #include <stdbool.h>

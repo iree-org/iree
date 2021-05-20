@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/descriptor_set.h"
 #include "iree/hal/descriptor_set_layout.h"

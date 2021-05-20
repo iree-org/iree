@@ -7,6 +7,8 @@
 #ifndef IREE_RUNTIME_CALL_H_
 #define IREE_RUNTIME_CALL_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"

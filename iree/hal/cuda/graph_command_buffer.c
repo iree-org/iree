@@ -6,9 +6,14 @@
 
 #include "iree/hal/cuda/graph_command_buffer.h"
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/cuda_buffer.h"
-#include "iree/hal/cuda/cuda_event.h"
+#include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/native_executable.h"
 #include "iree/hal/cuda/status_util.h"
 

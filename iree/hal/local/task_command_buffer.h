@@ -12,6 +12,7 @@
 #include "iree/hal/local/arena.h"
 #include "iree/hal/local/task_queue_state.h"
 #include "iree/task/scope.h"
+#include "iree/task/task.h"
 
 #ifdef __cplusplus
 extern "C" {

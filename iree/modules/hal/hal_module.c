@@ -7,7 +7,11 @@
 #include "iree/modules/hal/hal_module.h"
 
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"

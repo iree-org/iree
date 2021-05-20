@@ -6,10 +6,18 @@
 
 #include "iree/hal/local/task_command_buffer.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_layout.h"
+#include "iree/task/affinity_set.h"
 #include "iree/task/list.h"
 #include "iree/task/submission.h"
 #include "iree/task/task.h"

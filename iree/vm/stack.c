@@ -6,8 +6,11 @@
 
 #include "iree/vm/stack.h"
 
+#include <assert.h>
+#include <stdbool.h>
 #include <string.h>
 
+#include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/module.h"

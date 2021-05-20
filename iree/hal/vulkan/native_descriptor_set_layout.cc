@@ -6,8 +6,15 @@
 
 #include "iree/hal/vulkan/native_descriptor_set_layout.h"
 
+#include <cstddef>
+#include <cstdint>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
+#include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 using namespace iree::hal::vulkan;
 

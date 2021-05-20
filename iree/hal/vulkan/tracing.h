@@ -11,6 +11,9 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/handle_util.h"
 

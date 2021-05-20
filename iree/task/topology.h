@@ -8,6 +8,8 @@
 #define IREE_TASK_TOPOLOGY_H_
 
 #include <limits.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/threading.h"

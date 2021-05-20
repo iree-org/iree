@@ -7,6 +7,9 @@
 #ifndef IREE_HAL_CUDA_NATIVE_EXECUTABLE_H_
 #define IREE_HAL_CUDA_NATIVE_EXECUTABLE_H_
 
+#include <stdint.h>
+
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cuda/context_wrapper.h"
 #include "iree/hal/cuda/cuda_headers.h"

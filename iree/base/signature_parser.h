@@ -22,10 +22,15 @@
 // TODO(#3848): new IREE native ABI work is progressing and once done we can
 // delete this file.
 
+#include <stddef.h>
+
 #include <array>
 #include <cassert>
+#include <cstdlib>
+#include <functional>
 #include <map>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "absl/strings/string_view.h"

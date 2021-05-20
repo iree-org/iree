@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_LOCAL_ARENA_H_
 #define IREE_HAL_LOCAL_ARENA_H_
 
+#include <stddef.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/atomic_slist.h"
 

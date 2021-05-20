@@ -15,6 +15,8 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 

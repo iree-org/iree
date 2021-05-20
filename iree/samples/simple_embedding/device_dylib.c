@@ -6,6 +6,8 @@
 
 // A example of setting up the the dylib driver.
 
+#include <stddef.h>
+
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_loader.h"

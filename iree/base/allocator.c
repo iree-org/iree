@@ -4,8 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
 IREE_API_EXPORT iree_status_t iree_allocator_malloc(

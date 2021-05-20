@@ -6,19 +6,23 @@
 
 #include "iree/modules/strings/strings_module.h"
 
+#include <cstddef>
 #include <cstdint>
-#include <sstream>
+#include <cstdio>
+#include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/logging.h"
+#include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/api.h"
 #include "iree/modules/strings/api_detail.h"
 #include "iree/vm/native_module_cc.h"
+#include "iree/vm/ref_cc.h"
 
 static iree_vm_ref_type_descriptor_t strings_string_descriptor = {0};
 static iree_vm_ref_type_descriptor_t strings_string_tensor_descriptor = {0};

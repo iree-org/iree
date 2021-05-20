@@ -113,6 +113,8 @@ iree_cc_test(
     "file_io_test.cc"
   DEPS
     ::file_io
+    iree::base::logging
+    iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -164,7 +166,7 @@ iree_cc_binary(
     "flags_demo.c"
   DEPS
     ::flags
-    iree::base::core_headers
+    iree::base
 )
 
 iree_lit_test_suite(
@@ -225,6 +227,7 @@ iree_cc_test(
   DEPS
     ::fpu_state
     benchmark
+    iree::base
     iree::testing::benchmark_main
 )
 
@@ -367,8 +370,10 @@ iree_cc_test(
     "threading_impl.h"
     "threading_test.cc"
   DEPS
+    ::internal
     ::synchronization
     ::threading
+    iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
 )

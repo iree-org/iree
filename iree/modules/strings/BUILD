@@ -21,6 +21,7 @@ cc_library(
     deps = [
         "//iree/base",
         "//iree/base:logging",
+        "//iree/base:status",
         "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",

@@ -67,9 +67,12 @@
 //   They are useful when problems are definitely unrelated to program flow,
 //   e.g. when validating user input.
 
+#include <cstddef>
 #include <cstdint>
+#include <ios>
 #include <limits>
 #include <sstream>
+#include <string>
 
 #include "iree/base/attributes.h"
 

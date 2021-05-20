@@ -6,6 +6,10 @@
 
 #include "iree/hal/local/event_pool.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
 

@@ -11,10 +11,15 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
-#include <array>
+#include <stdint.h>
 
+#include <array>
+#include <memory>
+
+#include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/status.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/util/intrusive_list.h"
 #include "iree/hal/vulkan/util/ref_ptr.h"

@@ -6,10 +6,16 @@
 
 #include "iree/hal/local/loaders/legacy_library_loader.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc.h"

@@ -8,13 +8,14 @@
 
 #include <ctype.h>
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
-#include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"
 
 IREE_API_EXPORT iree_status_t iree_hal_parse_shape(

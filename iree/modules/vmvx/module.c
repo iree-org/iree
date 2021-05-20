@@ -6,6 +6,11 @@
 
 #include "iree/modules/vmvx/module.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"

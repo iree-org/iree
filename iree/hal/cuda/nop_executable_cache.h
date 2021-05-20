@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_CUDA_NOP_EXECUTABLE_CACHE_H_
 #define IREE_HAL_CUDA_NOP_EXECUTABLE_CACHE_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cuda/context_wrapper.h"
 

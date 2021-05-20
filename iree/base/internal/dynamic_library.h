@@ -7,6 +7,8 @@
 #ifndef IREE_BASE_INTERNAL_DYNAMIC_LIBRARY_H_
 #define IREE_BASE_INTERNAL_DYNAMIC_LIBRARY_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 
 #ifdef __cplusplus

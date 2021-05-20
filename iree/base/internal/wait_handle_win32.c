@@ -8,6 +8,15 @@
 #include "iree/base/internal/wait_handle_impl.h"
 // clang-format on
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/api.h"
+#include "iree/base/internal/wait_handle.h"
+#include "iree/base/target_platform.h"
+
 #if defined(IREE_PLATFORM_WINDOWS)
 
 #include "iree/base/tracing.h"

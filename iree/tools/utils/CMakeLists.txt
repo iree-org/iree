@@ -20,8 +20,11 @@ iree_cc_library(
   DEPS
     absl::span
     absl::strings
+    iree::base
     iree::base::internal::file_io
+    iree::base::logging
     iree::base::status
+    iree::base::tracing
     iree::hal
     iree::modules::hal
     iree::vm
@@ -45,6 +48,7 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
+    iree::vm::cc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

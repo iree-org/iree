@@ -7,11 +7,12 @@
 #include "iree/hal/buffer_view.h"
 
 #include <inttypes.h>
+#include <stdbool.h>
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
-#include "iree/hal/detail.h"
+#include "iree/hal/resource.h"
 #include "iree/hal/string_util.h"
 
 struct iree_hal_buffer_view_t {

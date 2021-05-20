@@ -6,8 +6,9 @@
 
 #include "iree/hal/vulkan/vulkan_device.h"
 
-#include <functional>
-#include <utility>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "iree/base/internal/math.h"
@@ -29,7 +30,10 @@
 #include "iree/hal/vulkan/nop_executable_cache.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/timepoint_util.h"
 #include "iree/hal/vulkan/tracing.h"
+#include "iree/hal/vulkan/util/arena.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 #include "iree/hal/vulkan/vma_allocator.h"
 
 using namespace iree::hal::vulkan;

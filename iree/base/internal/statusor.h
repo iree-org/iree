@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "absl/utility/utility.h"
+#include "iree/base/api.h"
 #include "iree/base/attributes.h"
 #include "iree/base/internal/status.h"
 

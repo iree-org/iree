@@ -6,8 +6,14 @@
 
 #include "iree/hal/vulkan/native_semaphore.h"
 
+#include <cstddef>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vulkan/dynamic_symbol_tables.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 // The maximum valid payload value of an iree_hal_semaphore_t.
 // Payload values larger than this indicate that the semaphore has failed.

@@ -6,6 +6,9 @@
 
 #include "iree/hal/local/task_queue.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/local/task_command_buffer.h"
 #include "iree/hal/local/task_semaphore.h"

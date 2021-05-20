@@ -6,7 +6,10 @@
 
 #include "iree/base/internal/status.h"
 
-#include <memory>
+#include <cstddef>
+#include <ostream>
+
+#include "iree/base/attributes.h"
 
 namespace iree {
 

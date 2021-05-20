@@ -6,6 +6,8 @@
 
 #include "iree/hal/local/task_event.h"
 
+#include <stddef.h>
+
 #include "iree/base/tracing.h"
 
 typedef struct iree_hal_task_event_t {

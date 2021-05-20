@@ -7,6 +7,10 @@
 #ifndef IREE_TASK_WORKER_H_
 #define IREE_TASK_WORKER_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
+#include "iree/base/api.h"
 #include "iree/base/internal/prng.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
@@ -15,6 +19,8 @@
 #include "iree/task/executor.h"
 #include "iree/task/list.h"
 #include "iree/task/queue.h"
+#include "iree/task/task.h"
+#include "iree/task/topology.h"
 #include "iree/task/tuning.h"
 
 #ifdef __cplusplus

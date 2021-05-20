@@ -6,11 +6,15 @@
 
 #include "iree/hal/local/loaders/system_library_loader.h"
 
-#include "iree/base/tracing.h"
-#include "iree/hal/local/local_executable.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
-// flatcc schemas:
-#include "iree/base/internal/flatcc.h"
+#include "iree/base/tracing.h"
+#include "iree/hal/api.h"
+#include "iree/hal/local/executable_library.h"
+#include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_system_executable_t
@@ -46,8 +50,8 @@ static iree_status_t iree_hal_system_executable_create(
   iree_host_size_t total_size =
       sizeof(*executable) +
       executable_layout_count * sizeof(iree_hal_local_executable_layout_t);
-  iree_status_t status = iree_allocator_malloc(
-      host_allocator, sizeof(*executable), (void**)&executable);
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
     iree_hal_local_executable_layout_t** executable_layouts_ptr =
         (iree_hal_local_executable_layout_t**)(((uint8_t*)executable) +

@@ -7,10 +7,14 @@
 #ifndef IREE_HAL_VULKAN_ENUMLATED_SEMAPHORE_H_
 #define IREE_HAL_VULKAN_ENUMLATED_SEMAPHORE_H_
 
+#include <stdint.h>
+
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/timepoint_util.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 #ifdef __cplusplus
 extern "C" {
