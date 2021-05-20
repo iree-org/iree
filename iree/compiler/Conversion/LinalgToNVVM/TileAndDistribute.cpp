@@ -15,8 +15,8 @@
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/KernelConfig.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/LinalgToNVVM/KernelConfig.h"
+#include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
@@ -339,12 +339,12 @@ struct TileAndDistributeToThreads
       }
       linalg::Aliases aliases;
       linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
-      auto config = getLLVMGPULaunchConfig(context, dependenceGraph, linalgOps);
+      auto config = getCUDALaunchConfig(context, dependenceGraph, linalgOps);
       if (!config) return signalPassFailure();
 
       // Attach the workgroup size as an attribute. This will be used when
       // creating the flatbuffer.
-      funcOp->setAttr("llvmgpu_workgroup_size",
+      funcOp->setAttr("cuda_workgroup_size",
                       DenseElementsAttr::get<int64_t>(
                           VectorType::get(3, IntegerType::get(context, 64)),
                           config->getWorkgroupSize()));
@@ -436,7 +436,7 @@ createTileAndDistributeToThreads() {
 }
 
 static PassRegistration<TileAndDistributeToThreads> pass(
-    "iree-codegen-llvmgpu-tile-and-distribute",
+    "iree-codegen-cuda-tile-and-distribute",
     "Pass to tile and distribute linalg ops within a workgroup.");
 
 }  // namespace iree_compiler
