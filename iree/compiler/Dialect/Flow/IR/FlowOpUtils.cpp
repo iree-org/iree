@@ -231,7 +231,7 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
       entryBlock.getNumArguments());
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto blockArg = entryBlock.getArgument(opArg.index());
-    if (blockArg.use_empty()) {
+    if (!closureOp.isArgumentReadWithinRegion(blockArg)) {
       // Not used - Drop.
       elidedOperands.push_back(opArg.index());
       blockArgReplacements[opArg.index()] = BlockArgument();
@@ -252,7 +252,12 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
   SmallVector<Value, 4> preservedResults;
   SmallVector<unsigned, 4> elidedResults;
   for (auto result : llvm::enumerate(closureOp.getClosureResults())) {
-    if (result.value().use_empty()) {
+    BlockArgument arg = entryBlock.getArgument(
+        closureOp.getClosureOperands().size() + result.index());
+    // You can drop a result if the use is empty, and that it is only written to
+    // within the dispatch region.
+    if (result.value().use_empty() &&
+        !closureOp.isArgumentReadWithinRegion(arg)) {
       elidedResults.push_back(result.index());
     } else {
       preservedResults.push_back(result.value());
