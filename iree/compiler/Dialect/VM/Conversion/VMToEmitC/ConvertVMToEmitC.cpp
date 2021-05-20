@@ -204,7 +204,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
     rewriter.replaceOpWithNewOp<emitc::CallOp>(
         /*op=*/cmpOp,
         /*type=*/cmpOp.getType(),
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_equal"),
+        /*callee=*/StringAttr::get(ctx, funcName),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/operands);
@@ -219,6 +219,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
           /*operands=*/ArrayRef<Value>{operands[0]});
     }
 
+    // NOTE: If lhs and rhs alias we call release twice on the same argument.
     if (moveRhs) {
       rewriter.create<emitc::CallOp>(
           /*loc=*/loc,
