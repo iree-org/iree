@@ -46,7 +46,7 @@ cc_library(
         "LLVMCodeGenOptions.cpp",
         "LinalgTileAndVectorizePass.cpp",
         "LinalgVectorizePass.cpp",
-        "MaterializeCPULaunchConfigurationPass.cpp",
+        "LowerExecutableTargetPass.cpp",
         "PadLinalgWorkgroupTiles.cpp",
         "Passes.cpp",
         "PlanConvLoopOrder.cpp",
