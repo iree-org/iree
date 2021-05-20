@@ -10,7 +10,9 @@
 #include <vector>
 
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Support/LLVM.h"
 
 namespace mlir {
 namespace iree_compiler {

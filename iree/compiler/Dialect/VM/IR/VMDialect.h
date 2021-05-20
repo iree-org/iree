@@ -8,16 +8,22 @@
 #define IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_
 
 #include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/Types.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterface.h.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOpInterface.h.inc"  // IWYU pragma: export
 
 class VMDialect : public Dialect {
  public:

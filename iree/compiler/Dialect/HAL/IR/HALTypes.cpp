@@ -14,9 +14,10 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 
-// Order matters:
-#include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc"
-#include "iree/compiler/Dialect/HAL/IR/HALStructs.cpp.inc"
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc"    // IWYU pragma: keep
+#include "iree/compiler/Dialect/HAL/IR/HALStructs.cpp.inc"  // IWYU pragma: keep
+// clang-format on
 
 namespace mlir {
 namespace iree_compiler {

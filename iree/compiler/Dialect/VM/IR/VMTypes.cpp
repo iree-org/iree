@@ -13,9 +13,10 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/TypeSupport.h"
 
-// Order matters:
-#include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc"
-#include "iree/compiler/Dialect/VM/IR/VMStructs.cpp.inc"
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc"    // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMStructs.cpp.inc"  // IWYU pragma: keep
+// clang-format on
 
 namespace mlir {
 namespace iree_compiler {

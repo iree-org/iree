@@ -301,7 +301,7 @@ void registerFlowTransformPassPipeline() {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"  // IWYU pragma: export
 }  // namespace
 
 void registerFlowPasses() {

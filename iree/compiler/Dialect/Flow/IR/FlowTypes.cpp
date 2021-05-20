@@ -6,7 +6,9 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 
-#include "iree/compiler/Dialect/Flow/IR/FlowEnums.cpp.inc"
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Flow/IR/FlowEnums.cpp.inc"  // IWYU pragma: keep
+// clang-format on
 
 namespace mlir {
 namespace iree_compiler {

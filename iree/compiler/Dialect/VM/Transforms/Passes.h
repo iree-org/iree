@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
 
 namespace mlir {
 namespace iree_compiler {
