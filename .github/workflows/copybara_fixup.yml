@@ -36,7 +36,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
         with:
-          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           # Get all history. We're force-pushing here and will otherwise drop
           # all the branch history. This takes a whopping 2 seconds. I think
           # we'll live.
