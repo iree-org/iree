@@ -811,6 +811,27 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   return canDispatchRegionContainOp(op);
 }
 
+bool DispatchWorkgroupsOp::isArgumentReadWithinRegion(BlockArgument arg) {
+  // For inputs, just check if the uses are empty.
+  if (arg.getArgNumber() < getClosureOperands().size()) {
+    return !arg.use_empty();
+  }
+  // If argument is of `writeonly` access, then it is not read by constructions.
+  if (arg.getType().cast<DispatchTensorType>().getAccess() ==
+      TensorAccess::WriteOnly)
+    return false;
+  // If the argument is a result with `readwrite` access, return false if the
+  // value is only written to. Check this by looking at the uses of the argument
+  // being only the `target` of `flow.dispatch.tensor.store` ops.
+  for (OpOperand &uses : arg.getUses()) {
+    auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
+    if (!(storeOp && storeOp.target() == uses.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 ClosureOpInterface
 DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
@@ -845,18 +866,31 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
-  auto newOp = OpBuilder(getContext())
-                   .create<DispatchWorkgroupsOp>(
-                       getLoc(), workgroup_count(), newResultTypes,
-                       newResultDims, newOperandsValues, newOperandDims,
-                       newTiedOperandIndices, getOperation()->getAttrs());
+  OpBuilder builder(getContext());
+  auto newOp = builder.create<DispatchWorkgroupsOp>(
+      getLoc(), workgroup_count(), newResultTypes, newResultDims,
+      newOperandsValues, newOperandDims, newTiedOperandIndices,
+      getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
-  newBody.front().eraseArguments(excludedOperandIndices);
-  unsigned baseResultIndex = newBody.front().getNumArguments();
-  newBody.front().eraseArguments(llvm::to_vector<4>(llvm::map_range(
-      excludedResultIndices,
-      [&](unsigned index) { return baseResultIndex + index; })));
+  unsigned baseResultIndex = newOperandsValues.size();
+  // For dropped results, erase all the store-op uses. It is a pre-requisite
+  // that the result can be dropped only if it is written within the dispatch
+  // region op.
+  auto erasedArguments = llvm::to_vector<4>(excludedOperandIndices);
+  for (unsigned i = baseResultIndex, e = newBody.getNumArguments(); i != e;
+       ++i) {
+    if (!is_contained(excludedResultIndices, i - baseResultIndex)) continue;
+    auto arg = newBody.front().getArgument(i);
+    for (OpOperand &user : llvm::make_early_inc_range(arg.getUses())) {
+      auto storeOp = dyn_cast<DispatchTensorStoreOp>(user.getOwner());
+      if (storeOp && storeOp.target() == user.get()) {
+        storeOp->erase();
+      }
+    }
+    erasedArguments.push_back(i);
+  }
+  newBody.front().eraseArguments(erasedArguments);
   return newOp;
 }
 
@@ -1366,6 +1400,10 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
     return variableOp.is_mutable() == false;
   }
   return false;
+}
+
+bool ExStreamFragmentOp::isArgumentReadWithinRegion(BlockArgument arg) {
+  return !arg.use_empty();
 }
 
 ClosureOpInterface
