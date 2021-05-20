@@ -676,7 +676,6 @@ static Value getReverseOfCastOp(OpBuilder &b, tensor::CastOp castOp,
 /// gets the buffer to use to compute the value in-place.
 static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
                                     BlockAndValueMapping &bvm) {
-  SmallVector<Operation *> traversedOps;
   SmallVector<Value> traversedValues;
 
   // Traverse the use-def chains to get the `flow.dispatch.tensor.store`
@@ -693,7 +692,6 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     // the chain. For now use the `tiedOperands` cause that might result in
     // better reuse tracking.
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(user)) {
-      OpOperand &use = *defVal.use_begin();
       auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp);
       Value useResult = nullptr;
       for (auto tiedOperand : llvm::enumerate(tiedOperands)) {
@@ -708,7 +706,6 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
       if (user->getNumResults() != 1) return nullptr;
       defVal = user->getResult(0);
     }
-    traversedOps.push_back(user);
     traversedValues.push_back(defVal);
   }
   auto storeOp = dyn_cast_or_null<IREE::Flow::DispatchTensorStoreOp>(user);
