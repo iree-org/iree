@@ -1935,8 +1935,8 @@ func @multi_result_reduce() {
   %c2 = constant 2 : index
   %0 = hal.interface.binding.subspan @io::@ro0[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
   %1 = hal.interface.binding.subspan @io::@ro1[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
-  %2 = hal.interface.binding.subspan @io::@wo1[%c0] : !flow.dispatch.tensor<writeonly:?xi32>
-  %3 = hal.interface.binding.subspan @io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:?xi32>
+  %2 = hal.interface.binding.subspan @io::@wo0[%c0] : !flow.dispatch.tensor<writeonly:?xi32>
+  %3 = hal.interface.binding.subspan @io::@wo1[%c0] : !flow.dispatch.tensor<writeonly:?xi32>
   %d0 = hal.interface.load.constant offset = 0 : index
   %d1 = hal.interface.load.constant offset = 1 : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -1969,14 +1969,14 @@ func @multi_result_reduce() {
 hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @wo1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  hal.interface.binding @wo2, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @wo0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @wo1, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @multi_result_reduce
-//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@ret1
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@ro0
+//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@ro1
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@wo0
+//   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@wo1
 //       CHECK:   scf.for
 //   CHECK-DAG:     %[[ARG0_SV:.+]] = memref.subview %[[ARG0]]
 //   CHECK-DAG:     %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
