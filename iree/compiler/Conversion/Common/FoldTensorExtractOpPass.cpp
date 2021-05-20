@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Conversion/Common/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -23,7 +23,7 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-#include "iree/compiler/Conversion/LinalgToLLVM/FoldTensorExtractOp.cpp.inc"
+#include "iree/compiler/Conversion/Common/FoldTensorExtractOp.cpp.inc"
 }
 
 namespace {
