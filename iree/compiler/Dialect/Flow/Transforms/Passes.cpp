@@ -138,6 +138,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //----------------------------------------------------------------------------
   // Entry dialect cleanup
   //----------------------------------------------------------------------------
+  passManager.addPass(createVerifyCompilerInputLegality());
 
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf

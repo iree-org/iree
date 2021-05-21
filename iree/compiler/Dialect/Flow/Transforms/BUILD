@@ -56,6 +56,7 @@ cc_library(
         "Passes.cpp",
         "PrePostPartitioningConversion.cpp",
         "StripAndSplatConstantVariables.cpp",
+        "VerifyCompilerInputLegality.cpp",
     ],
     hdrs = [
         "DestructiveUpdateUtils.h",
