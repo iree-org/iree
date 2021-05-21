@@ -22,6 +22,7 @@
 #include <memory>
 
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Dialect/Flow/Conversion/HLOToFlow/ConvertHLOToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -307,6 +308,10 @@ struct ConvertHLOToLinalgOnTensorsPass
     MLIRContext *context = &getContext();
 
     auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
+    // NOTE: not using corresponding setupHLOToFlowPatterns because the entire
+    // HLO dialects are marked illegal by this pass.
+    // TODO: Wonky.
+    populateHLOToFlowPatterns(context, patterns);
     chlo::PopulateDecomposeChloPatterns(context, &patterns);
     populateHLOBroadcastingToLinalgPatterns(context, *typeConverter, patterns);
     populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,

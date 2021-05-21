@@ -68,8 +68,9 @@ class PrePartitioningConversionPass
 
     // We don't support broadcast_dimensions as part of ops, so materialize
     // any such attributes to dedicated mhlo.broadcast_in_dim ops.
-    mhlo::SetupMaterializeBroadcastsLegality(context, &conversionTarget);
-    mhlo::PopulateMaterializeBroadcastsPatterns(context, &conversionPatterns);
+    // mhlo::SetupMaterializeBroadcastsLegality(context, &conversionTarget);
+    // mhlo::PopulateMaterializeBroadcastsPatterns(context,
+    // &conversionPatterns);
 
     Shape::populateShapeToStandardConversionPatterns(conversionPatterns,
                                                      context);

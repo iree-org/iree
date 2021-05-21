@@ -15,6 +15,7 @@
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -616,4 +617,23 @@ void mlir::iree_compiler::populateHLOBroadcastingToLinalgPatterns(
   // TODO: Remove the benefit after it is removed upstream.
   patterns.insert<ConvertSelectOp>(typeConverter, context, 1000);
   patterns.insert<ConvertConstantLikeOp>(typeConverter, context);
+
+  // Make mixed scalar broadcasting of Clamp explicit.
+  // NOTE: Because we are doing a full conversion out of HLO, we do not use
+  // the corresponding setup legality, since that explicitly marks clamp as
+  // conditionally legal.
+  // TODO: This is wonky and should just be handled locally. It is also weird
+  // the pointwise to linalg conversion hard emits an error instead of notifying
+  // on match failure, making the error message behavior of clamp dependent
+  // on pattern application ordering. Fix this upstream:
+  // if (llvm::any_of(op.getOperation()->getResultTypes(), [&](Type t) {
+  //       return fail(this->typeConverter->convertType(t)
+  //                       .template dyn_cast<ShapedType>());
+  //     })) {
+  //   return emitError(loc,
+  //                    "hlo to linalg conversion expects ranked args of "
+  //                    "signless int, float or complex element type with ")
+  //          << nloops << " parallel iterators: " << *(op.getOperation());
+  // }
+  mhlo::PopulateMaterializeBroadcastsPatterns(context, &patterns);
 }
