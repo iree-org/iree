@@ -252,10 +252,7 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
   SmallVector<Value, 4> preservedResults;
   SmallVector<unsigned, 4> elidedResults;
   for (auto result : llvm::enumerate(closureOp.getClosureResults())) {
-    // You can drop a result if the use is empty, and that it is only written to
-    // within the dispatch region.
-    if (result.value().use_empty() &&
-        !closureOp.isOutputReadWithinRegion(result.index())) {
+    if (result.value().use_empty()) {
       elidedResults.push_back(result.index());
     } else {
       preservedResults.push_back(result.value());
