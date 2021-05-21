@@ -441,7 +441,10 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
 
 static LogicalResult analyseTensorExtractOp(tensor::ExtractOp extractOp,
                                             BufferizationPlan &plan) {
-  plan.unionSets(extractOp.tensor(), extractOp.result());
+  auto resultType = extractOp.result().getType();
+  if (resultType && resultType.isa<TensorType>()) {
+    plan.unionSets(extractOp.tensor(), extractOp.result());
+  }
   return success();
 }
 
@@ -843,17 +846,6 @@ static Value getAliasingBufferForResult(OpBuilder &b, SubTensorOp op,
                                      offsets, sizes, strides);
 }
 
-static SmallVector<Value> getScfForAliasingBuffers(OpBuilder &b, scf::ForOp op,
-                                                   BlockAndValueMapping &bvm) {
-  SmallVector<Value> buffers;
-  for (int i = 0; i < op.results().size(); ++i) {
-    Value inputTensor = op.initArgs()[i];
-    Value inputBuffer = bvm.lookup(inputTensor);
-    buffers.push_back(inputBuffer);
-  }
-  return buffers;
-}
-
 /// Returns a `memref` for every result that aliases the buffer for one of its
 /// operands. Returns the memref of the right shape/type based on the operation.
 static SmallVector<Value, 4> getAliasingBuffersForResults(
@@ -865,7 +857,13 @@ static SmallVector<Value, 4> getAliasingBuffersForResults(
             return {getAliasingBufferForResult(b, singleResultOp, bvm)};
           })
       .Case<scf::ForOp>([&](auto scfFor) -> SmallVector<Value> {
-        return getScfForAliasingBuffers(b, scfFor, bvm);
+        SmallVector<Value> allisedBuffers;
+        for (int i = 0; i < scfFor.results().size(); ++i) {
+          Value inputTensor = scfFor.initArgs()[i];
+          Value inputBuffer = bvm.lookup(inputTensor);
+          allisedBuffers.push_back(inputBuffer);
+        }
+        return allisedBuffers;
       })
       .Default([&](Operation *op) -> SmallVector<Value, 4> {
         return SmallVector<Value, 4>(op->getNumResults(), nullptr);
