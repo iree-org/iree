@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:02c21884ec62a548992fc62031c41375d5cb7ebc33cb4ecbb8ac0ec2c83a2aa1 AS final
+FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:fe497276b941502cdacecf1b7595d7ada07a68f976968b835149f239082a0d08 AS final
 COPY --from=gcr.io/iree-oss/swiftshader@sha256:ccae32c83c89a31e8fc5542e480c29f28bbf4a3b3b80198c06b687a92c6813f3 \
   /swiftshader /swiftshader
 

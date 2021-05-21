@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/iree-oss/cmake-bazel-frontends@sha256:699f6470e618c151f36cb4769ccaf2cfbf334ddb2fc2b6e69eb60732fe69bb6b AS final
+FROM gcr.io/iree-oss/cmake-bazel-frontends@sha256:9db0cf2f8622c3cbbd6860bc120c53a560da4a8b88362e84e11c04281593fe37 AS final
 
 # Note that NDK_VERSION should be kept in sync with the one in cmake-android.
 # That actually means this isn't really an ARG because we cannot build this

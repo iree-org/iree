@@ -24,3 +24,10 @@ RUN python3 -m pip install tf-nightly==2.6.0.dev20210412
 
 # Install JAX.
 RUN python3 -m pip install --upgrade jax jaxlib flax
+
+# Install KWS Streaming Library.
+RUN python3 -m pip install --upgrade tensorflow-model-optimization==0.5.1.dev0
+ARG KWS_COMMIT=4bfbfe4ec19fe39cf9d1803e894d8bfb5fd56a45
+RUN git clone https://github.com/google-research/google-research
+RUN cd google-research && git checkout "${KWS_COMMIT?}" && cd ..
+ENV PYTHONPATH="/google-research:$PYTHONPATH"
