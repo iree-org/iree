@@ -107,9 +107,6 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 # These tests currently have asan failures
 # TODO(#5715): Fix these
 declare -a excluded_tests=(
-  "iree/base/internal/file_io_test"
-  "iree/base/internal/wait_handle_test"
-  "iree/base/testing/dynamic_library_test"
   "iree/hal/cts/allocator_test"
   "iree/hal/cts/buffer_mapping_test"
   "iree/hal/cts/command_buffer_test"
