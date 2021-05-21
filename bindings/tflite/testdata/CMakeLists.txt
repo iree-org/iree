@@ -26,6 +26,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_tflite_testdata_add_dynamic"
   FLAGS
+    "--iree-input-type=mhlo"
     "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"
     "-iree-mlir-to-vm-bytecode-module"
@@ -42,6 +43,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_tflite_testdata_add_multi"
   FLAGS
+    "--iree-input-type=mhlo"
     "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"
     "-iree-mlir-to-vm-bytecode-module"
@@ -58,6 +60,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_tflite_testdata_add_static"
   FLAGS
+    "--iree-input-type=mhlo"
     "-iree-native-bindings-support=false"
     "-iree-tflite-bindings-support"
     "-iree-mlir-to-vm-bytecode-module"
