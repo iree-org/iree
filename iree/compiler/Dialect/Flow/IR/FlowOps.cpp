@@ -814,10 +814,11 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
 bool DispatchWorkgroupsOp::isOutputReadWithinRegion(unsigned resultIndex) {
   BlockArgument arg =
       body().front().getArgument(operands().size() + resultIndex);
-  // If argument is of `writeonly` access, then it is not read by constructions.
+  // If argument is of `writeonly` access, then it is not read by construction.
   if (arg.getType().cast<DispatchTensorType>().getAccess() ==
-      TensorAccess::WriteOnly)
+      TensorAccess::WriteOnly) {
     return false;
+  }
   // If the argument is a result with `readwrite` access, return false if the
   // value is only written to. Check this by looking at the uses of the argument
   // being only the `target` of `flow.dispatch.tensor.store` ops.
