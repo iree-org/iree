@@ -47,7 +47,7 @@ jobs:
         uses: peter-evans/create-pull-request@v3
         with:
           # Personal token is required to trigger additional automation (e.g. presubmits).
-          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           commit-message: "Synchronize submodules with LLVM at llvm/llvm-project@${{ env.LLVM_SHA }}"
           title: "Synchronize submodules with LLVM at llvm/llvm-project@${{ env.LLVM_SHA }}"
           body: |

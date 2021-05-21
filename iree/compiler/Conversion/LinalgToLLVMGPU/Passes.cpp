@@ -20,6 +20,7 @@
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRVPass.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -58,6 +59,10 @@ static void addLinalgToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
+
+  // Handled tensor-type constants.
+  pm.addNestedPass<ModuleOp>(createTensorConstantBufferizePass());
+  pm.addNestedPass<ModuleOp>(createFoldTensorExtractOpPass());
 
   // SCF -> STD
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createLowerToCFGPass());

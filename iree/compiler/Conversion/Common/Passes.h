@@ -71,5 +71,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 
+/// After running the upstream TensorConstantBufferize pass, remove tensor_loads
+/// introduced for use only in tensor_extract. These can be folded to use a load
+/// of the created memref object that holds the constant values.
+std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir

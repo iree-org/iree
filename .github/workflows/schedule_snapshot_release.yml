@@ -14,7 +14,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
         with:
-          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
       - name: Compute version
         run: |
@@ -31,7 +31,7 @@ jobs:
       - name: Pushing changes
         uses: ad-m/github-push-action@v0.6.0
         with:
-          github_token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
+          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: main
           tags: true
 
@@ -39,7 +39,7 @@ jobs:
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           tag_name: ${{ env.tag_name }}
           release_name: iree snapshot ${{ env.tag_name }}
@@ -52,6 +52,6 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Build Native Release Packages
-          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
           inputs: '{"package_suffix": "-snapshot", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'
