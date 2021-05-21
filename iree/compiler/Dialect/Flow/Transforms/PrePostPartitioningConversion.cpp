@@ -60,11 +60,11 @@ class PrePartitioningConversionPass
     conversionTarget.addLegalOp<FuncOp>();
 
     // Allow XLA HLO ops - we explicitly mark the ones we don't want below.
-    conversionTarget.addLegalDialect<mhlo::MhloDialect>();
+    //conversionTarget.addLegalDialect<mhlo::MhloDialect>();
 
     // Control flow must be converted to standard form via
     // mhlo::createLegalizeControlFlowPass() prior to conversion.
-    conversionTarget.addIllegalOp<mhlo::IfOp, mhlo::CaseOp, mhlo::WhileOp>();
+    //conversionTarget.addIllegalOp<mhlo::IfOp, mhlo::CaseOp, mhlo::WhileOp>();
 
     // We don't support broadcast_dimensions as part of ops, so materialize
     // any such attributes to dedicated mhlo.broadcast_in_dim ops.
@@ -78,8 +78,8 @@ class PrePartitioningConversionPass
 
     // Early conversion of ops that have matches we want to route through.
     // For example, DynamicUpdateSlice should end up as a stream operation.
-    setupDirectHLOToFlowLegality(context, conversionTarget);
-    populateHLOToFlowPatterns(context, conversionPatterns);
+    // setupDirectHLOToFlowLegality(context, conversionTarget);
+    // populateHLOToFlowPatterns(context, conversionPatterns);
     setupDirectStandardToFlowLegality(context, conversionTarget);
 
     conversionTarget.addLegalOp<linalg::GenericOp, linalg::IndexedGenericOp>();

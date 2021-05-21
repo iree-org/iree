@@ -316,6 +316,8 @@ struct ConvertHLOToLinalgOnTensorsPass
     populateHLOBroadcastingToLinalgPatterns(context, *typeConverter, patterns);
     populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
                                                    patterns);
+    populateHLOToFlowPatterns(context, patterns);
+
     if (useLinalgOnTensorsPath) {
       patterns.insert<PadTensorOpConversion>(context);
     }
