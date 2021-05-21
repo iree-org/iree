@@ -63,8 +63,7 @@ LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
 
 Optional<Value> allocateWorkgroupMemory(OpBuilder &b, memref::SubViewOp subview,
                                         ArrayRef<Value> boundingSubViewSize,
-                                        DataLayout &layout,
-                                        OperationFolder *folder) {
+                                        DataLayout &layout) {
   // Allocate the memory into the entry block of the parent FuncOp. This better
   // aligns with the semantics of this memory which is available at the entry of
   // the function.
