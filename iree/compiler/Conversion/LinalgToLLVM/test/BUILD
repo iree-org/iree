@@ -30,7 +30,6 @@ iree_lit_test_suite(
             "hal_interface_bindings.mlir",
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",
-            "fold_tensor_extract_op.mlir",
             "linalg_vectorize.mlir",
             "materialize_launch_configuration.mlir",
             "matmul_vectorization.mlir",
