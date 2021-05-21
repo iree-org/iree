@@ -41,11 +41,13 @@ iree_lit_test_suite(
 
 iree_check_test_suite(
     name = "check",
+    compiler_flags = ["--iree-input-type=mhlo"],
     srcs = ["success.mlir"],
 )
 
 iree_check_test_suite(
     name = "check_failure",
     srcs = ["failure.mlir"],
+    compiler_flags = ["--iree-input-type=mhlo"],
     runner_args = ["--expect_failure"],
 )
