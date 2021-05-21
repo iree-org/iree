@@ -328,12 +328,9 @@ struct ConvertHLOToLinalgOnTensorsPass
     // We don't see complex types in codegen. This assumes that we run
     // LowerComplexPass before, and all the complex types were folded away.
     // Mark them legal and rely on canonicalization patterns to fold them away.
-    target.addDynamicallyLegalOp<mhlo::ComplexOp>(
-        [](mhlo::ComplexOp op) { return true; });
-    target.addDynamicallyLegalOp<mhlo::RealOp>(
-        [](mhlo::RealOp op) { return true; });
-    target.addDynamicallyLegalOp<mhlo::ImagOp>(
-        [](mhlo::ImagOp op) { return true; });
+    target.addLegalOp<mhlo::ComplexOp>();
+    target.addLegalOp<mhlo::RealOp>();
+    target.addLegalOp<mhlo::ImagOp>();
 
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });

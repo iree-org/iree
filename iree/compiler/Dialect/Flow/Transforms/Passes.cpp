@@ -96,6 +96,10 @@ void buildMHLOInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       mlir::iree_compiler::createHLOToLinalgOnTensorsPass(true));
 
+  // Note that some MHLO ops are left by the above and must resolve via
+  // canonicalization. See comments in the above pass and find a better way.
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
   // passManager.addNestedPass<FuncOp>(mlir::createRemoveShapeConstraintsPass());
@@ -117,6 +121,7 @@ void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
 
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 }
 
 void registerInputTransformPassPipeline() {
@@ -156,7 +161,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Perform initial cleanup.
   // NOTE: There is no principled reason to be doing this here. But also ensures
   // some consistency at the tool boundary.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // // Legalize input types. We do this after flattening tuples so that we
