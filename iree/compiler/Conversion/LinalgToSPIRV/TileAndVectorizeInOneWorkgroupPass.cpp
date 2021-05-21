@@ -182,10 +182,12 @@ static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
 
   // subgroupID
   //   = id.z * nsubgroups.y * nsubgroups.x + id.y * nsubgroups.x + id.x
-  using edsc::op::operator%;
   for (size_t i = 0, e = numSubgroups.size(); i != e; ++i) {
     Value nprocs = builder.create<ConstantIndexOp>(loc, numSubgroups[i]);
-    Value procId = subgroupId % nprocs;
+    AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
+    AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
+    Value procId =
+        makeComposedAffineApply(builder, loc, d0 % s0, {subgroupId, nprocs});
     procInfo[e - i - 1] = linalg::ProcInfo{procId, nprocs};
     subgroupId = builder.create<SignedDivIOp>(loc, subgroupId, nprocs);
   }
