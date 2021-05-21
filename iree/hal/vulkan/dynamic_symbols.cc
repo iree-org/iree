@@ -69,6 +69,8 @@ static constexpr const FunctionPtrInfo kDynamicFunctionPtrInfos[] = {
 static const char* kVulkanLoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_ANDROID)
     "libvulkan.so",
+#elif defined(IREE_PLATFORM_IOS) || defined(IREE_PLATFORM_MACOS)
+    "libvulkan.dylib",
 #elif defined(IREE_PLATFORM_WINDOWS)
     "vulkan-1.dll",
 #else
