@@ -80,6 +80,14 @@ def FLOW_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
       /*args=*/(ins "ArrayRef<unsigned>":$excludedOperandIndices,
                     "ArrayRef<unsigned>":$excludedResultIndices)
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the output is also read within the region.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isOutputReadWithinRegion",
+      /*args=*/(ins "unsigned":$resultIndex)
+    >
   ];
 }
 
