@@ -237,9 +237,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //----------------------------------------------------------------------------
 
   // Convert into our expected input and (hopefully) some flow ops.
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createPrePartitioningConversionPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  // passManager.addNestedPass<FuncOp>(
+  //     IREE::Flow::createPrePartitioningConversionPass());
+  // passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
   if (clEnable1x1ConvToMatmul) {
     passManager.addNestedPass<FuncOp>(
@@ -278,6 +278,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
+
+  // TODO: Prune and rename this pass. This runs after sending everything
+  // possible to the device and then legalizes any remaining h<->d loads,
+  // typically coming from top level flow control.
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createPrePartitioningConversionPass());
 
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as
