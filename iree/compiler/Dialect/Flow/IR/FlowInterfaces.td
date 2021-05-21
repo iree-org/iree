@@ -82,11 +82,11 @@ def FLOW_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns true if an argument of the region is read within the region
+        Returns true if the output is also read within the region.
       }],
       /*retTy=*/"bool",
-      /*methodName=*/"isArgumentReadWithinRegion",
-      /*args=*/(ins "BlockArgument":$arg)
+      /*methodName=*/"isOutputReadWithinRegion",
+      /*args=*/(ins "unsigned":$resultIndex)
     >
   ];
 }

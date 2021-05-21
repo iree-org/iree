@@ -154,9 +154,9 @@ func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
 // CHECK-LABEL: func @remove_unused_result
 func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = constant 1 : index
-  //      CHECK: %[[RESULT:[a-zA-Z0-9_]+]] = flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32>
-  // CHECK-SAME:   (%[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:i32>)
-  //      CHECK: flow.dispatch.tensor.store %{{.+}},
+  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
+  // CHECK-NEXT:   (%arg2: !flow.dispatch.tensor<writeonly:i32>)
+  //      CHECK: flow.dispatch.tensor.store
   //  CHECK-NOT: flow.dispatch.tensor.store
   %0:2 = flow.dispatch.workgroups[%c1, %c1, %c1](%arg0, %arg1) : (tensor<9xi32>, tensor<9xi32>) -> (tensor<i32>, tensor<i32>) =
       (%arg0: !flow.dispatch.tensor<readonly:9xi32>, %arg1: !flow.dispatch.tensor<readonly:9xi32>, %arg2: !flow.dispatch.tensor<writeonly:i32>, %arg3: !flow.dispatch.tensor<writeonly:i32>) {
@@ -176,10 +176,11 @@ func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (ten
 
 // -----
 
+// CHECK-LABEL: func @remove_unused_read_write_result
 func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = constant 1 : index
-  //      CHECK: %[[RESULT:[a-zA-Z0-9_]+]] = flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32>
-  // CHECK-SAME:   (%[[ARG2:.+]]: !flow.dispatch.tensor<readwrite:i32>)
+  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
+  // CHECK-NEXT:   (%arg2: !flow.dispatch.tensor<writeonly:i32>)
   //      CHECK: flow.dispatch.tensor.store %{{.+}},
   //  CHECK-NOT: flow.dispatch.tensor.store
   %0:2 = flow.dispatch.workgroups[%c1, %c1, %c1](%arg0, %arg1) : (tensor<9xi32>, tensor<9xi32>) -> (tensor<i32>, tensor<i32>) =
@@ -200,10 +201,11 @@ func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi3
 
 // -----
 
-func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
+// CHECK-LABEL: func @keep_used_read_write_result
+func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = constant 1 : index
-  //      CHECK: %[[RESULT:[a-zA-Z0-9_]+]] = flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32>
-  // CHECK-SAME:   (%[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:i32>, %[[ARG3:.+]]: !flow.dispatch.tensor<readwrite:i33>)
+  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> (tensor<i32>, tensor<i32>) =
+  // CHECK-NEXT:   (%arg2: !flow.dispatch.tensor<writeonly:i32>, %arg3: !flow.dispatch.tensor<readwrite:i32>)
   %0:2 = flow.dispatch.workgroups[%c1, %c1, %c1](%arg0, %arg1) : (tensor<9xi32>, tensor<9xi32>) -> (tensor<i32>, tensor<i32>) =
       (%arg0: !flow.dispatch.tensor<readonly:9xi32>, %arg1: !flow.dispatch.tensor<readonly:9xi32>, %arg2: !flow.dispatch.tensor<writeonly:i32>, %arg3: !flow.dispatch.tensor<readwrite:i32>) {
     %c-2147483648_i32 = constant -2147483648 : i32
