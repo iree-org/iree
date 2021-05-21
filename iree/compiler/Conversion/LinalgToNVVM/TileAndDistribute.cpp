@@ -15,11 +15,12 @@
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/KernelConfig.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/LinalgToNVVM/KernelConfig.h"
+#include "iree/compiler/Conversion/LinalgToNVVM/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+#include "mlir/Dialect/Affine/EDSC/Builders.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -171,7 +172,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
     if (hasDynamicRange || wokgroupSize[1] != 1 || wokgroupSize[2] != 1)
       return getGPUThreadIdsAndCounts(builder, loc, parallelLoopRanges.size(),
                                       launchConfig.getWorkgroupSize());
-    Value serializedId =
+    Value serilizedId =
         builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(), "x");
     int64_t numIds = wokgroupSize[0];
     int numDims = parallelLoopRanges.size();
@@ -180,7 +181,8 @@ static void populateTilingCopyToWorkgroupMemPatterns(
     // Distribute the available Ids on the loop dimensions.
     for (int i = numDims - 1; i >= 0; i--) {
       std::array<int64_t, 3> &range = staticRanges[i];
-      Value id = serializedId;
+      Value id = serilizedId;
+      using mlir::edsc::op::operator%;
       int64_t interval = (range[1] - range[0]) / range[2];
       Value intervalValue = builder.create<ConstantIndexOp>(loc, interval);
       int64_t count = 0;
@@ -188,20 +190,13 @@ static void populateTilingCopyToWorkgroupMemPatterns(
         count = 1;
         id = builder.create<ConstantIndexOp>(loc, 0);
       } else if (numIds > interval) {
-        AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
-        AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
-        if (i > 0)
-          id = makeComposedAffineApply(builder, loc, d0 % s0,
-                                       {id, intervalValue});
+        if (i > 0) id = id % intervalValue;
         count = interval;
       } else {
         count = numIds;
       }
       numIds = numIds / interval;
-      AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
-      AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
-      serializedId = makeComposedAffineApply(builder, loc, d0.floorDiv(s0),
-                                             {serializedId, intervalValue});
+      serilizedId = edsc::op::floorDiv(serilizedId, intervalValue);
       procInfo[i] = {id, builder.create<ConstantIndexOp>(loc, count)};
     }
     return procInfo;
@@ -344,12 +339,12 @@ struct TileAndDistributeToThreads
       }
       linalg::Aliases aliases;
       linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
-      auto config = getLLVMGPULaunchConfig(context, dependenceGraph, linalgOps);
+      auto config = getCUDALaunchConfig(context, dependenceGraph, linalgOps);
       if (!config) return signalPassFailure();
 
       // Attach the workgroup size as an attribute. This will be used when
       // creating the flatbuffer.
-      funcOp->setAttr("llvmgpu_workgroup_size",
+      funcOp->setAttr("cuda_workgroup_size",
                       DenseElementsAttr::get<int64_t>(
                           VectorType::get(3, IntegerType::get(context, 64)),
                           config->getWorkgroupSize()));
@@ -441,7 +436,7 @@ createTileAndDistributeToThreads() {
 }
 
 static PassRegistration<TileAndDistributeToThreads> pass(
-    "iree-codegen-llvmgpu-tile-and-distribute",
+    "iree-codegen-cuda-tile-and-distribute",
     "Pass to tile and distribute linalg ops within a workgroup.");
 
 }  // namespace iree_compiler
