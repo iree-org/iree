@@ -16,6 +16,9 @@
 
 # To use the host GPUs, `docker run` must be called with the `--gpus all` flag.
 
+# We use .deb files that we host because we have to pin the version exactly to
+# match the host machine and packages routinely dissapear from the Ubuntu
+# apt repositories.
 ARG NVIDIA_GL_DEB="libnvidia-gl-460_460.39-0ubuntu0.18.04.1_amd64.deb"
 ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-460_460.39-0ubuntu0.18.04.1_amd64.deb"
 ARG NVIDIA_COMMON_DEB="libnvidia-common-460_460.39-0ubuntu0.18.04.1_all.deb"
@@ -46,7 +49,11 @@ ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
 
-COPY --from=fetch-nvidia "/fetch-nvidia/${NVIDIA_COMMON_DEB}" "/fetch-nvidia/${NVIDIA_GL_DEB}" "/fetch-nvidia/${NVIDIA_COMPUTE_DEB}" /tmp/
+COPY --from=fetch-nvidia \
+  "/fetch-nvidia/${NVIDIA_COMMON_DEB}" \
+  "/fetch-nvidia/${NVIDIA_GL_DEB}" \
+  "/fetch-nvidia/${NVIDIA_COMPUTE_DEB}" \
+  /tmp/
 
 RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB?}" \
   "/tmp/${NVIDIA_GL_DEB?}" \
