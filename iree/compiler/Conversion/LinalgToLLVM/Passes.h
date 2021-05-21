@@ -50,11 +50,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
 /// Pass to convert Linalg ops into vector operations.
 std::unique_ptr<FunctionPass> createLinalgVectorizePass();
 
-/// After running the upstream TensorConstantBufferize pass, remove tensor_loads
-/// introduced for use only in tensor_extract. These can be folded to use a load
-/// of the created memref object that holds the constant values.
-std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
-
 //===----------------------------------------------------------------------===//
 // Pass Pipelines for CPU Lowering
 //===----------------------------------------------------------------------===//

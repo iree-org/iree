@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_CONVERSION_LINALGTOLLVM_FOLDTENSOREXTRACTOP
-#define IREE_COMPILER_CONVERSION_LINALGTOLLVM_FOLDTENSOREXTRACTOP
+#ifndef IREE_COMPILER_CONVERSION_COMMON_FOLDTENSOREXTRACTOP
+#define IREE_COMPILER_CONVERSION_COMMON_FOLDTENSOREXTRACTOP
 
 include "mlir/Dialect/MemRef/IR/MemRefOps.td"
 include "mlir/Dialect/Tensor/IR/TensorOps.td"
@@ -23,4 +23,4 @@ include "mlir/Dialect/Tensor/IR/TensorOps.td"
 def : Pat<(Tensor_ExtractOp (TensorLoadOp $value), $indices),
           (LoadOp $value, $indices)>;
 
-#endif // IREE_COMPILER_CONVERSION_LINALGTOLLVM_FOLDTENSOREXTRACTOP
+#endif // IREE_COMPILER_CONVERSION_COMMON_FOLDTENSOREXTRACTOP

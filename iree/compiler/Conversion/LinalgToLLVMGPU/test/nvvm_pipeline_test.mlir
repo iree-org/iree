@@ -181,3 +181,41 @@ hal.executable.target @cuda, filter="cuda" {
 //         CHECK:   lvm.fmul %{{.*}}, %{{.*}}  : f32
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : f32
 //         CHECK:   llvm.store {{.*}} : !llvm.ptr<f32>
+
+// -----
+
+hal.executable @simpleMath_ex_dispatch_0 {
+  hal.interface @io {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.target @cuda, filter="cuda" {
+  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+  module  {
+    func @add_dispatch_0() {
+      %c0 = constant 0 : index
+      %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
+      %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:16xf32>
+      %3 = linalg.init_tensor [16] : tensor<16xf32>
+      %4 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %5 = constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]> : tensor<16xf32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xf32>, tensor<16xf32>) outs(%3 : tensor<16xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
+          %7 = addf %arg0, %arg1 : f32
+          linalg.yield %7 : f32
+        } -> tensor<16xf32>
+        flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
+        return
+      }
+      hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
+//       CHECK:   hal.executable.target @cuda, filter="cuda" {
+//       CHECK:   llvm.mlir.global private constant @{{.*}}(dense<[1.000000e+00, 2.000000e+00, 3.000000e+00, 4.000000e+00, 5.000000e+00, 6.000000e+00, 7.000000e+00, 8.000000e+00, 9.000000e+00, 1.000000e+01, 1.100000e+01, 1.200000e+01, 1.300000e+01, 1.400000e+01, 1.500000e+01, 1.600000e+01]> : tensor<16xf32>)
+//       CHECK:   llvm.fadd
