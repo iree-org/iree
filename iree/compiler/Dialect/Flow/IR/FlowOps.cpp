@@ -811,11 +811,9 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   return canDispatchRegionContainOp(op);
 }
 
-bool DispatchWorkgroupsOp::isArgumentReadWithinRegion(BlockArgument arg) {
-  // For inputs, just check if the uses are empty.
-  if (arg.getArgNumber() < getClosureOperands().size()) {
-    return !arg.use_empty();
-  }
+bool DispatchWorkgroupsOp::isOutputReadWithinRegion(unsigned resultIndex) {
+  BlockArgument arg =
+      body().front().getArgument(operands().size() + resultIndex);
   // If argument is of `writeonly` access, then it is not read by constructions.
   if (arg.getType().cast<DispatchTensorType>().getAccess() ==
       TensorAccess::WriteOnly)
@@ -1402,8 +1400,8 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   return false;
 }
 
-bool ExStreamFragmentOp::isArgumentReadWithinRegion(BlockArgument arg) {
-  return !arg.use_empty();
+bool ExStreamFragmentOp::isOutputReadWithinRegion(unsigned resultIndex) {
+  return false;
 }
 
 ClosureOpInterface
