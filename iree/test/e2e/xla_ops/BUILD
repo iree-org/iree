@@ -26,105 +26,21 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-CHECK_TESTS = [
-    "abs.mlir",
-    "add.mlir",
-    "batch_norm_inference.mlir",
-    "broadcast.mlir",
-    "broadcast_add.mlir",
-    "broadcast_in_dim.mlir",
-    "clamp.mlir",
-    "compare.mlir",
-    "concatenate.mlir",
-    "constant.mlir",
-    "convert.mlir",
-    "convolution.mlir",
-    "cosine.mlir",
-    "divide.mlir",
-    "dot.mlir",
-    "dot_general.mlir",
-    "dynamic_slice.mlir",
-    "exponential.mlir",
-    "exponential_minus_one.mlir",
-    "floor.mlir",
-    "gather.mlir",
-    "iota.mlir",
-    "log.mlir",
-    "log_plus_one.mlir",
-    "maximum.mlir",
-    "minimum.mlir",
-    "multiply.mlir",
-    "negate.mlir",
-    "pad.mlir",
-    "reduce.mlir",
-    "reduce_window.mlir",
-    "remainder.mlir",
-    "reshape.mlir",
-    "reverse.mlir",
-    "rsqrt.mlir",
-    "select.mlir",
-    "sine.mlir",
-    "slice.mlir",
-    "sqrt.mlir",
-    "subtract.mlir",
-    "tanh.mlir",
-    "torch_index_select.mlir",
-    "transpose.mlir",
-    "while.mlir",
-]
-
 iree_check_single_backend_test_suite(
     name = "check_cuda",
-    srcs = [
-        "abs.mlir",
-        "add.mlir",
-        "batch_norm_inference.mlir",
-        "broadcast.mlir",
-        "broadcast_add.mlir",
-        "broadcast_in_dim.mlir",
-        "clamp.mlir",
-        "compare.mlir",
-        #"concatenate.mlir",
-        "constant.mlir",
-        "convert.mlir",
-        "convolution.mlir",
-        "cosine.mlir",
-        "divide.mlir",
-        #"dot.mlir",
-        #"dot_general.mlir",
-        "dynamic_slice.mlir",
-        "exponential.mlir",
-        "exponential_minus_one.mlir",
-        "fft.mlir",
-        "finite.mlir",
-        "floor.mlir",
-        "gather.mlir",
-        "iota.mlir",
-        "log.mlir",
-        "log_plus_one.mlir",
-        "maximum.mlir",
-        "minimum.mlir",
-        "multiply.mlir",
-        "negate.mlir",
-        "pad.mlir",
-        #"reduce.mlir",
-        #"reduce_window.mlir",
-        #"remainder.mlir", frem has a bug in LLVM PTX backend for negative values.
-        "reshape.mlir",
-        "reverse.mlir",
-        #"round.mlir",
-        "rsqrt.mlir",
-        "select.mlir",
-        "sine.mlir",
-        "slice.mlir",
-        #"sort.mlir",
-        "sqrt.mlir",
-        "subtract.mlir",
-        "tanh.mlir",
-        "torch_index_select.mlir",
-        "transpose.mlir",
-        "while.mlir",
-    ],
+    srcs = glob(
+        ["*.mlir"],
+        exclude = [
+            "concatenate.mlir",
+            "dot.mlir",
+            "dot_general.mlir",
+            "reduce.mlir",
+            "reduce_window.mlir",
+            "remainder.mlir",  # frem has a bug in LLVM PTX backend for negative values.
+            "round.mlir",
+            "sort.mlir",
+        ],
+    ),
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -139,21 +55,40 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
-    srcs = CHECK_TESTS + ["fft.mlir"],  # TODO(hanchung): clean this up, like VMLA test suite.
+    srcs = glob(
+        ["*.mlir"],
+        exclude = [
+            "round.mlir",
+            "sort.mlir",
+        ],
+    ),
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
 
 iree_check_single_backend_test_suite(
     name = "check_vmvx_vmvx",
-    srcs = CHECK_TESTS + ["fft.mlir"],  # TODO(hanchung): clean this up, like VMLA test suite.
+    srcs = glob(
+        ["*.mlir"],
+        exclude = [
+            "round.mlir",
+            "sort.mlir",
+        ],
+    ),
     driver = "vmvx",
     target_backend = "vmvx",
 )
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = CHECK_TESTS,
+    srcs = glob(
+        ["*.mlir"],
+        exclude = [
+            "fft.mlir",  # TODO(GH-5444): Enable the test.
+            "round.mlir",
+            "sort.mlir",
+        ],
+    ),
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
