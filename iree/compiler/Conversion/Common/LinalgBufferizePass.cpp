@@ -431,7 +431,7 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
     Value outputTensor = yeildOp.results()[i];
     Value resultTensor = forOp.results()[i];
     Value initArg = forOp.initArgs()[i];
-    Value operand = forOp.getBodyRegion().getArgument(1);
+    Value operand = forOp.getBodyRegion().getArgument(i + 1);
     plan.unionSets(outputTensor, resultTensor);
     plan.unionSets(outputTensor, initArg);
     plan.unionSets(outputTensor, operand);
@@ -1133,9 +1133,11 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
 static LogicalResult convertScfForOp(OpBuilder &b, scf::ForOp forOp,
                                      BlockAndValueMapping &bvm,
                                      BufferizationPlan &plan) {
-  Value result = forOp.results()[0];
-  Value operand = forOp.getBodyRegion().getArgument(1);
-  bvm.map(operand, bvm.lookup(result));
+  for (int i = 0; i < forOp.results().size(); ++i) {
+    Value result = forOp.results()[i];
+    Value operand = forOp.getBodyRegion().getArgument(i + 1);
+    bvm.map(operand, bvm.lookup(result));
+  }
   return success();
 }
 
@@ -1287,10 +1289,12 @@ void LinalgBufferizePass::runOnFunction() {
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           if (forOp.results().empty()) return success();
           auto aliasingBuffers = getAliasingBuffersForResults(b, forOp, bvm);
-          Value operand = forOp.getBodyRegion().getArgument(1);
-          if (failed(getOrAllocateResultBuffers(b, forOp, operand,
-                                                aliasingBuffers, bvm, plan,
-                                                allocationFn))) {
+          SmallVector<Value> args;
+          for (int i = 0; i < forOp.results().size(); ++i) {
+            args.push_back(forOp.getBodyRegion().getArgument(i + 1));
+          }
+          if (failed(getOrAllocateResultBuffers(b, forOp, args, aliasingBuffers,
+                                                bvm, plan, allocationFn))) {
             return failure();
           }
           return convertScfForOp(b, forOp, bvm, plan);
