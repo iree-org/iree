@@ -1,7 +1,7 @@
 # IREE: Intermediate Representation Execution Environment
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment,
-pronounced as "eerie") is an [MLIR](https://mlir.llvm.org/)-based end-to-end
+pronounced as "eerie") is a [MLIR](https://mlir.llvm.org/)-based end-to-end
 compiler that lowers Machine Learning (ML) models to a unified IR optimized for
 real-time inference on mobile/edge devices against heterogeneous hardware
 accelerators. IREE also provides flexible deployment solutions for its compiled
