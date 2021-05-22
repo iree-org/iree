@@ -1991,6 +1991,15 @@ hal.interface @io attributes {sym_visibility = "private"} {
 
 // -----
 
+#config0 = {tileSizes = [[64, 64]]}
+#config1 = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 24], [4, 4, 4]]}
+#map0 = affine_map<()[s0] -> (s0 * 64)>
+#map1 = affine_map<(d0) -> (64, -d0 + 250)>
+#map2 = affine_map<(d0) -> (64, -d0 + 370)>
+#map3 = affine_map<(d0) -> (32, -d0 + 250)>
+#map4 = affine_map<(d0) -> (24, -d0 + 144)>
+#map5 = affine_map<(d0) -> (32, -d0 + 370)>
+#map6 = affine_map<(d0, d1) -> (32, d0 - d1)>
 module  {
   func @l1_tiled_matmul() {
     %cst = constant 0.000000e+00 : f32
@@ -2008,45 +2017,40 @@ module  {
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
-    %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
+    %3 = affine.apply #map0()[%workgroup_id_y]
+    %4 = affine.apply #map0()[%workgroup_count_y]
     scf.for %arg0 = %3 to %c250 step %4 {
-      %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-      %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+      %5 = affine.apply #map0()[%workgroup_id_x]
+      %6 = affine.apply #map0()[%workgroup_count_x]
       scf.for %arg1 = %5 to %c370 step %6 {
-        %7 = affine.min affine_map<(d0) -> (64, -d0 + 250)>(%arg0)
+        %7 = affine.min #map1(%arg0)
         %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 144], strides = [1, 1] : !flow.dispatch.tensor<readonly:250x144xf32> -> tensor<?x144xf32>
-        %9 = affine.min affine_map<(d0) -> (64, -d0 + 370)>(%arg1)
+        %9 = affine.min #map2(%arg1)
         %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [144, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:144x370xf32> -> tensor<144x?xf32>
-        %11 = affine.min affine_map<(d0) -> (64, -d0 + 250)>(%arg0)
-        %12 = affine.min affine_map<(d0) -> (64, -d0 + 370)>(%arg1)
-        %13 = affine.min affine_map<(d0) -> (-d0 + 250, 64)>(%arg0)
-        %14 = affine.min affine_map<(d0) -> (-d0 + 370, 64)>(%arg1)
-        %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-        %16 = linalg.fill(%15, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[64, 64]]}} : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
-        %17 = scf.for %arg2 = %c0 to %c250 step %c32 iter_args(%arg3 = %16) -> (tensor<?x?xf32>) {
-          %18 = scf.for %arg4 = %c0 to %c370 step %c32 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
-            %19 = scf.for %arg6 = %c0 to %c144 step %c24 iter_args(%arg7 = %arg5) -> (tensor<?x?xf32>) {
-              %20 = affine.min affine_map<(d0) -> (32, -d0 + 250)>(%arg2)
-              %21 = affine.min affine_map<(d0) -> (24, -d0 + 144)>(%arg6)
-              %22 = subtensor %8[%arg2, %arg6] [%20, %21] [1, 1] : tensor<?x144xf32> to tensor<?x?xf32>
-              %23 = affine.min affine_map<(d0) -> (24, -d0 + 144)>(%arg6)
-              %24 = affine.min affine_map<(d0) -> (32, -d0 + 370)>(%arg4)
-              %25 = subtensor %10[%arg6, %arg4] [%23, %24] [1, 1] : tensor<144x?xf32> to tensor<?x?xf32>
-              %26 = memref.dim %arg7, %c0 : tensor<?x?xf32>
-              %27 = affine.min affine_map<(d0, d1) -> (32, d0 - d1)>(%26, %arg2)
-              %28 = memref.dim %arg7, %c1 : tensor<?x?xf32>
-              %29 = affine.min affine_map<(d0, d1) -> (32, d0 - d1)>(%28, %arg4)
-              %30 = subtensor %arg7[%arg2, %arg4] [%27, %29] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-              %31 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 24], [4, 4, 4]]}} ins(%22, %25 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%30 : tensor<?x?xf32>) -> tensor<?x?xf32>
-              %32 = subtensor_insert %31 into %arg7[%arg2, %arg4] [%27, %29] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
-              scf.yield %32 : tensor<?x?xf32>
+        %11 = linalg.init_tensor [%7, %9] : tensor<?x?xf32>
+        %12 = linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+        %13 = scf.for %arg2 = %c0 to %c250 step %c32 iter_args(%arg3 = %12) -> (tensor<?x?xf32>) {
+          %14 = scf.for %arg4 = %c0 to %c370 step %c32 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
+            %15 = scf.for %arg6 = %c0 to %c144 step %c24 iter_args(%arg7 = %arg5) -> (tensor<?x?xf32>) {
+              %16 = affine.min #map3(%arg2)
+              %17 = affine.min #map4(%arg6)
+              %18 = subtensor %8[%arg2, %arg6] [%16, %17] [1, 1] : tensor<?x144xf32> to tensor<?x?xf32>
+              %19 = affine.min #map5(%arg4)
+              %20 = subtensor %10[%arg6, %arg4] [%17, %19] [1, 1] : tensor<144x?xf32> to tensor<?x?xf32>
+              %21 = memref.dim %arg7, %c0 : tensor<?x?xf32>
+              %22 = affine.min #map6(%21, %arg2)
+              %23 = memref.dim %arg7, %c1 : tensor<?x?xf32>
+              %24 = affine.min #map6(%23, %arg4)
+              %25 = subtensor %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+              %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
+              %27 = subtensor_insert %26 into %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
+              scf.yield %27 : tensor<?x?xf32>
             }
-            scf.yield %19 : tensor<?x?xf32>
+            scf.yield %15 : tensor<?x?xf32>
           }
-          scf.yield %18 : tensor<?x?xf32>
+          scf.yield %14 : tensor<?x?xf32>
         }
-        flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:250x370xf32>
+        flow.dispatch.tensor.store %13, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:250x370xf32>
       }
     }
     return
@@ -2073,8 +2077,6 @@ module  {
 //    CHECK-DAG:        %[[LHS_WORKGROUP_TILE:.+]] = memref.subview %[[LHS]][%[[WORKGROUP_I]], 0] [%[[WORKGROUP_I_SIZE]], 144] [1, 1] : memref<250x144xf32> to memref<?x144xf32
 //    CHECK-DAG:        %[[WORKGROUP_J_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_J]])
 //    CHECK-DAG:        %[[RHS_WORKGROUP_TILE:.+]] = memref.subview %[[RHS]][0, %[[WORKGROUP_J]]] [144, %[[WORKGROUP_J_SIZE]]] [1, 1] : memref<144x370xf32> to memref<144x?xf32
-//    CHECK-DAG:            %[[WORKGROUP_I_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_I]])
-//    CHECK-DAG:            %[[WORKGROUP_J_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_J]])
 //    CHECK-DAG:            %[[DST_WORKGROUP_TILE:.+]] = memref.alloc(%[[WORKGROUP_I_SIZE]], %[[WORKGROUP_J_SIZE]]) : memref<?x?xf32>
 //        CHECK:            scf.for %[[L1_I:.+]] = %{{.*}} to %[[M]] step %[[L1_MN_SIZE]] {
 //        CHECK:              scf.for %[[L1_J:.+]] = %{{.*}} to %[[N]] step %[[L1_MN_SIZE]] {
