@@ -31,6 +31,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensor
     MLIRTransforms
+    iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
