@@ -70,6 +70,11 @@ void buildMHLOInputTransformPassPipeline(OpPassManager &passManager) {
   // TODO: Currently recurses into SCF in Linalg generic - with hilarity.
   passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
 
+  // TODO: Rename/strip down this pass. It is really just hoisting any
+  // tensor.extract introduced in SCF conversion to flow.tensor.load (host
+  // read-back).
+  passManager.addNestedPass<FuncOp>(createPrePartitioningConversionPass());
+
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
@@ -114,6 +119,11 @@ void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
   // and cfg compatible.
   // TODO: Currently recurses into SCF in Linalg generic - with hilarity.
   passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
+
+  // TODO: Rename/strip down this pass. It is really just hoisting any
+  // tensor.extract introduced in SCF conversion to flow.tensor.load (host
+  // read-back).
+  passManager.addNestedPass<FuncOp>(createPrePartitioningConversionPass());
 
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
