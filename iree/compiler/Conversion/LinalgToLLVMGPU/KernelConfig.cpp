@@ -27,7 +27,13 @@ static constexpr unsigned cudaWarpSize = 32;
 static LaunchConfig getOpLaunchConfig(linalg::GenericOp op) {
   LaunchConfig config;
   size_t numLoops = getNumOuterParallelLoops(op);
-  if (numLoops == 0) return config;
+  if (numLoops == 0) {
+    // Pure reduction, we serialize the operation on a single thread.
+    // TODO: Use atomic to allow distributing reduction loops.
+    config.setWorkgroupSize({1, 1, 1});
+    config.setTileSizes(op, {}, 0);
+    return config;
+  }
 
   config.setWorkgroupSize({cudaWarpSize, 1, 1});
   // Pick a fixed tile size independent of the original shape.
@@ -111,15 +117,25 @@ Optional<LaunchConfig> getLLVMGPULaunchConfig(
     }
   }
   if (!rootOperation) {
-    // No root operations found. Dont need to do anything.
-    return llvm::None;
+    // If no named ops the dispatch region should have at exactly one generic op
+    // which is root operation.
+    assert(llvm::count_if(linalgOps, [](linalg::LinalgOp op) {
+             return isa<linalg::GenericOp>(op);
+           }) == 1);
+    for (linalg::LinalgOp op : linalgOps) {
+      if (isa<linalg::GenericOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
   }
   launchConfig = getOpLaunchConfig(rootOperation);
   launchConfig.setRootOperation(rootOperation.getOperation());
-
-  if (failed(propogateRootOperationLaunchConfig(launchConfig, rootOperation,
-                                                dependenceGraph)))
-    return llvm::None;
+  if (!launchConfig.getTileSizes(rootOperation, 0).empty()) {
+    if (failed(propogateRootOperationLaunchConfig(launchConfig, rootOperation,
+                                                  dependenceGraph)))
+      return llvm::None;
+  }
   return launchConfig;
 }
 
