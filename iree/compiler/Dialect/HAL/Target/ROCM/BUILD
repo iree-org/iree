@@ -32,6 +32,7 @@ cc_library(
     name = "ROCM",
     srcs = [
         "ROCMTarget.cpp",
+        "ROCMTargetUtils.cpp",
     ],
     hdrs = [
         "ROCMTarget.h",
@@ -44,6 +45,9 @@ cc_library(
         "//iree/schemas:rocm_executable_def_c_fbs",
         "@llvm-project//llvm:AMDGPUCodeGen",
         "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:IPO",
+        "@llvm-project//llvm:IRReader",
+        "@llvm-project//llvm:Linker",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
         "@llvm-project//mlir:LLVMDialect",
