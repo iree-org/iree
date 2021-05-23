@@ -212,8 +212,8 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
   }
 }
 
-bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
-                           PatternRewriter *rewriter) {
+LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
+                                    PatternRewriter &rewriter) {
   // NOTE: the block is transferred to the new op; we can update it in place.
   Block &entryBlock = closureOp.getClosureBodyRegion().front();
 
@@ -264,18 +264,13 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
 
   if (elidedOperands.empty() && elidedResults.empty()) {
     // No optimization required.
-    return false;
+    return failure();
   }
 
   if (elidedResults.size() == closureOp.getClosureResults().size()) {
     // The op is completely unused - delete it.
-    if (rewriter) {
-      rewriter->eraseOp(closureOp);
-    } else {
-      closureOp.erase();
-    }
-    closureOp = {};
-    return true;
+    rewriter.eraseOp(closureOp);
+    return success();
   }
 
   // Replace duplicate block arguments.
@@ -295,12 +290,7 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
   // Clone the op with the elidable operands and results removed.
   OpBuilder builder(closureOp);
   auto newOp = closureOp.cloneReplacementExcludingOperandsAndResults(
-      elidedOperands, elidedResults);
-  if (rewriter) {
-    rewriter->insert(newOp);
-  } else {
-    builder.insert(newOp);
-  }
+      elidedOperands, elidedResults, rewriter);
 
   // Replace original uses of the closure results.
   for (auto oldNewResult :
@@ -309,14 +299,9 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
   }
 
   // Erase the original op.
-  if (rewriter) {
-    rewriter->eraseOp(closureOp);
-  } else {
-    closureOp.erase();
-  }
+  rewriter.eraseOp(closureOp);
 
-  closureOp = newOp;
-  return true;
+  return success();
 }
 
 }  // namespace Flow

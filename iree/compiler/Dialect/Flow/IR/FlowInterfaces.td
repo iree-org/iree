@@ -78,7 +78,8 @@ def FLOW_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
       /*retTy=*/"ClosureOpInterface",
       /*methodName=*/"cloneReplacementExcludingOperandsAndResults",
       /*args=*/(ins "ArrayRef<unsigned>":$excludedOperandIndices,
-                    "ArrayRef<unsigned>":$excludedResultIndices)
+                    "ArrayRef<unsigned>":$excludedResultIndices,
+                    "PatternRewriter &":$rewriter)
     >,
     InterfaceMethod<
       /*desc=*/[{

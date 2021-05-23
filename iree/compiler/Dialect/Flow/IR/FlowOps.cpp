@@ -834,7 +834,7 @@ bool DispatchWorkgroupsOp::isOutputReadWithinRegion(unsigned resultIndex) {
 ClosureOpInterface
 DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
-    ArrayRef<unsigned> excludedResultIndices) {
+    ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
   SmallVector<Type, 4> newResultTypes = llvm::to_vector<4>(getResultTypes());
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
@@ -865,8 +865,7 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
-  OpBuilder builder(getContext());
-  auto newOp = builder.create<DispatchWorkgroupsOp>(
+  auto newOp = rewriter.create<DispatchWorkgroupsOp>(
       getLoc(), workgroup_count(), newResultTypes, newResultDims,
       newOperandsValues, newOperandDims, newTiedOperandIndices,
       getOperation()->getAttrs());
@@ -884,7 +883,7 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     for (OpOperand &user : llvm::make_early_inc_range(arg.getUses())) {
       auto storeOp = dyn_cast<DispatchTensorStoreOp>(user.getOwner());
       if (storeOp && storeOp.target() == user.get()) {
-        storeOp->erase();
+        rewriter.eraseOp(storeOp);
       }
     }
     erasedArguments.push_back(i);
@@ -1408,7 +1407,7 @@ bool ExStreamFragmentOp::isOutputReadWithinRegion(unsigned resultIndex) {
 ClosureOpInterface
 ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
-    ArrayRef<unsigned> excludedResultIndices) {
+    ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
   SmallVector<Type, 4> newResultTypes = llvm::to_vector<4>(getResultTypes());
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
@@ -1424,11 +1423,9 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   assert(getTiedOperandsIndexAndLength().first == 0 &&
          "operands must be the first ODS group");
 
-  auto newOp = OpBuilder(getContext())
-                   .create<ExStreamFragmentOp>(
-                       getLoc(), newResultTypes, newResultDims,
-                       newOperandsValues, newOperandDims, newTiedOperandIndices,
-                       getOperation()->getAttrs());
+  auto newOp = rewriter.create<ExStreamFragmentOp>(
+      getLoc(), newResultTypes, newResultDims, newOperandsValues,
+      newOperandDims, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
   eraseRegionResults(newBody, excludedResultIndices);
