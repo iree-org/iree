@@ -89,12 +89,10 @@ def _get_tf_import_output_kwargs(artifacts_dir: str,
   return kwargs
 
 
-def _incrementally_compile_tf_module(
-    module: Type[tf.Module],
-    backend_info: "BackendInfo",
-    exported_names: Sequence[str] = (),
-    artifacts_dir: Optional[str] = None,
-) -> Tuple[bytes, Optional[str]]:
+def _incrementally_compile_tf_module(module: Type[tf.Module],
+                                     backend_info: "BackendInfo",
+                                     exported_names: Sequence[str] = (),
+                                     artifacts_dir: Optional[str] = None):
   """Compile a TensorFlow tf.Module and optionally save compilation artifacts.
 
   The module blob this creates is not callable. See IreeCompiledModule for an
@@ -117,6 +115,10 @@ def _incrementally_compile_tf_module(
       backend_info.backend_id,
       needs_temp_saved_model_dir=True,
   ) if artifacts_dir else {})
+
+  # Pass in extra arguments for compilation
+  output_kwargs["extra_args"] = backend_info.compilation_flags
+
   immediate_result = iree.compiler.tf.compile_module(
       module,
       target_backends=backend_info.compiler_targets,
@@ -154,6 +156,10 @@ def _incrementally_compile_tf_signature_def_saved_model(
   """
   output_kwargs = (_get_tf_import_output_kwargs(
       artifacts_dir, backend_info.backend_id) if artifacts_dir else {})
+
+  # Pass in extra arguments for compilation
+  output_kwargs["extra_args"] = backend_info.compilation_flags
+
   immediate_result = iree.compiler.tf.compile_saved_model(
       saved_model_dir,
       import_type="SIGNATURE_DEF",
@@ -901,7 +907,11 @@ class BackendInfo:
       },
   }
 
-  def __init__(self, backend_name: str, backend_id: str = None):
+  def __init__(self,
+               backend_name: str,
+               backend_id: str = None,
+               compilation_flags: Sequence[str] = (),
+               runtime_flags: Sequence[str] = ()):
     """Creates a BackendInfo with the compilation details for backend_name.
 
     Args:
@@ -909,6 +919,10 @@ class BackendInfo:
         'tf', 'tflite', 'iree_vmvx', 'iree_vulkan', 'iree_llvmaot'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
+      compilation_flags: an optional sequence of flags to pass to the compiler
+        when compiling artifacts for the backend.
+      runtime_flags: an optional sequence of flags to pass to the runtime when
+        running the generated artifacts for the backend.
 
     Raises:
       KeyError: if backend_name is not one of ['tf', 'tflite', 'iree_vmvx',
@@ -930,6 +944,8 @@ class BackendInfo:
     self._compiled_module_class = info["compiled_module_class"]
     self.driver = info["driver"]
     self.compiler_targets = info["compiler_targets"]
+    self.compilation_flags = compilation_flags
+    self.runtime_flags = runtime_flags
 
   def compile_from_class(self,
                          module_class: Type[tf.Module],
