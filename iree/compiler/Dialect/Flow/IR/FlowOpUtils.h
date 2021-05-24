@@ -51,8 +51,8 @@ void eraseRegionResults(Region &region,
 // results. The op may be mutated, destroyed, or replaced with a new one. If an
 // optional |rewriter| is provided then it will be notified of the operations
 // performed on the op. Returns true if the op was optimized.
-bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
-                           PatternRewriter *rewriter = nullptr);
+LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
+                                    PatternRewriter &rewriter);
 
 // A pattern that optimizes the given region-containing op T (CSE, DCE, etc).
 // Duplicate operands will be combined and unused operands and results will be
@@ -66,7 +66,7 @@ struct ClosureOptimizationPattern : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     auto closureOp = cast<ClosureOpInterface>(op.getOperation());
-    return optimizeClosureLikeOp(closureOp, &rewriter) ? success() : failure();
+    return optimizeClosureLikeOp(closureOp, rewriter);
   }
 };
 
