@@ -427,14 +427,16 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
                                      BufferizationPlan &plan) {
   if (forOp.results().empty()) return success();
   auto yeildOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+  auto regionArgs = forOp.getRegionIterArgs();
+  auto initArgs = forOp.initArgs();
   for (int i = 0; i < yeildOp.results().size(); ++i) {
     Value outputTensor = yeildOp.results()[i];
     Value resultTensor = forOp.results()[i];
-    Value initArg = forOp.initArgs()[i];
-    Value operand = forOp.getBodyRegion().getArgument(i + 1);
+    Value initArg = initArgs[i];
+    Value arg = regionArgs[i];
     plan.unionSets(outputTensor, resultTensor);
     plan.unionSets(outputTensor, initArg);
-    plan.unionSets(outputTensor, operand);
+    plan.unionSets(outputTensor, arg);
   }
   return success();
 }
@@ -846,6 +848,18 @@ static Value getAliasingBufferForResult(OpBuilder &b, SubTensorOp op,
                                      offsets, sizes, strides);
 }
 
+/// Returns output buffers that aliases inputs.
+static SmallVector<Value> getScfForAliasingBuffers(scf::ForOp scfFor,
+                                                   BlockAndValueMapping &bvm) {
+  SmallVector<Value> allisedBuffers;
+  for (int i = 0; i < scfFor.results().size(); ++i) {
+    Value inputTensor = scfFor.initArgs()[i];
+    Value inputBuffer = bvm.lookup(inputTensor);
+    allisedBuffers.push_back(inputBuffer);
+  }
+  return allisedBuffers;
+}
+
 /// Returns a `memref` for every result that aliases the buffer for one of its
 /// operands. Returns the memref of the right shape/type based on the operation.
 static SmallVector<Value, 4> getAliasingBuffersForResults(
@@ -857,13 +871,7 @@ static SmallVector<Value, 4> getAliasingBuffersForResults(
             return {getAliasingBufferForResult(b, singleResultOp, bvm)};
           })
       .Case<scf::ForOp>([&](auto scfFor) -> SmallVector<Value> {
-        SmallVector<Value> allisedBuffers;
-        for (int i = 0; i < scfFor.results().size(); ++i) {
-          Value inputTensor = scfFor.initArgs()[i];
-          Value inputBuffer = bvm.lookup(inputTensor);
-          allisedBuffers.push_back(inputBuffer);
-        }
-        return allisedBuffers;
+        return getScfForAliasingBuffers(scfFor, bvm);
       })
       .Default([&](Operation *op) -> SmallVector<Value, 4> {
         return SmallVector<Value, 4>(op->getNumResults(), nullptr);
@@ -1131,10 +1139,11 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
 static LogicalResult convertScfForOp(OpBuilder &b, scf::ForOp forOp,
                                      BlockAndValueMapping &bvm,
                                      BufferizationPlan &plan) {
+  auto regionArgs = forOp.getRegionIterArgs();
   for (int i = 0; i < forOp.results().size(); ++i) {
     Value result = forOp.results()[i];
-    Value operand = forOp.getBodyRegion().getArgument(i + 1);
-    bvm.map(operand, bvm.lookup(result));
+    Value arg = regionArgs[i];
+    bvm.map(arg, bvm.lookup(result));
   }
   return success();
 }
@@ -1287,10 +1296,9 @@ void LinalgBufferizePass::runOnFunction() {
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           if (forOp.results().empty()) return success();
           auto aliasingBuffers = getAliasingBuffersForResults(b, forOp, bvm);
-          SmallVector<Value> args;
-          for (int i = 0; i < forOp.results().size(); ++i) {
-            args.push_back(forOp.getBodyRegion().getArgument(i + 1));
-          }
+          SmallVector<Value> args = llvm::to_vector<4>(
+              llvm::map_range(forOp.getRegionIterArgs(),
+                              [](BlockArgument arg) -> Value { return arg; }));
           if (failed(getOrAllocateResultBuffers(b, forOp, args, aliasingBuffers,
                                                 bvm, plan, allocationFn))) {
             return failure();
@@ -1372,10 +1380,10 @@ void LinalgBufferizePass::runOnFunction() {
   // Forward init arguments from outer scf.for loop to the inner loops.
   funcOp.walk<WalkOrder::PreOrder>([&](scf::ForOp scfForOp) {
     if (scfForOp.results().empty()) return;
+    auto regionArgs = scfForOp.getRegionIterArgs();
+    auto initArgs = scfForOp.initArgs();
     for (int i = 0; i < scfForOp.initArgs().size(); ++i) {
-      Value arg = scfForOp.getBodyRegion().getArgument(i + 1);
-      Value operand = scfForOp.initArgs()[i];
-      arg.replaceAllUsesWith(operand);
+      regionArgs[i].replaceAllUsesWith(initArgs[i]);
     }
   });
 
