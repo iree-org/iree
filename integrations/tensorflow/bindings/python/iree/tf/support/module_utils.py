@@ -892,7 +892,7 @@ class BackendInfo:
       "iree_vulkan": {
           "compiled_module_class": IreeCompiledModule,
           "driver": "vulkan",
-          "compiler_targets": ["vulkan-*"]
+          "compiler_targets": ["vulkan-spirv"]
       },
       "iree_llvmaot": {
           "compiled_module_class": IreeCompiledModule,
