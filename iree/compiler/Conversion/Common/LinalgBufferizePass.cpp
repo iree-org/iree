@@ -1290,12 +1290,20 @@ void LinalgBufferizePass::runOnFunction() {
             })
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           if (forOp.results().empty()) return success();
-          if (!llvm::all_of(forOp.results(), [](Value result) -> bool {
-                auto resultType = result.getType();
-                if (resultType && resultType.isa<TensorType>()) return true;
-                return false;
-              }))
-            return success();
+          bool tensorResults = false;
+          bool scalarResults = false;
+          for (auto result : forOp.results()) {
+            auto resultType = result.getType();
+            if (resultType && resultType.isa<TensorType>()) {
+              tensorResults = true;
+            } else {
+              scalarResults = true;
+            }
+          }
+          // We don't support converting scf.for with mixed scalar and tensor
+          // return types now.
+          if (scalarResults && tensorResults) return failure();
+          if (scalarResults) return success();
           auto aliasingBuffers = getAliasingBuffersForResults(b, forOp, bvm);
           SmallVector<Value> args = llvm::to_vector<4>(
               llvm::map_range(forOp.getRegionIterArgs(),
