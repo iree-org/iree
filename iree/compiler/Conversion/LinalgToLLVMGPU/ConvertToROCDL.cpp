@@ -54,6 +54,7 @@ struct ConvertToROCDLPass
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       OwningRewritePatternList patterns(&getContext());
+      populateScalarizeMathOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorSlicesLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
