@@ -441,15 +441,6 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
   return success();
 }
 
-static LogicalResult analyseTensorExtractOp(tensor::ExtractOp extractOp,
-                                            BufferizationPlan &plan) {
-  auto resultType = extractOp.result().getType();
-  if (resultType && resultType.isa<TensorType>()) {
-    plan.unionSets(extractOp.tensor(), extractOp.result());
-  }
-  return success();
-}
-
 static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
@@ -509,9 +500,6 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
             })
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
-        .Case<tensor::ExtractOp>([&](tensor::ExtractOp extractOp) {
-          return analyseTensorExtractOp(extractOp, plan);
-        })
         .Default([&](Operation *op) { return success(); });
   };
   if (funcOp.walk(bufferMappingFn).wasInterrupted()) {
@@ -851,13 +839,13 @@ static Value getAliasingBufferForResult(OpBuilder &b, SubTensorOp op,
 /// Returns output buffers that aliases inputs.
 static SmallVector<Value> getScfForAliasingBuffers(scf::ForOp scfFor,
                                                    BlockAndValueMapping &bvm) {
-  SmallVector<Value> allisedBuffers;
+  SmallVector<Value> alisedBuffers;
   for (int i = 0; i < scfFor.results().size(); ++i) {
     Value inputTensor = scfFor.initArgs()[i];
     Value inputBuffer = bvm.lookup(inputTensor);
-    allisedBuffers.push_back(inputBuffer);
+    alisedBuffers.push_back(inputBuffer);
   }
-  return allisedBuffers;
+  return alisedBuffers;
 }
 
 /// Returns a `memref` for every result that aliases the buffer for one of its
