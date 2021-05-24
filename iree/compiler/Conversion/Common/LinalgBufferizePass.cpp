@@ -426,6 +426,13 @@ static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
 static LogicalResult analyseScfForOp(scf::ForOp forOp,
                                      BufferizationPlan &plan) {
   if (forOp.results().empty()) return success();
+  if (!llvm::all_of(forOp.results(), [](Value result) -> bool {
+        auto resultType = result.getType();
+        if (resultType && resultType.isa<TensorType>()) return true;
+        return false;
+      }))
+    return success();
+
   auto yeildOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
   auto regionArgs = forOp.getRegionIterArgs();
   auto initArgs = forOp.initArgs();
@@ -1283,6 +1290,12 @@ void LinalgBufferizePass::runOnFunction() {
             })
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           if (forOp.results().empty()) return success();
+          if (!llvm::all_of(forOp.results(), [](Value result) -> bool {
+                auto resultType = result.getType();
+                if (resultType && resultType.isa<TensorType>()) return true;
+                return false;
+              }))
+            return success();
           auto aliasingBuffers = getAliasingBuffersForResults(b, forOp, bvm);
           SmallVector<Value> args = llvm::to_vector<4>(
               llvm::map_range(forOp.getRegionIterArgs(),
@@ -1368,6 +1381,12 @@ void LinalgBufferizePass::runOnFunction() {
   // Forward init arguments from outer scf.for loop to the inner loops.
   funcOp.walk<WalkOrder::PreOrder>([&](scf::ForOp scfForOp) {
     if (scfForOp.results().empty()) return;
+    if (!llvm::all_of(scfForOp.results(), [](Value result) -> bool {
+          auto resultType = result.getType();
+          if (resultType && resultType.isa<TensorType>()) return true;
+          return false;
+        }))
+      return;
     auto regionArgs = scfForOp.getRegionIterArgs();
     auto initArgs = scfForOp.initArgs();
     for (int i = 0; i < scfForOp.initArgs().size(); ++i) {
