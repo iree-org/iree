@@ -245,12 +245,14 @@ scf::ParallelOp collapseParallelLoops(ConversionPatternRewriter &rewriter,
   rewriter.setInsertionPointToStart(&newPLoopOp.getLoopBody().front());
   Value loopIv = *newPLoopOp.getInductionVars().begin();
   BlockAndValueMapping map;
-  edsc::ScopedContext scope(rewriter, loc);
-  using namespace edsc::op;
   for (int i : llvm::seq<int>(0, numLoops)) {
     Value iterNum =
         rewriter.create<SignedDivIOp>(loc, loopIv, iterationStride[i]);
-    Value newIv = lbs[i] + (iterNum * steps[i]);
+    AffineExpr d0, d1;
+    bindDims(rewriter.getContext(), d0, d1);
+    AffineExpr s0 = getAffineSymbolExpr(0, rewriter.getContext());
+    Value newIv = makeComposedAffineApply(rewriter, loc, d0 + d1 * s0,
+                                          {lbs[i], iterNum, steps[i]});
     map.map(pLoopBody.getArgument(i), newIv);
     loopIv = rewriter.create<SignedRemIOp>(loc, loopIv, iterationStride[i]);
   }

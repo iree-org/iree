@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "fold_tensor_extract_op.mlir"
     "hal_interface_bindings.mlir"
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"

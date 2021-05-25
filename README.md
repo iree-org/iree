@@ -2,10 +2,9 @@
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment,
 pronounced as "eerie") is an [MLIR](https://mlir.llvm.org/)-based end-to-end
-compiler that lowers Machine Learning (ML) models to a unified IR optimized for
-real-time inference on mobile/edge devices against heterogeneous hardware
-accelerators. IREE also provides flexible deployment solutions for its compiled
-ML models.
+compiler and runtime that lowers Machine Learning (ML) models to a unified IR
+that scales up to meet the needs of the datacenter and down to satisfy the
+constraints and special considerations of mobile and edge deployments.
 
 See [our website](https://google.github.io/iree/) for project details, user
 guides, and instructions on building from source.

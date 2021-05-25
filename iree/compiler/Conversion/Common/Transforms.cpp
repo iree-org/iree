@@ -40,7 +40,7 @@
 
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
-static unsigned kMaxNumParallelDims = 3;
+static constexpr unsigned kMaxNumParallelDims = 3;
 
 namespace mlir {
 namespace iree_compiler {

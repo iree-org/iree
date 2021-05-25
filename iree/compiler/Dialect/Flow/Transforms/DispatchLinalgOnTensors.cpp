@@ -413,6 +413,7 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
 
   llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
       insertAfterMap;
+  llvm::SetVector<Operation *> opSet(ops.begin(), ops.end());
   llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
   // For each operation compute the list of operations in `ops` that use its
   // results. Also compute the operations that form the leafs of the DAG of
@@ -420,9 +421,9 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   for (auto op : ops) {
     for (auto operand : op->getOperands()) {
       auto definingOp = operand.getDefiningOp();
-      if (!definingOp) continue;
+      if (!definingOp || !opSet.count(definingOp)) continue;
       insertAfterMap[definingOp].push_back(op);
-      if (leafOps.count(definingOp)) leafOps.remove(op);
+      if (leafOps.count(op)) leafOps.remove(op);
     }
   }
 
@@ -444,7 +445,6 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
   // number of uses of each operation). Given that the size of `ops` is at max
   // O(10), and not O(100), this is assumed to be reasonable.
-  // SmallVector<Operation *> readyOps = orderedOps;
   ArrayRef<Operation *> readyOps(orderedOps);
   size_t startPos = 0;
   while (!readyOps.empty()) {
@@ -457,7 +457,8 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
       if (processed.count(insertAfterOp)) continue;
       if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
             Operation *operandDefiningOp = operand.getDefiningOp();
-            return !operandDefiningOp || processed.count(operandDefiningOp);
+            return !operandDefiningOp || !opSet.count(operandDefiningOp) ||
+                   processed.count(operandDefiningOp);
           })) {
         // readyOps.push_back(insertAfterOp);
         orderedOps.push_back(insertAfterOp);

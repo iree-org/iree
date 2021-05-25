@@ -16,7 +16,7 @@
 """Uses prod_digests.txt to update GCR's :prod tags.
 
 Usage:
-  Pull all images that should have :prod tags, tag the with :prod and push
+  Pull all images that should have :prod tags, tag them with :prod and push
   them to GCR. This will make sure that you are at upstream head on the main
   branch before pushing:
     python3 build_tools/docker/manage_prod.py

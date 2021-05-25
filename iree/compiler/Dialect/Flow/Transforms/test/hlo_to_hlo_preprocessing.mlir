@@ -34,7 +34,7 @@ func @batch_norm_inference(
 // CHECK: @depth_conv(%[[ARG0:.+]]: tensor<2x4x5x2xf32>, %[[ARG1:.+]]: tensor<2x2x2x3xf32>)
 func @depth_conv(%arg0: tensor<2x4x5x2xf32>, %arg1: tensor<2x2x2x3xf32>) -> tensor<2x3x4x6xf32> {
     // CHECK-NOT: mhlo.reshape
-    // CHECK: "mhlo.convolution"(%[[ARG0]], %[[ARG1]])
+    // CHECK: mhlo.convolution(%[[ARG0]], %[[ARG1]])
     %0 = "mhlo.reshape"(%arg1) : (tensor<2x2x2x3xf32>) -> tensor<2x2x1x6xf32>
     %1 = "mhlo.convolution"(%arg0, %0) {
       batch_group_count = 1 : i64,
