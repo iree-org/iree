@@ -871,7 +871,8 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
       getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
-  unsigned baseResultIndex = newOperandsValues.size();
+  // Use old index when erasing ops.
+  unsigned baseResultIndex = operands().size();
   // For dropped results, erase all the store-op uses. It is a pre-requisite
   // that the result can be dropped only if it is written within the dispatch
   // region op.

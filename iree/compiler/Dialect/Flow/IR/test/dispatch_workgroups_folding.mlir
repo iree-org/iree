@@ -221,3 +221,27 @@ func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) 
   }
   return %0#0 : tensor<i32>
 }
+
+// -----
+
+// CHECK-LABEL: func @inline_cst_and_remove_unused_read_write_result
+func @inline_cst_and_remove_unused_read_write_result() -> tensor<i32> {
+  %cst = constant dense<0> : tensor<i32>
+  %c1 = constant 1 : index
+  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
+  // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<readwrite:i32>)
+  %0:2 = flow.dispatch.workgroups[%c1, %c1, %c1](%cst) : (tensor<i32>) -> (tensor<i32>, tensor<i32>) =
+      (%arg0: !flow.dispatch.tensor<readonly:i32>, %arg1: !flow.dispatch.tensor<writeonly:i32>, %arg2: !flow.dispatch.tensor<readwrite:i32>) {
+    %1 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
+    "test.sink"(%1) : (tensor<i32>) -> ()
+    %c0_i32 = constant 0 : i32
+    %c-2147483648_i32 = constant -2147483648 : i32
+    %2 = linalg.init_tensor [] : tensor<i32>
+    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32>
+    %4 = linalg.fill(%2, %c0_i32) : tensor<i32>, i32 -> tensor<i32>
+    flow.dispatch.tensor.store %3, %arg1, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
+    flow.dispatch.tensor.store %4, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<readwrite:i32>
+    flow.return
+  }
+  return %0#1 : tensor<i32>
+}
