@@ -222,6 +222,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_mlir_passes_and_dialects
       ::init_xla_dialects
       iree::compiler::Conversion::init_conversions
+      iree::compiler::Conversion::Conversion
       iree::compiler::Dialect::HAL::Conversion::Passes
     INCLUDES
       "${IREE_EMITC_INCLUDES}"
@@ -310,6 +311,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRTargetLLVMIRExport
       MLIRTranslation
       iree::compiler::Conversion::init_conversions
+      iree::compiler::Conversion::Conversion
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM

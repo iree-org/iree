@@ -21,7 +21,9 @@
 //===----------------------------------------------------------------------===//
 #include <memory>
 
-#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Conversion/Rewriters.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -291,26 +293,21 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 }  // namespace
 
 struct ConvertHLOToLinalgOnTensorsPass
-    : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
-  ConvertHLOToLinalgOnTensorsPass(bool useLinalgOnTensorsPath = false)
-      : useLinalgOnTensorsPath(useLinalgOnTensorsPath){};
-
+    : public ConvertHLOToLinalgOnTensorsBase<ConvertHLOToLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
                     mhlo::MhloDialect, ShapeDialect, math::MathDialect,
                     memref::MemRefDialect>();
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
     MLIRContext *context = &getContext();
 
     auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
     populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
                                                    patterns);
-    if (useLinalgOnTensorsPath) {
-      patterns.insert<PadTensorOpConversion>(context);
-    }
+    patterns.insert<PadTensorOpConversion>(context);
 
     ConversionTarget target(getContext());
     target.addIllegalDialect<mhlo::MhloDialect>();
@@ -328,27 +325,14 @@ struct ConvertHLOToLinalgOnTensorsPass
 
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-    if (useLinalgOnTensorsPath) {
-      // Set linalg.pad_tensor illegal for now.
-      target.addIllegalOp<linalg::PadTensorOp>();
-    }
+    // Set linalg.pad_tensor illegal for now.
+    target.addIllegalOp<linalg::PadTensorOp>();
 
-    if (failed(applyPartialConversion(getFunction(), target,
+    if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
       return signalPassFailure();
     }
   }
-
- private:
-  bool useLinalgOnTensorsPath;
-};
-
-/// This pass is just added for lit-testing when using the linalg on tensors
-/// path. Remove when the linalg on tensors path becomes default.
-struct ConvertHLOToLinalgOnTensorsPassExperimental
-    : public ConvertHLOToLinalgOnTensorsPass {
-  ConvertHLOToLinalgOnTensorsPassExperimental()
-      : ConvertHLOToLinalgOnTensorsPass(true) {}
 };
 
 /// Convert mhlo.constant op into std.const.
@@ -383,24 +367,9 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
       typeConverter, context, PatternBenefit(1000));
 }
 
-static llvm::cl::opt<bool> clUseLinalgOnTensorsPath(
-    "iree-linalg-on-tensors-path",
-    llvm::cl::desc("Convert from MHLO to Linalg on tensors for linalg on "
-                   "tensor codegen path"),
-    llvm::cl::init(false));
-
-std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass(
-    bool useLinalgOnTensorsPath) {
-  return std::make_unique<ConvertHLOToLinalgOnTensorsPass>(
-      useLinalgOnTensorsPath);
+std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {
+  return std::make_unique<ConvertHLOToLinalgOnTensorsPass>();
 }
-
-static PassRegistration<ConvertHLOToLinalgOnTensorsPass> legalize_pass(
-    "iree-codegen-hlo-to-linalg-on-tensors",
-    "Convert from XLA-HLO ops to Linalg ops on tensors", []() {
-      return std::make_unique<ConvertHLOToLinalgOnTensorsPass>(
-          clUseLinalgOnTensorsPath);
-    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

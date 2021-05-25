@@ -75,6 +75,7 @@ iree_cc_library(
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToVector
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect

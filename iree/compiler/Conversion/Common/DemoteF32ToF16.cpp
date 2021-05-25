@@ -15,7 +15,8 @@
 #include <memory>
 #include <utility>
 
-#include "iree/compiler/Conversion/Common/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/APFloat.h"
@@ -161,8 +162,7 @@ class GenericTypeConvert : public ConversionPattern {
   }
 };
 
-struct ConvertF32ToF16Pass
-    : public PassWrapper<ConvertF32ToF16Pass, OperationPass<ModuleOp>> {
+struct DemoteF32ToF16Pass : public DemoteF32ToF16Base<DemoteF32ToF16Pass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     ModuleOp moduleOp = getOperation();
@@ -182,12 +182,8 @@ struct ConvertF32ToF16Pass
 }  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass() {
-  return std::make_unique<ConvertF32ToF16Pass>();
+  return std::make_unique<DemoteF32ToF16Pass>();
 }
-
-static PassRegistration<ConvertF32ToF16Pass> pass(
-    "iree-convert-f32-to-f16",
-    "Convert f32 operations and values into equivalent f16 ones.");
 
 }  // namespace iree_compiler
 }  // namespace mlir
