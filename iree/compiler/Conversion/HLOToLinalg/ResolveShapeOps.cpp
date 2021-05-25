@@ -20,6 +20,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -85,17 +87,16 @@ struct TieShapeElider final : public OpRewritePattern<Shape::TieShapeOp> {
   }
 };
 
-struct ResolveShapeOpsPass
-    : public PassWrapper<ResolveShapeOpsPass, FunctionPass> {
+struct ResolveShapeOpsPass : public ResolveShapeOpsBase<ResolveShapeOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<ShapeDialect>();
   }
 
-  void runOnFunction() override;
+  void runOnOperation() override;
 };
 }  // namespace
 
-void ResolveShapeOpsPass::runOnFunction() {
+void ResolveShapeOpsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
   OwningRewritePatternList dimPatterns(&getContext());
@@ -106,8 +107,8 @@ void ResolveShapeOpsPass::runOnFunction() {
   ConversionTarget target(*context);
   target.addIllegalOp<memref::DimOp>();
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-  if (failed(
-          applyFullConversion(getFunction(), target, std::move(dimPatterns)))) {
+  if (failed(applyFullConversion(getOperation(), target,
+                                 std::move(dimPatterns)))) {
     return signalPassFailure();
   }
 
@@ -117,14 +118,12 @@ void ResolveShapeOpsPass::runOnFunction() {
 
   // Then elide all shapex.tie_shape ops and canonicalize shapex.ranked_dim
   // given that we don't need the shape annotation anymore.
-  (void)applyPatternsAndFoldGreedily(getFunction(), std::move(shapePatterns));
+  (void)applyPatternsAndFoldGreedily(getOperation(), std::move(shapePatterns));
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass() {
   return std::make_unique<ResolveShapeOpsPass>();
 }
 
-static PassRegistration<ResolveShapeOpsPass> pass("iree-codegen-resolve-shape",
-                                                  "resolve shape");
 }  // namespace iree_compiler
 }  // namespace mlir

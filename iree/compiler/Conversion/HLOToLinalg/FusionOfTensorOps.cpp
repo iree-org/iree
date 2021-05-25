@@ -20,7 +20,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -41,7 +42,7 @@ namespace {
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
 struct FusionOfTensorOpsPass
-    : public PassWrapper<FusionOfTensorOpsPass, OperationPass<>> {
+    : public FusionOfTensorOpsBase<FusionOfTensorOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::HAL::HALDialect, linalg::LinalgDialect>();
@@ -119,9 +120,6 @@ struct FusionOfTensorOpsPass
 std::unique_ptr<Pass> createFusionOfTensorOpsPass() {
   return std::make_unique<FusionOfTensorOpsPass>();
 }
-
-static PassRegistration<FusionOfTensorOpsPass> pass(
-    "iree-codegen-fusion-of-tensor-ops", "Fuse operations on tensors");
 
 }  // namespace iree_compiler
 }  // namespace mlir

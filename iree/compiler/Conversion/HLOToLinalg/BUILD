@@ -19,18 +19,18 @@ package(
 )
 
 cc_library(
-    name = "HLOToLinalgOnTensors",
+    name = "HLOToLinalg",
     srcs = [
         "FusionOfTensorOps.cpp",
         "HLOToLinalgOnTensors.cpp",
-    ],
-    hdrs = [
-        "HLOToLinalgOnTensorPasses.h",
+        "ResolveShapeOps.cpp",
     ],
     deps = [
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:IR",
@@ -45,27 +45,5 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@mlir-hlo//:hlo",
         "@mlir-hlo//:legalize_to_linalg",
-    ],
-)
-
-cc_library(
-    name = "HLOToLinalg",
-    srcs = [
-        "ResolveShapeOps.cpp",
-    ],
-    hdrs = [
-        "Passes.h",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/Shape/IR",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:DialectUtils",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:MemRefDialect",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Transforms",
     ],
 )

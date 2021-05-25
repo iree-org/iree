@@ -58,6 +58,7 @@ cc_library(
         "Transforms.h",
     ],
     deps = [
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common:FoldTensorExtractOpIncGen",
         "//iree/compiler/Dialect/Flow/IR",

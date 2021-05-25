@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_tablegen_library(
   NAME
-    Passes_inc_gen
+    PassesIncGen
   TD_FILE
     "Passes.td"
   OUTS
@@ -64,8 +64,9 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
+    iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLinalg
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::Flow::Conversion
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
@@ -86,3 +87,8 @@ set_property(SOURCE
   PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+# TODO: For some reason, these dependencies are not being added automatically.
+add_dependencies(
+  iree_compiler_Dialect_Flow_Transforms_Transforms
+  iree_compiler_Dialect_Flow_Transforms_PassesIncGen
+)

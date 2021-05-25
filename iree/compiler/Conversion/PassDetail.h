@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,25 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- Passes.h - Codegen pass to convert from XLA to Linalg on buffers----===//
-//
-// IREE specific passes used in the XLA to Linalg conversion
-//
-//===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_CONVERSION_HLOTOLINALG_PASSES_H_
-#define IREE_COMPILER_CONVERSION_HLOTOLINALG_PASSES_H_
-#include <memory>
+#ifndef IREE_COMPILER_CONVERSIONS_PASS_DETAIL_H_
+#define IREE_COMPILER_CONVERSIONS_PASS_DETAIL_H_
 
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-/// Resolves shape related ops (std.dim, shapex.tie_shape, etc.) by tracing
-/// them back to the original HAL interface bindings.
-std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();
+#define GEN_PASS_CLASSES
+#include "iree/compiler/Conversion/Passes.h.inc"
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CONVERSION_HLOTOLINALG_PASSES_H_
+#endif  // IREE_COMPILER_CONVERSIONS_PASS_DETAIL_H_
