@@ -118,3 +118,39 @@ hal.executable.target @cuda, filter="cuda" {
 //         CHECK:      linalg.matmul {__internal_linalg_transform__ = "vectorize", is_root_op, launch_info_key = "__op_num_0__"} ins(%[[A]], %[[B]] : memref<2x4xf32, #{{.*}}, 3>, memref<4x4xf32, #{{.*}}, 3>) outs(%[[C]] : memref<2x4xf32, #{{.*}}>)
 //         CHECK:    }
 //         CHECK:  }
+
+// -----
+
+// Pure reducion case, skip tiling.
+hal.executable @reduction_dispatch {
+hal.executable.target @cuda, filter="cuda" {
+    hal.executable.entry_point @predict_dispatch_153 attributes {interface = @io, ordinal = 0 : index}
+    module  {
+      func @predict_dispatch_153() {
+        %c0 = constant 0 : index
+        %cst = constant 0x7FC00000 : f32
+        %cst_0 = constant 0xFF800000 : f32
+        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<1000xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<f32>
+        linalg.fill(%1, %cst_0) : memref<f32>, f32
+        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %2 = cmpf ogt, %arg0, %arg1 : f32
+          %3 = select %2, %arg0, %arg1 : f32
+          %4 = cmpf uno, %arg0, %arg1 : f32
+          %5 = select %4, %cst, %3 : f32
+          linalg.yield %5 : f32
+        }
+        return
+      }
+      hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+
+//   CHECK-LABEL: hal.executable @reduction_dispatch
+//         CHECK: linalg.fill(%{{.*}}, %{{.*}}) : memref<f32>, f32
+//         CHECK: linalg.generic {{.*}} ins(%{{.*}} : memref<1000xf32>) outs(%{{.*}} : memref<f32>)

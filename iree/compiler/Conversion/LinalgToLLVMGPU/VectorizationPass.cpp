@@ -33,11 +33,20 @@ namespace iree_compiler {
 //====---------------------------------------------------------------------===//
 
 static void populateVectorizationPatterns(OwningRewritePatternList &patterns) {
+  // We currently don't support vectorization of generic ops with reduction.
+  // TODO(thomasraoux): Add lowering for vector.multireduce ops.
+  auto filterReduction = [](Operation *op) {
+    if (auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op)) {
+      if (genericOp.getNumReductionLoops() > 0) return failure();
+    }
+    return success();
+  };
   linalg::insertVectorizationPatterns<linalg::FillOp, linalg::CopyOp,
                                       linalg::GenericOp,
                                       linalg::ContractionOpInterface>(
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
+          filterReduction,
           Identifier::get(getVectorizeMarker(), patterns.getContext())));
 }
 

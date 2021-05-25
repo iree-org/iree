@@ -22,6 +22,8 @@ EXPLICIT_TARGET_MAPPING = {
     # absl
     "@com_google_absl//absl/flags:flag": ["absl::flags"],
     "@com_google_absl//absl/flags:parse": ["absl::flags_parse"],
+    # LLVM
+    "@llvm-project//llvm:IPO": ["LLVMipo"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],

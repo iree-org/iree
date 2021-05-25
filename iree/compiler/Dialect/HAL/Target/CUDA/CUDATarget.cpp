@@ -126,6 +126,14 @@ static void linkAndOptimize(llvm::Module &module,
   MPM.run(module);
 }
 
+/// Sanitize the function name as CUDA driver doesn't allow function names with
+/// '.' character.
+static std::string sanitizeNameForCuda(llvm::StringRef name) {
+  std::string sanitizedName(name);
+  std::replace(sanitizedName.begin(), sanitizedName.end(), '.', '_');
+  return sanitizedName;
+}
+
 class CUDATargetBackend final : public TargetBackend {
  public:
   CUDATargetBackend(CUDATargetOptions options) : options_(std::move(options)) {}
@@ -176,9 +184,13 @@ class CUDATargetBackend final : public TargetBackend {
                                      "dialect to the native llvm::Module";
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
+    std::vector<std::string> entryPointNames;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
+      // setName will make sure the function name is unique.
+      llvmFunc->setName(sanitizeNameForCuda(func.getName()));
+      entryPointNames.emplace_back(llvmFunc->getName());
       std::array<int32_t, 3> workgroup_size;
       for (auto it : llvm::enumerate(func->getAttr("llvmgpu_workgroup_size")
                                          .cast<DenseIntElementsAttr>()
@@ -232,9 +244,6 @@ class CUDATargetBackend final : public TargetBackend {
         builder, reinterpret_cast<const uint8_t *>(targetISA.c_str()),
         targetISA.size());
 
-    auto entryPointNames = llvm::to_vector<8>(
-        llvm::map_range(targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
-                        [&](auto op) { return op.getName(); }));
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
     iree_CUDABlockSizeDef_vec_start(builder);

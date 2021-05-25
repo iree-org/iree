@@ -219,3 +219,48 @@ hal.executable @simpleMath_ex_dispatch_0 {
 //       CHECK:   hal.executable.target @cuda, filter="cuda" {
 //       CHECK:   llvm.mlir.global private constant @{{.*}}(dense<[1.000000e+00, 2.000000e+00, 3.000000e+00, 4.000000e+00, 5.000000e+00, 6.000000e+00, 7.000000e+00, 8.000000e+00, 9.000000e+00, 1.000000e+01, 1.100000e+01, 1.200000e+01, 1.300000e+01, 1.400000e+01, 1.500000e+01, 1.600000e+01]> : tensor<16xf32>)
 //       CHECK:   llvm.fadd
+
+// -----
+
+hal.executable @reduction_dispatch {
+hal.executable.target @cuda, filter="cuda" {
+  hal.executable.entry_point @reduction attributes {interface = @io, ordinal = 0 : index}
+  module  {
+    func @reduction() {
+      %c0 = constant 0 : index
+      %cst = constant 0.000000e+00 : f32
+      %c96 = constant 96 : index
+      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:14x14x96xf32>
+      %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:96xf32>
+      %workgroup_size_x = hal.interface.workgroup.size[0] : index
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_count_x = hal.interface.workgroup.count[0] : index
+      %2 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+      scf.for %arg0 = %2 to %c96 step %3 {
+        %4 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 96)>(%arg0)[%workgroup_size_x]
+        %5 = flow.dispatch.tensor.load %0, offsets = [0, 0, %arg0], sizes = [14, 14, %4], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:14x14x96xf32> -> tensor<14x14x?xf32>
+        %6 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 96)>(%arg0)[%workgroup_size_x]
+        %7 = affine.min affine_map<(d0)[s0] -> (-d0 + 96, s0)>(%arg0)[%workgroup_size_x]
+        %8 = linalg.init_tensor [%7] : tensor<?xf32>
+        %9 = linalg.fill(%8, %cst) : tensor<?xf32>, f32 -> tensor<?xf32>
+        %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%5 : tensor<14x14x?xf32>) outs(%9 : tensor<?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
+          %11 = addf %arg1, %arg2 : f32
+          linalg.yield %11 : f32
+        } -> tensor<?xf32>
+        flow.dispatch.tensor.store %10, %1, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:96xf32>
+      }
+      return
+    }
+    hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+    }
+  }
+}
+}
+
+// CHECK-LABEL: hal.executable @reduction_dispatch
+//       CHECK:   hal.executable.target @cuda, filter="cuda" {
+//       CHECK:   llvm.fadd
