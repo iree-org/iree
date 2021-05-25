@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
 #include "emitc/Dialect/EmitC/IR/EmitC.h"
+#include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -462,20 +463,6 @@ class ConstRefRodataOpConversion
   VMAnalysisCache &vmAnalysisCache;
 };
 
-class DoNotOptimizeConversion
-    : public OpConversionPattern<IREE::DoNotOptimizeOp> {
-  using OpConversionPattern<IREE::DoNotOptimizeOp>::OpConversionPattern;
-
- private:
-  LogicalResult matchAndRewrite(
-      IREE::DoNotOptimizeOp doNotOptimizeOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::DoNotOptimizeOp>(
-        doNotOptimizeOp, operands, doNotOptimizeOp->getAttrs());
-    return success();
-  }
-};
-
 template <typename LoadOpTy, typename GlobalOpTy>
 class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
   using OpConversionPattern<LoadOpTy>::OpConversionPattern;
@@ -884,13 +871,11 @@ class ListGetRefOpConversion
     auto ctx = getOp.getContext();
     auto loc = getOp.getLoc();
 
-    auto refOp = rewriter.create<emitc::CallOp>(
+    auto refOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*callee=*/StringAttr::get(ctx, "*"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{operands[0]});
+        /*applicableOperator=*/StringAttr::get(ctx, "*"),
+        /*operand=*/operands[0]);
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -898,7 +883,7 @@ class ListGetRefOpConversion
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
+        /*operands=*/ArrayRef<Value>{refOp.getResult()});
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1059,13 +1044,11 @@ class ListSetRefOpConversion
     auto ctx = setOp.getContext();
     auto loc = setOp.getLoc();
 
-    auto refOp = rewriter.create<emitc::CallOp>(
+    auto refOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*callee=*/StringAttr::get(ctx, "*"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{operands[0]});
+        /*applicableOperator=*/StringAttr::get(ctx, "*"),
+        /*operand=*/operands[0]);
 
     auto listDerefOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1073,7 +1056,7 @@ class ListSetRefOpConversion
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refOp.getResult(0)});
+        /*operands=*/ArrayRef<Value>{refOp.getResult()});
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1117,7 +1100,7 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                IREE::VM::EmitCTypeConverter &typeConverter,
                                OwningRewritePatternList &patterns,
                                VMAnalysisCache &vmAnalysisCache) {
-  patterns.insert<DoNotOptimizeConversion>(typeConverter, context);
+  populatePreserveCompilerHintsPatterns(context, patterns);
 
   // Globals
   patterns.insert<
