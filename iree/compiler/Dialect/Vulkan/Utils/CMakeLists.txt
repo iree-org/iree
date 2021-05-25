@@ -14,9 +14,11 @@ iree_cc_library(
   NAME
     Utils
   HDRS
-    "TargetEnvUtils.h"
+    "TargetEnvironment.h"
+    "TargetTriple.h"
   SRCS
-    "TargetEnvUtils.cpp"
+    "TargetEnvironment.cpp"
+    "TargetTriple.cpp"
   DEPS
     LLVMSupport
     MLIRIR

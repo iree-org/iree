@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
+#include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvironment.h"
 
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
+#include "iree/compiler/Dialect/Vulkan/Utils/TargetTriple.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/IR/Builders.h"
 
@@ -181,90 +181,9 @@ spirv::ResourceLimitsAttr convertResourceLimits(
 }
 }  // anonymous namespace
 
-// TODO(antiagainst): The following is good to get us started but it is
-// certainly not a scalable way to describe GPU targets. We need more proper
-// data structures and such.
-const char *getTargetEnvForTriple(llvm::StringRef triple) {
-  if (triple == "qualcomm-adreno640-unknown-android10") {
-    // Example profile: https://vulkan.gpuinfo.org/displayreport.php?id=7175
-    return R"(#vk.target_env<
-      v1.1, r(87), [
-        VK_KHR_storage_buffer_storage_class, VK_KHR_variable_pointers
-      ], Qualcomm:IntegratedGPU, {
-        maxComputeSharedMemorySize = 32768: i32,
-        maxComputeWorkGroupInvocations = 1024: i32,
-        maxComputeWorkGroupSize = dense<[1024, 1024, 64]>: vector<3xi32>,
-        shaderInt16,
-        subgroupFeatures = 3: i32,
-        subgroupSize = 64: i32,
-        variablePointersStorageBuffer, variablePointers
-    }>)";
-  }
-
-  if (triple == "valhall-g77-unknown-android10") {
-    // Example profile: https://vulkan.gpuinfo.org/displayreport.php?id=8046
-    return R"(#vk.target_env<
-      v1.1, r(108), [
-        VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
-        VK_KHR_storage_buffer_storage_class, VK_KHR_variable_pointers
-      ], ARM:IntegratedGPU, {
-        maxComputeSharedMemorySize = 32768: i32,
-        maxComputeWorkGroupInvocations = 512: i32,
-        maxComputeWorkGroupSize = dense<[512, 512, 512]>: vector<3xi32>,
-        shaderInt16,
-        subgroupFeatures = 1: i32,
-        subgroupSize = 16: i32,
-        storageBuffer16BitAccess, storagePushConstant16,
-        uniformAndStorageBuffer16BitAccess,
-        storageBuffer8BitAccess, uniformAndStorageBuffer8BitAccess,
-        storagePushConstant8,
-        shaderFloat16, shaderInt8,
-        variablePointersStorageBuffer, variablePointers
-    }>)";
-  }
-
-  if (triple == "swiftshader-unknown-unknown") {
-    // Example profile: https://vulkan.gpuinfo.org/displayreport.php?id=9095
-    return R"(#vk.target_env<
-      v1.1, r(0), [VK_KHR_storage_buffer_storage_class], SwiftShader:CPU, {
-        maxComputeSharedMemorySize = 16384: i32,
-        maxComputeWorkGroupInvocations = 128: i32,
-        maxComputeWorkGroupSize = dense<[128, 128, 64]>: vector<3xi32>,
-        subgroupFeatures = 63: i32,
-        subgroupSize = 4: i32
-    }>)";
-  }
-
-  if (triple == "turing-t4-unknown-linux") {
-    return R"(#vk.target_env<
-     v1.2, r(133), [
-        VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
-        VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class,
-        VK_KHR_variable_pointers, VK_NV_cooperative_matrix], NVIDIA:DiscreteGPU, {
-       maxComputeSharedMemorySize = 49152: i32,
-       maxComputeWorkGroupInvocations = 1024: i32,
-       maxComputeWorkGroupSize = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-       shaderFloat64, shaderInt16, shaderInt64,
-       subgroupFeatures = 63: i32, subgroupSize = 32: i32,
-       storageBuffer16BitAccess, storagePushConstant16,
-       uniformAndStorageBuffer16BitAccess,
-       storageBuffer8BitAccess, storagePushConstant8,
-       uniformAndStorageBuffer8BitAccess,
-       shaderFloat16, shaderInt8,
-       variablePointersStorageBuffer, variablePointers,
-       cooperativeMatrixPropertiesNV = [{
-         mSize = 8: i32, nSize = 8: i32, kSize = 32: i32, aType = i8,
-         bType = i8, cType = i32, resultType = i32, scope = 3: i32
-       }, {
-         mSize = 16: i32, nSize = 16: i32, kSize = 16: i32, aType = f16,
-         bType = f16, cType = f16, resultType = f16, scope = 3: i32
-       }, {
-         mSize = 16: i32, nSize = 16: i32, kSize = 16: i32, aType = f16,
-         bType = f16, cType = f32, resultType = f32, scope = 3: i32
-       }]
-    }>)";
-  }
-  return nullptr;
+Vulkan::TargetEnvAttr getTargetEnvForTriple(MLIRContext *context,
+                                            llvm::StringRef triple) {
+  return TargetTriple::get(triple.data()).getTargetEnv(context);
 }
 
 spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
