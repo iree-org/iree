@@ -30,13 +30,14 @@ package(
 iree_check_single_backend_test_suite(
     name = "check_cuda",
     srcs = enforce_glob(
+        # keep sorted
         [
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
-            "broadcast.mlir",
             "clamp.mlir",
             "compare.mlir",
             "concatenate.mlir",
@@ -45,11 +46,11 @@ iree_check_single_backend_test_suite(
             "convolution.mlir",
             "cosine.mlir",
             "divide.mlir",
-            "dot_general.mlir",
             "dot.mlir",
+            "dot_general.mlir",
             "dynamic_slice.mlir",
-            "exponential_minus_one.mlir",
             "exponential.mlir",
+            "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
             "floor.mlir",
@@ -100,13 +101,14 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = enforce_glob(
+        # keep sorted
         [
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
-            "broadcast.mlir",
             "clamp.mlir",
             "compare.mlir",
             "concatenate.mlir",
@@ -115,11 +117,11 @@ iree_check_single_backend_test_suite(
             "convolution.mlir",
             "cosine.mlir",
             "divide.mlir",
-            "dot_general.mlir",
             "dot.mlir",
+            "dot_general.mlir",
             "dynamic_slice.mlir",
-            "exponential_minus_one.mlir",
             "exponential.mlir",
+            "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
             "floor.mlir",
@@ -162,13 +164,14 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_vmvx_vmvx",
     srcs = enforce_glob(
+        # keep sorted
         [
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
-            "broadcast.mlir",
             "clamp.mlir",
             "compare.mlir",
             "concatenate.mlir",
@@ -177,11 +180,11 @@ iree_check_single_backend_test_suite(
             "convolution.mlir",
             "cosine.mlir",
             "divide.mlir",
-            "dot_general.mlir",
             "dot.mlir",
+            "dot_general.mlir",
             "dynamic_slice.mlir",
-            "exponential_minus_one.mlir",
             "exponential.mlir",
+            "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
             "floor.mlir",
@@ -224,13 +227,14 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = enforce_glob(
+        # keep sorted
         [
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
-            "broadcast.mlir",
             "clamp.mlir",
             "compare.mlir",
             "concatenate.mlir",
@@ -239,11 +243,11 @@ iree_check_single_backend_test_suite(
             "convolution.mlir",
             "cosine.mlir",
             "divide.mlir",
-            "dot_general.mlir",
             "dot.mlir",
+            "dot_general.mlir",
             "dynamic_slice.mlir",
-            "exponential_minus_one.mlir",
             "exponential.mlir",
+            "exponential_minus_one.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
