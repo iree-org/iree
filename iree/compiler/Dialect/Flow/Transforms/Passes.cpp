@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
@@ -44,6 +45,12 @@ static llvm::cl::opt<bool> clTraceDispatchTensors(
     "iree-flow-trace-dispatch-tensors2",
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clDemoteF32ToF16(
+    "iree-flow-demote-f32-to-f16",
+    llvm::cl::desc("Convert all f32 ops and values into f16 counterparts "
+                   "unconditionally before main flow conversions"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
@@ -88,6 +95,9 @@ static void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
 void buildInputTransformPassPipeline(OpPassManager &passManager) {
   buildHLOInputTransformPassPipeline(passManager);
   buildTOSAInputTransformPassPipeline(passManager);
+  if (clDemoteF32ToF16) {
+    passManager.addPass(createDemoteF32ToF16Pass());
+  }
   passManager.addPass(createCanonicalizerPass());
 }
 

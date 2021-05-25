@@ -63,6 +63,7 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLinalg
     iree::compiler::Conversion::PassHeaders
