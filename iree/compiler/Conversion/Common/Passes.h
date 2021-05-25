@@ -62,10 +62,6 @@ std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass();
 /// backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
-/// Create a pass to convert a model using f32 type to the equivalent one
-/// using 16.
-std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
-
 /// Sets the number of workgroups to use for each entry point in the dispatch
 /// region.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>

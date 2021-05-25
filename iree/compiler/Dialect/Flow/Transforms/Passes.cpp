@@ -16,8 +16,8 @@
 
 #include <memory>
 
-#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
@@ -200,7 +200,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // TODO(benvanik): move up to input; requires pre-partitioning conversion
   // to be reworked first.
   passManager.addNestedPass<FuncOp>(
-      mlir::iree_compiler::createHLOToLinalgOnTensorsPass(true));
+      mlir::iree_compiler::createHLOToLinalgOnTensorsPass());
 
   if (clEnable1x1ConvToMatmul) {
     passManager.addNestedPass<FuncOp>(

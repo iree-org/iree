@@ -19,6 +19,7 @@
 
 #include <cstdlib>
 
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
 #include "iree/tools/init_iree_passes.h"
@@ -31,10 +32,10 @@ namespace iree_compiler {
 inline void registerAllPasses() {
   registerAllIreePasses();
   registerCommonConversionPasses();
+  registerConversionPasses();
   registerMlirPasses();
   registerHALConversionPasses();
   registerLinalgToSPIRVPasses();
-  registerHLOToLinalgPasses();
   registerLinalgToLLVMPasses();
   registerLinalgToLinalgPasses();
   registerVectorToLLVMPasses();

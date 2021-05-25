@@ -12,10 +12,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+gentbl_cc_library(
+    name = "Passes_inc_gen",
+    tbl_outs = [
+        (
+            ["-gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    td_srcs = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+cc_library(
+    name = "PassHeaders",
+    hdrs = [
+        "PassDetail.h",
+        "Passes.h",
+        "Passes.h.inc",
+    ],
+    deps = [
+        ":Passes_inc_gen",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Transforms",
+    ],
+)
+
+cc_library(
+    name = "Conversion",
+    srcs = [
+        "Passes.cpp",
+    ],
+    deps = [
+        ":PassHeaders",
+        ":Passes_inc_gen",
+        "//iree/compiler/Conversion/Common",
+        "//iree/compiler/Conversion/HLOToLinalg",
+    ],
 )
 
 cc_library(
@@ -24,6 +68,7 @@ cc_library(
         "init_conversions.h",
     ],
     deps = [
+        ":PassHeaders",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Conversion/LinalgToLLVMGPU",
         "//iree/compiler/Conversion/LinalgToLinalg",

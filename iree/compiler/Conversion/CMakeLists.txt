@@ -10,12 +10,47 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    Passes_inc_gen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    -gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  HDRS
+    "PassDetail.h"
+    "Passes.h"
+    "Passes.h.inc"
+  DEPS
+    MLIRPass
+    MLIRTransforms
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    Conversion
+  SRCS
+    "Passes.cpp"
+  DEPS
+    ::PassHeaders
+    iree::compiler::Conversion::Common
+    iree::compiler::Conversion::HLOToLinalg
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     init_conversions
   HDRS
     "init_conversions.h"
   DEPS
+    ::PassHeaders
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Conversion::LinalgToLLVMGPU
     iree::compiler::Conversion::LinalgToLinalg
@@ -26,3 +61,8 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+# TODO: For some reason, these dependencies are not being added automatically.
+add_dependencies(
+  iree_compiler_Conversion_PassHeaders
+  iree_compiler_Conversion_Passes_inc_gen
+)

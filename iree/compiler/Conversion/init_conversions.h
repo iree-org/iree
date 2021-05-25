@@ -16,11 +16,11 @@
 #define IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
 
 #include "iree/compiler/Conversion/Common/Passes.h"
-#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToVector/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Conversion/VectorToLLVM/Passes.h"
 
 namespace mlir {
@@ -37,15 +37,6 @@ inline void registerCommonConversionPasses() {
     createForOpCanonicalizationPass();
     createLinalgBufferizePass();
     createSetNumWorkgroupsPass();
-    return true;
-  }();
-  (void)init_once;
-}
-
-inline void registerHLOToLinalgPasses() {
-  static bool init_once = []() {
-    createHLOToLinalgOnTensorsPass();
-    createDemoteF32ToF16Pass();
     return true;
   }();
   (void)init_once;

@@ -54,6 +54,7 @@ cc_library(
     ],
     deps = [
         ":CodeGenOptionUtils",
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/HLOToLinalg",

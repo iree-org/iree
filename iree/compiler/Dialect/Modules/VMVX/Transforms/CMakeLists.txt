@@ -43,6 +43,7 @@ iree_cc_library(
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLLVM
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::IREE::IR

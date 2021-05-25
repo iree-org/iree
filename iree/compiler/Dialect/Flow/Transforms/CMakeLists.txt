@@ -63,7 +63,7 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
+    iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLinalg
     iree::compiler::Dialect::Flow::Conversion
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
@@ -85,3 +85,8 @@ set_property(SOURCE
   PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+# TODO: For some reason, these dependencies are not being added automatically.
+add_dependencies(
+  iree_compiler_Dialect_Flow_Transforms_Transforms
+  iree_compiler_Dialect_Flow_Transforms_Passes_inc_gen
+)
