@@ -41,6 +41,7 @@ cc_library(
         "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
+        "Rewriters.h",
     ],
     deps = [
         ":Passes_inc_gen",

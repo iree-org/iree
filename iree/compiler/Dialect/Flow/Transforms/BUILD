@@ -64,6 +64,7 @@ cc_library(
     ],
     deps = [
         ":Passes_inc_gen",
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/LinalgToLinalg",
         "//iree/compiler/Dialect/Flow/Conversion",

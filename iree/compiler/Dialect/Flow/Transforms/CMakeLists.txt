@@ -65,6 +65,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLinalg
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::Flow::Conversion
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow

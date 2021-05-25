@@ -26,6 +26,7 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
+    "Rewriters.h"
   DEPS
     MLIRPass
     MLIRTransforms
