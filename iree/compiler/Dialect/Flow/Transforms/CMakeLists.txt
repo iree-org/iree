@@ -89,5 +89,5 @@ set_property(SOURCE
 # TODO: For some reason, these dependencies are not being added automatically.
 add_dependencies(
   iree_compiler_Dialect_Flow_Transforms_Transforms
-  iree_compiler_Dialect_Flow_Transforms_Passes_inc_gen
+  iree_compiler_Dialect_Flow_Transforms_PassesIncGen
 )

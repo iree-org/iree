@@ -65,5 +65,5 @@ iree_cc_library(
 # TODO: For some reason, these dependencies are not being added automatically.
 add_dependencies(
   iree_compiler_Conversion_PassHeaders
-  iree_compiler_Conversion_Passes_inc_gen
+  iree_compiler_Conversion_PassesIncGen
 )
