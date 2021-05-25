@@ -152,7 +152,11 @@ struct InsertImmutabilityPreservingStreamClones
         SmallPtrSet<Operation *, 1> excludedOps;
         excludedOps.insert(tiedOp.getOperation());
         excludedOps.insert(clonedOperand.getDefiningOp());
-        tiedOperand.replaceAllUsesExcept(clonedOperand, excludedOps);
+        tiedOperand.replaceUsesWithIf(clonedOperand, [&](OpOperand &use) {
+          Operation *user = use.getOwner();
+          return !excludedOps.count(user) &&
+                 user->getBlock() == clonedOperand.getDefiningOp()->getBlock();
+        });
         didClone = true;
       }
     }
