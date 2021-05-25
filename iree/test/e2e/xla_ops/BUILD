@@ -31,11 +31,6 @@ iree_check_single_backend_test_suite(
     srcs = glob(
         ["*.mlir"],
         exclude = [
-            "concatenate.mlir",
-            "dot.mlir",
-            "dot_general.mlir",
-            "reduce.mlir",
-            "reduce_window.mlir",
             "remainder.mlir",  # frem has a bug in LLVM PTX backend for negative values.
             "round.mlir",
             "sort.mlir",

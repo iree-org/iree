@@ -24,6 +24,8 @@ void populateLLVMConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns,
                                     LLVMTypeConverter &converter, bool useROCM);
 
+void populateScalarizeMathOps(RewritePatternSet &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -78,8 +78,17 @@ def FLOW_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
       /*retTy=*/"ClosureOpInterface",
       /*methodName=*/"cloneReplacementExcludingOperandsAndResults",
       /*args=*/(ins "ArrayRef<unsigned>":$excludedOperandIndices,
-                    "ArrayRef<unsigned>":$excludedResultIndices)
+                    "ArrayRef<unsigned>":$excludedResultIndices,
+                    "PatternRewriter &":$rewriter)
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the output is also read within the region.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isOutputReadWithinRegion",
+      /*args=*/(ins "unsigned":$resultIndex)
+    >
   ];
 }
 
