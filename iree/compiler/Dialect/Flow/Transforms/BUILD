@@ -22,7 +22,7 @@ package(
 )
 
 gentbl_cc_library(
-    name = "Passes_inc_gen",
+    name = "PassesIncGen",
     tbl_outs = [
         (
             ["-gen-pass-decls"],
@@ -63,7 +63,7 @@ cc_library(
         "Passes.h.inc",
     ],
     deps = [
-        ":Passes_inc_gen",
+        ":PassesIncGen",
         "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/LinalgToLinalg",

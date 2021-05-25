@@ -21,7 +21,7 @@ package(
 )
 
 gentbl_cc_library(
-    name = "Passes_inc_gen",
+    name = "PassesIncGen",
     tbl_outs = [
         (
             ["-gen-pass-decls"],
@@ -44,7 +44,7 @@ cc_library(
         "Rewriters.h",
     ],
     deps = [
-        ":Passes_inc_gen",
+        ":PassesIncGen",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
     ],
@@ -57,7 +57,7 @@ cc_library(
     ],
     deps = [
         ":PassHeaders",
-        ":Passes_inc_gen",
+        ":PassesIncGen",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/HLOToLinalg",
     ],

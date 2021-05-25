@@ -29,7 +29,7 @@ void registerConversionPasses();
 // Conversions into Linalg
 //------------------------------------------------------------------------------
 
-/// Creates a pass to fuse operations on tensors.
+/// Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
@@ -44,7 +44,7 @@ std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();
 //------------------------------------------------------------------------------
 
 /// Create a pass to convert a model using f32 type to the equivalent one
-/// using 16.
+/// using f16.
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
 
 }  // namespace iree_compiler

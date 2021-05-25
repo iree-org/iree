@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_tablegen_library(
   NAME
-    Passes_inc_gen
+    PassesIncGen
   TD_FILE
     "Passes.td"
   OUTS
