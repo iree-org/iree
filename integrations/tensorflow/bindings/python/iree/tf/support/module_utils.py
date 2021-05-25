@@ -93,7 +93,8 @@ def _incrementally_compile_tf_module(
     module: Type[tf.Module],
     backend_info: "BackendInfo",
     exported_names: Sequence[str] = (),
-    artifacts_dir: Optional[str] = None) -> Tuple[bytes, Optional[str]]:
+    artifacts_dir: Optional[str] = None,
+) -> Tuple[bytes, Optional[str]]:
   """Compile a TensorFlow tf.Module and optionally save compilation artifacts.
 
   The module blob this creates is not callable. See IreeCompiledModule for an
