@@ -68,7 +68,7 @@ extra:
 extra_css:
   - assets/stylesheets/extra.css
 
-copyright: Copyright &copy; 2021 Google LLC
+copyright: Copyright &copy; 2021 The IREE Authors
 
 markdown_extensions:
   - abbr
