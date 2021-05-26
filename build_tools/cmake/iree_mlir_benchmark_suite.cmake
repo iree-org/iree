@@ -86,7 +86,11 @@ function(iree_mlir_benchmark_suite)
     if("${_MLIR_SOURCE}" MATCHES "^https?://")
       # Update the source file to the downloaded-to place.
       string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_MLIR_SOURCE}")
-      list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
+      # TODO: we can do `list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)`
+      # after migrating to CMake 3.15.
+      list(LENGTH _SOURCE_URL_SEGMENTS _URL_SEGMENT_COUNT)
+      math(EXPR _SEGMENT_LAST_INDEX "${_URL_SEGMENT_COUNT} - 1")
+      list(GET _SOURCE_URL_SEGMENTS ${_SEGMENT_LAST_INDEX} _LAST_URL_SEGMENT)
       set(_DOWNLOAD_TARGET_NAME "iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
       string(REPLACE "tar.gz" "mlir" _FILE_NAME "${_LAST_URL_SEGMENT}")
