@@ -19,7 +19,9 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "broadcasting.mlir",
             "dynamic_shape.mlir",
+            "missing_legalizations.mlir",
             "fft.mlir",
             "pad_tensor_to_tensor.mlir",
         ],
