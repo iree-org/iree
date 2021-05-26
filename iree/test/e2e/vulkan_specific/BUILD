@@ -34,6 +34,7 @@ iree_check_single_backend_test_suite(
             "gemm.mlir",
         ],
     ),
+    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -44,7 +45,10 @@ iree_check_single_backend_test_suite(
         "conv.mlir",
         "gemm.mlir",
     ],
-    compiler_flags = ["-iree-spirv-use-workgroup-memory"],
+    compiler_flags = [
+        "-iree-input-type=mhlo",
+        "-iree-spirv-use-workgroup-memory",
+    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -55,6 +59,7 @@ iree_check_single_backend_test_suite(
         "vectorized_conv.mlir",
     ],
     compiler_flags = [
+        "-iree-input-type=mhlo",
         "-iree-vulkan-target-triple=valhall-unknown-android11",
     ],
     driver = "vulkan",

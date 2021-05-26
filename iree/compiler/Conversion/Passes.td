@@ -17,7 +17,7 @@ def ConvertHLOToLinalgOnTensors :
 
   let options = [
     Option<"directHloClientLowering", "direct-hlo-client-lowering",
-        "bool", /*default=*/"false",
+        "bool", /*default=*/"true",
         "Lower directly from the HLO client dialect.">,
   ];
 }

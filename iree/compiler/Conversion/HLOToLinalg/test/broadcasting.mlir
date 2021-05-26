@@ -64,12 +64,15 @@ func @dynamicNonScalarByScalarBroadcastDimensions(%arg0: tensor<1x4xf32>, %arg1:
 
 // -----
 // CHECK-LABEL: @dynamicBroadcastComplex
-func @dynamicBroadcastComplex(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xcomplex<f32>> {
-  // NOTE: The lowering specifically allows mhlo.complex through and this should
-  // reduce to that.
-  // CHECK: mhlo.complex
+func @dynamicBroadcastComplex(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
+  // CHECK-NOT: mhlo.complex
+  // CHECK-NOT: chlo.broadcast_complex
   %0 = chlo.broadcast_complex %arg0, %arg1 : (tensor<?xf32>, tensor<?x?xf32>) -> tensor<?x?xcomplex<f32>>
-  return %0 : tensor<?x?xcomplex<f32>>
+
+  %1 = "mhlo.real"(%0) : (tensor<?x?xcomplex<f32>>) -> tensor<?x?xf32>
+  %2 = "mhlo.imag"(%0) : (tensor<?x?xcomplex<f32>>) -> tensor<?x?xf32>
+
+  return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
 }
 
 // -----
@@ -135,12 +138,15 @@ func @compareWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> ten
 
 // -----
 // CHECK-LABEL: @complexWithoutBroadcast
-func @complexWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xcomplex<f32>> {
-  // NOTE: The lowering specifically allows mhlo.complex through and this should
-  // reduce to that.
-  // CHECK: mhlo.complex
+func @complexWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
+  // CHECK-NOT: mhlo.complex
+  // CHECK-NOT: chlo.broadcast_complex
   %0 = chlo.broadcast_complex %arg0, %arg1 : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xcomplex<f32>>
-  return %0 : tensor<4xcomplex<f32>>
+
+  %1 = "mhlo.real"(%0) : (tensor<4xcomplex<f32>>) -> tensor<4xf32>
+  %2 = "mhlo.imag"(%0) : (tensor<4xcomplex<f32>>) -> tensor<4xf32>
+
+  return %1, %2 : tensor<4xf32>, tensor<4xf32>
 }
 
 // -----

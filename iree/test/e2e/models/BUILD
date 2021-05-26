@@ -51,6 +51,7 @@ iree_lit_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_linalg_on_tensors_dylib-llvm-aot_dylib",
     srcs = CHECK_FRAMEWORK_TESTS,
+    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
@@ -66,6 +67,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
     srcs = CHECK_FRAMEWORK_TESTS,
+    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

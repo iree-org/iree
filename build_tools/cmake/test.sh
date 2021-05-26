@@ -11,7 +11,9 @@
 set -x
 set -e
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
+if [ -z "$BUILD_DIR" ]; then
+  BUILD_DIR="$(git rev-parse --show-toplevel)/build"
+fi
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
@@ -64,5 +66,5 @@ fi
 # Join on "|"
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
-cd ${ROOT_DIR?}/build
+cd "$BUILD_DIR"
 ctest --output-on-failure --label-exclude "${label_exclude_regex?}"

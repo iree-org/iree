@@ -79,6 +79,7 @@ iree_check_single_backend_test_suite(
             "sort.mlir",
         ],
     ),
+    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -151,6 +152,7 @@ iree_check_single_backend_test_suite(
             "sort.mlir",
         ],
     ),
+    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
@@ -215,6 +217,7 @@ iree_check_single_backend_test_suite(
             "sort.mlir",
         ],
     ),
+    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vmvx",
     target_backend = "vmvx",
 )
@@ -279,6 +282,7 @@ iree_check_single_backend_test_suite(
             "sort.mlir",
         ],
     ),
+    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

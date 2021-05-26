@@ -23,13 +23,9 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-// Adds a set of passes to the given pass manager that perform input dialect
-// legalization required by the Flow dialect.
-//
-// NOTE: this will eventually be moved out to an associated import tool - it
-// currently relies on linking in all of the input dialects (mhlo, etc) and
-// instead those should be taken care of prior to coming into the compiler.
-void buildInputTransformPassPipeline(OpPassManager &passManager);
+// Performs input legalization for specific combination of input dialects.
+void buildMHLOInputTransformPassPipeline(OpPassManager &passManager);
+void buildTOSAInputTransformPassPipeline(OpPassManager &passManager);
 
 void registerInputTransformPassPipeline();
 
@@ -40,8 +36,10 @@ void registerInputTransformPassPipeline();
 // the passes themselves to ensure that expected pass ordering is observed.
 //
 // The expected usage is:
-//   <run conversion from TF/HLO/etc to flow>
-//   buildInputTransformPassPipeline
+//   Input legalization by one of:
+//     - Directly passing supported flow plus core ops
+//     - buildTOSAInputTransformPassPipeline()
+//     - buildMHLOInputTransformPassPipeline
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
 void buildFlowTransformPassPipeline(OpPassManager &passManager);

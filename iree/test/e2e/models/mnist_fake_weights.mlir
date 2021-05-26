@@ -1,8 +1,8 @@
 // MNIST model with placeholder weights, for testing.
 
-// RUN: iree-run-mlir -export-all -iree-hal-target-backends=vmvx %s -function-input="1x28x28x1xf32" | IreeFileCheck %s
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=dylib-llvm-aot %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=vulkan-spirv %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
+// RUN: iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=vmvx %s -function-input="1x28x28x1xf32" | IreeFileCheck %s
+// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=dylib-llvm-aot %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=vulkan-spirv %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
 
 module {
   flow.variable @"__iree_flow___sm_node17__model.layer-1.kernel" dense<1.000000e+00> : tensor<784x128xf32> attributes {noinline, sym_visibility = "private"}

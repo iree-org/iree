@@ -14,8 +14,6 @@ cc_library(
     name = "TF",
     srcs = [
         "ConvertToMHLO.cpp",
-        "EmitDefaultIREEABI.cpp",
-        "FlattenTuplesInCFG.cpp",
         "LowerExportedFunctions.cpp",
         "LowerGlobalTensors.cpp",
         "Passes.cpp",
@@ -33,6 +31,7 @@ cc_library(
         "IREE_COMPILER_TENSORFLOW_ENABLED",
     ],
     deps = [
+        "//iree_tf_compiler/MHLO",
         "//iree_tf_compiler/dialect/tf_strings/conversion:convert_tf_strings_to_strings",
         "//iree_tf_compiler/dialect/tf_strings/conversion:convert_tf_to_tf_strings",
         "//iree_tf_compiler/dialect/tf_strings/ir:dialect",
@@ -41,6 +40,7 @@ cc_library(
         "//iree_tf_compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "@iree//iree/compiler/Bindings/SIP/Utils",
         "@iree//iree/compiler/Dialect/Flow/IR",
+        "@iree//iree/compiler/Dialect/Flow/Transforms",
         "@iree//iree/compiler/Dialect/IREE/IR",
         "@iree//iree/compiler/Dialect/Shape/Conversion",
         "@iree//iree/compiler/Dialect/Shape/Transforms",
