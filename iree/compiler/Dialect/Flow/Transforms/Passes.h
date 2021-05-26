@@ -52,6 +52,10 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Verifies a module being input to the core compiler pipeline only contains
+// IR structures that are supported at that level.
+std::unique_ptr<OperationPass<ModuleOp>> createVerifyCompilerInputLegality();
+
 // Convert operations to equivalent flow.tensor.* ops. This is run after
 // dispatch region creation to catch operations that were left outside of
 // dispatch regions and could be represented as flow.tensor.* ops.

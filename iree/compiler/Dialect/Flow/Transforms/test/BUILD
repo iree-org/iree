@@ -36,6 +36,7 @@ iree_lit_test_suite(
             "pre_partitioning_conversion.mlir",
             "strip_and_splat_constant_variables.mlir",
             "transformation.mlir",
+            "verify_compiler_input_legality.mlir",
         ],
         include = ["*.mlir"],
     ),
