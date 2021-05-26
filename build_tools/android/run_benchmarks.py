@@ -34,7 +34,8 @@ import os
 import re
 import subprocess
 
-from common.benchmark_description import AndroidDeviceInfo, BenchmarkInfo, BenchmarkResults
+from common.benchmark_description import (AndroidDeviceInfo, BenchmarkInfo,
+                                          BenchmarkResults, get_output)
 
 # Relative path against build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
@@ -66,26 +67,9 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
 }
 
 
-def execute(args,
-            capture_output=False,
-            treat_io_as_text=True,
-            verbose=False,
-            **kwargs):
-  """Executes a command."""
-  if verbose:
-    cmd = " ".join(args)
-    print(f"cmd: {cmd}")
-  return subprocess.run(args,
-                        check=True,
-                        capture_output=capture_output,
-                        text=treat_io_as_text,
-                        **kwargs)
-
-
 def get_git_commit_hash(commit):
-  return execute(['git', 'rev-parse', commit],
-                 cwd=os.path.dirname(os.path.realpath(__file__)),
-                 capture_output=True).stdout.strip()
+  return get_output(['git', 'rev-parse', commit],
+                    cwd=os.path.dirname(os.path.realpath(__file__)))
 
 
 def adb_push_to_tmp_dir(content, relative_dir, verbose=False):
@@ -99,9 +83,10 @@ def adb_push_to_tmp_dir(content, relative_dir, verbose=False):
   - The full path to the content on the Android device.
   """
   filename = os.path.basename(content)
-  android_path = f"{ANDROID_TMP_DIR}/{relative_dir}/{filename}"
-  execute(["adb", "push", os.path.abspath(content), android_path],
-          verbose=verbose)
+  android_path = os.path.join(f"{ANDROID_TMP_DIR}", f"{relative_dir}",
+                              f"{filename}")
+  get_output(
+      ["adb", "push", os.path.abspath(content), android_path], verbose=verbose)
   return android_path
 
 
@@ -121,12 +106,12 @@ def adb_execute_in_dir(cmd_args, relative_dir, verbose=False):
   cmd.append("&&")
   cmd.extend(cmd_args)
 
-  return execute(cmd, capture_output=True, verbose=verbose).stdout
+  return get_output(cmd, verbose=verbose)
 
 
 def compose_benchmark_info_object(device_info, root_build_dir,
                                   model_benchmark_dir):
-  """Creates an BenchmarkInf object to describe the benchmark.
+  """Creates an BenchmarkInfo object to describe the benchmark.
 
     Args:
     - device_info: an AndroidDeviceInfo object.
@@ -261,7 +246,8 @@ def run_python_model_benchmark_suite(device_info,
     ]
     resultjson = adb_execute_in_dir(cmd, android_relative_dir, verbose=verbose)
 
-    print(resultjson)
+    if verbose:
+      print(resultjson)
     resultjson = json.loads(resultjson)
 
     for previous_result in results:
@@ -351,6 +337,9 @@ def main(args):
   if args.verbose:
     print(results.commit)
     print(results.benchmarks)
+
+  # Clear the benchmark directory on the Android device.
+  adb_execute_in_dir(["rm", "-rf", "*"], relative_dir="", verbose=args.verbose)
 
 
 if __name__ == "__main__":
