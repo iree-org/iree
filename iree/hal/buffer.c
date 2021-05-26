@@ -593,7 +593,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
 // Mapping / iree_hal_buffer_mapping_impl_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_buffer_mapping_impl_t {
   // Must be first (as in iree_hal_buffer_mapping_t).
   // Stores both the offset data pointer and the byte_length of the mapping.
   iree_byte_span_t contents;

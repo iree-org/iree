@@ -9,7 +9,7 @@
 #include "iree/hal/buffer_heap_impl.h"
 #include "iree/hal/detail.h"
 
-typedef struct iree_hal_heap_allocator_s {
+typedef struct iree_hal_heap_allocator_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_string_view_t identifier;

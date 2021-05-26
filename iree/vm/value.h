@@ -19,7 +19,7 @@ extern "C" {
 typedef int32_t iree_vm_size_t;
 
 // Defines the type of a primitive value.
-typedef enum {
+typedef enum iree_vm_value_type_e {
   // Not a value type.
   IREE_VM_VALUE_TYPE_NONE = 0,
   // int8_t.
@@ -36,14 +36,14 @@ typedef enum {
   IREE_VM_VALUE_TYPE_F64 = 6,
 
   IREE_VM_VALUE_TYPE_MAX = IREE_VM_VALUE_TYPE_F64,
-  IREE_VM_VALUE_TYPE_COUNT = IREE_VM_VALUE_TYPE_MAX + 1,
+  IREE_VM_VALUE_TYPE_COUNT = IREE_VM_VALUE_TYPE_MAX + 1,  // used for lookup
 } iree_vm_value_type_t;
 
 // Maximum size, in bytes, of any value type we can represent.
 #define IREE_VM_VALUE_STORAGE_SIZE 8
 
 // A variant value type.
-typedef struct iree_vm_value {
+typedef struct iree_vm_value_t {
   iree_vm_value_type_t type;
   union {
     int8_t i8;

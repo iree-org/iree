@@ -35,7 +35,7 @@ extern "C" {
 // cost (and deal with the consequences).
 //
 // WARNING: this API is unstable until the HAL is fully ported. Do not use.
-typedef struct {
+typedef struct iree_hal_driver_factory_t {
   // TODO(benvanik): version field.
   IREE_API_UNSTABLE
 
@@ -77,7 +77,7 @@ typedef struct {
 // iree_hal_driver_registry_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_driver_registry_s iree_hal_driver_registry_t;
+typedef struct iree_hal_driver_registry_t iree_hal_driver_registry_t;
 
 // Returns the default per-process driver registry.
 // In simple applications this is usually where you want to go to register and

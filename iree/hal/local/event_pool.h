@@ -17,7 +17,7 @@ extern "C" {
 // A simple pool of iree_event_ts to recycle.
 //
 // Thread-safe; multiple threads may acquire and release events from the pool.
-typedef struct iree_hal_local_event_pool_s iree_hal_local_event_pool_t;
+typedef struct iree_hal_local_event_pool_t iree_hal_local_event_pool_t;
 
 // Allocates a new event pool with up to |available_capacity| events.
 iree_status_t iree_hal_local_event_pool_allocate(

@@ -10,7 +10,7 @@
 #include "iree/hal/cuda/cuda_allocator.h"
 #include "iree/hal/cuda/status_util.h"
 
-typedef struct iree_hal_cuda_buffer_s {
+typedef struct iree_hal_cuda_buffer_t {
   iree_hal_buffer_t base;
   void* host_ptr;
   CUdeviceptr device_ptr;

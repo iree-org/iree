@@ -9,6 +9,8 @@
 #ifndef IREE_HAL_VULKAN_API_H_
 #define IREE_HAL_VULKAN_API_H_
 
+#include <stdint.h>
+
 // clang-format off: Must be included before all other headers:
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
@@ -26,7 +28,7 @@ extern "C" {
 
 // TODO(benvanik): replace with feature list (easier to version).
 // Bitfield that defines sets of Vulkan features.
-enum iree_hal_vulkan_feature_e {
+enum iree_hal_vulkan_feature_bits_t {
   // Use VK_LAYER_KHRONOS_standard_validation to validate Vulkan API usage.
   // Has a significant performance penalty and is *not* a security mechanism.
   IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS = 1u << 0,
@@ -44,37 +46,36 @@ enum iree_hal_vulkan_feature_e {
   // tracing with this enabled.
   IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING = 1u << 2,
 };
-typedef uint64_t iree_hal_vulkan_features_t;
+typedef uint32_t iree_hal_vulkan_features_t;
 
 // Describes the type of a set of Vulkan extensions.
-enum iree_hal_vulkan_extensibility_set_e {
+typedef enum iree_hal_vulkan_extensibility_set_e {
   // A set of required instance layer names. These must all be enabled on
   // the VkInstance for IREE to function.
   IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_REQUIRED = 0,
 
   // A set of optional instance layer names. If omitted fallbacks may be
   // used or debugging features may not be available.
-  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_OPTIONAL = 1,
+  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_OPTIONAL,
 
   // A set of required instance extension names. These must all be enabled on
   // the VkInstance for IREE to function.
-  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED = 2,
+  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED,
 
   // A set of optional instance extension names. If omitted fallbacks may be
   // used or debugging features may not be available.
-  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_OPTIONAL = 3,
+  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_OPTIONAL,
 
   // A set of required device extension names. These must all be enabled on
   // the VkDevice for IREE to function.
-  IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED = 4,
+  IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED,
 
   // A set of optional device extension names. If omitted fallbacks may be
   // used or debugging features may not be available.
-  IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL = 5,
+  IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
 
-  IREE_HAL_VULKAN_EXTENSIBILITY_SET_COUNT,
-};
-typedef uint32_t iree_hal_vulkan_extensibility_set_t;
+  IREE_HAL_VULKAN_EXTENSIBILITY_SET_COUNT,  // used for sizing lookup tables
+} iree_hal_vulkan_extensibility_set_t;
 
 // Queries the names of the Vulkan layers and extensions used for a given set of
 // IREE |requested_features|. All devices used by IREE must have the required
@@ -105,7 +106,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
 // iree_hal_vulkan_syms_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_vulkan_syms_s iree_hal_vulkan_syms_t;
+typedef struct iree_hal_vulkan_syms_t iree_hal_vulkan_syms_t;
 
 // Loads Vulkan functions by invoking |vkGetInstanceProcAddr|.
 //
@@ -138,7 +139,7 @@ IREE_API_EXPORT void iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
 //===----------------------------------------------------------------------===//
 
 // A set of queues within a specific queue family on a VkDevice.
-typedef struct {
+typedef struct iree_hal_vulkan_queue_set_t {
   // The index of a particular queue family on a VkPhysicalDevice, as described
   // by vkGetPhysicalDeviceQueueFamilyProperties.
   uint32_t queue_family_index;
@@ -148,15 +149,15 @@ typedef struct {
 } iree_hal_vulkan_queue_set_t;
 
 // TODO(benvanik): replace with flag list (easier to version).
-enum iree_hal_vulkan_device_flag_e {
+enum iree_hal_vulkan_device_flag_bits_t {
   // Uses timeline semaphore emulation even if native support exists.
   // May be removed in future versions when timeline semaphores can be assumed
   // present on all platforms (looking at you, Android ಠ_ಠ).
-  IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION = 1 << 0,
+  IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION = 1u << 0,
 };
-typedef uint64_t iree_hal_vulkan_device_flags_t;
+typedef uint32_t iree_hal_vulkan_device_flags_t;
 
-typedef struct {
+typedef struct iree_hal_vulkan_device_options_t {
   // Flags controlling device behavior.
   iree_hal_vulkan_device_flags_t flags;
 } iree_hal_vulkan_device_options_t;
@@ -207,7 +208,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
 //===----------------------------------------------------------------------===//
 
 // Vulkan driver creation options.
-typedef struct {
+typedef struct iree_hal_vulkan_driver_options_t {
   // Vulkan version that will be requested, e.g. `VK_API_VERSION_1_0`.
   // Driver creation will fail if the required version is not available.
   uint32_t api_version;

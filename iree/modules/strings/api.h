@@ -13,8 +13,8 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct strings_string strings_string_t;
-typedef struct strings_string_tensor strings_string_tensor_t;
+typedef struct strings_string_t strings_string_t;
+typedef struct strings_string_tensor_t strings_string_tensor_t;
 
 // Creates a string type.
 iree_status_t strings_string_create(iree_string_view_t value,

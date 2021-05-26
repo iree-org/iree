@@ -46,7 +46,7 @@ IREE_API_EXPORT iree_status_t iree_vmvx_module_register_types() {
 // Module type definitions
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_vmvx_module_t {
   iree_allocator_t host_allocator;
   // TODO(benvanik): types when we are not registering them globally.
 } iree_vmvx_module_t;
@@ -54,7 +54,7 @@ typedef struct {
 #define IREE_VMVX_MODULE_CAST(module) \
   (iree_vmvx_module_t*)((uint8_t*)(module) + iree_vm_native_module_size());
 
-typedef struct {
+typedef struct iree_vmvx_module_state_t {
   iree_allocator_t host_allocator;
 
   // If we have any external libraries we want to interact with that are

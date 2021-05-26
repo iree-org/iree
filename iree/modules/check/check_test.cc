@@ -173,11 +173,11 @@ class CheckTest : public ::testing::Test {
   }
 
   iree_status_t Invoke(const char* function_name,
-                       std::vector<iree_vm_value> args) {
+                       std::vector<iree_vm_value_t> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, args.size(),
                             iree_allocator_system(), &inputs_));
-    for (iree_vm_value& arg : args) {
+    for (auto& arg : args) {
       IREE_RETURN_IF_ERROR(iree_vm_list_push_value(inputs_.get(), &arg));
     }
     return Invoke(function_name);

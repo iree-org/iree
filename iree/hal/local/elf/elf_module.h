@@ -15,12 +15,12 @@
 // ELF symbol import table
 //==============================================================================
 
-typedef struct {
+typedef struct iree_elf_import_t {
   const char* sym_name;
   void* thunk_ptr;
 } iree_elf_import_t;
 
-typedef struct {
+typedef struct iree_elf_import_table_t {
   iree_host_size_t import_count;
   const iree_elf_import_t* imports;
 } iree_elf_import_table_t;
@@ -33,7 +33,7 @@ typedef struct {
 //==============================================================================
 
 // An ELF module mapped directly from memory.
-typedef struct {
+typedef struct iree_elf_module_t {
   // Base host virtual address the module is loaded into.
   uint8_t* vaddr_base;
   // Total size, in bytes, of the virtual address space reservation.

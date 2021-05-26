@@ -19,7 +19,7 @@
 // TODO(benvanik): iree_wait_set_s using a kqueue.
 // Could just cast the kqueue() fd to iree_wait_set_s* to avoid allocs.
 // https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/kqueue.2.html
-struct iree_wait_set_s {
+struct iree_wait_set_t {
   int reserved;
 };
 

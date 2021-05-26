@@ -11,7 +11,7 @@
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/device.h"
 
-typedef struct {
+typedef struct iree_hal_validating_command_buffer_t {
   iree_hal_resource_t resource;
   iree_hal_device_t* device;
   iree_hal_command_buffer_t* target_command_buffer;

@@ -37,7 +37,7 @@ typedef uint64_t iree_hal_driver_id_t;
 //   only guaranteed to live for as long as the driver is.
 // * When enumerating via factories the information may be valid only while the
 //   driver registry lock is held.
-typedef struct {
+typedef struct iree_hal_driver_info_t {
   IREE_API_UNSTABLE
 
   // Opaque handle used by factories. Unique across all factories.
@@ -61,7 +61,7 @@ typedef struct {
 // iree_hal_driver_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_driver_s iree_hal_driver_t;
+typedef struct iree_hal_driver_t iree_hal_driver_t;
 
 // Retains the given |driver| for the caller.
 IREE_API_EXPORT void iree_hal_driver_retain(iree_hal_driver_t* driver);
@@ -93,7 +93,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_default_device(
 // iree_hal_driver_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_driver_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

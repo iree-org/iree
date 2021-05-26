@@ -43,14 +43,14 @@ extern "C" {
 // to the lower levels.
 //
 // Thread-safe.
-typedef struct iree_runtime_instance_s iree_runtime_instance_t;
+typedef struct iree_runtime_instance_t iree_runtime_instance_t;
 
 //===----------------------------------------------------------------------===//
 // iree_runtime_instance_options_t
 //===----------------------------------------------------------------------===//
 
 // Options used to configure instance creation.
-typedef struct {
+typedef struct iree_runtime_instance_options_t {
   // Should be set to IREE_API_VERSION_LATEST.
   iree_api_version_t api_version;
 

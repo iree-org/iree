@@ -26,7 +26,7 @@ void IREEDbgHelpLock(void);
 void IREEDbgHelpUnlock(void);
 #endif  // TRACY_ENABLE
 
-struct iree_dynamic_library_s {
+struct iree_dynamic_library_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 

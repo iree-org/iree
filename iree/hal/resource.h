@@ -27,7 +27,7 @@ extern "C" {
 // ref count and vtable at predictable locations. Note that this allows for the
 // resource to be at >0 of the allocation but the pointers used with the HAL
 // (iree_hal_event_t*, etc) must point to the iree_hal_resource_t.
-typedef struct iree_hal_resource_s {
+typedef struct iree_hal_resource_t {
   // Reference count used to manage resource lifetime. The vtable->destroy
   // method will be called when the reference count falls to zero.
   iree_atomic_ref_count_t ref_count;

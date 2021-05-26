@@ -22,7 +22,7 @@ extern "C" {
 // iree_hal_executable_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_executable_loader_vtable_s
+typedef struct iree_hal_executable_loader_vtable_t
     iree_hal_executable_loader_vtable_t;
 
 // Interface for compiled executable loader implementations.
@@ -34,7 +34,7 @@ typedef struct iree_hal_executable_loader_vtable_s
 //
 // Thread-safe - multiple threads may load executables (including the *same*
 // executable) simultaneously.
-typedef struct {
+typedef struct iree_hal_executable_loader_t {
   iree_atomic_ref_count_t ref_count;
   const iree_hal_executable_loader_vtable_t* vtable;
 } iree_hal_executable_loader_t;
@@ -81,7 +81,7 @@ iree_status_t iree_hal_executable_loader_try_load(
 // iree_hal_executable_loader_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_executable_loader_vtable_s {
+typedef struct iree_hal_executable_loader_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_executable_loader_t* executable_loader);
 
   bool(IREE_API_PTR* query_support)(

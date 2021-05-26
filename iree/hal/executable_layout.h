@@ -18,7 +18,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_layout_t
@@ -40,7 +40,7 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 //
 // Maps to VkPipelineLayout:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineLayout.html
-typedef struct iree_hal_executable_layout_s iree_hal_executable_layout_t;
+typedef struct iree_hal_executable_layout_t iree_hal_executable_layout_t;
 
 // Creates an executable layout composed of the given descriptor set layouts.
 // The returned executable layout can be used by multiple executables with the
@@ -63,7 +63,7 @@ IREE_API_EXPORT void iree_hal_executable_layout_release(
 // iree_hal_executable_layout_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_executable_layout_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

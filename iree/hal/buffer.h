@@ -17,7 +17,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_allocator_s iree_hal_allocator_t;
+typedef struct iree_hal_allocator_t iree_hal_allocator_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
@@ -27,7 +27,7 @@ typedef struct iree_hal_allocator_s iree_hal_allocator_t;
 #define IREE_WHOLE_BUFFER ((iree_device_size_t)(-1))
 
 // A bitfield specifying properties for a memory type.
-enum iree_hal_memory_type_e {
+enum iree_hal_memory_type_bits_t {
   IREE_HAL_MEMORY_TYPE_NONE = 0u,
 
   // Memory is lazily allocated by the device and only exists transiently.
@@ -82,7 +82,7 @@ enum iree_hal_memory_type_e {
 typedef uint32_t iree_hal_memory_type_t;
 
 // A bitfield specifying how memory will be accessed in a mapped memory region.
-enum iree_hal_memory_access_e {
+enum iree_hal_memory_access_bits_t {
   // Memory is not mapped.
   IREE_HAL_MEMORY_ACCESS_NONE = 0u,
   // Memory will be read.
@@ -116,7 +116,7 @@ typedef uint32_t iree_hal_memory_access_t;
 // Bitfield that defines how a buffer is intended to be used.
 // Usage allows the driver to appropriately place the buffer for more
 // efficient operations of the specified types.
-enum iree_hal_buffer_usage_e {
+enum iree_hal_buffer_usage_bits_t {
   IREE_HAL_BUFFER_USAGE_NONE = 0u,
 
   // The buffer, once defined, will not be mapped or updated again.
@@ -154,24 +154,23 @@ enum iree_hal_buffer_usage_e {
 typedef uint32_t iree_hal_buffer_usage_t;
 
 // Buffer overlap testing results.
-enum iree_hal_buffer_overlap_e {
+typedef enum iree_hal_buffer_overlap_e {
   // No overlap between the two buffers.
   IREE_HAL_BUFFER_OVERLAP_DISJOINT = 0,
   // Partial overlap between the two buffers.
   IREE_HAL_BUFFER_OVERLAP_PARTIAL,
   // Complete overlap between the two buffers (they are the same).
   IREE_HAL_BUFFER_OVERLAP_COMPLETE,
-};
-typedef uint8_t iree_hal_buffer_overlap_t;
+} iree_hal_buffer_overlap_t;
 
-enum iree_hal_mapping_mode_e {
-  IREE_HAL_MAPPING_MODE_SCOPED = 0,
-  IREE_HAL_MAPPING_MODE_PERSISTENT = 0,
+enum iree_hal_mapping_mode_bits_t {
+  IREE_HAL_MAPPING_MODE_SCOPED = 1u << 0,
+  IREE_HAL_MAPPING_MODE_PERSISTENT = 1u << 1,
 };
 typedef uint32_t iree_hal_mapping_mode_t;
 
 // Reference to a buffer's mapped memory.
-typedef struct {
+typedef struct iree_hal_buffer_mapping_t {
   // Contents of the buffer. Behavior is undefined if an access is performed
   // whose type was not specified during mapping.
   //
@@ -253,7 +252,7 @@ typedef struct {
 // a device. iree_hal_buffer_Subspan can be used to reference subspans of
 // buffers like absl::Span - though unlike absl::Span the returned Buffer holds
 // a reference to the parent buffer.
-typedef struct iree_hal_buffer_s iree_hal_buffer_t;
+typedef struct iree_hal_buffer_t iree_hal_buffer_t;
 
 // Returns success iff the buffer was allocated with the given memory type.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
@@ -486,7 +485,7 @@ IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
 // iree_hal_buffer_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_buffer_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 
@@ -513,7 +512,7 @@ typedef struct {
       iree_device_size_t local_byte_length);
 } iree_hal_buffer_vtable_t;
 
-struct iree_hal_buffer_s {
+struct iree_hal_buffer_t {
   iree_hal_resource_t resource;
 
   iree_hal_allocator_t* allocator;

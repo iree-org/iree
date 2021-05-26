@@ -12,7 +12,7 @@
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_native_executable_layout_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   VkPipelineLayout handle;

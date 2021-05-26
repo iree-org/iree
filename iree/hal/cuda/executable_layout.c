@@ -9,7 +9,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/status_util.h"
 
-typedef struct {
+typedef struct iree_hal_cuda_executable_layout_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
   iree_host_size_t set_layout_count;

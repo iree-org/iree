@@ -20,7 +20,7 @@ extern "C" {
 //
 // Thread-compatible: only intended to be used by a queue with the submission
 // lock held.
-typedef struct {
+typedef struct iree_hal_task_queue_state_t {
   // TODO(#4518): track event state.
   int reserved;
 } iree_hal_task_queue_state_t;

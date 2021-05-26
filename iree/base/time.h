@@ -64,7 +64,7 @@ iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
 IREE_API_EXPORT iree_duration_t
 iree_absolute_deadline_to_timeout_ns(iree_time_t deadline_ns);
 
-typedef enum {
+typedef enum iree_timeout_type_e {
   // Timeout is defined by an absolute value `deadline_ns`.
   IREE_TIMEOUT_ABSOLUTE = 0,
   // Timeout is defined by a relative value `timeout_ns`.
@@ -72,7 +72,7 @@ typedef enum {
 } iree_timeout_type_t;
 
 // A timeout defined either by an absolute or relative value.
-typedef struct {
+typedef struct iree_timeout_t {
   iree_timeout_type_t type;
   iree_time_t nanos;
 } iree_timeout_t;

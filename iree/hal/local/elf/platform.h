@@ -21,7 +21,7 @@
 // Most operations will adjust this range by the allocation granularity, meaning
 // that a range that stradles a page boundary will be specifying multiple pages
 // (such as offset=1, length=4096 with a page size of 4096 indicating 2 pages).
-typedef struct {
+typedef struct iree_byte_range_t {
   iree_host_size_t offset;
   iree_host_size_t length;
 } iree_byte_range_t;
@@ -44,7 +44,7 @@ static inline uintptr_t iree_page_align_end(uintptr_t addr,
 // These can be used to control application behavior (such as whether to enable
 // a JIT if executable pages can be allocated) and allow callers to compute
 // memory ranges based on the variable page size of the platform.
-typedef struct {
+typedef struct iree_memory_info_t {
   // The page size and the granularity of page protection and commitment. This
   // is the page size used by the iree_memory_view_t functions.
   iree_host_size_t normal_page_size;
@@ -87,7 +87,7 @@ void iree_memory_jit_context_end(void);
 // defined may result in process termination/exceptions/sadness on platforms
 // with real MMUs and are generally not detectable: treat limited access as a
 // fail-safe mechanism only.
-typedef enum {
+enum iree_memory_access_bits_t {
   // Pages in the view may be read by the process.
   // Some platforms may not respect this value being unset meaning that reads
   // will still succeed.
@@ -100,17 +100,19 @@ typedef enum {
   // true prior to requesting executable memory as certain platforms or release
   // environments may not support allocating/using executable pages.
   IREE_MEMORY_ACCESS_EXECUTE = 1u << 2,
-} iree_memory_access_t;
+};
+typedef uint32_t iree_memory_access_t;
 
 // Flags used to control the behavior of allocated memory views.
-typedef enum {
+enum iree_memory_view_flag_bits_t {
   // TODO(benvanik): pull from memory_object.h.
   IREE_MEMORY_VIEW_FLAG_NONE = 0u,
 
   // Indicates that the memory may be used to execute code.
   // May be used to ask for special privileges (like MAP_JIT on MacOS).
   IREE_MEMORY_VIEW_FLAG_MAY_EXECUTE = 1u << 10,
-} iree_memory_view_flags_t;
+};
+typedef uint32_t iree_memory_view_flags_t;
 
 // Reserves a range of virtual address space in the host process.
 // The base alignment will be that of the page granularity as specified

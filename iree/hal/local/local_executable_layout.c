@@ -72,6 +72,8 @@ iree_status_t iree_hal_local_executable_layout_create(
           case IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
             ++layout->dynamic_binding_count;
             break;
+          default:
+            continue;
         }
       }
     }

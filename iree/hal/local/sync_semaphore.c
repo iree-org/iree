@@ -33,7 +33,7 @@ void iree_hal_sync_semaphore_state_deinitialize(
 // iree_hal_sync_semaphore_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_sync_semaphore_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
 
@@ -214,7 +214,7 @@ iree_status_t iree_hal_sync_semaphore_multi_signal(
   return status;
 }
 
-typedef struct {
+typedef struct iree_hal_sync_semaphore_notify_state_t {
   iree_hal_sync_semaphore_t* semaphore;
   uint64_t value;
 } iree_hal_sync_semaphore_notify_state_t;
