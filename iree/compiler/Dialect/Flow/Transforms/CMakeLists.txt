@@ -43,6 +43,7 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
+    "PromoteTensorLoads.cpp"
     "StripAndSplatConstantVariables.cpp"
     "VerifyCompilerInputLegality.cpp"
   DEPS

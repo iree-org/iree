@@ -82,6 +82,12 @@ def OutlineLargeConstants :
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass(25)";
 }
 
+def PromoteTensorLoads :
+    Pass<"iree-flow-promote-tensor-loads", "FuncOp"> {
+  let summary = "Converts standard ops which match to flow.tensor.load (typically causing a read-back)";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteTensorLoadsPass()";
+}
+
 def PrePartitioningConversion :
     Pass<"iree-flow-pre-partitioning-conversion", "FuncOp"> {
   let summary = "Dialect conversion prior to partitioning";
