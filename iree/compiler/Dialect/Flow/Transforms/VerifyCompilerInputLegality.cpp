@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -32,7 +31,6 @@ struct VerifyCompilerInputLegalityPass
     conversionTarget.addIllegalDialect<tosa::TosaDialect>();
     conversionTarget.addIllegalDialect<mhlo::MhloDialect>();
     conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
-    conversionTarget.addIllegalDialect<lmhlo::LmhloDialect>();
 
     // Exception: ApplyScaleOp is actually a lowered op on par with standard
     // dialect.

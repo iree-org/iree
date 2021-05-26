@@ -59,6 +59,7 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTosa
     MLIRTosaToLinalg
     MLIRTosaToSCF
     MLIRTosaToStandard
