@@ -83,8 +83,7 @@ def adb_push_to_tmp_dir(content, relative_dir, verbose=False):
   - The full path to the content on the Android device.
   """
   filename = os.path.basename(content)
-  android_path = os.path.join(f"{ANDROID_TMP_DIR}", f"{relative_dir}",
-                              f"{filename}")
+  android_path = os.path.join(ANDROID_TMP_DIR, relative_dir, filename)
   get_output(
       ["adb", "push", os.path.abspath(content), android_path], verbose=verbose)
   return android_path
