@@ -1,16 +1,16 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+FROM gcr.io/iree-oss/util@sha256:40846b4aea5886af3250399d6adfdb3e1195a8b0177706bb0375e812d62dc49c AS fetch-kws
+WORKDIR /fetch-kws
+ARG KWS_COMMIT=4bfbfe4ec19fe39cf9d1803e894d8bfb5fd56a45
+RUN wget "https://github.com/google-research/google-research/tarball/${KWS_COMMIT?}" \
+    -O google-research.tar.gz \
+  && tar --extract --gzip --file=google-research.tar.gz \
+    --wildcards */kws_streaming --strip-components=1
 
 FROM gcr.io/iree-oss/cmake-python@sha256:c1f05139fa478107bdd5889d6b3ca9f8a4bcf19e77e3e8058e2084367a1aa23d AS final
 
@@ -24,3 +24,8 @@ RUN python3 -m pip install tf-nightly==2.6.0.dev20210412
 
 # Install JAX.
 RUN python3 -m pip install --upgrade jax jaxlib flax
+
+# Install KWS Streaming Library.
+RUN python3 -m pip install --upgrade tensorflow-model-optimization==0.5.1.dev0
+COPY --from=fetch-kws /fetch-kws/kws_streaming /local-python/kws_streaming
+ENV PYTHONPATH="/local-python:$PYTHONPATH"

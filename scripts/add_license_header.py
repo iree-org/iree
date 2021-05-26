@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
 
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Prepends a license header to files that don't already have one.
 
 By default, only operates on known filetypes but behavior can be overridden with
@@ -29,21 +21,11 @@ import sys
 COPYRIGHT_PATTERN = re.compile(r"Copyright\s+\d+")
 
 LICENSE_HEADER_FORMATTER = """{shebang}{start_comment} Copyright {year} {holder}
-{middle_comment}
-{middle_comment} Licensed under the Apache License, Version 2.0 (the "License");
-{middle_comment} you may not use this file except in compliance with the License.
-{middle_comment} You may obtain a copy of the License at
-{middle_comment}
-{middle_comment}      https://www.apache.org/licenses/LICENSE-2.0
-{middle_comment}
-{middle_comment} Unless required by applicable law or agreed to in writing, software
-{middle_comment} distributed under the License is distributed on an "AS IS" BASIS,
-{middle_comment} WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-{middle_comment} See the License for the specific language governing permissions and
-{middle_comment} limitations under the License.{end_comment}
+{middle_comment} Licensed under the Apache License v2.0 with LLVM Exceptions.
+{middle_comment} See https://llvm.org/LICENSE.txt for license information.
+{middle_comment} SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception{end_comment}
 
 """
-
 
 class CommentSyntax(object):
 
@@ -118,8 +100,8 @@ def parse_arguments():
           current_year),
       default=current_year)
   parser.add_argument("--holder",
-                      help="Copyright holder. Default: Google LLC",
-                      default="Google LLC")
+                      help="Copyright holder. Default: The IREE Authors",
+                      default="The IREE Authors")
   parser.add_argument(
       "--quiet",
       help=("Don't raise a runtime error on encountering an unhandled filetype."

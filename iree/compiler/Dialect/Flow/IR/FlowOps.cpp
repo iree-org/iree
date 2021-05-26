@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
@@ -811,10 +803,30 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   return canDispatchRegionContainOp(op);
 }
 
+bool DispatchWorkgroupsOp::isOutputReadWithinRegion(unsigned resultIndex) {
+  BlockArgument arg =
+      body().front().getArgument(operands().size() + resultIndex);
+  // If argument is of `writeonly` access, then it is not read by construction.
+  if (arg.getType().cast<DispatchTensorType>().getAccess() ==
+      TensorAccess::WriteOnly) {
+    return false;
+  }
+  // If the argument is a result with `readwrite` access, return false if the
+  // value is only written to. Check this by looking at the uses of the argument
+  // being only the `target` of `flow.dispatch.tensor.store` ops.
+  for (OpOperand &uses : arg.getUses()) {
+    auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
+    if (!(storeOp && storeOp.target() == uses.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 ClosureOpInterface
 DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
-    ArrayRef<unsigned> excludedResultIndices) {
+    ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
   SmallVector<Type, 4> newResultTypes = llvm::to_vector<4>(getResultTypes());
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
@@ -845,18 +857,31 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
-  auto newOp = OpBuilder(getContext())
-                   .create<DispatchWorkgroupsOp>(
-                       getLoc(), workgroup_count(), newResultTypes,
-                       newResultDims, newOperandsValues, newOperandDims,
-                       newTiedOperandIndices, getOperation()->getAttrs());
+  auto newOp = rewriter.create<DispatchWorkgroupsOp>(
+      getLoc(), workgroup_count(), newResultTypes, newResultDims,
+      newOperandsValues, newOperandDims, newTiedOperandIndices,
+      getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
-  newBody.front().eraseArguments(excludedOperandIndices);
-  unsigned baseResultIndex = newBody.front().getNumArguments();
-  newBody.front().eraseArguments(llvm::to_vector<4>(llvm::map_range(
-      excludedResultIndices,
-      [&](unsigned index) { return baseResultIndex + index; })));
+  // Use old index when erasing ops.
+  unsigned baseResultIndex = operands().size();
+  // For dropped results, erase all the store-op uses. It is a pre-requisite
+  // that the result can be dropped only if it is written within the dispatch
+  // region op.
+  auto erasedArguments = llvm::to_vector<4>(excludedOperandIndices);
+  for (unsigned i = baseResultIndex, e = newBody.getNumArguments(); i != e;
+       ++i) {
+    if (!is_contained(excludedResultIndices, i - baseResultIndex)) continue;
+    auto arg = newBody.front().getArgument(i);
+    for (OpOperand &user : llvm::make_early_inc_range(arg.getUses())) {
+      auto storeOp = dyn_cast<DispatchTensorStoreOp>(user.getOwner());
+      if (storeOp && storeOp.target() == user.get()) {
+        rewriter.eraseOp(storeOp);
+      }
+    }
+    erasedArguments.push_back(i);
+  }
+  newBody.front().eraseArguments(erasedArguments);
   return newOp;
 }
 
@@ -1368,10 +1393,14 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   return false;
 }
 
+bool ExStreamFragmentOp::isOutputReadWithinRegion(unsigned resultIndex) {
+  return false;
+}
+
 ClosureOpInterface
 ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
-    ArrayRef<unsigned> excludedResultIndices) {
+    ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
   SmallVector<Type, 4> newResultTypes = llvm::to_vector<4>(getResultTypes());
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
@@ -1387,11 +1416,9 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   assert(getTiedOperandsIndexAndLength().first == 0 &&
          "operands must be the first ODS group");
 
-  auto newOp = OpBuilder(getContext())
-                   .create<ExStreamFragmentOp>(
-                       getLoc(), newResultTypes, newResultDims,
-                       newOperandsValues, newOperandDims, newTiedOperandIndices,
-                       getOperation()->getAttrs());
+  auto newOp = rewriter.create<ExStreamFragmentOp>(
+      getLoc(), newResultTypes, newResultDims, newOperandsValues,
+      newOperandDims, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
   eraseRegionResults(newBody, excludedResultIndices);

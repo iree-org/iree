@@ -1,18 +1,10 @@
-# Copyright 2021 Google LLC
+# Copyright 2021 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/cmake-bazel-frontends@sha256:699f6470e618c151f36cb4769ccaf2cfbf334ddb2fc2b6e69eb60732fe69bb6b AS final
+FROM gcr.io/iree-oss/cmake-bazel-frontends@sha256:3c2945cf40699ac38d68ebd56b1ca9d72ed3e2fbe14f032a2a4fdc000b96b657 AS final
 
 # Note that NDK_VERSION should be kept in sync with the one in cmake-android.
 # That actually means this isn't really an ARG because we cannot build this

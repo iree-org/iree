@@ -1,23 +1,16 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 
 #include <memory>
 
-#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
@@ -44,6 +37,12 @@ static llvm::cl::opt<bool> clTraceDispatchTensors(
     "iree-flow-trace-dispatch-tensors2",
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clDemoteF32ToF16(
+    "iree-flow-demote-f32-to-f16",
+    llvm::cl::desc("Convert all f32 ops and values into f16 counterparts "
+                   "unconditionally before main flow conversions"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
@@ -88,6 +87,9 @@ static void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
 void buildInputTransformPassPipeline(OpPassManager &passManager) {
   buildHLOInputTransformPassPipeline(passManager);
   buildTOSAInputTransformPassPipeline(passManager);
+  if (clDemoteF32ToF16) {
+    passManager.addPass(createDemoteF32ToF16Pass());
+  }
   passManager.addPass(createCanonicalizerPass());
 }
 
@@ -200,7 +202,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // TODO(benvanik): move up to input; requires pre-partitioning conversion
   // to be reworked first.
   passManager.addNestedPass<FuncOp>(
-      mlir::iree_compiler::createHLOToLinalgOnTensorsPass(true));
+      mlir::iree_compiler::createHLOToLinalgOnTensorsPass());
 
   if (clEnable1x1ConvToMatmul) {
     passManager.addNestedPass<FuncOp>(

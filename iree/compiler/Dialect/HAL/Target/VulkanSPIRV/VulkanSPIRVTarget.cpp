@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 
@@ -20,7 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
-#include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
+#include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvironment.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/spirv_executable_def_builder.h"
 #include "llvm/ADT/STLExtras.h"
@@ -50,7 +42,7 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
 
   static llvm::cl::opt<std::string> clVulkanTargetTriple(
       "iree-vulkan-target-triple", llvm::cl::desc("Vulkan target triple"),
-      llvm::cl::init("swiftshader-unknown-unknown"));
+      llvm::cl::init("cpu-swiftshader-unknown"));
 
   static llvm::cl::opt<std::string> clVulkanTargetEnv(
       "iree-vulkan-target-env",
@@ -60,28 +52,31 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
 
   VulkanSPIRVTargetOptions targetOptions;
   targetOptions.codegenOptions = getSPIRVCodegenOptionsFromClOptions();
-  if (!clVulkanTargetEnv.empty()) {
-    targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
-  } else {
-    targetOptions.vulkanTargetEnv =
-        Vulkan::getTargetEnvForTriple(clVulkanTargetTriple);
-  }
+  targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
+  targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
 
   return targetOptions;
 }
 
 // Returns the Vulkan target environment for conversion.
 static spirv::TargetEnvAttr getSPIRVTargetEnv(
-    const std::string &vulkanTargetEnv, MLIRContext *context) {
-  if (auto attr = mlir::parseAttribute(vulkanTargetEnv, context)) {
-    if (auto vkTargetEnv = attr.dyn_cast<Vulkan::TargetEnvAttr>()) {
-      return convertTargetEnv(vkTargetEnv);
+    const std::string &vulkanTargetEnv, const std::string &vulkanTargetTriple,
+    MLIRContext *context) {
+  if (!vulkanTargetEnv.empty()) {
+    if (auto attr = mlir::parseAttribute(vulkanTargetEnv, context)) {
+      if (auto vkTargetEnv = attr.dyn_cast<Vulkan::TargetEnvAttr>()) {
+        return convertTargetEnv(vkTargetEnv);
+      }
     }
+    emitError(Builder(context).getUnknownLoc())
+        << "cannot parse vulkan target environment as #vk.target_env "
+           "attribute: '"
+        << vulkanTargetEnv << "'";
+  } else if (!vulkanTargetTriple.empty()) {
+    return convertTargetEnv(
+        Vulkan::getTargetEnvForTriple(context, vulkanTargetTriple));
   }
 
-  emitError(Builder(context).getUnknownLoc())
-      << "cannot parse vulkan target environment as #vk.target_env attribute: '"
-      << vulkanTargetEnv << "'";
   return {};
 }
 
@@ -118,7 +113,8 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
   void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
                         IREE::HAL::ExecutableOp executableOp) override {
     spirv::TargetEnvAttr spvTargetEnv =
-        getSPIRVTargetEnv(options_.vulkanTargetEnv, sourceOp.getContext());
+        getSPIRVTargetEnv(options_.vulkanTargetEnv, options_.vulkanTargetTriple,
+                          sourceOp.getContext());
     declareTargetOpsForEnv(sourceOp, executableOp, spvTargetEnv);
   }
 

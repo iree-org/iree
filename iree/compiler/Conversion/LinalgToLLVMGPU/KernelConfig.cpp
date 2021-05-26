@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/KernelConfig.h"
 
@@ -67,6 +59,20 @@ static LaunchConfig getOpLaunchConfig(linalg::MatmulOp op) {
   return config;
 }
 
+static LaunchConfig getOpLaunchConfig(linalg::BatchMatmulOp op) {
+  LaunchConfig config;
+  const int64_t numWarp = 2;
+  std::array<int64_t, 3> workgroupSize = {numWarp * cudaWarpSize, 1, 1};
+  config.setWorkgroupSize(workgroupSize);
+  SmallVector<int64_t, 4> ts = {1, 2, 256, 4};
+  config.setTileSizes(op, ts, 0);  // Workgroup level.
+  config.setTileSizes(op, {}, 1);  // Subgroup level.
+  SmallVector<int64_t, 4> invocationLevelTs = {ts[0], ts[1] / workgroupSize[1],
+                                               ts[2] / workgroupSize[0]};
+  config.setTileSizes(op, invocationLevelTs, 2);  // Thread level.
+  return config;
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
 static LaunchConfig getDefaultOpLaunchConfig(linalg::LinalgOp op) {
   LaunchConfig config;
@@ -90,6 +96,9 @@ static LaunchConfig getOpLaunchConfig(linalg::LinalgOp linalgOp) {
     return getOpLaunchConfig(genericOp);
   if (auto matmul = dyn_cast<linalg::MatmulOp>(linalgOp.getOperation()))
     return getOpLaunchConfig(matmul);
+  if (auto batchMatmul =
+          dyn_cast<linalg::BatchMatmulOp>(linalgOp.getOperation()))
+    return getOpLaunchConfig(batchMatmul);
   return getDefaultOpLaunchConfig(linalgOp);
 }
 
@@ -111,7 +120,11 @@ Optional<LaunchConfig> getLLVMGPULaunchConfig(
             linalg::DepthwiseConvInputNHWCFilterHWCOp,
             linalg::ConvInputNHWCFilterHWCFOp,
             linalg::DepthwiseConvInputNHWCFilterHWCFOp,
-            linalg::DepthwiseConvInputNHWCFilterHWCOp>(op.getOperation())) {
+            linalg::DepthwiseConvInputNHWCFilterHWCOp,
+            linalg::PoolingNHWCMaxI8Op, linalg::PoolingNHWCMaxI16Op,
+            linalg::PoolingNHWCMaxI32Op, linalg::PoolingNHWCMaxFOp,
+            linalg::PoolingNHWCMinFOp, linalg::PoolingNHWCSumFOp>(
+            op.getOperation())) {
       rootOperation = op;
       break;
     }
