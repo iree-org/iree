@@ -1,0 +1,127 @@
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    "MobileNetV2-imagenet"
+    "MobileNetV3Small-imagenet"
+  MLIR_SOURCES
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+  BENCHMARK_MODE
+    "fp32-full-inference-1-thread"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCH
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "-iree-llvm-loop-unrolling=true"
+  DRIVER
+    "dylib-sync"
+  RUNTIME_FLAGS
+    "--entry_function=call"
+    "--function_input=1x224x224x3xf32"
+)
+
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    "MobileNetV2-imagenet"
+    "MobileNetV3Small-imagenet"
+  MLIR_SOURCES
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+  BENCHMARK_MODE
+    "fp32-full-inference-3-thread"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCH
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "-iree-llvm-loop-unrolling=true"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--entry_function=call"
+    "--function_input=1x224x224x3xf32"
+    "--task_topology_group_count=3"
+)
+
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    "MobileNetV2-imagenet"
+    "MobileNetV3Small-imagenet"
+  MLIR_SOURCES
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+  BENCHMARK_MODE
+    "fp32-full-inference"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCH
+    "GPU-Adreno"
+  TRANSLATION_FLAGS
+    "--iree-vulkan-target-triple=adreno-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+  RUNTIME_FLAGS
+    "--entry_function=call"
+    "--function_input=1x224x224x3xf32"
+)
+
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    "MobileNetV2-imagenet"
+    "MobileNetV3Small-imagenet"
+  MLIR_SOURCES
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+  BENCHMARK_MODE
+    "fp32-full-inference"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCH
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+  RUNTIME_FLAGS
+    "--entry_function=call"
+    "--function_input=1x224x224x3xf32"
+)
+
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    "MobileNetV2-imagenet"
+    "MobileNetV3Small-imagenet"
+  MLIR_SOURCES
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+  BENCHMARK_MODE
+    "fp32-kernel-execution"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCH
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+  DRIVER
+    "vulkan"
+  RUNTIME_FLAGS
+    "--entry_function=call"
+    "--function_input=1x224x224x3xf32"
+    "--batch_size=32"
+)
