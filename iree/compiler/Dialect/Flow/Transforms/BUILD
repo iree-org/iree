@@ -48,6 +48,7 @@ cc_library(
         "Passes.cpp",
         "PrePostPartitioningConversion.cpp",
         "StripAndSplatConstantVariables.cpp",
+        "VerifyCompilerInputLegality.cpp",
     ],
     hdrs = [
         "DestructiveUpdateUtils.h",
@@ -84,6 +85,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToLinalg",
         "@llvm-project//mlir:TosaToSCF",
         "@llvm-project//mlir:TosaToStandard",

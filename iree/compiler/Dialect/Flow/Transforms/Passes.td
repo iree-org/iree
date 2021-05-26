@@ -94,4 +94,10 @@ def StripAndSplatConstantVariables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
 }
 
+def VerifyCompilerInputLegality :
+    Pass<"iree-verify-compiler-input-legality", "ModuleOp"> {
+  let summary = "Verifies that only supported IR constructs are passed to the compiler.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyCompilerInputLegality()";
+}
+
 #endif  // IREE_DIALECT_FLOW_PASSES

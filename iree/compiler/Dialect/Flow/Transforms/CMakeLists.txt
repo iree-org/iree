@@ -44,6 +44,7 @@ iree_cc_library(
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
     "StripAndSplatConstantVariables.cpp"
+    "VerifyCompilerInputLegality.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -58,6 +59,7 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTosa
     MLIRTosaToLinalg
     MLIRTosaToSCF
     MLIRTosaToStandard
