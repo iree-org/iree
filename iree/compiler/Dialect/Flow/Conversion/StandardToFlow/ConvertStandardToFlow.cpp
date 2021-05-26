@@ -50,13 +50,13 @@ struct ExtractElementOpLowering
 
 }  // namespace
 
-void setupDirectStandardToFlowLegality(MLIRContext *context,
-                                       ConversionTarget &conversionTarget) {
+void setupStandardToFlowTensorLoadLegality(MLIRContext *context,
+                                           ConversionTarget &conversionTarget) {
   conversionTarget.addIllegalOp<tensor::ExtractOp>();
 }
 
-void populateStandardToFlowPatterns(MLIRContext *context,
-                                    OwningRewritePatternList &patterns) {
+void populateStandardToFlowTensorLoadPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns) {
   patterns.insert<ExtractElementOpLowering>(context);
 }
 

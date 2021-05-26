@@ -13,16 +13,16 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Setup the |conversionTarget| op legality for early-phase direct-to-flow
-// conversion from the standard op dialect. This will make certain ops illegal
-// that we know we have good patterns for such that we can be sure we catch them
-// before they are outlined into dispatch regions.
-void setupDirectStandardToFlowLegality(MLIRContext *context,
-                                       ConversionTarget &conversionTarget);
+// Setup the |conversionTarget| op legality for conversion of standard ops
+// which should be mapped to flow.tensor.load. This is maintained as a very
+// specific legalization because flow.tensor.load represents a kind of host
+// read-back and should be materialized at specific points.
+void setupStandardToFlowTensorLoadLegality(MLIRContext *context,
+                                           ConversionTarget &conversionTarget);
 
-// Appends all patterns for converting std ops to flow ops.
-void populateStandardToFlowPatterns(MLIRContext *context,
-                                    OwningRewritePatternList &patterns);
+// Appends all patterns for converting to flow.tensor.load.
+void populateStandardToFlowTensorLoadPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir
