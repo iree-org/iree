@@ -16,9 +16,11 @@
 #include "iree/compiler/Conversion/PassDetail.h"
 #include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Conversion/Rewriters.h"
+#include "iree/compiler/Dialect/Flow/Conversion/HLOToFlow/ConvertHLOToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -297,23 +299,40 @@ struct ConvertHLOToLinalgOnTensorsPass
     MLIRContext *context = &getContext();
 
     auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
-    populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
-                                                   patterns);
+    if (directHloClientLowering) {
+      // NOTE: not using corresponding setupHLOToFlowPatterns because the entire
+      // HLO dialects are marked illegal by this pass.
+      // TODO: Collapse/rework all of these patterns once the consolidation
+      // lands. There is little reason to have these so spread out.
+      populateHLOToFlowPatterns(context, patterns);
+      chlo::PopulateDecomposeChloPatterns(context, &patterns);
+      populateHLOBroadcastingToLinalgPatterns(context, *typeConverter,
+                                              patterns);
+      populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
+                                                     patterns);
+    } else {
+      // Legacy: assumes that HLO client -> HLO has been run previously.
+      populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
+                                                     patterns);
+    }
+
     patterns.insert<PadTensorOpConversion>(context);
 
     ConversionTarget target(getContext());
     target.addIllegalDialect<mhlo::MhloDialect>();
 
+    if (directHloClientLowering) {
+      // Conversions to also legalize the HLO client dialect.
+      target.addIllegalDialect<chlo::HloClientDialect>();
+    }
+
     // TODO(hanchung): Do it in a cleaner way.
     // We don't see complex types in codegen. This assumes that we run
     // LowerComplexPass before, and all the complex types were folded away.
     // Mark them legal and rely on canonicalization patterns to fold them away.
-    target.addDynamicallyLegalOp<mhlo::ComplexOp>(
-        [](mhlo::ComplexOp op) { return true; });
-    target.addDynamicallyLegalOp<mhlo::RealOp>(
-        [](mhlo::RealOp op) { return true; });
-    target.addDynamicallyLegalOp<mhlo::ImagOp>(
-        [](mhlo::ImagOp op) { return true; });
+    target.addLegalOp<mhlo::ComplexOp>();
+    target.addLegalOp<mhlo::RealOp>();
+    target.addLegalOp<mhlo::ImagOp>();
 
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });

@@ -13,12 +13,14 @@ package(
 cc_library(
     name = "HLOToLinalg",
     srcs = [
+        "BroadcastingToLinalgPatterns.cpp",
         "FusionOfTensorOps.cpp",
         "HLOToLinalgOnTensors.cpp",
         "ResolveShapeOps.cpp",
     ],
     deps = [
         "//iree/compiler/Conversion:PassHeaders",
+        "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
