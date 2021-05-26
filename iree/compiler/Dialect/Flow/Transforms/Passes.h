@@ -52,6 +52,10 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Verifies a module being input to the core compiler pipeline only contains
+// IR structures that are supported at that level.
+std::unique_ptr<OperationPass<ModuleOp>> createVerifyCompilerInputLegality();
+
 // Convert operations to equivalent flow.tensor.* ops. This is run after
 // dispatch region creation to catch operations that were left outside of
 // dispatch regions and could be represented as flow.tensor.* ops.
@@ -72,6 +76,13 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass();
 // This converts some input ops directly to flow ops when doing so has a
 // benefit. Other ops are left unmodified and will be outlined later on.
 std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
+
+// Converts standard ops which match to flow.tensor.load (typically causing a
+// read-back).
+// Note that there are typically very specific phase ordering issues with
+// performing such a conversion, so even though it is of fine granularity,
+// this is maintained separately.
+std::unique_ptr<OperationPass<FuncOp>> createPromoteTensorLoadsPass();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();

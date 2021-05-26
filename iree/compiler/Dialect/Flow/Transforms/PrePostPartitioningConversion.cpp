@@ -71,12 +71,12 @@ class PrePartitioningConversionPass
     // For example, DynamicUpdateSlice should end up as a stream operation.
     setupDirectHLOToFlowLegality(context, conversionTarget);
     populateHLOToFlowPatterns(context, conversionPatterns);
-    setupDirectStandardToFlowLegality(context, conversionTarget);
+    setupStandardToFlowTensorLoadLegality(context, conversionTarget);
 
     conversionTarget.addLegalOp<linalg::GenericOp, linalg::IndexedGenericOp>();
     conversionTarget
         .markOpRecursivelyLegal<linalg::GenericOp, linalg::IndexedGenericOp>();
-    populateStandardToFlowPatterns(context, conversionPatterns);
+    populateStandardToFlowTensorLoadPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {
