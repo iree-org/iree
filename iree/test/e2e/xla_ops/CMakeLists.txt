@@ -10,18 +10,55 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
-file(GLOB _GLOB_REMAINDER_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS remainder.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_REMAINDER_MLIR})
-file(GLOB _GLOB_ROUND_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS round.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ROUND_MLIR})
-file(GLOB _GLOB_SORT_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS sort.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_SORT_MLIR})
 iree_check_single_backend_test_suite(
   NAME
     check_cuda
   SRCS
-    "${_GLOB_X_MLIR}"
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "exponential.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -34,50 +71,168 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
-file(GLOB _GLOB_ROUND_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS round.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ROUND_MLIR})
-file(GLOB _GLOB_SORT_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS sort.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_SORT_MLIR})
 iree_check_single_backend_test_suite(
   NAME
     check_dylib-llvm-aot_dylib
   SRCS
-    "${_GLOB_X_MLIR}"
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "exponential.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
     "dylib"
 )
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
-file(GLOB _GLOB_ROUND_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS round.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ROUND_MLIR})
-file(GLOB _GLOB_SORT_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS sort.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_SORT_MLIR})
 iree_check_single_backend_test_suite(
   NAME
     check_vmvx_vmvx
   SRCS
-    "${_GLOB_X_MLIR}"
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "exponential.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
     "vmvx"
 )
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
-file(GLOB _GLOB_FFT_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS fft.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_FFT_MLIR})
-file(GLOB _GLOB_ROUND_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS round.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ROUND_MLIR})
-file(GLOB _GLOB_SORT_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS sort.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_SORT_MLIR})
 iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
-    "${_GLOB_X_MLIR}"
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "exponential.mlir"
+    "exponential_minus_one.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER

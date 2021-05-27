@@ -21,7 +21,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "-iree-vulkan-target-triple=valhall-g77-unknown-android10"
+    "-iree-vulkan-target-triple=valhall-unknown-android11"
   LABELS
     "notap"
     "vulkan_uses_vk_khr_shader_float16_int8"

@@ -61,5 +61,5 @@ BuildKite | CMake         | Android  | arm64-v8a       | Runtime              | 
 
 ## License
 
-IREE is licensed under the terms of the Apache license. See [LICENSE](LICENSE)
-for more information.
+IREE is licensed under the terms of the Apache 2.0 License with LLVM Exceptions.
+See [LICENSE](LICENSE) for more information.

@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===--- FusionOfTensorsOps.cpp - Pass to fuse operations on tensors-------===//
 //
@@ -20,7 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -41,7 +34,7 @@ namespace {
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
 struct FusionOfTensorOpsPass
-    : public PassWrapper<FusionOfTensorOpsPass, OperationPass<>> {
+    : public FusionOfTensorOpsBase<FusionOfTensorOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::HAL::HALDialect, linalg::LinalgDialect>();
@@ -119,9 +112,6 @@ struct FusionOfTensorOpsPass
 std::unique_ptr<Pass> createFusionOfTensorOpsPass() {
   return std::make_unique<FusionOfTensorOpsPass>();
 }
-
-static PassRegistration<FusionOfTensorOpsPass> pass(
-    "iree-codegen-fusion-of-tensor-ops", "Fuse operations on tensors");
 
 }  // namespace iree_compiler
 }  // namespace mlir

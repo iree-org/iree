@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
-# Copyright 2021 Google LLC
+# Copyright 2021 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 
 class TargetInfo:
@@ -133,17 +125,16 @@ def get_pixel4_default_target_list(skipped_target=None,
                  runtime_flags=[
                      "--task_topology_group_count=3",
                  ]),
-      TargetInfo(
-          driver="vulkan",
-          hal_target_backend="vulkan-spirv",
-          taskset="80",
-          mako_tag="vlk",
-          compilation_flags=[
-              "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10",
-              "--iree-flow-inline-constants-max-byte-length=2048",
-              "--iree-flow-dispatch-formation-enable-operand-fusion",
-              "--iree-enable-fusion-with-reduction-ops",
-          ])
+      TargetInfo(driver="vulkan",
+                 hal_target_backend="vulkan-spirv",
+                 taskset="80",
+                 mako_tag="vlk",
+                 compilation_flags=[
+                     "--iree-vulkan-target-triple=adreno-a640-android11",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion",
+                     "--iree-enable-fusion-with-reduction-ops",
+                 ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
   for target in targets:
@@ -199,7 +190,7 @@ def get_s20_default_target_list(skipped_target=None,
           taskset="80",
           mako_tag="vlk",
           compilation_flags=[
-              "--iree-vulkan-target-triple=valhall-g77-unknown-android10",
+              "--iree-vulkan-target-triple=valhall-g77-android11",
               # TODO(GH-5330): Revisit the number or delete the flag.
               "--iree-flow-inline-constants-max-byte-length=16",
               "--iree-flow-dispatch-formation-enable-operand-fusion"

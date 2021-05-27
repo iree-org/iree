@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===- ResolveShapeOps.cpp - Pass to resolve shape related ops ------------===//
 //
@@ -20,6 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -85,17 +79,16 @@ struct TieShapeElider final : public OpRewritePattern<Shape::TieShapeOp> {
   }
 };
 
-struct ResolveShapeOpsPass
-    : public PassWrapper<ResolveShapeOpsPass, FunctionPass> {
+struct ResolveShapeOpsPass : public ResolveShapeOpsBase<ResolveShapeOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<ShapeDialect>();
   }
 
-  void runOnFunction() override;
+  void runOnOperation() override;
 };
 }  // namespace
 
-void ResolveShapeOpsPass::runOnFunction() {
+void ResolveShapeOpsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
   OwningRewritePatternList dimPatterns(&getContext());
@@ -106,8 +99,8 @@ void ResolveShapeOpsPass::runOnFunction() {
   ConversionTarget target(*context);
   target.addIllegalOp<memref::DimOp>();
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-  if (failed(
-          applyFullConversion(getFunction(), target, std::move(dimPatterns)))) {
+  if (failed(applyFullConversion(getOperation(), target,
+                                 std::move(dimPatterns)))) {
     return signalPassFailure();
   }
 
@@ -117,14 +110,12 @@ void ResolveShapeOpsPass::runOnFunction() {
 
   // Then elide all shapex.tie_shape ops and canonicalize shapex.ranked_dim
   // given that we don't need the shape annotation anymore.
-  (void)applyPatternsAndFoldGreedily(getFunction(), std::move(shapePatterns));
+  (void)applyPatternsAndFoldGreedily(getOperation(), std::move(shapePatterns));
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass() {
   return std::make_unique<ResolveShapeOpsPass>();
 }
 
-static PassRegistration<ResolveShapeOpsPass> pass("iree-codegen-resolve-shape",
-                                                  "resolve shape");
 }  // namespace iree_compiler
 }  // namespace mlir
