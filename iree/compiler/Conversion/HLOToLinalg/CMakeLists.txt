@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     HLOToLinalg
   SRCS
+    "BroadcastingToLinalgPatterns.cpp"
     "FusionOfTensorOps.cpp"
     "HLOToLinalgOnTensors.cpp"
     "ResolveShapeOps.cpp"
@@ -30,6 +31,7 @@ iree_cc_library(
     MLIRTensor
     MLIRTransforms
     iree::compiler::Conversion::PassHeaders
+    iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect

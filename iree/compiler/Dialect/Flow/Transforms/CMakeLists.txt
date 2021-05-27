@@ -43,7 +43,9 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
+    "PromoteTensorLoads.cpp"
     "StripAndSplatConstantVariables.cpp"
+    "VerifyCompilerInputLegality.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -58,11 +60,13 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTosa
     MLIRTosaToLinalg
     MLIRTosaToSCF
     MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLinalg
     iree::compiler::Conversion::PassHeaders

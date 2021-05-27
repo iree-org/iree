@@ -14,8 +14,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "broadcasting.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
+    "missing_legalizations.mlir"
     "pad_tensor_to_tensor.mlir"
   DATA
     iree::tools::IreeFileCheck
