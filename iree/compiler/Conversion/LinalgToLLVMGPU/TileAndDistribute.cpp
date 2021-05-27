@@ -94,8 +94,9 @@ static void populateTilingToInvocationPatterns(
     return getGPUThreadIdsAndCounts(builder, loc, parallelLoopRanges.size(),
                                     launchConfig.getWorkgroupSize());
   };
-  linalg::LinalgLoopDistributionOptions invocationDistributionOptions = {
-      getThreadProcInfoFn,
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions;
+  invocationDistributionOptions.procInfo = getThreadProcInfoFn;
+  invocationDistributionOptions.distributionMethod = {
       {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
        linalg::DistributionMethod::Cyclic}};
 
@@ -206,10 +207,12 @@ static void populateTilingCopyToWorkgroupMemPatterns(
     }
     return procInfo;
   };
-  linalg::LinalgLoopDistributionOptions copyInvocationDistributionOptions = {
-      getCopyThreadProcInfoFn,
+  linalg::LinalgLoopDistributionOptions copyInvocationDistributionOptions;
+  copyInvocationDistributionOptions.procInfo = getCopyThreadProcInfoFn;
+  copyInvocationDistributionOptions.distributionMethod = {
       {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
        linalg::DistributionMethod::Cyclic}};
+
   auto tilingOptions =
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
