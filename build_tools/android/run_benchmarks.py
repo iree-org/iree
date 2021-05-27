@@ -40,7 +40,7 @@ from common.benchmark_description import (AndroidDeviceInfo, BenchmarkInfo,
 # Relative path against build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 # Relative path against root benchmark suite directory.
-PYTON_MODEL_REL_PATH = "tf_models"
+MLIR_MODEL_SUITE_REL_PATH = "mlir_models"
 
 # The flagfile's filename for compiled Python models.
 MODEL_FLAGFILE_NAME = "flagfile"
@@ -115,26 +115,31 @@ def compose_benchmark_info_object(device_info, root_build_dir,
     Args:
     - device_info: an AndroidDeviceInfo object.
     - root_build_dir: the root build directory.
-    - model_benchmark_dirs: a directory containing model benchmarks.
+    - model_benchmark_dir: a directory containing model benchmarks.
 
     Returns:
     - A BenchmarkInfo object.
   """
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
-                                PYTON_MODEL_REL_PATH)
+                                MLIR_MODEL_SUITE_REL_PATH)
 
   # Extract the model name from the directory path. This uses the relative
   # path under the root model directory. If there are multiple segments,
   # additional ones will be placed in parentheses.
   model_name = os.path.relpath(model_benchmark_dir, model_root_dir)
-  model_name = os.path.dirname(model_name)  # Remove IREE driver segment
+  # Now we have <model-name>/.../<iree-driver>__<target-arch>__<bench_mode>,
+  # Remove the last segment.
+  model_name = os.path.dirname(model_name)
   main, rest = os.path.split(model_name)
   if main:
+    # Tags coming from directory structure.
     model_name = main
     model_tags = [re.sub(r"\W+", "-", rest)]
   else:
-    model_name = re.sub(r"\W+", "-", rest)
-    model_tags = []
+    # Tags coming from the name itself.
+    rest = re.sub(r"\W+", "-", rest).split("-")
+    model_name = rest[0]
+    model_tags = rest[1:]
 
   # Extract benchmark info from the directory path following convention:
   #   <iree-driver>__<target-architecture>__<benchmark_mode>
@@ -144,6 +149,7 @@ def compose_benchmark_info_object(device_info, root_build_dir,
   return BenchmarkInfo(model_name=model_name,
                        model_tags=model_tags,
                        model_source="TensorFlow",
+                       bench_mode=bench_mode,
                        runner=iree_driver,
                        device_info=device_info)
 
@@ -164,7 +170,7 @@ def filter_python_model_benchmark_suite(device_info,
   gpu_target_arch = GPU_NAME_TO_TARGET_ARCH_MAP[device_info.gpu_name.lower()]
 
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
-                                PYTON_MODEL_REL_PATH)
+                                MLIR_MODEL_SUITE_REL_PATH)
   matched_benchmarks = []
 
   # Go over all benchmarks in the model directory to find those matching the
@@ -176,7 +182,7 @@ def filter_python_model_benchmark_suite(device_info,
     #   <iree-driver>__<target-architecture>__<benchmark_mode>
     root_immediate_dir = os.path.basename(root)
     segments = root_immediate_dir.split("__")
-    if len(segments) != 3 or not segments[0].startswith("iree_"):
+    if len(segments) != 3 or not segments[0].startswith("iree-"):
       continue
 
     iree_driver, target_arch, bench_mode = segments
@@ -219,7 +225,7 @@ def run_python_model_benchmark_suite(device_info,
                                           verbose=verbose)
 
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
-                                PYTON_MODEL_REL_PATH)
+                                MLIR_MODEL_SUITE_REL_PATH)
 
   results = []
 
@@ -245,8 +251,7 @@ def run_python_model_benchmark_suite(device_info,
     ]
     resultjson = adb_execute_in_dir(cmd, android_relative_dir, verbose=verbose)
 
-    if verbose:
-      print(resultjson)
+    print(resultjson)
     resultjson = json.loads(resultjson)
 
     for previous_result in results:

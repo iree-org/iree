@@ -35,9 +35,10 @@ __all__ = [
 # mapping to more friendly ones and detach to keep driver names used in
 # benchmark presentation stable.
 IREE_DRIVER_NAME_MAP = {
-    "iree_llvmaot": "IREE-Dylib",
-    "iree_vmvx": "IREE-VMVX",
-    "iree_vulkan": "IREE-Vulkan",
+    "iree-dylib": "IREE-Dylib",
+    "iree-dylib-sync": "IREE-Dylib-Sync",
+    "iree-vmvx": "IREE-VMVX",
+    "iree-vulkan": "IREE-Vulkan",
 }
 
 
@@ -173,6 +174,7 @@ class BenchmarkInfo:
   - model_tags: a list of tags used to describe additional model information,
       e.g., ['imagenet']
   - model_source: the source of the model, e.g., 'TensorFlow'
+  - bench_mode: the mode of the benchmark, e.g., 'f32-full-inference'
   - runner: which runner is used for benchmarking, e.g., 'iree_vulkan', 'tflite'
   - device_info: an AndroidDeviceInfo object describing the phone where
       bnechmarks run
@@ -181,6 +183,7 @@ class BenchmarkInfo:
   model_name: str
   model_tags: Sequence[str]
   model_source: str
+  bench_mode: str
   runner: str
   device_info: AndroidDeviceInfo
 
@@ -188,10 +191,11 @@ class BenchmarkInfo:
     # Get the target architecture and better driver name depending on the runner.
     target_arch = ""
     driver = ""
-    if self.runner == "iree_vulkan":
+    if self.runner == "iree-vulkan":
       target_arch = "GPU-" + self.device_info.gpu_name
       driver = IREE_DRIVER_NAME_MAP[self.runner]
-    elif self.runner == "iree_llvmaot" or self.runner == "iree_vmvx":
+    elif (self.runner == "iree-dylib" or self.runner == "iree-dylib-sync" or
+          self.runner == "iree-vmvx"):
       target_arch = "CPU-" + self.device_info.get_arm_arch_revision()
       driver = IREE_DRIVER_NAME_MAP[self.runner]
     else:
@@ -199,28 +203,32 @@ class BenchmarkInfo:
 
     if self.model_tags:
       tags = ",".join(self.model_tags)
-      model_part = f"{self.model_name} ({tags}) [{self.model_source}]"
+      model_part = f"{self.model_name} [{tags}] ({self.model_source})"
     else:
-      model_part = f"{self.model_name} [{self.model_source}]"
+      model_part = f"{self.model_name} ({self.model_source})"
     phone_part = f"{self.device_info.model} ({target_arch})"
 
-    return f"{model_part} with {driver} @ {phone_part}"
+    return f"{model_part} {self.bench_mode} with {driver} @ {phone_part}"
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
         "model_name": self.model_name,
         "model_tags": self.model_tags,
         "model_source": self.model_source,
+        "bench_mode": self.bench_mode,
         "runner": self.runner,
         "device_info": self.device_info.to_json_object(),
     }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return BenchmarkInfo(
-        json_object["model_name"], json_object["model_tags"],
-        json_object["model_source"], json_object["runner"],
-        AndroidDeviceInfo.from_json_object(json_object["device_info"]))
+    return BenchmarkInfo(model_name=json_object["model_name"],
+                         model_tags=json_object["model_tags"],
+                         model_source=json_object["model_source"],
+                         bench_mode=json_object["bench_mode"],
+                         runner=json_object["runner"],
+                         device_info=AndroidDeviceInfo.from_json_object(
+                             json_object["device_info"]))
 
 
 class BenchmarkResults(object):
