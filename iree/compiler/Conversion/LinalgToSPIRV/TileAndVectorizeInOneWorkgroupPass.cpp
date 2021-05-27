@@ -225,8 +225,9 @@ static void populateTilingToSubgroupPatterns(
     return getSubgroupIdsAndCounts(builder, loc, numSubgroups);
   };
 
-  linalg::LinalgLoopDistributionOptions subgroupDistributionOptions = {
-      getSubgroupProcInfoFn,
+  linalg::LinalgLoopDistributionOptions subgroupDistributionOptions;
+  subgroupDistributionOptions.procInfo = getSubgroupProcInfoFn;
+  subgroupDistributionOptions.distributionMethod = {
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
 
@@ -267,8 +268,9 @@ static void populateTilingToInvocationPatterns(
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
         builder, loc, parallelLoopRanges.size());
   };
-  linalg::LinalgLoopDistributionOptions invocationDistributionOptions = {
-      getThreadProcInfoFn,
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions;
+  invocationDistributionOptions.procInfo = getThreadProcInfoFn;
+  invocationDistributionOptions.distributionMethod = {
       {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
        linalg::DistributionMethod::Cyclic}};
 
