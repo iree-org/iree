@@ -29,9 +29,6 @@ export CMAKE_BIN="$(which cmake)"
 python3 --version
 echo "Android NDK path: $ANDROID_NDK"
 
-# Install requests needed for benchmark artifact generation
-sudo apt-get install -y python3-requests
-
 echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
