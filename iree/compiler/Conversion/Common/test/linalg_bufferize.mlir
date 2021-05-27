@@ -1426,8 +1426,8 @@ hal.interface @interface_io attributes {sym_visibility = "private"} {
 
 // CHECK-LABEL: func @bufferize_cst_output_tensor()
 
-//       CHECK: %[[CST1:.+]] = constant dense<-2147483648> : tensor<i32>
-//       CHECK: %[[CST5:.+]] = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+//       CHECK-DAG: %[[CST1:.+]] = constant dense<-2147483648> : tensor<i32>
+//       CHECK-DAG: %[[CST5:.+]] = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
 //       CHECK: %[[CAST1:.+]] = memref.buffer_cast %[[CST1]] : memref<i32>
 //       CHECK: %[[CAST5:.+]] = memref.buffer_cast %[[CST5]] : memref<5xi32>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan @io::@ro0[%c0] : memref<5xf32>
