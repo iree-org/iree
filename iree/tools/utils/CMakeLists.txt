@@ -40,7 +40,7 @@ iree_cc_test(
     absl::strings
     iree::base
     iree::hal
-    iree::hal::vmla::registration
+    iree::hal::vmvx::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main

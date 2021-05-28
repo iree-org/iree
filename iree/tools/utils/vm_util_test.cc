@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/tools/utils/vm_util.h"
 
@@ -19,7 +11,7 @@
 #include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -31,13 +23,13 @@ namespace {
 class VmUtilTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+    IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(
         iree_hal_driver_registry_default()));
   }
 
   virtual void SetUp() {
     IREE_ASSERT_OK(iree_hal_module_register_types());
-    IREE_ASSERT_OK(CreateDevice("vmla", &device_));
+    IREE_ASSERT_OK(CreateDevice("vmvx", &device_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 

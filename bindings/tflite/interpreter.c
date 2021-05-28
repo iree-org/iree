@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "bindings/tflite/interpreter.h"
 
@@ -51,8 +43,8 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
   // TODO(benvanik): figure out how we want to emulate device selection; may
   // just say "whatever is first" on a query.
   // iree_string_view_t driver_name = driver_infos[0].driver_name;
-  // NOTE: currently the sample file is compiled only with vmla.
-  iree_string_view_t driver_name = iree_make_cstring_view("vmla");
+  // NOTE: currently the sample file is compiled only with vmvx.
+  iree_string_view_t driver_name = iree_make_cstring_view("vmvx");
 
   // TODO(benvanik): switch to iree_hal_driver_registry_try_create when
   // implemented.

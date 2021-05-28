@@ -29,8 +29,8 @@ vm.module @my_module {
 
 vm.module @my_module {
   // CHECK-LABEL: vm.func @const_ref_zero
-  vm.func @const_ref_zero() -> !vm.ref<?> {
-    // CHECK: %[[NULL:.+]] = "emitc.const"() {value = "{0}"} : () -> !emitc.opaque<"iree_vm_ref_t">
+  vm.func @const_ref_zero() {
+    /// CHECK: %[[NULL:.+]] = "emitc.const"() {value = #emitc.opaque<"{0}">} : () -> !emitc.opaque<"iree_vm_ref_t">
     %null = vm.const.ref.zero : !vm.ref<?>
     vm.return
   }

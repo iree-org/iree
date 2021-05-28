@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 
@@ -47,20 +39,10 @@ int32_t getRoundedElementByteWidth(Type type) {
   return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
 }
 
-TensorType convertTensorTypeToABIType(TensorType sourceType) {
-  assert(sourceType.hasRank() && "only ranked tensors are supported");
-  Type sourceElementType = sourceType.getElementType();
-  Type targetElementType = sourceElementType;
-  if (auto sourceIntType = sourceElementType.dyn_cast<IntegerType>()) {
-    int32_t targetByteWidth = getRoundedElementByteWidth(sourceElementType);
-    targetElementType =
-        IntegerType::get(sourceElementType.getContext(), targetByteWidth * 8);
-  }
-  return RankedTensorType::get(sourceType.getShape(), targetElementType);
-}
-
-SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
-                                         OpBuilder &builder) {
+// Returns an array of i32 values representing the shape of the |shapedType|.
+static SmallVector<Value, 4> getStaticShapeDims(Location loc,
+                                                ShapedType shapedType,
+                                                OpBuilder &builder) {
   SmallVector<Value, 4> shape;
   if (shapedType.getRank() >= 1) {
     for (auto dim : shapedType.getShape()) {
@@ -70,9 +52,10 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
   return shape;
 }
 
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
-                                                   Value shapedValue,
-                                                   OpBuilder &builder) {
+// Returns an array of i32 values representing the shape of the |shapedValue|.
+static llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
+                                                          Value shapedValue,
+                                                          OpBuilder &builder) {
   ShapedType shapedType = shapedValue.getType().cast<ShapedType>();
   if (shapedType.hasStaticShape()) {
     return getStaticShapeDims(loc, shapedType, builder);

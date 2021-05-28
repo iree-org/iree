@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "bindings/python/iree/runtime/hal.h"
 
@@ -104,6 +96,9 @@ void SetupHalBindings(pybind11::module m) {
       .value("FLOAT_16", IREE_HAL_ELEMENT_TYPE_FLOAT_16)
       .value("FLOAT_32", IREE_HAL_ELEMENT_TYPE_FLOAT_32)
       .value("FLOAT_64", IREE_HAL_ELEMENT_TYPE_FLOAT_64)
+      .value("BOOL_8", static_cast<enum iree_hal_element_type_e>(
+                           IREE_HAL_ELEMENT_TYPE_VALUE(
+                               IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1)))
       .export_values();
 
   py::class_<HalDevice>(m, "HalDevice");

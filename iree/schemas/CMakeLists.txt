@@ -38,6 +38,19 @@ flatbuffer_c_library(
 
 flatbuffer_c_library(
   NAME
+    rocm_executable_def_c_fbs
+  SRCS
+    "rocm_executable_def.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
+  PUBLIC
+)
+
+flatbuffer_c_library(
+  NAME
     dylib_executable_def_c_fbs
   SRCS
     "dylib_executable_def.fbs"
@@ -67,19 +80,6 @@ flatbuffer_c_library(
     spirv_executable_def_c_fbs
   SRCS
     "spirv_executable_def.fbs"
-  FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
-  PUBLIC
-)
-
-flatbuffer_c_library(
-  NAME
-    vmla_executable_def_c_fbs
-  SRCS
-    "vmla_executable_def.fbs"
   FLATCC_ARGS
     "--reader"
     "--builder"

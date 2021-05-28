@@ -107,5 +107,5 @@ $ export PYTHONPATH=$(pwd)/bindings/python
 # This is a Python 3 program. On some systems, such as Debian derivatives,
 # use 'python3' instead of 'python'.
 $ python ../iree/integrations/tensorflow/e2e/simple_arithmetic_test.py \
-    --target_backends=iree_vmla --artifacts_dir=/tmp/artifacts
+    --target_backends=iree_vmvx --artifacts_dir=/tmp/artifacts
 ```

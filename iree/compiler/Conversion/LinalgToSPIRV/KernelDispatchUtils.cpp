@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===- KernelDispatchUtils.cpp - Utilities for generating dispatch info ---===//
 //
@@ -111,12 +103,12 @@ getInputOutputTypes(linalg::LinalgOp op) {
   SmallVector<ShapedType> inputTypes(op.getNumInputs()),
       outputTypes(op.getNumOutputs());
   for (auto operand : enumerate(op.getInputOpOperands())) {
-    Value source = getViewSource(operand.value().get());
-    inputTypes[operand.index()] = source.getType().dyn_cast<ShapedType>();
+    inputTypes[operand.index()] =
+        getUntiledType(operand.value().get()).dyn_cast<ShapedType>();
   }
   for (auto operand : enumerate(op.getOutputOpOperands())) {
-    Value source = getViewSource(operand.value().get());
-    outputTypes[operand.index()] = source.getType().dyn_cast<ShapedType>();
+    outputTypes[operand.index()] =
+        getUntiledType(operand.value().get()).dyn_cast<ShapedType>();
   }
   return std::make_tuple(std::move(inputTypes), std::move(outputTypes));
 }

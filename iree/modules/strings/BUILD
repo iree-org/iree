@@ -48,7 +48,7 @@ cc_test(
         "//iree/base",
         "//iree/base:logging",
         "//iree/hal",
-        "//iree/hal/vmla/registration",
+        "//iree/hal/vmvx/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",

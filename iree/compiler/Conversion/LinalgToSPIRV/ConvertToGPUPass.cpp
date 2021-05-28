@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===- ConvertToGPUPass.cpp -----------------------------------------------===//
 //
@@ -245,12 +237,14 @@ scf::ParallelOp collapseParallelLoops(ConversionPatternRewriter &rewriter,
   rewriter.setInsertionPointToStart(&newPLoopOp.getLoopBody().front());
   Value loopIv = *newPLoopOp.getInductionVars().begin();
   BlockAndValueMapping map;
-  edsc::ScopedContext scope(rewriter, loc);
-  using namespace edsc::op;
   for (int i : llvm::seq<int>(0, numLoops)) {
     Value iterNum =
         rewriter.create<SignedDivIOp>(loc, loopIv, iterationStride[i]);
-    Value newIv = lbs[i] + (iterNum * steps[i]);
+    AffineExpr d0, d1;
+    bindDims(rewriter.getContext(), d0, d1);
+    AffineExpr s0 = getAffineSymbolExpr(0, rewriter.getContext());
+    Value newIv = makeComposedAffineApply(rewriter, loc, d0 + d1 * s0,
+                                          {lbs[i], iterNum, steps[i]});
     map.map(pLoopBody.getArgument(i), newIv);
     loopIv = rewriter.create<SignedRemIOp>(loc, loopIv, iterationStride[i]);
   }
@@ -498,7 +492,7 @@ struct SerializeAndDistributeCopy : public OpConversionPattern<linalg::CopyOp> {
       return failure();
 
     Optional<linalg::LinalgLoops> loops =
-        linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, copyOp);
+        linalg::linalgOpToParallelLoops(rewriter, copyOp);
     if (!loops) return failure();
     if (!loops.getValue().empty()) {
       auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
@@ -553,7 +547,7 @@ struct MapLinalgOpToGlobalInvocationId
     FuncOp funcOp = linalgOp->template getParentOfType<FuncOp>();
     if (!funcOp) return failure();
     Optional<linalg::LinalgLoops> loops =
-        linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
+        linalg::linalgOpToParallelLoops(rewriter, linalgOp);
     if (!loops) return failure();
 
     SmallVector<int64_t, 3> workgroupSize(3, 1);

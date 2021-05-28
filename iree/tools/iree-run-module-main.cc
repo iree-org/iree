@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <array>
 #include <iostream>
@@ -33,7 +25,7 @@ IREE_FLAG(string, entry_function, "",
           "Name of a function contained in the module specified by module_file "
           "to run.");
 
-IREE_FLAG(string, driver, "vmla", "Backend driver to use.");
+IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 static iree_status_t parse_function_input(iree_string_view_t flag_name,
                                           void* storage,

@@ -8,7 +8,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vmvx, filter="vmvx" {
-      hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
           vm.func @dispatch_0() {
@@ -26,7 +26,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vmvx, filter="vmvx" {
-      hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
           vm.func @dispatch_1() {
@@ -45,7 +45,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vmvx, filter="vmvx" {
-      hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
           vm.func @dispatch_2() {
@@ -84,9 +84,9 @@ module {
 // CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.target @vmvx, filter="vmvx" {
-// CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
-// CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @io_0, ordinal = 1 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
-// CHECK-NEXT:      hal.executable.entry_point @dispatch_2 attributes {interface = @io_1, ordinal = 2 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @io_0, ordinal = 1 : index}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_2 attributes {interface = @io_1, ordinal = 2 : index}
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
@@ -123,7 +123,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vmvx, filter="vmvx" {
-      hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
           vm.func @dispatch_0() {
@@ -144,7 +144,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vmvx, filter="vmvx" {
-      hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index, signature = (tensor<1x1xf32>) -> tensor<1x1xf32>}
+      hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
           vm.func @dispatch_1() {
@@ -191,8 +191,8 @@ module {
 // CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.target @vmvx, filter="vmvx" {
-// CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
-// CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @io_1, ordinal = 1 : index, signature = (tensor<1x1xf32>) -> tensor<1x1xf32>}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @io_1, ordinal = 1 : index}
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
@@ -243,7 +243,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vmvx, filter="vmvx" {
-      hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {}
       }
@@ -256,7 +256,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vmvx, filter="vmvx" {
-      hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {}
       }
@@ -269,7 +269,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @vmvx, filter="vmvx" {
-      hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {}
       }

@@ -21,7 +21,7 @@ To use `iree-benchmark-module`, generate an IREE module for the target backend:
 ```shell
 $ bazel run //iree/tools:iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmvx \
   $PWD/iree/tools/test/iree-benchmark-module.mlir \
   -o /tmp/module.fb
 ```
@@ -31,7 +31,7 @@ and then benchmark an exported function in that module:
 ```shell
 $ bazel run //iree/tools:iree-benchmark-module -- \
   --module_file=/tmp/module.fb \
-  --driver=vmla \
+  --driver=vmvx \
   --entry_function=abs \
   --function_input=i32=-2
 ```
@@ -78,7 +78,7 @@ Now we'll actually invoke the binary:
 ```shell
 $ ./bazel-bin/iree/tools/iree-benchmark-module \
   --module_file=/tmp/module.fb \
-  --driver=vmla \
+  --driver=vmvx \
   --entry_function=abs \
   --function_input=i32=-2
 ```
@@ -110,7 +110,7 @@ dispatch functions, generate an IREE module with the
 $ build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-flow-export-benchmark-funcs \
-  -iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmvx \
   iree/test/e2e/models/fullyconnected.mlir \
   -o /tmp/fullyconnected.vmfb
 ```
@@ -121,7 +121,7 @@ in that module:
 ```shell
 $ build/iree/tools/iree-benchmark-module
   --module_file=/tmp/fullyconnected.vmfb
-  --driver=vmla
+  --driver=vmvx
 ```
 
 If no `entry_function` is specified, `iree-benchmark-module` will register a

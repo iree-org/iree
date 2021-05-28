@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
@@ -52,14 +44,17 @@ void registerInputTransformPassPipeline();
 //   buildInputTransformPassPipeline
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager,
-                                    bool dispatchLinalgOnTensors = true);
+void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
 void registerFlowTransformPassPipeline();
 
 //===----------------------------------------------------------------------===//
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
+
+// Verifies a module being input to the core compiler pipeline only contains
+// IR structures that are supported at that level.
+std::unique_ptr<OperationPass<ModuleOp>> createVerifyCompilerInputLegality();
 
 // Convert operations to equivalent flow.tensor.* ops. This is run after
 // dispatch region creation to catch operations that were left outside of
@@ -82,33 +77,26 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass();
 // benefit. Other ops are left unmodified and will be outlined later on.
 std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
 
+// Converts standard ops which match to flow.tensor.load (typically causing a
+// read-back).
+// Note that there are typically very specific phase ordering issues with
+// performing such a conversion, so even though it is of fine granularity,
+// this is maintained separately.
+std::unique_ptr<OperationPass<FuncOp>> createPromoteTensorLoadsPass();
+
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
 
 //===----------------------------------------------------------------------===//
-// Dispatches (flow.dispatch.region)
+// Dispatches (flow.dispatch.workgroups)
 //===----------------------------------------------------------------------===//
 
 /// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
 /// A dispatch region is created for each tiled loop nest.
 std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass();
 
-// Analyzes a module to identify which functions are dispatchable.
-// This information is cached on the module and is used by other FuncOp-scoped
-// passes to quickly access the module-level dispatchability information.
-std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityAnalysisPass();
-
-// Identifies dispatchable regions of functions and wraps them in
-// flow.dispatch_regions (version 2).
-std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegions2Pass();
-
-// Folds multiple dispatch regions together that have compatible workloads.
-std::unique_ptr<OperationPass<FuncOp>>
-createFoldCompatibleDispatchRegionsPass();
-
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegions2Pass();
 
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass();

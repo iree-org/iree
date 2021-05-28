@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===- LinalgBufferizePass.cpp.cpp - Pass to bufferize Linalg on tensors --===//
 //
@@ -423,6 +415,31 @@ static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
   return success();
 }
 
+static LogicalResult analyseScfForOp(scf::ForOp forOp,
+                                     BufferizationPlan &plan) {
+  if (forOp.results().empty()) return success();
+  if (!llvm::all_of(forOp.results(), [](Value result) -> bool {
+        auto resultType = result.getType();
+        if (resultType && resultType.isa<TensorType>()) return true;
+        return false;
+      }))
+    return success();
+
+  auto yeildOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+  auto regionArgs = forOp.getRegionIterArgs();
+  auto initArgs = forOp.initArgs();
+  for (int i = 0; i < yeildOp.results().size(); ++i) {
+    Value outputTensor = yeildOp.results()[i];
+    Value resultTensor = forOp.results()[i];
+    Value initArg = initArgs[i];
+    Value arg = regionArgs[i];
+    plan.unionSets(outputTensor, resultTensor);
+    plan.unionSets(outputTensor, initArg);
+    plan.unionSets(outputTensor, arg);
+  }
+  return success();
+}
+
 static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
@@ -480,6 +497,8 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
                                                 transferWriteOp.source(),
                                                 transferWriteOp.result(), plan);
             })
+        .Case<scf::ForOp>(
+            [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Default([&](Operation *op) { return success(); });
   };
   if (funcOp.walk(bufferMappingFn).wasInterrupted()) {
@@ -676,7 +695,7 @@ static Value getReverseOfCastOp(OpBuilder &b, tensor::CastOp castOp,
 /// gets the buffer to use to compute the value in-place.
 static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
                                     BlockAndValueMapping &bvm) {
-  SmallVector<Operation *> traversedOps;
+  SmallVector<Value> traversedValues;
 
   // Traverse the use-def chains to get the `flow.dispatch.tensor.store`
   // operation keeping track of all the traversed operations. Note that the
@@ -688,10 +707,25 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     user = *(defVal.user_begin());
     // If the user is a store op, we are done.
     if (isa<IREE::Flow::DispatchTensorStoreOp>(user)) break;
-    // If user has more than one results, abort.
-    if (user->getNumResults() != 1) return nullptr;
-    traversedOps.push_back(user);
-    defVal = user->getResult(0);
+    // If user has more than one results, with a `LinalgOp` we can still follow
+    // the chain. For now use the `tiedOperands` cause that might result in
+    // better reuse tracking.
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(user)) {
+      auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp);
+      Value useResult = nullptr;
+      for (auto tiedOperand : llvm::enumerate(tiedOperands)) {
+        if (tiedOperand.value() == defVal) {
+          useResult = linalgOp->getResult(tiedOperand.index());
+          break;
+        }
+      }
+      if (!useResult) return nullptr;
+      defVal = useResult;
+    } else {
+      if (user->getNumResults() != 1) return nullptr;
+      defVal = user->getResult(0);
+    }
+    traversedValues.push_back(defVal);
   }
   auto storeOp = dyn_cast_or_null<IREE::Flow::DispatchTensorStoreOp>(user);
   if (!storeOp) return nullptr;
@@ -709,7 +743,8 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
 
   // Now replay the instructions that are essentially doing type-conversion, in
   // reverse, to get the type needed for the operation computing the value.
-  for (auto op : traversedOps) {
+  for (auto value : traversedValues) {
+    Operation *op = value.getDefiningOp();
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
             .Case<linalg::LinalgOp, SubTensorInsertOp, vector::TransferWriteOp>(
@@ -723,9 +758,10 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
             })
             .Default([&](Operation *) { return nullptr; });
     if (!resultBuffer) return nullptr;
-    bvm.map(op->getResult(0), resultBuffer);
+    unsigned resultNumber = value.cast<OpResult>().getResultNumber();
+    bvm.map(op->getResult(resultNumber), resultBuffer);
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "Pair :\n\tTensor :";
+      llvm::dbgs() << "Pair :\n\tTensor result " << resultNumber << " :";
       op->print(llvm::dbgs());
       llvm::dbgs() << "\nt\tMemref :";
       resultBuffer.print(llvm::dbgs());
@@ -799,6 +835,18 @@ static Value getAliasingBufferForResult(OpBuilder &b, SubTensorOp op,
                                      offsets, sizes, strides);
 }
 
+/// Returns output buffers that aliases inputs.
+static SmallVector<Value> getScfForAliasingBuffers(scf::ForOp scfFor,
+                                                   BlockAndValueMapping &bvm) {
+  SmallVector<Value> alisedBuffers;
+  for (int i = 0; i < scfFor.results().size(); ++i) {
+    Value inputTensor = scfFor.initArgs()[i];
+    Value inputBuffer = bvm.lookup(inputTensor);
+    alisedBuffers.push_back(inputBuffer);
+  }
+  return alisedBuffers;
+}
+
 /// Returns a `memref` for every result that aliases the buffer for one of its
 /// operands. Returns the memref of the right shape/type based on the operation.
 static SmallVector<Value, 4> getAliasingBuffersForResults(
@@ -809,6 +857,9 @@ static SmallVector<Value, 4> getAliasingBuffersForResults(
           [&](auto singleResultOp) -> SmallVector<Value, 4> {
             return {getAliasingBufferForResult(b, singleResultOp, bvm)};
           })
+      .Case<scf::ForOp>([&](auto scfFor) -> SmallVector<Value> {
+        return getScfForAliasingBuffers(scfFor, bvm);
+      })
       .Default([&](Operation *op) -> SmallVector<Value, 4> {
         return SmallVector<Value, 4>(op->getNumResults(), nullptr);
       });
@@ -853,7 +904,7 @@ static LogicalResult getOrAllocateResultBuffers(
     }
     bvm.map(result.value(), buffer);
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "Pair :\n\tTensor :";
+      llvm::dbgs() << "Pair :\n\tTensor result " << result.index() << ":";
       op->print(llvm::dbgs());
       llvm::dbgs() << "\nt\tMemref :";
       buffer.print(llvm::dbgs());
@@ -1072,6 +1123,18 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
   return success();
 }
 
+static LogicalResult convertScfForOp(OpBuilder &b, scf::ForOp forOp,
+                                     BlockAndValueMapping &bvm,
+                                     BufferizationPlan &plan) {
+  auto regionArgs = forOp.getRegionIterArgs();
+  for (int i = 0; i < forOp.results().size(); ++i) {
+    Value result = forOp.results()[i];
+    Value arg = regionArgs[i];
+    bvm.map(arg, bvm.lookup(result));
+  }
+  return success();
+}
+
 /// If the alias of the buffer for an input oeprand cannot be used for the
 /// "tied" results, need to do an explicit copy of the memory pointed to by the
 /// aliased buffer into the buffer assigned to the result.
@@ -1217,6 +1280,32 @@ void LinalgBufferizePass::runOnFunction() {
             [&](IREE::Flow::DispatchTieShapeOp shapeOp) {
               return convertDispatchTieShapeOp(b, shapeOp, bvm);
             })
+        .Case<scf::ForOp>([&](scf::ForOp forOp) {
+          if (forOp.results().empty()) return success();
+          bool tensorResults = false;
+          bool scalarResults = false;
+          for (auto result : forOp.results()) {
+            auto resultType = result.getType();
+            if (resultType && resultType.isa<TensorType>()) {
+              tensorResults = true;
+            } else {
+              scalarResults = true;
+            }
+          }
+          // We don't support converting scf.for with mixed scalar and tensor
+          // return types now.
+          if (scalarResults && tensorResults) return failure();
+          if (scalarResults) return success();
+          auto aliasingBuffers = getAliasingBuffersForResults(b, forOp, bvm);
+          SmallVector<Value> args = llvm::to_vector<4>(
+              llvm::map_range(forOp.getRegionIterArgs(),
+                              [](BlockArgument arg) -> Value { return arg; }));
+          if (failed(getOrAllocateResultBuffers(b, forOp, args, aliasingBuffers,
+                                                bvm, plan, allocationFn))) {
+            return failure();
+          }
+          return convertScfForOp(b, forOp, bvm, plan);
+        })
         .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorReshapeOp,
               SubTensorOp, tensor::CastOp>([&](auto aliasingOp) {
           auto aliasingBuffers =
@@ -1289,10 +1378,28 @@ void LinalgBufferizePass::runOnFunction() {
         });
   };
 
-  auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
-    b.setInsertionPoint(op);
-    return conversionDispatch(op);
+  // Forward init arguments from outer scf.for loop to the inner loops.
+  funcOp.walk<WalkOrder::PreOrder>([&](scf::ForOp scfForOp) {
+    if (scfForOp.results().empty()) return;
+    if (!llvm::all_of(scfForOp.results(), [](Value result) -> bool {
+          auto resultType = result.getType();
+          if (resultType && resultType.isa<TensorType>()) return true;
+          return false;
+        }))
+      return;
+    auto regionArgs = scfForOp.getRegionIterArgs();
+    auto initArgs = scfForOp.initArgs();
+    for (int i = 0; i < scfForOp.initArgs().size(); ++i) {
+      regionArgs[i].replaceAllUsesWith(initArgs[i]);
+    }
   });
+
+  auto walkResult =
+      funcOp.walk<WalkOrder::PostOrder>([&](Operation *op) -> WalkResult {
+        b.setInsertionPoint(op);
+        return conversionDispatch(op);
+      });
+
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
   }

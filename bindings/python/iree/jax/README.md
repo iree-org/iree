@@ -19,7 +19,7 @@ import iree.jax
 import jax
 import jax.numpy as jnp
 
-# 'backend' is one of 'vmla', 'llvmaot' and 'vulkan' and defaults to 'llvmaot'.
+# 'backend' is one of 'vmvx', 'llvmaot' and 'vulkan' and defaults to 'llvmaot'.
 @iree.jax.jit(backend="llvmaot")
 def linear_relu_layer(params, x):
   w, b = params

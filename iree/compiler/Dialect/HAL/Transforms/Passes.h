@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
@@ -73,8 +65,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
-    TargetOptions targetOptions);
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass(
     TargetOptions targetOptions);
 
 // Propagates hal.interface.workload.* information when constant.
@@ -152,7 +142,6 @@ inline void registerHALPasses() {
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
-  createMaterializeInterfacesPass(targetOptions);
   createTranslateExecutablesPass(targetOptions);
   createLinkExecutablesPass(targetOptions);
   createResolveEntryPointOrdinalsPass();

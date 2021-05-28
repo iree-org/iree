@@ -16,7 +16,9 @@ iree_lit_test_suite(
   SRCS
     "affinemin_canonicalization.mlir"
     "canonicalize_interface_load_store.mlir"
+    "f32Tof16.mlir"
     "flatten_memref_subspan.mlir"
+    "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
     "linalg_bufferize.mlir"
     "remove_dead_allocs.mlir"

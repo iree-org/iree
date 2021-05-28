@@ -42,7 +42,10 @@ devices from the command line. Install it following the
 Build and install on your host machine:
 
 ``` shell
-cmake  -B ../iree-build/ -DCMAKE_INSTALL_PREFIX=../iree-build/install .
+cmake -B ../iree-build/ \
+  -DCMAKE_INSTALL_PREFIX=../iree-build/install \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  .
 cmake --build ../iree-build/ --target install
 ```
 
@@ -50,7 +53,7 @@ cmake --build ../iree-build/ --target install
 
 Build the runtime using the Android NDK toolchain:
 
-=== "Linux"
+=== "Linux and MacOS"
 
     ``` shell
     cmake -B ../iree-build-android/ \
@@ -109,9 +112,9 @@ Invoke the host compiler tools produce input files:
 ``` shell
 ../iree-build/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmvx \
   iree/tools/test/iree-run-module.mlir \
-  -o /tmp/iree-run-module-vmla.vmfb
+  -o /tmp/iree-run-module-vmvx.vmfb
 ```
 
 Push the Android runtime tools to the device, along with any input files:
@@ -119,14 +122,14 @@ Push the Android runtime tools to the device, along with any input files:
 ``` shell
 adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
 adb shell chmod +x /data/local/tmp/iree-run-module
-adb push /tmp/iree-run-module-vmla.vmfb /data/local/tmp/
+adb push /tmp/iree-run-module-vmvx.vmfb /data/local/tmp/
 ```
 
 Run the tool:
 
 ``` shell
-adb shell /data/local/tmp/iree-run-module -driver=vmla \
-  -module_file=/data/local/tmp/iree-run-module-vmla.vmfb \
+adb shell /data/local/tmp/iree-run-module -driver=vmvx \
+  -module_file=/data/local/tmp/iree-run-module-vmvx.vmfb \
   -entry_function=abs \
   -function_inputs="i32=-5"
 ```

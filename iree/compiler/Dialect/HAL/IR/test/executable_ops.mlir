@@ -7,12 +7,10 @@ hal.executable @ex {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : index
-    // CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index,
-      signature = (tensor<4xf32>) -> tensor<4xf32>,
       workgroup_size = [4 : index, 1 : index, 1 : index]
     }
   }
@@ -41,12 +39,10 @@ hal.executable @ex_with_workgroup_count_region {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : index
-    // CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index,
-      signature = (tensor<4xf32>) -> tensor<4xf32>,
       workgroup_size = [4 : index, 1 : index, 1 : index]
     } {
     ^bb0(%arg0: index, %arg1: index, %arg2: index):

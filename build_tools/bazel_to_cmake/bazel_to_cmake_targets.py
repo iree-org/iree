@@ -1,17 +1,9 @@
 # Lint as: python3
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
@@ -22,6 +14,8 @@ EXPLICIT_TARGET_MAPPING = {
     # absl
     "@com_google_absl//absl/flags:flag": ["absl::flags"],
     "@com_google_absl//absl/flags:parse": ["absl::flags_parse"],
+    # LLVM
+    "@llvm-project//llvm:IPO": ["LLVMipo"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
@@ -51,6 +45,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
+    "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
     # Cuda
@@ -63,7 +58,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
-    "@pffft": ["pffft"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
     "@cpuinfo": ["cpuinfo"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
@@ -125,8 +119,5 @@ def convert_external_target(target):
   if target.startswith("@mlir-hlo//"):
     # All Bazel targets map to a single CMake target.
     return ["tensorflow::mlir_hlo"]
-  if target.startswith("@com_google_ruy//ruy"):
-    # All Bazel targets map to a single CMake target.
-    return ["ruy"]
 
   raise KeyError(f"No conversion found for target '{target}'")

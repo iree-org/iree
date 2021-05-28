@@ -93,9 +93,9 @@ Translate a source MLIR into IREE module:
 ```shell
 $ ../iree-build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmvx \
   $PWD/iree/tools/test/iree-run-module.mlir \
-  -o /tmp/iree-run-module-vmla.vmfb
+  -o /tmp/iree-run-module-vmvx.vmfb
 ```
 
 Then run on the RISC-V QEMU:
@@ -105,8 +105,8 @@ $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
   ../iree-build-riscv/iree/tools/iree-run-module \
-  --driver=vmla \
-  --module_file=/tmp/iree-run-module-vmla.vmfb \
+  --driver=vmvx \
+  --module_file=/tmp/iree-run-module-vmvx.vmfb \
   --entry_function=abs \
   --function_input=i32=-5
 ```
@@ -114,7 +114,7 @@ $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
 Output:
 
 ```
-I ../iree/tools/utils/vm_util.cc:227] Creating driver and device for 'vmla'...
+I ../iree/tools/utils/vm_util.cc:227] Creating driver and device for 'vmvx'...
 EXEC @abs
 I ../iree/tools/utils/vm_util.cc:172] result[0]: Buffer<sint32[]>
 i32=5

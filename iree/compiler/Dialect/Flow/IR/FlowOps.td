@@ -1,17 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_DIALECT_FLOW_OPS
 #define IREE_DIALECT_FLOW_OPS
@@ -173,76 +164,6 @@ def FLOW_VariableStoreIndirectOp : FLOW_Op<"variable.store.indirect"> {
 //===----------------------------------------------------------------------===//
 // Partitioned regions
 //===----------------------------------------------------------------------===//
-
-def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
-    IsolatedFromAbove,
-    DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
-  ]> {
-  let summary = [{partitioned region representing a dispatched workload}];
-  let description = [{
-    A closure that represents a functional dispatch unit. These perform
-    computations in a way that can be lowered to target executable formats such
-    as SPIR-V for execution.
-
-    Ops that are identified as "dispatchable" are grouped into dispatch regions
-    and compatible dispatch regions are folded together. What remains outside of
-    the dispatch regions is the glue required to schedule the work (commonly
-    referred to as "host" code, even if it doesn't run on an AP).
-
-    Dispatch regions are modeled using value semantics: it is assumed that all
-    arguments are read-only and that the dispatch regions themselves have no
-    side-effects.
-  }];
-
-  let arguments = (ins
-    FLOW_Workload:$workload,
-    Variadic<AnyType>:$args
-  );
-  let results = (outs
-    Variadic<AnyType>:$results
-  );
-
-  let regions = (region AnyRegion:$body);
-
-  let extraClassDeclaration = [{
-    /// Forms a dispatch region around a given anchor operation, returning
-    /// the new DispatchRegionOp and anchor operation within the region.
-    /// Returns llvm::None on failure.
-    /// The insertion point of the OpBuilder will be modified.
-    static llvm::Optional<std::pair<DispatchRegionOp, Operation *>>
-        formFromAnchorOp(Value workload, Operation *anchorOp,
-                         OpBuilder &builder);
-
-    // Appends results to the dispatch region. This will re-allocate the
-    // DispatchRegionOp itself but preserve the contained body block.
-    // Returns a ResultRange for the new dispatch region op's results
-    // corresponding to addlResults.
-    static ResultRange appendResults(
-        DispatchRegionOp &self, ValueRange addlResults, OpBuilder &builder);
-
-    /// Returns the index of the args() operand in the Operation operands list.
-    unsigned mapArgOperandToOpOperand(unsigned i) { return i + 1; }
-
-    /// Inlines an op into the dispatch region.
-    /// By default, this will inline the op at the beginning of the region.
-    /// Set positionAtEnd=true to inline at the end. This is not a general
-    /// IR splicing helper: it can only inline ops with inputs that map to
-    /// either captured operands or results and is used to coelesce an op
-    /// into an adjacent dispatch region.
-    /// Note that the original op is cloned but not erased. It is up to the
-    /// caller to cleanup the original op as needed.
-    Operation *inlineOp(Operation *origOp, OpBuilder &builder,
-        bool positionAtEnd=false);
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "ArrayRef<Type>":$resultTypes, "Value":$workload,
-      "ValueRange":$args, CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
-  ];
-
-  let hasCanonicalizer = 1;
-}
 
 def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     IsolatedFromAbove,
@@ -715,7 +636,6 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
   let arguments = (ins
     StrAttr:$sym_name,
     FlatSymbolRefAttr:$function_ref,
-    OptionalAttr<TypeAttr>:$signature,
     OptionalAttr<IndexAttr>:$workgroup_rank
   );
 }

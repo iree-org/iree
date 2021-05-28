@@ -1,17 +1,9 @@
 # Lint as: python3
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # pylint: disable=unused-variable
 
@@ -35,7 +27,7 @@ def create_simple_mul_module():
         }
       }
       """,
-      target_backends=["vulkan-spirv"],
+      target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
@@ -49,7 +41,7 @@ class SystemApiTest(absltest.TestCase):
       config = iree.runtime.Config("nothere1,nothere2")
 
   def test_subsequent_driver(self):
-    config = iree.runtime.Config("nothere1,vmla")
+    config = iree.runtime.Config("nothere1,dylib")
 
   def test_empty_dynamic(self):
     ctx = iree.runtime.SystemContext()

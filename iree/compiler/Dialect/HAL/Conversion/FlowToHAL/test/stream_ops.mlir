@@ -5,11 +5,10 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @vmla, filter="vmla" {
+  hal.executable.target @vmvx, filter="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
-      ordinal = 0 : index,
-      signature = (tensor<128xf32>) -> tensor<128xf32>
+      ordinal = 0 : index
     }
     module {}
   }
@@ -42,12 +41,12 @@ func @multipleDispatches(%input: tensor<128xf32>) -> tensor<128xf32> {
     // CHECK-NEXT:     %c0 = (%[[INPUT_BUF]] : !hal.buffer)[%c0, %c512],
     // CHECK-NEXT:     %c1 = (%[[TMP_BUF]] : !hal.buffer)[%c0, %c512]
     //      CHECK: hal.command_buffer.dispatch.symbol
-    // CHECK-SAME:   target(@ex0::@vmla::@entry0)
+    // CHECK-SAME:   target(@ex0::@vmvx::@entry0)
     //      CHECK: hal.command_buffer.execution_barrier
     %1 = flow.dispatch @ex0::@entry0[%arg1](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
     //      CHECK: hal.command_buffer.push_descriptor_set
     //      CHECK: hal.command_buffer.dispatch.symbol
-    // CHECK-SAME:   target(@ex0::@vmla::@entry0)
+    // CHECK-SAME:   target(@ex0::@vmvx::@entry0)
     //      CHECK: hal.command_buffer.execution_barrier
     %2 = flow.dispatch @ex0::@entry0[%arg1](%1) : (tensor<128xf32>) -> tensor<128xf32>
     flow.return %2 : tensor<128xf32>
@@ -140,11 +139,10 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Discard|Write"
   }
-  hal.executable.target @vmla, filter="vmla" {
+  hal.executable.target @vmvx, filter="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
-      ordinal = 0 : index,
-      signature = (tensor<4x4x1x2xf32>) -> tensor<4x4x1x2xf32>
+      ordinal = 0 : index
     }
     module {}
   }
@@ -243,11 +241,10 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @vmla, filter="vmla" {
+  hal.executable.target @vmvx, filter="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
-      ordinal = 0 : index,
-      signature = (tensor<?x128xf32>, index) -> tensor<?x128xf32>
+      ordinal = 0 : index
     }
     module {}
   }
@@ -288,8 +285,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
       interface = @io,
-      ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:7x4x24xf32>, !flow.dispatch.tensor<writeonly:4x7x1024xf32>) -> ()
+      ordinal = 0 : index
     }
     module {}
   }
@@ -328,8 +324,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
       interface = @io,
-      ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:7x?x24x?xf32>, !flow.dispatch.tensor<writeonly:?x?x1024xf32>, index, index, index, index) -> ()
+      ordinal = 0 : index
     }
     module {}
   }
@@ -380,8 +375,7 @@ hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @pad_dispatch_0 attributes {
       interface = @interface_io,
-      ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:i32>, !flow.dispatch.tensor<writeonly:3x9xi32>) -> ()
+      ordinal = 0 : index
     }
     module {}
   }
@@ -395,8 +389,7 @@ hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
   hal.executable.target @tgt, filter="dylib-llvm-aot" {
     hal.executable.entry_point @pad_dispatch_1 attributes {
       interface = @interface_io,
-      ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:2x3xi32>, !flow.dispatch.tensor<readwrite:3x9xi32>) -> ()
+      ordinal = 0 : index
     }
     module {}
   }

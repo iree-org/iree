@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_DIALECT_FLOW_PASSES
 #define IREE_DIALECT_FLOW_PASSES
@@ -27,12 +19,6 @@ def DeduplicateExecutables :
     Pass<"iree-flow-deduplicate-executables", "ModuleOp"> {
   let summary = "Deduplicates executables that are identical";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDeduplicateExecutablesPass()";
-}
-
-def DispatchabilityAnalysis :
-    Pass<"iree-flow-dispatchability-analysis", "ModuleOp"> {
-  let summary = "Analyzes functions to determine their dispatchability";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchabilityAnalysisPass()";
 }
 
 def DispatchLinalgOnTensors :
@@ -53,12 +39,6 @@ def ExportBenchmarkFuncs :
   let constructor = "mlir::iree_compiler::IREE::Flow::createExportBenchmarkFuncsPass()";
 }
 
-def FoldCompatibleDispatchRegions :
-    Pass<"iree-flow-fold-compatible-dispatch-regions", "FuncOp"> {
-  let summary = "Folds dispatch regions that have compatible workloads";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createFoldCompatibleDispatchRegionsPass()";
-}
-
 def FormStreams :
     Pass<"iree-flow-form-streams", "FuncOp"> {
   let summary = "Identifies dispatches that can be grouped into streams within functions";
@@ -77,12 +57,6 @@ def HLOToHLOPreprocessing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createHLOToHLOPreprocessingPass()";
 }
 
-def IdentifyDispatchRegions2 :
-    Pass<"iree-flow-identify-dispatch-regions2", "FuncOp"> {
-  let summary = "Conservatively identifies dispatch regions in functions (v2)";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createIdentifyDispatchRegions2Pass()";
-}
-
 def InjectDispatchTracing :
     Pass<"iree-flow-inject-dispatch-tracing", "FuncOp"> {
   let summary = "Injects dispatch region tracing";
@@ -96,15 +70,9 @@ def LegalizeInputTypes :
 }
 
 def OutlineDispatchRegions :
-    Pass<"iree-flow-outline-dispatch-regions", "ModuleOp"> {
-  let summary = "Outlines dispatch regions into standalone functions";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
-}
-
-def OutlineDispatchRegions2 :
     Pass<"iree-flow-outline-dispatch-regions2", "ModuleOp"> {
   let summary = "Outlines dispatch regions into executables";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegions2Pass()";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }
 
 def OutlineLargeConstants :
@@ -112,6 +80,12 @@ def OutlineLargeConstants :
   let summary = "Outlines large tensor constants into flow.variables at the module level.";
   // TODO(#5493): add a flag for this.
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass(25)";
+}
+
+def PromoteTensorLoads :
+    Pass<"iree-flow-promote-tensor-loads", "FuncOp"> {
+  let summary = "Converts standard ops which match to flow.tensor.load (typically causing a read-back)";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteTensorLoadsPass()";
 }
 
 def PrePartitioningConversion :
@@ -124,6 +98,12 @@ def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "ModuleOp"> {
   let summary = "Strips constant flow.variables and replaces them with splats.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
+}
+
+def VerifyCompilerInputLegality :
+    Pass<"iree-verify-compiler-input-legality", "ModuleOp"> {
+  let summary = "Verifies that only supported IR constructs are passed to the compiler.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyCompilerInputLegality()";
 }
 
 #endif  // IREE_DIALECT_FLOW_PASSES

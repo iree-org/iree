@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir -export-all -iree-hal-target-backends=vmla -iree-flow-trace-dispatch-tensors %s 2>&1 | IreeFileCheck %s
+// RUN: iree-run-mlir -export-all -iree-hal-target-backends=vmvx -iree-flow-trace-dispatch-tensors2 %s 2>&1 | IreeFileCheck %s
 
 func @two_dispatch() -> (tensor<5x5xf32>, tensor<3x5xf32>) attributes { iree.module.export } {
   %0 = iree.unfoldable_constant dense<1.0> : tensor<5x3xf32>
@@ -7,13 +7,13 @@ func @two_dispatch() -> (tensor<5x5xf32>, tensor<3x5xf32>) attributes { iree.mod
   %3 = "mhlo.dot"(%1, %2) : (tensor<3x5xf32>, tensor<5x5xf32>) -> tensor<3x5xf32>
   return %2, %3 : tensor<5x5xf32>, tensor<3x5xf32>
 }
-// CHECK: === Input for two_dispatch_ex_dispatch_0 ===
+// CHECK: === two_dispatch_dispatch_0::two_dispatch_dispatch_0 inputs ===
 // CHECK: 5x3xf32=
 // CHECK: 3x5xf32=
-// CHECK: === Output for two_dispatch_ex_dispatch_0 ===
+// CHECK: === two_dispatch_dispatch_0::two_dispatch_dispatch_0 outputs ===
 // CHECK: 5x5xf32=
-// CHECK: === Input for two_dispatch_ex_dispatch_1 ===
+// CHECK: === two_dispatch_dispatch_1::two_dispatch_dispatch_1 inputs ===
 // CHECK: 3x5xf32=
 // CHECK: 5x5xf32=
-// CHECK: === Output for two_dispatch_ex_dispatch_1 ===
+// CHECK: === two_dispatch_dispatch_1::two_dispatch_dispatch_1 outputs ===
 // CHECK: 3x5xf32=

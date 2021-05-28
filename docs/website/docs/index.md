@@ -1,10 +1,10 @@
 # IREE
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment[^1]) is
-an [MLIR](https://mlir.llvm.org/)-based end-to-end compiler that lowers Machine
-Learning (ML) models to a unified IR optimized for real-time inference on
-mobile/edge devices against heterogeneous hardware accelerators. IREE also
-provides flexible deployment solutions for its compiled ML models.
+an [MLIR](https://mlir.llvm.org/)-based end-to-end compiler and runtime that
+lowers Machine Learning (ML) models to a unified IR that scales up to meet the
+needs of the datacenter and down to satisfy the constraints and special
+considerations of mobile and edge deployments.
 
 ## Key features
 
@@ -23,8 +23,8 @@ IREE supports importing from a variety of ML frameworks:
 - [x] TensorFlow
 - [x] TensorFlow Lite
 - [x] JAX
-- [ ] PyTorch
-<!-- - [ ] ONNX -->
+- [ ] PyTorch (planned)
+- [ ] ONNX (hoped for)
 
 The IREE compiler tools run on :fontawesome-brands-linux: Linux,
 :fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS
@@ -32,11 +32,11 @@ and can generate efficient code for a variety of runtime platforms:
 
 - [x] Linux
 - [x] Windows
-- [x] macOS
-- [x] iOS
 - [x] Android
-- [x] Bare metal
-- [ ] WebAssembly
+- [ ] macOS (planned)
+- [ ] iOS (planned)
+- [ ] Bare metal (planned)
+- [ ] WebAssembly (planned)
 
 and architectures:
 
@@ -48,8 +48,8 @@ Support for hardware accelerators and APIs is also included:
 
 - [x] Vulkan
 - [x] CUDA
-- [ ] Metal
-- [ ] WebGPU
+- [ ] Metal (planned)
+- [ ] WebGPU (planned)
 
 ## Project architecture
 

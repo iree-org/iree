@@ -1,17 +1,9 @@
 # Lint as: python3
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Test utilities interop with TensorFlow."""
 
 # pylint: disable=missing-docstring
@@ -80,8 +72,8 @@ def _parse_target_backends() -> Tuple[Sequence[str], Sequence[str]]:
   backend_ids = []
 
   # If there are multiple copies of the same backend_name, index them. e.g.
-  # backend_names = ["tf", "iree_vmla", "tf"]
-  # --> backend_ids = ["tf_0", "iree_vmla", "tf_1"]
+  # backend_names = ["tf", "iree_vmvx", "tf"]
+  # --> backend_ids = ["tf_0", "iree_vmvx", "tf_1"]
   for backend_name in backend_names:
     if backend_name in backend_to_index:
       backend_ids.append(f"{backend_name}_{backend_to_index[backend_name]}")

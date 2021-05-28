@@ -9,7 +9,6 @@ hal.executable @exe {
     hal.executable.entry_point @entry attributes {
       interface = @interface,
       ordinal = 0 : index,
-      signature = (tensor<4xf32>) -> tensor<4xf32>,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }
@@ -66,7 +65,6 @@ hal.executable @exe {
     hal.executable.entry_point @entry attributes {
       interface = @interface,
       ordinal = 0 : index,
-      signature = (tensor<4xf32>) -> tensor<4xf32>,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }

@@ -1426,8 +1426,8 @@ hal.interface @interface_io attributes {sym_visibility = "private"} {
 
 // CHECK-LABEL: func @bufferize_cst_output_tensor()
 
-//       CHECK: %[[CST1:.+]] = constant dense<-2147483648> : tensor<i32>
-//       CHECK: %[[CST5:.+]] = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+//       CHECK-DAG: %[[CST1:.+]] = constant dense<-2147483648> : tensor<i32>
+//       CHECK-DAG: %[[CST5:.+]] = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
 //       CHECK: %[[CAST1:.+]] = memref.buffer_cast %[[CST1]] : memref<i32>
 //       CHECK: %[[CAST5:.+]] = memref.buffer_cast %[[CST5]] : memref<5xi32>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan @io::@ro0[%c0] : memref<5xf32>
@@ -1925,3 +1925,170 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //  CHECK-SAME:        outs(%[[ALLOC_RET0_RESHAPE]]
 //       CHECK:      %[[RET0_SV:.+]] = memref.subview %[[RET0]]
 //       CHECK:      linalg.copy(%[[ALLOC_RET0]], %[[RET0_SV]])
+
+// -----
+
+func @multi_result_reduce() {
+  %c0 = constant 0 : index
+  %c0_i32 = constant 0 : i32
+  %c-2147483648_i32 = constant -2147483648 : i32
+  %c2 = constant 2 : index
+  %0 = hal.interface.binding.subspan @io::@ro0[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
+  %1 = hal.interface.binding.subspan @io::@ro1[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
+  %2 = hal.interface.binding.subspan @io::@wo0[%c0] : !flow.dispatch.tensor<writeonly:?xi32>
+  %3 = hal.interface.binding.subspan @io::@wo1[%c0] : !flow.dispatch.tensor<writeonly:?xi32>
+  %d0 = hal.interface.load.constant offset = 0 : index
+  %d1 = hal.interface.load.constant offset = 1 : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
+  %5 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_count_x]
+  scf.for %arg0 = %4 to %d1 step %5 {
+    %6 = affine.min affine_map<(d0)[s0] -> (128, -d0 + s0)>(%arg0)[%d1]
+    %7 = flow.dispatch.tensor.load %0, offsets = [0, %arg0], sizes = [%d0, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+    %9 = flow.dispatch.tensor.load %1, offsets = [0, %arg0], sizes = [%d0, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+    %13 = linalg.init_tensor [%6] : tensor<?xi32>
+    %14 = linalg.fill(%13, %c-2147483648_i32) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} : tensor<?xi32>, i32 -> tensor<?xi32> 
+    %17 = linalg.fill(%13, %c0_i32) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} : tensor<?xi32>, i32 -> tensor<?xi32> 
+    %18:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%7, %9 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%14, %17 : tensor<?xi32>, tensor<?xi32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} {
+    ^bb0(%arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32):  // no predecessors
+      %19 = cmpi sge, %arg1, %arg3 : i32
+      %20 = select %19, %arg1, %arg3 : i32
+      %21 = cmpi eq, %arg1, %arg3 : i32
+      %22 = cmpi slt, %arg2, %arg4 : i32
+      %23 = select %22, %arg2, %arg4 : i32
+      %24 = select %19, %arg2, %arg4 : i32
+      %25 = select %21, %23, %24 : i32
+      linalg.yield %20, %25 : i32, i32
+    } -> tensor<?xi32>, tensor<?xi32>
+    flow.dispatch.tensor.store %18#0, %2, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>
+    flow.dispatch.tensor.store %18#1, %3, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>
+  }
+  return
+}
+hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
+  hal.interface.binding @wo0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @wo1, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @multi_result_reduce
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@ro0
+//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@ro1
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@wo0
+//   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@wo1
+//       CHECK:   scf.for
+//   CHECK-DAG:     %[[ARG0_SV:.+]] = memref.subview %[[ARG0]]
+//   CHECK-DAG:     %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
+//   CHECK-DAG:     %[[RET0_SV:.+]] = memref.subview %[[RET0]]
+//   CHECK-DAG:     linalg.fill(%[[RET0_SV]]
+//   CHECK-DAG:     %[[RET1_SV:.+]] = memref.subview %[[RET1]]
+//   CHECK-DAG:     linalg.fill(%[[RET1_SV]]
+//       CHECK:     linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0_SV]], %[[ARG1_SV]]
+//  CHECK-SAME:       outs(%[[RET0_SV]], %[[RET1_SV]]
+
+
+// -----
+
+#config0 = {tileSizes = [[64, 64]]}
+#config1 = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 24], [4, 4, 4]]}
+#map0 = affine_map<()[s0] -> (s0 * 64)>
+#map1 = affine_map<(d0) -> (64, -d0 + 250)>
+#map2 = affine_map<(d0) -> (64, -d0 + 370)>
+#map3 = affine_map<(d0) -> (32, -d0 + 250)>
+#map4 = affine_map<(d0) -> (24, -d0 + 144)>
+#map5 = affine_map<(d0) -> (32, -d0 + 370)>
+#map6 = affine_map<(d0, d1) -> (32, d0 - d1)>
+module  {
+  func @l1_tiled_matmul() {
+    %cst = constant 0.000000e+00 : f32
+    %c32 = constant 32 : index
+    %c24 = constant 24 : index
+    %c144 = constant 144 : index
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c250 = constant 250 : index
+    %c370 = constant 370 : index
+    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:250x144xf32>
+    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:144x370xf32>
+    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:250x370xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_count_x = hal.interface.workgroup.count[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %workgroup_count_y = hal.interface.workgroup.count[1] : index
+    %3 = affine.apply #map0()[%workgroup_id_y]
+    %4 = affine.apply #map0()[%workgroup_count_y]
+    scf.for %arg0 = %3 to %c250 step %4 {
+      %5 = affine.apply #map0()[%workgroup_id_x]
+      %6 = affine.apply #map0()[%workgroup_count_x]
+      scf.for %arg1 = %5 to %c370 step %6 {
+        %7 = affine.min #map1(%arg0)
+        %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 144], strides = [1, 1] : !flow.dispatch.tensor<readonly:250x144xf32> -> tensor<?x144xf32>
+        %9 = affine.min #map2(%arg1)
+        %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [144, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:144x370xf32> -> tensor<144x?xf32>
+        %11 = linalg.init_tensor [%7, %9] : tensor<?x?xf32>
+        %12 = linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+        %13 = scf.for %arg2 = %c0 to %c250 step %c32 iter_args(%arg3 = %12) -> (tensor<?x?xf32>) {
+          %14 = scf.for %arg4 = %c0 to %c370 step %c32 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
+            %15 = scf.for %arg6 = %c0 to %c144 step %c24 iter_args(%arg7 = %arg5) -> (tensor<?x?xf32>) {
+              %16 = affine.min #map3(%arg2)
+              %17 = affine.min #map4(%arg6)
+              %18 = subtensor %8[%arg2, %arg6] [%16, %17] [1, 1] : tensor<?x144xf32> to tensor<?x?xf32>
+              %19 = affine.min #map5(%arg4)
+              %20 = subtensor %10[%arg6, %arg4] [%17, %19] [1, 1] : tensor<144x?xf32> to tensor<?x?xf32>
+              %21 = memref.dim %arg7, %c0 : tensor<?x?xf32>
+              %22 = affine.min #map6(%21, %arg2)
+              %23 = memref.dim %arg7, %c1 : tensor<?x?xf32>
+              %24 = affine.min #map6(%23, %arg4)
+              %25 = subtensor %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+              %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
+              %27 = subtensor_insert %26 into %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
+              scf.yield %27 : tensor<?x?xf32>
+            }
+            scf.yield %15 : tensor<?x?xf32>
+          }
+          scf.yield %14 : tensor<?x?xf32>
+        }
+        flow.dispatch.tensor.store %13, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:250x370xf32>
+      }
+    }
+    return
+  }
+  hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// CHECK-LABEL: l1_tiled_matmul
+//    CHECK-DAG: %[[M:.+]] = constant 250 : index
+//    CHECK-DAG: %[[N:.+]] = constant 370 : index
+//    CHECK-DAG: %[[K:.+]] = constant 144 : index
+//    CHECK-DAG: %[[L1_MN_SIZE:.+]] = constant 32 : index
+//    CHECK-DAG: %[[L1_K_SIZE:.+]] = constant 24 : index
+//    CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%{{.*}}] : memref<250x144xf32>
+//    CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%{{.*}}] : memref<144x370xf32>
+//    CHECK-DAG: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%{{.*}}] : memref<250x370xf32>
+//        CHECK: scf.for %[[WORKGROUP_I:.+]] = %{{.*}} to %[[M]] step %{{.*}} {
+//        CHECK:    scf.for %[[WORKGROUP_J:.+]] = %{{.*}} to %[[N]] step %{{.*}} {
+//    CHECK-DAG:        %[[WORKGROUP_I_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_I]])
+//    CHECK-DAG:        %[[LHS_WORKGROUP_TILE:.+]] = memref.subview %[[LHS]][%[[WORKGROUP_I]], 0] [%[[WORKGROUP_I_SIZE]], 144] [1, 1] : memref<250x144xf32> to memref<?x144xf32
+//    CHECK-DAG:        %[[WORKGROUP_J_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_J]])
+//    CHECK-DAG:        %[[RHS_WORKGROUP_TILE:.+]] = memref.subview %[[RHS]][0, %[[WORKGROUP_J]]] [144, %[[WORKGROUP_J_SIZE]]] [1, 1] : memref<144x370xf32> to memref<144x?xf32
+//    CHECK-DAG:            %[[DST_WORKGROUP_TILE:.+]] = memref.alloc(%[[WORKGROUP_I_SIZE]], %[[WORKGROUP_J_SIZE]]) : memref<?x?xf32>
+//        CHECK:            scf.for %[[L1_I:.+]] = %{{.*}} to %[[M]] step %[[L1_MN_SIZE]] {
+//        CHECK:              scf.for %[[L1_J:.+]] = %{{.*}} to %[[N]] step %[[L1_MN_SIZE]] {
+//        CHECK:                scf.for %[[L1_K:.+]] = %{{.*}} to %[[K]] step %[[L1_K_SIZE]] {
+//    CHECK-DAG:                    %[[LHS_L1_TILE:.+]] = memref.subview %[[LHS_WORKGROUP_TILE]][%[[L1_I]], %[[L1_K]]]
+//    CHECK-DAG:                    %[[RHS_L1_TILE:.+]] = memref.subview %[[RHS_WORKGROUP_TILE]][%[[L1_K]], %[[L1_J]]]
+//    CHECK-DAG:                    %[[L1_I_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_I_SIZE]], %[[L1_I]])
+//    CHECK-DAG:                    %[[L1_J_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_J_SIZE]], %[[L1_J]])
+//    CHECK-DAG:                    %[[DST_L1_TILE:.+]] = memref.subview %[[DST_WORKGROUP_TILE]][%[[L1_I]], %[[L1_J]]]
+//    CHECK-DAG:                    %[[L1DST:.+]] = memref.alloc(%[[L1_I_SIZE]], %[[L1_J_SIZE]])
+//        CHECK:                    linalg.copy(%[[DST_L1_TILE]], %[[L1DST]])
+//        CHECK:                    linalg.matmul
+//   CHECK-SAME:                    ins(%[[LHS_L1_TILE]], %[[RHS_L1_TILE]]
+//   CHECK-SAME:                    outs(%[[L1DST]]
+//        CHECK:                    linalg.copy(%[[L1DST]], %[[DST_L1_TILE]])
