@@ -259,6 +259,30 @@ class BenchmarkResults(object):
         "results": run_results,
     })
 
+  def merge(self, other):
+    if self.commit != other.commit:
+      raise ValueError("Inconsistent pull request commit")
+    self.benchmarks.extend(other.benchmarks)
+
+  def get_aggregate_time(self, benchmark_index: int, kind: str) -> int:
+    """Returns the Google Benchmark aggreate time for the given kind.
+
+      Args:
+      - benchmark_index: the benchmark's index.
+      - kind: what kind of aggregate time to get; choices:
+        'mean', 'median', 'stddev'.
+      """
+    time = None
+    for bench_case in self.benchmarks[benchmark_index]["results"]:
+      if bench_case["name"].endswith(f"real_time_{kind}"):
+        if bench_case["time_unit"] != "ms":
+          raise ValueError(f"Expected ms as time unit")
+        time = int(round(bench_case["real_time"]))
+        break
+    if time is None:
+      raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
+    return time
+
   def to_json_str(self) -> str:
     json_object = {"commit": self.commit, "benchmarks": []}
     for benchmark in self.benchmarks:
