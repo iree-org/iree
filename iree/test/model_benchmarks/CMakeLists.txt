@@ -1,15 +1,27 @@
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2-imagenet"
-    "MobileNetV3Small-imagenet"
+    "MobileNetV2"
+    "MobileNetV3Small"
+  MODULE_TAGS
+    "fp32,imagenet"
+    "fp32,imagenet"
+  MODULE_SOURCES
+    "TensorFlow"
+    "TensorFlow"
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+  ENTRY_FUNCTIONS
+    "call"
+    "call"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+    "1x224x224x3xf32"
   BENCHMARK_MODE
-    "fp32-full-inference-1-thread"
+    "1-thread,big-core,full-inference"
   TARGET_BACKEND
     "dylib-llvm-aot"
-  TARGET_ARCH
+  TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
@@ -18,23 +30,32 @@ iree_mlir_benchmark_suite(
     "-iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib-sync"
-  RUNTIME_FLAGS
-    "--entry_function=call"
-    "--function_input=1x224x224x3xf32"
 )
 
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2-imagenet"
-    "MobileNetV3Small-imagenet"
+    "MobileNetV2"
+    "MobileNetV3Small"
+  MODULE_TAGS
+    "fp32,imagenet"
+    "fp32,imagenet"
+  MODULE_SOURCES
+    "TensorFlow"
+    "TensorFlow"
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+  ENTRY_FUNCTIONS
+    "call"
+    "call"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+    "1x224x224x3xf32"
   BENCHMARK_MODE
-    "fp32-full-inference-3-thread"
+    "3-thread,big-core,full-inference"
   TARGET_BACKEND
     "dylib-llvm-aot"
-  TARGET_ARCH
+  TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
@@ -44,23 +65,33 @@ iree_mlir_benchmark_suite(
   DRIVER
     "dylib"
   RUNTIME_FLAGS
-    "--entry_function=call"
-    "--function_input=1x224x224x3xf32"
     "--task_topology_group_count=3"
 )
 
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2-imagenet"
-    "MobileNetV3Small-imagenet"
+    "MobileNetV2"
+    "MobileNetV3Small"
+  MODULE_TAGS
+    "fp32,imagenet"
+    "fp32,imagenet"
+  MODULE_SOURCES
+    "TensorFlow"
+    "TensorFlow"
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+  ENTRY_FUNCTIONS
+    "call"
+    "call"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+    "1x224x224x3xf32"
   BENCHMARK_MODE
-    "fp32-full-inference"
+    "full-inference"
   TARGET_BACKEND
     "vulkan-spirv"
-  TARGET_ARCH
+  TARGET_ARCHITECTURE
     "GPU-Adreno"
   TRANSLATION_FLAGS
     "--iree-vulkan-target-triple=adreno-unknown-android11"
@@ -69,23 +100,32 @@ iree_mlir_benchmark_suite(
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
     "vulkan"
-  RUNTIME_FLAGS
-    "--entry_function=call"
-    "--function_input=1x224x224x3xf32"
 )
 
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2-imagenet"
-    "MobileNetV3Small-imagenet"
+    "MobileNetV2"
+    "MobileNetV3Small"
+  MODULE_TAGS
+    "fp32,imagenet"
+    "fp32,imagenet"
+  MODULE_SOURCES
+    "TensorFlow"
+    "TensorFlow"
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+  ENTRY_FUNCTIONS
+    "call"
+    "call"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+    "1x224x224x3xf32"
   BENCHMARK_MODE
-    "fp32-full-inference"
+    "full-inference"
   TARGET_BACKEND
     "vulkan-spirv"
-  TARGET_ARCH
+  TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
     "--iree-vulkan-target-triple=valhall-unknown-android11"
@@ -94,23 +134,32 @@ iree_mlir_benchmark_suite(
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
     "vulkan"
-  RUNTIME_FLAGS
-    "--entry_function=call"
-    "--function_input=1x224x224x3xf32"
 )
 
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2-imagenet"
-    "MobileNetV3Small-imagenet"
+    "MobileNetV2"
+    "MobileNetV3Small"
+  MODULE_TAGS
+    "fp32,imagenet"
+    "fp32,imagenet"
+  MODULE_SOURCES
+    "TensorFlow"
+    "TensorFlow"
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-imagenet-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-imagenet-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+  ENTRY_FUNCTIONS
+    "call"
+    "call"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+    "1x224x224x3xf32"
   BENCHMARK_MODE
-    "fp32-kernel-execution"
+    "kernel-execution"
   TARGET_BACKEND
     "vulkan-spirv"
-  TARGET_ARCH
+  TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
     "--iree-vulkan-target-triple=valhall-unknown-android11"
@@ -121,7 +170,5 @@ iree_mlir_benchmark_suite(
   DRIVER
     "vulkan"
   RUNTIME_FLAGS
-    "--entry_function=call"
-    "--function_input=1x224x224x3xf32"
     "--batch_size=32"
 )

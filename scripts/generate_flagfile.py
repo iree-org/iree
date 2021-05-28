@@ -31,7 +31,17 @@ def parse_arguments():
                       type=str,
                       required=True,
                       metavar="<driver>",
-                      help="The name of IREE driver")
+                      help="The name of the IREE driver")
+  parser.add_argument("--entry_function",
+                      type=str,
+                      required=True,
+                      metavar="<entry-function>",
+                      help="The name of the entry function")
+  parser.add_argument("--function_inputs",
+                      type=str,
+                      required=True,
+                      metavar="<function-inputs>",
+                      help="A list of comma-separated function inputs")
   parser.add_argument("--additional_args",
                       type=str,
                       required=True,
@@ -47,7 +57,13 @@ def parse_arguments():
 
 
 def main(args):
-  lines = [f"--module_file={args.module_file}", f"--driver={args.driver}"]
+  lines = [
+      f"--driver={args.driver}", f"--module_file={args.module_file}",
+      f"--entry_function={args.entry_function}"
+  ]
+  lines.extend([
+      ("--function_input=" + e) for e in args.function_inputs.split(",")
+  ])
   lines.extend(args.additional_args.split(";"))
   content = "\n".join(lines) + "\n"
 

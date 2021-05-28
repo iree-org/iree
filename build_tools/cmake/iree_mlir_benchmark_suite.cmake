@@ -12,30 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# iree_check_lists_have_same_size()
+#
+# Note that the caller should pass in the list variables themselves to
+# LIST1 and LIST2, not the list variables' values.
+function(iree_check_lists_have_same_size LIST1 LIST2)
+  list(LENGTH "${LIST1}" _LIST1_COUNT)
+  list(LENGTH "${LIST2}" _LIST2_COUNT)
+  if(NOT _LIST1_COUNT EQUAL _LIST2_COUNT)
+    message(SEND_ERROR "${LIST1} count ${_LIST1_COUNT} does not "
+                       "match ${LIST2} count ${_LIST2_COUNT}"
+    )
+  endif()
+endfunction()
+
 # iree_mlir_benchmark_suite()
 #
 # Generates benchmark suites for MLIR input modules. The generated artifacts
 # will be executed with `iree-benchmark-module`.
 #
 # Parameters:
-#   MODULE_NAMES: A list of MLIR input module names. The list size should be
-#       the same as MLIR_SOURCES.
-#   MLIR_SOURCES: A list of MLIR input module sources. Each one can be a file
-#       checked in the repo; it can also be a URL for downloading form the web.
-#       When it's a URL, it can be a tarball which contains a .mlir file
-#       with the name as specified in the MODULE_NAMES. The list size should
-#       be the same as MODULE_NAMES.
-#   BENCHMARK_MODE: The mode of this benchmark suite.
+#   MODULE_NAMES: A list of input module names.
+#   MODULE_TAGS: A list of tags for each input module.
+#   MODULE_SOURCES: The initial generating source for each input module.
+#   MLIR_SOURCES: The input file for each input module. It can be a file in
+#       checked in the repository; it can also be a URL for downloading from.
+#       the web. When it's a URL, the file should be a a direct .mlir file
+#       or a tarball containing a .mlir file; for both cases, the .mlir file
+#       should have a name matching the one in MODULE_NAMES.
+#   ENTRY_FUNCTIONS: The entry function name for each input module.
+#   FUNCTION_INPUTS: A list of entry function inputs for each input module.
+#   BENCHMARK_MODE: A comma-separated list of benchmark mode tags.
 #   TARGET_BACKEND: The compiler target backend.
-#   TARGET_ARCH: The detailed target backend's architecture.
+#   TARGET_ARCHITECTURE: The detailed target backend's architecture.
 #   TRANSLATION_FLAGS: A list of command-line options and their values to
 #       pass to the IREE translation tool for artifact generation.
-#   DRIVER: The IREE runtime driver.
+#   DRIVER: The runtime driver.
 #   RUNTIME_FLAGS: A list of command-line options and their values to pass
 #       to the IREE runtime during benchmark exectuion.
-
-# The full CMake target is a combination of the MODULE_NAME, BENCHMARK_MODE,
-# TARGET_BACKEND, and TARGET_ARCH.
+#
+# The above parameters largely fall into two categories: 1) for specifying
+# the MLIR input module and its metadata, 2) for specifying the translation/
+# runtime configuration.
+#
+# 1)
+#
+# MODULE_NAMES, MODULE_TAGS, MODULE_SOURCES, MLIR_SOURCES, ENTRY_FUNCTIONS,
+# and FUNCTION_INPUTS together provide good flexiblity for specifying the MLIR
+# input module and its metadata. For example, we can generate modules with
+# idential name from different sources (TensorFlow, TFLite, PyTorch, etc.),
+# and we can transform the same input module differently for benchmarking
+# different aspects like fp32 vs fp16.
+#
+# Note that the above parameters are all lists and they should have the name
+# number of elements. This enables us to use the same CMake function call to
+# generate benchmarks for many models and share the specification of
+# translation/runtime configurations.
+#
+# 2)
+#
+# TARGET_BACKEND and TRANSLATION_FLAGS control how the input module will be
+# converted into the final IREE deployable module format. DRIVER and
+# RUNTIME_FLAGS specify how the module will be executed. BENCHMARK_MODE
+# can be used to give descriptions of the translation/runtime configuration
+# (e.g., full-inference vs. kernel-execution) and specify more contextual
+# requirements (e.g., big-core vs. little-core).
 #
 function(iree_mlir_benchmark_suite)
   if(NOT IREE_BUILD_BENCHMARKS)
@@ -46,30 +87,29 @@ function(iree_mlir_benchmark_suite)
     PARSE_ARGV 0
     _RULE
     ""
-    "BENCHMARK_MODE;DRIVER;TARGET_BACKEND;TARGET_ARCH"
-    "MLIR_SOURCES;MODULE_NAMES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
+    "BENCHMARK_MODE;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "ENTRY_FUNCTIONS;FUNCTION_INPUTS;MLIR_SOURCES;MODULE_NAMES;MODULE_SOURCES;MODULE_TAGS;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
-  list(LENGTH _RULE_MODULE_NAMES _MODULE_NAMES_COUNT)
-  list(LENGTH _RULE_MLIR_SOURCES _MLIR_SOURCES_COUNT)
-
-  if(NOT _MODULE_NAMES_COUNT EQUAL _MLIR_SOURCES_COUNT)
-    message(
-      SEND_ERROR
-        "MODULE_NAMES count ${_MODULE_NAMES_COUNT} does not match MLIR_SOURCES"
-        " count ${_MLIR_SOURCES_COUNT}"
-    )
-  endif()
-
-  # Generate all benchmarks to the root build directory. This helps for
-  # discovering them and execute them on devices.
-  set(_ROOT_ARTIFACTS_DIR "${CMAKE_BINARY_DIR}/benchmark_suites/mlir_modules")
+  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_MODULE_TAGS)
+  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_MODULE_SOURCES)
+  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_MLIR_SOURCES)
+  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_ENTRY_FUNCTIONS)
+  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_FUNCTION_INPUTS)
 
   # Loop over all modules and their sources to create targets.
   math(EXPR _MAX_INDEX "${_MODULE_NAMES_COUNT} - 1")
   foreach(_INDEX RANGE 0 "${_MAX_INDEX}")
+    # Generate all benchmarks to the root build directory. This helps for
+    # discovering them and execute them on devices.
+    list(GET _RULE_MODULE_SOURCES ${_INDEX} _MODULE_SOURCE)
+    set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_MODULE_SOURCE}")
+
     list(GET _RULE_MODULE_NAMES ${_INDEX} _MODULE_NAME)
+    list(GET _RULE_MODULE_TAGS ${_INDEX} _MODULE_TAGS)
     list(GET _RULE_MLIR_SOURCES ${_INDEX} _MLIR_SOURCE)
+    list(GET _RULE_ENTRY_FUNCTIONS ${_INDEX} _ENTRY_FUNCTION)
+    list(GET _RULE_FUNCTION_INPUTS ${_INDEX} _FUNCTION_INPUTS)
 
     # The source file used to generate benchmark artifacts.
     set(_SOURCE_FILE "${_MLIR_SOURCE}")
@@ -114,8 +154,10 @@ function(iree_mlir_benchmark_suite)
 
     # Next create the command and target for compiling the input module into
     # IREE deployable format.
-    set(_BENCHMARK_DIR_NAME "iree-${_RULE_DRIVER}__${_RULE_TARGET_ARCH}__${_RULE_BENCHMARK_MODE}")
-    set(_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_NAME}/${_BENCHMARK_DIR_NAME}")
+    string(JOIN "-" _MODULE_DIR_NAME "${_MODULE_NAME}" "${_MODULE_TAGS}")
+    set(_BENCHMARK_DIR_NAME
+        "iree-${_RULE_DRIVER}__${_RULE_TARGET_ARCHITECTURE}__${_RULE_BENCHMARK_MODE}")
+    set(_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
 
     set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
     list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
@@ -136,10 +178,12 @@ function(iree_mlir_benchmark_suite)
       COMMENT "Generating ${_VMFB_FILE}"
     )
 
-  set(_COMMON_NAME_SEGMENTS "${_MODULE_NAME}")
-    list(APPEND _COMMON_NAME_SEGMENTS "${_RULE_BENCHMARK_MODE}")
-    list(APPEND _COMMON_NAME_SEGMENTS "${_RULE_TARGET_BACKEND}")
-    list(APPEND _COMMON_NAME_SEGMENTS "${_RULE_TARGET_ARCH}")
+    set(_COMMON_NAME_SEGMENTS "${_MODULE_NAME}")
+    string(REPLACE "," "-" _TAGS "${_MODULE_TAGS}")
+    string(REPLACE "," "-" _MODE "${_RULE_BENCHMARK_MODE}")
+    list(APPEND _COMMON_NAME_SEGMENTS
+         "${_TAGS}" "${_MODE}" "${_RULE_TARGET_BACKEND}"
+         "${_RULE_TARGET_ARCHITECTURE}")
 
     # Construct the benchmark artifact generation target name, which is the module
     # name, followed by benchmark mode, target backend, and configuration.
@@ -164,6 +208,8 @@ function(iree_mlir_benchmark_suite)
         "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
           --module_file=compiled.vmfb
           --driver=${_RULE_DRIVER}
+          --entry_function=${_ENTRY_FUNCTION}
+          --function_inputs=${_FUNCTION_INPUTS}
           "${_ADDITIONAL_ARGS_CL}"
           -o "${_FLAG_FILE}"
       DEPENDS
