@@ -124,6 +124,21 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   }
 };
 
+class SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::SelectOp selectOp, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    mlir::SelectOp::Adaptor adaptor(operands);
+    rewriter.replaceOpWithNewOp<mlir::SelectOp>(selectOp, adaptor.condition(),
+                                                adaptor.true_value(),
+                                                adaptor.false_value());
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateStandardStructuralToHALPatterns(MLIRContext *context,
@@ -131,7 +146,8 @@ void populateStandardStructuralToHALPatterns(MLIRContext *context,
                                              TypeConverter &converter) {
   patterns
       .insert<FuncOpSignatureConversion, CallOpConversion, BranchOpConversion,
-              CondBranchOpConversion, ReturnOpConversion>(converter, context);
+              CondBranchOpConversion, ReturnOpConversion, SelectOpConversion>(
+          converter, context);
 }
 
 }  // namespace iree_compiler
