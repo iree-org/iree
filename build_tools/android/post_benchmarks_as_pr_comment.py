@@ -29,8 +29,8 @@ Example usage:
   export ...
   # Then run the script:
   python3 post_benchmarks_as_pr_comment.py <benchmark-json-file>...
-  #   where each <benchmark-json-file> is expected to be of format:
-  #   {"commit": <commit-sha>, "benchmarks": {<name>: <value>, ...}}
+  #   where each <benchmark-json-file> is expected to be of format expected
+  #   by BenchmarkResults objects.
 """
 
 import argparse
@@ -39,10 +39,14 @@ import os
 import requests
 import markdown_strings as md
 
+from typing import Any, Dict, Sequence, Tuple, Union
+
+from common.benchmark_description import BenchmarkResults
+
 GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/google/iree"
 
 
-def get_required_env_var(var):
+def get_required_env_var(var: str) -> str:
   """Gets the value for a required environment variable."""
   value = os.getenv(var, None)
   if value is None:
@@ -50,46 +54,75 @@ def get_required_env_var(var):
   return value
 
 
-def aggregate_all_benchmarks(benchmark_files):
+def get_reported_time(bench_results: Sequence[Dict[str, Any]],
+                      kind: str) -> int:
+  """Returns the Google Benchmark reported time for the given kind."""
+  time = None
+  for bench_case in bench_results:
+    if bench_case["name"].endswith(f"real_time_{kind}"):
+      if bench_case["time_unit"] != "ms":
+        raise ValueError(f"Expected ms as time unit")
+      time = int(round(bench_case["real_time"]))
+      break
+  if time is None:
+    raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
+  return time
+
+
+def aggregate_all_benchmarks(
+    benchmark_files: Sequence[str]) -> Sequence[Tuple[Union[str, int]]]:
   """Aggregates all benchmarks in the given files.
 
   Args:
-  - benchmark_files: A list of JSON files, each with the format:
-    {"commit": <commit-sha>, "benchmarks": {<name>: <value>, ...}}
+  - benchmark_files: A list of JSON files, each can be decoded as a
+    BenchmarkResults.
 
   Returns:
-  - A list of benchmark (name, value) tuples.
+  - A list of (name, mean-latency, median-latency, stddev-latency) tuples.
   """
+
   pr_commit = get_required_env_var("BUILDKITE_COMMIT")
-  all_benchmarks = []
+  benchmark_avg_results = {}
 
   for benchmark_file in benchmark_files:
     with open(benchmark_file) as f:
-      benchmarks = json.load(f)
-    if benchmarks["commit"] != pr_commit:
+      content = f.read()
+    file_results = BenchmarkResults.from_json_str(content)
+
+    if file_results.commit != pr_commit:
       raise ValueError("Inconsistent pull request commit")
-    for name, value in benchmarks["benchmarks"].items():
-      if name in all_benchmarks:
+
+    for benchmark_case in file_results.benchmarks:
+      # Make sure each benchmark has a unique name.
+      name = str(benchmark_case["benchmark"])
+      if name in benchmark_avg_results:
         raise ValueError(f"Duplicated benchmarks: {name}")
-      all_benchmarks.append((name, value))
 
-  return sorted(all_benchmarks)
+      # Now scan all benchmark iterations and find the average latency.
+      mean_time = get_reported_time(benchmark_case["results"], "mean")
+      median_time = get_reported_time(benchmark_case["results"], "median")
+      stddev_time = get_reported_time(benchmark_case["results"], "stddev")
+
+      benchmark_avg_results[name] = (mean_time, median_time, stddev_time)
+
+  return sorted([(k,) + v for k, v in benchmark_avg_results.items()])
 
 
-def get_benchmark_result_markdown(benchmark_files):
+def get_benchmark_result_markdown(benchmark_files: Sequence[str]) -> str:
   """Gets markdown summary of all benchmarks in the given files."""
   all_benchmarks = aggregate_all_benchmarks(benchmark_files)
-  names = [k for k, _ in all_benchmarks]
-  values = [v for _, v in all_benchmarks]
-  names.insert(0, "Benchmark Name")
-  values.insert(0, "Time (ms)")
+  names, means, medians, stddevs = zip(*all_benchmarks)
+  names = ("Benchmark Name",) + names
+  means = ("Average Latency (ms)",) + means
+  medians = ("Median Latency (ms)",) + medians
+  stddevs = ("Latency Standard Deviation (ms)",) + stddevs
 
   build_url = get_required_env_var("BUILDKITE_BUILD_URL")
   pr_commit = get_required_env_var("BUILDKITE_COMMIT")
 
   commit = f"@ commit {pr_commit}"
   header = md.header("Benchmark results", 3)
-  benchmark_table = md.table([names, values])
+  benchmark_table = md.table([names, means, medians, stddevs])
   link = "See more details on " + md.link("Buildkite", build_url)
 
   return "\n\n".join([header, commit, benchmark_table, link])
