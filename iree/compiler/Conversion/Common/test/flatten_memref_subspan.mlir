@@ -10,12 +10,12 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
 }
 
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s2 * 8 + s3 * 56 + s1 floordiv 4)>
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s1 * 8 + s2 * 56 + s3 floordiv 4)>
 //      CHECK: func @load_subspan_with_offset
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[ZERO:.+]] = constant 0 : index
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[ZERO]]] : memref<?xf32>
-//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I2]], %[[OFFSET]], %[[I1]], %[[I0]]]
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I2]], %[[I1]], %[[I0]], %[[OFFSET]]]
 //      CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]]
 //      CHECK:   return %[[LOAD]]
 
@@ -31,12 +31,12 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
 }
 
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s2 * 4 + s3 * 12 + s1 floordiv 4)>
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s1 * 4 + s2 * 12 + s3 floordiv 4)>
 //      CHECK: func @store_subspan_with_offset
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[ZERO:.+]] = constant 0 : index
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[ZERO]]] : memref<?xf32>
-//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I2]], %[[OFFSET]], %[[I1]], %[[I0]]]
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I2]], %[[I1]], %[[I0]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[SUBSPAN]][%[[INDEX]]] : memref<?xf32>
 
 // -----
@@ -51,7 +51,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
 }
 
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s2 * 8 + s3 * 56 + s1 floordiv 16)>
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s1 * 8 + s2 * 56 + s3 floordiv 16)>
 //      CHECK: func @load_subspan_with_vector_element
 //      CHECK:   affine.apply #[[MAP]]()
 
@@ -67,7 +67,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
 }
 
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s2 * 8 + s3 * 56 + s1 floordiv 2)>
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s1 * 8 + s2 * 56 + s3 floordiv 2)>
 //      CHECK: func @load_subspan_with_16bit_element
 //      CHECK:   affine.apply #[[MAP]]()
 
@@ -83,7 +83,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
 }
 
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s2 * 4 + s3 * 12 + s1 floordiv 4)>
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 + s1 * 4 + s2 * 12 + s3 floordiv 4)>
 //      CHECK: func @store_subspan_with_leading_unknown_dim
 //      CHECK:   affine.apply #[[MAP]]()
 

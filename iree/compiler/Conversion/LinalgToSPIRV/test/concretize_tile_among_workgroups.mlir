@@ -77,8 +77,8 @@ hal.executable @conv2d_static_shape attributes {sym_visibility = "private"} {
 //  CHECK-DAG: #[[MAP7:.+]] = affine_map<()[s0] -> (4, s0 * -4 + 112)>
 
 //      CHECK: hal.executable.entry_point @conv2d_static_shape
-//      CHECK:   %[[C2:.+]] = constant 2 : index
-//      CHECK:   %[[C28:.+]] = constant 28 : index
+//      CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//      CHECK-DAG:   %[[C28:.+]] = constant 28 : index
 //      CHECK:   hal.return %[[C2]], %[[C28]], %[[C28]] : index, index, index
 
 //      CHECK: func @conv2d_static_shape()

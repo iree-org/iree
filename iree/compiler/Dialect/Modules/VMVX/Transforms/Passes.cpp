@@ -1,26 +1,19 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Modules/VMVX/Transforms/Passes.h"
 
 #include <memory>
 
 #include "iree/compiler/Conversion/Common/Passes.h"
-#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -49,7 +42,10 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Configuration
   // ---------------------------------------------------------------------------
 
-  passManager.addPass(createMaterializeCPULaunchConfigurationPass());
+  // TODO(#5925): This can also be modified to just use the dynamic pass
+  // pipeline like the CPU side.
+  // passManager.addPass(createMaterializeCPULaunchConfigurationPass());
+  passManager.addPass(createSetNumWorkgroupsPass());
 
   // ---------------------------------------------------------------------------
   // Linalg -> Vectors
@@ -75,8 +71,10 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
 
   // Tiling and distribution.
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<FuncOp>(
-      createLinalgTileAndVectorizeWorkgroupsPass());
+  // TODO(#5925): This can also be modified to just use the dynamic pass
+  // pipeline like the CPU side.
+  // nestedModulePM.addNestedPass<FuncOp>(
+  //     createLinalgTileAndVectorizeWorkgroupsPass());
 
   // Linalg -> SCF.
   nestedModulePM.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());

@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
@@ -19,6 +11,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/test/emitc/arithmetic_ops.h"
+#include "iree/vm/test/emitc/arithmetic_ops_f32.h"
 #include "iree/vm/test/emitc/arithmetic_ops_i64.h"
 #include "iree/vm/test/emitc/assignment_ops.h"
 #include "iree/vm/test/emitc/assignment_ops_i64.h"
@@ -60,6 +53,7 @@ std::vector<TestParams> GetModuleTestParams() {
   // TODO(simon-camp): get these automatically
   std::vector<ModuleDescription> modules = {
       {arithmetic_ops_descriptor_, arithmetic_ops_create},
+      {arithmetic_ops_f32_descriptor_, arithmetic_ops_f32_create},
       {arithmetic_ops_i64_descriptor_, arithmetic_ops_i64_create},
       {assignment_ops_descriptor_, assignment_ops_create},
       {assignment_ops_i64_descriptor_, assignment_ops_i64_create},

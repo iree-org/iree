@@ -31,8 +31,10 @@ iree_lit_test_suite(
     "outline_dispatch_regions.mlir"
     "outline_large_constants.mlir"
     "pre_partitioning_conversion.mlir"
+    "promote_tensor_loads.mlir"
     "strip_and_splat_constant_variables.mlir"
     "transformation.mlir"
+    "verify_compiler_input_legality.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

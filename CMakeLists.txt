@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.13.4)
 # Do not set MSVC warning flags like /W3 by default (since 3.15):
@@ -88,6 +80,7 @@ endif()
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
+option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -161,6 +154,7 @@ set(IREE_ALL_TARGET_BACKENDS
   DYLIB-LLVM-AOT
   WASM-LLVM-AOT
   Metal-SPIRV
+  ROCM
   Vulkan-SPIRV
   VMVX
 )
@@ -445,6 +439,10 @@ add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
+if(${IREE_BUILD_EXPERIMENTAL_ROCM})
+  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
+  add_subdirectory(experimental/rocm)
+endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)

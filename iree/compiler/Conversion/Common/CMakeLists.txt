@@ -10,6 +10,15 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    FoldTensorExtractOpIncGen
+  TD_FILE
+    "FoldTensorExtractOp.td"
+  OUTS
+    -gen-rewriters FoldTensorExtractOp.cpp.inc
+)
+
 iree_cc_library(
   NAME
     Common
@@ -21,10 +30,12 @@ iree_cc_library(
     "BufferAllocViewCleanUpPass.cpp"
     "DemoteF32ToF16.cpp"
     "FlattenMemRefSubspanPass.cpp"
+    "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
     "Passes.cpp"
+    "SetNumWorkgroupsPass.cpp"
     "Transforms.cpp"
     "VectorTransferOptimization.cpp"
   DEPS
@@ -42,9 +53,12 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRTransforms
     MLIRVector
     iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Conversion::Common::FoldTensorExtractOpIncGen
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR

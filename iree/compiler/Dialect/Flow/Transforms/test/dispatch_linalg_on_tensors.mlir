@@ -658,6 +658,55 @@ func @inline_dag_2(
 
 // -----
 
+func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i32>) -> tensor<9xi1> {
+  %c9 = constant 9 : index
+  %c5_i32 = constant 5 : i32
+  %c0_i32 = constant 0 : i32
+  %c9_i32 = constant 9 : i32
+  %245 = flow.tensor.update %240, %244[%c9] : tensor<9xi32> -> tensor<18xi32>
+  %248 = tensor.extract %247[] : tensor<i32>
+  %249 = cmpi slt, %248, %c9_i32 : i32
+  %250 = select %249, %248, %c9_i32 : i32
+  %251 = cmpi sgt, %250, %c0_i32 : i32
+  %252 = select %251, %250, %c0_i32 : i32
+  %253 = index_cast %252 : i32 to index
+  %254 = subtensor %245[%253] [9] [1] : tensor<18xi32> to tensor<9xi32>
+  %255 = linalg.init_tensor [9] : tensor<9xi1>
+  %256 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%254 : tensor<9xi32>) outs(%255 : tensor<9xi1>) {
+        ^bb0(%arg20: i32, %arg21: i1):  // no predecessors
+          %849 = cmpi eq, %arg20, %c5_i32 : i32
+          linalg.yield %849 : i1
+      } -> tensor<9xi1>
+  return %256 : tensor<9xi1>
+}
+// CHECK-LABEL: func @inline_dag_3
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<9xi32>
+//  CHECK-SAME:   %[[ARG1:.+]]: tensor<18xi32>
+//  CHECK-SAME:   %[[ARG2:.+]]: tensor<i32>
+//       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[ARG0]], %[[ARG1]]
+//       CHECK:   flow.dispatch.workgroups
+//  CHECK-SAME:     (%[[UPDATE]], %[[ARG2]])
+//  CHECK-NEXT:     (%[[ARG3:.+]]: !flow.dispatch.tensor<readonly:18xi32>
+//  CHECK-SAME:      %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:i32>,
+//   CHECK-DAG:     %[[C5:.+]] = constant 5 : i32
+//   CHECK-DAG:     %[[C0:.+]] = constant 0 : i32
+//   CHECK-DAG:     %[[C9:.+]] = constant 9 : i32
+//   CHECK-DAG:     %[[ARG3V:.+]] = flow.dispatch.tensor.load %[[ARG3]]
+//   CHECK-DAG:     %[[ARG4V:.+]] = flow.dispatch.tensor.load %[[ARG4]]
+//   CHECK-DAG:     %[[EXTRACT:.+]] = tensor.extract %[[ARG4V]]
+//   CHECK-DAG:     %[[CMP1:.+]] = cmpi slt, %[[EXTRACT]]
+//   CHECK-DAG:     %[[SELECT1:.+]] = select %[[CMP1]], %[[EXTRACT]], %[[C9]]
+//   CHECK-DAG:     %[[CMP2:.+]] = cmpi sgt, %[[SELECT1]], %[[C0]]
+//   CHECK-DAG:     %[[SELECT2:.+]] = select %[[CMP2]], %[[SELECT1]], %[[C0]]
+//   CHECK-DAG:     %[[INDEX_CAST:.+]] = index_cast %[[SELECT2]]
+//   CHECK-DAG:     subtensor %[[ARG3V]][%[[INDEX_CAST]]]
+//       CHECK:     flow.return
+
+// -----
+
 func @multi_result(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?xi32>) -> (tensor<?xi32>, tensor<?xi32>) {
   %cmin = constant -2147483648 : i32
   %c0_i32 = constant 0 : i32

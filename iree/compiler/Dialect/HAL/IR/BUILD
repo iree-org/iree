@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
@@ -22,15 +14,20 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["HALBase.td"])
+exports_files([
+    "HALBase.td",
+    "HALDialect.td",
+])
 
 filegroup(
     name = "td_files",
     srcs = enforce_glob(
         [
             "HALBase.td",
+            "HALDialect.td",
             "HALInterfaces.td",
             "HALOps.td",
+            "LoweringConfig.td",
         ],
         include = ["*.td"],
     ),
@@ -42,11 +39,13 @@ cc_library(
         "HALOpFolders.cpp",
         "HALOps.cpp",
         "HALTypes.cpp",
+        "LoweringConfig.cpp",
     ],
     hdrs = [
         "HALDialect.h",
         "HALOps.h",
         "HALTypes.h",
+        "LoweringConfig.h",
     ],
     textual_hdrs = [
         "HALEnums.cpp.inc",
@@ -59,12 +58,18 @@ cc_library(
         "HALStructs.h.inc",
         "HALTypeInterfaces.cpp.inc",
         "HALTypeInterfaces.h.inc",
+        "LoweringConfig.h.inc",
+        "LoweringConfig.cpp.inc",
+        "LoweringConfigEnums.h.inc",
+        "LoweringConfigEnums.cpp.inc",
     ],
     deps = [
         ":HALInterfacesGen",
         ":HALOpsGen",
         ":HALStructsGen",
         ":HALTypesGen",
+        ":LoweringConfigEnumGen",
+        ":LoweringConfigGen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
@@ -213,5 +218,47 @@ iree_tablegen_doc(
         "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "LoweringConfigGen",
+    tbl_outs = [
+        (
+            ["-gen-struct-attr-decls"],
+            "LoweringConfig.h.inc",
+        ),
+        (
+            ["-gen-struct-attr-defs"],
+            "LoweringConfig.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LoweringConfig.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "LoweringConfigEnumGen",
+    tbl_outs = [
+        (
+            ["-gen-enum-decls"],
+            "LoweringConfigEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "LoweringConfigEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LoweringConfig.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )

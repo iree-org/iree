@@ -52,7 +52,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "-iree-vulkan-target-triple=valhall-g77-unknown-android10"
+    "-iree-vulkan-target-triple=valhall-unknown-android11"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

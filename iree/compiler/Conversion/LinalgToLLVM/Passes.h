@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOLLVM_PASSES_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOLLVM_PASSES_H_
@@ -50,15 +42,31 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
 /// Pass to convert Linalg ops into vector operations.
 std::unique_ptr<FunctionPass> createLinalgVectorizePass();
 
-/// Pass to materialize static launch information for a dispatch region when
-/// using the linalg on tensors path.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createMaterializeCPULaunchConfigurationPass();
+//===----------------------------------------------------------------------===//
+// Pass Pipelines for CPU Lowering
+//===----------------------------------------------------------------------===//
 
-/// After running the upstream TensorConstantBufferize pass, remove tensor_loads
-/// introduced for use only in tensor_extract. These can be folded to use a load
-/// of the created memref object that holds the constant values.
-std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
+/// Populates the passes to lower to scalars operations for linalg based
+/// code-generation. This pipeline does not vectorize, but instead just converts
+/// to memrefs
+void addCPUDefaultPassPipeline(OpPassManager &passManager,
+                               LLVMCodegenOptions options);
+
+/// Populates the passes needed to lower to vector operations using linalg based
+/// progressive lowering with vectorization after bufferization.
+void addCPUVectorizationPassPipeline(OpPassManager &passManager,
+                                     LLVMCodegenOptions options);
+
+/// Populates the passes needed to lower scalar/native vector code to LLVM
+/// Dialect.
+void addLowerToLLVMPasses(OpPassManager &passManager,
+                          LLVMCodegenOptions options);
+
+/// Pass to lower the module an hal.executable.target operation to external
+/// dialect. Currently this pass lowers to LLVM dialect, but could be
+/// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createLowerExecutableTargetPass(LLVMCodegenOptions options);
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the

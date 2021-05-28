@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -413,6 +405,7 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
 
   llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
       insertAfterMap;
+  llvm::SetVector<Operation *> opSet(ops.begin(), ops.end());
   llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
   // For each operation compute the list of operations in `ops` that use its
   // results. Also compute the operations that form the leafs of the DAG of
@@ -420,9 +413,9 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   for (auto op : ops) {
     for (auto operand : op->getOperands()) {
       auto definingOp = operand.getDefiningOp();
-      if (!definingOp) continue;
+      if (!definingOp || !opSet.count(definingOp)) continue;
       insertAfterMap[definingOp].push_back(op);
-      if (leafOps.count(definingOp)) leafOps.remove(op);
+      if (leafOps.count(op)) leafOps.remove(op);
     }
   }
 
@@ -444,7 +437,6 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
   // number of uses of each operation). Given that the size of `ops` is at max
   // O(10), and not O(100), this is assumed to be reasonable.
-  // SmallVector<Operation *> readyOps = orderedOps;
   ArrayRef<Operation *> readyOps(orderedOps);
   size_t startPos = 0;
   while (!readyOps.empty()) {
@@ -457,7 +449,8 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
       if (processed.count(insertAfterOp)) continue;
       if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
             Operation *operandDefiningOp = operand.getDefiningOp();
-            return !operandDefiningOp || processed.count(operandDefiningOp);
+            return !operandDefiningOp || !opSet.count(operandDefiningOp) ||
+                   processed.count(operandDefiningOp);
           })) {
         // readyOps.push_back(insertAfterOp);
         orderedOps.push_back(insertAfterOp);
@@ -1118,7 +1111,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         return procInfo;
       },
       {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic}};
+       linalg::DistributionMethod::Cyclic},
+      DenseMap<StringRef,
+               std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 
   auto tileSizeFn = [&](OpBuilder &builder,
                         Operation *op) -> SmallVector<Value, 4> {

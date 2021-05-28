@@ -29,6 +29,14 @@ and clang-tidy handle that for us). The compiler portion of the project follows
 Improvements to code structure and clarity are welcome but please file issues to
 track such work first.
 
+## AUTHORS file
+
+If you would like to receive additional recognition for your contribution, you
+may add yourself (or your organization) to the AUTHORS file. This keeps track of
+those who have made significant contributions to the project. Please add the
+entity who owns the copyright for your contribution. The source control history
+remains the most accurate source for individual contributions.
+
 ## Code reviews
 
 All submissions, including submissions by project members, require review. We

@@ -1,19 +1,12 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
+#include "iree/base/api.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
@@ -704,6 +697,41 @@ class SelectOpConversion : public OpConversionPattern<SelectOp> {
   }
 };
 
+class AssertOpConversion : public OpConversionPattern<AssertOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      AssertOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    AssertOpAdaptor adaptor(operands);
+    Location loc = srcOp.getLoc();
+
+    // Start by splitting the block containing the assert into two. The part
+    // before will contain the condition, and the part after will contain
+    // the continuation point.
+    Block *condBlock = rewriter.getInsertionBlock();
+    Block::iterator opPosition = rewriter.getInsertionPoint();
+    Block *continuationBlock = rewriter.splitBlock(condBlock, opPosition);
+
+    // Create a new block for the target of the failure.
+    Block *failureBlock;
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      Region *parentRegion = condBlock->getParent();
+      failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
+      auto status = rewriter.create<IREE::VM::ConstI32Op>(
+          loc, rewriter.getIntegerAttr(rewriter.getIntegerType(32),
+                                       IREE_STATUS_FAILED_PRECONDITION));
+      rewriter.create<IREE::VM::FailOp>(loc, status, srcOp.msgAttr());
+    }
+
+    rewriter.setInsertionPointToEnd(condBlock);
+    rewriter.replaceOpWithNewOp<CondBranchOp>(srcOp, adaptor.arg(),
+                                              continuationBlock, failureBlock);
+    return success();
+  }
+};
+
 class BranchOpConversion : public OpConversionPattern<BranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -760,10 +788,10 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 void populateStandardToVMPatterns(MLIRContext *context,
                                   TypeConverter &typeConverter,
                                   OwningRewritePatternList &patterns) {
-  patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
-                  CmpFOpConversion, CondBranchOpConversion, ModuleOpConversion,
-                  FuncOpConversion, ReturnOpConversion, SelectOpConversion>(
-      typeConverter, context);
+  patterns.insert<AssertOpConversion, BranchOpConversion, CallOpConversion,
+                  CmpIOpConversion, CmpFOpConversion, CondBranchOpConversion,
+                  ModuleOpConversion, FuncOpConversion, ReturnOpConversion,
+                  SelectOpConversion>(typeConverter, context);
 
   // TODO(#2878): figure out how to pass the type converter in a supported way.
   // Right now if we pass the type converter as the first argument - triggering

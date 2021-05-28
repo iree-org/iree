@@ -29,7 +29,10 @@ iree_cc_library(
     "CUDATarget.cpp"
   DEPS
     ::cuda_libdevice
+    LLVMBitReader
     LLVMCore
+    LLVMipo
+    LLVMLinker
     LLVMNVPTXCodeGen
     LLVMSupport
     LLVMTarget
@@ -41,7 +44,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTargetLLVMIRExport
     iree::base::internal::flatcc
-    iree::compiler::Conversion::LinalgToNVVM
+    iree::compiler::Conversion::LinalgToLLVMGPU
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Utils
     iree::schemas::cuda_executable_def_c_fbs

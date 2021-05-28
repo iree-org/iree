@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorToSCF
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Utils

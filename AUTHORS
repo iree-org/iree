@@ -1,0 +1,12 @@
+# This is the list of IREE's significant contributors.
+#
+# This does not necessarily list everyone who has contributed code, especially
+# since many employees of one corporation may be contributing. To see the full
+# list of contributors, see the revision history in source control.
+#
+# Please only add individuals if they are not contributing on behalf of a
+# company (who should be listed instead). Add new entries at the bottom of the
+# file.
+Google LLC
+Fraunhofer-Gesellschaft zur Förderung der angewandten Forschung e.V. for its Fraunhofer Institute for Material Flow and Logistics (IML)
+Nod, Inc.

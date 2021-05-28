@@ -1,17 +1,10 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -76,19 +69,6 @@ std::pair<int, int> getWorkgroupPaddedTileSize(int dim, int workgoupSize,
   }
 }
 
-// Returns static full-shape sizes of operand.
-// TODO(ravishankarm): Simplify this as part of #5842.
-ArrayRef<int64_t> getFullSize(Value operand) {
-  auto defOp = operand.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-  if (!defOp) return {};
-  TensorType shape = defOp.source()
-                         .getType()
-                         .cast<IREE::Flow::DispatchTensorType>()
-                         .asTensorType();
-  if (!shape.hasStaticShape()) return {};
-  return shape.getShape();
-}
-
 // Creates linalg.matmul with operands padded to the next integer multiple of
 // the workgroup size.
 class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
@@ -97,6 +77,7 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
+    if (!hasLoweringConfig(matmulOp)) return failure();
     auto loc = matmulOp.getLoc();
     auto lhs = matmulOp.getInput(0);
     auto rhs = matmulOp.getInput(1);
@@ -106,19 +87,19 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
         rhs.getDefiningOp<linalg::PadTensorOp>())
       return failure();
 
-    auto lhsFullSize = getFullSize(lhs);
-    auto rhsFullSize = getFullSize(rhs);
+    auto workgroupTileSizes = getTileSizes(
+        matmulOp, static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+    auto vectorTileSizes =
+        getTileSizes(matmulOp, static_cast<unsigned>(TilingLevel::Level2Tiles));
+    if (workgroupTileSizes.empty() || vectorTileSizes.empty()) return failure();
 
+    auto lhsFullSize = getUntiledShape(lhs);
+    auto rhsFullSize = getUntiledShape(rhs);
     if (lhsFullSize.empty() || rhsFullSize.empty()) return failure();
 
     int problemSizeM = lhsFullSize[0];
     int problemSizeN = rhsFullSize[1];
     int problemSizeK = lhsFullSize[1];
-
-    // TODO(ravishankarm): Use tiling attributes as part of #5842.
-    auto workgroupTileSizes =
-        getTileSizes<TilingLevel::WorkGroupTiles>(matmulOp);
-    auto vectorTileSizes = getTileSizes<TilingLevel::Level2Tiles>(matmulOp);
 
     int paddedMSize, paddedNSize, paddedKSize;
     int paddingForM, paddingForN, paddingForK;
@@ -134,7 +115,8 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
       return failure();
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      auto l1TileSizes = getTileSizes<TilingLevel::Level1Tiles>(matmulOp);
+      auto l1TileSizes = getTileSizes(
+          matmulOp, static_cast<unsigned>(TilingLevel::Level1Tiles));
       llvm::dbgs() << "Problem-size: "
                    << "[" << problemSizeM << "," << problemSizeK << "]"
                    << ", "

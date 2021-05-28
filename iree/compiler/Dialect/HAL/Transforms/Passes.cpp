@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 
@@ -19,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -44,7 +37,10 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
     "iree-hal-benchmark-dispatch-repeat-count",
     llvm::cl::desc(
-        "The number of times to repeat each hal.command_buffer.dispatch op."),
+        "The number of times to repeat each hal.command_buffer.dispatch op. "
+        "(Not that this simply duplicates the dispatch op and inserts "
+        "barriers. It's meant for command buffers having linear dispatch "
+        "structures.)"),
     llvm::cl::init(1)};
 
 }  // namespace
