@@ -295,6 +295,12 @@ def parse_arguments():
                       dest="output",
                       default=None,
                       help="Path to the ouput file")
+  parser.add_argument(
+      "--no-clean",
+      action="store_true",
+      help=
+      "Do not clean up the temporary directory used for benchmarking on the Android device"
+  )
   parser.add_argument("--verbose",
                       action="store_true",
                       help="Print internal information during execution")
@@ -343,8 +349,11 @@ def main(args):
     print(results.commit)
     print(results.benchmarks)
 
-  # Clear the benchmark directory on the Android device.
-  adb_execute_in_dir(["rm", "-rf", "*"], relative_dir="", verbose=args.verbose)
+  if not args.no_clean:
+    # Clear the benchmark directory on the Android device.
+    adb_execute_in_dir(["rm", "-rf", "*"],
+                       relative_dir="",
+                       verbose=args.verbose)
 
 
 if __name__ == "__main__":
