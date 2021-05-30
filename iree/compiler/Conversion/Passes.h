@@ -39,6 +39,12 @@ std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();
 /// using f16.
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
 
+//------------------------------------------------------------------------------
+// Test passes
+//------------------------------------------------------------------------------
+
+std::unique_ptr<OperationPass<FuncOp>> createTestMHLOConvertComplexToRealPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
