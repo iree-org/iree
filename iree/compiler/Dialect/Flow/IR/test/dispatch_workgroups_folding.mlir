@@ -134,9 +134,9 @@ func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
   %cst = constant dense<0.0> : tensor<4x8xf32>
   %x = constant 100 : index
   %y = constant 50 : index
-  //      CHECK: flow.dispatch.workgroups[{{.+}}](%[[ARG0]], %[[CST]]) : (tensor<1x4xf32>, tensor<4x8xf32>) -> %cst
+  //      CHECK: flow.dispatch.workgroups[{{.+}}](%[[ARG0]], %[[CST]]) : (tensor<1x4xf32>, tensor<4x8xf32>) -> tensor<4x8xf32>
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<readonly:1x4xf32>, %{{.+}}: !flow.dispatch.tensor<readwrite:4x8xf32>)
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0, %cst) : (tensor<1x4xf32>, tensor<4x8xf32>) -> %cst = (
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0, %cst) : (tensor<1x4xf32>, tensor<4x8xf32>) -> tensor<4x8xf32> = (
     %arg0_capture: !flow.dispatch.tensor<readonly:1x4xf32>,
     %arg1_capture: !flow.dispatch.tensor<readwrite:4x8xf32>
   ) {
@@ -165,8 +165,8 @@ func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (ten
     %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %1 = flow.dispatch.tensor.load %arg1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %2 = linalg.init_tensor [] : tensor<i32>
-    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32> 
-    %4 = linalg.fill(%2, %c0_i32) : tensor<i32>, i32 -> tensor<i32> 
+    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32>
+    %4 = linalg.fill(%2, %c0_i32) : tensor<i32>, i32 -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.return
@@ -190,8 +190,8 @@ func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi3
     %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %1 = flow.dispatch.tensor.load %arg1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %2 = linalg.init_tensor [] : tensor<i32>
-    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32> 
-    %4 = linalg.fill(%2, %c0_i32) : tensor<i32>, i32 -> tensor<i32> 
+    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32>
+    %4 = linalg.fill(%2, %c0_i32) : tensor<i32>, i32 -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<readwrite:i32>
     flow.return
@@ -213,8 +213,8 @@ func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) 
     %val = tensor.extract %0[] : tensor<i32>
     %1 = flow.dispatch.tensor.load %arg1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %2 = linalg.init_tensor [] : tensor<i32>
-    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32> 
-    %4 = linalg.fill(%2, %val) : tensor<i32>, i32 -> tensor<i32> 
+    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32>
+    %4 = linalg.fill(%2, %val) : tensor<i32>, i32 -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<readwrite:i32>
     flow.return
@@ -244,4 +244,62 @@ func @inline_cst_and_remove_unused_read_write_result() -> tensor<i32> {
     flow.return
   }
   return %0#1 : tensor<i32>
+}
+
+// -----
+
+// CHECK-LABEL: func @untie_constant_operand
+//  CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>, %[[ARG1:.+]]: tensor<4x4xf32>, %[[ARG2:.+]]: tensor<8x8xf32>)
+func @untie_constant_operand(%arg0: tensor<1x4xf32>, %arg1: tensor<4x4xf32>, %arg2: tensor<8x8xf32>) -> (tensor<4x4xf32>, tensor<1024x2048xf32>, tensor<512x1024xf32>) {
+  %x = constant 100 : index
+  %y = constant 50 : index
+
+  // CHECK-DAG:   %[[CST0:.+]] = constant opaque<"_", "0xBEEF"> : tensor<512x1024xf32>
+  %cst0 = constant opaque<"_", "0xbeef"> : tensor<512x1024xf32>
+  // CHECK-DAG:   %[[CST1:.+]] = constant opaque<"_", "0xFACE"> : tensor<1024x2048xf32>
+  %cst1 = constant opaque<"_", "0xface"> : tensor<1024x2048xf32>
+
+  // CHECK:      flow.dispatch.workgroups[%{{.+}}, %{{.+}}](%[[ARG0]], %[[CST0]], %[[ARG2]], %[[CST1]], %[[ARG1]])
+  // CHECK-SAME:   -> (%[[ARG1]], tensor<1024x2048xf32>, tensor<512x1024xf32>) =
+  %0:3 = flow.dispatch.workgroups[%x, %y](%arg0, %cst0, %arg2, %cst1, %arg1) :
+    (tensor<1x4xf32>, tensor<512x1024xf32>, tensor<8x8xf32>, tensor<1024x2048xf32>, tensor<4x4xf32>) -> (%arg1, %cst1, %cst0) = (
+    // CHECK-NEXT:  (%[[ARG0_CAPTURE:.+]]: !flow.dispatch.tensor<readonly:1x4xf32>,
+    // CHECK-SAME:   %[[CST0_CAPTURE:.+]]: !flow.dispatch.tensor<readonly:512x1024xf32>,
+    // CHECK-SAME:   %[[ARG2_CAPTURE:.+]]: !flow.dispatch.tensor<readonly:8x8xf32>,
+    // CHECK-SAME:   %[[CST1_CAPTURE:.+]]: !flow.dispatch.tensor<readonly:1024x2048xf32>,
+    // CHECK-SAME:   %[[ARG1_CAPTURE:.+]]: !flow.dispatch.tensor<readwrite:4x4xf32>,
+    // CHECK-SAME:   %[[CST1_OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1024x2048xf32>,
+    // CHECK-SAME:   %[[CST0_OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:512x1024xf32>)
+    %arg0_capture: !flow.dispatch.tensor<readonly:1x4xf32>,
+    %arg2_capture: !flow.dispatch.tensor<readonly:8x8xf32>,
+    %arg1_capture: !flow.dispatch.tensor<readwrite:4x4xf32>,
+    %cst1_capture: !flow.dispatch.tensor<readwrite:1024x2048xf32>,
+    %cst0_capture: !flow.dispatch.tensor<readwrite:512x1024xf32>
+  ) {
+    // CHECK: "test.sink"(%[[ARG0_CAPTURE]])
+    "test.sink"(%arg0_capture) : (!flow.dispatch.tensor<readonly:1x4xf32>) -> ()
+    // CHECK: "test.sink"(%[[ARG2_CAPTURE]])
+    "test.sink"(%arg2_capture) : (!flow.dispatch.tensor<readonly:8x8xf32>) -> ()
+
+    // CHECK: flow.dispatch.tensor.load %[[CST0_CAPTURE]]
+    // CHECK: flow.dispatch.tensor.store %{{.+}}, %[[CST0_OUTPUT]]
+    %load_cst0 = flow.dispatch.tensor.load %cst0_capture, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readwrite:512x1024xf32> -> tensor<512x1024xf32>
+    %1 = "test.do_work"(%load_cst0) : (tensor<512x1024xf32>) -> (tensor<512x1024xf32>)
+    flow.dispatch.tensor.store %1, %cst0_capture, offsets=[], sizes=[], strides=[] : tensor<512x1024xf32> -> !flow.dispatch.tensor<readwrite:512x1024xf32>
+
+    // CHECK: flow.dispatch.tensor.load %[[CST1_CAPTURE]]
+    // CHECK: flow.dispatch.tensor.store %{{.+}}, %[[CST1_OUTPUT]]
+    %load_cst1 = flow.dispatch.tensor.load %cst1_capture, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readwrite:1024x2048xf32> -> tensor<1024x2048xf32>
+    %2 = "test.do_work"(%load_cst1) : (tensor<1024x2048xf32>) -> (tensor<1024x2048xf32>)
+    flow.dispatch.tensor.store %2, %cst1_capture, offsets=[], sizes=[], strides=[] : tensor<1024x2048xf32> -> !flow.dispatch.tensor<readwrite:1024x2048xf32>
+
+    // CHECK: flow.dispatch.tensor.load %[[ARG1_CAPTURE]]
+    // CHECK: flow.dispatch.tensor.store %{{.+}}, %[[ARG1_CAPTURE]]
+    %load_arg1 = flow.dispatch.tensor.load %arg1_capture, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readwrite:4x4xf32> -> tensor<4x4xf32>
+    %3 = "test.do_work"(%load_arg1) : (tensor<4x4xf32>) -> (tensor<4x4xf32>)
+    flow.dispatch.tensor.store %3, %arg1_capture, offsets=[], sizes=[], strides=[] : tensor<4x4xf32> -> !flow.dispatch.tensor<readwrite:4x4xf32>
+
+    flow.return
+  }
+  return %0#0, %0#1, %0#2 : tensor<4x4xf32>, tensor<1024x2048xf32>, tensor<512x1024xf32>
 }

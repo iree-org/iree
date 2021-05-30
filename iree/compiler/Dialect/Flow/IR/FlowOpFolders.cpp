@@ -342,9 +342,129 @@ void VariableStoreIndirectOp::getCanonicalizationPatterns(
 // Dispatch ops
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+/// Unties the operand-result connection if the operand is a constant.
+///
+/// We won't create such ties delibrately, but they can come from multiple
+/// rounds of canonicalization. For example, if we have linalg.fill to prepare
+/// the initial result tensor for subtensor_insert, the linalg.fill may be
+/// folded into a constant. Then the subtensor_insert op will have a tie
+/// between the initial result tensor and its resultant tensor. So this must be
+/// a canonicalization pattern.
+///
+/// In IREE, operand-result tying indicates that we can use the same buffer.
+/// This is unlikely to happen if the operand is constant, though: constants are
+/// typically collected into a dense buffer that is read only. So having such
+/// kind of ties can mess up buffer allocation in later stages: we will try to
+/// reuse the buffer for the constant in a read-write fashion, which is
+/// incorrect.
+class UntieConstantOperands final
+    : public OpRewritePattern<DispatchWorkgroupsOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchWorkgroupsOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    unsigned resultArgStartIndex =
+        dispatchOp.getBody()->getNumArguments() - dispatchOp->getNumResults();
+    auto operandIndexAndLength = dispatchOp.getTiedOperandsIndexAndLength();
+
+    // Indices for still tied operands.
+    SmallVector<unsigned, 2> tiedOperandIndices;
+    // Indices for untied results.
+    SmallVector<unsigned, 2> untiedResultIndices;
+    // (operand index, result block argument) tuple for untying.
+    SmallVector<std::pair<unsigned, BlockArgument>, 2> untiedOperandArgs;
+
+    // Scan all results to see whether they are tied to some operands.
+    for (unsigned resultIndex = 0; resultIndex < dispatchOp->getNumResults();
+         ++resultIndex) {
+      auto tiedOperandIndex = dispatchOp.getTiedResultOperandIndex(resultIndex);
+      if (!tiedOperandIndex.hasValue()) continue;
+
+      auto tiedOperand = dispatchOp->getOperand(*tiedOperandIndex);
+      if (!matchPattern(tiedOperand, m_Constant())) {
+        // This is not a constant operand; still keep the tie.
+        tiedOperandIndices.push_back(*tiedOperandIndex -
+                                     operandIndexAndLength.first);
+        continue;
+      }
+
+      // This is a constant operand; let's mark it for breaking the tie.
+      BlockArgument resultArg =
+          dispatchOp.getBody()->getArgument(resultArgStartIndex + resultIndex);
+      untiedOperandArgs.emplace_back(
+          *tiedOperandIndex - operandIndexAndLength.first, resultArg);
+      untiedResultIndices.push_back(resultIndex);
+
+      // Breaking the tie means inserting a block argument for the operand and
+      // rewrite all tensor reads to use that. We need to make sure we know
+      // all user ops.
+      for (Operation *op : resultArg.getUsers()) {
+        if (!isa<DispatchTensorLoadOp, DispatchTensorStoreOp>(op)) {
+          return failure();
+        }
+      }
+    }
+
+    if (untiedOperandArgs.empty()) return failure();
+
+    rewriter.startRootUpdate(dispatchOp);
+
+    // Untie all operand-result pairs.
+    for (unsigned resultIndex : untiedResultIndices) {
+      dispatchOp.setTiedResultOperandIndex(resultIndex, llvm::None);
+    }
+
+    // Next adjust the block arguments. This is tricky because we need to make
+    // sure that we insert block arguments for those untied operands while
+    // considering still tied operands and maintaining the order.
+
+    unsigned blockArgIndex = 0;
+    // Go over each operand sequentially to make sure we maintain the order.
+    for (unsigned i = 0; i < operandIndexAndLength.second; ++i) {
+      auto it = llvm::find_if(
+          untiedOperandArgs,
+          [i](const std::pair<unsigned, BlockArgument> &operandArg) {
+            return operandArg.first == i;
+          });
+
+      if (it != untiedOperandArgs.end()) {
+        BlockArgument tiedResultArg = it->second;
+        auto resultType = tiedResultArg.getType().cast<DispatchTensorType>();
+
+        // This operand has a tied result. We need to insert a new block
+        // argument for it and rewrite all reads. We also need to change the
+        // result's block argument to write-only.
+
+        Type argType = DispatchTensorType::get(TensorAccess::ReadOnly,
+                                               resultType.asTensorType());
+        BlockArgument newArg =
+            dispatchOp.getBody()->insertArgument(blockArgIndex++, argType);
+        tiedResultArg.replaceUsesWithIf(newArg, [](OpOperand &use) {
+          return isa<DispatchTensorLoadOp>(use.getOwner());
+        });
+
+        tiedResultArg.setType(DispatchTensorType::get(
+            TensorAccess::WriteOnly, resultType.asTensorType()));
+      } else if (llvm::is_contained(tiedOperandIndices, i)) {
+        // Do nothing.
+      } else {
+        // The current operand has a corresponding block argument.
+        blockArgIndex++;
+      }
+    }
+
+    rewriter.finalizeRootUpdate(dispatchOp);
+    return success();
+  }
+};
+}
+
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>>(context);
+  results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>,
+                 UntieConstantOperands>(context);
 }
 
 //===----------------------------------------------------------------------===//
