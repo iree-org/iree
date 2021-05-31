@@ -430,3 +430,34 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
   }
   return %0 : tensor<3x9xi32>
 }
+
+// -----
+
+// CHECK-LABEL: func @update_constant_subspan
+// CHECK-SAME:   (%[[ARG0:.+]]: !hal.buffer)
+func @update_constant_subspan(%source: tensor<2xi32>) -> tensor<7xi32> {
+  //  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+  //  CHECK-DAG:   %[[C4:.+]] = constant 4 : index
+  //  CHECK-DAG:   %[[C8:.+]] = constant 8 : index
+  //  CHECK-DAG:   %[[C12:.+]] = constant 12 : index
+  //  CHECK-DAG:   %[[C28:.+]] = constant 28 : index
+  //      CHECK:   %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator>
+  // CHECK-SAME:     type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[C28]]}
+  //      CHECK:   %[[CSTPOOL:.+]] = hal.variable.load @_const_pool_splats : !hal.buffer
+  //      CHECK:   hal.command_buffer.begin
+  %0 = flow.ex.stream.fragment(%source) : (tensor<2xi32>) -> tensor<7xi32> =
+      (%arg0: tensor<2xi32>) -> tensor<7xi32> {
+    %c3 = constant 3 : index
+    // CHECK-NEXT:   hal.command_buffer.copy_buffer<%{{.+}} : !hal.command_buffer> source(%[[CSTPOOL]] : !hal.buffer)[%[[C4]]] target(%[[BUFFER]] : !hal.buffer)[%[[C0]]] length(%[[C28]])
+    // CHECK-NEXT:   hal.command_buffer.execution_barrier<%{{.+}} : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    %const_span = hal.constant.subspan @_const_pool_splats[#hal.byte_range<4, 36>] : tensor<7xi32>
+    // CHECK-NEXT:   hal.command_buffer.copy_buffer<%{{.+}} : !hal.command_buffer> source(%[[ARG0]] : !hal.buffer)[%[[C0]]] target(%[[BUFFER]] : !hal.buffer)[%[[C12]]] length(%[[C8]])
+    // CHECK-NEXT:   hal.command_buffer.execution_barrier<%{{.+}} : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
+    %1 = flow.tensor.update %arg0, %const_span[%c3] : tensor<2xi32> -> tensor<7xi32>
+    flow.return %1 : tensor<7xi32>
+  }
+  // CHECK-NEXT:   hal.command_buffer.end
+  return %0: tensor<7xi32>
+}
+
+hal.variable @_const_pool_splats : !hal.buffer attributes {sym_visibility = "private"}

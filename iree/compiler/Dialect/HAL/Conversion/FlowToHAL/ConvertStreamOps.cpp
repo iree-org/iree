@@ -46,8 +46,7 @@ static ValueAliasingMap computeValueAliases(
   auto *streamBlock = &streamOp.body().front();
   ValueAliasingMap valueAliases;
 
-  std::function<void(Value streamValue, Value aliasedValue)> propagateAlias;
-  propagateAlias = [&](Value streamValue, Value aliasedValue) {
+  auto propagateAlias = [&](Value streamValue, Value aliasedValue) {
     auto &baseSet = valueAliases[streamValue];
     baseSet.insert(aliasedValue);
     auto &aliasedSet = valueAliases[aliasedValue];
@@ -73,17 +72,27 @@ static ValueAliasingMap computeValueAliases(
 
   for (auto &op : *streamBlock) {
     auto tiedOp = dyn_cast<IREE::TiedOpInterface>(op);
+    if (!tiedOp) continue;
     for (auto it : llvm::enumerate(op.getResults())) {
       auto result = it.value();
       if (!result.getType().isa<ShapedType>()) continue;
 
       // Tied results reuse their operand buffer.
-      if (tiedOp) {
-        auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(it.index());
-        if (tiedOperandIndex.hasValue()) {
-          auto operand = op.getOperand(tiedOperandIndex.getValue());
-          propagateAlias(result, operand);
+      auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(it.index());
+      if (tiedOperandIndex.hasValue()) {
+        auto operand = op.getOperand(tiedOperandIndex.getValue());
+        // Constant tensors are different: they are already pooled together in a
+        // read-only buffer. We can create aliases from them as long as they are
+        // not mutated. Otherwise, we need to allocate new buffers and copy
+        // constants over.
+        if (operand.getDefiningOp<IREE::HAL::ConstantSubspanOp>() &&
+            // It's a bit unfortunate that we need to check the exact op here.
+            // But right now they are the only op that can "mutate" the constant
+            // buffer. Probably we need an op interface..
+            isa<IREE::Flow::TensorUpdateOp>(op)) {
+          continue;
         }
+        propagateAlias(result, operand);
       }
     }
   }
@@ -854,6 +863,18 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                     IREE::Flow::DispatchOp &dispatchOp,
                                     StreamSchedulingState &schedulingState,
                                     ConversionPatternRewriter &rewriter) {
+  // First check that we don't have results with tied constant operands created
+  // by previous passes.
+  for (auto result : llvm::enumerate(dispatchOp.getResults())) {
+    auto tiedOperandIndex =
+        dispatchOp.getTiedResultOperandIndex(result.index());
+    if (!tiedOperandIndex.hasValue()) continue;
+    auto tiedOperand = dispatchOp.getOperand(tiedOperandIndex.getValue());
+    if (tiedOperand.getDefiningOp<IREE::HAL::ConstantSubspanOp>()) {
+      return dispatchOp.emitOpError("has unexpected tied constant operand");
+    }
+  }
+
   // Get the handle to the executable that is compatible with our device.
   auto executableOp =
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
@@ -993,6 +1014,8 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
       schedulingState.lookupTensorBufferRange(updateOp.update());
   auto targetBuffer =
       schedulingState.lookupTensorBufferRange(updateOp.target());
+  auto resultBuffer =
+      schedulingState.lookupTensorBufferRange(updateOp.result());
 
   // TODO(benvanik): use something other than the BufferRange::buffer?
   // This may require us to subview the buffer first.
@@ -1003,6 +1026,19 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
   if (!update.hasValue() || !target.hasValue()) {
     return updateOp.emitOpError()
            << "cannot create adaptors for tensor update operands/results";
+  }
+
+  auto zeroOffset = schedulingState.lookupOrCreateIndex(0, rewriter);
+
+  if (targetBuffer.buffer != resultBuffer.buffer) {
+    // This should only happen for constant tensors as the targets.
+    assert(updateOp.target().getDefiningOp<IREE::HAL::ConstantSubspanOp>());
+
+    // Copy the initial value to the result buffer.
+    rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
+        updateOp.getLoc(), commandBuffer, targetBuffer.buffer, zeroOffset,
+        resultBuffer.buffer, zeroOffset, resultBuffer.length);
+    recordFullExecutionBarrier(commandBuffer, updateOp.getLoc(), rewriter);
   }
 
   // Compute the size of the update range.
@@ -1016,10 +1052,9 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
   if (!targetRange) return failure();
 
   // TODO(benvanik): slice left/mid/right, but really just don't do this.
-  auto zeroOffset = schedulingState.lookupOrCreateIndex(0, rewriter);
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
       updateOp.getLoc(), commandBuffer, updateBuffer.buffer, zeroOffset,
-      targetBuffer.buffer, targetRange->offset, targetRange->length);
+      resultBuffer.buffer, targetRange->offset, targetRange->length);
 
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could
