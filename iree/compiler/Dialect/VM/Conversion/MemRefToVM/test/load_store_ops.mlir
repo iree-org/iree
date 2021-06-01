@@ -20,7 +20,7 @@ module {
 // -----
 
 module {
-  // CHECK: vm.rodata private @__constant dense<[0.0287729427, 0.0297581609]> : tensor<2xf32>
+  // CHECK: vm.rodata @__constant dense<[0.0287729427, 0.0297581609]> : tensor<2xf32>
   memref.global "private" constant @__constant : memref<2xf32> = dense<[0.0287729427, 0.0297581609]>
   // CHECK-LABEL: vm.func @load_global
   // CHECK-SAME: (%[[IDX:.+]]: i32) -> f32 {

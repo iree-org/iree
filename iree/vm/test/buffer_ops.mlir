@@ -1,6 +1,6 @@
 vm.module @buffer_ops {
 
-  vm.rodata private @rodata_3xi32 dense<[1, 2, 3]> : tensor<3xi32>
+  vm.rodata @rodata_3xi32 dense<[1, 2, 3]> : tensor<3xi32>
 
   //===--------------------------------------------------------------------===//
   // Compare
@@ -8,8 +8,8 @@ vm.module @buffer_ops {
   // NOTE: we test this first because all of the other tests rely on it and we
   // can do it with rodata.
 
-  vm.rodata private @rodata_cmp_3xi32_a dense<[100, 200, 300]> : tensor<3xi32>
-  vm.rodata private @rodata_cmp_3xi32_b dense<[100, 201, 300]> : tensor<3xi32>
+  vm.rodata @rodata_cmp_3xi32_a dense<[100, 200, 300]> : tensor<3xi32>
+  vm.rodata @rodata_cmp_3xi32_b dense<[100, 201, 300]> : tensor<3xi32>
 
   // Compares some multi-element buffers. Note that comparisons are bytewise.
   vm.export @test_compare
@@ -169,7 +169,7 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.rodata private @test_copy_partial_ref dense<[2]> : tensor<1xi32>
+  vm.rodata @test_copy_partial_ref dense<[2]> : tensor<1xi32>
 
   // Tests copying a range of bytes from one buffer to another.
   vm.export @test_copy_partial
@@ -263,7 +263,7 @@ vm.module @buffer_ops {
   // Fill
   //===--------------------------------------------------------------------===//
 
-  vm.rodata private @test_fill_i16_ref dense<[0, 51966, 51966, 0]> : tensor<4xi16>
+  vm.rodata @test_fill_i16_ref dense<[0, 51966, 51966, 0]> : tensor<4xi16>
 
   // Tests filling a buffer with 16-bit values.
   vm.export @test_fill_i16
@@ -289,7 +289,7 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.rodata private @test_fill_i16_misaligned_offset_ref dense<[0xCAFE, 0xCAFE, 0, 0]> : tensor<4xi16>
+  vm.rodata @test_fill_i16_misaligned_offset_ref dense<[0xCAFE, 0xCAFE, 0, 0]> : tensor<4xi16>
 
   // Tests that misaligned fill offsets will succeed but round down.
   vm.export @test_fill_i16_misaligned_offset
@@ -315,7 +315,7 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.rodata private @test_fill_i16_misaligned_length_ref dense<[0, 0, 0, 0]> : tensor<4xi16>
+  vm.rodata @test_fill_i16_misaligned_length_ref dense<[0, 0, 0, 0]> : tensor<4xi16>
 
   // Tests that misaligned fill lengths will succeed but round down.
   vm.export @test_fill_i16_misaligned_length
@@ -357,7 +357,7 @@ vm.module @buffer_ops {
   // Load
   //===--------------------------------------------------------------------===//
 
-  vm.rodata private @test_load_i8_data dense<[0x00, 0x01, 0x7F, 0x80, 0xFF]> : tensor<5xui8>
+  vm.rodata @test_load_i8_data dense<[0x00, 0x01, 0x7F, 0x80, 0xFF]> : tensor<5xui8>
 
   vm.export @test_load_i8u
   vm.func @test_load_i8u() {
@@ -411,7 +411,7 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.rodata private @test_load_i16_data dense<[0x0000, 0x0001, 0x7FFF, 0x8000, 0xFFFF]> : tensor<5xui16>
+  vm.rodata @test_load_i16_data dense<[0x0000, 0x0001, 0x7FFF, 0x8000, 0xFFFF]> : tensor<5xui16>
 
   vm.export @test_load_i16u
   vm.func @test_load_i16u() {
@@ -465,7 +465,7 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.rodata private @test_load_i32_data dense<[0x00000000, 0x00000001, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF]> : tensor<5xui32>
+  vm.rodata @test_load_i32_data dense<[0x00000000, 0x00000001, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF]> : tensor<5xui32>
 
   vm.export @test_load_i32
   vm.func @test_load_i32() {
@@ -493,7 +493,7 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.rodata private @test_load_i32_unaligned_data dense<[0x00112233, 0x44556677, 0x8899AABB, 0xCCDDEEFF]> : tensor<4xui32>
+  vm.rodata @test_load_i32_unaligned_data dense<[0x00112233, 0x44556677, 0x8899AABB, 0xCCDDEEFF]> : tensor<4xui32>
 
   // Unaligned loads are not supported and offsets will be rounded down.
   vm.export @test_load_i32_unaligned
@@ -513,7 +513,7 @@ vm.module @buffer_ops {
   // Store
   //===--------------------------------------------------------------------===//
 
-  vm.rodata private @test_store_i8_ref dense<[0x00, 0x01, 0x7F, 0x80, 0xFF]> : tensor<5xui8>
+  vm.rodata @test_store_i8_ref dense<[0x00, 0x01, 0x7F, 0x80, 0xFF]> : tensor<5xui8>
 
   vm.export @test_store_i8
   vm.func @test_store_i8() {
@@ -546,7 +546,7 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.rodata private @test_store_i16_ref dense<[0x0000, 0x0001, 0x7FFF, 0x8000, 0xFFFF]> : tensor<5xui16>
+  vm.rodata @test_store_i16_ref dense<[0x0000, 0x0001, 0x7FFF, 0x8000, 0xFFFF]> : tensor<5xui16>
 
   vm.export @test_store_i16
   vm.func @test_store_i16() {
@@ -579,7 +579,7 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.rodata private @test_store_i32_ref dense<[0x00000000, 0x00000001, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF]> : tensor<5xui32>
+  vm.rodata @test_store_i32_ref dense<[0x00000000, 0x00000001, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF]> : tensor<5xui32>
 
   vm.export @test_store_i32
   vm.func @test_store_i32() {

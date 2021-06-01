@@ -36,7 +36,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  vm.rodata private @buf0 dense<[0, 1, 2]> : tensor<3xi8>
+  vm.rodata @buf0 dense<[0, 1, 2]> : tensor<3xi8>
   // CHECK-LABEL: @const_ref_rodata
   vm.func @const_ref_rodata() -> !vm.buffer {
     // CHECK: %buf0 = vm.const.ref.rodata @buf0 : !vm.buffer
