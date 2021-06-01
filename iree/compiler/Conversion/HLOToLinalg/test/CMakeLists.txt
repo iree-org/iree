@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "broadcasting.mlir"
+    "convert_complex_to_real.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
     "missing_legalizations.mlir"
