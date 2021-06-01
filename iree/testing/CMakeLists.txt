@@ -37,6 +37,11 @@ iree_cc_library(
   PUBLIC
 )
 
+# TODO(#3848): gtest library has implicit thread dependency from absl.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 iree_cc_library(
   NAME
     gtest

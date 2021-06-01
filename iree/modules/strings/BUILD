@@ -7,6 +7,16 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+# absl and benchmark have thread dependency.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+""",
+    inline = True,
+)
+
 cc_library(
     name = "strings_module",
     srcs = [

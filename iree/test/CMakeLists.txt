@@ -10,4 +10,9 @@
 
 iree_add_all_subdirs()
 
+# TODO(#3848): Test tools has implicit thread dependency from absl.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

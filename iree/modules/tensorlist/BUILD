@@ -13,6 +13,17 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+# absl has thread dependency.
+# TODO(#3848): Remove this condition.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+""",
+    inline = True,
+)
+
 cc_library(
     name = "native_module",
     srcs = ["native_module.cc"],

@@ -10,6 +10,11 @@
 
 iree_add_all_subdirs()
 
+# absl and benchmark have thread dependency.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 iree_cc_library(
   NAME
     strings_module
