@@ -496,6 +496,14 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }
+    // Only clone if operation either has no operands, or the operation is in
+    // same basic block as the dispatch op. This could really be relaxed, but
+    // this is conservative for now.
+    if (definingOp->getNumOperands() != 0 &&
+        definingOp->getBlock() != dispatchOp->getBlock()) {
+      valuesDefinedAbove.insert(outsideValue);
+      continue;
+    }
     clonedOps.push_back(definingOp);
     worklist.append(definingOp->operand_begin(), definingOp->operand_end());
   }
