@@ -54,21 +54,6 @@ def get_required_env_var(var: str) -> str:
   return value
 
 
-def get_reported_time(bench_results: Sequence[Dict[str, Any]],
-                      kind: str) -> int:
-  """Returns the Google Benchmark reported time for the given kind."""
-  time = None
-  for bench_case in bench_results:
-    if bench_case["name"].endswith(f"real_time_{kind}"):
-      if bench_case["time_unit"] != "ms":
-        raise ValueError(f"Expected ms as time unit")
-      time = int(round(bench_case["real_time"]))
-      break
-  if time is None:
-    raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
-  return time
-
-
 def aggregate_all_benchmarks(
     benchmark_files: Sequence[str]) -> Sequence[Tuple[Union[str, int]]]:
   """Aggregates all benchmarks in the given files.
@@ -82,7 +67,7 @@ def aggregate_all_benchmarks(
   """
 
   pr_commit = get_required_env_var("BUILDKITE_COMMIT")
-  benchmark_avg_results = {}
+  aggregate_results = {}
 
   for benchmark_file in benchmark_files:
     with open(benchmark_file) as f:
@@ -92,20 +77,22 @@ def aggregate_all_benchmarks(
     if file_results.commit != pr_commit:
       raise ValueError("Inconsistent pull request commit")
 
-    for benchmark_case in file_results.benchmarks:
+    for benchmark_index in range(len(file_results.benchmarks)):
+      benchmark_case = file_results.benchmarks[benchmark_index]
+
       # Make sure each benchmark has a unique name.
       name = str(benchmark_case["benchmark"])
-      if name in benchmark_avg_results:
+      if name in aggregate_results:
         raise ValueError(f"Duplicated benchmarks: {name}")
 
-      # Now scan all benchmark iterations and find the average latency.
-      mean_time = get_reported_time(benchmark_case["results"], "mean")
-      median_time = get_reported_time(benchmark_case["results"], "median")
-      stddev_time = get_reported_time(benchmark_case["results"], "stddev")
+      # Now scan all benchmark iterations and find the aggregate results.
+      mean_time = file_results.get_aggregate_time(benchmark_index, "mean")
+      median_time = file_results.get_aggregate_time(benchmark_index, "median")
+      stddev_time = file_results.get_aggregate_time(benchmark_index, "stddev")
 
-      benchmark_avg_results[name] = (mean_time, median_time, stddev_time)
+      aggregate_results[name] = (mean_time, median_time, stddev_time)
 
-  return sorted([(k,) + v for k, v in benchmark_avg_results.items()])
+  return sorted([(k,) + v for k, v in aggregate_results.items()])
 
 
 def get_benchmark_result_markdown(benchmark_files: Sequence[str]) -> str:
