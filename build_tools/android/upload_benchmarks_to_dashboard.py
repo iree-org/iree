@@ -40,6 +40,7 @@ from common.benchmark_description import (BenchmarkInfo, BenchmarkResults,
 
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/google/iree/commit'
 IREE_PROJECT_ID = 'IREE'
+THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
 # A non-exhaustive list of models and their source URLs.
 # For models listed here we can provide a nicer description for them on
@@ -69,14 +70,14 @@ def get_model_description(benchmark_info: BenchmarkInfo) -> Optional[str]:
 def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
   """Gets the commit hash for the given commit."""
   return get_output(['git', 'rev-parse', commit],
-                    cwd=os.path.dirname(os.path.realpath(__file__)),
+                    cwd=THIS_DIRECTORY,
                     verbose=verbose)
 
 
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
   count = get_output(['git', 'rev-list', '--count', commit],
-                     cwd=os.path.dirname(os.path.realpath(__file__)),
+                     cwd=THIS_DIRECTORY,
                      verbose=verbose)
   return int(count)
 
@@ -86,9 +87,7 @@ def get_git_commit_info(commit: str, verbose: bool = False) -> Dict[str, str]:
   cmd = [
       'git', 'show', '--format=%H:::%h:::%an:::%ae:::%s', '--no-patch', commit
   ]
-  info = get_output(cmd,
-                    cwd=os.path.dirname(os.path.realpath(__file__)),
-                    verbose=verbose)
+  info = get_output(cmd, cwd=THIS_DIRECTORY, verbose=verbose)
   segments = info.split(':::')
   return {
       'hash': segments[0],
@@ -167,16 +166,23 @@ def get_required_env_var(var: str) -> str:
   return value
 
 
-def post_to_dashboard(url: str, payload: Dict[str, Any], verbose: bool = False):
+def post_to_dashboard(url: str,
+                      payload: Dict[str, Any],
+                      dry_run: bool = False,
+                      verbose: bool = False):
+  data = json.dumps(payload)
+
+  if dry_run or verbose:
+    print(f'API request payload: {data}')
+
+  if dry_run:
+    return
+
   api_token = get_required_env_var('IREE_DASHBOARD_API_TOKEN')
   headers = {
       'Content-type': 'application/json',
       'Authorization': f'Bearer {api_token}',
   }
-  data = json.dumps(payload)
-
-  if verbose:
-    print(f'API request payload: {data}')
 
   response = requests.post(url, data=data, headers=headers)
   code = response.status_code
@@ -188,6 +194,7 @@ def post_to_dashboard(url: str, payload: Dict[str, Any], verbose: bool = False):
 def add_new_iree_series(series_id: str,
                         series_description: Optional[str] = None,
                         override: bool = False,
+                        dry_run: bool = False,
                         verbose: bool = False):
   """Posts a new series to the dashboard."""
   url = get_required_env_var('IREE_DASHBOARD_URL')
@@ -195,31 +202,42 @@ def add_new_iree_series(series_id: str,
                                    series_id,
                                    series_description,
                                    override=override)
-  post_to_dashboard(f'{url}/apis/addSerie', payload, verbose=verbose)
+  post_to_dashboard(f'{url}/apis/addSerie',
+                    payload,
+                    dry_run=dry_run,
+                    verbose=verbose)
 
 
 def add_new_iree_build(build_id: int,
                        commit: str,
                        override: bool = False,
+                       dry_run: bool = False,
                        verbose: bool = False):
   """Posts a new build to the dashboard."""
   url = get_required_env_var('IREE_DASHBOARD_URL')
   payload = compose_build_payload(IREE_PROJECT_ID,
                                   IREE_GITHUB_COMMIT_URL_PREFIX, build_id,
                                   commit, override)
-  post_to_dashboard(f'{url}/apis/addBuild', payload, verbose=verbose)
+  post_to_dashboard(f'{url}/apis/addBuild',
+                    payload,
+                    dry_run=dry_run,
+                    verbose=verbose)
 
 
 def add_new_sample(series_id: str,
                    build_id: int,
                    sample_value: int,
                    override: bool = False,
+                   dry_run: bool = False,
                    verbose: bool = False):
   """Posts a new sample to the dashboard."""
   url = get_required_env_var('IREE_DASHBOARD_URL')
   payload = compose_sample_payload(IREE_PROJECT_ID, series_id, build_id,
                                    sample_value, override)
-  post_to_dashboard(f'{url}/apis/addSample', payload, verbose=verbose)
+  post_to_dashboard(f'{url}/apis/addSample',
+                    payload,
+                    dry_run=dry_run,
+                    verbose=verbose)
 
 
 def parse_arguments():
@@ -237,6 +255,9 @@ def parse_arguments():
                       type=check_file_path,
                       nargs='+',
                       help='Path to the JSON file containing benchmark results')
+  parser.add_argument("--dry-run",
+                      action="store_true",
+                      help="Print the comment instead of posting to dashboard")
   parser.add_argument('--verbose',
                       action='store_true',
                       help='Print internal information during execution')
@@ -259,7 +280,10 @@ def main(args):
   # Register a new build for the current commit.
   commit_hash = get_git_commit_hash(all_results.commit, verbose=args.verbose)
   commit_count = get_git_total_commit_count(commit_hash, verbose=args.verbose)
-  add_new_iree_build(commit_count, commit_hash, verbose=args.verbose)
+  add_new_iree_build(commit_count,
+                     commit_hash,
+                     dry_run=args.dry_run,
+                     verbose=args.verbose)
 
   # Get the mean time for all benchmarks.
   aggregate_results = {}
@@ -283,8 +307,13 @@ def main(args):
     add_new_iree_series(series_id,
                         model_description,
                         override=True,
+                        dry_run=args.dry_run,
                         verbose=args.verbose)
-    add_new_sample(series_id, commit_count, sample_value, verbose=args.verbose)
+    add_new_sample(series_id,
+                   commit_count,
+                   sample_value,
+                   dry_run=args.dry_run,
+                   verbose=args.verbose)
 
 
 if __name__ == "__main__":
