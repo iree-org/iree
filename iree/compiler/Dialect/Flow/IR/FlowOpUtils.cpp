@@ -168,8 +168,10 @@ static bool shouldInlineIntoClosure(Value value) {
 // multiple times. That's fine, as anything we can inline here is something we
 // should also be able to CSE and that happens later on anyway.
 static void inlineClosureOperands(ClosureOpInterface &closureOp,
-                                  Block &entryBlock) {
-  auto builder = OpBuilder::atBlockBegin(&entryBlock);
+                                  Block &entryBlock,
+                                  PatternRewriter &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointToStart(&entryBlock);
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto outerValue = opArg.value();
     auto *sourceOp = outerValue.getDefiningOp();
@@ -187,7 +189,7 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
     if (closureOp.canClosureContainOp(sourceOp) &&
         shouldInlineIntoClosure(outerValue)) {
       // Clone the op (with regions).
-      auto *clonedOp = builder.clone(*sourceOp);
+      auto *clonedOp = rewriter.clone(*sourceOp);
 
       // Ensure we are using the right result in the case of ops with multiple
       // results. If we only end up using a single result then canonicalization
@@ -214,7 +216,7 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   // then elide below. When we do inline things the operands will be changed
   // such that the following work is guaranteed to happen and thus our op will
   // be rebuilt.
-  inlineClosureOperands(closureOp, entryBlock);
+  inlineClosureOperands(closureOp, entryBlock, rewriter);
 
   // Build data structure for unused operand elision.
   SmallVector<unsigned, 4> elidedOperands;
@@ -280,7 +282,6 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   }
 
   // Clone the op with the elidable operands and results removed.
-  OpBuilder builder(closureOp);
   auto newOp = closureOp.cloneReplacementExcludingOperandsAndResults(
       elidedOperands, elidedResults, rewriter);
 
