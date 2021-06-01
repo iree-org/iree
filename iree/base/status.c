@@ -275,6 +275,10 @@ IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
 
 // TODO(#55): move payload methods/types to header when API is stabilized.
 
+struct iree_status_handle_t {
+  uintptr_t value;
+};
+
 // Defines the type of an iree_status_payload_t.
 typedef enum iree_status_payload_type_e {
   // Opaque; payload may still be formatted by a formatter but is not possible
