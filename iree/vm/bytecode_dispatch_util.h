@@ -62,7 +62,7 @@
 // value.
 
 // Pointers to typed register storage.
-typedef struct {
+typedef struct iree_vm_registers_t {
   // Ordinal mask defining which ordinal bits are valid. All i32 indexing must
   // be ANDed with this mask.
   uint16_t i32_mask;
@@ -78,7 +78,7 @@ typedef struct {
 // Storage associated with each stack frame of a bytecode function.
 // NOTE: we cannot store pointers to the stack in here as the stack may be
 // reallocated.
-typedef struct {
+typedef struct iree_vm_bytecode_frame_storage_t {
   // Pointer to a register list within the stack frame where return registers
   // will be stored by callees upon return.
   const iree_vm_register_list_t* return_registers;
@@ -95,7 +95,7 @@ typedef struct {
 // Interleaved src-dst register sets for branch register remapping.
 // This structure is an overlay for the bytecode that is serialized in a
 // matching format.
-typedef struct {
+typedef struct iree_vm_register_remap_list_t {
   uint16_t size;
   struct pair {
     uint16_t src_reg;

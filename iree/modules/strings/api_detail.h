@@ -14,13 +14,13 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct strings_string {
+typedef struct strings_string_t {
   iree_vm_ref_object_t ref_object;
   iree_allocator_t allocator;
   iree_string_view_t value;
 } strings_string_t;
 
-typedef struct strings_string_tensor {
+typedef struct strings_string_tensor_t {
   iree_vm_ref_object_t ref_object;
   iree_allocator_t allocator;
   iree_string_view_t* values;

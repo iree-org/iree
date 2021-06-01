@@ -236,7 +236,7 @@ void VmVariantList::PushList(VmVariantList& other) {
 
 void VmVariantList::PushBufferView(HalDevice& device,
                                    py::object py_buffer_object,
-                                   iree_hal_element_type_e element_type) {
+                                   iree_hal_element_type_t element_type) {
   // Request a view of the buffer (use the raw python C API to avoid some
   // allocation and copying at the pybind level).
   Py_buffer py_view;

@@ -21,7 +21,7 @@ extern "C" {
 // This struct is at the head of all task allocations made from the allocator.
 // It is used to form a linked list of all allocations made so that they can be
 // easily freed during pool teardown.
-typedef struct {
+typedef struct iree_task_allocation_header_t {
   // Next allocation in the linked list of allocations.
   iree_atomic_slist_intrusive_ptr_t* next;
 } iree_task_allocation_header_t;
@@ -42,7 +42,7 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_atomic_task_allocation,
 // Pools can either be fixed-size with a maximum number of available tasks that
 // can be outstanding at any time or growable to allow the pool to be grown
 // unbounded after initialization.
-typedef struct iree_task_pool_s {
+typedef struct iree_task_pool_t {
   // Allocator used for allocating/freeing each allocation block.
   iree_allocator_t allocator;
 

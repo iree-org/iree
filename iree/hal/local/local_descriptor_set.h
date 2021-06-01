@@ -15,7 +15,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct {
+typedef struct iree_hal_local_descriptor_set_t {
   iree_hal_resource_t resource;
   iree_hal_local_descriptor_set_layout_t* layout;
   iree_host_size_t binding_count;

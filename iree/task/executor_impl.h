@@ -24,7 +24,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-struct iree_task_executor_s {
+struct iree_task_executor_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 

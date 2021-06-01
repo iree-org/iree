@@ -360,7 +360,7 @@ void MapBufferAttrs(Py_buffer& py_view,
 
 void PackScalar(const RawSignatureParser::Description& desc, py::handle py_arg,
                 VmVariantList& f_args) {
-  iree_vm_value value;
+  iree_vm_value_t value;
   value.type = IREE_VM_VALUE_TYPE_I32;
   switch (desc.scalar.type) {
     case AbiConstants::ScalarType::kUint8:

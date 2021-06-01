@@ -121,7 +121,7 @@
 // frames without exposing their exact structure through the API. This makes it
 // easier for us to add/version additional information or hide implementation
 // details.
-typedef struct iree_vm_stack_frame_header {
+typedef struct iree_vm_stack_frame_header_t {
   // Size, in bytes, of the frame header and frame payload including registers.
   // Adding this value to the base header pointer will yield the next available
   // memory location. Ensure that it does not exceed the total
@@ -130,7 +130,7 @@ typedef struct iree_vm_stack_frame_header {
 
   // Pointer to the parent stack frame, usually immediately preceding this one
   // in the frame storage. May be NULL.
-  struct iree_vm_stack_frame_header* parent;
+  struct iree_vm_stack_frame_header_t* parent;
 
   // Stack frame type used to determine which fields are valid.
   iree_vm_stack_frame_type_t type;
@@ -150,7 +150,7 @@ typedef struct iree_vm_stack_frame_header {
 // Core stack storage. This will be mapped either into dynamic memory allocated
 // by the member allocator or static memory allocated externally. Static stacks
 // cannot grow when storage runs out while dynamic ones will resize their stack.
-struct iree_vm_stack {
+struct iree_vm_stack_t {
   // NOTE: to get better cache hit rates we put the most frequently accessed
   // members first.
 

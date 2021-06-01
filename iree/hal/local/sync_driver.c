@@ -10,7 +10,7 @@
 
 #define IREE_HAL_SYNC_DEVICE_ID_DEFAULT 0
 
-typedef struct {
+typedef struct iree_hal_sync_driver_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
 

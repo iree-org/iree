@@ -17,7 +17,7 @@
 //==============================================================================
 
 // Fields taken from the ELF headers used only during verification and loading.
-typedef struct {
+typedef struct iree_elf_module_load_state_t {
   iree_memory_info_t memory_info;
   const iree_elf_ehdr_t* ehdr;
   const iree_elf_phdr_t* phdr_table;  // ehdr.e_phnum has count

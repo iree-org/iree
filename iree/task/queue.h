@@ -100,7 +100,7 @@ extern "C" {
 // list we can't easily just walk backward and we don't want to be introducing
 // cache line contention as thieves start touching the same tasks as the worker
 // is while processing.
-typedef struct {
+typedef struct iree_task_queue_t {
   // Must be held when manipulating the queue. >90% accesses are by the owner.
   iree_slim_mutex_t mutex;
 

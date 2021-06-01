@@ -13,6 +13,7 @@
 // this was a schema: backwards-incompatible changes require version bumps or
 // the ability to feature-detect at runtime.
 
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -37,7 +38,7 @@
 //===----------------------------------------------------------------------===//
 
 // Defines a bitfield of features that the library requires or supports.
-enum iree_hal_executable_library_feature_e {
+enum iree_hal_executable_library_feature_bits_t {
   IREE_HAL_EXECUTABLE_LIBRARY_FEATURE_NONE = 0u,
   // TODO(benvanik): declare features for debugging/coverage/printf/etc.
   // These will control which symbols are injected into the library at runtime.
@@ -48,38 +49,41 @@ typedef uint32_t iree_hal_executable_library_features_t;
 // Loaders can use this declaration to check as to whether the library is
 // compatible with the hosting environment for cases where the sanitizer
 // requires host support.
-enum iree_hal_executable_library_sanitizer_kind_e {
-  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_NONE = 0u,
+typedef enum iree_hal_executable_library_sanitizer_kind_e {
+  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_NONE = 0,
   // Indicates the library is compiled to use AddressSanitizer:
   // https://clang.llvm.org/docs/AddressSanitizer.html
   // Equivalent compiler flag: -fsanitize=address
-  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_ADDRESS = 1u,
+  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_ADDRESS = 1,
   // Indicates the library is compiled to use MemorySanitizer:
   // https://clang.llvm.org/docs/MemorySanitizer.html
   // Equivalent compiler flag: -fsanitize=memory
-  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_MEMORY = 2u,
+  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_MEMORY = 2,
   // Indicates the library is compiled to use ThreadSanitizer:
   // https://clang.llvm.org/docs/ThreadSanitizer.html
   // Equivalent compiler flag: -fsanitize=thread
-  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_THREAD = 3u,
+  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_THREAD = 3,
   // Indicates the library is compiled to use UndefinedBehaviorSanitizer:
   // https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
   // Equivalent compiler flag: -fsanitize=undefined
-  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_UNDEFINED = 4u,
-};
-typedef uint32_t iree_hal_executable_library_sanitizer_kind_t;
+  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_UNDEFINED = 4,
+
+  IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_MAX_ENUM = INT32_MAX,
+} iree_hal_executable_library_sanitizer_kind_t;
 
 //===----------------------------------------------------------------------===//
 // Versioning and interface querying
 //===----------------------------------------------------------------------===//
 
 // Known valid version values.
-enum iree_hal_executable_library_version_e {
+typedef enum iree_hal_executable_library_version_e {
   // iree_hal_executable_library_v0_t is used as the API communication
   // structure.
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0 = 0u,
-};
-typedef uint32_t iree_hal_executable_library_version_t;
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0 = 0,
+
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_MAX_ENUM = INT32_MAX,
+} iree_hal_executable_library_version_t;
+static_assert(sizeof(iree_hal_executable_library_version_t) == 4, "uint32_t");
 
 // The latest version of the library API; can be used to populate the
 // iree_hal_executable_library_header_t::version when building libraries.
@@ -88,7 +92,7 @@ typedef uint32_t iree_hal_executable_library_version_t;
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
-typedef struct {
+typedef struct iree_hal_executable_library_header_t {
   // Version of the API this library was built with, which was likely the value
   // of IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION.
   iree_hal_executable_library_version_t version;
@@ -119,12 +123,12 @@ typedef const iree_hal_executable_library_header_t** (
 //===----------------------------------------------------------------------===//
 
 // TBD: do not use this yet.
-typedef struct {
+typedef struct iree_hal_executable_import_table_v0_t {
   size_t import_count;
   void* import_fns;
 } iree_hal_executable_import_table_v0_t;
 
-typedef union {
+typedef union iree_hal_vec3_t {
   struct {
     uint32_t x;
     uint32_t y;
@@ -134,7 +138,7 @@ typedef union {
 } iree_hal_vec3_t;
 
 // Read-only per-dispatch state passed to each workgroup in a dispatch.
-typedef struct {
+typedef struct iree_hal_executable_dispatch_state_v0_t {
   // Total workgroup count for the dispatch. This is sourced from either the
   // original dispatch call (for iree_hal_command_buffer_dispatch) or the
   // indirection buffer (for iree_hal_command_buffer_dispatch_indirect).
@@ -183,7 +187,7 @@ typedef int (*iree_hal_executable_dispatch_v0_t)(
 // at runtime so long as they observe the thread-safety guarantees. For example,
 // a JIT may default all entry_points to JIT thunk functions and then swap them
 // out for the translated function pointers.
-typedef struct {
+typedef struct iree_hal_executable_library_v0_t {
   // Version/metadata header. Will have a version of
   // IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0.
   const iree_hal_executable_library_header_t* header;

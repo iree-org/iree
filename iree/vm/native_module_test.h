@@ -71,8 +71,8 @@ static iree_status_t call_shim_i32_i32(iree_vm_stack_t* stack,
 
 struct module_a_s;
 struct module_a_state_s;
-typedef struct module_a_s module_a_t;
-typedef struct module_a_state_s module_a_state_t;
+typedef struct module_a_t module_a_t;
+typedef struct module_a_state_t module_a_state_t;
 
 // vm.import @module_a.add_1(%arg0 : i32) -> i32
 static iree_status_t module_a_add_1(iree_vm_stack_t* stack, module_a_t* module,
@@ -135,13 +135,13 @@ static iree_status_t module_a_create(iree_allocator_t allocator,
 
 struct module_b_s;
 struct module_b_state_s;
-typedef struct module_b_s module_b_t;
-typedef struct module_b_state_s module_b_state_t;
+typedef struct module_b_t module_b_t;
+typedef struct module_b_state_t module_b_state_t;
 
 // Stores shared state across all instances of the module.
 // This should generally be treated as read-only and if mutation is possible
 // then users must synchronize themselves.
-typedef struct module_b_s {
+typedef struct module_b_t {
   // Allocator the module must be freed with and that can be used for any other
   // shared dynamic allocations.
   iree_allocator_t allocator;
@@ -153,7 +153,7 @@ typedef struct module_b_s {
 // Stores per-context state; at the minimum imports, but possibly other user
 // state data. No synchronization is required as the VM will not call functions
 // with the same state from multiple threads concurrently.
-typedef struct module_b_state_s {
+typedef struct module_b_state_t {
   // Allocator the state must be freed with and that can be used for any other
   // per-context dynamic allocations.
   iree_allocator_t allocator;

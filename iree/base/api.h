@@ -158,7 +158,7 @@ extern "C" {
 // Well-known status codes matching iree::StatusCode.
 // Note that any code within IREE_STATUS_CODE_MASK is valid even if not
 // enumerated here. Always check for unhandled errors/have default conditions.
-typedef enum {
+typedef enum iree_status_code_e {
   IREE_STATUS_OK = 0,
   IREE_STATUS_CANCELLED = 1,
   IREE_STATUS_UNKNOWN = 2,
@@ -568,12 +568,11 @@ IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status);
 
 // Known versions of the API that can be referenced in code.
 // Out-of-bounds values are possible in forward-versioned changes.
-enum iree_api_version_e {
-  IREE_API_VERSION_0 = 0u,
+typedef enum iree_api_version_e {
+  IREE_API_VERSION_0 = 0,
   // Always set to the latest version of the library from source.
   IREE_API_VERSION_LATEST = IREE_API_VERSION_0,
-};
-typedef uint32_t iree_api_version_t;
+} iree_api_version_t;
 
 // Checks whether the |expected_version| of the caller matches the implemented
 // version of |out_actual_version|. Forward compatibility of the API is

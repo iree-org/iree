@@ -39,7 +39,7 @@ extern "C" {
 //
 // Thread-safe; once created scopes are modified exclusively via atomic
 // operations.
-typedef struct iree_task_scope_s {
+typedef struct iree_task_scope_t {
   // Name used for logging and tracing.
   char name[16];
 

@@ -13,7 +13,7 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 
-struct iree_vm_context {
+struct iree_vm_context_t {
   iree_atomic_ref_count_t ref_count;
   iree_vm_instance_t* instance;
   iree_allocator_t allocator;

@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 // Inline synchronous one-shot command "buffer".
-typedef struct {
+typedef struct iree_hal_inline_command_buffer_t {
   iree_hal_resource_t resource;
 
   iree_hal_device_t* device;

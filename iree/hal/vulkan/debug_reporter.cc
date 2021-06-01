@@ -9,7 +9,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
 
-struct iree_hal_vulkan_debug_reporter_s {
+struct iree_hal_vulkan_debug_reporter_t {
   iree_allocator_t host_allocator;
   VkInstance instance;
   iree::hal::vulkan::DynamicSymbols* syms;

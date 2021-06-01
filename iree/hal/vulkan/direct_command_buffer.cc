@@ -22,7 +22,7 @@ using namespace iree::hal::vulkan;
 // Command buffer implementation that directly maps to VkCommandBuffer.
 // This records the commands on the calling thread without additional threading
 // indirection.
-typedef struct {
+typedef struct iree_hal_vulkan_direct_command_buffer_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   iree_hal_command_buffer_mode_t mode;

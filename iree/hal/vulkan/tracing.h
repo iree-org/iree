@@ -63,7 +63,7 @@ extern "C" {
 //
 // Thread-compatible: external synchronization is required if using from
 // multiple threads (same as with VkQueue itself).
-typedef struct iree_hal_vulkan_tracing_context_s
+typedef struct iree_hal_vulkan_tracing_context_t
     iree_hal_vulkan_tracing_context_t;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION

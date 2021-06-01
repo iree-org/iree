@@ -11,7 +11,7 @@
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_native_event_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   VkEvent handle;

@@ -54,8 +54,8 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   llvm::raw_ostream &output = emitter.ostream();
   std::string moduleName = moduleOp.getName().str();
 
-  output << "struct " << moduleName << "_s;\n";
-  output << "struct " << moduleName << "_state_s {\n";
+  output << "struct " << moduleName << "_t;\n";
+  output << "struct " << moduleName << "_state_t {\n";
 
   output << "iree_allocator_t allocator;\n";
   output << "uint8_t rwdata["
@@ -64,8 +64,8 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
          << moduleOp.ordinal_counts().getValue().global_refs() << "];\n";
   output << "};\n";
 
-  output << "typedef struct " << moduleName << "_s " << moduleName << "_t;\n";
-  output << "typedef struct " << moduleName << "_state_s " << moduleName
+  output << "typedef struct " << moduleName << "_t " << moduleName << "_t;\n";
+  output << "typedef struct " << moduleName << "_state_t " << moduleName
          << "_state_t;\n";
 
   output << "\n";

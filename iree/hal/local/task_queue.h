@@ -19,7 +19,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct {
+typedef struct iree_hal_task_queue_t {
   // Shared executor that the queue submits tasks to.
   iree_task_executor_t* executor;
 

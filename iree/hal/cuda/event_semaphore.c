@@ -9,7 +9,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/status_util.h"
 
-typedef struct {
+typedef struct iree_hal_cuda_semaphore_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
   uint64_t initial_value;

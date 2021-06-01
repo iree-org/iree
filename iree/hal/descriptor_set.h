@@ -19,7 +19,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
@@ -35,7 +35,7 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 // be applied at the time the binding is recording into the command buffer.
 //
 // Maps to VkDescriptorSetBinding.
-typedef struct {
+typedef struct iree_hal_descriptor_set_binding_t {
   // The binding number of this entry and corresponds to a resource of the
   // same binding number in the executable interface.
   uint32_t binding;
@@ -65,7 +65,7 @@ typedef struct {
 //
 // Maps to VkDescriptorSet:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSet.html
-typedef struct iree_hal_descriptor_set_s iree_hal_descriptor_set_t;
+typedef struct iree_hal_descriptor_set_t iree_hal_descriptor_set_t;
 
 // Creates a descriptor set of the given layout and bindings.
 // Descriptor sets are immutable and retain their bindings.
@@ -87,7 +87,7 @@ IREE_API_EXPORT void iree_hal_descriptor_set_release(
 // iree_hal_descriptor_set_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_descriptor_set_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

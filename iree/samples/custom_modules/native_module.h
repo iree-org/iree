@@ -16,7 +16,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_custom_message iree_custom_message_t;
+typedef struct iree_custom_message_t iree_custom_message_t;
 
 // Creates a new !custom.message object with a copy of the given |value|.
 iree_status_t iree_custom_message_create(iree_string_view_t value,

@@ -22,7 +22,7 @@ bool iree_elf_arch_is_valid(const iree_elf_ehdr_t* ehdr);
 //==============================================================================
 
 // State used during relocation.
-typedef struct {
+typedef struct iree_elf_relocation_state_t {
   // Bias applied to all relative addresses (from the string table, etc) in the
   // loaded module. This is an offset from the vaddr_base that may not be 0 if
   // host page granularity was larger than the ELF's defined granularity.

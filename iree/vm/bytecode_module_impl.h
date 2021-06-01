@@ -42,7 +42,7 @@ extern "C" {
 #define IREE_REF_REGISTER_MASK 0x3FFF
 
 // A loaded bytecode module.
-typedef struct {
+typedef struct iree_vm_bytecode_module_t {
   // Interface routing to the bytecode module functions.
   // Must be first in the struct as we dereference the interface to find our
   // members below.
@@ -76,7 +76,7 @@ typedef struct {
 // only store the absolute minimum information to reduce our fixed overhead.
 // There's a big tradeoff though as a few extra bytes here can avoid non-trivial
 // work per import function invocation.
-typedef struct {
+typedef struct iree_vm_bytecode_import_t {
   // Import function in the source module.
   iree_vm_function_t function;
 
@@ -96,7 +96,7 @@ typedef struct {
 // This is allocated with a provided allocator as a single flat allocation.
 // This struct is a prefix to the allocation pointing into the dynamic offsets
 // of the allocation storage.
-typedef struct {
+typedef struct iree_vm_bytecode_module_state_t {
   // Combined rwdata storage for the entire module, including globals.
   // Aligned to 16 bytes (128-bits) for SIMD usage.
   iree_byte_span_t rwdata_storage;

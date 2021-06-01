@@ -30,20 +30,19 @@ extern "C" {
 // NOTE: state values are ordered such that </> comparisons can be used; ensure
 // that for example all states after resuming are > SUSPENDED and all states
 // before exiting are < EXITING.
-enum iree_task_worker_state_e {
+typedef enum iree_task_worker_state_e {
   // Worker has been created in a suspended state and must be resumed to wake.
-  IREE_TASK_WORKER_STATE_SUSPENDED = 0u,
+  IREE_TASK_WORKER_STATE_SUSPENDED = 0,
   // Worker is idle or actively processing tasks (either its own or others).
-  IREE_TASK_WORKER_STATE_RUNNING = 1u,
+  IREE_TASK_WORKER_STATE_RUNNING = 1,
   // Worker should exit (or is exiting) and will soon enter the zombie state.
   // Coordinators can request workers to exit by setting their state to this and
   // then waking.
-  IREE_TASK_WORKER_STATE_EXITING = 2u,
+  IREE_TASK_WORKER_STATE_EXITING = 2,
   // Worker has exited and entered a 🧟 state (waiting for join).
   // The thread handle is still valid and must be destroyed.
-  IREE_TASK_WORKER_STATE_ZOMBIE = 3u,
-};
-typedef int32_t iree_task_worker_state_t;
+  IREE_TASK_WORKER_STATE_ZOMBIE = 3,
+} iree_task_worker_state_t;
 
 // A worker within the executor pool.
 //
@@ -51,7 +50,7 @@ typedef int32_t iree_task_worker_state_t;
 // techniques. The alignment of the entire iree_task_worker_t as well as the
 // alignment and padding between particular fields is carefully (though perhaps
 // not yet correctly) selected; see the 'LAYOUT' comments below.
-typedef struct iree_task_worker_s {
+typedef struct iree_task_worker_t {
   // A LIFO mailbox used by coordinators to post tasks to this worker.
   // As workers self-nominate to be coordinators and fan out dispatch slices
   // they can directly emplace those slices into the workers that should execute

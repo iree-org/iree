@@ -27,7 +27,7 @@ extern "C" {
 // functions in previously registered modules.
 //
 // Thread-compatible and must be externally synchronized.
-typedef struct iree_vm_context iree_vm_context_t;
+typedef struct iree_vm_context_t iree_vm_context_t;
 
 // Creates a new context that uses the given |instance| for device management.
 // |out_context| must be released by the caller.

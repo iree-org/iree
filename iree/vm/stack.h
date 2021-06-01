@@ -39,7 +39,7 @@ extern "C" {
 // The maximum size of VM stack storage; anything larger is probably a bug.
 #define IREE_VM_STACK_MAX_SIZE (1 * 1024 * 1024)
 
-enum {
+typedef enum iree_vm_stack_frame_type_e {
   // Represents an `[external]` frame that needs to marshal args/results.
   // These frames have no source location and are tracked so that we know when
   // transitions occur into/out-of external code.
@@ -50,8 +50,7 @@ enum {
   IREE_VM_STACK_FRAME_NATIVE = 1,
   // VM stack frame in bytecode using internal register storage.
   IREE_VM_STACK_FRAME_BYTECODE = 2,
-};
-typedef uint8_t iree_vm_stack_frame_type_t;
+} iree_vm_stack_frame_type_t;
 
 // A single stack frame within the VM.
 //
@@ -59,7 +58,7 @@ typedef uint8_t iree_vm_stack_frame_type_t;
 // accessed members **LAST**. This is because the custom frame storage data
 // immediately follows this struct in memory and is highly likely to be touched
 // by the callee immediately and repeatedly.
-typedef struct iree_vm_stack_frame {
+typedef struct iree_vm_stack_frame_t {
   // Function that the stack frame is within.
   iree_vm_function_t function;
 
@@ -94,7 +93,7 @@ typedef void(IREE_API_PTR* iree_vm_stack_frame_cleanup_fn_t)(
     iree_vm_stack_frame_t* frame);
 
 // A state resolver that can allocate or lookup module state.
-typedef struct iree_vm_state_resolver {
+typedef struct iree_vm_state_resolver_t {
   void* self;
   iree_status_t(IREE_API_PTR* query_module_state)(
       void* state_resolver, iree_vm_module_t* module,
@@ -104,7 +103,7 @@ typedef struct iree_vm_state_resolver {
 // A fiber stack used for storing stack frame state during execution.
 // All required state is stored within the stack and no host thread-local state
 // is used allowing us to execute multiple fibers on the same host thread.
-typedef struct iree_vm_stack iree_vm_stack_t;
+typedef struct iree_vm_stack_t iree_vm_stack_t;
 
 // Defines and initializes an inline VM stack.
 // The stack will be ready for use and must be deinitialized with

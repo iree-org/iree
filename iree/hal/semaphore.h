@@ -17,7 +17,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
@@ -52,7 +52,7 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 // https://www.youtube.com/watch?v=SpE--Rf516Y
 // https://www.khronos.org/assets/uploads/developers/library/2018-xdc/Vulkan-Timeline-Semaphores-Part-1_Sep18.pdf
 // https://docs.microsoft.com/en-us/windows/win32/direct3d12/user-mode-heap-synchronization
-typedef struct iree_hal_semaphore_s iree_hal_semaphore_t;
+typedef struct iree_hal_semaphore_t iree_hal_semaphore_t;
 
 // Creates a semaphore that can be used with command queues owned by this
 // device. To use the semaphores with other devices or instances they must
@@ -113,7 +113,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
 // iree_hal_semaphore_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_semaphore_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

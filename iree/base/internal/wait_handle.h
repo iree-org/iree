@@ -40,7 +40,7 @@ extern "C" {
 // runtime surprises).
 
 // Specifies the type of a wait handle.
-enum iree_wait_primitive_type_e {
+enum iree_wait_primitive_type_bits_t {
   // Android/Linux eventfd handle.
   // These are akin to pipe() but require only a single handle and have
   // significantly lower overhead (equivalent if not slightly better than
@@ -123,7 +123,7 @@ typedef union {
 
 // Non-owning handle reference to a waitable object.
 // TODO(benvanik): packing to ensure we are getting the expected alignments.
-typedef struct {
+typedef struct iree_wait_handle_t {
   iree_wait_primitive_type_t type;  // uint8_t
   union {
     // Used by iree_wait_set_t storage to track the number of duplicate
@@ -176,7 +176,7 @@ void iree_wait_handle_deinitialize(iree_wait_handle_t* handle);
 //
 // Thread-compatible; only one thread may be manipulating or waiting on a
 // particular set at any time.
-typedef struct iree_wait_set_s iree_wait_set_t;
+typedef struct iree_wait_set_t iree_wait_set_t;
 
 // Allocates a wait set with the maximum |capacity| of unique handles.
 iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,

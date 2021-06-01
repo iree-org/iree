@@ -96,7 +96,8 @@ extern "C" {
 //
 // Windows: Slim Reader/Writer (SRW) Locks
 // All others: pthread_mutex_t
-typedef struct IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) {
+typedef struct iree_mutex_t IREE_THREAD_ANNOTATION_ATTRIBUTE(
+    capability("mutex")) {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
   int reserved;
 #elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_MUTEX_USE_WIN32_SRW)
@@ -209,7 +210,8 @@ void iree_mutex_unlock(iree_mutex_t* mutex)
 //   https://man7.org/linux/man-pages/man2/futex.2.html
 //   https://eli.thegreenplace.net/2018/basics-of-futexes/
 //   https://bartoszmilewski.com/2008/09/01/thin-lock-vs-futex/
-typedef struct IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) {
+typedef struct iree_slim_mutex_t IREE_THREAD_ANNOTATION_ATTRIBUTE(
+    capability("mutex")) {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
   int reserved;
 #elif (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS)
@@ -281,7 +283,7 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
 // https://github.com/r10a/Event-Counts
 // https://github.com/facebook/folly/blob/master/folly/experimental/EventCount.h
 // https://github.com/concurrencykit/ck/blob/master/include/ck_ec.h
-typedef struct {
+typedef struct iree_notification_t {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
   // Nothing required.
 #elif !defined(IREE_PLATFORM_HAS_FUTEX)

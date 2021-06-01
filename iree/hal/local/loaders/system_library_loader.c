@@ -16,7 +16,7 @@
 // iree_hal_system_executable_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_system_executable_t {
   iree_hal_local_executable_t base;
 
   // TODO(benvanik): library handle for ownership.
@@ -126,7 +126,7 @@ static const iree_hal_local_executable_vtable_t
 // iree_hal_system_library_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_system_library_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
 } iree_hal_system_library_loader_t;

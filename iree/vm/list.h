@@ -29,7 +29,7 @@ extern "C" {
 // This type the same performance characteristics as std::vector; pushes may
 // grow the capacity of the list and to ensure minimal wastage it is always
 // better to reserve the exact desired element count first.
-typedef struct iree_vm_list iree_vm_list_t;
+typedef struct iree_vm_list_t iree_vm_list_t;
 
 // Returns the size in bytes required to store a list with the given element
 // type and capacity. This storage size can be used to stack allocate or reserve

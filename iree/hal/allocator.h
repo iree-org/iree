@@ -23,7 +23,7 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // A bitfield indicating compatible behavior for buffers in an allocator.
-enum iree_hal_buffer_compatibility_e {
+enum iree_hal_buffer_compatibility_bits_t {
   // Indicates (in the absence of other bits) the buffer is not compatible with
   // the allocator or device at all. Any attempts to use the buffer for any
   // usage will fail. This will happen if the buffer is device-local to another
@@ -57,7 +57,7 @@ typedef uint32_t iree_hal_buffer_compatibility_t;
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_allocator_s iree_hal_allocator_t;
+typedef struct iree_hal_allocator_t iree_hal_allocator_t;
 
 // Retains the given |allocator| for the caller.
 IREE_API_EXPORT void iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
@@ -143,7 +143,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
 // iree_hal_allocator_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_allocator_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

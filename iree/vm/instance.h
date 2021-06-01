@@ -24,7 +24,7 @@ extern "C" {
 // restrictions it is mandatory to share instances, so plan accordingly.
 //
 // Thread-safe.
-typedef struct iree_vm_instance iree_vm_instance_t;
+typedef struct iree_vm_instance_t iree_vm_instance_t;
 
 // Creates a new instance. This should be shared with all contexts in an
 // application to ensure that resources are tracked properly and threads are

@@ -27,12 +27,12 @@
 // The more we do the better confidence we have in a lower-bound.
 #define IREE_HAL_VULKAN_TRACING_MAX_DEVIATION_PROBE_COUNT 32
 
-typedef struct {
+typedef struct iree_hal_vulkan_timestamp_query_t {
   uint64_t timestamp;
   uint64_t availability;  // non-zero if available
 } iree_hal_vulkan_timestamp_query_t;
 
-struct iree_hal_vulkan_tracing_context_s {
+struct iree_hal_vulkan_tracing_context_t {
   // Device and queue the context represents.
   iree::hal::vulkan::VkDeviceHandle* logical_device;
   VkQueue queue;

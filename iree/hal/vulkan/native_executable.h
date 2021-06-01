@@ -18,7 +18,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct {
+typedef struct iree_hal_vulkan_source_location_t {
   iree_string_view_t file_name;
   int line;
   iree_string_view_t func_name;

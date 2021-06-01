@@ -27,7 +27,7 @@
 // isolating/sandboxing/multi-versioning).
 #define IREE_HAL_MAX_DRIVER_FACTORY_COUNT 8
 
-struct iree_hal_driver_registry_s {
+struct iree_hal_driver_registry_t {
   iree_slim_mutex_t mutex;
 
   // Factories in registration order. As factories are unregistered the list is

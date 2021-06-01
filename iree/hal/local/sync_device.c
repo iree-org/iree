@@ -16,7 +16,7 @@
 #include "iree/hal/local/sync_event.h"
 #include "iree/hal/local/sync_semaphore.h"
 
-typedef struct {
+typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 
