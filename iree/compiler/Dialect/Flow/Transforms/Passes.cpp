@@ -125,7 +125,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Legalize constants to be valid for IREE.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createLegalizeConstantsPass());
+  passManager.addNestedPass<FuncOp>(IREE::Flow::createPromoteI1ToI8Pass());
 
   // Legalize input types. We do this after flattening tuples so that we don't
   // have to deal with them.
