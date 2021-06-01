@@ -94,8 +94,7 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
 
 }  // namespace
 
-class PromoteI1ToI8Pass
-    : public PromoteI1ToI8Base<PromoteI1ToI8Pass> {
+class PromoteI1ToI8Pass : public PromoteI1ToI8Base<PromoteI1ToI8Pass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, mlir::StandardOpsDialect>();
