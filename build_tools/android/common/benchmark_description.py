@@ -174,7 +174,8 @@ class BenchmarkInfo:
   - model_tags: a list of tags used to describe additional model information,
       e.g., ['imagenet']
   - model_source: the source of the model, e.g., 'TensorFlow'
-  - bench_mode: the mode of the benchmark, e.g., 'f32-full-inference'
+  - bench_mode: a list of tags for benchmark mode,
+      e.g., ['1-thread', 'big-core', 'full-inference']
   - runner: which runner is used for benchmarking, e.g., 'iree_vulkan', 'tflite'
   - device_info: an AndroidDeviceInfo object describing the phone where
       bnechmarks run
@@ -183,7 +184,7 @@ class BenchmarkInfo:
   model_name: str
   model_tags: Sequence[str]
   model_source: str
-  bench_mode: str
+  bench_mode: Sequence[str]
   runner: str
   device_info: AndroidDeviceInfo
 
@@ -207,8 +208,20 @@ class BenchmarkInfo:
     else:
       model_part = f"{self.model_name} ({self.model_source})"
     phone_part = f"{self.device_info.model} ({target_arch})"
+    mode = ",".join(self.bench_mode)
 
-    return f"{model_part} {self.bench_mode} with {driver} @ {phone_part}"
+    return f"{model_part} {mode} with {driver} @ {phone_part}"
+
+  def deduce_taskset(self) -> str:
+    """Deduces the CPU affinity taskset mask according to benchmark modes."""
+    # TODO: we actually should check the number of cores the phone have.
+    if "big-core" in self.bench_mode:
+      return "80" if "1-thread" in self.bench_mode else "f0"
+    if "little-core" in self.bench_mode:
+      return "08" if "1-thread" in self.bench_mode else "0f"
+
+    # Not specified: use the 7th core.
+    return "80"
 
   def to_json_object(self) -> Dict[str, Any]:
     return {

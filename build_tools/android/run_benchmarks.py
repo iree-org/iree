@@ -40,7 +40,7 @@ from common.benchmark_description import (AndroidDeviceInfo, BenchmarkInfo,
 # Relative path against build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 # Relative path against root benchmark suite directory.
-MLIR_MODEL_SUITE_REL_PATH = "mlir_models"
+TENSORFLOW_MODEL_SUITE_REL_PATH = "TensorFlow"
 
 # The flagfile's filename for compiled Python models.
 MODEL_FLAGFILE_NAME = "flagfile"
@@ -121,7 +121,7 @@ def compose_benchmark_info_object(device_info, root_build_dir,
     - A BenchmarkInfo object.
   """
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
-                                MLIR_MODEL_SUITE_REL_PATH)
+                                TENSORFLOW_MODEL_SUITE_REL_PATH)
 
   # Extract the model name from the directory path. This uses the relative
   # path under the root model directory. If there are multiple segments,
@@ -137,9 +137,8 @@ def compose_benchmark_info_object(device_info, root_build_dir,
     model_tags = [re.sub(r"\W+", "-", rest)]
   else:
     # Tags coming from the name itself.
-    rest = re.sub(r"\W+", "-", rest).split("-")
-    model_name = rest[0]
-    model_tags = rest[1:]
+    model_name, rest = rest.split("-", 1)
+    model_tags = rest.split(",")
 
   # Extract benchmark info from the directory path following convention:
   #   <iree-driver>__<target-architecture>__<benchmark_mode>
@@ -149,7 +148,7 @@ def compose_benchmark_info_object(device_info, root_build_dir,
   return BenchmarkInfo(model_name=model_name,
                        model_tags=model_tags,
                        model_source="TensorFlow",
-                       bench_mode=bench_mode,
+                       bench_mode=bench_mode.split(","),
                        runner=iree_driver,
                        device_info=device_info)
 
@@ -170,7 +169,7 @@ def filter_python_model_benchmark_suite(device_info,
   gpu_target_arch = GPU_NAME_TO_TARGET_ARCH_MAP[device_info.gpu_name.lower()]
 
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
-                                MLIR_MODEL_SUITE_REL_PATH)
+                                TENSORFLOW_MODEL_SUITE_REL_PATH)
   matched_benchmarks = []
 
   # Go over all benchmarks in the model directory to find those matching the
@@ -225,7 +224,7 @@ def run_python_model_benchmark_suite(device_info,
                                           verbose=verbose)
 
   model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
-                                MLIR_MODEL_SUITE_REL_PATH)
+                                TENSORFLOW_MODEL_SUITE_REL_PATH)
 
   results = []
 
@@ -244,6 +243,8 @@ def run_python_model_benchmark_suite(device_info,
                                                 verbose=verbose)
 
     cmd = [
+        "taskset",
+        benchmark_info.deduce_taskset(),
         android_tool_path,
         f"--flagfile={android_flagfile_path}",
         f"--benchmark_repetitions={BENCHMARK_REPETITIONS}",
@@ -294,6 +295,12 @@ def parse_arguments():
                       dest="output",
                       default=None,
                       help="Path to the ouput file")
+  parser.add_argument(
+      "--no-clean",
+      action="store_true",
+      help=
+      "Do not clean up the temporary directory used for benchmarking on the Android device"
+  )
   parser.add_argument("--verbose",
                       action="store_true",
                       help="Print internal information during execution")
@@ -342,8 +349,11 @@ def main(args):
     print(results.commit)
     print(results.benchmarks)
 
-  # Clear the benchmark directory on the Android device.
-  adb_execute_in_dir(["rm", "-rf", "*"], relative_dir="", verbose=args.verbose)
+  if not args.no_clean:
+    # Clear the benchmark directory on the Android device.
+    adb_execute_in_dir(["rm", "-rf", "*"],
+                       relative_dir="",
+                       verbose=args.verbose)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,7 @@ option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
@@ -222,6 +223,7 @@ include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_run_binary_test)
+include(iree_mlir_benchmark_suite)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -416,6 +418,11 @@ endif()
 #-------------------------------------------------------------------------------
 # IREE top-level targets
 #-------------------------------------------------------------------------------
+
+if(${IREE_BUILD_BENCHMARKS})
+  # Add a top-level custom target to drive generating benchmark suites.
+  add_custom_target(iree-benchmark-suites)
+endif()
 
 if(${IREE_BUILD_DOCS})
   # Add a top-level custom target to drive generating all documentation.
