@@ -1,22 +1,77 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+
+################################################################################
+#                                                                              #
+# Benchmark models                                                             #
+#                                                                              #
+# All the lists should have the same number of elements. Each list describes   #
+# one aspect of the model. Elements at the same index are for the same model.  #
+#                                                                              #
+# Normally models to be benchmarked should be placed here becuase all          #
+# benchmark cases will be enabled for them. There might exist cases where we   #
+# cannot enable all the benchmark cases for one model; then they should be     #
+# placed directly in the cmake function calls in the next section.             #
+#                                                                              #
+################################################################################
+
+set(BENCHMARK_MODULE_NAMES
+  "MobileNetV2"
+  "MobileNetV3Small"
+)
+
+# Each element is a comma-separated list.
+set(BENCHMARK_MODULE_TAGS
+  "fp32,imagenet"
+  "fp32,imagenet"
+)
+
+set(BENCHMARK_MODULE_SOURCES
+  "TensorFlow"
+  "TensorFlow"
+)
+
+set(BENCHMARK_MLIR_SOURCES
+  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
+  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+)
+
+set(BENCHMARK_ENTRY_FUNCTIONS
+  "call"
+  "call"
+)
+
+# Each element is a comma-separated list.
+set(BENCHMARK_FUNCTION_INPUTS
+  "1x224x224x3xf32"
+  "1x224x224x3xf32"
+)
+
+################################################################################
+#                                                                              #
+# Benchmark cases                                                              #
+#                                                                              #
+################################################################################
+
+# CPU, Dylib-Sync, 1-thread, big-core, full-inference
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2"
-    "MobileNetV3Small"
+    ${BENCHMARK_MODULE_NAMES}
   MODULE_TAGS
-    "fp32,imagenet"
-    "fp32,imagenet"
+    ${BENCHMARK_MODULE_TAGS}
   MODULE_SOURCES
-    "TensorFlow"
-    "TensorFlow"
+    ${BENCHMARK_MODULE_SOURCES}
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+    ${BENCHMARK_MLIR_SOURCES}
   ENTRY_FUNCTIONS
-    "call"
-    "call"
+    ${BENCHMARK_ENTRY_FUNCTIONS}
   FUNCTION_INPUTS
-    "1x224x224x3xf32"
-    "1x224x224x3xf32"
+    ${BENCHMARK_FUNCTION_INPUTS}
+
   BENCHMARK_MODE
     "1-thread,big-core,full-inference"
   TARGET_BACKEND
@@ -32,25 +87,21 @@ iree_mlir_benchmark_suite(
     "dylib-sync"
 )
 
+# CPU, Dylib, 3-thread, big-core, full-inference
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2"
-    "MobileNetV3Small"
+    ${BENCHMARK_MODULE_NAMES}
   MODULE_TAGS
-    "fp32,imagenet"
-    "fp32,imagenet"
+    ${BENCHMARK_MODULE_TAGS}
   MODULE_SOURCES
-    "TensorFlow"
-    "TensorFlow"
+    ${BENCHMARK_MODULE_SOURCES}
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+    ${BENCHMARK_MLIR_SOURCES}
   ENTRY_FUNCTIONS
-    "call"
-    "call"
+    ${BENCHMARK_ENTRY_FUNCTIONS}
   FUNCTION_INPUTS
-    "1x224x224x3xf32"
-    "1x224x224x3xf32"
+    ${BENCHMARK_FUNCTION_INPUTS}
+
   BENCHMARK_MODE
     "3-thread,big-core,full-inference"
   TARGET_BACKEND
@@ -68,25 +119,21 @@ iree_mlir_benchmark_suite(
     "--task_topology_group_count=3"
 )
 
+# GPU, Vulkan, Adreno, full-inference
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2"
-    "MobileNetV3Small"
+    ${BENCHMARK_MODULE_NAMES}
   MODULE_TAGS
-    "fp32,imagenet"
-    "fp32,imagenet"
+    ${BENCHMARK_MODULE_TAGS}
   MODULE_SOURCES
-    "TensorFlow"
-    "TensorFlow"
+    ${BENCHMARK_MODULE_SOURCES}
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+    ${BENCHMARK_MLIR_SOURCES}
   ENTRY_FUNCTIONS
-    "call"
-    "call"
+    ${BENCHMARK_ENTRY_FUNCTIONS}
   FUNCTION_INPUTS
-    "1x224x224x3xf32"
-    "1x224x224x3xf32"
+    ${BENCHMARK_FUNCTION_INPUTS}
+
   BENCHMARK_MODE
     "full-inference"
   TARGET_BACKEND
@@ -102,25 +149,21 @@ iree_mlir_benchmark_suite(
     "vulkan"
 )
 
+# GPU, Vulkan, Mali, full-inference
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2"
-    "MobileNetV3Small"
+    ${BENCHMARK_MODULE_NAMES}
   MODULE_TAGS
-    "fp32,imagenet"
-    "fp32,imagenet"
+    ${BENCHMARK_MODULE_TAGS}
   MODULE_SOURCES
-    "TensorFlow"
-    "TensorFlow"
+    ${BENCHMARK_MODULE_SOURCES}
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+    ${BENCHMARK_MLIR_SOURCES}
   ENTRY_FUNCTIONS
-    "call"
-    "call"
+    ${BENCHMARK_ENTRY_FUNCTIONS}
   FUNCTION_INPUTS
-    "1x224x224x3xf32"
-    "1x224x224x3xf32"
+    ${BENCHMARK_FUNCTION_INPUTS}
+
   BENCHMARK_MODE
     "full-inference"
   TARGET_BACKEND
@@ -136,25 +179,21 @@ iree_mlir_benchmark_suite(
     "vulkan"
 )
 
+# GPU, Vulkan, Mali, kernel-execution
 iree_mlir_benchmark_suite(
   MODULE_NAMES
-    "MobileNetV2"
-    "MobileNetV3Small"
+    ${BENCHMARK_MODULE_NAMES}
   MODULE_TAGS
-    "fp32,imagenet"
-    "fp32,imagenet"
+    ${BENCHMARK_MODULE_TAGS}
   MODULE_SOURCES
-    "TensorFlow"
-    "TensorFlow"
+    ${BENCHMARK_MODULE_SOURCES}
   MLIR_SOURCES
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
+    ${BENCHMARK_MLIR_SOURCES}
   ENTRY_FUNCTIONS
-    "call"
-    "call"
+    ${BENCHMARK_ENTRY_FUNCTIONS}
   FUNCTION_INPUTS
-    "1x224x224x3xf32"
-    "1x224x224x3xf32"
+    ${BENCHMARK_FUNCTION_INPUTS}
+
   BENCHMARK_MODE
     "kernel-execution"
   TARGET_BACKEND
