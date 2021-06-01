@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
-// CHECK: vm.rodata private @_exe_binary1_binary_format1 dense<[0, 1, 2, 3]> : vector<4xi8>
-// CHECK: vm.rodata private @_exe_binary2_binary_format2 dense<[4, 5, 6, 7]> : vector<4xi8>
+// CHECK: vm.rodata @_exe_binary1_binary_format1 dense<[0, 1, 2, 3]> : vector<4xi8>
+// CHECK: vm.rodata @_exe_binary2_binary_format2 dense<[4, 5, 6, 7]> : vector<4xi8>
 hal.executable @exe {
   hal.interface @interface {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -47,7 +47,7 @@ func @executableCreate(
 
 // -----
 
-// CHECK: vm.rodata private @_exe1_binary1_binary_format dense<[0, 1, 2, 3]> : vector<4xi8>
+// CHECK: vm.rodata @_exe1_binary1_binary_format dense<[0, 1, 2, 3]> : vector<4xi8>
 hal.executable @exe1 {
   hal.interface @interface {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -58,7 +58,7 @@ hal.executable @exe1 {
     format = "format"
   }
 }
-// CHECK: vm.rodata private @_exe2_binary2_binary_format dense<[4, 5, 6, 7]> : vector<4xi8>
+// CHECK: vm.rodata @_exe2_binary2_binary_format dense<[4, 5, 6, 7]> : vector<4xi8>
 hal.executable @exe2 {
   hal.interface @interface {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
