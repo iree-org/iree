@@ -328,17 +328,17 @@ static LogicalResult analysePadTensorOp(linalg::PadTensorOp padTensorOp,
 static SmallVector<Value> getTiedOperandsForLinalgOps(
     linalg::LinalgOp linalgOp) {
   SmallVector<Value> tiedOperands(linalgOp.getOperation()->getNumResults());
-  for (auto outTensor : llvm::enumerate(linalgOp.getOutputs())) {
-    if (linalgOp.payloadUsesValueFromOutputOperandIndex(outTensor.index())) {
+  for (auto outTensor : llvm::enumerate(linalgOp.getOutputOperands())) {
+    if (linalgOp.payloadUsesValueFromOperand(outTensor.value())) {
       // If the `outs` tensor has a single use (this op) and is not from a
       // read-only buffer, the `outs` tensor can be tied to the result.
-      if (outTensor.value().hasOneUse() &&
-          !isFromReadOnlyTensor(outTensor.value())) {
-        tiedOperands[outTensor.index()] = outTensor.value();
+      if (outTensor.value()->get().hasOneUse() &&
+          !isFromReadOnlyTensor(outTensor.value()->get())) {
+        tiedOperands[outTensor.index()] = outTensor.value()->get();
       }
     }
   }
-  for (auto result : llvm::enumerate(linalgOp.getOutputs())) {
+  for (auto result : llvm::enumerate(linalgOp.getOutputOperands())) {
     // If the output tensor is not actually used (for initialization) by this
     // op, we can reuse the result tensor's buffer for some operands.
     // TODO(#5040): A better way to handle this case is to allocate a buffer and
@@ -348,14 +348,14 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
     if (linalgOp.payloadUsesValueFromOutputOperandIndex(result.index())) {
       continue;
     }
-    for (auto input : llvm::enumerate(linalgOp.getInputTensors())) {
-      auto producerOp = input.value().getDefiningOp<linalg::LinalgOp>();
-      if (producerOp && input.value().hasOneUse() &&
-          input.value().getType() == result.value().getType() &&
-          linalgOp.getInputIndexingMap(input.index()) ==
-              linalgOp.getOutputIndexingMap(result.index())) {
+    for (auto input : llvm::enumerate(linalgOp.getInputTensorsOpOperands())) {
+      auto producerOp = input.value()->get().getDefiningOp<linalg::LinalgOp>();
+      if (producerOp && input.value()->get().hasOneUse() &&
+          input.value()->get().getType() == result.value()->get().getType() &&
+          linalgOp.getTiedIndexingMap(input.value()) ==
+              linalgOp.getTiedIndexingMap(result.value())) {
         assert(!tiedOperands[result.index()]);
-        tiedOperands[result.index()] = input.value();
+        tiedOperands[result.index()] = input.value()->get();
         break;
       }
     }
@@ -376,7 +376,7 @@ static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
     if (tiedOperand) {
       plan.unionSets(resultTensor, tiedOperand);
     }
-    plan.insert(linalgOp.getOutput(it.index()));
+    plan.insert(linalgOp.getOutputOperands()[it.index()]->get());
     plan.insert(resultTensor);
   }
   return success();
