@@ -459,7 +459,7 @@ class UntieConstantOperands final
     return success();
   }
 };
-}
+}  // namespace
 
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
