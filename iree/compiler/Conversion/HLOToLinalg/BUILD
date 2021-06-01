@@ -14,6 +14,7 @@ cc_library(
     name = "HLOToLinalg",
     srcs = [
         "BroadcastingToLinalgPatterns.cpp",
+        "ConvertComplexToReal.cpp",
         "FusionOfTensorOps.cpp",
         "HLOToLinalgOnTensors.cpp",
         "ResolveShapeOps.cpp",
@@ -37,6 +38,7 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
+        "@mlir-hlo//:chlo_legalize_to_hlo",
         "@mlir-hlo//:hlo",
         "@mlir-hlo//:legalize_to_linalg",
     ],

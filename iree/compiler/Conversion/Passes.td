@@ -40,4 +40,14 @@ def ResolveShapeOps :
   let constructor = "mlir::iree_compiler::createResolveShapeOpsPass()";
 }
 
+//------------------------------------------------------------------------------
+// Test passes
+//------------------------------------------------------------------------------
+
+def TestMHLOConvertComplexToReal :
+    Pass<"iree-test-mhlo-convert-complex-to-real", "FuncOp"> {
+  let summary = "Test pass that does an MHLO->MHLO conversion of just complex arithmetic ops.";
+  let constructor = "mlir::iree_compiler::createTestMHLOConvertComplexToRealPass()";
+}
+
 #endif  // IREE_DIALECT_FLOW_PASSES

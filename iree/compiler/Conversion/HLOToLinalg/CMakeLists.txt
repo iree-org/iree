@@ -15,6 +15,7 @@ iree_cc_library(
     HLOToLinalg
   SRCS
     "BroadcastingToLinalgPatterns.cpp"
+    "ConvertComplexToReal.cpp"
     "FusionOfTensorOps.cpp"
     "HLOToLinalgOnTensors.cpp"
     "ResolveShapeOps.cpp"
