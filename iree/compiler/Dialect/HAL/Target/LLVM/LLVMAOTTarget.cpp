@@ -95,10 +95,12 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     if (sourceExecutableOps.size() <= 1) return success();
 
-    // Private symbols (i.e. llvm dialect private symbols) get deduped
-    // incorrectly by the link executables pass even though they should be
-    // treated as different symbols. For now just change the names of the
-    // private symbols to avoid conflicts.
+    // Ensure any LLVM symbol names we define are unique prior to linking.
+    //
+    // The link executables pass requires that there be no name conflicts
+    // between symbols with public MLIR Symbol visibility. LLVM dialect symbols
+    // use a different visibility mechanism, defaulting to public for MLIR
+    // Symbol visibility.
     unsigned moduleNumber = 0;
     for (auto sourceExecutableOp : enumerate(sourceExecutableOps)) {
       auto targetOps = llvm::to_vector<4>(
