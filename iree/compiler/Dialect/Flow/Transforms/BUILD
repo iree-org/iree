@@ -47,6 +47,7 @@ cc_library(
         "PassDetail.h",
         "Passes.cpp",
         "PrePostPartitioningConversion.cpp",
+        "PromoteI1ToI8Pass.cpp",
         "PromoteTensorLoads.cpp",
         "StripAndSplatConstantVariables.cpp",
         "VerifyCompilerInputLegality.cpp",
