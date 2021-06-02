@@ -1027,7 +1027,6 @@ static LogicalResult convertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp,
     BlockAndValueMapping &bvm, BufferizationPlan &plan) {
   if (plan.isEquivalent(storeOp.target(), storeOp.value())) {
-    storeOp->erase();
     return success();
   }
   OpBuilder::InsertionGuard g(b);
@@ -1039,7 +1038,6 @@ static LogicalResult convertInterfaceStoreTensorOp(
                       storeOp.getMixedSizes(), storeOp.getMixedStrides());
 
   b.create<linalg::CopyOp>(storeOp->getLoc(), storeFrom, subview);
-  storeOp->erase();
   return success();
 }
 
@@ -1366,6 +1364,10 @@ void LinalgBufferizePass::runOnFunction() {
               if (remappedVal) op->setOperand(i, remappedVal);
             }
           }
+          return success();
+        })
+        .Case<IREE::Flow::DispatchTensorStoreOp>([&](auto op) {
+          op.erase();
           return success();
         })
         .Default([&](Operation *op) { return success(); });
