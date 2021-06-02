@@ -7,8 +7,8 @@
 #include "iree/vm/context.h"
 
 #include <assert.h>
-#include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"

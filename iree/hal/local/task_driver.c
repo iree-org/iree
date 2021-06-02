@@ -6,6 +6,9 @@
 
 #include "iree/hal/local/task_driver.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
 
 #define IREE_HAL_TASK_DEVICE_ID_DEFAULT 0

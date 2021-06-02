@@ -102,6 +102,7 @@ iree_cc_library(
     "vulkan_headers.h"
   DEPS
     Vulkan::Headers
+    iree::base
     iree::base::core_headers
     iree::base::internal::dynamic_library
     iree::base::status
@@ -117,6 +118,7 @@ iree_cc_test(
     "dynamic_symbols_test.cc"
   DEPS
     ::dynamic_symbols
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

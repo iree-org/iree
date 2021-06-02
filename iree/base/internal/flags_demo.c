@@ -5,9 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <inttypes.h>
-#include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 
 IREE_FLAG(bool, test_bool, false, "A boolean value.");

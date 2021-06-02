@@ -8,10 +8,10 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
 iree_status_t iree_file_exists(const char* path) {

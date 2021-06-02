@@ -58,15 +58,18 @@ iree_cc_binary(
     "iree-benchmark-module-main.cc"
   DEPS
     benchmark
+    iree::base
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::status
     iree::base::tracing
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
+    iree::vm::cc
   TESTONLY
 )
 
@@ -82,12 +85,15 @@ iree_cc_binary(
     iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
+    iree::base::logging
     iree::base::status
     iree::base::tracing
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::testing::gtest
     iree::tools::utils::vm_util
+    iree::vm
     iree::vm::bytecode_module
   TESTONLY
 )
@@ -99,8 +105,8 @@ iree_cc_binary(
     "iree-dump-module-main.cc"
   DEPS
     flatcc::runtime
+    iree::base
     iree::base::internal::file_io
-    iree::base::status
     iree::schemas::bytecode_module_def_c_fbs
     iree::tools::utils::vm_util
 )
@@ -346,8 +352,10 @@ if(${IREE_BUILD_COMPILER})
       absl::span
       iree::base
       iree::base::internal::flags
+      iree::base::logging
       iree::base::status
       iree::base::tracing
+      iree::compiler::Dialect::HAL::Target
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
@@ -357,6 +365,7 @@ if(${IREE_BUILD_COMPILER})
       iree::tools::utils::vm_util
       iree::vm
       iree::vm::bytecode_module
+      iree::vm::cc
     HOSTONLY
   )
 

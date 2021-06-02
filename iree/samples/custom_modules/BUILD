@@ -58,9 +58,11 @@ cc_library(
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base",
+        "//iree/base:status",
         "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:cc",
+        "@com_google_absl//absl/types:span",
     ],
 )

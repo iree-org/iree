@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "iree/base/api.h"
+
 #if IREE_FLAGS_ENABLE_CLI == 1
 
 #include "iree/base/internal/debugging.h"

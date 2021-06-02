@@ -27,10 +27,13 @@ cc_library(
         "IREE_HAL_HAVE_VMVX_DRIVER_MODULE=1",
     ],
     deps = [
+        "//iree/base",
         "//iree/hal",
+        "//iree/hal/local",
         "//iree/hal/local:task_driver",
         "//iree/hal/local/loaders:vmvx_module_loader",
         "//iree/task:api",
+        "//iree/vm",
     ],
 )
 

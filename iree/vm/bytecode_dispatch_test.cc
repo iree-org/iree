@@ -48,8 +48,7 @@ std::vector<TestParams> GetModuleTestParams() {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file.data),
             module_file.size},
-        iree_allocator_null(), iree_allocator_system(), &module))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &module));
     iree_vm_module_signature_t signature = module->signature(module->self);
     test_params.reserve(test_params.size() + signature.export_function_count);
     for (int i = 0; i < signature.export_function_count; ++i) {
@@ -78,8 +77,7 @@ class VMBytecodeDispatchTest
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(test_params.module_file.data),
             test_params.module_file.size},
-        iree_allocator_null(), iree_allocator_system(), &bytecode_module_))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
@@ -97,8 +95,7 @@ class VMBytecodeDispatchTest
     iree_vm_function_t function;
     IREE_CHECK_OK(bytecode_module_->lookup_function(
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_make_cstring_view(function_name), &function))
-        << "Exported function '" << function_name << "' not found";
+        iree_make_cstring_view(function_name), &function));
 
     return iree_vm_invoke(context_, function,
                           /*policy=*/nullptr, /*inputs=*/nullptr,

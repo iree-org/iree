@@ -6,7 +6,6 @@
 
 #include "iree/vm/ref.h"
 
-#include <assert.h>
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"

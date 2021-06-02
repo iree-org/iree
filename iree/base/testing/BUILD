@@ -33,7 +33,8 @@ cc_test(
     srcs = ["dynamic_library_test.cc"],
     deps = [
         ":dynamic_library_test_library",
-        "//iree/base:core_headers",
+        "//iree/base",
+        "//iree/base:logging",
         "//iree/base/internal:dynamic_library",
         "//iree/base/internal:file_io",
         "//iree/testing:gtest",

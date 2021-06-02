@@ -6,6 +6,8 @@
 
 #include "iree/hal/local/executable_loader.h"
 
+#include "iree/base/api.h"
+
 void iree_hal_executable_loader_initialize(
     const void* vtable, iree_hal_executable_loader_t* out_base_loader) {
   iree_atomic_ref_count_init(&out_base_loader->ref_count);

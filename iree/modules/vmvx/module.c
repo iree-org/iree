@@ -6,6 +6,11 @@
 
 #include "iree/modules/vmvx/module.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
@@ -108,7 +113,7 @@ static const iree_vm_native_function_ptr_t iree_vmvx_module_funcs_[] = {
           iree_vm_shim_##arg_types##_##ret_types,              \
       .target = (iree_vm_native_function_target_t)(target_fn), \
   },
-#include "iree/modules/vmvx/exports.inl"
+#include "iree/modules/vmvx/exports.inl"  // IWYU pragma: keep
 #undef EXPORT_FN
 };
 
@@ -124,7 +129,7 @@ static const iree_vm_native_export_descriptor_t iree_vmvx_module_exports_[] = {
       .reflection_attr_count = 0,                                  \
       .reflection_attrs = NULL,                                    \
   },
-#include "iree/modules/vmvx/exports.inl"
+#include "iree/modules/vmvx/exports.inl"  // IWYU pragma: keep
 #undef EXPORT_FN
 };
 static_assert(IREE_ARRAYSIZE(iree_vmvx_module_funcs_) ==

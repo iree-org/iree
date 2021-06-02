@@ -7,6 +7,8 @@
 #ifndef IREE_TASK_EXECUTOR_H_
 #define IREE_TASK_EXECUTOR_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/wait_handle.h"

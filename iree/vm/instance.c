@@ -6,6 +6,8 @@
 
 #include "iree/vm/instance.h"
 
+#include <stddef.h>
+
 #include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/builtin_types.h"

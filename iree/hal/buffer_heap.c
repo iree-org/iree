@@ -4,10 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/detail.h"
+#include "iree/hal/resource.h"
 
 typedef struct iree_hal_heap_buffer_t {
   iree_hal_buffer_t base;

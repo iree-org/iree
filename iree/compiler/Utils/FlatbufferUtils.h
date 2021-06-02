@@ -7,8 +7,15 @@
 #ifndef IREE_COMPILER_UTILS_FLATBUFFERUTILS_H_
 #define IREE_COMPILER_UTILS_FLATBUFFERUTILS_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include <functional>
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -16,8 +23,9 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-// NOTE: order matters here as some of the LLVM includes conflict.
+// clang-format off: order matters here as some of the LLVM includes conflict:
 #include "iree/base/internal/flatcc.h"
+// clang-format on
 
 namespace mlir {
 namespace iree_compiler {

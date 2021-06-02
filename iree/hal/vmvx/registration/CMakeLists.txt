@@ -20,10 +20,13 @@ iree_cc_library(
   SRCS
     "driver_module.c"
   DEPS
+    iree::base
     iree::hal
+    iree::hal::local
     iree::hal::local::loaders::vmvx_module_loader
     iree::hal::local::task_driver
     iree::task::api
+    iree::vm
   DEFINES
     "IREE_HAL_HAVE_VMVX_DRIVER_MODULE=1"
   PUBLIC

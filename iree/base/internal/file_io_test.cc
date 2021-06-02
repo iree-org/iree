@@ -6,6 +6,15 @@
 
 #include "iree/base/internal/file_io.h"
 
+#include <cstdlib>
+#include <cstring>
+#include <ostream>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include "iree/base/logging.h"
+#include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -36,8 +45,7 @@ TEST(FileIO, ReadWriteContents) {
   auto path = GetUniquePath(kUniqueName);
 
   // File must not exist.
-  ASSERT_THAT(Status(iree_file_exists(path.c_str())),
-              StatusIs(StatusCode::kNotFound));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, iree_file_exists(path.c_str()));
 
   // Generate file contents.
   auto write_contents = GetUniqueContents(kUniqueName);

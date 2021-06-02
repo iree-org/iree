@@ -13,6 +13,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"

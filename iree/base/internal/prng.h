@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/target_platform.h"
 

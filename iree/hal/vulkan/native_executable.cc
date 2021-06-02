@@ -6,10 +6,18 @@
 
 #include "iree/hal/vulkan/native_executable.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vulkan/dynamic_symbol_tables.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_executable_layout.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc.h"

@@ -92,6 +92,7 @@
 #define IREE_BASE_API_H_
 
 #include <assert.h>
+#include <errno.h>
 #include <memory.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -101,11 +102,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "iree/base/alignment.h"
-#include "iree/base/attributes.h"
-#include "iree/base/config.h"
-#include "iree/base/string_view.h"
-#include "iree/base/time.h"
+#include "iree/base/alignment.h"    // IWYU pragma: export
+#include "iree/base/attributes.h"   // IWYU pragma: export
+#include "iree/base/config.h"       // IWYU pragma: export
+#include "iree/base/string_view.h"  // IWYU pragma: export
+#include "iree/base/time.h"         // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {
@@ -589,6 +590,6 @@ iree_api_version_check(iree_api_version_t expected_version,
 }  // extern "C"
 #endif  // __cplusplus
 
-#include "iree/base/allocator.h"
+#include "iree/base/allocator.h"  // IWYU pragma: export
 
 #endif  // IREE_BASE_API_H_

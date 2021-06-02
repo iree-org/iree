@@ -4,12 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_dispatch_util.h"
+#include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/ops.h"
 
 //===----------------------------------------------------------------------===//

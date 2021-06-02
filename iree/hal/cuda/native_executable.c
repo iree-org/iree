@@ -6,7 +6,11 @@
 
 #include "iree/hal/cuda/native_executable.h"
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/status_util.h"
 
 // flatcc schemas:

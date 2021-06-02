@@ -7,6 +7,7 @@
 #ifndef IREE_SAMPLES_CUSTOM_MODULES_NATIVE_MODULE_H_
 #define IREE_SAMPLES_CUSTOM_MODULES_NATIVE_MODULE_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"

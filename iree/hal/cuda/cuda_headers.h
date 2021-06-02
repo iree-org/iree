@@ -7,6 +7,6 @@
 #ifndef IREE_HAL_CUDA_CUDA_HEADERS_H_
 #define IREE_HAL_CUDA_CUDA_HEADERS_H_
 
-#include "cuda.h"
+#include "cuda.h"  // IWYU pragma: export
 
 #endif  // IREE_HAL_CUDA_CUDA_HEADERS_H_

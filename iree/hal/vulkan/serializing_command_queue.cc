@@ -6,7 +6,9 @@
 
 #include "iree/hal/vulkan/serializing_command_queue.h"
 
+#include <cstdint>
 #include <memory>
+#include <type_traits>
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
@@ -14,6 +16,8 @@
 #include "iree/hal/vulkan/direct_command_buffer.h"
 #include "iree/hal/vulkan/emulated_semaphore.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/tracing.h"
+#include "iree/hal/vulkan/util/arena.h"
 
 namespace iree {
 namespace hal {

@@ -6,9 +6,13 @@
 
 #include "iree/hal/executable_cache.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
+#include "iree/hal/resource.h"
 
 void iree_hal_executable_spec_initialize(iree_hal_executable_spec_t* out_spec) {
   memset(out_spec, 0, sizeof(*out_spec));

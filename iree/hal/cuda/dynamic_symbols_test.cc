@@ -6,8 +6,10 @@
 
 #include "iree/hal/cuda/dynamic_symbols.h"
 
+#include <iostream>
+
+#include "iree/base/api.h"
 #include "iree/testing/gtest.h"
-#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -25,7 +27,7 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   iree_status_t status = iree_hal_cuda_dynamic_symbols_initialize(
       iree_allocator_system(), &symbols);
   if (!iree_status_is_ok(status)) {
-    IREE_LOG(WARNING) << "Symbols cannot be loaded, skipping test.";
+    std::cerr << "Symbols cannot be loaded, skipping test.";
     GTEST_SKIP();
   }
 

@@ -6,9 +6,13 @@
 
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 
-#include "iree/base/alignment.h"
+#include <cstddef>
+#include <type_traits>
+#include <utility>
+
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/native_descriptor_set_layout.h"
 #include "iree/hal/vulkan/native_executable_layout.h"
 #include "iree/hal/vulkan/status_util.h"

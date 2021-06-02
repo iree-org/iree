@@ -6,8 +6,15 @@
 
 #include "iree/vm/invocation.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/vm/ref.h"
+#include "iree/vm/stack.h"
+#include "iree/vm/value.h"
 
 // Marshals caller arguments from the variant list to the ABI convention.
 static iree_status_t iree_vm_invoke_marshal_inputs(

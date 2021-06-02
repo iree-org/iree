@@ -8,7 +8,6 @@
 
 #include "iree/task/testing/test_util.h"
 #include "iree/testing/gtest.h"
-#include "iree/testing/status_matchers.h"
 
 namespace {
 

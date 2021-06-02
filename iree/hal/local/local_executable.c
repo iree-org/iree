@@ -6,8 +6,6 @@
 
 #include "iree/hal/local/local_executable.h"
 
-#include <stdio.h>
-
 #include "iree/base/tracing.h"
 
 void iree_hal_local_executable_initialize(

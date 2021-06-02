@@ -6,12 +6,14 @@
 
 #include "iree/hal/vulkan/api.h"
 
+#include <cstring>
+#include <functional>
+#include <string>
+
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
-#include "iree/hal/vulkan/extensibility_util.h"
-#include "iree/hal/vulkan/vulkan_device.h"
-#include "iree/hal/vulkan/vulkan_driver.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 using namespace iree::hal::vulkan;
 

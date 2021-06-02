@@ -6,9 +6,13 @@
 
 #include "iree/hal/command_buffer.h"
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
+#include "iree/hal/resource.h"
 
 #define _VTABLE_DISPATCH(command_buffer, method_name) \
   IREE_HAL_VTABLE_DISPATCH(command_buffer, iree_hal_command_buffer, method_name)

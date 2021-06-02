@@ -6,7 +6,8 @@
 
 #include "iree/hal/local/executable_library.h"
 
-#include <assert.h>
+#include <stdbool.h>
+#include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/local/executable_library_demo.h"

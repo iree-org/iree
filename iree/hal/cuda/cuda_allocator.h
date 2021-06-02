@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_CUDA_ALLOCATOR_H_
 #define IREE_HAL_CUDA_ALLOCATOR_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cuda/context_wrapper.h"
 #include "iree/hal/cuda/status_util.h"

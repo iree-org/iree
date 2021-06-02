@@ -6,10 +6,16 @@
 
 #include "iree/hal/local/loaders/embedded_library_loader.h"
 
-#include "iree/base/target_platform.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/local/elf/elf_module.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_elf_executable_t

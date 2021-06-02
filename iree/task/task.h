@@ -7,6 +7,10 @@
 #ifndef IREE_TASK_TASK_H_
 #define IREE_TASK_TASK_H_
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"

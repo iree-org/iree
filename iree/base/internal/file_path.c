@@ -6,6 +6,9 @@
 
 #include "iree/base/internal/file_path.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/target_platform.h"
 
 static iree_status_t iree_string_view_dup(iree_string_view_t value,

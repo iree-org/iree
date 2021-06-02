@@ -114,6 +114,7 @@ cc_library(
         "dynamic_symbol_tables.h",
     ],
     deps = [
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",
@@ -129,6 +130,7 @@ cc_test(
     tags = ["driver=vulkan"],
     deps = [
         ":dynamic_symbols",
+        "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

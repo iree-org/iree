@@ -22,17 +22,18 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
-// Order matters.
-#include "iree/compiler/Dialect/HAL/IR/HALEnums.h.inc"
-#include "iree/compiler/Dialect/HAL/IR/HALStructs.h.inc"
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/HAL/IR/HALEnums.h.inc"    // IWYU pragma: keep
+#include "iree/compiler/Dialect/HAL/IR/HALStructs.h.inc"  // IWYU pragma: export
+// clang-format on
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-#include "iree/compiler/Dialect/HAL/IR/HALOpInterfaces.h.inc"
-#include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.h.inc"
+#include "iree/compiler/Dialect/HAL/IR/HALOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.h.inc"  // IWYU pragma: export
 
 //===----------------------------------------------------------------------===//
 // Enum utilities

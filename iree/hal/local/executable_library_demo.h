@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_DEMO_H_
 #define IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_DEMO_H_
 
+#include <stdint.h>
+
 #include "iree/hal/local/executable_library.h"
 
 #ifdef __cplusplus

@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_VULKAN_VULKAN_DEVICE_H_
 #define IREE_HAL_VULKAN_VULKAN_DEVICE_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

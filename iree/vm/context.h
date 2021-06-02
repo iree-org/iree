@@ -7,6 +7,8 @@
 #ifndef IREE_VM_CONTEXT_H_
 #define IREE_VM_CONTEXT_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"

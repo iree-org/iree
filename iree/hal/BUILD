@@ -76,7 +76,7 @@ cc_test(
     srcs = ["string_util_test.cc"],
     deps = [
         ":hal",
-        "//iree/base:core_headers",
+        "//iree/base",
         "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",

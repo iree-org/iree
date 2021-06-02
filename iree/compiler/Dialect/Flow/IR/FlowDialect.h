@@ -17,7 +17,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-#include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.h.inc"
+#include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.h.inc"  // IWYU pragma: export
 
 class FlowDialect : public Dialect {
  public:

@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_VULKAN_VMA_BUFFER_H_
 #define IREE_HAL_VULKAN_VMA_BUFFER_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/internal_vk_mem_alloc.h"
 

@@ -6,6 +6,8 @@
 
 // A example of setting up the the vulkan driver.
 
+#include <stddef.h>
+
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/registration/driver_module.h"

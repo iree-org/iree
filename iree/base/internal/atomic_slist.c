@@ -6,7 +6,9 @@
 
 #include "iree/base/internal/atomic_slist.h"
 
-#include <assert.h>
+#include <string.h>
+
+#include "iree/base/attributes.h"
 
 // TODO(benvanik): add TSAN annotations when switched to atomics:
 // https://github.com/gcc-mirror/gcc/blob/master/libsanitizer/include/sanitizer/tsan_interface_atomic.h

@@ -7,13 +7,21 @@
 #include "iree/samples/custom_modules/native_module.h"
 
 #include <atomic>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 
+#include "absl/types/span.h"
 #include "iree/base/api.h"
+#include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/native_module_cc.h"
+#include "iree/vm/ref_cc.h"
 
 //===----------------------------------------------------------------------===//
 // !custom.message type

@@ -6,6 +6,11 @@
 
 #include "iree/base/internal/threading.h"
 
+#include <assert.h>
+#include <errno.h>
+#include <string.h>
+
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading_impl.h"
 
 int iree_strncpy_s(char* IREE_RESTRICT dest, size_t destsz,

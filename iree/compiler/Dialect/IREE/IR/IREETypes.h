@@ -134,7 +134,7 @@ void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedResultIndices,
     SmallVector<int64_t, 4> &tiedOperandIndices);
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOpInterfaces.h.inc"
+#include "iree/compiler/Dialect/IREE/IR/IREEOpInterfaces.h.inc"  // IWYU pragma: export
 
 }  // namespace IREE
 

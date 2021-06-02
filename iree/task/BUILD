@@ -71,7 +71,7 @@ cc_test(
     deps = [
         ":task",
         "//iree/base",
-        "//iree/base:core_headers",
+        "//iree/base:tracing",
         "//iree/base/internal:prng",
         "//iree/task/testing:test_util",
         "//iree/testing:gtest",

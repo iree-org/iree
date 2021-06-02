@@ -6,7 +6,10 @@
 
 #include "iree/vm/list.h"
 
-#include "iree/base/alignment.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 // Size of each iree_vm_value_type_t in bytes.
 static const iree_host_size_t kValueTypeSizes[7] = {

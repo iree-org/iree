@@ -11,7 +11,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "iree/base/status.h"
+#include "iree/base/status.h"  // IWYU pragma: export
 #include "iree/testing/gtest.h"
 
 namespace iree {

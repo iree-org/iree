@@ -37,9 +37,10 @@ iree_cc_test(
     "dynamic_library_test.cc"
   DEPS
     ::dynamic_library_test_library
-    iree::base::core_headers
+    iree::base
     iree::base::internal::dynamic_library
     iree::base::internal::file_io
+    iree::base::logging
     iree::testing::gtest
     iree::testing::gtest_main
 )

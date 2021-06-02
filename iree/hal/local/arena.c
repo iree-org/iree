@@ -6,7 +6,10 @@
 
 #include "iree/hal/local/arena.h"
 
-#include "iree/base/alignment.h"
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_arena_block_pool_t

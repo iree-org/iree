@@ -187,7 +187,7 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 //==============================================================================
 
 #if defined(__APPLE__)
-#include <TargetConditionals.h>
+#include <TargetConditionals.h>  // IWYU pragma: export
 #if TARGET_OS_IPHONE
 #define IREE_PLATFORM_IOS 1
 #else
@@ -231,7 +231,7 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 #endif  // NOMINMAX
 #endif  // _MSC_VER
 
-#include <windows.h>
+#include <windows.h>  // IWYU pragma: export
 
 // WinGDI.h defines `ERROR`, undef to avoid conflict naming.
 #undef ERROR

@@ -6,8 +6,10 @@
 
 #include "iree/hal/cuda/executable_layout.h"
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/cuda/status_util.h"
 
 typedef struct iree_hal_cuda_executable_layout_t {
   iree_hal_resource_t resource;

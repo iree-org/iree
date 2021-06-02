@@ -6,7 +6,11 @@
 
 #include "iree/hal/vulkan/nop_executable_cache.h"
 
+#include <cstddef>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vulkan/dynamic_symbol_tables.h"
 #include "iree/hal/vulkan/native_executable.h"
 
 using namespace iree::hal::vulkan;

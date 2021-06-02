@@ -6,13 +6,8 @@
 
 #include "iree/base/api.h"
 
-#include <sstream>
-#include <string>
-#include <vector>
+#include <cstring>
 
-#include "absl/types/span.h"
-#include "iree/base/logging.h"
-#include "iree/hal/api.h"
 #include "iree/modules/strings/api.h"
 #include "iree/modules/strings/api_detail.h"
 #include "iree/modules/strings/strings_module.h"

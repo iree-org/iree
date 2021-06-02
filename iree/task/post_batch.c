@@ -6,11 +6,16 @@
 
 #include "iree/task/post_batch.h"
 
+#include <string.h>
+
+#include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
 #include "iree/base/tracing.h"
 #include "iree/task/executor_impl.h"
+#include "iree/task/queue.h"
+#include "iree/task/worker.h"
 
 void iree_task_post_batch_initialize(iree_task_executor_t* executor,
                                      iree_task_worker_t* current_worker,

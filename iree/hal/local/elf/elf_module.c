@@ -7,9 +7,11 @@
 #include "iree/hal/local/elf/elf_module.h"
 
 #include <inttypes.h>
+#include <string.h>
 
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/local/elf/arch.h"
 #include "iree/hal/local/elf/platform.h"
 
 //==============================================================================

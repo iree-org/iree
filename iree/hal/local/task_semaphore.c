@@ -7,6 +7,9 @@
 #include "iree/hal/local/task_semaphore.h"
 
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"

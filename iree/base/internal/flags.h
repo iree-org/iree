@@ -7,6 +7,8 @@
 #ifndef IREE_BASE_INTERNAL_FLAGS_H_
 #define IREE_BASE_INTERNAL_FLAGS_H_
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "iree/base/api.h"

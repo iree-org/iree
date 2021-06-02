@@ -6,15 +6,23 @@
 
 #include "iree/hal/vulkan/direct_command_buffer.h"
 
+#include <cstddef>
+#include <cstdint>
+
+#include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
 #include "iree/base/internal/math.h"
+#include "iree/base/logging.h"
+#include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
 #include "iree/hal/vulkan/native_event.h"
+#include "iree/hal/vulkan/native_executable.h"
 #include "iree/hal/vulkan/native_executable_layout.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 #include "iree/hal/vulkan/vma_buffer.h"
 
 using namespace iree::hal::vulkan;
