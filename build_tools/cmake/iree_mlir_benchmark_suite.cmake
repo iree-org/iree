@@ -34,7 +34,8 @@ endfunction()
 #       should have a name matching the one in MODULE_NAMES.
 #   ENTRY_FUNCTIONS: The entry function name for each input module.
 #   FUNCTION_INPUTS: A list of entry function inputs for each input module.
-#   BENCHMARK_MODE: A comma-separated list of benchmark mode tags.
+#   BENCHMARK_MODES: A list strings, where ech one of them is a comma-
+#       separated list of benchmark mode tags.
 #   TARGET_BACKEND: The compiler target backend.
 #   TARGET_ARCHITECTURE: The detailed target backend's architecture.
 #   TRANSLATION_FLAGS: A list of command-line options and their values to
@@ -65,7 +66,7 @@ endfunction()
 #
 # TARGET_BACKEND and TRANSLATION_FLAGS control how the input module will be
 # converted into the final IREE deployable module format. DRIVER and
-# RUNTIME_FLAGS specify how the module will be executed. BENCHMARK_MODE
+# RUNTIME_FLAGS specify how the module will be executed. BENCHMARK_MODES
 # can be used to give descriptions of the translation/runtime configuration
 # (e.g., full-inference vs. kernel-execution) and specify more contextual
 # requirements (e.g., big-core vs. little-core).
@@ -79,8 +80,8 @@ function(iree_mlir_benchmark_suite)
     PARSE_ARGV 0
     _RULE
     ""
-    "BENCHMARK_MODE;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
-    "ENTRY_FUNCTIONS;FUNCTION_INPUTS;MLIR_SOURCES;MODULE_NAMES;MODULE_SOURCES;MODULE_TAGS;TRANSLATION_FLAGS;RUNTIME_FLAGS"
+    "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "BENCHMARK_MODES;ENTRY_FUNCTIONS;FUNCTION_INPUTS;MLIR_SOURCES;MODULE_NAMES;MODULE_SOURCES;MODULE_TAGS;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
   iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_MODULE_TAGS)
@@ -145,80 +146,82 @@ function(iree_mlir_benchmark_suite)
     endif()
 
     # Next create the command and target for compiling the input module into
-    # IREE deployable format.
+    # IREE deployable format for each benchmark mode.
     string(JOIN "-" _MODULE_DIR_NAME "${_MODULE_NAME}" "${_MODULE_TAGS}")
-    set(_BENCHMARK_DIR_NAME
-        "iree-${_RULE_DRIVER}__${_RULE_TARGET_ARCHITECTURE}__${_RULE_BENCHMARK_MODE}")
-    set(_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
+    foreach (_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
+      set(_BENCHMARK_DIR_NAME
+          "iree-${_RULE_DRIVER}__${_RULE_TARGET_ARCHITECTURE}__${_BENCHMARK_MODE}")
+      set(_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
 
-    set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
-    list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
-    list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
+      set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
+      list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
+      list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
 
-    set(_VMFB_FILE "${_ARTIFACTS_DIR}/compiled.vmfb")
-    add_custom_command(
-      OUTPUT "${_VMFB_FILE}"
-      COMMAND
-        "$<TARGET_FILE:iree_tools_iree-translate>"
-          ${_TRANSLATION_ARGS}
-          "${_SOURCE_FILE}"
-          -o "${_VMFB_FILE}"
-      WORKING_DIRECTORY "${_ARTIFACTS_DIR}"
-      DEPENDS
-        iree_tools_iree-translate
-        "${_DOWNLOAD_TARGET_NAME}"
-      COMMENT "Generating ${_VMFB_FILE}"
-    )
+      set(_VMFB_FILE "${_ARTIFACTS_DIR}/compiled.vmfb")
+      add_custom_command(
+        OUTPUT "${_VMFB_FILE}"
+        COMMAND
+          "$<TARGET_FILE:iree_tools_iree-translate>"
+            ${_TRANSLATION_ARGS}
+            "${_SOURCE_FILE}"
+            -o "${_VMFB_FILE}"
+        WORKING_DIRECTORY "${_ARTIFACTS_DIR}"
+        DEPENDS
+          iree_tools_iree-translate
+          "${_DOWNLOAD_TARGET_NAME}"
+        COMMENT "Generating ${_VMFB_FILE}"
+      )
 
-    set(_COMMON_NAME_SEGMENTS "${_MODULE_NAME}")
-    string(REPLACE "," "-" _TAGS "${_MODULE_TAGS}")
-    string(REPLACE "," "-" _MODE "${_RULE_BENCHMARK_MODE}")
-    list(APPEND _COMMON_NAME_SEGMENTS
-         "${_TAGS}" "${_MODE}" "${_RULE_TARGET_BACKEND}"
-         "${_RULE_TARGET_ARCHITECTURE}")
+      set(_COMMON_NAME_SEGMENTS "${_MODULE_NAME}")
+      string(REPLACE "," "-" _TAGS "${_MODULE_TAGS}")
+      string(REPLACE "," "-" _MODE "${_BENCHMARK_MODE}")
+      list(APPEND _COMMON_NAME_SEGMENTS
+           "${_TAGS}" "${_MODE}" "${_RULE_TARGET_BACKEND}"
+           "${_RULE_TARGET_ARCHITECTURE}")
 
-    # Construct the benchmark artifact generation target name, which is the module
-    # name, followed by benchmark mode, target backend, and configuration.
-    set(_TRANSLATION_TARGET_NAME_LIST "iree-generate-benchmark-artifact")
-    list(APPEND _TRANSLATION_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-    list(JOIN _TRANSLATION_TARGET_NAME_LIST "__" _TRANSLATION_TARGET_NAME)
+      # Construct the benchmark artifact generation target name, which is the module
+      # name, followed by benchmark mode, target backend, and configuration.
+      set(_TRANSLATION_TARGET_NAME_LIST "iree-generate-benchmark-artifact")
+      list(APPEND _TRANSLATION_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
+      list(JOIN _TRANSLATION_TARGET_NAME_LIST "__" _TRANSLATION_TARGET_NAME)
 
-    add_custom_target("${_TRANSLATION_TARGET_NAME}"
-      DEPENDS "${_VMFB_FILE}"
-    )
+      add_custom_target("${_TRANSLATION_TARGET_NAME}"
+        DEPENDS "${_VMFB_FILE}"
+      )
 
-    # Mark dependency so that we have one target to drive them all.
-    add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
+      # Mark dependency so that we have one target to drive them all.
+      add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
 
-    # Finally create the command and target for the flagfile used to execute the
-    # generated artifacts.
-    set(_FLAG_FILE "${_ARTIFACTS_DIR}/flagfile")
-    set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\"")
-    add_custom_command(
-      OUTPUT "${_FLAG_FILE}"
-      COMMAND
-        "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
-          --module_file=compiled.vmfb
-          --driver=${_RULE_DRIVER}
-          --entry_function=${_ENTRY_FUNCTION}
-          --function_inputs=${_FUNCTION_INPUTS}
-          "${_ADDITIONAL_ARGS_CL}"
-          -o "${_FLAG_FILE}"
-      DEPENDS
-        "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
-      WORKING_DIRECTORY "${_ARTIFACTS_DIR}"
-      COMMENT "Generating ${_FLAG_FILE}"
-    )
+      # Finally create the command and target for the flagfile used to execute the
+      # generated artifacts.
+      set(_FLAG_FILE "${_ARTIFACTS_DIR}/flagfile")
+      set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\"")
+      add_custom_command(
+        OUTPUT "${_FLAG_FILE}"
+        COMMAND
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
+            --module_file=compiled.vmfb
+            --driver=${_RULE_DRIVER}
+            --entry_function=${_ENTRY_FUNCTION}
+            --function_inputs=${_FUNCTION_INPUTS}
+            "${_ADDITIONAL_ARGS_CL}"
+            -o "${_FLAG_FILE}"
+        DEPENDS
+          "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
+        WORKING_DIRECTORY "${_ARTIFACTS_DIR}"
+        COMMENT "Generating ${_FLAG_FILE}"
+      )
 
-    set(_FLAGFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-flagfile")
-    list(APPEND _FLAGFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-    list(JOIN _FLAGFILE_GEN_TARGET_NAME_LIST "__" _FLAGFILE_GEN_TARGET_NAME)
+      set(_FLAGFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-flagfile")
+      list(APPEND _FLAGFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
+      list(JOIN _FLAGFILE_GEN_TARGET_NAME_LIST "__" _FLAGFILE_GEN_TARGET_NAME)
 
-    add_custom_target("${_FLAGFILE_GEN_TARGET_NAME}"
-      DEPENDS "${_FLAG_FILE}"
-    )
+      add_custom_target("${_FLAGFILE_GEN_TARGET_NAME}"
+        DEPENDS "${_FLAG_FILE}"
+      )
 
-    # Mark dependency so that we have one target to drive them all.
-    add_dependencies(iree-benchmark-suites "${_FLAGFILE_GEN_TARGET_NAME}")
-  endforeach()
+      # Mark dependency so that we have one target to drive them all.
+      add_dependencies(iree-benchmark-suites "${_FLAGFILE_GEN_TARGET_NAME}")
+    endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
+  endforeach(_INDEX RANGE 0 "${_MAX_INDEX}")
 endfunction()
