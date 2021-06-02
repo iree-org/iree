@@ -47,8 +47,11 @@ cd build-host
   -DCMAKE_INSTALL_PREFIX=./install \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
+  -DIREE_BUILD_BENCHMARKS=ON \
   -DIREE_BUILD_SAMPLES=OFF
 "${CMAKE_BIN?}" --build . --target install
+# Also make sure that we can generate artifacts for benchmarking on Android.
+"${CMAKE_BIN?}" --build . --target iree-benchmark-suites
 # --------------------------------------------------------------------------- #
 
 cd ${ROOT_DIR?}
