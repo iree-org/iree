@@ -18,7 +18,7 @@ extern "C" {
 
 // Parameters configuring an iree_hal_task_device_t.
 // Must be initialized with iree_hal_task_device_params_initialize prior to use.
-typedef struct {
+typedef struct iree_hal_task_device_params_t {
   // Number of queues exposed on the device.
   // Each queue acts as a separate synchronization scope where all work executes
   // concurrently unless prohibited by semaphores.

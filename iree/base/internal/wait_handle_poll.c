@@ -113,7 +113,7 @@ static iree_status_t iree_syscall_poll(struct pollfd* fds, nfds_t nfds,
 // iree_wait_set_t
 //===----------------------------------------------------------------------===//
 
-struct iree_wait_set_s {
+struct iree_wait_set_t {
   iree_allocator_t allocator;
 
   // Total capacity of each handle list.

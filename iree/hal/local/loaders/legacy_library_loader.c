@@ -58,7 +58,7 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
 // iree_hal_legacy_executable_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_legacy_executable_t {
   iree_hal_local_executable_t base;
 
   // Flatbuffer definition referencing the executable memory.
@@ -282,7 +282,7 @@ const iree_hal_local_executable_vtable_t iree_hal_legacy_executable_vtable = {
 // iree_hal_legacy_library_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_legacy_library_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
 } iree_hal_legacy_library_loader_t;

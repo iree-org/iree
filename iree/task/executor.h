@@ -252,7 +252,7 @@ extern "C" {
 
 // A bitfield specifying the scheduling mode used for configuring how (or if)
 // work is balanced across queues.
-enum iree_task_scheduling_mode_e {
+enum iree_task_scheduling_mode_bits_t {
   // TODO(benvanik): batch, round-robin, FCFS, SJF, etc.
   // We can also allow for custom scheduling, though I'm skeptical of the value
   // of that. We should look into what GPUs do in hardware for balancing things
@@ -295,7 +295,7 @@ enum iree_task_scheduling_mode_e {
 typedef uint32_t iree_task_scheduling_mode_t;
 
 // Base task system executor interface.
-typedef struct iree_task_executor_s iree_task_executor_t;
+typedef struct iree_task_executor_t iree_task_executor_t;
 
 // Creates a task executor using the specified topology.
 // |topology| is only used during creation and need not live beyond this call.

@@ -804,8 +804,8 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
 }
 
 bool DispatchWorkgroupsOp::isOutputReadWithinRegion(unsigned resultIndex) {
-  BlockArgument arg =
-      body().front().getArgument(operands().size() + resultIndex);
+  unsigned startIndex = getBody()->getNumArguments() - getNumResults();
+  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
   // If argument is of `writeonly` access, then it is not read by construction.
   if (arg.getType().cast<DispatchTensorType>().getAccess() ==
       TensorAccess::WriteOnly) {

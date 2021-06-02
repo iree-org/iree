@@ -15,7 +15,7 @@
 // Command buffer implementation that directly maps to cuda graph.
 // This records the commands on the calling thread without additional threading
 // indirection.
-typedef struct {
+typedef struct iree_hal_cuda_graph_command_buffer_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
   iree_hal_command_buffer_mode_t mode;

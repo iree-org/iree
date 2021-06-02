@@ -21,7 +21,7 @@
 // VkInstanceCreateInfo::pNext chain. The callback will only be used this way
 // during the creation call after which users can create the real
 // instance-specific reporter.
-typedef struct iree_hal_vulkan_debug_reporter_s
+typedef struct iree_hal_vulkan_debug_reporter_t
     iree_hal_vulkan_debug_reporter_t;
 
 iree_status_t iree_hal_vulkan_debug_reporter_allocate(

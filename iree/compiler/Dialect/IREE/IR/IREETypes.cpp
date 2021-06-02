@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "llvm/ADT/BitVector.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/TypeSupport.h"
@@ -128,17 +129,22 @@ void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
   auto indices = getTiedResultOperandIndices(op);
   if (indices.empty()) {
     indices.resize(op->getNumResults(), TiedOpInterface::kUntiedIndex);
+  } else {
+    // Well, getTiedResultOperandIndices() returns indices into the full range
+    // of the op, but in the attribute, we expect to store ranges into the range
+    // returned by `getTiedOperandsIndexAndLength`.
+    auto tiedOp = cast<TiedOpInterface>(op);
+    unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+    for (auto &index : indices) {
+      if (index != TiedOpInterface::kUntiedIndex) index -= tiedOperandsOffset;
+    }
   }
+
   indices[resultIndex] = operandIndex.hasValue()
                              ? operandIndex.getValue()
                              : TiedOpInterface::kUntiedIndex;
-  auto indexType = IndexType::get(op->getContext());
   op->setAttr(TiedOpInterface::getStorageAttrName(),
-              ArrayAttr::get(op->getContext(),
-                             llvm::to_vector<8>(llvm::map_range(
-                                 indices, [&](int64_t v) -> Attribute {
-                                   return IntegerAttr::get(indexType, v);
-                                 }))));
+              Builder(op).getIndexArrayAttr(indices));
 }
 
 SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {

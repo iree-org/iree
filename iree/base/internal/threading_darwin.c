@@ -22,7 +22,7 @@
 // Useful to see how pthreads is implemented on (old) darwin:
 // https://opensource.apple.com/source/Libc/Libc-825.40.1/pthreads/pthread.c.auto.html
 
-struct iree_thread_s {
+struct iree_thread_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 

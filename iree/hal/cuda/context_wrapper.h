@@ -13,7 +13,7 @@
 
 // Structure to wrap all objects constant within a context. This makes it
 // simpler to pass it to the different objects and saves memory.
-typedef struct {
+typedef struct iree_hal_cuda_context_wrapper_t {
   CUcontext cu_context;
   iree_allocator_t host_allocator;
   iree_hal_cuda_dynamic_symbols_t* syms;

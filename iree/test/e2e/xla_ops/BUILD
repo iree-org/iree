@@ -57,6 +57,7 @@ iree_check_single_backend_test_suite(
             "pad.mlir",
             "reduce.mlir",
             "reduce_window.mlir",
+            "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
             "rsqrt.mlir",
@@ -72,7 +73,6 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "remainder.mlir",  # frem has a bug in LLVM PTX backend for negative values.
             "round.mlir",
             "scatter.mlir",
             "sort.mlir",

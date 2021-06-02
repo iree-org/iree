@@ -22,7 +22,7 @@ typedef uint64_t iree_hal_local_binding_mask_t;
 #define IREE_HAL_LOCAL_BINDING_MASK_BITS \
   (sizeof(iree_hal_local_binding_mask_t) * 8)
 
-typedef struct {
+typedef struct iree_hal_local_executable_layout_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_host_size_t push_constants;

@@ -27,7 +27,7 @@
 
 #define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
 
-typedef struct {
+typedef struct iree_hal_vmvx_executable_t {
   iree_hal_local_executable_t base;
 
   // Context containing both the VMVX module and the loaded executable.
@@ -333,7 +333,7 @@ const iree_hal_local_executable_vtable_t iree_hal_vmvx_executable_vtable = {
 // iree_hal_vmvx_module_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_vmvx_module_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
   iree_vm_instance_t* instance;

@@ -508,7 +508,7 @@ using namespace iree::hal::vulkan;
 // Porting the above to C is ideal but since this is just a fallback layer I'm
 // not sure it's worth it (given that we may require Vulkan 1.2 with timeline
 // semaphores built in at some point soon).
-typedef struct {
+typedef struct iree_hal_vulkan_emulated_semaphore_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   EmulatedTimelineSemaphore* handle;

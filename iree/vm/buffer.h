@@ -17,7 +17,7 @@ extern "C" {
 // Describes where a byte buffer originates from, what guarantees can be made
 // about its lifetime and ownership, and how it may be accessed.
 // Note that buffers may always be read.
-enum iree_vm_buffer_access_e {
+enum iree_vm_buffer_access_bits_t {
   // The guest is allowed to write to the buffer.
   // If not specified the buffer is read-only.
   IREE_VM_BUFFER_ACCESS_MUTABLE = 1u << 0,
@@ -55,7 +55,7 @@ typedef uint32_t iree_vm_buffer_access_t;
 // For heap-allocated buffers created with iree_vm_buffer_create/clone/etc the
 // allocator is used to free the entire iree_vm_buffer_t and the co-allocated
 // buffer data that lives after it in memory.
-typedef struct {
+typedef struct iree_vm_buffer_t {
   iree_vm_ref_object_t ref_object;
   iree_vm_buffer_access_t access;
   iree_byte_span_t data;

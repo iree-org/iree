@@ -14,7 +14,7 @@
 #include "iree/hal/detail.h"
 #include "iree/hal/string_util.h"
 
-struct iree_hal_buffer_view_s {
+struct iree_hal_buffer_view_t {
   iree_atomic_ref_count_t ref_count;
   iree_hal_buffer_t* buffer;
   iree_hal_element_type_t element_type;

@@ -91,7 +91,7 @@ static bool iree_wait_primitive_compare_identical(
 // iree_wait_set_t
 //===----------------------------------------------------------------------===//
 
-struct iree_wait_set_s {
+struct iree_wait_set_t {
   iree_allocator_t allocator;
 
   // Total capacity of handles in the set (including duplicates).

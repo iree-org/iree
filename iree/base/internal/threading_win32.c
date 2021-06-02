@@ -19,7 +19,7 @@
 // Great documentation:
 // https://www.microsoftpressstore.com/articles/article.aspx?p=2233328
 
-struct iree_thread_s {
+struct iree_thread_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 

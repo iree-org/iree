@@ -22,7 +22,7 @@
 // iree_hal_cuda_device_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_cuda_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 

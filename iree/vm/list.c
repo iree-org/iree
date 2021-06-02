@@ -24,17 +24,17 @@ static_assert(IREE_VM_VALUE_TYPE_COUNT ==
 
 // Defines how the iree_vm_list_t storage is allocated and what elements are
 // interpreted as.
-typedef enum iree_vm_list_storage_mode {
+typedef enum iree_vm_list_storage_mode_e {
   // Each element is a primitive value and stored as a dense array.
   IREE_VM_LIST_STORAGE_MODE_VALUE = 0,
   // Each element is an iree_vm_ref_t of some type.
-  IREE_VM_LIST_STORAGE_MODE_REF = 1,
+  IREE_VM_LIST_STORAGE_MODE_REF,
   // Each element is a variant of any type (possibly all different).
-  IREE_VM_LIST_STORAGE_MODE_VARIANT = 2,
+  IREE_VM_LIST_STORAGE_MODE_VARIANT,
 } iree_vm_list_storage_mode_t;
 
 // A list able to hold either flat primitive elements or ref values.
-struct iree_vm_list {
+struct iree_vm_list_t {
   iree_vm_ref_object_t ref_object;
   iree_allocator_t allocator;
 

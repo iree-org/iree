@@ -17,7 +17,7 @@ extern "C" {
 
 // Parameters configuring an iree_hal_sync_device_t.
 // Must be initialized with iree_hal_sync_device_params_initialize prior to use.
-typedef struct {
+typedef struct iree_hal_sync_device_params_t {
   int reserved;
 } iree_hal_sync_device_params_t;
 

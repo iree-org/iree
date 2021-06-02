@@ -16,13 +16,13 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_task_worker_s iree_task_worker_t;
+typedef struct iree_task_worker_t iree_task_worker_t;
 
 // Transient/stack-allocated structure for batching up tasks for posting to
 // worker mailboxes in single operations. This avoids the need to repeatedly
 // thrash caches during coordination as only during submission are the worker
 // mailboxes touched and only once per worker.
-typedef struct {
+typedef struct iree_task_post_batch_t {
   iree_task_executor_t* executor;
 
   // Local worker constructing the post batch.

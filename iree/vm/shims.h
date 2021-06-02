@@ -28,7 +28,7 @@
                               IREE_VM_ABI_TYPE_NAME(types), body)
 
 #define IREE_VM_ABI_FIXED_STRUCT_IMPL(types, struct_type, body)        \
-  typedef struct iree_vm_abi_##types##_s body IREE_ATTRIBUTE_PACKED    \
+  typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED    \
       struct_type;                                                     \
   static inline struct_type* iree_vm_abi_##types##_checked_deref(      \
       iree_byte_span_t buffer) {                                       \
@@ -43,7 +43,7 @@
 #define IREE_VM_ABI_FIELD_SIZE(type, member) sizeof(((type*)NULL)->member)
 #define IREE_VM_ABI_VLA_STRUCT_IMPL(types, vla_count, vla_field, struct_type, \
                                     body)                                     \
-  typedef struct iree_vm_abi_##types##_s body IREE_ATTRIBUTE_PACKED           \
+  typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED           \
       struct_type;                                                            \
   static inline struct_type* iree_vm_abi_##types##_checked_deref(             \
       iree_byte_span_t buffer) {                                              \
@@ -148,7 +148,7 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
 #endif  // IREE_COMPILER_MSVC
 
 // Special case for void (empty args/rets) as C structs can't have a 0 length.
-typedef struct {
+typedef struct iree_vm_abi_v_t {
   int unused;
 } iree_vm_abi_v_t;
 static inline iree_vm_abi_v_t* iree_vm_abi_v_checked_deref(

@@ -18,8 +18,8 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_vm_invocation iree_vm_invocation_t;
-typedef struct iree_vm_invocation_policy iree_vm_invocation_policy_t;
+typedef struct iree_vm_invocation_t iree_vm_invocation_t;
+typedef struct iree_vm_invocation_policy_t iree_vm_invocation_policy_t;
 
 // Synchronously invokes a function in the VM.
 //

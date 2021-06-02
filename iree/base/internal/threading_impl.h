@@ -43,7 +43,7 @@ int iree_strncpy_s(char* dest, size_t destsz, const char* src, size_t count);
 typedef void (*iree_thread_set_priority_fn_t)(
     iree_thread_t* thread, iree_thread_priority_class_t priority_class);
 
-typedef struct {
+typedef struct iree_thread_override_list_t {
   iree_thread_set_priority_fn_t set_priority_fn;
   iree_thread_priority_class_t base_priority_class;
   iree_allocator_t allocator;

@@ -11,7 +11,7 @@
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_nop_executable_cache_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
 } iree_hal_vulkan_nop_executable_cache_t;

@@ -14,13 +14,13 @@ extern "C" {
 #endif
 
 // Defines the behavior of the dynamic library loader.
-enum iree_dynamic_library_flags_e {
+enum iree_dynamic_library_flag_bits_t {
   IREE_DYNAMIC_LIBRARY_FLAG_NONE = 0u,
 };
 typedef uint32_t iree_dynamic_library_flags_t;
 
 // Dynamic library (aka shared object) cross-platform wrapper.
-typedef struct iree_dynamic_library_s iree_dynamic_library_t;
+typedef struct iree_dynamic_library_t iree_dynamic_library_t;
 
 // Loads a system library using both the system library load paths and the given
 // file name. The path may may be absolute or relative.

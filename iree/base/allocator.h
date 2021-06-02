@@ -45,7 +45,7 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // A span of mutable bytes (ala std::span of uint8_t).
-typedef struct {
+typedef struct iree_byte_span_t {
   uint8_t* data;
   iree_host_size_t data_length;
 } iree_byte_span_t;
@@ -57,7 +57,7 @@ static inline iree_byte_span_t iree_make_byte_span(
 }
 
 // A span of constant bytes (ala std::span of const uint8_t).
-typedef struct {
+typedef struct iree_const_byte_span_t {
   const uint8_t* data;
   iree_host_size_t data_length;
 } iree_const_byte_span_t;
@@ -90,7 +90,7 @@ static inline iree_const_byte_span_t iree_make_const_byte_span(
 //===----------------------------------------------------------------------===//
 
 // Defines how an allocation from an iree_allocator_t should be made.
-enum iree_allocation_mode_e {
+enum iree_allocation_mode_bits_t {
   // The contents of the allocation *must* be zeroed by the allocator prior to
   // returning. Allocators may be able to elide the zeroing if they allocate
   // fresh pages from the system. It is always safe to zero contents if the
@@ -119,7 +119,7 @@ typedef void(IREE_API_PTR* iree_allocator_free_fn_t)(void* self, void* ptr);
 // An allocator for host-memory allocations.
 // IREE will attempt to use this in place of the system malloc and free.
 // Pass the iree_allocator_system() macro to use the system allocator.
-typedef struct {
+typedef struct iree_allocator_t {
   // User-defined pointer passed to all functions.
   void* self;
   // Allocates |byte_length| of memory and stores the pointer in |out_ptr|.

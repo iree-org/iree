@@ -12,7 +12,7 @@
 
 using namespace iree::hal::vulkan;
 
-typedef struct iree_hal_vulkan_vma_allocator_s {
+typedef struct iree_hal_vulkan_vma_allocator_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   VmaAllocator vma;

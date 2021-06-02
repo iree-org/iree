@@ -15,7 +15,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_runtime_session_s iree_runtime_session_t;
+typedef struct iree_runtime_session_t iree_runtime_session_t;
 
 //===----------------------------------------------------------------------===//
 // iree_runtime_call_t
@@ -25,7 +25,7 @@ typedef struct iree_runtime_session_s iree_runtime_session_t;
 // or whether to consume inputs like this or by having separate call types.
 // For example, an async_call may make things more clear when using semaphores
 // without having to pollute this interface.
-enum iree_runtime_call_flags_e {
+enum iree_runtime_call_flag_bits_t {
   IREE_RUNTIME_CALL_FLAG_RESERVED = 0u,
 };
 typedef uint32_t iree_runtime_call_flags_t;
@@ -41,7 +41,7 @@ typedef uint32_t iree_runtime_call_flags_t;
 //
 // Thread-compatible; these are designed to be stack-local or embedded in a user
 // data structure that can provide synchronization when required.
-typedef struct iree_runtime_call_s {
+typedef struct iree_runtime_call_t {
   iree_runtime_session_t* session;
   iree_vm_function_t function;
   iree_vm_list_t* inputs;

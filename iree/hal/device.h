@@ -38,8 +38,8 @@ typedef uintptr_t iree_hal_device_id_t;
 // request of the calling application. Note that certain features may disable
 // runtime optimizations or require compilation flags to ensure the required
 // metadata is present in executables.
-enum iree_hal_device_feature_e {
-  IREE_HAL_DEVICE_FEATURE_NONE = 0,
+enum iree_hal_device_feature_bits_t {
+  IREE_HAL_DEVICE_FEATURE_NONE = 0u,
 
   // Device supports executable debugging.
   // When present executables *may* be compiled with
@@ -47,26 +47,26 @@ enum iree_hal_device_feature_e {
   // debugging related methods. Note that if the input executables do not have
   // embedded debugging information they still may not be able to perform
   // disassembly or fine-grained breakpoint insertion.
-  IREE_HAL_DEVICE_FEATURE_SUPPORTS_DEBUGGING = 1 << 0,
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_DEBUGGING = 1u << 0,
 
   // Device supports executable coverage information.
   // When present executables *may* be compiled with
   // IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_COVERAGE and will produce
   // coverage buffers during dispatch. Note that input executables must have
   // partial embedded debug information to allow mapping back to source offsets.
-  IREE_HAL_DEVICE_FEATURE_SUPPORTS_COVERAGE = 1 << 1,
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_COVERAGE = 1u << 1,
 
   // Device supports executable and command queue profiling.
   // When present executables *may* be compiled with
   // IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING and will produce
   // profiling buffers during dispatch. Note that input executables must have
   // partial embedded debug information to allow mapping back to source offsets.
-  IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING = 1 << 2,
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING = 1u << 2,
 };
 typedef uint32_t iree_hal_device_feature_t;
 
 // Describes an enumerated HAL device.
-typedef struct {
+typedef struct iree_hal_device_info_t {
   // Opaque handle used by drivers. Not valid across driver instances.
   iree_hal_device_id_t device_id;
   // Name of the device as returned by the API.
@@ -76,7 +76,7 @@ typedef struct {
 // A list of semaphores and their corresponding payloads.
 // When signaling each semaphore will be set to the new payload value provided.
 // When waiting each semaphore must reach or exceed the payload value.
-typedef struct {
+typedef struct iree_hal_semaphore_list_t {
   iree_host_size_t count;
   iree_hal_semaphore_t** semaphores;
   uint64_t* payload_values;
@@ -96,7 +96,7 @@ typedef struct {
 // Note that as the HAL only models timeline semaphores we take the payload
 // values directly in this struct; see:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkTimelineSemaphoreSubmitInfo.html
-typedef struct {
+typedef struct iree_hal_submission_batch_t {
   // Semaphores to wait on prior to executing any command buffer.
   iree_hal_semaphore_list_t wait_semaphores;
 
@@ -109,19 +109,18 @@ typedef struct {
 } iree_hal_submission_batch_t;
 
 // Defines how a multi-wait operation treats the results of multiple semaphores.
-enum iree_hal_wait_mode_e {
+typedef enum iree_hal_wait_mode_e {
   // Waits for all semaphores to reach or exceed their specified values.
   IREE_HAL_WAIT_MODE_ALL = 0,
   // Waits for one or more semaphores to reach or exceed their specified values.
   IREE_HAL_WAIT_MODE_ANY = 1,
-};
-typedef uint8_t iree_hal_wait_mode_t;
+} iree_hal_wait_mode_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 // Retains the given |device| for the caller.
 IREE_API_EXPORT void iree_hal_device_retain(iree_hal_device_t* device);
@@ -235,7 +234,7 @@ iree_hal_device_wait_idle(iree_hal_device_t* device, iree_timeout_t timeout);
 // iree_hal_device_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_device_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

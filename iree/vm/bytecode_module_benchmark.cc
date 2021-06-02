@@ -18,8 +18,8 @@ namespace {
 
 struct native_import_module_s;
 struct native_import_module_state_s;
-typedef struct native_import_module_s native_import_module_t;
-typedef struct native_import_module_state_s native_import_module_state_t;
+typedef struct native_import_module_t native_import_module_t;
+typedef struct native_import_module_state_t native_import_module_state_t;
 
 // vm.import @native_import_module.add_1(%arg0 : i32) -> i32
 static iree_status_t native_import_module_add_1(

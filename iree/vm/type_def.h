@@ -23,7 +23,7 @@ extern "C" {
 // * i8: primitive value (value_type != 0)
 // * !vm.ref<?>: any ref value (ref_type == IREE_VM_REF_TYPE_ANY)
 // * !vm.ref<!foo>: ref value of type !foo (ref_type > 0)
-typedef struct {
+typedef struct iree_vm_type_def_t {
   iree_vm_value_type_t value_type : 8;
   iree_vm_ref_type_t ref_type : 24;
 } iree_vm_type_def_t;
@@ -61,7 +61,7 @@ static inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
 // An variant value that can be either a primitive value type or a ref type.
 // Each variant value stores its type but users are required to check the type
 // prior to accessing any of the data.
-typedef struct {
+typedef struct iree_vm_variant_t {
   iree_vm_type_def_t type;
   union {
     // TODO(benvanik): replace with iree_vm_value_t.

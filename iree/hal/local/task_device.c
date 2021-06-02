@@ -21,7 +21,7 @@
 
 #define IREE_HAL_LOCAL_TASK_EVENT_POOL_CAPACITY 32
 
-typedef struct {
+typedef struct iree_hal_task_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 

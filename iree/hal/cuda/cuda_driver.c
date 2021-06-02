@@ -10,7 +10,7 @@
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/status_util.h"
 
-typedef struct {
+typedef struct iree_hal_cuda_driver_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   // Identifier used for the driver in the IREE driver registry.

@@ -11,7 +11,7 @@
 
 namespace {
 
-typedef struct {
+typedef struct iree_test_task_t {
   iree_task_t base;
   uint8_t payload[32];
 } iree_test_task_t;

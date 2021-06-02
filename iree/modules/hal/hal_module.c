@@ -110,7 +110,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 // Module type definitions
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
   iree_hal_device_t* shared_device;
   // TODO(benvanik): types.
@@ -119,7 +119,7 @@ typedef struct {
 #define IREE_HAL_MODULE_CAST(module) \
   (iree_hal_module_t*)((uint8_t*)(module) + iree_vm_native_module_size());
 
-typedef struct {
+typedef struct iree_hal_module_state_t {
   iree_allocator_t host_allocator;
   iree_hal_device_t* shared_device;
   iree_hal_executable_cache_t* executable_cache;

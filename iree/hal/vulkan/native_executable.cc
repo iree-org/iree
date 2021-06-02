@@ -18,7 +18,7 @@
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_entry_point_t {
   VkPipeline pipeline;
   iree_string_view_t name;
 } iree_hal_vulkan_entry_point_t;
@@ -184,7 +184,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   return iree_ok_status();
 }
 
-typedef struct {
+typedef struct iree_hal_vulkan_native_executable_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   iree_host_size_t entry_point_count;

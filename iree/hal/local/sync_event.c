@@ -8,7 +8,7 @@
 
 #include "iree/base/tracing.h"
 
-typedef struct {
+typedef struct iree_hal_sync_event_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
 } iree_hal_sync_event_t;

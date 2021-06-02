@@ -17,7 +17,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t
@@ -36,7 +36,7 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 //
 //
 // Maps (roughly) to vkShaderModule + VkPipeline[].
-typedef struct iree_hal_executable_s iree_hal_executable_t;
+typedef struct iree_hal_executable_t iree_hal_executable_t;
 
 // Retains the given |executable| for the caller.
 IREE_API_EXPORT void iree_hal_executable_retain(
@@ -50,7 +50,7 @@ IREE_API_EXPORT void iree_hal_executable_release(
 // iree_hal_executable_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_executable_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

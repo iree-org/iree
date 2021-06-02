@@ -9,7 +9,7 @@
 #include "iree/hal/buffer.h"
 #include "iree/hal/detail.h"
 
-typedef struct iree_hal_heap_buffer_s {
+typedef struct iree_hal_heap_buffer_t {
   iree_hal_buffer_t base;
 
   iree_byte_span_t data;
