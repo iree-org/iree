@@ -57,7 +57,8 @@ inline void registerLinalgToSPIRVPasses() {
 
 inline void registerLinalgToLLVMPasses() {
   static bool init_once = []() {
-    createLowerExecutableTargetPass(LLVMCodegenOptions());
+    createLowerExecutableTargetPass();
+    createLinalgVectorizePass();
     // LinalgToLLVM
     createLinalgTileAndVectorizeWorkgroupsPass();
     createUnfusedFMAOpsPass();

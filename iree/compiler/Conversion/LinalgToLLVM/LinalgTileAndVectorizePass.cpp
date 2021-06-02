@@ -68,11 +68,24 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 namespace {
 struct TileAndVectorizeWorkgroups
     : public PassWrapper<TileAndVectorizeWorkgroups, FunctionPass> {
+  TileAndVectorizeWorkgroups(bool vectorize = true)
+      : lowerToVectors(vectorize) {}
+  TileAndVectorizeWorkgroups(const TileAndVectorizeWorkgroups &pass) {
+    lowerToVectors = pass.lowerToVectors;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, AffineDialect, scf::SCFDialect,
                     vector::VectorDialect>();
   }
   void runOnFunction() override;
+
+ private:
+  /// TODO(ravishankarm): Option to not generate any `vector.` instructions. The
+  /// VMVX backend uses the same lowering as the CPU pass but there is no
+  /// lowering of these `vector.` operations to scalar code. So as a WAR do the
+  /// same tiling scheme but avoid generating vector instructions. When VMVX can
+  /// handle vector instructions, drop this options.
+  bool lowerToVectors;
 };
 }  // namespace
 
@@ -209,6 +222,10 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     }
   }
 
+  if (!lowerToVectors) {
+    return;
+  }
+
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns(&getContext());
@@ -281,8 +298,9 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   }
 }
 
-std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass() {
-  return std::make_unique<TileAndVectorizeWorkgroups>();
+std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass(
+    bool lowerToVectors) {
+  return std::make_unique<TileAndVectorizeWorkgroups>(lowerToVectors);
 }
 
 static PassRegistration<TileAndVectorizeWorkgroups> pass(

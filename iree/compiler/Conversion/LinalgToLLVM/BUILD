@@ -15,7 +15,6 @@ cc_library(
     srcs = [
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
-        "LLVMCodeGenOptions.cpp",
         "LinalgTileAndVectorizePass.cpp",
         "LinalgVectorizePass.cpp",
         "LowerExecutableTargetPass.cpp",
@@ -26,7 +25,6 @@ cc_library(
     ],
     hdrs = [
         "KernelDispatch.h",
-        "LLVMCodeGenOptions.h",
         "Passes.h",
     ],
     deps = [
