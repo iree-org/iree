@@ -637,24 +637,23 @@ func @inline_dag_2(
 // CHECK-LABEL: func @inline_dag_2
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x?xf32>
-//       CHECK:   %[[OP1:.+]] = linalg.tensor_reshape %[[ARG0]]
-//       CHECK:   subtensor %[[OP1]]
-//       CHECK:   linalg.tensor_reshape %[[ARG1]]
 //       CHECK:   flow.dispatch.workgroups
 //  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
 //  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
-//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
-//  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:i32>
-//  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:     %[[ARG9:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xf32>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:i32>
+//  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xf32>
 //       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
-//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
-//       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG7]], {{.*}}
-//       CHECK:     %[[OP1:.+]] = subtensor %[[LEAF2]][0, 0]
-//       CHECK:     %[[OP2:.+]] = subtensor %[[LEAF2]][0, 10]
-//       CHECK:     %[[OP3:.+]] = linalg.tensor_reshape %[[LEAF1]]
-//       CHECK:     %[[OP4:.+]] = linalg.tensor_reshape %[[OP1]]
-//       CHECK:     %[[OP5:.+]] = linalg.tensor_reshape %[[OP2]]
+//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
+//       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
+//       CHECK:     %[[OP1:.+]] = linalg.tensor_reshape %[[LEAF2]]
+//       CHECK:     %[[OP2:.+]] = linalg.tensor_reshape %[[LEAF1]]
+//       CHECK:     %[[OP3:.+]] = subtensor %[[OP1]][0, 0]
+//       CHECK:     %[[OP4:.+]] = subtensor %[[OP1]][0, 10]
+//       CHECK:     %[[OP5:.+]] = subtensor %[[OP1]][0, 20]
+//       CHECK:     %[[OP6:.+]] = linalg.tensor_reshape %[[OP3]]
+//       CHECK:     %[[OP7:.+]] = linalg.tensor_reshape %[[OP4]]
+//       CHECK:     %[[OP8:.+]] = linalg.tensor_reshape %[[OP5]]
 
 // -----
 
@@ -704,6 +703,58 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
 //   CHECK-DAG:     %[[INDEX_CAST:.+]] = index_cast %[[SELECT2]]
 //   CHECK-DAG:     subtensor %[[ARG3V]][%[[INDEX_CAST]]]
 //       CHECK:     flow.return
+
+// -----
+
+#map = affine_map<() -> ()>
+func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16> {
+  %c3_i32 = constant 3 : i32
+  %c0_i32 = constant 0 : i32
+  %0 = tensor.extract %arg1[] : tensor<i32>
+  %1 = cmpi slt, %0, %c3_i32 : i32
+  %2 = select %1, %0, %c3_i32 : i32
+  %3 = cmpi sgt, %2, %c0_i32 : i32
+  %4 = select %3, %2, %c0_i32 : i32
+  %5 = index_cast %4 : i32 to index
+  %6 = subtensor %arg0[%5] [1] [1] : tensor<4xi32> to tensor<i32>
+  br ^bb1
+^bb1:  // pred: ^bb0
+  %7 = linalg.init_tensor [] : tensor<i16>
+  %8 = linalg.generic {indexing_maps = [#map, #map], iterator_types = []} ins(%6 : tensor<i32>) outs(%7 : tensor<i16>) {
+  ^bb0(%arg2: i32, %arg3: i16):  // no predecessors
+    %9 = trunci %arg2 : i32 to i16
+    linalg.yield %9 : i16
+  } -> tensor<i16>
+  return %8 : tensor<i16>
+}
+// CHECK-LABEL: func @inline_dag_4
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<4xi32>
+//  CHECK-SAME:   %[[ARG1:.+]]: tensor<i32>
+//       CHECK:   flow.dispatch.workgroups
+//  CHECK-SAME:     (%[[ARG0]], %[[ARG1]])
+//  CHECK-NEXT:     (%[[ARG2:.+]]: !flow.dispatch.tensor<readonly:4xi32>
+//  CHECK-SAME:      %[[ARG3:.+]]: !flow.dispatch.tensor<readonly:i32>
+//  CHECK-SAME:      %[[ARG4:.+]]: !flow.dispatch.tensor<writeonly:i16>
+//   CHECK-DAG:     %[[C0:.+]] = constant 0 : i32
+//   CHECK-DAG:     %[[C3:.+]] = constant 3 : i32
+//       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG2]], {{.*}}
+//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG3]], {{.*}}
+//       CHECK:     %[[INIT:.+]] = linalg.init_tensor [] : tensor<i16>
+//       CHECK:     %[[OP1:.+]] = tensor.extract %[[LEAF2]][] : tensor<i32>
+//       CHECK:     %[[OP2:.+]] = cmpi slt, %[[OP1]], %[[C3]] : i32
+//       CHECK:     %[[OP3:.+]] = select %[[OP2]], %[[OP1]], %[[C3]] : i32
+//       CHECK:     %[[OP4:.+]] = cmpi sgt, %[[OP3]], %[[C0]] : i32
+//       CHECK:     %[[OP5:.+]] = select %[[OP4]], %[[OP3]], %[[C0]] : i32
+//       CHECK:     %[[OP6:.+]] = index_cast %[[OP5]] : i32 to index
+//       CHECK:     %[[OP7:.+]] = subtensor %[[LEAF1]][%[[OP6]]] [1] [1] : tensor<4xi32> to tensor<i32>
+//       CHECK:     %[[RES:.+]] = linalg.generi
+//  CHECK-SAME:       ins(%[[OP7]] : tensor<i32>)
+//  CHECK-SAME:       outs(%[[INIT]] : tensor<i16>) {
+//       CHECK:     ^bb0(%[[ARG5:.+]]: i32, %{{.+}}: i16):  // no predecessors
+//       CHECK:       %[[TRUNC:.+]] = trunci %[[ARG5]] : i32 to i16
+//       CHECK:       linalg.yield %[[TRUNC]] : i16
+//       CHECK:     } -> tensor<i16>
+//       CHECK:     flow.dispatch.tensor.store %[[RES]], %[[ARG4]]
 
 // -----
 

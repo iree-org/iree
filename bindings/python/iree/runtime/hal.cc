@@ -53,7 +53,7 @@ HalDevice HalDriver::CreateDefaultDevice() {
 
 void SetupHalBindings(pybind11::module m) {
   // Enums.
-  py::enum_<enum iree_hal_memory_type_e>(m, "MemoryType")
+  py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType")
       .value("NONE", IREE_HAL_MEMORY_TYPE_NONE)
       .value("TRANSIENT", IREE_HAL_MEMORY_TYPE_TRANSIENT)
       .value("HOST_VISIBLE", IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)
@@ -63,7 +63,7 @@ void SetupHalBindings(pybind11::module m) {
       .value("DEVICE_VISIBLE", IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)
       .value("DEVICE_LOCAL", IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
       .export_values();
-  py::enum_<enum iree_hal_buffer_usage_e>(m, "BufferUsage")
+  py::enum_<enum iree_hal_buffer_usage_bits_t>(m, "BufferUsage")
       .value("NONE", IREE_HAL_BUFFER_USAGE_NONE)
       .value("CONSTANT", IREE_HAL_BUFFER_USAGE_CONSTANT)
       .value("TRANSFER", IREE_HAL_BUFFER_USAGE_TRANSFER)
@@ -71,7 +71,7 @@ void SetupHalBindings(pybind11::module m) {
       .value("DISPATCH", IREE_HAL_BUFFER_USAGE_DISPATCH)
       .value("ALL", IREE_HAL_BUFFER_USAGE_ALL)
       .export_values();
-  py::enum_<enum iree_hal_memory_access_e>(m, "MemoryAccess")
+  py::enum_<enum iree_hal_memory_access_bits_t>(m, "MemoryAccess")
       .value("NONE", IREE_HAL_MEMORY_ACCESS_NONE)
       .value("READ", IREE_HAL_MEMORY_ACCESS_READ)
       .value("WRITE", IREE_HAL_MEMORY_ACCESS_WRITE)
@@ -79,7 +79,7 @@ void SetupHalBindings(pybind11::module m) {
       .value("DISCARD_WRITE", IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE)
       .value("ALL", IREE_HAL_MEMORY_ACCESS_ALL)
       .export_values();
-  py::enum_<enum iree_hal_element_type_e>(m, "HalElementType")
+  py::enum_<enum iree_hal_element_types_t>(m, "HalElementType")
       .value("NONE", IREE_HAL_ELEMENT_TYPE_NONE)
       .value("OPAQUE_8", IREE_HAL_ELEMENT_TYPE_OPAQUE_8)
       .value("OPAQUE_16", IREE_HAL_ELEMENT_TYPE_OPAQUE_16)
@@ -96,9 +96,9 @@ void SetupHalBindings(pybind11::module m) {
       .value("FLOAT_16", IREE_HAL_ELEMENT_TYPE_FLOAT_16)
       .value("FLOAT_32", IREE_HAL_ELEMENT_TYPE_FLOAT_32)
       .value("FLOAT_64", IREE_HAL_ELEMENT_TYPE_FLOAT_64)
-      .value("BOOL_8", static_cast<enum iree_hal_element_type_e>(
-                           IREE_HAL_ELEMENT_TYPE_VALUE(
-                               IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1)))
+      .value("BOOL_8",
+             static_cast<iree_hal_element_types_t>(IREE_HAL_ELEMENT_TYPE_VALUE(
+                 IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1)))
       .export_values();
 
   py::class_<HalDevice>(m, "HalDevice");

@@ -6,11 +6,15 @@
 
 #include "iree/hal/cuda/cuda_buffer.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/cuda_allocator.h"
-#include "iree/hal/cuda/status_util.h"
 
-typedef struct iree_hal_cuda_buffer_s {
+typedef struct iree_hal_cuda_buffer_t {
   iree_hal_buffer_t base;
   void* host_ptr;
   CUdeviceptr device_ptr;

@@ -6,14 +6,21 @@
 
 #include "iree/hal/local/loaders/static_library_loader.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_static_executable_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_static_executable_t {
   iree_hal_local_executable_t base;
 
   // Name used for the file field in tracy and debuggers.
@@ -127,7 +134,7 @@ static const iree_hal_local_executable_vtable_t
 // iree_hal_static_library_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_static_library_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
   iree_host_size_t library_count;

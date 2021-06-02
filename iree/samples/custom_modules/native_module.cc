@@ -7,13 +7,21 @@
 #include "iree/samples/custom_modules/native_module.h"
 
 #include <atomic>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 
+#include "absl/types/span.h"
 #include "iree/base/api.h"
+#include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/native_module_cc.h"
+#include "iree/vm/ref_cc.h"
 
 //===----------------------------------------------------------------------===//
 // !custom.message type
@@ -29,7 +37,7 @@ static iree_vm_ref_type_descriptor_t iree_custom_message_descriptor = {0};
 // The descriptor that is registered at startup defines how to manage the
 // lifetime of the type (such as which destruction function is called, if any).
 // See ref.h for more information and additional utilities.
-typedef struct iree_custom_message {
+typedef struct iree_custom_message_t {
   // Ideally first; used to track the reference count of the object.
   iree_vm_ref_object_t ref_object;
   // Allocator the message was created from.

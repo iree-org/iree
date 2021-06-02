@@ -6,6 +6,8 @@
 
 #include "iree/base/internal/atomic_slist.h"
 
+#include <vector>
+
 #include "iree/testing/gtest.h"
 
 namespace {

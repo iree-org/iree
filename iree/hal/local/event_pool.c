@@ -6,10 +6,14 @@
 
 #include "iree/hal/local/event_pool.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
 
-struct iree_hal_local_event_pool_s {
+struct iree_hal_local_event_pool_t {
   // Allocator used to create the event pool.
   iree_allocator_t host_allocator;
   // Guards the pool. Since this pool is used to get operating system-level

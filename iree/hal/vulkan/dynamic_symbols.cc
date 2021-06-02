@@ -7,9 +7,10 @@
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <type_traits>
 
-#include "iree/base/attributes.h"
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"

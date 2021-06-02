@@ -6,8 +6,9 @@
 
 #include "iree/hal/vulkan/vulkan_device.h"
 
-#include <functional>
-#include <utility>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "iree/base/internal/math.h"
@@ -29,7 +30,10 @@
 #include "iree/hal/vulkan/nop_executable_cache.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/timepoint_util.h"
 #include "iree/hal/vulkan/tracing.h"
+#include "iree/hal/vulkan/util/arena.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 #include "iree/hal/vulkan/vma_allocator.h"
 
 using namespace iree::hal::vulkan;
@@ -155,7 +159,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
 
 #define IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY_INDEX (-1)
 
-typedef struct {
+typedef struct iree_hal_vulkan_queue_family_info_t {
   uint32_t dispatch_index;
   iree_host_size_t dispatch_queue_count;
   uint32_t transfer_index;
@@ -316,7 +320,7 @@ static iree_status_t iree_hal_vulkan_build_queue_sets(
 // iree_hal_vulkan_device_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_vulkan_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 

@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"
@@ -23,7 +24,7 @@ extern "C" {
 // are correct at runtime. We don't allow control over the ref types from the
 // VM ops and as such we can use the type specified as a safe way to avoid
 // reinterpreting memory incorrectly.
-typedef enum {
+enum iree_vm_ref_type_bits_t {
   IREE_VM_REF_TYPE_NULL = 0,
 
   // NOTE: these type values are assigned dynamically right now. Treat them as
@@ -35,12 +36,13 @@ typedef enum {
   // Wildcard type that indicates that a value may be a ref type but of an
   // unspecified internal type.
   IREE_VM_REF_TYPE_ANY = 0x00FFFFFFu,
-} iree_vm_ref_type_t;
+};
+typedef uint32_t iree_vm_ref_type_t;
 
 // Base for iree_vm_ref_t object targets.
 //
 // Usage (C):
-//  typedef struct {
+//  typedef struct my_type_t {
 //    iree_vm_ref_object_t ref_object;
 //    int my_fields;
 //  } my_type_t;
@@ -56,7 +58,7 @@ typedef enum {
 //
 // Usage (C++):
 //  Prefer using iree::vm::RefObject as a base type.
-typedef struct {
+typedef struct iree_vm_ref_object_t {
   iree_atomic_ref_count_t counter;
 } iree_vm_ref_object_t;
 
@@ -70,7 +72,7 @@ typedef struct {
 // Ideally the iree_vm_ref_t is in-cache on the stack and the target ptr is
 // either in cache from a previous use or will be used again after manipulating
 // its ref count.
-typedef struct {
+typedef struct iree_vm_ref_t {
   // Pointer to the object. Type is resolved based on the |type| field.
   // Will be NULL if the reference points to nothing.
   void* ptr;
@@ -88,7 +90,7 @@ static_assert(
 typedef void(IREE_API_PTR* iree_vm_ref_destroy_t)(void* ptr);
 
 // Describes a type for the VM.
-typedef struct {
+typedef struct iree_vm_ref_type_descriptor_t {
   // Function called when references of this type reach 0 and should be
   // destroyed.
   iree_vm_ref_destroy_t destroy;

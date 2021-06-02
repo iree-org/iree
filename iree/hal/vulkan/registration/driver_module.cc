@@ -6,10 +6,11 @@
 
 #include "iree/hal/vulkan/registration/driver_module.h"
 
-#include <inttypes.h>
+#include <cinttypes>
+#include <cstddef>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"
 

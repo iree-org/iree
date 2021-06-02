@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_LOCAL_SYNC_SEMAPHORE_H_
 #define IREE_HAL_LOCAL_SYNC_SEMAPHORE_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
@@ -22,7 +24,7 @@ extern "C" {
 // State shared between all sync semaphores.
 // Owned by the device and guaranteed to remain valid for the lifetime of any
 // semaphore created from it.
-typedef struct {
+typedef struct iree_hal_sync_semaphore_state_t {
   // In-process notification signaled when any semaphore value changes.
   iree_notification_t notification;
 } iree_hal_sync_semaphore_state_t;

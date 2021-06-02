@@ -6,6 +6,8 @@
 
 #include "iree/tools/init_targets.h"
 
+#include <functional>
+
 #ifdef IREE_HAVE_CUDA_TARGET
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 #endif  // IREE_HAVE_CUDA_TARGET

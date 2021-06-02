@@ -6,16 +6,22 @@
 
 #include "iree/hal/local/loaders/embedded_library_loader.h"
 
-#include "iree/base/target_platform.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/local/elf/elf_module.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_elf_executable_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_elf_executable_t {
   iree_hal_local_executable_t base;
 
   // Loaded ELF module.
@@ -202,7 +208,7 @@ const iree_hal_local_executable_vtable_t iree_hal_elf_executable_vtable = {
 // iree_hal_embedded_library_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_embedded_library_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
 } iree_hal_embedded_library_loader_t;

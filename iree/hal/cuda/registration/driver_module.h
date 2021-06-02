@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_CUDA_REGISTRATION_DRIVER_MODULE_H_
 #define IREE_HAL_CUDA_REGISTRATION_DRIVER_MODULE_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus

@@ -6,7 +6,10 @@
 
 #include "iree/vm/bytecode_module.h"
 
-#include "iree/base/alignment.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"

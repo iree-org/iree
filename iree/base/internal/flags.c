@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "iree/base/api.h"
+
 #if IREE_FLAGS_ENABLE_CLI == 1
 
 #include "iree/base/internal/debugging.h"
@@ -54,7 +56,7 @@ static iree_allocator_t iree_flags_leaky_allocator(void) {
 //===----------------------------------------------------------------------===//
 
 // Storage for registered flags.
-typedef struct {
+typedef struct iree_flag_t {
   // __FILE__ of flag definition.
   const char* file;
   // __LINE__ of flag definition.
@@ -74,7 +76,7 @@ typedef struct {
 } iree_flag_t;
 
 // State used for flag registration and reflection.
-typedef struct {
+typedef struct iree_flag_registry_t {
   const char* program_name;
   const char* usage;
 

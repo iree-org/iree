@@ -6,6 +6,11 @@
 
 #include "iree/base/internal/threading.h"
 
+#include <assert.h>
+#include <errno.h>
+#include <string.h>
+
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading_impl.h"
 
 int iree_strncpy_s(char* IREE_RESTRICT dest, size_t destsz,
@@ -42,7 +47,7 @@ void iree_thread_affinity_set_any(iree_thread_affinity_t* out_thread_affinity) {
 // This is shared by multiple platform implementations and gets stripped in LTO
 // when unused.
 
-struct iree_thread_override_s {
+struct iree_thread_override_t {
   iree_thread_override_list_t* list;
   iree_thread_override_t* next;
   iree_thread_override_t* prev;

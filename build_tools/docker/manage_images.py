@@ -45,7 +45,7 @@ IMAGES_TO_DEPENDENCIES = {
     'base': [],
     'bazel': ['base', 'util'],
     'cmake': ['base', 'util'],
-    'cmake-android': ['cmake', 'util'],
+    'cmake-android': ['cmake-python', 'util'],
     'cmake-python': ['cmake'],
     'cmake-python-vulkan': ['cmake-python', 'vulkan'],
     'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],

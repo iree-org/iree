@@ -59,17 +59,17 @@ extern "C" {
 #if defined(IREE_COMPILER_MSVC)
 
 // Atomics using the Win32 Interlocked* APIs.
-#include "iree/base/internal/atomics_msvc.h"
+#include "iree/base/internal/atomics_msvc.h"  // IWYU pragma: export
 
 #elif defined(IREE_COMPILER_CLANG)
 
 // C11 atomics using Clang builtins.
-#include "iree/base/internal/atomics_clang.h"
+#include "iree/base/internal/atomics_clang.h"  // IWYU pragma: export
 
 #elif defined(IREE_COMPILER_GCC)
 
 // Atomics for GCC (compatible with both C and C++).
-#include "iree/base/internal/atomics_gcc.h"
+#include "iree/base/internal/atomics_gcc.h"  // IWYU pragma: export
 
 #else
 

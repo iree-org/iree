@@ -7,6 +7,8 @@
 // Only compile if an external implementation has not been otherwise linked.
 #if !defined(VULKAN_MEMORY_ALLOCATOR_EXTERNAL_IMPL)
 
+#include <ostream>
+
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/logging.h"
 

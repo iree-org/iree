@@ -11,6 +11,11 @@
 // formats. Thus we use our own main entry function because we register
 // Dialects and PassManager CLI options.
 
+#include <functional>
+#include <memory>
+#include <string>
+#include <type_traits>
+
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/tools/init_compiler_modules.h"
@@ -19,16 +24,22 @@
 #include "iree/tools/init_targets.h"
 #include "iree/tools/init_translations.h"
 #include "iree/tools/init_xla_dialects.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/Timing.h"
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Translation.h"

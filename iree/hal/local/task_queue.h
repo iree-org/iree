@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_LOCAL_TASK_QUEUE_H_
 #define IREE_HAL_LOCAL_TASK_QUEUE_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
@@ -14,12 +16,13 @@
 #include "iree/hal/local/task_queue_state.h"
 #include "iree/task/executor.h"
 #include "iree/task/scope.h"
+#include "iree/task/task.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct {
+typedef struct iree_hal_task_queue_t {
   // Shared executor that the queue submits tasks to.
   iree_task_executor_t* executor;
 

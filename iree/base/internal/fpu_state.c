@@ -6,6 +6,8 @@
 
 #include "iree/base/internal/fpu_state.h"
 
+#include <stdbool.h>
+
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)

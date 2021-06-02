@@ -109,6 +109,7 @@ cc_test(
     name = "status_test",
     srcs = ["status_test.cc"],
     deps = [
+        ":base",
         ":status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",

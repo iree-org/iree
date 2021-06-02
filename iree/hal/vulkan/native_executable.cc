@@ -6,10 +6,18 @@
 
 #include "iree/hal/vulkan/native_executable.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vulkan/dynamic_symbol_tables.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_executable_layout.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc.h"
@@ -18,7 +26,7 @@
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_entry_point_t {
   VkPipeline pipeline;
   iree_string_view_t name;
 } iree_hal_vulkan_entry_point_t;
@@ -184,7 +192,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   return iree_ok_status();
 }
 
-typedef struct {
+typedef struct iree_hal_vulkan_native_executable_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   iree_host_size_t entry_point_count;

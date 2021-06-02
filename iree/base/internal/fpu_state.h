@@ -8,6 +8,7 @@
 #define IREE_BASE_INTERNAL_FPU_STATE_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
@@ -21,7 +22,7 @@ extern "C" {
 //==============================================================================
 
 // Flags controlling FPU features.
-enum iree_fpu_state_flags_e {
+enum iree_fpu_state_flag_bits_t {
   // Platform default.
   IREE_FPU_STATE_DEFAULT = 0,
 
@@ -38,7 +39,7 @@ enum iree_fpu_state_flags_e {
 typedef uint32_t iree_fpu_state_flags_t;
 
 // Opaque FPU state vector manipulated with iree_fpu_* functions.
-typedef struct {
+typedef struct iree_fpu_state_t {
   uint64_t previous_value;
   uint64_t current_value;
 } iree_fpu_state_t;

@@ -7,10 +7,13 @@
 #include "iree/base/internal/threading.h"
 
 #include <chrono>
+#include <cstring>
 #include <thread>
 
+#include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading_impl.h"  // to test the override list
+#include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -28,14 +31,14 @@ TEST(ThreadTest, Lifetime) {
   memset(&params, 0, sizeof(params));
 
   // Our thread: do a bit of math and notify the main test thread when done.
-  struct entry_data_s {
+  struct entry_data_t {
     iree_atomic_int32_t value;
     iree_notification_t barrier;
   } entry_data;
   iree_atomic_store_int32(&entry_data.value, 123, iree_memory_order_relaxed);
   iree_notification_initialize(&entry_data.barrier);
   iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
-    auto* entry_data = reinterpret_cast<struct entry_data_s*>(entry_arg);
+    auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
     iree_atomic_fetch_add_int32(&entry_data->value, 1,
                                 iree_memory_order_acq_rel);
     iree_notification_post(&entry_data->barrier, IREE_ALL_WAITERS);
@@ -44,8 +47,8 @@ TEST(ThreadTest, Lifetime) {
 
   // Create the thread and immediately begin running it.
   iree_thread_t* thread = nullptr;
-  IREE_ASSERT_OK(Status(iree_thread_create(entry_fn, &entry_data, params,
-                                           iree_allocator_system(), &thread)));
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
+                                    iree_allocator_system(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // Drop the thread handle; should be safe as the thread should keep itself
@@ -56,7 +59,7 @@ TEST(ThreadTest, Lifetime) {
   iree_notification_await(
       &entry_data.barrier,
       +[](void* entry_arg) -> bool {
-        auto* entry_data = reinterpret_cast<struct entry_data_s*>(entry_arg);
+        auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
         return iree_atomic_load_int32(&entry_data->value,
                                       iree_memory_order_relaxed) == (123 + 1);
       },
@@ -69,14 +72,14 @@ TEST(ThreadTest, CreateSuspended) {
   memset(&params, 0, sizeof(params));
   params.create_suspended = true;
 
-  struct entry_data_s {
+  struct entry_data_t {
     iree_atomic_int32_t value;
     iree_notification_t barrier;
   } entry_data;
   iree_atomic_store_int32(&entry_data.value, 123, iree_memory_order_relaxed);
   iree_notification_initialize(&entry_data.barrier);
   iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
-    auto* entry_data = reinterpret_cast<struct entry_data_s*>(entry_arg);
+    auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
     iree_atomic_fetch_add_int32(&entry_data->value, 1,
                                 iree_memory_order_acq_rel);
     iree_notification_post(&entry_data->barrier, IREE_ALL_WAITERS);
@@ -84,8 +87,8 @@ TEST(ThreadTest, CreateSuspended) {
   };
 
   iree_thread_t* thread = nullptr;
-  IREE_ASSERT_OK(Status(iree_thread_create(entry_fn, &entry_data, params,
-                                           iree_allocator_system(), &thread)));
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
+                                    iree_allocator_system(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // NOTE: the thread will not be running and we should not expect a change in
@@ -103,7 +106,7 @@ TEST(ThreadTest, CreateSuspended) {
   iree_notification_await(
       &entry_data.barrier,
       +[](void* entry_arg) -> bool {
-        auto* entry_data = reinterpret_cast<struct entry_data_s*>(entry_arg);
+        auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
         return iree_atomic_load_int32(&entry_data->value,
                                       iree_memory_order_relaxed) == (123 + 1);
       },
@@ -120,14 +123,14 @@ TEST(ThreadTest, PriorityOverride) {
   iree_thread_create_params_t params;
   memset(&params, 0, sizeof(params));
 
-  struct entry_data_s {
+  struct entry_data_t {
     iree_atomic_int32_t value;
     iree_notification_t barrier;
   } entry_data;
   iree_atomic_store_int32(&entry_data.value, 0, iree_memory_order_relaxed);
   iree_notification_initialize(&entry_data.barrier);
   iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
-    auto* entry_data = reinterpret_cast<struct entry_data_s*>(entry_arg);
+    auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
     iree_atomic_fetch_add_int32(&entry_data->value, 1,
                                 iree_memory_order_acq_rel);
     iree_notification_post(&entry_data->barrier, IREE_ALL_WAITERS);
@@ -135,8 +138,8 @@ TEST(ThreadTest, PriorityOverride) {
   };
 
   iree_thread_t* thread = nullptr;
-  IREE_ASSERT_OK(Status(iree_thread_create(entry_fn, &entry_data, params,
-                                           iree_allocator_system(), &thread)));
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
+                                    iree_allocator_system(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // Push a few overrides.
@@ -154,7 +157,7 @@ TEST(ThreadTest, PriorityOverride) {
   iree_notification_await(
       &entry_data.barrier,
       +[](void* entry_arg) -> bool {
-        auto* entry_data = reinterpret_cast<struct entry_data_s*>(entry_arg);
+        auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
         return iree_atomic_load_int32(&entry_data->value,
                                       iree_memory_order_relaxed) == 1;
       },

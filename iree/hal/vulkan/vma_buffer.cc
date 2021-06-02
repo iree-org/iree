@@ -6,10 +6,15 @@
 
 #include "iree/hal/vulkan/vma_buffer.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
 
-typedef struct iree_hal_vulkan_vma_buffer_s {
+typedef struct iree_hal_vulkan_vma_buffer_t {
   iree_hal_buffer_t base;
 
   VmaAllocator vma;

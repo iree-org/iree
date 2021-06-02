@@ -25,7 +25,7 @@ extern "C" {
 // Benchmark state manipulator.
 // Passed to each benchmark during execution to control the benchmark state
 // or append information beyond just timing.
-typedef struct iree_benchmark_state_s {
+typedef struct iree_benchmark_state_t {
   // Internal implementation handle.
   void* impl;
 
@@ -82,21 +82,22 @@ void iree_benchmark_set_items_processed(iree_benchmark_state_t* state,
 // iree_benchmark_def_t
 //===----------------------------------------------------------------------===//
 
-typedef enum {
+enum iree_benchmark_flag_bits_t {
   IREE_BENCHMARK_FLAG_MEASURE_PROCESS_CPU_TIME = 1u << 0,
 
   IREE_BENCHMARK_FLAG_USE_REAL_TIME = 1u << 1,
   IREE_BENCHMARK_FLAG_USE_MANUAL_TIME = 1u << 2,
-} iree_benchmark_flags_t;
+};
+typedef uint32_t iree_benchmark_flags_t;
 
-typedef enum {
+typedef enum iree_benchmark_unit_e {
   IREE_BENCHMARK_UNIT_MILLISECOND = 0,
   IREE_BENCHMARK_UNIT_MICROSECOND,
   IREE_BENCHMARK_UNIT_NANOSECOND,
 } iree_benchmark_unit_t;
 
 // A benchmark case definition.
-typedef struct iree_benchmark_def_s {
+typedef struct iree_benchmark_def_t {
   // IREE_BENCHMARK_FLAG_* bitmask controlling benchmark behavior and reporting.
   iree_benchmark_flags_t flags;
 

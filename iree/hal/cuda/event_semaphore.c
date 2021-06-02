@@ -6,10 +6,12 @@
 
 #include "iree/hal/cuda/event_semaphore.h"
 
-#include "iree/base/tracing.h"
-#include "iree/hal/cuda/status_util.h"
+#include <stddef.h>
 
-typedef struct {
+#include "iree/base/api.h"
+#include "iree/base/tracing.h"
+
+typedef struct iree_hal_cuda_semaphore_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
   uint64_t initial_value;

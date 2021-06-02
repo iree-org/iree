@@ -7,10 +7,13 @@
 #ifndef IREE_HAL_VULKAN_TRACING_H_
 #define IREE_HAL_VULKAN_TRACING_H_
 
-// clang-format off: Must be included before all other headers:
+// clang-format off: must be included before all other headers.
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/handle_util.h"
 
@@ -63,7 +66,7 @@ extern "C" {
 //
 // Thread-compatible: external synchronization is required if using from
 // multiple threads (same as with VkQueue itself).
-typedef struct iree_hal_vulkan_tracing_context_s
+typedef struct iree_hal_vulkan_tracing_context_t
     iree_hal_vulkan_tracing_context_t;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION

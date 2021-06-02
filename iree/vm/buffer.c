@@ -6,6 +6,9 @@
 
 #include "iree/vm/buffer.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
 
 static iree_vm_ref_type_descriptor_t iree_vm_buffer_descriptor = {0};

@@ -6,19 +6,24 @@
 
 #include "iree/hal/vulkan/vulkan_driver.h"
 
-#include <memory>
+#include <cstdint>
+#include <cstring>
 
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/debug_reporter.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/arena.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 #include "iree/hal/vulkan/vulkan_device.h"
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_driver_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
 

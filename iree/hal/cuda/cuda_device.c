@@ -6,8 +6,12 @@
 
 #include "iree/hal/cuda/cuda_device.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
-#include "iree/hal/cuda/api.h"
+#include "iree/hal/cuda/context_wrapper.h"
 #include "iree/hal/cuda/cuda_allocator.h"
 #include "iree/hal/cuda/cuda_event.h"
 #include "iree/hal/cuda/descriptor_set_layout.h"
@@ -22,7 +26,7 @@
 // iree_hal_cuda_device_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_cuda_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 

@@ -6,9 +6,12 @@
 
 #include "iree/hal/descriptor_set_layout.h"
 
+#include <stddef.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
+#include "iree/hal/resource.h"
 
 #define _VTABLE_DISPATCH(descriptor_set_layout, method_name) \
   IREE_HAL_VTABLE_DISPATCH(descriptor_set_layout,            \

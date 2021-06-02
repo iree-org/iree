@@ -6,11 +6,14 @@
 
 #include "iree/hal/local/task_driver.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
 
 #define IREE_HAL_TASK_DEVICE_ID_DEFAULT 0
 
-typedef struct {
+typedef struct iree_hal_task_driver_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
 

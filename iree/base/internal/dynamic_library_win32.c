@@ -4,7 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/call_once.h"
@@ -22,11 +24,12 @@
 #define IREE_HAVE_DYNAMIC_LIBRARY_PDB_SUPPORT 1
 #pragma warning(disable : 4091)
 #include <dbghelp.h>
+
 void IREEDbgHelpLock(void);
 void IREEDbgHelpUnlock(void);
 #endif  // TRACY_ENABLE
 
-struct iree_dynamic_library_s {
+struct iree_dynamic_library_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 

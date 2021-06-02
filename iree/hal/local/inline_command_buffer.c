@@ -6,8 +6,14 @@
 
 #include "iree/hal/local/inline_command_buffer.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_layout.h"
@@ -17,7 +23,7 @@
 //===----------------------------------------------------------------------===//
 
 // Inline synchronous one-shot command "buffer".
-typedef struct {
+typedef struct iree_hal_inline_command_buffer_t {
   iree_hal_resource_t resource;
 
   iree_hal_device_t* device;

@@ -6,10 +6,12 @@
 
 #include "iree/hal/cuda/executable_layout.h"
 
-#include "iree/base/tracing.h"
-#include "iree/hal/cuda/status_util.h"
+#include <stddef.h>
 
-typedef struct {
+#include "iree/base/api.h"
+#include "iree/base/tracing.h"
+
+typedef struct iree_hal_cuda_executable_layout_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
   iree_host_size_t set_layout_count;

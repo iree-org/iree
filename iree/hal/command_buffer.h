@@ -13,6 +13,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/descriptor_set.h"
+#include "iree/hal/descriptor_set_layout.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_layout.h"
@@ -22,14 +23,14 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
 // A bitfield specifying the mode of operation for a command buffer.
-enum iree_hal_command_buffer_mode_e {
+enum iree_hal_command_buffer_mode_bits_t {
   // Command buffer will be submitted once and never used again.
   // This may enable in-place patching of command buffers that reduce overhead
   // when it's known that command buffers will not be reused.
@@ -63,7 +64,7 @@ enum iree_hal_command_buffer_mode_e {
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
 // A bitfield specifying the category of commands in a command queue.
-enum iree_hal_command_category_e {
+enum iree_hal_command_category_bits_t {
   // Command is considered a transfer operation (memcpy, etc).
   IREE_HAL_COMMAND_CATEGORY_TRANSFER = 1u << 0,
   // Command is considered a dispatch operation (dispatch/execute).
@@ -96,7 +97,7 @@ typedef uint64_t iree_hal_queue_affinity_t;
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
 // Maps to VkPipelineStageFlagBits.
-enum iree_hal_execution_stage_e {
+enum iree_hal_execution_stage_bits_t {
   // Top of the pipeline when commands are initially issued by the device.
   IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE = 1u << 0,
   // Stage of the pipeline when dispatch parameter data is consumed.
@@ -115,7 +116,7 @@ typedef uint32_t iree_hal_execution_stage_t;
 // Bitfield specifying flags controlling an execution dependency.
 //
 // Maps to VkDependencyFlags.
-enum iree_hal_execution_barrier_flags_e {
+enum iree_hal_execution_barrier_flag_bits_t {
   IREE_HAL_EXECUTION_BARRIER_FLAG_NONE = 0,
 };
 typedef uint32_t iree_hal_execution_barrier_flags_t;
@@ -123,7 +124,7 @@ typedef uint32_t iree_hal_execution_barrier_flags_t;
 // Bitfield specifying which scopes will access memory and how.
 //
 // Maps to VkAccessFlagBits.
-enum iree_hal_access_scope_e {
+enum iree_hal_access_scope_bits_t {
   // Read access to indirect command data as part of an indirect dispatch.
   IREE_HAL_ACCESS_SCOPE_INDIRECT_COMMAND_READ = 1u << 0,
   // Constant uniform buffer reads by the device.
@@ -154,7 +155,7 @@ typedef uint32_t iree_hal_access_scope_t;
 // completely changing execution contexts).
 //
 // Maps to VkMemoryBarrier.
-typedef struct {
+typedef struct iree_hal_memory_barrier_t {
   // All access scopes prior-to the barrier (inclusive).
   iree_hal_access_scope_t source_scope;
   // All access scopes following the barrier (inclusive).
@@ -167,7 +168,7 @@ typedef struct {
 // reordering.
 //
 // Maps to VkBufferMemoryBarrier.
-typedef struct {
+typedef struct iree_hal_buffer_barrier_t {
   // All access scopes prior-to the barrier (inclusive).
   iree_hal_access_scope_t source_scope;
   // All access scopes following the barrier (inclusive).
@@ -218,7 +219,7 @@ typedef struct {
 // to record commands from multiple threads. Command buffers must not be mutated
 // between when they have are submitted for execution on a queue and when the
 // semaphore fires indicating the completion of their execution.
-typedef struct iree_hal_command_buffer_s iree_hal_command_buffer_t;
+typedef struct iree_hal_command_buffer_t iree_hal_command_buffer_t;
 
 // Creates a command buffer ready to begin recording, possibly reusing an
 // existing one from the |device| pool.
@@ -453,7 +454,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wrap_validation(
 // iree_hal_command_buffer_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_command_buffer_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

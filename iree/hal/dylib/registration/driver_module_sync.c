@@ -7,8 +7,12 @@
 #include "iree/hal/dylib/registration/driver_module_sync.h"
 
 #include <inttypes.h>
+#include <stddef.h>
 
+#include "iree/base/api.h"
+#include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/legacy_library_loader.h"
+#include "iree/hal/local/sync_device.h"
 #include "iree/hal/local/sync_driver.h"
 
 // TODO(#4298): remove this driver registration and wrapper.

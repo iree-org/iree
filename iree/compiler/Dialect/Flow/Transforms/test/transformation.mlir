@@ -101,35 +101,3 @@ func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   return %0 : tensor<4xf32>
 //  CHECK-NEXT: }
-
-// -----
-
-func @dynamicUpdateSlice(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, %indices_0 : tensor<i64>, %indices_1 : tensor<i64>) -> tensor<2x4xi32> {
-  %0 = "mhlo.dynamic-update-slice"(%operand, %update, %indices_0, %indices_1) : (tensor<2x4xi32>, tensor<1x1xi32>, tensor<i64>, tensor<i64>) -> tensor<2x4xi32>
-  %1 = mhlo.add %operand, %0 : tensor<2x4xi32>
-  return %1 : tensor<2x4xi32>
-}
-
-// CHECK-LABEL: flow.executable @dynamicUpdateSlice_dispatch_0 attributes {sym_visibility = "private"} {
-//  CHECK-NEXT: flow.dispatch.entry @dynamicUpdateSlice_dispatch_0
-//  CHECK-NEXT:   module {
-//  CHECK-NEXT:     func @dynamicUpdateSlice_dispatch_0
-//       CHECK:       %{{.+}} = linalg.generic
-//       CHECK:         %{{.+}} = addi %{{.+}}, %{{.+}} : i32
-//       CHECK: func @dynamicUpdateSlice(%arg0: tensor<2x4xi32>, %arg1: tensor<1x1xi32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> tensor<2x4xi32> {
-//   CHECK-DAG:   %[[ARG2_LOAD:.+]] = flow.tensor.load %arg2 : tensor<i32>
-//   CHECK-DAG:   %[[ARG2_INDEX:.+]] = index_cast %[[ARG2_LOAD]] : i32 to index
-//   CHECK-DAG:   %[[ARG3_LOAD:.+]] = flow.tensor.load %arg3 : tensor<i32>
-//   CHECK-DAG:   %[[ARG3_INDEX:.+]] = index_cast %[[ARG3_LOAD]] : i32 to index
-//  CHECK-NEXT:   %[[RET:.+]] = flow.ex.stream.fragment(%arg0, %[[ARG2_INDEX]], %[[ARG3_INDEX]], %arg1) : (tensor<2x4xi32>, index, index, tensor<1x1xi32>) -> tensor<2x4xi32> =
-//  CHECK-NEXT:        (%arg4: tensor<2x4xi32>, %arg5: index, %arg6: index, %arg7: tensor<1x1xi32>) -> tensor<2x4xi32> {
-//   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
-//   CHECK-DAG:     %[[C4:.+]] = constant 4 : index
-//  CHECK-NEXT:     %[[ARG4_CLONE:.+]] = flow.tensor.clone %arg4 : tensor<2x4xi32>
-//  CHECK-NEXT:     %[[T0:.+]] = flow.tensor.update %arg7, %arg4[%arg5, %arg6] : tensor<1x1xi32> -> tensor<2x4xi32>
-//  CHECK-NEXT:     %[[T1:.+]] = flow.dispatch @dynamicUpdateSlice_dispatch_0::@dynamicUpdateSlice_dispatch_0[%[[C4]], %[[C2]], %[[C1]]](%[[ARG4_CLONE]], %[[T0]]) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
-//  CHECK-NEXT:     flow.return %[[T1]] : tensor<2x4xi32>
-//  CHECK-NEXT:   }
-//  CHECK-NEXT:   return %[[RET]] : tensor<2x4xi32>
-//  CHECK-NEXT: }

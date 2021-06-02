@@ -7,6 +7,9 @@
 #ifndef IREE_TASK_SCOPE_H_
 #define IREE_TASK_SCOPE_H_
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
@@ -39,7 +42,7 @@ extern "C" {
 //
 // Thread-safe; once created scopes are modified exclusively via atomic
 // operations.
-typedef struct iree_task_scope_s {
+typedef struct iree_task_scope_t {
   // Name used for logging and tracing.
   char name[16];
 

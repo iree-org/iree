@@ -6,12 +6,17 @@
 
 #include "iree/hal/vulkan/native_event.h"
 
+#include <cstddef>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_native_event_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   VkEvent handle;

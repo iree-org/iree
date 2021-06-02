@@ -25,6 +25,7 @@ iree_cc_library(
     benchmark
     iree::base
     iree::base::logging
+    iree::base::status
     iree::hal
     iree::modules::hal
     iree::vm

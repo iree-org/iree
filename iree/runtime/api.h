@@ -7,8 +7,14 @@
 #ifndef IREE_RUNTIME_API_H_
 #define IREE_RUNTIME_API_H_
 
-#include "iree/runtime/call.h"
-#include "iree/runtime/instance.h"
-#include "iree/runtime/session.h"
+// Lower-level APIs:
+#include "iree/base/api.h"  // IWYU pragma: export
+#include "iree/hal/api.h"   // IWYU pragma: export
+#include "iree/vm/api.h"    // IWYU pragma: export
+
+// Runtime API:
+#include "iree/runtime/call.h"      // IWYU pragma: export
+#include "iree/runtime/instance.h"  // IWYU pragma: export
+#include "iree/runtime/session.h"   // IWYU pragma: export
 
 #endif  // IREE_RUNTIME_API_H_

@@ -6,10 +6,16 @@
 
 #include "iree/hal/local/loaders/legacy_library_loader.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc.h"
@@ -58,7 +64,7 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
 // iree_hal_legacy_executable_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_legacy_executable_t {
   iree_hal_local_executable_t base;
 
   // Flatbuffer definition referencing the executable memory.
@@ -282,7 +288,7 @@ const iree_hal_local_executable_vtable_t iree_hal_legacy_executable_vtable = {
 // iree_hal_legacy_library_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_legacy_library_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
 } iree_hal_legacy_library_loader_t;

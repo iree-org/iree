@@ -5,13 +5,23 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
+#include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
+#include "iree/hal/descriptor_set.h"
 #include "iree/hal/device.h"
+#include "iree/hal/event.h"
+#include "iree/hal/executable.h"
+#include "iree/hal/executable_layout.h"
+#include "iree/hal/resource.h"
 
-typedef struct {
+typedef struct iree_hal_validating_command_buffer_t {
   iree_hal_resource_t resource;
   iree_hal_device_t* device;
   iree_hal_command_buffer_t* target_command_buffer;

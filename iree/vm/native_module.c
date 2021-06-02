@@ -6,10 +6,15 @@
 
 #include "iree/vm/native_module.h"
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/vm/stack.h"
 
 // Native module implementation allocated for all modules.
-typedef struct {
+typedef struct iree_vm_native_module_t {
   // Interface containing default function pointers.
   // base_interface.self will be the self pointer to iree_vm_native_module_t.
   //

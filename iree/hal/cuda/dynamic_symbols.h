@@ -19,12 +19,12 @@ extern "C" {
 // loads all the function declared in `dynamic_symbol_tables.def` and fail if
 // any of the symbol is not available. The functions signatures are matching
 // the declarations in `cuda.h`.
-typedef struct {
+typedef struct iree_hal_cuda_dynamic_symbols_t {
   iree_dynamic_library_t* loader_library;
 
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
-#include "iree/hal/cuda/dynamic_symbol_tables.h"
+#include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef CU_PFN_DECL
 } iree_hal_cuda_dynamic_symbols_t;
 

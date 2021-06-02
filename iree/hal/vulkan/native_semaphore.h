@@ -7,6 +7,9 @@
 #ifndef IREE_HAL_VULKAN_NATIVE_SEMAPHORE_H_
 #define IREE_HAL_VULKAN_NATIVE_SEMAPHORE_H_
 
+#include <stdint.h>
+
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/handle_util.h"
 

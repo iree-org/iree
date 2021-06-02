@@ -6,7 +6,9 @@
 
 #include "iree/base/logging.h"
 
-#include <string>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 
 #ifdef __ANDROID__
 #include <android/log.h>

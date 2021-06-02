@@ -7,7 +7,9 @@
 #ifndef IREE_BASE_STRING_VIEW_H_
 #define IREE_BASE_STRING_VIEW_H_
 
+#include <limits.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,7 +23,7 @@ extern "C" {
 #define IREE_STRING_VIEW_NPOS SIZE_MAX
 
 // A string view (ala std::string_view) into a non-NUL-terminated string.
-typedef struct {
+typedef struct iree_string_view_t {
   const char* data;
   iree_host_size_t size;
 } iree_string_view_t;

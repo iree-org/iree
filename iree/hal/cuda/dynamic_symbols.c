@@ -6,7 +6,7 @@
 
 #include "iree/hal/cuda/dynamic_symbols.h"
 
-#include <stddef.h>
+#include <string.h>
 
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/target_platform.h"
@@ -28,7 +28,7 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(          \
         syms->loader_library, kName, (void**)&syms->cudaSymbolName)); \
   }
-#include "iree/hal/cuda/dynamic_symbol_tables.h"
+#include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
   return iree_ok_status();
 }

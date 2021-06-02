@@ -24,6 +24,6 @@
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h.inc"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h.inc"  // IWYU pragma: export
 
 #endif  // IREE_COMPILER_DIALECT_HAL_IR_HALOPS_H_

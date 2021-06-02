@@ -6,11 +6,13 @@
 
 #include "iree/vm/instance.h"
 
+#include <stddef.h>
+
 #include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/builtin_types.h"
 
-struct iree_vm_instance {
+struct iree_vm_instance_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 };

@@ -21,7 +21,7 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // CUDA driver creation options.
-typedef struct {
+typedef struct iree_hal_cuda_driver_options_t {
   // Index of the default CUDA device to use within the list of available
   // devices.
   int default_device_index;

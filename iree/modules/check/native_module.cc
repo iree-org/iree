@@ -6,13 +6,18 @@
 
 #include "iree/modules/check/native_module.h"
 
-#include <math.h>
-
+#include <cassert>
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
-#include <cstring>
+#include <memory>
 #include <sstream>
+#include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/status.h"
@@ -20,6 +25,7 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/native_module_cc.h"
+#include "iree/vm/ref_cc.h"
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation

@@ -7,6 +7,9 @@
 #ifndef IREE_TASK_LIST_H_
 #define IREE_TASK_LIST_H_
 
+#include <stdbool.h>
+#include <stddef.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/task/task.h"
@@ -31,7 +34,7 @@ void iree_atomic_task_slist_discard(iree_atomic_task_slist_t* slist);
 //
 // Thread-compatible; designed to be used from a single thread manipulating a
 // list for passing to an API that accepts lists.
-typedef struct iree_task_list_s {
+typedef struct iree_task_list_t {
   iree_task_t* head;
   iree_task_t* tail;
 } iree_task_list_t;

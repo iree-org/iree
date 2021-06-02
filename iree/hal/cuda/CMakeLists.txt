@@ -85,6 +85,7 @@ iree_cc_test(
     "dynamic_symbols_test.cc"
   DEPS
     ::dynamic_symbols
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

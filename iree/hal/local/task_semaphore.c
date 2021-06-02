@@ -7,6 +7,9 @@
 #include "iree/hal/local/task_semaphore.h"
 
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
@@ -26,9 +29,9 @@
 // Instances are owned and retained by the caller that requested them - usually
 // in the arena associated with the submission, but could be on the stack of a
 // synchronously waiting thread.
-typedef struct iree_hal_task_timepoint_s {
-  struct iree_hal_task_timepoint_s* next;
-  struct iree_hal_task_timepoint_s* prev;
+typedef struct iree_hal_task_timepoint_t {
+  struct iree_hal_task_timepoint_t* next;
+  struct iree_hal_task_timepoint_t* prev;
   uint64_t payload_value;
   iree_event_t event;
 } iree_hal_task_timepoint_t;
@@ -39,7 +42,7 @@ typedef struct iree_hal_task_timepoint_s {
 //
 // Note that the timepoints are not owned by the list - this just nicely
 // stitches together timepoints for the semaphore.
-typedef struct {
+typedef struct iree_hal_task_timepoint_list_t {
   iree_hal_task_timepoint_t* head;
   iree_hal_task_timepoint_t* tail;
 } iree_hal_task_timepoint_list_t;
@@ -127,7 +130,7 @@ static void iree_hal_task_timepoint_list_notify_ready(
 // iree_hal_task_semaphore_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_task_semaphore_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_hal_local_event_pool_t* event_pool;
@@ -310,7 +313,7 @@ static iree_status_t iree_hal_task_semaphore_acquire_timepoint(
   return iree_ok_status();
 }
 
-typedef struct {
+typedef struct iree_hal_task_semaphore_wait_cmd_t {
   iree_task_wait_t task;
   iree_hal_task_semaphore_t* semaphore;
   iree_hal_task_timepoint_t timepoint;

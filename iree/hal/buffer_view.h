@@ -9,6 +9,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/buffer.h"
@@ -25,7 +26,7 @@ extern "C" {
 // NOTE: these values must be in sync with
 //    iree/compiler/Dialect/HAL/IR/HALTypes.cpp
 
-enum iree_hal_numerical_type_e {
+enum iree_hal_numerical_type_bits_t {
   IREE_HAL_NUMERICAL_TYPE_UNKNOWN = 0x00u,
   IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED = 0x01u,
   IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED = 0x02u,
@@ -55,7 +56,7 @@ typedef uint8_t iree_hal_numerical_type_t;
 //   [numerical type] [reserved] [reserved] [number of bits]
 //
 // clang-format off
-enum iree_hal_element_type_e {
+enum iree_hal_element_types_t {
   IREE_HAL_ELEMENT_TYPE_NONE             = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             0),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_8         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             8),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_16        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            16),  // NOLINT
@@ -113,7 +114,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
 // effectively just `tuple(shape, type, buffer)`, and if the application is
 // already tracking this information in its own structures this entire type can
 // be ignored.
-typedef struct iree_hal_buffer_view_s iree_hal_buffer_view_t;
+typedef struct iree_hal_buffer_view_t iree_hal_buffer_view_t;
 
 // Creates a buffer view with the given |buffer|.
 // |out_buffer_view| must be released by the caller.

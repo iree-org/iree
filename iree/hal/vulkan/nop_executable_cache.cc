@@ -6,12 +6,16 @@
 
 #include "iree/hal/vulkan/nop_executable_cache.h"
 
+#include <cstddef>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vulkan/dynamic_symbol_tables.h"
 #include "iree/hal/vulkan/native_executable.h"
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_nop_executable_cache_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
 } iree_hal_vulkan_nop_executable_cache_t;

@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
 #define IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/handle_util.h"

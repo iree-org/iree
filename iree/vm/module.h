@@ -7,6 +7,8 @@
 #ifndef IREE_VM_MODULE_H_
 #define IREE_VM_MODULE_H_
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "iree/base/alignment.h"
@@ -17,9 +19,9 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_vm_module iree_vm_module_t;
-typedef struct iree_vm_stack iree_vm_stack_t;
-typedef struct iree_vm_stack_frame iree_vm_stack_frame_t;
+typedef struct iree_vm_module_t iree_vm_module_t;
+typedef struct iree_vm_stack_t iree_vm_stack_t;
+typedef struct iree_vm_stack_frame_t iree_vm_stack_frame_t;
 
 // An opaque offset into a source map that a source resolver can calculate.
 // Do not assume that iree_vm_source_offset_t+1 means the next byte offset as
@@ -28,7 +30,7 @@ typedef struct iree_vm_stack_frame iree_vm_stack_frame_t;
 typedef int64_t iree_vm_source_offset_t;
 
 // A key-value pair of module/function reflection information.
-typedef struct {
+typedef struct iree_vm_reflection_attr_t {
   iree_string_view_t key;
   iree_string_view_t value;
 } iree_vm_reflection_attr_t;
@@ -42,7 +44,7 @@ typedef struct {
 // used for toll-free variadic argument lists here. We could just define an
 // identical structure (and static_assert) to at least rename it to something
 // sensible (iree_vm_segment_size_list_t).
-typedef struct {
+typedef struct iree_vm_register_list_t {
   uint16_t size;
   uint16_t registers[];
 } iree_vm_register_list_t;
@@ -52,7 +54,7 @@ static_assert(offsetof(iree_vm_register_list_t, registers) == 2,
               "expect no padding in the struct");
 
 // Describes the type of a function reference.
-enum iree_vm_function_linkage_e {
+typedef enum iree_vm_function_linkage_e {
   // Function is internal to the module and may not be reflectable.
   IREE_VM_FUNCTION_LINKAGE_INTERNAL = 0,
   // Function is an import from another module.
@@ -60,8 +62,7 @@ enum iree_vm_function_linkage_e {
   // Function is an export from the module.
   IREE_VM_FUNCTION_LINKAGE_EXPORT = 2,
   // TODO(#1979): add linkage types for well-known functions like __init.
-};
-typedef uint16_t iree_vm_function_linkage_t;
+} iree_vm_function_linkage_t;
 
 // A function reference that can be used with the iree_vm_function_* methods.
 // These should be treated as opaque and the accessor functions should be used
@@ -71,7 +72,7 @@ typedef uint16_t iree_vm_function_linkage_t;
 // frame management and debugging. They must at least be able to contain all
 // entry arguments for the function. The counts may be omitted if the function
 // will not be referenced by a VM stack frame.
-typedef struct {
+typedef struct iree_vm_function_t {
   // Module the function is contained within.
   iree_vm_module_t* module;
   // Linkage of the function. Note that IREE_VM_FUNCTION_LINKAGE_INTERNAL
@@ -80,7 +81,7 @@ typedef struct {
   // Ordinal within the module in the linkage scope.
   uint16_t ordinal;
 } iree_vm_function_t;
-static_assert(sizeof(iree_vm_function_t) <= 2 * sizeof(void*),
+static_assert(sizeof(iree_vm_function_t) <= 3 * sizeof(void*),
               "Must remain small as stored on the stack");
 
 // Returns true if the |function| is null (didn't exist, etc).
@@ -90,7 +91,7 @@ static inline bool iree_vm_function_is_null(iree_vm_function_t function) {
 
 // Describes the expected calling convention and arguments/results of a
 // function.
-typedef struct {
+typedef struct iree_vm_function_signature_t {
   // The VM calling convention declaration used to marshal arguments and
   // results into and out of the function.
   // Optional for imports and internal functions but required for exports.
@@ -119,7 +120,7 @@ typedef struct {
 } iree_vm_function_signature_t;
 
 // Describes the imports, exports, and capabilities of a module.
-typedef struct {
+typedef struct iree_vm_module_signature_t {
   // Total number of imported functions.
   iree_host_size_t import_function_count;
   // Total number of exported functions.
@@ -132,7 +133,7 @@ typedef struct {
 // Internal storage for the module state.
 // Thread-compatible; it's expected that only one thread at a time is executing
 // VM functions and accessing this state.
-typedef struct iree_vm_module_state iree_vm_module_state_t;
+typedef struct iree_vm_module_state_t iree_vm_module_state_t;
 
 // Function call data.
 //
@@ -177,7 +178,7 @@ typedef struct iree_vm_module_state iree_vm_module_state_t;
 // argument/result buffers and map them between independent address spaces.
 // Instead, implementing a native_module-alike of libffi_module would be a
 // better layering for callee modules.
-typedef struct {
+typedef struct iree_vm_function_call_t {
   // Function to call.
   iree_vm_function_t function;
 
@@ -250,7 +251,7 @@ IREE_API_EXPORT void iree_vm_function_call_release(
     const iree_vm_function_signature_t* signature);
 
 // Results of an iree_vm_module_execute request.
-typedef struct {
+typedef struct iree_vm_execution_result_t {
   // TODO(benvanik): yield information.
   // Yield modes:
   // - yield (yield instruction)
@@ -265,7 +266,7 @@ typedef struct {
 // Module implementations must be thread-safe as lookups and executions may
 // occur in any order from any thread.
 // TODO(benvanik): version this interface.
-typedef struct iree_vm_module {
+typedef struct iree_vm_module_t {
   IREE_API_UNSTABLE
 
   void* self;

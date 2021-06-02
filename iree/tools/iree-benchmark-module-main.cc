@@ -5,17 +5,26 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <array>
+#include <cstdio>
+#include <iostream>
+#include <iterator>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "benchmark/benchmark.h"
+#include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/ref_cc.h"
 
 IREE_FLAG(string, module_file, "-",
           "File containing the module to load that contains the entry "

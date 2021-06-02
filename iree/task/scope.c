@@ -6,6 +6,11 @@
 
 #include "iree/task/scope.h"
 
+#include <stddef.h>
+#include <string.h>
+
+#include "iree/base/api.h"
+
 void iree_task_scope_initialize(iree_string_view_t name,
                                 iree_task_scope_t* out_scope) {
   IREE_TRACE_ZONE_BEGIN(z0);

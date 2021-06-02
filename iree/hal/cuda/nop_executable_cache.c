@@ -6,10 +6,14 @@
 
 #include "iree/hal/cuda/nop_executable_cache.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/native_executable.h"
 
-typedef struct {
+typedef struct iree_hal_cuda_nop_executable_cache_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
 } iree_hal_cuda_nop_executable_cache_t;

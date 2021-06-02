@@ -6,8 +6,15 @@
 
 #include "iree/compiler/Utils/GraphUtils.h"
 
-#include <algorithm>
 #include <functional>
+#include <utility>
+
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/iterator.h"
+#include "llvm/ADT/iterator_range.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/UseDefLists.h"
+#include "mlir/IR/Value.h"
 
 namespace mlir {
 namespace iree_compiler {

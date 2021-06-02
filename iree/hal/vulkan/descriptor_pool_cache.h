@@ -7,10 +7,14 @@
 #ifndef IREE_HAL_VULKAN_DESCRIPTOR_POOL_CACHE_H_
 #define IREE_HAL_VULKAN_DESCRIPTOR_POOL_CACHE_H_
 
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "iree/base/api.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
 namespace hal {

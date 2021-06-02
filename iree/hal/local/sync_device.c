@@ -6,17 +6,20 @@
 
 #include "iree/hal/local/sync_device.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/local/inline_command_buffer.h"
 #include "iree/hal/local/local_descriptor_set.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
-#include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/local/sync_event.h"
 #include "iree/hal/local/sync_semaphore.h"
 
-typedef struct {
+typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 

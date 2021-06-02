@@ -4,22 +4,27 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// NOTE: must be first to ensure that we can define settings for all includes.
+// clang-format off: must be included before all other headers.
 #include "iree/base/internal/threading_impl.h"
+// clang-format on
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/threading.h"
-#include "iree/base/internal/threading_impl.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
 // Great documentation:
 // https://www.microsoftpressstore.com/articles/article.aspx?p=2233328
 
-struct iree_thread_s {
+struct iree_thread_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 

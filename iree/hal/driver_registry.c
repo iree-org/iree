@@ -6,10 +6,12 @@
 
 #include "iree/hal/driver_registry.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/internal/call_once.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/detail.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_driver_registry_t
@@ -27,7 +29,7 @@
 // isolating/sandboxing/multi-versioning).
 #define IREE_HAL_MAX_DRIVER_FACTORY_COUNT 8
 
-struct iree_hal_driver_registry_s {
+struct iree_hal_driver_registry_t {
   iree_slim_mutex_t mutex;
 
   // Factories in registration order. As factories are unregistered the list is

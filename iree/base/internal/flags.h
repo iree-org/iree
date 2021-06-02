@@ -7,6 +7,8 @@
 #ifndef IREE_BASE_INTERNAL_FLAGS_H_
 #define IREE_BASE_INTERNAL_FLAGS_H_
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "iree/base/api.h"
@@ -89,10 +91,11 @@ extern "C" {
 // Flag definition
 //===----------------------------------------------------------------------===//
 
-typedef enum {
-  IREE_FLAG_DUMP_MODE_DEFAULT = 0,
+enum iree_flag_dump_mode_bits_t {
+  IREE_FLAG_DUMP_MODE_DEFAULT = 0u,
   IREE_FLAG_DUMP_MODE_VERBOSE = 1u << 0,
-} iree_flag_dump_mode_t;
+};
+typedef uint32_t iree_flag_dump_mode_t;
 
 #define IREE_FLAG_CTYPE_bool bool
 #define IREE_FLAG_CTYPE_int32_t int32_t
@@ -104,7 +107,7 @@ typedef enum {
 #if IREE_FLAGS_ENABLE_CLI == 1
 
 // Types of flags supported by the parser.
-typedef enum {
+typedef enum iree_flag_type_e {
   // Empty/unspecified sentinel.
   IREE_FLAG_TYPE_none = 0,
   // Custom parsing callback; see IREE_FLAG_CALLBACK.
@@ -221,7 +224,7 @@ int iree_flag_register(const char* file, int line, iree_flag_type_t type,
 //===----------------------------------------------------------------------===//
 
 // Controls how flag parsing is performed.
-enum iree_flags_parse_mode_e {
+enum iree_flags_parse_mode_bits_t {
   IREE_FLAGS_PARSE_MODE_DEFAULT = 0,
   // Do not error out on undefined flags; leave them in the list.
   // Useful when needing to chain multiple flag parsers together.

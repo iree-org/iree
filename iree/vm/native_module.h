@@ -13,6 +13,7 @@
 
 #include "iree/base/api.h"
 #include "iree/vm/module.h"
+#include "iree/vm/stack.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,7 +22,7 @@ extern "C" {
 // Describes an imported native function in a native module.
 // All of this information is assumed read-only and will be referenced for the
 // lifetime of any module created with the descriptor.
-typedef struct {
+typedef struct iree_vm_native_import_descriptor_t {
   // Fully-qualified function name (for example, 'other_module.foo').
   iree_string_view_t full_name;
 } iree_vm_native_import_descriptor_t;
@@ -29,7 +30,7 @@ typedef struct {
 // Describes an exported native function in a native module.
 // All of this information is assumed read-only and will be referenced for the
 // lifetime of any module created with the descriptor.
-typedef struct {
+typedef struct iree_vm_native_export_descriptor_t {
   // Module-local function name (for example, 'foo' for function 'module.foo').
   iree_string_view_t local_name;
 
@@ -50,7 +51,7 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_shim_t)(
     void* module_state, iree_vm_execution_result_t* out_result);
 
 // An entry in the function pointer table.
-typedef struct {
+typedef struct iree_vm_native_function_ptr_t {
   // A shim function that takes the VM ABI and maps it to the target ABI.
   iree_vm_native_function_shim_t shim;
   // Target function passed to the shim.
@@ -64,7 +65,7 @@ typedef struct {
 // The common native module code will use this descriptor to return metadata on
 // query, lookup exported functions, and call module-provided implementation
 // functions for state and call management.
-typedef struct {
+typedef struct iree_vm_native_module_descriptor_t {
   IREE_API_UNSTABLE
 
   // Name of the module prefixed on all exported functions.

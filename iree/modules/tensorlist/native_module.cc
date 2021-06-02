@@ -6,9 +6,11 @@
 
 #include "iree/modules/tensorlist/native_module.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 #include "absl/types/span.h"

@@ -6,6 +6,9 @@
 
 #include "iree/runtime/session.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/tracing.h"
@@ -29,7 +32,7 @@ IREE_API_EXPORT void iree_runtime_session_options_initialize(
 // iree_runtime_session_t
 //===----------------------------------------------------------------------===//
 
-struct iree_runtime_session_s {
+struct iree_runtime_session_t {
   iree_atomic_ref_count_t ref_count;
 
   // Allocator used to allocate the session and all of its resources.

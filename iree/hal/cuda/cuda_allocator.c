@@ -6,11 +6,15 @@
 
 #include "iree/hal/cuda/cuda_allocator.h"
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/cuda_buffer.h"
+#include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/status_util.h"
 
-typedef struct iree_hal_cuda_allocator_s {
+typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
 } iree_hal_cuda_allocator_t;

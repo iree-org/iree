@@ -13,6 +13,7 @@
 #include "iree/tools/init_targets.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MlirOptMain.h"
 
 int main(int argc, char **argv) {

@@ -6,6 +6,9 @@
 
 #include "iree/runtime/instance.h"
 
+#include <stddef.h>
+#include <string.h>
+
 #include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -37,7 +40,7 @@ IREE_API_EXPORT void iree_runtime_instance_options_use_all_available_drivers(
 // iree_runtime_instance_t
 //===----------------------------------------------------------------------===//
 
-struct iree_runtime_instance_s {
+struct iree_runtime_instance_t {
   iree_atomic_ref_count_t ref_count;
 
   // Allocator used to allocate the instance and all of its resources.

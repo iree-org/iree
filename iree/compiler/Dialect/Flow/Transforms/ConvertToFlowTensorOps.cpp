@@ -103,6 +103,18 @@ static SmallVector<Value, 4> getDynamicValues(
   return dynamicDims;
 }
 
+/// Get shape of the tensor given the sizes as a list of `OpFoldResult`.
+static SmallVector<int64_t, 4> getShapeFromSizes(
+    ArrayRef<OpFoldResult> valueOrAttrList) {
+  return llvm::to_vector<4>(llvm::map_range(
+      valueOrAttrList, [&](OpFoldResult valueOrAttr) -> int64_t {
+        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+          return attr.cast<IntegerAttr>().getInt();
+        }
+        return ShapedType::kDynamicSize;
+      }));
+}
+
 /// Generates `memref.dim` operations to get the dynamic sizes of a value `v`.
 static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
                                                  Value v) {
@@ -171,13 +183,8 @@ struct SubTensorInsertToTensorUpdate
 
     // Handle rank-reduced version.
     if (sourceType.getRank() < destType.getRank()) {
-      // Pad the leading dimensions by 1. By construction, only leading sizes of
-      // the subtensor can be 1 at this stage (and therefore can be
-      // rank-reduced).
-      SmallVector<int64_t> unreducedShape(
-          destType.getRank() - sourceType.getRank(), 1);
-      unreducedShape.append(sourceType.getShape().begin(),
-                            sourceType.getShape().end());
+      // Get the un-rank-reduced shape of the source.
+      auto unreducedShape = getShapeFromSizes(sizes);
       sourceType =
           RankedTensorType::get(unreducedShape, sourceType.getElementType());
       source = rewriter.create<IREE::Flow::TensorReshapeOp>(
@@ -218,13 +225,8 @@ struct SubTensorToTensorSlice : public OpRewritePattern<SubTensorOp> {
 
     // Handle rank reduced version.
     if (resultType.getRank() < sourceType.getRank()) {
-      // Pad the leading dimensions by 1. By construction, only leading sizes of
-      // the subtensor can be 1 at this stage (and therefore can be
-      // rank-reduced).
-      SmallVector<int64_t> unreducedShape(
-          sourceType.getRank() - resultType.getRank(), 1);
-      unreducedShape.append(resultType.getShape().begin(),
-                            resultType.getShape().end());
+      // Get the un-rank-reduced shape of the result.
+      auto unreducedShape = getShapeFromSizes(sizes);
       resultType =
           RankedTensorType::get(unreducedShape, sourceType.getElementType());
     }

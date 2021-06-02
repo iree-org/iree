@@ -16,8 +16,8 @@
 #ifndef IREE_HAL_VULKAN_HANDLE_UTIL_H_
 #define IREE_HAL_VULKAN_HANDLE_UTIL_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format off: must be included before all other headers.
+#include "iree/hal/vulkan/vulkan_headers.h"  // IWYU pragma: export
 // clang-format on
 
 #include "iree/base/internal/synchronization.h"

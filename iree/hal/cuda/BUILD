@@ -94,6 +94,7 @@ cc_test(
     tags = ["driver=cuda"],
     deps = [
         ":dynamic_symbols",
+        "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

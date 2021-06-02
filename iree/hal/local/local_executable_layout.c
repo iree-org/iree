@@ -6,6 +6,8 @@
 
 #include "iree/hal/local/local_executable_layout.h"
 
+#include <stddef.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 
@@ -72,6 +74,8 @@ iree_status_t iree_hal_local_executable_layout_create(
           case IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
             ++layout->dynamic_binding_count;
             break;
+          default:
+            continue;
         }
       }
     }

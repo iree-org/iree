@@ -16,14 +16,14 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct {
+typedef struct iree_hal_local_executable_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_host_size_t executable_layout_count;
   iree_hal_local_executable_layout_t** executable_layouts;
 } iree_hal_local_executable_t;
 
-typedef struct {
+typedef struct iree_hal_local_executable_vtable_t {
   iree_hal_executable_vtable_t base;
 
   iree_status_t(IREE_API_PTR* issue_call)(

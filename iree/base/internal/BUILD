@@ -121,6 +121,8 @@ cc_test(
     srcs = ["file_io_test.cc"],
     deps = [
         ":file_io",
+        "//iree/base:logging",
+        "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -166,7 +168,7 @@ cc_binary(
     srcs = ["flags_demo.c"],
     deps = [
         ":flags",
-        "//iree/base:core_headers",
+        "//iree/base",
     ],
 )
 
@@ -216,6 +218,7 @@ cc_test(
     srcs = ["fpu_state_benchmark.cc"],
     deps = [
         ":fpu_state",
+        "//iree/base",
         "//iree/testing:benchmark_main",
         "@com_google_benchmark//:benchmark",
     ],
@@ -352,8 +355,10 @@ cc_test(
         "threading_test.cc",
     ],
     deps = [
+        ":internal",
         ":synchronization",
         ":threading",
+        "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

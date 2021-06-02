@@ -20,7 +20,7 @@
 // epoll lets us route the wait set operations right to kernel and not need our
 // own duplicate data structure. epoll is great, just not available on mac/ios
 // so we still need poll for that. linux/android/bsd all have epoll, though.
-struct iree_wait_set_s {
+struct iree_wait_set_t {
   // NOTE: we could in theory use the epoll handle directly (iree_wait_set_s
   // then is just a pointer). Then allocate/free just go straight to the system.
   int reserved;

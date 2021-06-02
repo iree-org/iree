@@ -14,6 +14,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h.inc"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h.inc"  // IWYU pragma: export
 
 #endif  // IREE_COMPILER_DIALECT_IREE_IR_IREEOPS_H_

@@ -70,7 +70,7 @@ iree_cc_test(
     ::hal
     absl::span
     absl::strings
-    iree::base::core_headers
+    iree::base
     iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main

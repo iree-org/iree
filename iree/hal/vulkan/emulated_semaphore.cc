@@ -6,12 +6,17 @@
 
 #include "iree/hal/vulkan/emulated_semaphore.h"
 
-#include <inttypes.h>
-#include <stdint.h>
-
+#include <atomic>
+#include <cinttypes>
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
 #include <vector>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
+#include "iree/base/logging.h"
+#include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"
@@ -508,7 +513,7 @@ using namespace iree::hal::vulkan;
 // Porting the above to C is ideal but since this is just a fallback layer I'm
 // not sure it's worth it (given that we may require Vulkan 1.2 with timeline
 // semaphores built in at some point soon).
-typedef struct {
+typedef struct iree_hal_vulkan_emulated_semaphore_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   EmulatedTimelineSemaphore* handle;

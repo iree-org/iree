@@ -6,7 +6,7 @@
 
 #include "iree/hal/local/task_queue_state.h"
 
-#include "iree/base/tracing.h"
+#include <string.h>
 
 void iree_hal_task_queue_state_initialize(
     iree_hal_task_queue_state_t* out_queue_state) {

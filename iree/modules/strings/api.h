@@ -7,14 +7,17 @@
 #ifndef IREE_MODULES_STRINGS_STRINGS_API_H_
 #define IREE_MODULES_STRINGS_STRINGS_API_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "iree/base/api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct strings_string strings_string_t;
-typedef struct strings_string_tensor strings_string_tensor_t;
+typedef struct strings_string_t strings_string_t;
+typedef struct strings_string_tensor_t strings_string_tensor_t;
 
 // Creates a string type.
 iree_status_t strings_string_create(iree_string_view_t value,

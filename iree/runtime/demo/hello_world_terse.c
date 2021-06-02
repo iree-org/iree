@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stdio.h>
+
 #include "iree/runtime/api.h"
 #include "iree/runtime/testdata/simple_mul_module_c.h"
 

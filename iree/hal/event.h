@@ -17,7 +17,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_event_t
@@ -32,7 +32,7 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 //
 // Maps to VkEvent:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkEvent.html
-typedef struct iree_hal_event_s iree_hal_event_t;
+typedef struct iree_hal_event_t iree_hal_event_t;
 
 // Creates an event for recording into command buffers.
 // The returned event object is only usable with this device and events must
@@ -50,7 +50,7 @@ IREE_API_EXPORT void iree_hal_event_release(iree_hal_event_t* event);
 // iree_hal_event_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_event_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 
