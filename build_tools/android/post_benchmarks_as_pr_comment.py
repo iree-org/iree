@@ -51,6 +51,7 @@ from common.benchmark_description import BenchmarkResults, get_output
 GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/google/iree"
 IREE_PROJECT_ID = 'IREE'
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+RESULT_EMPHASIS_THRESHOLD = 0.05
 
 
 def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
@@ -155,15 +156,21 @@ def get_comparsion_against_base(pr_means: Sequence[int],
       comparisions.append(str(pr))
       continue
 
+    diff = abs(pr - base) / base
     if pr > base:
-      percent = "{:.2%}".format((pr - base) / base)
+      percent = "{:.2%}".format(diff)
       direction = "↑"
-    elif pr == base:
-      percent = "{:.2%}".format((pr - base) / base)
-      direction = ""
-    else:
-      percent = "{:.2%}".format((base - pr) / base)
+      if diff > RESULT_EMPHASIS_THRESHOLD:
+        direction += ", 🚩"
+    elif pr < base:
+      percent = "{:.2%}".format(diff)
       direction = "↓"
+      if diff > RESULT_EMPHASIS_THRESHOLD:
+        direction += ", 🎉"
+    else:
+      percent = "{:.0%}".format(diff)
+      direction = ""
+
     comparisions.append(f"{pr} (vs. {base}, {percent}{direction})")
 
   return tuple(comparisions)
