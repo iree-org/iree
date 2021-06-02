@@ -84,13 +84,23 @@ BufferConstraintsAttr TargetBackend::queryBufferConstraints(
   return makeDefaultBufferConstraints(context);
 }
 
-static void renameWithDisambiguatedName(
-    Operation *op, Operation *moduleOp, llvm::StringRef originalName,
-    llvm::StringMap<unsigned> &symbolOccurrences) {
-  // Note: this assumes that no other names will naturally occur in this format.
-  auto disambiguatedName =
-      llvm::formatv("{0}_{1}", originalName, symbolOccurrences[originalName]++)
-          .str();
+// Renames |op| within |moduleOp| with a new name that is unique within both
+// |moduleOp| and |otherModuleOp|.
+static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
+                                        Operation *otherModuleOp,
+                                        llvm::StringRef originalName) {
+  SymbolTable moduleSymbolTable(moduleOp);
+  SymbolTable otherModuleSymbolTable(otherModuleOp);
+
+  // Iteratively try suffixes until we find one that isn't used.
+  std::string disambiguatedName;
+  int uniqueingCounter = 0;
+  do {
+    disambiguatedName =
+        llvm::formatv("{0}_{1}", originalName, uniqueingCounter++).str();
+  } while (moduleSymbolTable.lookup(disambiguatedName) ||
+           otherModuleSymbolTable.lookup(disambiguatedName));
+
   SymbolTableCollection symbolTable;
   SymbolUserMap symbolUsers(symbolTable, moduleOp);
   symbolUsers.replaceAllUsesWith(op, disambiguatedName);
@@ -110,15 +120,13 @@ void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
 // |targetSymbolMap| is updated with the new symbols.
 //
 // If a private symbol in |sourceModuleOp| conflicts with another symbol
-// (public or private) tracked in |targetSymbolMap|, it will be renamed and
-// |privateSymbolOccurrences| will be updated to reflect this.
+// (public or private) tracked in |targetSymbolMap|, it will be renamed.
 //
 // Fails if a public symbol in |sourceModuleOp| conflicts with another public
 // symbol tracked in |targetSymbolMap|.
 static LogicalResult mergeModuleInto(
     Operation *sourceModuleOp, Operation *targetModuleOp,
-    DenseMap<StringRef, Operation *> &targetSymbolMap,
-    llvm::StringMap<unsigned> &privateSymbolOccurrences) {
+    DenseMap<StringRef, Operation *> &targetSymbolMap) {
   auto &sourceBlock = sourceModuleOp->getRegion(0).front();
   auto &targetBlock = targetModuleOp->getRegion(0).front();
   auto allOps = llvm::to_vector<8>(
@@ -139,8 +147,8 @@ static LogicalResult mergeModuleInto(
             continue;
           } else {
             // Preserve the op but give it a unique name.
-            renameWithDisambiguatedName(op, sourceModuleOp, symbolName,
-                                        privateSymbolOccurrences);
+            renameWithDisambiguatedName(op, sourceModuleOp, targetModuleOp,
+                                        symbolName);
           }
         } else {
           // The source symbol has 'nested' or 'public' visibility.
@@ -158,8 +166,8 @@ static LogicalResult mergeModuleInto(
                    << "multiple public symbols with the name: " << symbolName;
           } else {
             // Keep the original name for our new op, rename the target op.
-            renameWithDisambiguatedName(targetOp, targetModuleOp, symbolName,
-                                        privateSymbolOccurrences);
+            renameWithDisambiguatedName(targetOp, targetModuleOp,
+                                        targetModuleOp, symbolName);
           }
         }
       }
@@ -204,7 +212,6 @@ LogicalResult TargetBackend::linkExecutablesInto(
   llvm::SmallVector<IREE::HAL::InterfaceOp, 4> linkedInterfaceOps;
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
-  llvm::StringMap<unsigned> privateSymbolOccurrences;
   DenseMap<Attribute, Attribute> entryPointRefReplacements;
 
   auto linkedExecutableBuilder =
@@ -269,7 +276,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
       auto sourceModuleOp = getInnerModuleFn(targetOp.getInnerModule());
       auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
       if (failed(mergeModuleInto(sourceModuleOp, linkedModuleOp,
-                                 targetSymbolMap, privateSymbolOccurrences))) {
+                                 targetSymbolMap))) {
         return failure();
       }
 
