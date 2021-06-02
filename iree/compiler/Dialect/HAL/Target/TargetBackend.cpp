@@ -150,7 +150,7 @@ static LogicalResult mergeModuleInto(
           } else {
             // Preserve the op but give it a unique name.
             renameWithDisambiguatedName(op, sourceModuleOp, targetSymbolMap,
-                                        /*optionalSymbolTable=*/nullptr);
+                                        &sourceSymbolTable);
           }
         } else {
           // The source symbol has 'nested' or 'public' visibility.
@@ -169,11 +169,12 @@ static LogicalResult mergeModuleInto(
           } else {
             // Keep the original name for our new op, rename the target op.
             renameWithDisambiguatedName(targetOp, targetModuleOp,
-                                        targetSymbolMap, &sourceSymbolTable);
+                                        targetSymbolMap,
+                                        /*optionalSymbolTable=*/nullptr);
           }
         }
       }
-      targetSymbolMap[symbolName] = op;
+      targetSymbolMap[SymbolTable::getSymbolName(op)] = op;
     }
     if (!targetBlock.empty() &&
         targetBlock.back().hasTrait<OpTrait::IsTerminator>()) {
