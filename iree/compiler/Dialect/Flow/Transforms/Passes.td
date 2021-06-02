@@ -64,7 +64,7 @@ def InjectDispatchTracing :
 }
 
 def PromoteI1ToI8 :
-    Pass<"iree-flow-promote-i1-to-i9", "FuncOp"> {
+    Pass<"iree-flow-promote-i1-to-i8", "FuncOp"> {
   let summary = "Legalizes i1 tensor constants to i8s";
   let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
 }
