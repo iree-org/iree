@@ -146,12 +146,9 @@ VULKAN_SRCS = enforce_glob(
         "ceil.mlir",
         "clamp.mlir",
         "const.mlir",
-        "equal.mlir",
         "exp.mlir",
         "floor.mlir",
         "gather.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
         "if.mlir",
         "log.mlir",
         "logical_left_shift.mlir",
@@ -177,6 +174,9 @@ VULKAN_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "fully_connected.mlir",  # Currently failing on vulkan.
+        "equal.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
+        "greater.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
+        "greater_equal.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
         "reduce.mlir",  # Currently failing on vulkan.
         "max_pool.mlir",  # Currently failing on vulkan.
     ],
