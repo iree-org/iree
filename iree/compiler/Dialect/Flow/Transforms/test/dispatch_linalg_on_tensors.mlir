@@ -735,8 +735,8 @@ func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16> {
 //  CHECK-NEXT:     (%[[ARG2:.+]]: !flow.dispatch.tensor<readonly:4xi32>
 //  CHECK-SAME:      %[[ARG3:.+]]: !flow.dispatch.tensor<readonly:i32>
 //  CHECK-SAME:      %[[ARG4:.+]]: !flow.dispatch.tensor<writeonly:i16>
-//       CHECK:     %[[C0:.+]] = constant 0 : i32
-//       CHECK:     %[[C3:.+]] = constant 3 : i32
+//   CHECK-DAG:     %[[C0:.+]] = constant 0 : i32
+//   CHECK-DAG:     %[[C3:.+]] = constant 3 : i32
 //       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG2]], {{.*}}
 //       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG3]], {{.*}}
 //       CHECK:     %[[INIT:.+]] = linalg.init_tensor [] : tensor<i16>
