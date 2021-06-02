@@ -14,7 +14,7 @@ steps:
       - "tar -czvf model-S20-artifacts.tgz build-android/iree/tools/iree-benchmark-module *S20*.vmfb"
       - "tar -czvf flagfiles.tgz *_flagfile"
     agents:
-      - "build=true"
+      - "queue=build"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     artifact_paths:
