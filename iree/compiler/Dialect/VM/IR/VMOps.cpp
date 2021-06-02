@@ -728,6 +728,16 @@ void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
 }
 
 static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
+  // TODO(#4670): Share across ops or upstream a custom directive
+  StringRef visibility;
+  if (parser.parseOptionalKeyword(&visibility,
+                                  {"public", "private", "nested"})) {
+    return failure();
+  }
+  StringAttr visibilityAttr = parser.getBuilder().getStringAttr(visibility);
+  result->attributes.push_back(parser.getBuilder().getNamedAttr(
+      SymbolTable::getVisibilityAttrName(), visibilityAttr));
+
   StringAttr nameAttr;
   Attribute valueAttr;
   if (failed(parser.parseSymbolName(nameAttr,
@@ -736,11 +746,19 @@ static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
       failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
     return failure();
   }
+
   return success();
 }
 
 static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   p << op.getOperationName() << ' ';
+
+  // TODO(#4670): Share across ops or upstream a custom directive
+  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
+  if (auto visibility = op->getAttrOfType<StringAttr>(visibilityAttrName)) {
+    p << visibility.getValue() << ' ';
+  }
+
   p.printSymbolName(op.sym_name());
   p << ' ';
   p.printAttribute(op.value());
