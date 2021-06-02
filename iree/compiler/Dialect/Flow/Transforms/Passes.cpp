@@ -124,8 +124,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Legalize constants to be valid for IREE.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createPromoteI1ToI8Pass());
+  // TODO(suderman): Determine why adding these passes causes failures on
+  // pixel 4 dot_general test.
+  // passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  // passManager.addNestedPass<FuncOp>(IREE::Flow::createPromoteI1ToI8Pass());
 
   // Legalize input types. We do this after flattening tuples so that we don't
   // have to deal with them.
