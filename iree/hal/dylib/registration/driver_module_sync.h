@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_DYLIB_REGISTRATION_DRIVER_MODULE_SYNC_H_
 #define IREE_HAL_DYLIB_REGISTRATION_DRIVER_MODULE_SYNC_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus

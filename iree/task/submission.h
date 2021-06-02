@@ -7,8 +7,11 @@
 #ifndef IREE_TASK_SUBMISSION_H_
 #define IREE_TASK_SUBMISSION_H_
 
+#include <stdbool.h>
+
 #include "iree/base/api.h"
 #include "iree/task/list.h"
+#include "iree/task/task.h"
 
 #ifdef __cplusplus
 extern "C" {

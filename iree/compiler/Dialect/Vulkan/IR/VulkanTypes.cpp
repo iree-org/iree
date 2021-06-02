@@ -6,7 +6,8 @@
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 
-#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringExtras.h"  // IWYU pragma: keep
 
-// Pull in auto-generated Vulkan enum class definitions
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanEnums.cpp.inc"
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanEnums.cpp.inc"  // IWYU pragma: keep
+// clang-format on

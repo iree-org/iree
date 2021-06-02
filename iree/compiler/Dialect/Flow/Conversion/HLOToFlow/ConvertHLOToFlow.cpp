@@ -31,35 +31,16 @@ struct ConstOpLowering : public OpRewritePattern<mhlo::ConstOp> {
   }
 };
 
-struct DynamicUpdateSliceOpLowering
-    : public OpRewritePattern<mhlo::DynamicUpdateSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(mhlo::DynamicUpdateSliceOp op,
-                                PatternRewriter &rewriter) const override {
-    auto startIndices = llvm::to_vector<4>(
-        llvm::map_range(op.start_indices(), [&](Value tensorValue) {
-          return rewriter.createOrFold<IndexCastOp>(
-              op.getLoc(),
-              rewriter.createOrFold<tensor::ExtractOp>(op.getLoc(),
-                                                       tensorValue),
-              rewriter.getIndexType());
-        }));
-    rewriter.replaceOpWithNewOp<IREE::Flow::TensorUpdateOp>(
-        op, op.operand(), startIndices, op.update());
-    return success();
-  }
-};
-
 }  // namespace
 
 void setupDirectHLOToFlowLegality(MLIRContext *context,
                                   ConversionTarget &conversionTarget) {
-  conversionTarget.addIllegalOp<mhlo::ConstOp, mhlo::DynamicUpdateSliceOp>();
+  conversionTarget.addIllegalOp<mhlo::ConstOp>();
 }
 
 void populateHLOToFlowPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns) {
-  patterns.insert<ConstOpLowering, DynamicUpdateSliceOpLowering>(context);
+  patterns.insert<ConstOpLowering>(context);
 }
 
 }  // namespace iree_compiler

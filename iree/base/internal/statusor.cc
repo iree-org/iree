@@ -6,6 +6,10 @@
 
 #include "iree/base/internal/statusor.h"
 
+#include <ostream>
+
+#include "iree/base/logging.h"
+
 namespace iree {
 
 namespace internal_statusor {

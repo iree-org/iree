@@ -6,7 +6,7 @@
 
 #include "iree/task/topology.h"
 
-#include <cpuinfo.h>
+#include <cstddef>
 
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"

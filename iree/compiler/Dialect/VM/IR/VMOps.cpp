@@ -1243,6 +1243,6 @@ Optional<MutableOperandRange> CondBreakOp::getMutableSuccessorOperands(
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/VM/IR/VMOpEncoder.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOpEncoder.cpp.inc"  // IWYU pragma: keep
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"  // IWYU pragma: keep

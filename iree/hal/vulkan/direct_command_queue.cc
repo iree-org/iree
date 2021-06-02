@@ -10,8 +10,11 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/native_semaphore.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/tracing.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
 namespace hal {

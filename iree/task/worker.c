@@ -6,9 +6,16 @@
 
 #include "iree/task/worker.h"
 
+#include <stdbool.h>
+#include <string.h>
+
 #include "iree/base/internal/math.h"
+#include "iree/base/tracing.h"
 #include "iree/task/executor_impl.h"
+#include "iree/task/post_batch.h"
+#include "iree/task/submission.h"
 #include "iree/task/task_impl.h"
+#include "iree/task/tuning.h"
 
 static int iree_task_worker_main(iree_task_worker_t* worker);
 

@@ -4,10 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "iree/base/api.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
@@ -446,7 +452,7 @@ struct BufferView final
                                           &actual_rank);
       shape.resize(actual_rank);
     } while (iree_status_is_out_of_range(status));
-    IREE_DCHECK(iree_status_is_ok(status));
+    IREE_CHECK_OK(status);
     return shape;
   }
 

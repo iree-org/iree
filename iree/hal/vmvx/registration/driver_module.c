@@ -7,10 +7,15 @@
 #include "iree/hal/vmvx/registration/driver_module.h"
 
 #include <inttypes.h>
+#include <stddef.h>
 
+#include "iree/base/api.h"
+#include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/vmvx_module_loader.h"
+#include "iree/hal/local/task_device.h"
 #include "iree/hal/local/task_driver.h"
 #include "iree/task/api.h"
+#include "iree/vm/api.h"
 
 // TODO(#4298): remove this driver registration and wrapper.
 

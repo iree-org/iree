@@ -26,6 +26,7 @@ cc_library(
     deps = [
         "//iree/base",
         "//iree/base:core_headers",
+        "//iree/base:tracing",
         "//iree/base/internal:atomic_slist",
         "//iree/base/internal:synchronization",
     ],
@@ -61,6 +62,7 @@ cc_test(
         "//iree/base",
         "//iree/base:tracing",
         "//iree/base/internal:flags",
+        "//iree/hal",
         "//iree/hal/local/loaders:embedded_library_loader",
         "//iree/testing:benchmark",
     ],
@@ -161,6 +163,7 @@ cc_library(
     deps = [
         ":arena",
         ":event_pool",
+        ":executable_library",
         ":local",
         "//iree/base",
         "//iree/base:core_headers",

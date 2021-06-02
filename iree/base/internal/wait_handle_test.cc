@@ -6,6 +6,9 @@
 
 #include "iree/base/internal/wait_handle.h"
 
+#include <chrono>
+#include <cstddef>
+#include <cstring>
 #include <thread>
 
 #include "iree/testing/gtest.h"

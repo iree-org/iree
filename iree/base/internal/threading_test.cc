@@ -7,10 +7,13 @@
 #include "iree/base/internal/threading.h"
 
 #include <chrono>
+#include <cstring>
 #include <thread>
 
+#include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading_impl.h"  // to test the override list
+#include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -44,8 +47,8 @@ TEST(ThreadTest, Lifetime) {
 
   // Create the thread and immediately begin running it.
   iree_thread_t* thread = nullptr;
-  IREE_ASSERT_OK(Status(iree_thread_create(entry_fn, &entry_data, params,
-                                           iree_allocator_system(), &thread)));
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
+                                    iree_allocator_system(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // Drop the thread handle; should be safe as the thread should keep itself
@@ -84,8 +87,8 @@ TEST(ThreadTest, CreateSuspended) {
   };
 
   iree_thread_t* thread = nullptr;
-  IREE_ASSERT_OK(Status(iree_thread_create(entry_fn, &entry_data, params,
-                                           iree_allocator_system(), &thread)));
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
+                                    iree_allocator_system(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // NOTE: the thread will not be running and we should not expect a change in
@@ -135,8 +138,8 @@ TEST(ThreadTest, PriorityOverride) {
   };
 
   iree_thread_t* thread = nullptr;
-  IREE_ASSERT_OK(Status(iree_thread_create(entry_fn, &entry_data, params,
-                                           iree_allocator_system(), &thread)));
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
+                                    iree_allocator_system(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // Push a few overrides.

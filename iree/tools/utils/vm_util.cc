@@ -6,15 +6,24 @@
 
 #include "iree/tools/utils/vm_util.h"
 
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
 #include <ostream>
+#include <type_traits>
+#include <vector>
 
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
+#include "iree/base/logging.h"
 #include "iree/base/status.h"
+#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree/vm/ref_cc.h"
 
 namespace iree {
 

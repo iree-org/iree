@@ -6,12 +6,17 @@
 
 #include "iree/hal/vulkan/emulated_semaphore.h"
 
-#include <inttypes.h>
-#include <stdint.h>
-
+#include <atomic>
+#include <cinttypes>
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
 #include <vector>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
+#include "iree/base/logging.h"
+#include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"

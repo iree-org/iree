@@ -6,8 +6,12 @@
 
 #include "iree/task/api.h"
 
+#include <stdbool.h>
+#include <string.h>
+
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
+#include "iree/task/topology.h"
 
 //===----------------------------------------------------------------------===//
 // Executor configuration

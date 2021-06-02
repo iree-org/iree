@@ -20,6 +20,7 @@ iree_cc_library(
   SRCS
     "driver_module.cc"
   DEPS
+    iree::base
     iree::base::core_headers
     iree::base::internal::flags
     iree::base::status

@@ -11,9 +11,11 @@
 
 #include <stdint.h>
 
-// clang-format off: Must be included before all other headers:
+// clang-format off: must be included before all other headers.
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
+
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"

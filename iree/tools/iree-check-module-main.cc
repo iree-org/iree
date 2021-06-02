@@ -5,27 +5,35 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <array>
+#include <cstdio>
 #include <iostream>
+#include <iterator>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/tools/utils/vm_util.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/api.h"
 
 // On Windows stdin defaults to text mode and will get weird line ending
 // expansion that will corrupt the input binary.
 #if defined(IREE_PLATFORM_WINDOWS)
 #include <fcntl.h>
 #include <io.h>
+
 #define IREE_FORCE_BINARY_STDIN() _setmode(_fileno(stdin), O_BINARY)
 #else
 #define IREE_FORCE_BINARY_STDIN()

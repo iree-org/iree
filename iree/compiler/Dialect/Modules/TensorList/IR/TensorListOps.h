@@ -11,6 +11,6 @@
 #include "mlir/IR/OpDefinition.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h.inc"
+#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h.inc"  // IWYU pragma: export
 
 #endif  // IREE_COMPILER_DIALECT_MODULES_TENSORLIST_IR_TENSORLISTOPS_H_

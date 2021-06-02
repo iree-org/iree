@@ -7,6 +7,7 @@
 #ifndef IREE_TASK_POOL_H_
 #define IREE_TASK_POOL_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"

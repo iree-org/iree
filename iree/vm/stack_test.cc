@@ -6,12 +6,9 @@
 
 #include "iree/vm/stack.h"
 
-#include <cstring>
-
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/vm/ref.h"
 
 namespace {
 
@@ -130,7 +127,7 @@ TEST(VMStackTest, UnbalancedPop) {
                                   iree_allocator_system());
 
   IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
-                        ::iree::Status(iree_vm_stack_function_leave(stack)));
+                        iree_vm_stack_function_leave(stack));
 
   iree_vm_stack_deinitialize(stack);
 }
@@ -196,8 +193,8 @@ TEST(VMStackTest, ModuleStateQueryFailure) {
   iree_vm_stack_frame_t* frame_a = nullptr;
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_INTERNAL,
-      ::iree::Status(iree_vm_stack_function_enter(
-          stack, &function_a, IREE_VM_STACK_FRAME_NATIVE, 0, NULL, &frame_a)));
+      iree_vm_stack_function_enter(
+          stack, &function_a, IREE_VM_STACK_FRAME_NATIVE, 0, NULL, &frame_a));
 
   iree_vm_stack_deinitialize(stack);
 }

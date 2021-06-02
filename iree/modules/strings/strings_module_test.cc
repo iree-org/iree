@@ -44,8 +44,7 @@ class StringsModuleTest : public ::testing::Test {
     // Setup strings module:
     IREE_CHECK_OK(iree_strings_module_register_types());
     IREE_CHECK_OK(
-        iree_strings_module_create(iree_allocator_system(), &strings_module_))
-        << "Strings module failed to init";
+        iree_strings_module_create(iree_allocator_system(), &strings_module_));
 
     // Setup hal module:
     IREE_CHECK_OK(iree_hal_module_register_types());
@@ -65,8 +64,7 @@ class StringsModuleTest : public ::testing::Test {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        iree_allocator_null(), iree_allocator_system(), &bytecode_module_))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {strings_module_, hal_module_,
                                               bytecode_module_};
@@ -88,8 +86,7 @@ class StringsModuleTest : public ::testing::Test {
     iree_vm_function_t function;
     IREE_CHECK_OK(bytecode_module_->lookup_function(
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_make_cstring_view(function_name), &function))
-        << "Exported function '" << function_name << "' not found";
+        iree_make_cstring_view(function_name), &function));
     return function;
   }
 

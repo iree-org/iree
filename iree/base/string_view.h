@@ -7,7 +7,9 @@
 #ifndef IREE_BASE_STRING_VIEW_H_
 #define IREE_BASE_STRING_VIEW_H_
 
+#include <limits.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 

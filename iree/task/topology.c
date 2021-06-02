@@ -6,13 +6,14 @@
 
 #include "iree/task/topology.h"
 
-#include <assert.h>
 #include <cpuinfo.h>
 #include <stdio.h>
+#include <string.h>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/math.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
-#include "iree/task/tuning.h"
 
 void iree_task_topology_group_initialize(
     uint8_t group_index, iree_task_topology_group_t* out_group) {

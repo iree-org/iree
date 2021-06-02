@@ -6,6 +6,11 @@
 
 #include "iree/vm/native_module.h"
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/vm/stack.h"
 
 // Native module implementation allocated for all modules.

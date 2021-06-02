@@ -6,6 +6,9 @@
 
 #include "iree/base/internal/atomics.h"
 
+#include <cstddef>
+#include <cstdint>
+
 #include "iree/testing/gtest.h"
 
 namespace {

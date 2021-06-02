@@ -6,9 +6,12 @@
 
 #include "iree/hal/event.h"
 
+#include <stddef.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
+#include "iree/hal/resource.h"
 
 #define _VTABLE_DISPATCH(event, method_name) \
   IREE_HAL_VTABLE_DISPATCH(event, iree_hal_event, method_name)

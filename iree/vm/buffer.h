@@ -7,6 +7,9 @@
 #ifndef IREE_VM_BUFFER_H_
 #define IREE_VM_BUFFER_H_
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/vm/ref.h"
 

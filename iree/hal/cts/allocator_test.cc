@@ -4,9 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <string>
+#include <vector>
+
+#include "iree/base/api.h"
+#include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {

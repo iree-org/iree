@@ -7,6 +7,8 @@
 #include "iree/hal/buffer.h"
 
 #include <inttypes.h>
+#include <stddef.h>
+#include <string.h>
 
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"

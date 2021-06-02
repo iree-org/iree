@@ -7,7 +7,10 @@
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 
 #include <array>
+#include <cstdint>
+#include <ostream>
 
+#include "iree/base/logging.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
 

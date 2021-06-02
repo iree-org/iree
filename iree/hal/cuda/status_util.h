@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_CUDA_STATUS_UTIL_H_
 #define IREE_HAL_CUDA_STATUS_UTIL_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/hal/cuda/dynamic_symbols.h"
 

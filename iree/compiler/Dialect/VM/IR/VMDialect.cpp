@@ -22,7 +22,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterface.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOpInterface.cpp.inc"  // IWYU pragma: keep
 
 namespace {
 
@@ -199,7 +199,7 @@ VMDialect::VMDialect(MLIRContext *context)
 
 #define GET_OP_LIST
   addOperations<
-#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"  // IWYU pragma: keep
       >();
 }
 

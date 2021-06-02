@@ -12,8 +12,10 @@
 #endif  // !__cplusplus
 
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 #include "iree/base/api.h"
 #include "iree/base/attributes.h"
@@ -220,19 +222,6 @@ IREE_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
 IREE_MUST_USE_RESULT static inline bool IsOk(const iree_status_t& status) {
   return iree_status_is_ok(status);
 }
-
-// TODO(#2843): better logging of status checks.
-#undef IREE_CHECK_OK
-#undef IREE_QCHECK_OK
-#undef IREE_DCHECK_OK
-#define IREE_CHECK_OK_IMPL(status, val) \
-  auto status = ::iree::Status(val);    \
-  IREE_CHECK(::iree::IsOk(status)) << (status)
-#define IREE_CHECK_OK(val) \
-  IREE_CHECK_OK_IMPL(IREE_STATUS_IMPL_CONCAT_(_status, __LINE__), val)
-
-#define IREE_QCHECK_OK(val) IREE_QCHECK_EQ(::iree::StatusCode::kOk, (val))
-#define IREE_DCHECK_OK(val) IREE_DCHECK_EQ(::iree::StatusCode::kOk, (val))
 
 }  // namespace iree
 

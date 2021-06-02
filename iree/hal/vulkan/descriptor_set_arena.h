@@ -7,13 +7,20 @@
 #ifndef IREE_HAL_VULKAN_DESCRIPTOR_SET_ARENA_H_
 #define IREE_HAL_VULKAN_DESCRIPTOR_SET_ARENA_H_
 
+#include <stdint.h>
+
 #include <array>
 #include <vector>
 
+#include "iree/base/api.h"
 #include "iree/base/status.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
+#include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_executable.h"
 #include "iree/hal/vulkan/util/arena.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
 namespace hal {

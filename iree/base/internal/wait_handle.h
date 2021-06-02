@@ -7,6 +7,9 @@
 #ifndef IREE_BASE_INTERNAL_WAIT_HANDLE_H_
 #define IREE_BASE_INTERNAL_WAIT_HANDLE_H_
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 

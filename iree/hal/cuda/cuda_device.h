@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_CUDA_CUDA_DEVICE_H_
 #define IREE_HAL_CUDA_CUDA_DEVICE_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cuda/api.h"
 #include "iree/hal/cuda/dynamic_symbols.h"

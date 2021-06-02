@@ -1445,4 +1445,4 @@ void populateFlowDispatchCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc"  // IWYU pragma: keep

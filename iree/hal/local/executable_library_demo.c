@@ -6,6 +6,8 @@
 
 #include "iree/hal/local/executable_library_demo.h"
 
+#include <stddef.h>
+
 // An executable entry point, called one or more times based on the 3D XYZ
 // workgroup count specified during the dispatch. Each invocation gets access to
 // the dispatch state via |dispatch_state| such as workgroup parameters, push

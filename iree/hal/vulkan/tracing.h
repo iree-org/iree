@@ -7,10 +7,13 @@
 #ifndef IREE_HAL_VULKAN_TRACING_H_
 #define IREE_HAL_VULKAN_TRACING_H_
 
-// clang-format off: Must be included before all other headers:
+// clang-format off: must be included before all other headers.
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/handle_util.h"
 

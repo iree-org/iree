@@ -7,9 +7,13 @@
 #ifndef IREE_TASK_POST_BATCH_H_
 #define IREE_TASK_POST_BATCH_H_
 
+#include <stdbool.h>
+
+#include "iree/base/config.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
 #include "iree/task/list.h"
+#include "iree/task/task.h"
 #include "iree/task/tuning.h"
 
 #ifdef __cplusplus

@@ -7,8 +7,16 @@
 #include "iree/task/task.h"
 
 #include <stdio.h>
+#include <string.h>
 
+#include "iree/base/tracing.h"
+#include "iree/task/list.h"
+#include "iree/task/pool.h"
+#include "iree/task/post_batch.h"
+#include "iree/task/scope.h"
+#include "iree/task/submission.h"
 #include "iree/task/task_impl.h"
+#include "iree/task/tuning.h"
 
 //==============================================================================
 // Task bookkeeping

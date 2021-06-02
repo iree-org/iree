@@ -6,6 +6,9 @@
 
 #include "iree/hal/vulkan/extensibility_util.h"
 
+#include <cstdint>
+#include <cstring>
+
 #include "iree/hal/vulkan/status_util.h"
 
 // Returns true if |layers| contains a layer matching |layer_name|.

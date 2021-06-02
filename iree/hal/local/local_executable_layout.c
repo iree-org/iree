@@ -6,6 +6,8 @@
 
 #include "iree/hal/local/local_executable_layout.h"
 
+#include <stddef.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 

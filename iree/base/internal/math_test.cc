@@ -7,7 +7,6 @@
 #include "iree/base/internal/math.h"
 
 #include "iree/testing/gtest.h"
-#include "iree/testing/status_matchers.h"
 
 namespace {
 

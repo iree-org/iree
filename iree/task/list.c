@@ -6,6 +6,8 @@
 
 #include "iree/task/list.h"
 
+#include <string.h>
+
 void iree_atomic_task_slist_discard(iree_atomic_task_slist_t* slist) {
   iree_task_list_t discard_list;
   iree_task_list_initialize(&discard_list);

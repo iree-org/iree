@@ -6,11 +6,11 @@
 
 #include "iree/vm/buffer.h"
 
+#include <cstddef>
+
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
-#include "iree/testing/status_matchers.h"
 #include "iree/vm/builtin_types.h"
-#include "iree/vm/ref_cc.h"
 
 namespace {
 

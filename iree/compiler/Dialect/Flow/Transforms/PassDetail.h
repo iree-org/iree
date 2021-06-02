@@ -15,7 +15,7 @@ namespace IREE {
 namespace Flow {
 
 #define GEN_PASS_CLASSES
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"  // IWYU pragma: keep
 
 }  // namespace Flow
 }  // namespace IREE

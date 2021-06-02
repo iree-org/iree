@@ -21,15 +21,16 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
-// Order matters.
-#include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXEnums.h.inc"
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXEnums.h.inc"  // IWYU pragma: export
+// clang-format on
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VMVX {
 
-#include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOpInterface.h.inc"
+#include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOpInterface.h.inc"  // IWYU pragma: export
 
 }  // namespace VMVX
 }  // namespace IREE

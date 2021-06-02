@@ -6,9 +6,16 @@
 
 #include "iree/hal/local/loaders/vmvx_module_loader.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
-#include "iree/hal/local/local_descriptor_set_layout.h"
+#include "iree/hal/api.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 #include "iree/modules/vmvx/module.h"
 #include "iree/vm/bytecode_module.h"
 

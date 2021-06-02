@@ -8,6 +8,7 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
+#include "iree/hal/resource.h"
 
 #define _VTABLE_DISPATCH(device, method_name) \
   IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, method_name)

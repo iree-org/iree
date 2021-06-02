@@ -6,7 +6,11 @@
 
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 
-#include <vector>
+#include <assert.h>
+#include <stdlib.h>
+
+#include <cstdint>
+#include <type_traits>
 
 #include "mlir/IR/BuiltinTypes.h"
 

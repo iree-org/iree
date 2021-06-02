@@ -7,8 +7,9 @@
 #include "iree/hal/cuda/registration/driver_module.h"
 
 #include <inttypes.h>
+#include <stddef.h>
 
-#include "iree/base/target_platform.h"
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/api.h"
 

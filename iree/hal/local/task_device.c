@@ -6,12 +6,15 @@
 
 #include "iree/hal/local/task_device.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/local/arena.h"
 #include "iree/hal/local/event_pool.h"
 #include "iree/hal/local/local_descriptor_set.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
-#include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/local/task_command_buffer.h"
