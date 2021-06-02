@@ -85,12 +85,12 @@ BufferConstraintsAttr TargetBackend::queryBufferConstraints(
 }
 
 // Renames |op| within |moduleOp| with a new name that is unique within both
-// |moduleOp| and |otherModuleOp|.
-static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
-                                        Operation *otherModuleOp,
-                                        llvm::StringRef originalName) {
-  SymbolTable moduleSymbolTable(moduleOp);
-  SymbolTable otherModuleSymbolTable(otherModuleOp);
+// |moduleOp| and |optionalSymbolTable| (if one is provided).
+static void renameWithDisambiguatedName(
+    Operation *op, Operation *moduleOp,
+    DenseMap<StringRef, Operation *> &targetSymbolMap,
+    SymbolTable *optionalSymbolTable) {
+  StringRef originalName = SymbolTable::getSymbolName(op);
 
   // Iteratively try suffixes until we find one that isn't used.
   std::string disambiguatedName;
@@ -98,8 +98,9 @@ static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
   do {
     disambiguatedName =
         llvm::formatv("{0}_{1}", originalName, uniqueingCounter++).str();
-  } while (moduleSymbolTable.lookup(disambiguatedName) ||
-           otherModuleSymbolTable.lookup(disambiguatedName));
+  } while (
+      targetSymbolMap.lookup(disambiguatedName) ||
+      (optionalSymbolTable && optionalSymbolTable->lookup(disambiguatedName)));
 
   SymbolTableCollection symbolTable;
   SymbolUserMap symbolUsers(symbolTable, moduleOp);
@@ -129,6 +130,7 @@ static LogicalResult mergeModuleInto(
     DenseMap<StringRef, Operation *> &targetSymbolMap) {
   auto &sourceBlock = sourceModuleOp->getRegion(0).front();
   auto &targetBlock = targetModuleOp->getRegion(0).front();
+  SymbolTable sourceSymbolTable(sourceModuleOp);
   auto allOps = llvm::to_vector<8>(
       llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
 
@@ -147,8 +149,8 @@ static LogicalResult mergeModuleInto(
             continue;
           } else {
             // Preserve the op but give it a unique name.
-            renameWithDisambiguatedName(op, sourceModuleOp, targetModuleOp,
-                                        symbolName);
+            renameWithDisambiguatedName(op, sourceModuleOp, targetSymbolMap,
+                                        /*optionalSymbolTable=*/nullptr);
           }
         } else {
           // The source symbol has 'nested' or 'public' visibility.
@@ -167,7 +169,7 @@ static LogicalResult mergeModuleInto(
           } else {
             // Keep the original name for our new op, rename the target op.
             renameWithDisambiguatedName(targetOp, targetModuleOp,
-                                        targetModuleOp, symbolName);
+                                        targetSymbolMap, &sourceSymbolTable);
           }
         }
       }
@@ -217,6 +219,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
   auto linkedExecutableBuilder =
       OpBuilder::atBlockBegin(linkedExecutableOp.getBody());
   auto linkedTargetBuilder = OpBuilder::atBlockBegin(linkedTargetOp.getBody());
+  auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
 
   // Iterate over all source executable ops, linking as many as we can.
   for (auto sourceExecutableOp : sourceExecutableOps) {
@@ -274,7 +277,6 @@ LogicalResult TargetBackend::linkExecutablesInto(
 
       // Merge the existing module into the new linked module op.
       auto sourceModuleOp = getInnerModuleFn(targetOp.getInnerModule());
-      auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
       if (failed(mergeModuleInto(sourceModuleOp, linkedModuleOp,
                                  targetSymbolMap))) {
         return failure();
