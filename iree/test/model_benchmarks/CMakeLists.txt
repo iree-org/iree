@@ -57,7 +57,7 @@ set(BENCHMARK_FUNCTION_INPUTS
 #                                                                              #
 ################################################################################
 
-# CPU, Dylib-Sync, 1-thread, big-core, full-inference
+# CPU, Dylib-Sync, big/little-core, full-inference
 iree_mlir_benchmark_suite(
   MODULE_NAMES
     ${BENCHMARK_MODULE_NAMES}
@@ -72,8 +72,9 @@ iree_mlir_benchmark_suite(
   FUNCTION_INPUTS
     ${BENCHMARK_FUNCTION_INPUTS}
 
-  BENCHMARK_MODE
-    "1-thread,big-core,full-inference"
+  BENCHMARK_MODES
+    "big-core,full-inference"
+    "little-core,full-inference"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
@@ -82,9 +83,42 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-flow-dispatch-formation-enable-operand-fusion"
-    "-iree-llvm-loop-unrolling=true"
+    "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib-sync"
+)
+
+# CPU, Dylib, 1-thread, big/little-core, full-inference
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    ${BENCHMARK_MODULE_NAMES}
+  MODULE_TAGS
+    ${BENCHMARK_MODULE_TAGS}
+  MODULE_SOURCES
+    ${BENCHMARK_MODULE_SOURCES}
+  MLIR_SOURCES
+    ${BENCHMARK_MLIR_SOURCES}
+  ENTRY_FUNCTIONS
+    ${BENCHMARK_ENTRY_FUNCTIONS}
+  FUNCTION_INPUTS
+    ${BENCHMARK_FUNCTION_INPUTS}
+
+  BENCHMARK_MODES
+    "1-thread,big-core,full-inference"
+    "1-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-llvm-loop-unrolling=true"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=1"
 )
 
 # CPU, Dylib, 3-thread, big-core, full-inference
@@ -102,8 +136,9 @@ iree_mlir_benchmark_suite(
   FUNCTION_INPUTS
     ${BENCHMARK_FUNCTION_INPUTS}
 
-  BENCHMARK_MODE
+  BENCHMARK_MODES
     "3-thread,big-core,full-inference"
+    "3-thread,little-core,full-inference"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
@@ -112,7 +147,7 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-flow-dispatch-formation-enable-operand-fusion"
-    "-iree-llvm-loop-unrolling=true"
+    "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -134,7 +169,7 @@ iree_mlir_benchmark_suite(
   FUNCTION_INPUTS
     ${BENCHMARK_FUNCTION_INPUTS}
 
-  BENCHMARK_MODE
+  BENCHMARK_MODES
     "full-inference"
   TARGET_BACKEND
     "vulkan-spirv"
@@ -164,7 +199,7 @@ iree_mlir_benchmark_suite(
   FUNCTION_INPUTS
     ${BENCHMARK_FUNCTION_INPUTS}
 
-  BENCHMARK_MODE
+  BENCHMARK_MODES
     "full-inference"
   TARGET_BACKEND
     "vulkan-spirv"
@@ -194,7 +229,7 @@ iree_mlir_benchmark_suite(
   FUNCTION_INPUTS
     ${BENCHMARK_FUNCTION_INPUTS}
 
-  BENCHMARK_MODE
+  BENCHMARK_MODES
     "kernel-execution"
   TARGET_BACKEND
     "vulkan-spirv"
