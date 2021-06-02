@@ -1,4 +1,4 @@
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=dylib-llvm-aot -function-input="10xi32=[0,1,2,3,4,5,6,7,8,9]" -function-input="10xi32=[0,1,2,3,4,5,6,7,8,9]" -function-input="10xi32=[0,1,2,3,4,5,6,7,8,9]" -function-input="10xi32=[9,8,7,6,5,4,3,2,1,0]" %s | IreeFileCheck %s)
+// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=dylib-llvm-aot -function-input="10xi32=[0,1,2,3,4,5,6,7,8,9]" -function-input="10xi32=[0,1,2,3,4,5,6,7,8,9]" -function-input="10xi32=[0,1,2,3,4,5,6,7,8,9]" -function-input="10xi32=[9,8,7,6,5,4,3,2,1,0]" %s | IreeFileCheck %s)
 
 // CHECK: EXEC @main
 // CHECK: 10xi32=9 8 7 6 5 4 3 2 1 0

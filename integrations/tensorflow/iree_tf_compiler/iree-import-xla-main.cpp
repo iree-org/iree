@@ -10,7 +10,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "iree_tf_compiler/TF/Passes.h"
+#include "iree_tf_compiler/MHLO/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
@@ -214,7 +214,7 @@ int main(int argc, char **argv) {
   applyPassManagerCLOptions(pm);
   applyDefaultTimingPassManagerCLOptions(pm);
 
-  iree_integrations::TF::buildMHLOImportPassPipeline(pm);
+  iree_integrations::MHLO::buildMHLOImportPassPipeline(pm);
 
   // Note that we emit the ABI last since any needed function-level
   // transformations (i.e. de-tupling, etc) should have been done.

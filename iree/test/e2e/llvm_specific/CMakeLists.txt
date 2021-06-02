@@ -20,6 +20,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "dylib"
   COMPILER_FLAGS
+    "-iree-input-type=mhlo"
     "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
 )
 

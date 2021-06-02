@@ -310,6 +310,7 @@ struct ConvertHLOToLinalgOnTensorsPass
                                               patterns);
       populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
                                                      patterns);
+      populateHLOComplexToRealPatterns(context, *typeConverter, patterns);
     } else {
       // Legacy: assumes that HLO client -> HLO has been run previously.
       populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
@@ -319,20 +320,13 @@ struct ConvertHLOToLinalgOnTensorsPass
     patterns.insert<PadTensorOpConversion>(context);
 
     ConversionTarget target(getContext());
+    target.addIllegalDialect<chlo::HloClientDialect>();
     target.addIllegalDialect<mhlo::MhloDialect>();
 
     if (directHloClientLowering) {
       // Conversions to also legalize the HLO client dialect.
       target.addIllegalDialect<chlo::HloClientDialect>();
     }
-
-    // TODO(hanchung): Do it in a cleaner way.
-    // We don't see complex types in codegen. This assumes that we run
-    // LowerComplexPass before, and all the complex types were folded away.
-    // Mark them legal and rely on canonicalization patterns to fold them away.
-    target.addLegalOp<mhlo::ComplexOp>();
-    target.addLegalOp<mhlo::RealOp>();
-    target.addLegalOp<mhlo::ImagOp>();
 
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });

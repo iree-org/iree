@@ -141,6 +141,7 @@ iree_e2e_cartesian_product_test_suite(
     ",,asinh,,,iree_vulkan"
     ",,atan,,,iree_vulkan"
     ",,atan2,,,iree_vulkan"
+    ",,atanh,,,iree_vulkan"
     ",,bessel_i0,,,iree_vulkan"
     ",,bessel_i0e,,,iree_vulkan"
     ",,bessel_i1,,,iree_vulkan"

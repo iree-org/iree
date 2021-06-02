@@ -31,6 +31,7 @@ cc_binary(
     name = "iree-tf-opt",
     srcs = ["iree-tf-opt-main.cpp"],
     deps = [
+        "//iree_tf_compiler/MHLO",
         "//iree_tf_compiler/TF",
         "//iree_tf_compiler/dialect/tf_strings/ir:dialect",
         "//iree_tf_compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
@@ -99,7 +100,7 @@ cc_binary(
     name = "iree-import-xla",
     srcs = ["iree-import-xla-main.cpp"],
     deps = [
-        "//iree_tf_compiler/TF",
+        "//iree_tf_compiler/MHLO",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

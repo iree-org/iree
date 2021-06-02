@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir -export-all -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
+// RUN: iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 module {
   flow.variable @counter mutable dense<2.0> : tensor<f32>

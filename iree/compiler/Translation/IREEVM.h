@@ -20,6 +20,7 @@ namespace iree_compiler {
 
 void registerIREEVMTransformPassPipeline();
 void registerIREEVMTranslation();
+void registerIREEVMTranslationFlags();
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager);
 

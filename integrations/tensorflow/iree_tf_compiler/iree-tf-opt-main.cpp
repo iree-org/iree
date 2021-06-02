@@ -11,6 +11,7 @@
 // each addition will likely end up on the build critical path.
 
 #include "iree/tools/init_xla_dialects.h"
+#include "iree_tf_compiler/MHLO/Passes.h"
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/IR/Dialect.h"
@@ -26,6 +27,7 @@ int main(int argc, char **argv) {
   mlir::RegisterAllTensorFlowDialects(registry);
   mlir::iree_integrations::TF::registerAllDialects(registry);
   mlir::iree_integrations::TF::registerAllPasses();
+  mlir::iree_integrations::MHLO::registerAllPasses();
 
   if (failed(MlirOptMain(argc, argv, "IREE-TF modular optimizer driver\n",
                          registry,

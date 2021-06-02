@@ -496,6 +496,7 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
+  mlir::iree_compiler::registerIREEVMTranslationFlags();
   mlir::registerLLVMDialectTranslation(registry);
 
   // Register MLIRContext command-line options like
