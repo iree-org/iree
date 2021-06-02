@@ -37,6 +37,14 @@ model, pre-processes it for import, then compiles it using IREE
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tensorflow_hub_import.ipynb)
 
+### [tflite_text_classificaiton\.ipynb](tflite_text_classification.ipynb)
+
+Downloads a pretrained
+[TFLite text classification](https://www.tensorflow.org/lite/examples/text_classification/overview)
+model, and runs it using TFLite and IREE
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb)
+
 ## Working with GitHub
 
 Refer to

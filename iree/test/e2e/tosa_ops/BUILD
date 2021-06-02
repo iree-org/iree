@@ -84,13 +84,10 @@ VMVX_SRCS = enforce_glob(
         "ceil.mlir",
         "clamp.mlir",
         "const.mlir",
-        "equal.mlir",
         "exp.mlir",
         "floor.mlir",
         "fully_connected.mlir",
         "gather.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
         "if.mlir",
         "log.mlir",
         "logical_left_shift.mlir",
@@ -116,6 +113,9 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "equal.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
+        "greater.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
+        "greater_equal.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
         "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],
 )

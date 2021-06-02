@@ -61,6 +61,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createVerifyCompilerInputLegality();
 // dispatch regions and could be represented as flow.tensor.* ops.
 std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass();
 
+// Promote I1 tensor constants to I8 tensors to match later operations.
+std::unique_ptr<OperationPass<FuncOp>> createPromoteI1ToI8Pass();
+
 // Legalizes the input types to those supported by the flow dialect.
 // This will fail if types that cannot be supported at all are present, however
 // conditionally supported types (based on availability, etc) may still be

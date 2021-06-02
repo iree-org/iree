@@ -63,6 +63,12 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def PromoteI1ToI8 :
+    Pass<"iree-flow-promote-i1-to-i8", "FuncOp"> {
+  let summary = "Legalizes i1 tensor constants to i8s";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
+}
+
 def LegalizeInputTypes :
     Pass<"iree-flow-legalize-input-types", "ModuleOp"> {
   let summary = "Legalizes input types to ones supported by the IREE flow dialect";
