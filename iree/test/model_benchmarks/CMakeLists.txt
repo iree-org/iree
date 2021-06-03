@@ -250,11 +250,11 @@ iree_mlir_benchmark_suite(
     # TODO(GH-6086): Turn on the flag.
     #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-enable-fusion-with-reduction-ops"
-    "--iree-hal-benchmark-dispatch-repeat-count=32"
+    "--iree-hal-benchmark-dispatch-repeat-count=16"
   DRIVER
     "vulkan"
   RUNTIME_FLAGS
-    "--batch_size=32"
+    "--batch_size=16"
 )
 
 # GPU, Vulkan, Mali, full-inference
