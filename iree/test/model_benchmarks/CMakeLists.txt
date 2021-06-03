@@ -158,97 +158,97 @@ iree_mlir_benchmark_suite(
 )
 
 # GPU, Vulkan, Adreno, full-inference
-#iree_mlir_benchmark_suite(
-  #MODULE_NAMES
-    #${BENCHMARK_MODULE_NAMES}
-  #MODULE_TAGS
-    #${BENCHMARK_MODULE_TAGS}
-  #MODULE_SOURCES
-    #${BENCHMARK_MODULE_SOURCES}
-  #MLIR_SOURCES
-    #${BENCHMARK_MLIR_SOURCES}
-  #ENTRY_FUNCTIONS
-    #${BENCHMARK_ENTRY_FUNCTIONS}
-  #FUNCTION_INPUTS
-    #${BENCHMARK_FUNCTION_INPUTS}
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    ${BENCHMARK_MODULE_NAMES}
+  MODULE_TAGS
+    ${BENCHMARK_MODULE_TAGS}
+  MODULE_SOURCES
+    ${BENCHMARK_MODULE_SOURCES}
+  MLIR_SOURCES
+    ${BENCHMARK_MLIR_SOURCES}
+  ENTRY_FUNCTIONS
+    ${BENCHMARK_ENTRY_FUNCTIONS}
+  FUNCTION_INPUTS
+    ${BENCHMARK_FUNCTION_INPUTS}
 
-  #BENCHMARK_MODES
-    #"full-inference"
-  #TARGET_BACKEND
-    #"vulkan-spirv"
-  #TARGET_ARCHITECTURE
-    #"GPU-Adreno"
-  #TRANSLATION_FLAGS
-    #"--iree-input-type=mhlo"
-    #"--iree-vulkan-target-triple=adreno-unknown-android11"
-    #"--iree-flow-inline-constants-max-byte-length=2048"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
-    #"--iree-enable-fusion-with-reduction-ops"
-  #DRIVER
-    #"vulkan"
-#)
+  BENCHMARK_MODES
+    "full-inference"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Adreno"
+  TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-vulkan-target-triple=adreno-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    # "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+)
 
 # GPU, Vulkan, Mali, full-inference
-#iree_mlir_benchmark_suite(
-  #MODULE_NAMES
-    #${BENCHMARK_MODULE_NAMES}
-  #MODULE_TAGS
-    #${BENCHMARK_MODULE_TAGS}
-  #MODULE_SOURCES
-    #${BENCHMARK_MODULE_SOURCES}
-  #MLIR_SOURCES
-    #${BENCHMARK_MLIR_SOURCES}
-  #ENTRY_FUNCTIONS
-    #${BENCHMARK_ENTRY_FUNCTIONS}
-  #FUNCTION_INPUTS
-    #${BENCHMARK_FUNCTION_INPUTS}
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    ${BENCHMARK_MODULE_NAMES}
+  MODULE_TAGS
+    ${BENCHMARK_MODULE_TAGS}
+  MODULE_SOURCES
+    ${BENCHMARK_MODULE_SOURCES}
+  MLIR_SOURCES
+    ${BENCHMARK_MLIR_SOURCES}
+  ENTRY_FUNCTIONS
+    ${BENCHMARK_ENTRY_FUNCTIONS}
+  FUNCTION_INPUTS
+    ${BENCHMARK_FUNCTION_INPUTS}
 
-  #BENCHMARK_MODES
-    #"full-inference"
-  #TARGET_BACKEND
-    #"vulkan-spirv"
-  #TARGET_ARCHITECTURE
-    #"GPU-Mali-Valhall"
-  #TRANSLATION_FLAGS
-    #"--iree-input-type=mhlo"
-    #"--iree-vulkan-target-triple=valhall-unknown-android11"
-    #"--iree-flow-inline-constants-max-byte-length=16"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
-    #"--iree-enable-fusion-with-reduction-ops"
-  #DRIVER
-    #"vulkan"
-#)
+  BENCHMARK_MODES
+    "full-inference"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    # "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+)
 
 # GPU, Vulkan, Mali, kernel-execution
-#iree_mlir_benchmark_suite(
-  #MODULE_NAMES
-    #${BENCHMARK_MODULE_NAMES}
-  #MODULE_TAGS
-    #${BENCHMARK_MODULE_TAGS}
-  #MODULE_SOURCES
-    #${BENCHMARK_MODULE_SOURCES}
-  #MLIR_SOURCES
-    #${BENCHMARK_MLIR_SOURCES}
-  #ENTRY_FUNCTIONS
-    #${BENCHMARK_ENTRY_FUNCTIONS}
-  #FUNCTION_INPUTS
-    #${BENCHMARK_FUNCTION_INPUTS}
+iree_mlir_benchmark_suite(
+  MODULE_NAMES
+    ${BENCHMARK_MODULE_NAMES}
+  MODULE_TAGS
+    ${BENCHMARK_MODULE_TAGS}
+  MODULE_SOURCES
+    ${BENCHMARK_MODULE_SOURCES}
+  MLIR_SOURCES
+    ${BENCHMARK_MLIR_SOURCES}
+  ENTRY_FUNCTIONS
+    ${BENCHMARK_ENTRY_FUNCTIONS}
+  FUNCTION_INPUTS
+    ${BENCHMARK_FUNCTION_INPUTS}
 
-  #BENCHMARK_MODES
-    #"kernel-execution"
-  #TARGET_BACKEND
-    #"vulkan-spirv"
-  #TARGET_ARCHITECTURE
-    #"GPU-Mali-Valhall"
-  #TRANSLATION_FLAGS
-    #"--iree-input-type=mhlo"
-    #"--iree-vulkan-target-triple=valhall-unknown-android11"
-    #"--iree-flow-inline-constants-max-byte-length=16"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
-    #"--iree-enable-fusion-with-reduction-ops"
-    #"--iree-hal-benchmark-dispatch-repeat-count=32"
-  #DRIVER
-    #"vulkan"
-  #RUNTIME_FLAGS
-    #"--batch_size=32"
-#)
+  BENCHMARK_MODES
+    "kernel-execution"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    # "--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+  DRIVER
+    "vulkan"
+  RUNTIME_FLAGS
+    "--batch_size=32"
+)
