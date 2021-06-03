@@ -91,6 +91,7 @@ function(iree_mlir_benchmark_suite)
   iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_FUNCTION_INPUTS)
 
   # Loop over all modules and their sources to create targets.
+  list(LENGTH _RULE_MODULE_NAMES _MODULE_NAMES_COUNT)
   math(EXPR _MAX_INDEX "${_MODULE_NAMES_COUNT} - 1")
   foreach(_INDEX RANGE 0 "${_MAX_INDEX}")
     # Generate all benchmarks to the root build directory. This helps for
