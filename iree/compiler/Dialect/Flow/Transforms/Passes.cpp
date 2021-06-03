@@ -178,6 +178,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(
         mlir::iree_compiler::createConvertConv2DToImg2ColPass());
   }
+  passManager.addPass(
+      mlir::iree_compiler::createPadTensorToSubTensorInsertPass());
 
   // Elementwise, fusion, tiling and distribution.
   passManager.addNestedPass<FuncOp>(

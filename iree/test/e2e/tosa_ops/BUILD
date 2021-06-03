@@ -163,6 +163,7 @@ VULKAN_SRCS = enforce_glob(
         "minimum.mlir",
         "mul.mlir",
         "negate.mlir",
+        "pad.mlir",
         "reciprocal.mlir",
         "reluN.mlir",
         "reshape.mlir",
@@ -180,8 +181,6 @@ VULKAN_SRCS = enforce_glob(
         "fully_connected.mlir",  # Currently failing on vulkan.
         "reduce.mlir",  # Currently failing on vulkan.
         "max_pool.mlir",  # Currently failing on vulkan.
-        # TODO: Re-enable pad test.
-        "pad.mlir",
     ],
 )
 
