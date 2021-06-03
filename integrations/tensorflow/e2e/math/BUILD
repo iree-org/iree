@@ -292,7 +292,6 @@ VULKAN_FAILING = [
     "asinh",
     "atan",
     "atan2",
-    "atanh",
     "bessel_i0",
     "bessel_i0e",
     "bessel_i1",
