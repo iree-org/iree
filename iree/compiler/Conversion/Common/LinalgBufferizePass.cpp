@@ -1248,7 +1248,7 @@ void LinalgBufferizePass::runOnFunction() {
 
   // Visit all the operations that return `tensor`s and convert them to using
   // `memref`s.
-  auto convertTensorOps = [&](Operation *op) -> WalkResult {
+  auto convertTensorProducingOps = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<ConstantOp>([&](ConstantOp constantOp) {
           return convertConstantOp(b, constantOp, bvm);
@@ -1342,7 +1342,7 @@ void LinalgBufferizePass::runOnFunction() {
   auto walkResult =
       funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) -> WalkResult {
         b.setInsertionPoint(op);
-        return convertTensorOps(op);
+        return convertTensorProducingOps(op);
       });
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
@@ -1351,7 +1351,7 @@ void LinalgBufferizePass::runOnFunction() {
   // Lastly visit the non-tensor return operations that still use `tensor`
   // values. These need to be updated to use the corresponding `memref` values,
   // but dont need to update the block-and-value mapping.
-  auto convertNonTensorOps = [&](Operation *op) -> LogicalResult {
+  auto convertNonTensorProducingOps = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<tensor::ExtractOp>([&](tensor::ExtractOp op) {
           return convertTensorExtractOp(b, op, bvm);
@@ -1375,7 +1375,7 @@ void LinalgBufferizePass::runOnFunction() {
 
   walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
     b.setInsertionPoint(op);
-    return convertNonTensorOps(op);
+    return convertNonTensorProducingOps(op);
   });
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
