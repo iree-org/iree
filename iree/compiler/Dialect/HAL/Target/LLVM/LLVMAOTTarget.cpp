@@ -79,7 +79,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // overrides options grows.
     llvm::Triple triple(options_.targetTriple);
     LLVMTransformPassPipelineOptions codeGenOptions;
-    codeGenOptions.unfuseFMAOps = true;
+    if (triple.isWasm()) {
+      codeGenOptions.unfuseFMAOps = true;
+    }
     buildLLVMTransformPassPipeline(passManager, codeGenOptions);
   }
 
