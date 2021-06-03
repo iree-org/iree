@@ -134,9 +134,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/base/internal:synchronization",
-        "//iree/base/internal:wait_handle",
         "//iree/hal",
-        "//iree/task",
     ],
 )
 
