@@ -79,6 +79,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-flow-inline-constants-max-byte-length=2048"
   DRIVER
     "vmvx"
@@ -243,6 +244,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Adreno"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=adreno-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-flow-dispatch-formation-enable-operand-fusion"
