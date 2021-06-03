@@ -497,6 +497,8 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
   mlir::registerLLVMDialectTranslation(registry);
+  // Make sure command line options are registered.
+  (void)mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.
