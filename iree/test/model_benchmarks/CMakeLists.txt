@@ -83,7 +83,8 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    # TODO(GH-5857): Enable this after fixing segfault.
+    #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib-sync"
@@ -115,7 +116,8 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    # TODO(GH-5857): Enable this after fixing segfault.
+    #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
