@@ -373,11 +373,26 @@ static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
   return success();
 }
 
+/// Returns true if there is a a single use that is a subtensor_insert.
+static bool hasSingleSubTensorInsertNotDimUse(Value value) {
+  int numUsers = 0;
+  int numSubTensorInsertUsers = 0;
+  for (auto user : value.getUsers()) {
+    if (isa<SubTensorInsertOp>(user)) {
+      numSubTensorInsertUsers++;
+    } else if (!isa<memref::DimOp>(user)) {
+      numUsers++;
+    }
+  }
+  return numUsers == 1 && numSubTensorInsertUsers <= 1;
+}
+
 /// For operations that have a single operand and result, adds both to the same
 /// equivalence class.
 static LogicalResult analyseSingleOperandResultOp(Value source, Value result,
                                                   BufferizationPlan &plan) {
-  if (source.hasOneUse() || isFromReadOnlyTensor(source)) {
+  if (hasSingleSubTensorInsertNotDimUse(source) ||
+      isFromReadOnlyTensor(source)) {
     plan.unionSets(source, result);
     return success();
   }
@@ -405,10 +420,8 @@ static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
                                                 BufferizationPlan &plan) {
   if (dest.hasOneUse() && !isFromReadOnlyTensor(dest)) {
     plan.unionSets(dest, result);
-  }
-  if (source && plan.isEquivalent(source, dest)) {
-    return op->emitError(
-        "unexpected source and dest being mapped to same buffer");
+  } else if (source && plan.isEquivalent(source, dest)) {
+    return success();
   }
   plan.insert(dest);
   plan.insert(result);
@@ -747,7 +760,8 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     Operation *op = value.getDefiningOp();
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
-            .Case<linalg::LinalgOp, SubTensorInsertOp, vector::TransferWriteOp>(
+            .Case<scf::ForOp, linalg::LinalgOp, SubTensorInsertOp,
+                  vector::TransferWriteOp>(
                 [&](auto op) { return resultBuffer; })
             .Case<linalg::TensorReshapeOp>(
                 [&](linalg::TensorReshapeOp reshapeOp) {
