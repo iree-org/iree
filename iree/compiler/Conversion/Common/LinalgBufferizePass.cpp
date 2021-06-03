@@ -373,8 +373,8 @@ static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
   return success();
 }
 
-/// Returns true if there is a only one use that
-static bool hasOneUseExecludingDimOp(Value value) {
+/// Returns true if there is a a single use that is a subtensor_insert.
+static bool hasSingleSubTensorInsertNotDimUse(Value value) {
   int numUsers = 0;
   int numSubTensorInsertUsers = 0;
   for (auto user : value.getUsers()) {
@@ -391,7 +391,8 @@ static bool hasOneUseExecludingDimOp(Value value) {
 /// equivalence class.
 static LogicalResult analyseSingleOperandResultOp(Value source, Value result,
                                                   BufferizationPlan &plan) {
-  if (hasOneUseExecludingDimOp(source) || isFromReadOnlyTensor(source)) {
+  if (hasSingleSubTensorInsertNotDimUse(source) ||
+      isFromReadOnlyTensor(source)) {
     plan.unionSets(source, result);
     return success();
   }
