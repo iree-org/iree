@@ -410,8 +410,6 @@ static LogicalResult analyseSubTensorOp(SubTensorOp subTensorOp,
   }
   return analyseSingleOperandResultOp(subTensorOp.source(),
                                       subTensorOp.result(), plan);
-  // plan.unionSets(subTensorOp.source(), subTensorOp.result());
-  // return success();
 }
 
 /// Adds the `dest` and `result` tensor of a subtensor insert operation into the
