@@ -249,7 +249,8 @@ MODEL_BENCHMARKS = [
                             "-iree-llvm-loop-unrolling=true"
                         ],
                         'cpu3t': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            # TODO(GH-5857): Enable this after fixing segfault.
+                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ]
                     })),
@@ -263,7 +264,8 @@ MODEL_BENCHMARKS = [
                             "-iree-llvm-loop-unrolling=true"
                         ],
                         'cpu3t': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            # TODO(GH-5857): Enable this after fixing segfault.
+                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ]
                     })),
