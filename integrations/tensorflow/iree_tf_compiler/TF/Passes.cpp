@@ -6,8 +6,10 @@
 
 #include "iree_tf_compiler/TF/Passes.h"
 
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree_tf_compiler/MHLO/Passes.h"
 #include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"
 #include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
@@ -85,12 +87,12 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
   // Lowering shape-related constructs.
   //----------------------------------------------------------------------------
-  pm.addPass(iree_compiler::Shape::createConvertHLOToShapePass());
+  // pm.addPass(iree_compiler::Shape::createConvertHLOToShapePass());
   // TODO(GH-2277): Lower HLO shape constraints instead of eliding them here.
   pm.addPass(createRemoveShapeConstraintsPass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(iree_compiler::Shape::createConvertShapeToShapexPass());
-  pm.addPass(createCanonicalizerPass());
+  // pm.addPass(iree_compiler::Shape::createConvertShapeToShapexPass());
+  // pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
   // Lowering intermediate dialects to module specific dialects.
@@ -124,38 +126,7 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.nest<ModuleOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createVerifyFullyConvertedPass());
 
-  buildMHLOImportPassPipeline(pm);
-}
-
-void buildMHLOImportPassPipeline(OpPassManager &pm) {
-  //----------------------------------------------------------------------------
-  // Convert control flow and flatten tuples (like tuple<tensor<...>, ...>)
-  //----------------------------------------------------------------------------
-  // NOTE: FlattenTuplesInCFGPass requires inlining to have run and has some
-  // sensitivity to structured control flow ops.
-  // SCF would be ideal as a target (as that matches our other IREE inputs) but
-  // the current HLO to SCF pass is extremely basic and doesn't handle anything
-  // but tf.while for less-than comparisons from 0. Since those are common we
-  // still try to pull those out here but then fall back on the full conversion
-  // to CFG form.
-  pm.addNestedPass<FuncOp>(mhlo::createControlFlowToScfPass());
-  pm.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
-  pm.addPass(createFlattenTuplesInCFGPass());
-
-  ////////////////////////////////////////////////////////////////////////////
-  // Temporary: Does some special case fixups of HLO ops with dynamic
-  // shapes until these can be done properly upstream.
-  ////////////////////////////////////////////////////////////////////////////
-  pm.addPass(iree_compiler::Shape::createConvertHLOToShapePass());
-}
-
-void registerMHLOImportPassPipeline() {
-  mlir::PassPipelineRegistration<> pipeline(
-      "iree-mhlo-import-pipeline",
-      "Run IREE-specific passes for importing MHLO code into IREE",
-      [](OpPassManager &passManager) {
-        buildMHLOImportPassPipeline(passManager);
-      });
+  MHLO::buildMHLOImportPassPipeline(pm);
 }
 
 void registerTFImportPassPipeline() {

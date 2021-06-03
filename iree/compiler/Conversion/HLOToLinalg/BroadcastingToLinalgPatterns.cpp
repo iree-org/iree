@@ -23,6 +23,9 @@ namespace {
 // Broadcasting utilities
 // -----------------------------------------------------------------------------
 
+/// Whether an element type is legal for codegen via linalg on IREE.
+bool isElementTypeLegalForCodegen(Type t) { return !t.isa<ComplexType>(); }
+
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
 /// attributes.
@@ -373,6 +376,11 @@ struct ConvertRankedBroadcastBinaryOp : public ConversionPattern {
     if (failed(bcastAdaptor.verifyBroadcastCompatibility(op, operands))) {
       return rewriter.notifyMatchFailure(op, "not legal broadcasting");
     }
+    if (!isElementTypeLegalForCodegen(lhsType.getElementType()) ||
+        !isElementTypeLegalForCodegen(rhsType.getElementType())) {
+      return rewriter.notifyMatchFailure(op,
+                                         "not legal element type for codegen");
+    }
 
     // Extract the original extents.
     SmallVector<Extent> lhsOrigExtents;
@@ -450,22 +458,27 @@ struct ConvertTrivialNonBroadcastBinaryOp : public ConversionPattern {
       ConversionPatternRewriter &rewriter) const override {
     // Only rewrite for statically determinable non-broadcasting cases.
     auto bcastOperands = bcastAdaptor.getFromBroadcastValues(op, operands);
-    auto lhs_type =
+    auto lhsType =
         bcastOperands.first.getType().template dyn_cast<RankedTensorType>();
-    auto rhs_type =
+    auto rhsType =
         bcastOperands.second.getType().template dyn_cast<RankedTensorType>();
-    if (!lhs_type || !rhs_type)
+    if (!lhsType || !rhsType)
       return rewriter.notifyMatchFailure(op, "not ranked tensors");
+    if (!isElementTypeLegalForCodegen(lhsType.getElementType()) ||
+        !isElementTypeLegalForCodegen(rhsType.getElementType())) {
+      return rewriter.notifyMatchFailure(op,
+                                         "not legal element type for codegen");
+    }
 
     // Requires rank broadcast.
-    if (lhs_type.getRank() != rhs_type.getRank())
+    if (lhsType.getRank() != rhsType.getRank())
       return rewriter.notifyMatchFailure(op, "not same rank");
     // Any dynamic dimension may require broadcasting and requires more
     // analysis.
-    if (!lhs_type.hasStaticShape() || !rhs_type.hasStaticShape())
+    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape())
       return rewriter.notifyMatchFailure(op, "not static shapes");
 
-    for (auto extents : llvm::zip(lhs_type.getShape(), rhs_type.getShape())) {
+    for (auto extents : llvm::zip(lhsType.getShape(), rhsType.getShape())) {
       auto lhs_extent = std::get<0>(extents);
       auto rhs_extent = std::get<1>(extents);
       if (lhs_extent != rhs_extent) {
@@ -526,6 +539,10 @@ struct ConvertSelectOp : public OpConversionPattern<chlo::BroadcastSelectOp> {
     auto resultType = op.getResult().getType().dyn_cast<RankedTensorType>();
     if (!predType || !onTrueType || !onFalseType || !resultType) {
       return rewriter.notifyMatchFailure(op, "cannot convert unranked tensors");
+    }
+    if (!isElementTypeLegalForCodegen(resultType.getElementType())) {
+      return rewriter.notifyMatchFailure(op,
+                                         "not legal element type for codegen");
     }
 
     // Short-circuit if all types are statically equal.

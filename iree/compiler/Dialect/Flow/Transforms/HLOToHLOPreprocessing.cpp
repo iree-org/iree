@@ -812,12 +812,11 @@ struct HLOToHLOPreprocessingPass
     // Note that various input modalities may do their own legalization of
     // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
     // whether it was legalized away at a higher level.
-    chlo::PopulateDecomposeChloPatterns(context, &conversionPatterns);
-    chlo::PopulateChloBroadcastingPatterns(context, &conversionPatterns);
-    conversionTarget.addLegalDialect<shape::ShapeDialect, mhlo::MhloDialect,
-                                     mlir::StandardOpsDialect,
-                                     mlir::tensor::TensorDialect>();
-    conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
+    // chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
+    conversionTarget.addLegalDialect<
+        shape::ShapeDialect, chlo::HloClientDialect, mhlo::MhloDialect,
+        mlir::StandardOpsDialect, mlir::tensor::TensorDialect>();
+    // conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {
       return signalPassFailure();

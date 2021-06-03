@@ -1,4 +1,4 @@
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=dylib-llvm-aot %s | IreeFileCheck %s)
+// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=dylib-llvm-aot %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @dynamic_dot
 func @dynamic_dot() -> tensor<?x?xf32> attributes { iree.module.export } {

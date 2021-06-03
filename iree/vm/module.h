@@ -77,7 +77,7 @@ typedef struct iree_vm_function_t {
   iree_vm_module_t* module;
   // Linkage of the function. Note that IREE_VM_FUNCTION_LINKAGE_INTERNAL
   // functions may be missing reflection information.
-  iree_vm_function_linkage_t linkage;
+  uint16_t linkage;
   // Ordinal within the module in the linkage scope.
   uint16_t ordinal;
 } iree_vm_function_t;

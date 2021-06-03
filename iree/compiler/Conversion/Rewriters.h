@@ -26,6 +26,12 @@ void populateHLOBroadcastingToLinalgPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     OwningRewritePatternList &patterns);
 
+/// Populates patterns to convert MHLO/CHLO arithmetic on complex tensors to
+/// equivalent HLO level real arithmetic.
+void populateHLOComplexToRealPatterns(MLIRContext *context,
+                                      TypeConverter &typeConverter,
+                                      OwningRewritePatternList &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

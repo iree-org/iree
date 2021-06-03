@@ -21,6 +21,7 @@ iree_check_single_backend_test_suite(
         "conv.mlir",
     ],
     compiler_flags = [
+        "-iree-input-type=mhlo",
         "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true",
     ],
     driver = "dylib",
