@@ -37,6 +37,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -254,6 +255,71 @@ struct LinearizeStoreIndices final
   }
 };
 
+/// Linearizes indices in vector.transfer_read ops.
+struct LinearizeTransferReadIndices final
+    : public OpConversionPattern<vector::TransferReadOp> {
+  using OpConversionPattern<vector::TransferReadOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      vector::TransferReadOp transferReadOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!transferReadOp.permutation_map().isMinorIdentity()) {
+      return rewriter.notifyMatchFailure(
+          transferReadOp, "cannot convert op with non-minor identity map");
+    }
+    vector::TransferReadOp::Adaptor adaptor(
+        operands, transferReadOp->getAttrDictionary());
+    if (!isRankZeroOrOneMemRef(adaptor.source().getType())) {
+      return rewriter.notifyMatchFailure(
+          transferReadOp, "expected converted memref of rank <= 1");
+    }
+    Value linearIndex = linearizeIndices(
+        transferReadOp.getShapedType().cast<MemRefType>(),
+        transferReadOp.indices(), transferReadOp.getLoc(), rewriter);
+    if (!linearIndex) {
+      return transferReadOp.emitOpError() << "failed to linearize index";
+    }
+
+    rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+        transferReadOp, transferReadOp.getVectorType(), adaptor.source(),
+        linearIndex, rewriter.getDimIdentityMap(), transferReadOp.padding(),
+        transferReadOp.in_boundsAttr());
+    return success();
+  }
+};
+
+/// Linearizes indices in vector.transfer_write ops.
+struct LinearizeTransferWriteIndices final
+    : public OpConversionPattern<vector::TransferWriteOp> {
+  using OpConversionPattern<vector::TransferWriteOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      vector::TransferWriteOp transferWriteOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!transferWriteOp.permutation_map().isMinorIdentity()) {
+      return rewriter.notifyMatchFailure(
+          transferWriteOp, "cannot convert op with non-minor identity map");
+    }
+    vector::TransferWriteOp::Adaptor adaptor(
+        operands, transferWriteOp->getAttrDictionary());
+    if (!isRankZeroOrOneMemRef(adaptor.source().getType())) {
+      return rewriter.notifyMatchFailure(
+          transferWriteOp, "expected converted memref of rank <= 1");
+    }
+    Value linearIndex = linearizeIndices(
+        transferWriteOp.getShapedType().cast<MemRefType>(),
+        transferWriteOp.indices(), transferWriteOp.getLoc(), rewriter);
+    if (!linearIndex) {
+      return transferWriteOp.emitOpError() << "failed to linearize index";
+    }
+
+    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+        transferWriteOp, adaptor.vector(), adaptor.source(), linearIndex,
+        rewriter.getDimIdentityMap(), transferWriteOp.in_boundsAttr());
+    return success();
+  }
+};
+
 /// Adjusts unrealized_conversion_cast ops' inputs to flattened memref values.
 struct AdjustConversionCast final
     : public OpConversionPattern<UnrealizedConversionCastOp> {
@@ -380,10 +446,11 @@ struct FlattenMemRefSubspanPass
     MLIRContext &context = getContext();
     FlattenMemRefTypeConverter typeConverter;
     RewritePatternSet flattenPatterns(&context);
-    flattenPatterns
-        .add<FlattenGlobal, FlattenGetGlobal, FlattenBindingSubspan,
-             LinearizeLoadIndices, LinearizeStoreIndices, AdjustConversionCast>(
-            typeConverter, &context);
+    flattenPatterns.add<FlattenGlobal, FlattenGetGlobal, FlattenBindingSubspan,
+                        LinearizeLoadIndices, LinearizeStoreIndices,
+                        LinearizeTransferReadIndices,
+                        LinearizeTransferWriteIndices, AdjustConversionCast>(
+        typeConverter, &context);
 
     ConversionTarget target(context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
@@ -405,6 +472,16 @@ struct FlattenMemRefSubspanPass
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
       return isRankZeroOrOneMemRef(storeOp.getMemRefType());
     });
+    target.addDynamicallyLegalOp<vector::TransferReadOp>(
+        [](vector::TransferReadOp readOp) {
+          return isRankZeroOrOneMemRef(
+              readOp.source().getType().cast<MemRefType>());
+        });
+    target.addDynamicallyLegalOp<vector::TransferWriteOp>(
+        [](vector::TransferWriteOp writeOp) {
+          return isRankZeroOrOneMemRef(
+              writeOp.source().getType().cast<MemRefType>());
+        });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
         [](UnrealizedConversionCastOp castOp) {
           return castOp->getNumOperands() == 1 &&

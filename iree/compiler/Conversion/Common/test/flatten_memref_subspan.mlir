@@ -139,3 +139,48 @@ func @load_global_with_offset(%i0: index, %i1: index, %i2: index, %i3: index) ->
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I3]], %[[I2]], %[[I1]], %[[I0]]]
 //      CHECK:   %[[LOAD:.+]] = memref.load %[[GLOBAL]][%[[INDEX]]]
 //      CHECK:   return %[[LOAD]]
+
+// -----
+
+func @transfer_read_subspan_with_offset(
+    %arg0 : index, %arg1: index, %arg2: index, %arg3: index) -> vector<4xf32> {
+  %subspan = hal.interface.binding.subspan @io::@ro[%arg0] : memref<6x7x8xf32>
+  %cst = constant 0.0 : f32
+  %val = vector.transfer_read %subspan[%arg1, %arg2, %arg3], %cst {in_bounds = [true]} : memref<6x7x8xf32>, vector<4xf32>
+  return %val: vector<4xf32>
+}
+hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface.binding @ro, set=0, binding=0, type="StorageBuffer", access="Read"
+}
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 8 + s2 * 56)>
+//      CHECK: func @transfer_read_subspan_with_offset
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: index
+//      CHECK:   %[[MEMREF:.+]] = hal.interface.binding.subspan @io::@ro[%[[ARG0]]] : memref<?xf32>
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[ARG3]], %[[ARG2]], %[[ARG1]]]
+//      CHECK:   %[[VEC:.+]] = vector.transfer_read %[[MEMREF]][%[[INDEX]]]
+//      CHECK:   return %[[VEC]]
+
+// -----
+
+func @transfer_write_subspan_with_offset(
+    %arg0 : index, %arg1: index, %arg2: index, %arg3: index, %arg4 : vector<4xf32>) {
+  %subspan = hal.interface.binding.subspan @io::@ro[%arg0] : memref<6x7x8xf32>
+  vector.transfer_write %arg4, %subspan[%arg1, %arg2, %arg3] {in_bounds = [true]} :  vector<4xf32>, memref<6x7x8xf32>
+  return
+}
+hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface.binding @ro, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+}
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 8 + s2 * 56)>
+//      CHECK: func @transfer_write_subspan_with_offset
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[ARG4:[a-zA-Z0-9_]+]]: vector<4xf32>
+//      CHECK:   %[[MEMREF:.+]] = hal.interface.binding.subspan @io::@ro[%[[ARG0]]] : memref<?xf32>
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[ARG3]], %[[ARG2]], %[[ARG1]]]
+//      CHECK:   vector.transfer_write %[[ARG4]], %[[MEMREF]][%[[INDEX]]]
