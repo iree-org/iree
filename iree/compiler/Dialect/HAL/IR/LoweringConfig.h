@@ -27,6 +27,30 @@
 namespace mlir {
 namespace iree_compiler {
 
+namespace IREE {
+namespace HAL {
+/// Struct that for a given hal.target.executable defines how it is translated.
+// TODO(ravishankarm): This could also be converted to an attribute on the
+// hal.executable.target
+struct TranslateExecutableInfo {
+  DispatchLoweringPassPipeline passPipeline;
+  SmallVector<int64_t, 3> workgroupSize;
+};
+
+inline bool operator==(const TranslateExecutableInfo &lhs,
+                       const TranslateExecutableInfo &rhs) {
+  return lhs.passPipeline == rhs.passPipeline &&
+         lhs.workgroupSize == rhs.workgroupSize;
+}
+
+inline bool operator!=(const TranslateExecutableInfo &lhs,
+                       const TranslateExecutableInfo &rhs) {
+  return !(lhs == rhs);
+}
+
+}  // namespace HAL
+}  // namespace IREE
+
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting the `hal.lowering.*` attributes that drive the
 // linalg-based lowering.

@@ -1,5 +1,7 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-lower-executable-target-pass{invoke-lowering-pipelines=false}, module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file %s | IreeFileCheck %s
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-lower-executable-target-pass{invoke-lowering-pipelines=false}, module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file -iree-codegen-llvm-promote-workgroup-to-full-tiles -cse %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-lower-executable-target-pass{use-lowering-pipeline='func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass)'}))" -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-lower-executable-target-pass{use-lowering-pipeline='func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass{promote-workgroup-to-full-tiles}),cse'}))" -split-input-file %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
+
+#config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
 hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -31,7 +33,7 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
             %7 = memref.subview %0[%arg0, 0] [64, 128] [1, 1] : memref<128x128xf32> to memref<64x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %8 = memref.subview %1[0, %arg1] [128, 64] [1, 1] : memref<128x128xf32> to memref<128x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %9 = memref.subview %2[%arg0, %arg1] [64, 64] [1, 1] : memref<128x128xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%7, %8 : memref<64x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
+            linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%7, %8 : memref<64x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
           }
         }
         return
@@ -112,6 +114,7 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
 
 // -----
 
+#config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
 hal.executable @matmul_i8_i8_i32 attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -143,7 +146,7 @@ hal.executable @matmul_i8_i8_i32 attributes {sym_visibility = "private"} {
             %7 = memref.subview %0[%arg0, 0] [64, 128] [1, 1] : memref<128x128xi8> to memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %8 = memref.subview %1[0, %arg1] [128, 64] [1, 1] : memref<128x128xi8> to memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %9 = memref.subview %2[%arg0, %arg1] [64, 64] [1, 1] : memref<128x128xi32> to memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-            linalg.matmul_i8_i8_i32 {__internal_linalg_transform__ = "workgroup"} ins(%7, %8 : memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
+            linalg.matmul_i8_i8_i32 {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%7, %8 : memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
           }
         }
         return

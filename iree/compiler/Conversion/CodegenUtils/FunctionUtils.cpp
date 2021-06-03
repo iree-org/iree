@@ -16,6 +16,17 @@ namespace iree_compiler {
 
 bool isEntryPoint(FuncOp func) { return func.isPublic(); }
 
+FailureOr<FuncOp> getSingleEntryPointFunction(ModuleOp module) {
+  auto entryPointFns = llvm::to_vector<1>(llvm::make_filter_range(
+      module.getOps<FuncOp>(), [&](FuncOp op) { return isEntryPoint(op); }));
+  if (!llvm::hasSingleElement(entryPointFns)) {
+    module.emitError(
+        "cannot handle modules with multiple entry point functions.");
+    return {};
+  }
+  return entryPointFns[0];
+}
+
 unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
   return op.iterator_types()
       .getValue()
