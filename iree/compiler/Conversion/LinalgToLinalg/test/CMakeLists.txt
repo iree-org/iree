@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
+    "pad_tensor_to_tensor.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

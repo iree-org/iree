@@ -47,84 +47,6 @@ namespace iree_compiler {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// linalg.pad_tensor conversion patterns.
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Pattern to convert a linalg.pad_tensor operation into a fill + subtensor
-/// insert. This is needed till pad_tensor op can be fused with its consumers.
-struct PadTensorOpConversion : public OpConversionPattern<linalg::PadTensorOp> {
-  using OpConversionPattern<linalg::PadTensorOp>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      linalg::PadTensorOp padTensorOp, ArrayRef<Value> args,
-      ConversionPatternRewriter &rewriter) const override {
-    linalg::PadTensorOpAdaptor padOpAdaptor(args,
-                                            padTensorOp->getAttrDictionary());
-    // Check that the region is just a yield operation which is returning a
-    // scalar that is not one of the arguments of the linalg operation.
-    Region &region = padTensorOp.region();
-    Block &block = region.front();
-    if (!llvm::hasSingleElement(block)) return failure();
-    auto yieldOp = cast<linalg::YieldOp>(block.getTerminator());
-    if (!llvm::hasSingleElement(yieldOp.values())) return failure();
-    Value yieldVal = yieldOp.values().front();
-    if (llvm::any_of(block.getArguments(),
-                     [&](Value v) { return v == yieldVal; })) {
-      return failure();
-    }
-
-    OpBuilder::InsertionGuard g(rewriter);
-    Location loc = padTensorOp.getLoc();
-    auto lowPad = padTensorOp.getMixedLowPad();
-    auto highPad = padTensorOp.getMixedHighPad();
-    Value source = padOpAdaptor.source();
-    RankedTensorType sourceType = padTensorOp.getSourceType();
-    int64_t rank = sourceType.getRank();
-
-    // TODO(ravishankarm): Use shape inference interface to get this.
-    SmallVector<OpFoldResult> sourceShape;
-    SmallVector<OpFoldResult> outputShape;
-    for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
-      SmallVector<Value> mapValues;
-      Value sourceDim = rewriter.createOrFold<memref::DimOp>(loc, source, dim);
-      mapValues.push_back(sourceDim);
-      sourceShape.push_back(sourceDim);
-      AffineExpr expr = rewriter.getAffineDimExpr(0);
-      unsigned numSymbols = 0;
-      auto addValueOrAttr = [&](AffineExpr e, OpFoldResult valueOrAttr) {
-        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          e = e + attr.cast<IntegerAttr>().getInt();
-          return e;
-        }
-        e = e + rewriter.getAffineSymbolExpr(numSymbols++);
-        mapValues.push_back(valueOrAttr.get<Value>());
-        return e;
-      };
-      expr = addValueOrAttr(expr, lowPad[dim]);
-      expr = addValueOrAttr(expr, highPad[dim]);
-      Value v = linalg::applyMapToValues(
-          rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
-      if (auto cst = v.getDefiningOp<ConstantOp>()) {
-        outputShape.push_back(cst.value());
-      } else {
-        outputShape.push_back(v);
-      }
-    }
-    Value initTensor = rewriter.create<linalg::InitTensorOp>(
-        loc, outputShape, sourceType.getElementType());
-    Value fill =
-        rewriter.create<linalg::FillOp>(loc, initTensor, yieldVal).getResult(0);
-    SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
-    rewriter.replaceOpWithNewOp<SubTensorInsertOp>(
-        padTensorOp, source, fill, lowPad, sourceShape, strides);
-    return success();
-  }
-};
-
-}  // namespace
-
-//===----------------------------------------------------------------------===//
 // mhlo.concatenate conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -317,8 +239,6 @@ struct ConvertHLOToLinalgOnTensorsPass
                                                      patterns);
     }
 
-    patterns.insert<PadTensorOpConversion>(context);
-
     ConversionTarget target(getContext());
     target.addIllegalDialect<chlo::HloClientDialect>();
     target.addIllegalDialect<mhlo::MhloDialect>();
@@ -330,8 +250,6 @@ struct ConvertHLOToLinalgOnTensorsPass
 
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-    // Set linalg.pad_tensor illegal for now.
-    target.addIllegalOp<linalg::PadTensorOp>();
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {

@@ -18,11 +18,13 @@ iree_cc_library(
   SRCS
     "Conv2D1x1ToMatmul.cpp"
     "Conv2DToImg2Col.cpp"
+    "PadTensorToSubTensorInsert.cpp"
   DEPS
     LLVMSupport
     MLIRIR
     MLIRLinalg
     MLIRPass
+    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
   PUBLIC

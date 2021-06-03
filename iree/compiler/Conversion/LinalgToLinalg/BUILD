@@ -15,6 +15,7 @@ cc_library(
     srcs = [
         "Conv2D1x1ToMatmul.cpp",
         "Conv2DToImg2Col.cpp",
+        "PadTensorToSubTensorInsert.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -24,6 +25,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
     ],
