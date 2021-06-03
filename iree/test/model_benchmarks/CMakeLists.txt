@@ -247,7 +247,8 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=adreno-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-flow-dispatch-formation-enable-operand-fusion"
+    # TODO(GH-6086): Turn on the flag.
+    #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   DRIVER
