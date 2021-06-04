@@ -130,13 +130,14 @@ namespace {
 
 /// Converts linalg.tensor_reshape operations into flow.tensor.reshape
 /// operations.
+template <typename TensorReshapeOp>
 struct LinalgTensorReshapeToFlowTensorReshape
-    : public OpRewritePattern<linalg::TensorReshapeOp> {
-  using OpRewritePattern<linalg::TensorReshapeOp>::OpRewritePattern;
+    : public OpRewritePattern<TensorReshapeOp> {
+  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::TensorReshapeOp reshapeOp,
+  LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
-    if (reshapeOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (reshapeOp->template getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
     SmallVector<SmallVector<Value>> outputShape;
@@ -263,9 +264,10 @@ struct ConvertToFlowTensorOpsPass
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
-    patterns.insert<LinalgTensorReshapeToFlowTensorReshape,
-                    SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(
-        context);
+    patterns.insert<
+        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
+        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>,
+        SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(context);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();

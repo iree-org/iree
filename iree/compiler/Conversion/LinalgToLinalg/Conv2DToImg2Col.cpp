@@ -131,14 +131,15 @@ class Conv2DImg2ColMatmulConversion
         RankedTensorType::get({outputShape[1] * outputShape[2], outputShape[3]},
                               outputShapeType.getElementType());
 
-    Value reshapedImg2ColTensor = rewriter.create<linalg::TensorReshapeOp>(
-        loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
-        img2ColTensorReassociationIndices);
+    Value reshapedImg2ColTensor =
+        rewriter.create<linalg::TensorCollapseShapeOp>(
+            loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
+            img2ColTensorReassociationIndices);
 
-    Value reshapedFilter = rewriter.create<linalg::TensorReshapeOp>(
+    Value reshapedFilter = rewriter.create<linalg::TensorCollapseShapeOp>(
         loc, reshapedFilterType, filter, filterAndOutputReassociationIndices);
 
-    Value reshapedOutput = rewriter.create<linalg::TensorReshapeOp>(
+    Value reshapedOutput = rewriter.create<linalg::TensorCollapseShapeOp>(
         loc, reshapedOutputType, output, filterAndOutputReassociationIndices);
 
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
@@ -146,7 +147,7 @@ class Conv2DImg2ColMatmulConversion
         ArrayRef<Value>{reshapedImg2ColTensor, reshapedFilter},
         ArrayRef<Value>{reshapedOutput});
 
-    auto reshapedResult = rewriter.create<linalg::TensorReshapeOp>(
+    auto reshapedResult = rewriter.create<linalg::TensorExpandShapeOp>(
         loc, outputShapeType, matmulResult.getResults()[0],
         filterAndOutputReassociationIndices);
 

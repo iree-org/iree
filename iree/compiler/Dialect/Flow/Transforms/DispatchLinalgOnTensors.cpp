@@ -261,7 +261,9 @@ static bool isDispatchableOp(Operation *op) {
 }
 
 static bool isAlwaysFusedIntoDispatchOp(Operation *op) {
-  return isDispatchableOp(op) && isa<linalg::TensorReshapeOp, SubTensorOp>(op);
+  return isDispatchableOp(op) &&
+         (isa<linalg::TensorCollapseShapeOp, SubTensorOp>(op) ||
+          isa<linalg::TensorExpandShapeOp, SubTensorOp>(op));
 }
 
 //===----------------------------------------------------------------------===//
