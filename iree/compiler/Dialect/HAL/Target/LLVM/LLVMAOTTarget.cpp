@@ -8,7 +8,6 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/LinalgToLLVM/LLVMCodeGenOptions.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
@@ -74,13 +73,13 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    auto codeGenOptions = getLLVMCodegenOptionsFromClOptions();
+    passManager.addPass(createLowerExecutableTargetPass());
     // Set target specific options.
     // TODO(ataei): This is temporary here, should move when target specific
     // overrides options grows.
     llvm::Triple triple(options_.targetTriple);
+    LLVMTransformPassPipelineOptions codeGenOptions;
     if (triple.isWasm()) {
-      // WebAssembly does not (yet) support FMA ops natively, so unfuse them.
       codeGenOptions.unfuseFMAOps = true;
     }
     buildLLVMTransformPassPipeline(passManager, codeGenOptions);
