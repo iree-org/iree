@@ -108,7 +108,10 @@ iree_e2e_cartesian_product_test_suite(
                 "iree_llvmaot",
                 "iree_vulkan",
             ],
-            "model": "VGG19",
+            "model": [
+                "VGG16",
+                "VGG19",
+            ],
         },
     ],
     matrix = {

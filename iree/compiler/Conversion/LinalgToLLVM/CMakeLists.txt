@@ -15,12 +15,10 @@ iree_cc_library(
     LinalgToLLVM
   HDRS
     "KernelDispatch.h"
-    "LLVMCodeGenOptions.h"
     "Passes.h"
   SRCS
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
-    "LLVMCodeGenOptions.cpp"
     "LinalgTileAndVectorizePass.cpp"
     "LinalgVectorizePass.cpp"
     "LowerExecutableTargetPass.cpp"

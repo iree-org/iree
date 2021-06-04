@@ -19,6 +19,8 @@
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -42,7 +44,9 @@ void buildMHLOImportPassPipeline(OpPassManager &pm) {
   pm.addPass(mlir::createInlinerPass());
   pm.addNestedPass<FuncOp>(mhlo::createControlFlowToScfPass());
   pm.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
+  pm.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
   pm.addPass(createFlattenTuplesInCFGPass());
+  pm.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
   // Mostly delicate to the IREE side MHLO legalization pipeline, now that
   // we have handled the weird that comes from legacy HLO clients.
