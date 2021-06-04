@@ -28,8 +28,9 @@ static llvm::cl::opt<bool> clEnableFusionWithReductionOps(
 
 namespace mlir {
 namespace iree_compiler {
-
 namespace {
+
+using linalg::LinalgOp;
 
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
@@ -58,7 +59,7 @@ struct FusionOfTensorOpsPass
           if (!clEnableFusionWithReductionOps) {
             auto consumerOp = consumer.getOwner();
             if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
-                dyn_cast<linalg::LinalgOp>(consumerOp).getNumReductionLoops()) {
+                dyn_cast<LinalgOp>(consumerOp).getNumReductionLoops()) {
               return false;
             }
           }
@@ -77,8 +78,14 @@ struct FusionOfTensorOpsPass
     // to the consumer linalg op.
     linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
         [](const OpResult &producer, const OpOperand &consumer) {
-          auto reshapeOp = producer.getDefiningOp<linalg::TensorReshapeOp>();
-          return reshapeOp.src().getDefiningOp<linalg::LinalgOp>() != nullptr;
+          auto collapseOp =
+              producer.getDefiningOp<linalg::TensorCollapseShapeOp>();
+          if (collapseOp)
+            return collapseOp.src().getDefiningOp<LinalgOp>() != nullptr;
+          auto expandOp = producer.getDefiningOp<linalg::TensorExpandShapeOp>();
+          if (expandOp)
+            return expandOp.src().getDefiningOp<LinalgOp>() != nullptr;
+          return false;
         };
     linalg::populateElementwiseOpsFusionPatterns(
         fusionPatterns,
@@ -92,7 +99,9 @@ struct FusionOfTensorOpsPass
     OwningRewritePatternList reshapeCanonicalizations(&getContext());
     linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
         reshapeCanonicalizations);
-    linalg::TensorReshapeOp::getCanonicalizationPatterns(
+    linalg::TensorCollapseShapeOp::getCanonicalizationPatterns(
+        reshapeCanonicalizations, context);
+    linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
         reshapeCanonicalizations, context);
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(reshapeCanonicalizations));
@@ -100,8 +109,10 @@ struct FusionOfTensorOpsPass
     // Push the remaining reshapes down the graphs.
     OwningRewritePatternList pushReshapePatterns(&getContext());
     linalg::populatePushReshapeOpsPatterns(pushReshapePatterns);
-    linalg::TensorReshapeOp::getCanonicalizationPatterns(pushReshapePatterns,
-                                                         context);
+    linalg::TensorCollapseShapeOp::getCanonicalizationPatterns(
+        pushReshapePatterns, context);
+    linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
+        pushReshapePatterns, context);
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(pushReshapePatterns));
   }

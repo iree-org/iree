@@ -313,9 +313,10 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// - tensor_to_memref can become a no-op since tensors are lowered to
   ///   !spv.array.
   /// - unrealized_conversion_cast with the same source and target type.
-  patterns
-      .insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<memref::BufferCastOp>,
-              RemoveIdentityConversionCast>(typeConverter, context);
+  patterns.insert<
+      FoldAsNoOp<linalg::CollapseShapeOp>, FoldAsNoOp<linalg::ExpandShapeOp>,
+      FoldAsNoOp<memref::BufferCastOp>, RemoveIdentityConversionCast>(
+      typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
       SPIRVConversionTarget::get(targetAttr);

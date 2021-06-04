@@ -62,18 +62,18 @@ class Convert1x1ConvolutionMatmulOp
     Value output = convOp.getOutput(0);
     auto loc = convOp.getLoc();
 
-    Value reshapedInput = rewriter.create<linalg::TensorReshapeOp>(
+    Value reshapedInput = rewriter.create<linalg::TensorCollapseShapeOp>(
         loc, reshapedInputType, input, reassociationIndices);
-    Value reshapedFilter = rewriter.create<linalg::TensorReshapeOp>(
+    Value reshapedFilter = rewriter.create<linalg::TensorCollapseShapeOp>(
         loc, reshapedFilterType, filter, reassociationIndices);
-    Value reshapedOutput = rewriter.create<linalg::TensorReshapeOp>(
+    Value reshapedOutput = rewriter.create<linalg::TensorCollapseShapeOp>(
         loc, reshapedOutputType, output, reassociationIndices);
 
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
         loc, reshapedOutputType, ArrayRef<Value>{reshapedInput, reshapedFilter},
         ArrayRef<Value>{reshapedOutput});
 
-    auto reshapedResult = rewriter.create<linalg::TensorReshapeOp>(
+    auto reshapedResult = rewriter.create<linalg::TensorExpandShapeOp>(
         loc, outputShapeType, matmulResult.getResults()[0],
         reassociationIndices);
 
