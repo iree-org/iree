@@ -98,6 +98,7 @@ function(iree_mlir_benchmark_suite)
     # discovering them and execute them on devices.
     list(GET _RULE_MODULE_SOURCES ${_INDEX} _MODULE_SOURCE)
     set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_MODULE_SOURCE}")
+    set(_VMFB_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/vmfb")
 
     list(GET _RULE_MODULE_NAMES ${_INDEX} _MODULE_NAME)
     list(GET _RULE_MODULE_TAGS ${_INDEX} _MODULE_TAGS)
@@ -152,27 +153,8 @@ function(iree_mlir_benchmark_suite)
     foreach (_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
       set(_BENCHMARK_DIR_NAME
           "iree-${_RULE_DRIVER}__${_RULE_TARGET_ARCHITECTURE}__${_BENCHMARK_MODE}")
-      set(_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
 
-      set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
-      list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
-      list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
-
-      set(_VMFB_FILE "${_ARTIFACTS_DIR}/compiled.vmfb")
-      add_custom_command(
-        OUTPUT "${_VMFB_FILE}"
-        COMMAND
-          "$<TARGET_FILE:iree_tools_iree-translate>"
-            ${_TRANSLATION_ARGS}
-            "${_SOURCE_FILE}"
-            -o "${_VMFB_FILE}"
-        WORKING_DIRECTORY "${_ARTIFACTS_DIR}"
-        DEPENDS
-          iree_tools_iree-translate
-          "${_DOWNLOAD_TARGET_NAME}"
-        COMMENT "Generating ${_VMFB_FILE}"
-      )
-
+      # A list of name segments for composing unique CMake target names.
       set(_COMMON_NAME_SEGMENTS "${_MODULE_NAME}")
       string(REPLACE "," "-" _TAGS "${_MODULE_TAGS}")
       string(REPLACE "," "-" _MODE "${_BENCHMARK_MODE}")
@@ -180,28 +162,65 @@ function(iree_mlir_benchmark_suite)
            "${_TAGS}" "${_MODE}" "${_RULE_TARGET_BACKEND}"
            "${_RULE_TARGET_ARCHITECTURE}")
 
-      # Construct the benchmark artifact generation target name, which is the module
-      # name, followed by benchmark mode, target backend, and configuration.
-      set(_TRANSLATION_TARGET_NAME_LIST "iree-generate-benchmark-artifact")
-      list(APPEND _TRANSLATION_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-      list(JOIN _TRANSLATION_TARGET_NAME_LIST "__" _TRANSLATION_TARGET_NAME)
+      # The full list of translation flags.
+      set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
+      if("${_MODULE_SOURCE}" STREQUAL "TensorFlow")
+        list(APPEND _TRANSLATION_ARGS "--iree-input-type=mhlo")
+      endif()
+      list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
+      list(SORT _RULE_TRANSLATION_FLAGS)
+      list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
 
-      add_custom_target("${_TRANSLATION_TARGET_NAME}"
-        DEPENDS "${_VMFB_FILE}"
+      # Get a unique identifier for this IREE module file by hashing the command
+      # line flags and input file. We will also use this for the CMake target.
+      string(SHA1 _VMFB_HASH "${_TRANSLATION_ARGS};${_SOURCE_FILE}")
+
+      set(_TRANSLATION_TARGET_NAME "iree-generate-benchmark-artifact-${_VMFB_HASH}")
+
+      # Register the target once and share across all benchmarks having the same
+      # MLIR source and translation flags.
+      if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
+        set(_VMFB_FILE "${_VMFB_ARTIFACTS_DIR}/compiled-${_VMFB_HASH}.vmfb")
+        add_custom_command(
+          OUTPUT "${_VMFB_FILE}"
+          COMMAND
+            "$<TARGET_FILE:iree_tools_iree-translate>"
+              ${_TRANSLATION_ARGS}
+              "${_SOURCE_FILE}"
+              -o "${_VMFB_FILE}"
+          WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"
+          DEPENDS
+            iree_tools_iree-translate
+            "${_DOWNLOAD_TARGET_NAME}"
+            COMMENT "Generating VMFB for ${_COMMON_NAME_SEGMENTS}"
+        )
+
+        add_custom_target("${_TRANSLATION_TARGET_NAME}"
+          DEPENDS "${_VMFB_FILE}"
+        )
+
+        # Mark dependency so that we have one target to drive them all.
+        add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
+      endif(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
+
+      # Add a friendly target alias for this particular benchmark.
+      set(_FRIENDLY_TARGET_NAME_LIST "iree-generate-benchmark-artifact")
+      list(APPEND _FRIENDLY_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
+      list(JOIN _FRIENDLY_TARGET_NAME_LIST "__" _FRIENDLY_TARGET_NAME)
+      add_custom_target("${_FRIENDLY_TARGET_NAME}"
+        DEPENDS "${_TRANSLATION_TARGET_NAME}"
       )
-
-      # Mark dependency so that we have one target to drive them all.
-      add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
 
       # Finally create the command and target for the flagfile used to execute the
       # generated artifacts.
-      set(_FLAG_FILE "${_ARTIFACTS_DIR}/flagfile")
+      set(_FLAGFILE_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
+      set(_FLAG_FILE "${_FLAGFILE_ARTIFACTS_DIR}/flagfile")
       set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\"")
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
         COMMAND
           "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
-            --module_file=compiled.vmfb
+            --module_file="../../vmfb/compiled-${_VMFB_HASH}.vmfb"
             --driver=${_RULE_DRIVER}
             --entry_function=${_ENTRY_FUNCTION}
             --function_inputs=${_FUNCTION_INPUTS}
@@ -209,7 +228,7 @@ function(iree_mlir_benchmark_suite)
             -o "${_FLAG_FILE}"
         DEPENDS
           "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
-        WORKING_DIRECTORY "${_ARTIFACTS_DIR}"
+        WORKING_DIRECTORY "${_FLAGFILE_ARTIFACTS_DIR}"
         COMMENT "Generating ${_FLAG_FILE}"
       )
 
