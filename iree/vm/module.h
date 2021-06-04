@@ -81,7 +81,7 @@ typedef struct iree_vm_function_t {
   // Ordinal within the module in the linkage scope.
   uint16_t ordinal;
 } iree_vm_function_t;
-static_assert(sizeof(iree_vm_function_t) <= 2 * sizeof(void*),
+static_assert(sizeof(iree_vm_function_t) <= 3 * sizeof(void*),
               "Must remain small as stored on the stack");
 
 // Returns true if the |function| is null (didn't exist, etc).

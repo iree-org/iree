@@ -176,6 +176,11 @@ struct RegisterUsage {
 // block live-in values as we walk the blocks.
 static SmallVector<Block *, 8> sortBlocksInDominanceOrder(
     IREE::VM::FuncOp funcOp) {
+  if (funcOp.getBlocks().size() == 1) {
+    // Dominance info cannot be computed for regions with one block.
+    return {&funcOp.getBlocks().front()};
+  }
+
   DominanceInfo dominanceInfo(funcOp);
   llvm::SmallSetVector<Block *, 8> unmarkedBlocks;
   for (auto &block : funcOp.getBlocks()) {
