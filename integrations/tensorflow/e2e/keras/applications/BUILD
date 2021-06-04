@@ -103,7 +103,11 @@ iree_e2e_cartesian_product_test_suite(
     failing_configurations = [
         # Frequently OOMs
         {
-            "target_backends": "tflite",
+            "target_backends": [
+                "tflite",
+                "iree_llvmaot",
+                "iree_vulkan",
+            ],
             "model": "VGG19",
         },
     ],

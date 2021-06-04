@@ -14,7 +14,7 @@ vm.module @constants {
   // CHECK-NEXT:   2,
   // CHECK-NEXT:   3
   // CHECK-NEXT: ]
-  vm.rodata @dense_i8s dense<[1, 2, 3]> : tensor<3xi8>
+  vm.rodata private @dense_i8s dense<[1, 2, 3]> : tensor<3xi8>
 
   //      CHECK: "data": [
   // CHECK-NEXT:   0,
@@ -30,7 +30,7 @@ vm.module @constants {
   // CHECK-NEXT:   64,
   // CHECK-NEXT:   64
   // CHECK-NEXT: ]
-  vm.rodata @dense_float32s dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf32>
+  vm.rodata private @dense_float32s dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf32>
 
   //      CHECK: "data": [
   // CHECK-NEXT:   0,
@@ -46,7 +46,7 @@ vm.module @constants {
   // CHECK-NEXT:   128,
   // CHECK-NEXT:   63
   // CHECK-NEXT: ]
-  vm.rodata @splat_float32s dense<1.000000e+00> : tensor<3xf32>
+  vm.rodata private @splat_float32s dense<1.000000e+00> : tensor<3xf32>
 
   //      CHECK: "data": [
   // CHECK-NEXT:   0,
@@ -56,6 +56,6 @@ vm.module @constants {
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   66
   // CHECK-NEXT: ]
-  vm.rodata @dense_float16s dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf16>
+  vm.rodata private @dense_float16s dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf16>
 
 }

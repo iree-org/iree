@@ -2077,7 +2077,7 @@ module  {
 //    CHECK-DAG:        %[[LHS_WORKGROUP_TILE:.+]] = memref.subview %[[LHS]][%[[WORKGROUP_I]], 0] [%[[WORKGROUP_I_SIZE]], 144] [1, 1] : memref<250x144xf32> to memref<?x144xf32
 //    CHECK-DAG:        %[[WORKGROUP_J_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_J]])
 //    CHECK-DAG:        %[[RHS_WORKGROUP_TILE:.+]] = memref.subview %[[RHS]][0, %[[WORKGROUP_J]]] [144, %[[WORKGROUP_J_SIZE]]] [1, 1] : memref<144x370xf32> to memref<144x?xf32
-//    CHECK-DAG:            %[[DST_WORKGROUP_TILE:.+]] = memref.alloc(%[[WORKGROUP_I_SIZE]], %[[WORKGROUP_J_SIZE]]) : memref<?x?xf32>
+//    CHECK-DAG:            %[[DST_WORKGROUP_TILE:.+]] = memref.subview %[[DST]][%[[WORKGROUP_I]], %[[WORKGROUP_J]]] [%[[WORKGROUP_I_SIZE]], %[[WORKGROUP_J_SIZE]]]
 //        CHECK:            scf.for %[[L1_I:.+]] = %{{.*}} to %[[M]] step %[[L1_MN_SIZE]] {
 //        CHECK:              scf.for %[[L1_J:.+]] = %{{.*}} to %[[N]] step %[[L1_MN_SIZE]] {
 //        CHECK:                scf.for %[[L1_K:.+]] = %{{.*}} to %[[K]] step %[[L1_K_SIZE]] {
@@ -2086,9 +2086,7 @@ module  {
 //    CHECK-DAG:                    %[[L1_I_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_I_SIZE]], %[[L1_I]])
 //    CHECK-DAG:                    %[[L1_J_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_J_SIZE]], %[[L1_J]])
 //    CHECK-DAG:                    %[[DST_L1_TILE:.+]] = memref.subview %[[DST_WORKGROUP_TILE]][%[[L1_I]], %[[L1_J]]]
-//    CHECK-DAG:                    %[[L1DST:.+]] = memref.alloc(%[[L1_I_SIZE]], %[[L1_J_SIZE]])
-//        CHECK:                    linalg.copy(%[[DST_L1_TILE]], %[[L1DST]])
 //        CHECK:                    linalg.matmul
 //   CHECK-SAME:                    ins(%[[LHS_L1_TILE]], %[[RHS_L1_TILE]]
-//   CHECK-SAME:                    outs(%[[L1DST]]
-//        CHECK:                    linalg.copy(%[[L1DST]], %[[DST_L1_TILE]])
+//   CHECK-SAME:                    outs(%[[DST_L1_TILE]]
+//        CHECK:                    linalg.copy(%[[DST_L1_TILE]], %[[DST_L1_TILE]])

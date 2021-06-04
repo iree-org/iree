@@ -96,9 +96,10 @@ class ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
           globalOp, "mutable global memrefs not yet implemented");
     }
 
-    rewriter.replaceOpWithNewOp<IREE::VM::RodataOp>(
+    auto rodataOp = rewriter.replaceOpWithNewOp<IREE::VM::RodataOp>(
         globalOp, globalOp.sym_name(),
         globalOp.initial_valueAttr().cast<ElementsAttr>());
+    rodataOp.setPrivate();
     return success();
   }
 };

@@ -84,6 +84,30 @@ BufferConstraintsAttr TargetBackend::queryBufferConstraints(
   return makeDefaultBufferConstraints(context);
 }
 
+// Renames |op| within |moduleOp| with a new name that is unique within both
+// |moduleOp| and |optionalSymbolTable| (if one is provided).
+static void renameWithDisambiguatedName(
+    Operation *op, Operation *moduleOp,
+    DenseMap<StringRef, Operation *> &targetSymbolMap,
+    SymbolTable *optionalSymbolTable) {
+  StringRef originalName = SymbolTable::getSymbolName(op);
+
+  // Iteratively try suffixes until we find one that isn't used.
+  std::string disambiguatedName;
+  int uniqueingCounter = 0;
+  do {
+    disambiguatedName =
+        llvm::formatv("{0}_{1}", originalName, uniqueingCounter++).str();
+  } while (
+      targetSymbolMap.lookup(disambiguatedName) ||
+      (optionalSymbolTable && optionalSymbolTable->lookup(disambiguatedName)));
+
+  SymbolTableCollection symbolTable;
+  SymbolUserMap symbolUsers(symbolTable, moduleOp);
+  symbolUsers.replaceAllUsesWith(op, disambiguatedName);
+  SymbolTable::setSymbolName(op, disambiguatedName);
+}
+
 void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
                                      IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());
@@ -94,33 +118,76 @@ void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
 }
 
 // Destructively merges |sourceModuleOp| into |targetModuleOp|.
-// |targetSymbolTable| is updated with the new symbols.
-static void mergeModuleInto(Operation *sourceModuleOp,
-                            Operation *targetModuleOp,
-                            DenseMap<StringRef, Operation *> &targetSymbolMap) {
+// |targetSymbolMap| is updated with the new symbols.
+//
+// If a private symbol in |sourceModuleOp| conflicts with another symbol
+// (public or private) tracked in |targetSymbolMap|, it will be renamed.
+//
+// Fails if a public symbol in |sourceModuleOp| conflicts with another public
+// symbol tracked in |targetSymbolMap|.
+static LogicalResult mergeModuleInto(
+    Operation *sourceModuleOp, Operation *targetModuleOp,
+    DenseMap<StringRef, Operation *> &targetSymbolMap) {
   auto &sourceBlock = sourceModuleOp->getRegion(0).front();
   auto &targetBlock = targetModuleOp->getRegion(0).front();
+  SymbolTable sourceSymbolTable(sourceModuleOp);
   auto allOps = llvm::to_vector<8>(
       llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
+
   for (auto &op : allOps) {
     if (op->hasTrait<OpTrait::IsTerminator>()) continue;
-    if (auto symbolInterface = dyn_cast<SymbolOpInterface>(op)) {
-      if (targetSymbolMap.count(symbolInterface.getName())) {
-        // TODO(scotttodd): compare ops to ensure we aren't copying different
-        // things with the same name.
-        continue;
+    if (auto symbolOp = dyn_cast<SymbolOpInterface>(op)) {
+      auto symbolName = symbolOp.getName();
+
+      // Resolve symbol name conflicts.
+      if (auto targetOp = targetSymbolMap[symbolName]) {
+        if (symbolOp.getVisibility() == SymbolTable::Visibility::Private) {
+          // Private symbols can be safely folded into duplicates or renamed.
+          if (OperationEquivalence::isEquivalentTo(targetOp, op)) {
+            // Optimization: skip over duplicate private symbols.
+            // We could let CSE do this later, but we may as well check here.
+            continue;
+          } else {
+            // Preserve the op but give it a unique name.
+            renameWithDisambiguatedName(op, sourceModuleOp, targetSymbolMap,
+                                        &sourceSymbolTable);
+          }
+        } else {
+          // The source symbol has 'nested' or 'public' visibility.
+          if (SymbolTable::getSymbolVisibility(targetOp) !=
+              SymbolTable::Visibility::Private) {
+            // Oops! Both symbols are public and we can't safely rename either.
+            // If you hit this with ops that you think are safe to rename, mark
+            // them private.
+            //
+            // Note: we could also skip linking between executables with
+            // conflicting symbol names. We think such conflicts will be better
+            // fixed in other ways, so we'll emit an error until we find a case
+            // where that isn't true.
+            return op->emitError()
+                   << "multiple public symbols with the name: " << symbolName;
+          } else {
+            // Keep the original name for our new op, rename the target op.
+            renameWithDisambiguatedName(targetOp, targetModuleOp,
+                                        targetSymbolMap,
+                                        /*optionalSymbolTable=*/nullptr);
+          }
+        }
       }
-      targetSymbolMap[symbolInterface.getName()] = op;
+      targetSymbolMap[SymbolTable::getSymbolName(op)] = op;
     }
     if (!targetBlock.empty() &&
-        targetBlock.back().hasTrait<OpTrait::IsTerminator>())
+        targetBlock.back().hasTrait<OpTrait::IsTerminator>()) {
       op->moveBefore(&targetBlock.back());
-    else
+    } else {
       op->moveBefore(&targetBlock, targetBlock.end());
+    }
   }
 
   // Now that we're done cloning its ops, delete the original target op.
   sourceModuleOp->erase();
+
+  return success();
 }
 
 // Replaces each usage of an entry point with its original symbol name with a
@@ -147,11 +214,15 @@ LogicalResult TargetBackend::linkExecutablesInto(
     OpBuilder &builder) {
   llvm::SmallVector<IREE::HAL::InterfaceOp, 4> linkedInterfaceOps;
   int nextEntryPointOrdinal = 0;
-  DenseMap<StringRef, Operation *> symbolMap;
+  DenseMap<StringRef, Operation *> targetSymbolMap;
   DenseMap<Attribute, Attribute> entryPointRefReplacements;
+
   auto linkedExecutableBuilder =
       OpBuilder::atBlockBegin(linkedExecutableOp.getBody());
   auto linkedTargetBuilder = OpBuilder::atBlockBegin(linkedTargetOp.getBody());
+  auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
+
+  // Iterate over all source executable ops, linking as many as we can.
   for (auto sourceExecutableOp : sourceExecutableOps) {
     auto targetOps = llvm::to_vector<4>(
         sourceExecutableOp.getOps<IREE::HAL::ExecutableTargetOp>());
@@ -207,8 +278,10 @@ LogicalResult TargetBackend::linkExecutablesInto(
 
       // Merge the existing module into the new linked module op.
       auto sourceModuleOp = getInnerModuleFn(targetOp.getInnerModule());
-      auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
-      mergeModuleInto(sourceModuleOp, linkedModuleOp, symbolMap);
+      if (failed(mergeModuleInto(sourceModuleOp, linkedModuleOp,
+                                 targetSymbolMap))) {
+        return failure();
+      }
 
       targetOp.erase();
     }

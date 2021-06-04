@@ -29,6 +29,8 @@ iree_check_test_suite(
     check
   SRCS
     "success.mlir"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
 )
 
 iree_check_test_suite(
@@ -36,6 +38,8 @@ iree_check_test_suite(
     check_failure
   SRCS
     "failure.mlir"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
   RUNNER_ARGS
     "--expect_failure"
 )

@@ -17,6 +17,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_vulkan_simple_mul_bytecode_module"
   FLAGS
+    "--iree-input-type=mhlo"
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=vulkan-spirv"
 )

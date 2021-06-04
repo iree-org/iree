@@ -69,6 +69,7 @@ LLVM_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = LLVM_SRCS,
+    compiler_flags = ["-iree-input-type=tosa"],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
@@ -84,10 +85,13 @@ VMVX_SRCS = enforce_glob(
         "ceil.mlir",
         "clamp.mlir",
         "const.mlir",
+        "equal.mlir",
         "exp.mlir",
         "floor.mlir",
         "fully_connected.mlir",
         "gather.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
         "if.mlir",
         "log.mlir",
         "logical_left_shift.mlir",
@@ -113,9 +117,6 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "equal.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
-        "greater.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
-        "greater_equal.mlir",  # Currently failing due to https://github.com/google/iree/issues/5946
         "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],
 )
@@ -124,6 +125,7 @@ iree_check_single_backend_test_suite(
     name = "check_vmvx_vmvx",
     srcs = VMVX_SRCS,
     compiler_flags = [
+        "-iree-input-type=tosa",
         # tosa.apply_scale currently expands to i64 math, requiring this
         # extension. Nothing else about the tests require it, though, and we
         # really should not be emulating it with 64-bit math. Having this
@@ -185,6 +187,7 @@ VULKAN_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = VULKAN_SRCS,
+    compiler_flags = ["-iree-input-type=tosa"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

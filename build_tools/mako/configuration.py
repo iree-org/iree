@@ -36,7 +36,9 @@ class TargetInfo:
     self.hal_target_backend = hal_target_backend
     self.taskset = taskset
     self.mako_tag = mako_tag
-    self.compilation_flags = compilation_flags
+    # This setup is going to be deprecated. Now we only test mhlo inputs for
+    # Mako setup, hardcoded would make it eaiser.
+    self.compilation_flags = compilation_flags + ['--iree-input-type=mhlo']
     self.runtime_flags = runtime_flags
 
   def add_batch_flag(self, size):
@@ -125,16 +127,18 @@ def get_pixel4_default_target_list(skipped_target=None,
                  runtime_flags=[
                      "--task_topology_group_count=3",
                  ]),
-      TargetInfo(driver="vulkan",
-                 hal_target_backend="vulkan-spirv",
-                 taskset="80",
-                 mako_tag="vlk",
-                 compilation_flags=[
-                     "--iree-vulkan-target-triple=adreno-a640-android11",
-                     "--iree-flow-inline-constants-max-byte-length=2048",
-                     "--iree-flow-dispatch-formation-enable-operand-fusion",
-                     "--iree-enable-fusion-with-reduction-ops",
-                 ])
+      TargetInfo(
+          driver="vulkan",
+          hal_target_backend="vulkan-spirv",
+          taskset="80",
+          mako_tag="vlk",
+          compilation_flags=[
+              "--iree-vulkan-target-triple=adreno-a640-android11",
+              "--iree-flow-inline-constants-max-byte-length=2048",
+              # TODO(GH-6086): Turn on the flag.
+              # "--iree-flow-dispatch-formation-enable-operand-fusion",
+              "--iree-enable-fusion-with-reduction-ops",
+          ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
   for target in targets:
@@ -193,7 +197,8 @@ def get_s20_default_target_list(skipped_target=None,
               "--iree-vulkan-target-triple=valhall-g77-android11",
               # TODO(GH-5330): Revisit the number or delete the flag.
               "--iree-flow-inline-constants-max-byte-length=16",
-              "--iree-flow-dispatch-formation-enable-operand-fusion"
+              # TODO(GH-6086): Turn on the flag.
+              # "--iree-flow-dispatch-formation-enable-operand-fusion"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -240,11 +245,13 @@ MODEL_BENCHMARKS = [
                     skipped_target=["vlk2"],
                     compilation_flags={
                         'cpu': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            # TODO(GH-5857): Enable this after fixing segfault.
+                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ],
                         'cpu3t': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            # TODO(GH-5857): Enable this after fixing segfault.
+                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ]
                     })),
@@ -254,11 +261,13 @@ MODEL_BENCHMARKS = [
                 targets=get_s20_default_target_list(
                     compilation_flags={
                         'cpu': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            # TODO(GH-5857): Enable this after fixing segfault.
+                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ],
                         'cpu3t': [
-                            "--iree-flow-dispatch-formation-enable-operand-fusion",
+                            # TODO(GH-5857): Enable this after fixing segfault.
+                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ]
                     })),

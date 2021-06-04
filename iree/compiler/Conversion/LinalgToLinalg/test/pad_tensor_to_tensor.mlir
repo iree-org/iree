@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-flow-pad-tensor-to-subtensor-insert -canonicalize %s | IreeFileCheck %s
 
 module  {
   func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {

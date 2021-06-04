@@ -16,6 +16,10 @@ std::unique_ptr<OperationPass<FuncOp>> createConvert1x1ConvToMatmulPass();
 
 std::unique_ptr<OperationPass<FuncOp>> createConvertConv2DToImg2ColPass();
 
+/// Pass to convert a linalg.pad_tensor operation into a linalg.fill +
+/// subtensor_insert. This allows lowering the operation into a single kernel.
+std::unique_ptr<OperationPass<>> createPadTensorToSubTensorInsertPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 #endif  // IREE_COMPILER_CONVERSION_LINALGTOLINALG_PASSES_H_
