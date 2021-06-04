@@ -121,6 +121,8 @@ void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(mlir::createInlinerPass());
 
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(Flow::createPromoteI1ToI8Pass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 }
