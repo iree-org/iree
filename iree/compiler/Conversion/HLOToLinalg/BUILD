@@ -41,5 +41,6 @@ cc_library(
         "@mlir-hlo//:chlo_legalize_to_hlo",
         "@mlir-hlo//:hlo",
         "@mlir-hlo//:legalize_to_linalg",
+        "@mlir-hlo//:materialize_broadcasts",
     ],
 )

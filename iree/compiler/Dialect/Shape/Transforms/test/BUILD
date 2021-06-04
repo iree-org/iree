@@ -17,13 +17,8 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "convert_hlo_to_shape_dialect.mlir",
             "expand_function_dynamic_dims.mlir",
             "expand_function_ranked_shape_dims.mlir",
-            "hoist_shape_calculations.mlir",
-            "materialize_shape_calculations.mlir",
-            "tie_dynamic_shapes.mlir",
-            "tie_dynamic_shapes_no_recurse.mlir",
         ],
         include = ["*.mlir"],
     ),

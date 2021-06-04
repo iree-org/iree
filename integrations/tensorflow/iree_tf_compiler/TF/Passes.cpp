@@ -7,7 +7,6 @@
 #include "iree_tf_compiler/TF/Passes.h"
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree_tf_compiler/MHLO/Passes.h"
 #include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"

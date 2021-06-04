@@ -73,11 +73,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
 /// backends.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass();
 
-// Runs pre-partitioning conversion passes to convert to the flow dialect.
-// This converts some input ops directly to flow ops when doing so has a
-// benefit. Other ops are left unmodified and will be outlined later on.
-std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
-
 // Converts standard ops which match to flow.tensor.load (typically causing a
 // read-back).
 // Note that there are typically very specific phase ordering issues with
