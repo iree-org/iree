@@ -42,7 +42,6 @@ cc_library(
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/Flow/Transforms",
         "@iree//iree/compiler/Dialect/IREE/IR",
-        "@iree//iree/compiler/Dialect/Shape/Conversion",
         "@iree//iree/compiler/Dialect/Shape/Transforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
