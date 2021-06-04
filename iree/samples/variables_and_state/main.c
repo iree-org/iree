@@ -8,8 +8,74 @@
 
 #include "iree/runtime/api.h"
 
-iree_status_t RunSample(iree_string_view_t bytecode_module_path,
-                        iree_string_view_t driver_name) {
+iree_status_t counter_get_value(iree_runtime_call_t* call_get_value,
+                                iree_hal_buffer_view_t** out_value) {
+  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(call_get_value, /*flags=*/0));
+  IREE_RETURN_IF_ERROR(iree_runtime_call_outputs_pop_front_buffer_view(
+      call_get_value, out_value));
+  return iree_ok_status();
+}
+
+iree_status_t counter_print_current_value(iree_runtime_call_t* call_get_value) {
+  iree_hal_buffer_view_t* ret = NULL;
+  IREE_RETURN_IF_ERROR(counter_get_value(call_get_value, &ret));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_fprint(stdout, ret,
+                                                   /*max_element_count=*/64));
+  iree_hal_buffer_view_release(ret);
+  return iree_ok_status();
+}
+
+iree_status_t counter_set_value(iree_runtime_call_t* call_set_value,
+                                int new_value) {
+  iree_runtime_call_reset(call_set_value);
+  iree_hal_buffer_view_t* arg0 = NULL;
+  static const iree_hal_dim_t arg0_shape[1] = {1};
+  int arg0_data[1] = {new_value};
+
+  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
+  //   * debugging some apparent memory corruption with the stack-local value
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_clone_heap_buffer(
+      iree_runtime_session_device_allocator(call_set_value->session),
+      arg0_shape, IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_ALL,
+      iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0));
+  IREE_RETURN_IF_ERROR(
+      iree_runtime_call_inputs_push_back_buffer_view(call_set_value, arg0));
+  iree_hal_buffer_view_release(arg0);
+  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(call_set_value, /*flags=*/0));
+  return iree_ok_status();
+}
+
+iree_status_t counter_add_to_value(iree_runtime_call_t* call_add_to_value,
+                                   int x) {
+  iree_runtime_call_reset(call_add_to_value);
+  iree_hal_buffer_view_t* arg0 = NULL;
+  static const iree_hal_dim_t arg0_shape[1] = {1};
+  int arg0_data[1] = {x};
+
+  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
+  //   * debugging some apparent memory corruption with the stack-local value
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_clone_heap_buffer(
+      iree_runtime_session_device_allocator(call_add_to_value->session),
+      arg0_shape, IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_ALL,
+      iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0));
+  IREE_RETURN_IF_ERROR(
+      iree_runtime_call_inputs_push_back_buffer_view(call_add_to_value, arg0));
+  iree_hal_buffer_view_release(arg0);
+  IREE_RETURN_IF_ERROR(
+      iree_runtime_call_invoke(call_add_to_value, /*flags=*/0));
+  return iree_ok_status();
+}
+
+iree_status_t counter_reset_value(iree_runtime_call_t* call_reset_value) {
+  return iree_runtime_call_invoke(call_reset_value, /*flags=*/0);
+}
+
+iree_status_t run_sample(iree_string_view_t bytecode_module_path,
+                         iree_string_view_t driver_name) {
   //===-------------------------------------------------------------------===//
   // Instance configuration (this should be shared across sessions).
   fprintf(stdout, "Configuring IREE runtime instance and '%s' device\n",
@@ -45,8 +111,7 @@ iree_status_t RunSample(iree_string_view_t bytecode_module_path,
   //===-------------------------------------------------------------------===//
 
   //===-------------------------------------------------------------------===//
-  // Call functions.
-  fprintf(stdout, "Calling functions\n\n");
+  // Look up functions.
   iree_runtime_call_t call_get_value;
   iree_runtime_call_t call_set_value;
   iree_runtime_call_t call_add_to_value;
@@ -62,96 +127,44 @@ iree_status_t RunSample(iree_string_view_t bytecode_module_path,
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
       session, iree_make_cstring_view("module.reset_value"),
       &call_reset_value));
+  //===-------------------------------------------------------------------===//
 
-  iree_hal_buffer_view_t* ret0 = NULL;
+  //===-------------------------------------------------------------------===//
+  // Call functions to manipulate the counter
+  fprintf(stdout, "Calling functions\n\n");
 
-  // Call get_value() to check the initial value.
-  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(&call_get_value, /*flags=*/0));
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_outputs_pop_front_buffer_view(&call_get_value, &ret0));
-  fprintf(stdout, "Initial value from get_value():\n");
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_fprint(stdout, ret0, /*max_element_count=*/64));
+  // 1. get_value() // initial value
+  fprintf(stdout, "Initial get_value():\n");
+  IREE_RETURN_IF_ERROR(counter_print_current_value(&call_get_value));
 
-  // Call set_value() then get_value() again.
-  iree_hal_buffer_view_t* arg0 = NULL;
-  static const iree_hal_dim_t arg0_shape[1] = {1};
-  static const int arg0_data[1] = {101};
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
-      iree_runtime_session_device_allocator(session), arg0_shape,
-      IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
-      iree_make_byte_span((void*)arg0_data, sizeof(arg0_data)),
-      iree_allocator_null(), &arg0));
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_inputs_push_back_buffer_view(&call_set_value, arg0));
-  iree_hal_buffer_view_release(arg0);
-  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(&call_set_value, /*flags=*/0));
-  // Value should be set now, check by calling get_value().
-  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(&call_get_value, /*flags=*/0));
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_outputs_pop_front_buffer_view(&call_get_value, &ret0));
-  fprintf(stdout, "\nNew value from get_value() after set_value():\n");
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_fprint(stdout, ret0, /*max_element_count=*/64));
+  // 2. set_value(101)
+  IREE_RETURN_IF_ERROR(counter_set_value(&call_set_value, 101));
+  fprintf(stdout, "\nAfter set_value(101):\n");
+  IREE_RETURN_IF_ERROR(counter_print_current_value(&call_get_value));
 
-  // Call add_to_value() a few times.
-  iree_hal_buffer_view_t* arg1 = NULL;
-  static const iree_hal_dim_t arg1_shape[1] = {1};
-  static const int arg1_data[1] = {20};
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
-      iree_runtime_session_device_allocator(session), arg1_shape,
-      IREE_ARRAYSIZE(arg1_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
-      iree_make_byte_span((void*)arg1_data, sizeof(arg1_data)),
-      iree_allocator_null(), &arg1));
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_inputs_push_back_buffer_view(&call_add_to_value, arg1));
-  iree_hal_buffer_view_release(arg1);
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_invoke(&call_add_to_value, /*flags=*/0));
-  // Value should be set now, check by calling get_value().
-  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(&call_get_value,
-                                                /*flags=*/0));
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_outputs_pop_front_buffer_view(&call_get_value, &ret0));
-  fprintf(stdout, "\nNew value from get_value() after add_to_value():\n");
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_fprint(stdout, ret0, /*max_element_count=*/64));
-  // Call add_to_value() again *without* a call to iree_runtime_call_reset.
-  // This should retain the previous input.
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_invoke(&call_add_to_value, /*flags=*/0));
-  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(&call_get_value,
-                                                /*flags=*/0));
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_outputs_pop_front_buffer_view(&call_get_value, &ret0));
-  fprintf(stdout, "\nNew value from get_value() after add_to_value():\n");
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_fprint(stdout, ret0, /*max_element_count=*/64));
+  // 3. add_to_value(20)
+  IREE_RETURN_IF_ERROR(counter_add_to_value(&call_add_to_value, 20));
+  fprintf(stdout, "\nAfter add_to_value(20):\n");
+  IREE_RETURN_IF_ERROR(counter_print_current_value(&call_get_value));
 
-  // Call reset_value().
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_invoke(&call_reset_value, /*flags=*/0));
-  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(&call_get_value, /*flags=*/0));
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_outputs_pop_front_buffer_view(&call_get_value, &ret0));
-  fprintf(stdout, "\nNew value from get_value() after reset_value():\n");
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_fprint(stdout, ret0, /*max_element_count=*/64));
+  // 4. add_to_value(-50)
+  IREE_RETURN_IF_ERROR(counter_add_to_value(&call_add_to_value, -50));
+  fprintf(stdout, "\nAfter add_to_value(-50):\n");
+  IREE_RETURN_IF_ERROR(counter_print_current_value(&call_get_value));
 
-  iree_hal_buffer_view_release(ret0);
-
-  iree_runtime_call_deinitialize(&call_get_value);
-  iree_runtime_call_deinitialize(&call_set_value);
-  iree_runtime_call_deinitialize(&call_add_to_value);
-  iree_runtime_call_deinitialize(&call_reset_value);
+  // 5. reset_value()
+  IREE_RETURN_IF_ERROR(counter_reset_value(&call_reset_value));
+  fprintf(stdout, "\nAfter reset_value():\n");
+  IREE_RETURN_IF_ERROR(counter_print_current_value(&call_get_value));
   //===-------------------------------------------------------------------===//
 
   //===-------------------------------------------------------------------===//
   // Cleanup.
+  iree_runtime_call_deinitialize(&call_get_value);
+  iree_runtime_call_deinitialize(&call_set_value);
+  iree_runtime_call_deinitialize(&call_add_to_value);
+  iree_runtime_call_deinitialize(&call_reset_value);
+
   iree_runtime_session_release(session);
   iree_runtime_instance_release(instance);
   //===-------------------------------------------------------------------===//
@@ -171,7 +184,7 @@ int main(int argc, char** argv) {
   iree_string_view_t bytecode_module_path = iree_make_cstring_view(argv[1]);
   iree_string_view_t driver_name = iree_make_cstring_view(argv[2]);
 
-  iree_status_t result = RunSample(bytecode_module_path, driver_name);
+  iree_status_t result = run_sample(bytecode_module_path, driver_name);
   if (!iree_status_is_ok(result)) {
     iree_status_fprint(stderr, result);
     iree_status_ignore(result);

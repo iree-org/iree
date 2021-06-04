@@ -13,11 +13,6 @@ target_sources(${_NAME}
 
 set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "variables-and-state")
 
-target_include_directories(${_NAME}
-  PUBLIC
-    ${CMAKE_CURRENT_BINARY_DIR}
-)
-
 target_link_libraries(${_NAME}
   iree_runtime_runtime
 )
