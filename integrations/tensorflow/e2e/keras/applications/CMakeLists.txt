@@ -28,6 +28,8 @@ iree_e2e_cartesian_product_test_suite(
     "tf;tflite;iree_llvmaot;iree_vulkan"
   FAILING_CONFIGURATIONS
     ",,,VGG19,tflite"
+    ",,,VGG19,iree_llvmaot"
+    ",,,VGG19,iree_vulkan"
   LABELS
     "manual"
 )
