@@ -94,12 +94,6 @@ def PromoteTensorLoads :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteTensorLoadsPass()";
 }
 
-def PrePartitioningConversion :
-    Pass<"iree-flow-pre-partitioning-conversion", "FuncOp"> {
-  let summary = "Dialect conversion prior to partitioning";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPrePartitioningConversionPass()";
-}
-
 def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "ModuleOp"> {
   let summary = "Strips constant flow.variables and replaces them with splats.";

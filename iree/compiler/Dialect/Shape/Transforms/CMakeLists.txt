@@ -15,16 +15,9 @@ iree_cc_library(
     Transforms
   HDRS
     "Passes.h"
-    "Patterns.h"
   SRCS
     "CleanupPlaceholdersPass.cpp"
-    "ConvertHLOToShapeDialectPass.cpp"
-    "ConvertShapeToStandard.cpp"
     "FunctionSignatureExpansionPass.cpp"
-    "HoistShapeCalculationsPass.cpp"
-    "MaterializeShapeCalculations.cpp"
-    "MaterializeShapeCalculationsPass.cpp"
-    "TieDynamicShapesPass.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis
@@ -36,10 +29,8 @@ iree_cc_library(
     MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
     iree::compiler::Dialect::Shape::Utils::TypeConversion
     iree::compiler::Utils
-    tensorflow::mlir_hlo
   PUBLIC
 )
 

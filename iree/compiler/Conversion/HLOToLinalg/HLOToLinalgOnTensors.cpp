@@ -221,32 +221,20 @@ struct ConvertHLOToLinalgOnTensorsPass
     MLIRContext *context = &getContext();
 
     auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
-    if (directHloClientLowering) {
-      // NOTE: not using corresponding setupHLOToFlowPatterns because the entire
-      // HLO dialects are marked illegal by this pass.
-      // TODO: Collapse/rework all of these patterns once the consolidation
-      // lands. There is little reason to have these so spread out.
-      populateHLOToFlowPatterns(context, patterns);
-      chlo::PopulateDecomposeChloPatterns(context, &patterns);
-      populateHLOBroadcastingToLinalgPatterns(context, *typeConverter,
-                                              patterns);
-      populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
-                                                     patterns);
-      populateHLOComplexToRealPatterns(context, *typeConverter, patterns);
-    } else {
-      // Legacy: assumes that HLO client -> HLO has been run previously.
-      populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
-                                                     patterns);
-    }
+    // NOTE: not using corresponding setupHLOToFlowPatterns because the entire
+    // HLO dialects are marked illegal by this pass.
+    // TODO: Collapse/rework all of these patterns once the consolidation
+    // lands. There is little reason to have these so spread out.
+    populateHLOToFlowPatterns(context, patterns);
+    chlo::PopulateDecomposeChloPatterns(context, &patterns);
+    populateHLOBroadcastingToLinalgPatterns(context, *typeConverter, patterns);
+    populateHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
+                                                   patterns);
+    populateHLOComplexToRealPatterns(context, *typeConverter, patterns);
 
     ConversionTarget target(getContext());
     target.addIllegalDialect<chlo::HloClientDialect>();
     target.addIllegalDialect<mhlo::MhloDialect>();
-
-    if (directHloClientLowering) {
-      // Conversions to also legalize the HLO client dialect.
-      target.addIllegalDialect<chlo::HloClientDialect>();
-    }
 
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
