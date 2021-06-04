@@ -79,6 +79,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-flow-inline-constants-max-byte-length=2048"
   DRIVER
     "vmvx"
@@ -109,6 +110,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
@@ -141,6 +143,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
@@ -175,6 +178,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
@@ -208,6 +212,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Adreno"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=adreno-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-6086): Turn on the flag.
@@ -239,6 +244,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Adreno"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=adreno-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-6086): Turn on the flag.
@@ -273,6 +279,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=16"
     # TODO(GH-6086): Turn on the flag.
@@ -304,6 +311,7 @@ iree_mlir_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=16"
     # TODO(GH-6086): Turn on the flag.
