@@ -164,9 +164,6 @@ function(iree_mlir_benchmark_suite)
 
       # The full list of translation flags.
       set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
-      if("${_MODULE_SOURCE}" STREQUAL "TensorFlow")
-        list(APPEND _TRANSLATION_ARGS "--iree-input-type=mhlo")
-      endif()
       list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
       list(SORT _RULE_TRANSLATION_FLAGS)
       list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
