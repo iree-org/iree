@@ -113,6 +113,7 @@ Translate a source MLIR file into an IREE module:
 
 ```powershell
 > ..\iree-build\iree\tools\iree-translate.exe \
+  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   iree/tools/test/iree-run-module.mlir \
@@ -125,6 +126,7 @@ cross-compiling:
 
 ```powershell
 > ..\iree-build\iree\tools\iree-translate.exe \
+  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=x86_64-pc-windows-msvc \
