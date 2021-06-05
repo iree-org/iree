@@ -496,7 +496,7 @@ bool isConsecutive(ArrayRef<int64_t> array) {
   return true;
 }
 
-SmallVector<int64_t> Extract1DVector(DenseIntElementsAttr elements) {
+SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements) {
   SmallVector<int64_t> ret;
   for (const APInt &element : elements) {
     ret.push_back(element.getLimitedValue());
@@ -509,8 +509,7 @@ SmallVector<int64_t> Extract1DVector(DenseIntElementsAttr elements) {
 // inserts transposes so the dot_general always has the form:
 // {batch_dims, parallel_dims, contraction_dims}.
 //   {batch_dims, contraction_dims, parallel_dims}
-class TransposeGenericDotGeneral
-    : public OpRewritePattern<mhlo::DotGeneralOp> {
+class TransposeGenericDotGeneral : public OpRewritePattern<mhlo::DotGeneralOp> {
  public:
   using OpRewritePattern<mhlo::DotGeneralOp>::OpRewritePattern;
 
@@ -537,9 +536,9 @@ class TransposeGenericDotGeneral
     SmallVector<int64_t> lhsTargetOrder, rhsTargetOrder;
     mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
     auto lhsBatchingDims =
-        Extract1DVector(dimNumbers.lhs_batching_dimensions());
+        extract1DVector(dimNumbers.lhs_batching_dimensions());
     auto lhsContractingDims =
-        Extract1DVector(dimNumbers.lhs_contracting_dimensions());
+        extract1DVector(dimNumbers.lhs_contracting_dimensions());
     SmallVector<bool> isLhsParallel(lhsShapeType.getRank(), true);
     for (auto i : lhsBatchingDims) {
       lhsTargetOrder.push_back(i);
@@ -559,9 +558,9 @@ class TransposeGenericDotGeneral
 
     SmallVector<bool> isRhsParallel(rhsShapeType.getRank(), true);
     auto rhsBatchingDims =
-        Extract1DVector(dimNumbers.rhs_batching_dimensions());
+        extract1DVector(dimNumbers.rhs_batching_dimensions());
     auto rhsContractingDims =
-        Extract1DVector(dimNumbers.rhs_contracting_dimensions());
+        extract1DVector(dimNumbers.rhs_contracting_dimensions());
     for (auto i : rhsBatchingDims) {
       rhsTargetOrder.push_back(i);
       isRhsParallel[i] = false;
