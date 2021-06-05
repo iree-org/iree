@@ -49,7 +49,9 @@ GITHUB_IREE_REPO_PREFIX = "https://github.com/google/iree"
 # TODO: Replace this with a bot account, probably iree-github-actions-bot.
 GITHUB_USER = "antiagainst"
 IREE_PROJECT_ID = 'IREE'
+# The ratio below which benchmarks will be considered as similar with base.
 SIMILAR_BECNHMARK_THRESHOLD = 0.05
+# The max number of rows to show per table.
 TABLE_SIZE_CUT = 3
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
@@ -222,7 +224,7 @@ def sort_benchmarks_and_get_table(benchmarks: Dict[str,
   # Turn the tuple about means into a string representation.
   str_means = []
   for pr, base, ratio in means:
-    direction = "↑" if pr > base else "↓"
+    direction = "↑" if pr > base else ("↓" if pr < base else "")
     str_means.append(f"{pr} (vs. {base}, {ratio:.2%}{direction})")
   str_means = tuple(str_means)
 
@@ -270,15 +272,7 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
   # If we want to abbreviate, similar results won't be interesting.
   if similar and size_cut is None:
     tables.append(md.header("Similar Benchmarks", 3))
-    similar_list = [(k, v.mean_time, v.median_time, v.stddev_time)
-                    for k, v in similar.items()]
-    names, means, medians, stddevs = zip(*similar_list)
-    tables.append(
-        add_header_and_get_markdown_table(names=names,
-                                          means=means,
-                                          medians=medians,
-                                          stddevs=stddevs,
-                                          size_cut=size_cut))
+    tables.append(sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Similar Benchmarks", 3))
     raw_list = [
