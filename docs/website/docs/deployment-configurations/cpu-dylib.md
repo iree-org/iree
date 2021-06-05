@@ -93,7 +93,6 @@ In the build directory, run the following command:
 
 ``` shell hl_lines="3"
 iree/tools/iree-translate \
-    -iree-input-type=mhlo \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=dylib-llvm-aot \
     iree_input.mlir -o mobilenet-dylib.vmfb
