@@ -30,7 +30,7 @@ typedef struct {
   void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;
 
-#define max_binding_count 64
+static const size_t max_binding_count = 64;
 
 extern const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable;
