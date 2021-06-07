@@ -23,6 +23,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -213,7 +214,7 @@ struct ConvertHLOToLinalgOnTensorsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
                     mhlo::MhloDialect, ShapeDialect, math::MathDialect,
-                    memref::MemRefDialect>();
+                    memref::MemRefDialect, complex::ComplexDialect>();
   }
 
   void runOnOperation() override {
