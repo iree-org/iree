@@ -36,7 +36,7 @@ iree_status_t counter_get_value(iree_runtime_session_t* session,
   iree_hal_buffer_view_release(buffer_view);
 
   iree_runtime_call_deinitialize(&call);
-  return iree_ok_status();
+  return status;
 }
 
 iree_status_t counter_set_value(iree_runtime_session_t* session,
@@ -117,6 +117,8 @@ iree_status_t counter_reset_value(iree_runtime_session_t* session) {
 
 iree_status_t run_sample(iree_string_view_t bytecode_module_path,
                          iree_string_view_t driver_name) {
+  iree_status_t status = iree_ok_status();
+
   //===-------------------------------------------------------------------===//
   // Instance configuration (this should be shared across sessions).
   fprintf(stdout, "Configuring IREE runtime instance and '%s' device\n",
@@ -126,12 +128,16 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
                                            &instance_options);
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
-  IREE_RETURN_IF_ERROR(iree_runtime_instance_create(
-      &instance_options, iree_allocator_system(), &instance));
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_instance_create(&instance_options,
+                                          iree_allocator_system(), &instance);
+  }
   // TODO(#5724): move device selection into the compiled modules.
   iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_runtime_instance_try_create_default_device(
-      instance, driver_name, &device));
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_instance_try_create_default_device(
+        instance, driver_name, &device);
+  }
   //===-------------------------------------------------------------------===//
 
   //===-------------------------------------------------------------------===//
@@ -140,15 +146,19 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   iree_runtime_session_options_t session_options;
   iree_runtime_session_options_initialize(&session_options);
   iree_runtime_session_t* session = NULL;
-  IREE_RETURN_IF_ERROR(iree_runtime_session_create_with_device(
-      instance, &session_options, device,
-      iree_runtime_instance_host_allocator(instance), &session));
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_session_create_with_device(
+        instance, &session_options, device,
+        iree_runtime_instance_host_allocator(instance), &session);
+  }
   iree_hal_device_release(device);
 
   fprintf(stdout, "Loading bytecode module at '%s'\n",
           bytecode_module_path.data);
-  IREE_RETURN_IF_ERROR(iree_runtime_session_append_bytecode_module_from_file(
-      session, bytecode_module_path.data));
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_session_append_bytecode_module_from_file(
+        session, bytecode_module_path.data);
+  }
   //===-------------------------------------------------------------------===//
 
   //===-------------------------------------------------------------------===//
@@ -157,27 +167,45 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
 
   // 1. get_value() // initial value
   int value;
-  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  if (iree_status_is_ok(status)) {
+    status = counter_get_value(session, &value);
+  }
   fprintf(stdout, "Initial get_value()    : %d\n", value);
 
   // 2. set_value(101)
-  IREE_RETURN_IF_ERROR(counter_set_value(session, 101));
-  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  if (iree_status_is_ok(status)) {
+    status = counter_set_value(session, 101);
+  }
+  if (iree_status_is_ok(status)) {
+    status = counter_get_value(session, &value);
+  }
   fprintf(stdout, "After set_value(101)   : %d\n", value);
 
   // 3. add_to_value(20)
-  IREE_RETURN_IF_ERROR(counter_add_to_value(session, 20));
-  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  if (iree_status_is_ok(status)) {
+    status = counter_add_to_value(session, 20);
+  }
+  if (iree_status_is_ok(status)) {
+    status = counter_get_value(session, &value);
+  }
   fprintf(stdout, "After add_to_value(20) : %d\n", value);
 
   // 4. add_to_value(-50)
-  IREE_RETURN_IF_ERROR(counter_add_to_value(session, -50));
-  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  if (iree_status_is_ok(status)) {
+    status = counter_add_to_value(session, -50);
+  }
+  if (iree_status_is_ok(status)) {
+    status = counter_get_value(session, &value);
+  }
   fprintf(stdout, "After add_to_value(-50): %d\n", value);
 
   // 5. reset_value()
-  IREE_RETURN_IF_ERROR(counter_reset_value(session));
-  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  if (iree_status_is_ok(status)) {
+    status = counter_reset_value(session);
+  }
+  if (iree_status_is_ok(status)) {
+    status = counter_get_value(session, &value);
+  }
   fprintf(stdout, "After reset_value()    : %d\n", value);
   //===-------------------------------------------------------------------===//
 
@@ -187,7 +215,7 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   iree_runtime_instance_release(instance);
   //===-------------------------------------------------------------------===//
 
-  return iree_ok_status();
+  return status;
 }
 
 int main(int argc, char** argv) {
