@@ -20,6 +20,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToStandard"],
+    "@llvm-project//mlir:ComplexDialect": ["MLIRComplex"],
     "@llvm-project//mlir:DialectUtils": [""],
     "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
