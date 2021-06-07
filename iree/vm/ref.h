@@ -170,8 +170,12 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_wrap_retain(void* ptr,
 // Checks that the given reference-counted pointer |ref| is of |type|.
 static inline iree_status_t iree_vm_ref_check(const iree_vm_ref_t ref,
                                               iree_vm_ref_type_t type) {
-  return ref.type == type ? iree_ok_status()
-                          : iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  return IREE_LIKELY(ref.type == type)
+             ? iree_ok_status()
+             : iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                ref.type == IREE_VM_REF_TYPE_NULL
+                                    ? "ref is null"
+                                    : "ref type mismatch");
 }
 
 // Retains the reference-counted pointer |ref|.
