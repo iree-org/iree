@@ -32,11 +32,11 @@ from common.benchmark_description import (AndroidDeviceInfo, BenchmarkInfo,
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 # Relative path against root benchmark suite directory.
 TENSORFLOW_MODEL_SUITE_REL_PATH = "TensorFlow"
+# Relative path against TensorFlow directory.
+VMFB_REL_PATH = "vmfb"
 
 # The flagfile's filename for compiled Python models.
 MODEL_FLAGFILE_NAME = "flagfile"
-# The artifact's filename for compiled Python models.
-MODEL_VMFB_NAME = "compiled.vmfb"
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMP_DIR = "/data/local/tmp/iree-benchmarks"
@@ -209,13 +209,16 @@ def run_python_model_benchmark_suite(device_info,
   Returns:
   - A list containing (BenchmarkInfo, context, results) tuples.
   """
-  # Push the benchmark tool to the Android device first.
+  model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
+                                TENSORFLOW_MODEL_SUITE_REL_PATH)
+
+  # Push the benchmark vmfb and tool files to the Android device first.
+  adb_push_to_tmp_dir(os.path.join(model_root_dir, VMFB_REL_PATH),
+                      relative_dir="",
+                      verbose=verbose)
   android_tool_path = adb_push_to_tmp_dir(benchmark_tool,
                                           relative_dir="tools",
                                           verbose=verbose)
-
-  model_root_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH,
-                                TENSORFLOW_MODEL_SUITE_REL_PATH)
 
   results = []
 
@@ -225,19 +228,15 @@ def run_python_model_benchmark_suite(device_info,
                                                    model_benchmark_dir)
     print(f"--> benchmark: {benchmark_info} <--")
     android_relative_dir = os.path.relpath(model_benchmark_dir, model_root_dir)
-    adb_push_to_tmp_dir(os.path.join(model_benchmark_dir, MODEL_VMFB_NAME),
+    adb_push_to_tmp_dir(os.path.join(model_benchmark_dir, MODEL_FLAGFILE_NAME),
                         android_relative_dir,
                         verbose=verbose)
-    android_flagfile_path = adb_push_to_tmp_dir(os.path.join(
-        model_benchmark_dir, MODEL_FLAGFILE_NAME),
-                                                android_relative_dir,
-                                                verbose=verbose)
 
     cmd = [
         "taskset",
         benchmark_info.deduce_taskset(),
         android_tool_path,
-        f"--flagfile={android_flagfile_path}",
+        f"--flagfile={MODEL_FLAGFILE_NAME}",
         f"--benchmark_repetitions={BENCHMARK_REPETITIONS}",
         "--benchmark_format=json",
     ]
@@ -316,6 +315,10 @@ def main(args):
   if device_info.gpu_name.lower() not in GPU_NAME_TO_TARGET_ARCH_MAP:
     raise ValueError(f"Unrecognized GPU name: '{device_info.gpu_name}'; "
                      "need to update the map")
+
+  # Clear the benchmark directory on the Android device first just in case
+  # there are leftovers from manual or failed runs.
+  adb_execute_in_dir(["rm", "-rf", "*"], relative_dir="", verbose=args.verbose)
 
   benchmarks = filter_python_model_benchmark_suite(device_info, args.build_dir,
                                                    args.verbose)

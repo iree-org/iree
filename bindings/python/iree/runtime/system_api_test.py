@@ -27,6 +27,7 @@ def create_simple_mul_module():
         }
       }
       """,
+      input_type="mhlo",
       target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)

@@ -24,7 +24,6 @@ iree_lit_test_suite(
             "dynamic_shape.mlir",
             "missing_legalizations.mlir",
             "fft.mlir",
-            "pad_tensor_to_tensor.mlir",
         ],
         include = ["*.mlir"],
     ),

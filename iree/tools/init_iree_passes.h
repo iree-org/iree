@@ -20,7 +20,6 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Modules/VMVX/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -40,7 +39,6 @@ inline void registerAllIreePasses() {
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
   IREE::registerTransformPasses();
-  Shape::registerShapeConversionPasses();
   Shape::registerShapePasses();
   IREE::VM::registerVMPasses();
   IREE::VM::registerVMAnalysisTestPasses();

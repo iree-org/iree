@@ -89,7 +89,6 @@ cc_library(
         "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
         "//iree/compiler/Dialect/Modules/VMVX/Transforms",
-        "//iree/compiler/Dialect/Shape/Conversion",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/VM/Analysis",
@@ -150,6 +149,7 @@ cc_library(
         ":init_xla_dialects",
         "//iree/compiler/Conversion",
         "//iree/compiler/Conversion:init_conversions",
+        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Dialect/HAL/Conversion:Passes",
     ],
 )

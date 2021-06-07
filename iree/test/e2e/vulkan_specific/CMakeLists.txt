@@ -26,6 +26,8 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -39,6 +41,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
+    "-iree-input-type=mhlo"
     "-iree-spirv-use-workgroup-memory"
 )
 
@@ -52,6 +55,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
+    "-iree-input-type=mhlo"
     "-iree-vulkan-target-triple=valhall-unknown-android11"
 )
 

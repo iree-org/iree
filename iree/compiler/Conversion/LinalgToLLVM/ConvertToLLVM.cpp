@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/LinalgToLLVM/LLVMCodeGenOptions.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -594,8 +593,10 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
 class ConvertToLLVMPass
     : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
  public:
-  ConvertToLLVMPass(LLVMCodegenOptions options) : options_(options) {}
-
+  ConvertToLLVMPass(bool unfuseFMA = false) { unfuseFMAOps = unfuseFMA; }
+  ConvertToLLVMPass(const ConvertToLLVMPass &pass) {
+    unfuseFMAOps = pass.unfuseFMAOps;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect>();
   }
@@ -603,7 +604,10 @@ class ConvertToLLVMPass
   void runOnOperation() override;
 
  private:
-  LLVMCodegenOptions options_;
+  Option<bool> unfuseFMAOps{
+      *this, "unfuse-fma-ops",
+      llvm::cl::desc("Enable rewriting llvm.fma to its unfused version."),
+      llvm::cl::init(false)};
 };
 
 }  // namespace
@@ -710,7 +714,7 @@ void ConvertToLLVMPass::runOnOperation() {
   // Post conversion patterns.
   {
     OwningRewritePatternList postPatterns(&getContext());
-    if (options_.unfuseFMAOps) {
+    if (unfuseFMAOps) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
       (void)applyPatternsAndFoldGreedily(module, std::move(postPatterns));
     }
@@ -718,18 +722,15 @@ void ConvertToLLVMPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
-    LLVMCodegenOptions options) {
-  return std::make_unique<ConvertToLLVMPass>(options);
+    bool unfuseFMAOps) {
+  return std::make_unique<ConvertToLLVMPass>(unfuseFMAOps);
 }
 
 static PassRegistration<ConvertToLLVMPass> pass(
     "iree-codegen-convert-to-llvm",
     "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to "
     "LLVMIR dialect",
-    [] {
-      return std::make_unique<ConvertToLLVMPass>(
-          getLLVMCodegenOptionsFromClOptions());
-    });
+    [] { return std::make_unique<ConvertToLLVMPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

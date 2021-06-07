@@ -20,6 +20,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "dot.mlir",
     ],
+    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.

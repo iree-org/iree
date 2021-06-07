@@ -19,7 +19,6 @@ iree_lit_test_suite(
     "dynamic_shape.mlir"
     "fft.mlir"
     "missing_legalizations.mlir"
-    "pad_tensor_to_tensor.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

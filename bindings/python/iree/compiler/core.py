@@ -30,6 +30,31 @@ DEFAULT_TESTING_BACKENDS = ["dylib-llvm-aot"]
 DEFAULT_TESTING_DRIVER = "dylib"
 
 
+class InputType(Enum):
+  """The type of input pipeline to run prior to the core compiler."""
+  NONE = "none"
+  MHLO = "mhlo"
+  TOSA = "tosa"
+
+  @staticmethod
+  def parse(spec: Union[str, "InputType"]) -> "InputType":
+    """Parses or returns an InputType.
+
+    Args:
+      spec: An InputType instance or the case-insensitive name of one of the
+        enum values.
+    Returns:
+      An InputType instance.
+    """
+    if isinstance(spec, InputType):
+      return spec
+    spec = spec.upper().replace("-", "_")
+    if spec not in InputType.__members__:
+      raise ValueError(f"For input_type= argument, expected one of: "
+                       f"{', '.join(InputType.__members__.keys())}")
+    return InputType[spec]
+
+
 class OutputFormat(Enum):
   """The output format of the compiler."""
   FLATBUFFER_BINARY = "flatbuffer-binary"
@@ -65,6 +90,8 @@ class CompilerOptions:
     target_backends: List of str names of target backends to compile into
       the binary. The resulting binary will run on targets that match one
       or more of the compiled backends.
+    input_type: The type of input legalization to perform prior to full
+      compilation. Defaults to none.
     output_format: Override the output format. See the OutputFormat enum.
       Values can either be an enum value or a case-insensitive name of
       the option. Typically used for debugging
@@ -95,6 +122,7 @@ class CompilerOptions:
                *,
                output_file: Optional[str] = None,
                target_backends: Sequence[str] = (),
+               input_type: Union[InputType, str] = InputType.NONE,
                output_format: Union[OutputFormat,
                                     str] = OutputFormat.FLATBUFFER_BINARY,
                extra_args: Sequence[str] = (),
@@ -110,6 +138,7 @@ class CompilerOptions:
                enable_benchmark: bool = False):
     self.output_file = output_file
     self.target_backends = target_backends
+    self.input_type = InputType.parse(input_type)
     self.output_format = OutputFormat.parse(output_format)
     self.extra_args = extra_args
     self.optimize = optimize
@@ -141,6 +170,7 @@ def build_compile_command_line(input_file: str,
   cl = [
       iree_translate,
       input_file,
+      f"--iree-input-type={options.input_type.value}",
       f"--iree-vm-bytecode-module-output-format={options.output_format.value}",
   ]
   for target_backend in options.target_backends:

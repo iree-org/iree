@@ -32,9 +32,12 @@ class LowerExecutableTargetPass
                     LLVM::LLVMDialect>();
   }
 
-  LowerExecutableTargetPass(LLVMCodegenOptions options) : options(options) {}
-  LowerExecutableTargetPass(const LowerExecutableTargetPass &pass)
-      : options(pass.options) {}
+  LowerExecutableTargetPass(bool vectorize = true)
+      : lowerToVectors(vectorize) {}
+  LowerExecutableTargetPass(const LowerExecutableTargetPass &pass) {
+    invokeLoweringPipelines = pass.invokeLoweringPipelines;
+    lowerToVectors = pass.lowerToVectors;
+  }
 
   void runOnOperation() override;
 
@@ -47,7 +50,12 @@ class LowerExecutableTargetPass
           "can be set to false for testing purposes."),
       llvm::cl::init(true)};
 
-  LLVMCodegenOptions options;
+  /// TODO(ravishankarm): Option to not generate any `vector.` instructions. The
+  /// VMVX backend uses the same lowering as the CPU pass but there is no
+  /// lowering of these `vector.` operations to scalar code. So as a WAR do the
+  /// same tiling scheme but avoid generating vector instructions. When VMVX can
+  /// handle vector instructions, drop this options.
+  bool lowerToVectors;
 };
 }  // namespace
 
@@ -64,19 +72,19 @@ void LowerExecutableTargetPass::runOnOperation() {
   OpPassManager executableLoweringPipeline(
       IREE::HAL::ExecutableTargetOp::getOperationName());
   executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
+  OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
 
   if (invokeLoweringPipelines) {
     IREE::HAL::DispatchLoweringPassPipeline passPipeline =
         setPipeline.getValue();
     switch (passPipeline) {
       case IREE::HAL::DispatchLoweringPassPipeline::CPUDefault:
-        addCPUDefaultPassPipeline(executableLoweringPipeline, options);
+        addCPUDefaultPassPipeline(nestedModulePM);
         break;
       case IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization:
-        addCPUVectorizationPassPipeline(executableLoweringPipeline, options);
+        addCPUVectorizationPassPipeline(nestedModulePM, lowerToVectors);
         break;
     }
-    addLowerToLLVMPasses(executableLoweringPipeline, options);
   }
 
   if (failed(runPipeline(executableLoweringPipeline, targetOp))) {
@@ -85,18 +93,15 @@ void LowerExecutableTargetPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createLowerExecutableTargetPass(LLVMCodegenOptions options) {
-  return std::make_unique<LowerExecutableTargetPass>(options);
+createLowerExecutableTargetPass(bool lowerToVectors) {
+  return std::make_unique<LowerExecutableTargetPass>(lowerToVectors);
 }
 
 static PassRegistration<LowerExecutableTargetPass> pass(
     "iree-lower-executable-target-pass",
-    "Perform lowering of executable target to export dialects. Currently "
-    "lowers to LLVM dialect",
-    [] {
-      return std::make_unique<LowerExecutableTargetPass>(
-          getLLVMCodegenOptionsFromClOptions());
-    });
+    "Perform lowering of executable target using one of the "
+    "IREE::HAL::DispatchLoweringPassPipeline",
+    [] { return std::make_unique<LowerExecutableTargetPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -22,6 +22,7 @@ def create_add_scalar_module():
         return %0 : i32
       }
       """,
+      input_type="mhlo",
       target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
@@ -37,6 +38,7 @@ def create_simple_static_mul_module():
           return %0 : tensor<4xf32>
       }
       """,
+      input_type="mhlo",
       target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
@@ -54,6 +56,7 @@ def create_simple_dynamic_abs_module():
           return %0 : tensor<?x?xf32>
       }
       """,
+      input_type="mhlo",
       target_backends=target_backends,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)

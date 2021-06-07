@@ -29,7 +29,7 @@ class CompilerTest(unittest.TestCase):
     text = iree.compiler.xla.compile_file(path,
                                           import_only=True).decode("utf-8")
     logging.info("%s", text)
-    self.assertIn("mhlo.constant", text)
+    self.assertIn("linalg.generic", text)
     self.assertIn("iree.module.export", text)
 
   def testCompileBinaryPbFile(self):
@@ -53,7 +53,7 @@ class CompilerTest(unittest.TestCase):
       finally:
         os.remove(f.name)
     logging.info("%s", text)
-    self.assertIn("mhlo.constant", text)
+    self.assertIn("linalg.generic", text)
 
   def testCompileBinaryPbFileOutputFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.pb")
@@ -79,7 +79,7 @@ class CompilerTest(unittest.TestCase):
     text = iree.compiler.xla.compile_str(content,
                                          import_only=True).decode("utf-8")
     logging.info("%s", text)
-    self.assertIn("mhlo.constant", text)
+    self.assertIn("linalg.generic", text)
 
   def testCompileBinaryPbBytes(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.pb")
@@ -95,7 +95,7 @@ class CompilerTest(unittest.TestCase):
     text = iree.compiler.xla.compile_file(
         path, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
-    self.assertIn("mhlo.constant", text)
+    self.assertIn("linalg.generic", text)
     self.assertIn("iree.module.export", text)
 
   def testImportHloTextStr(self):
@@ -105,7 +105,7 @@ class CompilerTest(unittest.TestCase):
     text = iree.compiler.xla.compile_str(
         content, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
-    self.assertIn("mhlo.constant", text)
+    self.assertIn("linalg.generic", text)
     self.assertIn("iree.module.export", text)
 
   def testImportHloTextBytes(self):
@@ -115,7 +115,7 @@ class CompilerTest(unittest.TestCase):
     text = iree.compiler.xla.compile_str(
         content, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
-    self.assertIn("mhlo.constant", text)
+    self.assertIn("linalg.generic", text)
     self.assertIn("iree.module.export", text)
 
 

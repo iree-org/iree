@@ -19,6 +19,7 @@ iree_lit_test_suite(
         [
             "conv1x1_to_matmul.mlir",
             "conv2d_to_img2col.mlir",
+            "pad_tensor_to_tensor.mlir",
         ],
         include = ["*.mlir"],
     ),

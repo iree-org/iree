@@ -112,6 +112,7 @@ iree_bytecode_module(
     src = "simple_embedding_test.mlir",
     c_identifier = "iree_samples_simple_embedding_test_module",
     flags = [
+        "-iree-input-type=mhlo",
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",
         "-iree-hal-target-backends=vulkan-spirv",

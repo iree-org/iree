@@ -68,7 +68,8 @@ void populateStandardToVMVXPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns,
                                     TypeConverter &typeConverter) {
   // We type/shape erase memrefs as we lower so there is no need for reshapes.
-  patterns.insert<FoldAsNoOp<linalg::ReshapeOp>>(typeConverter, context);
+  patterns.insert<FoldAsNoOp<linalg::CollapseShapeOp>>(typeConverter, context);
+  patterns.insert<FoldAsNoOp<linalg::ExpandShapeOp>>(typeConverter, context);
 
   patterns.insert<RemoveIdentityConversionCast>(typeConverter, context);
 }

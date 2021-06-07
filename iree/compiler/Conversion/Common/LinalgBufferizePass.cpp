@@ -85,9 +85,14 @@ static bool isFromReadOnlyTensor(Value v) {
   if (!definingOp) return false;
   return TypeSwitch<Operation *, bool>(definingOp)
       .Case<ConstantOp>([&](ConstantOp constantOp) { return true; })
-      .Case<linalg::TensorReshapeOp>([&](linalg::TensorReshapeOp reshapeOp) {
-        return isFromReadOnlyTensor(reshapeOp.src());
-      })
+      .Case<linalg::TensorExpandShapeOp>(
+          [&](linalg::TensorExpandShapeOp reshapeOp) {
+            return isFromReadOnlyTensor(reshapeOp.src());
+          })
+      .Case<linalg::TensorCollapseShapeOp>(
+          [&](linalg::TensorCollapseShapeOp reshapeOp) {
+            return isFromReadOnlyTensor(reshapeOp.src());
+          })
       .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
         return isFromReadOnlyTensor(subTensorOp.source());
       })
@@ -108,7 +113,10 @@ static bool canUsersHandleSubviews(Operation *op) {
   // TODO(ravishankarm): Maybe this is too aggressive, might have to switch this
   // to have a white-list instead of blacklist.
   for (Operation *user : op->getUsers()) {
-    if (isa<IREE::Flow::DispatchTensorStoreOp, linalg::TensorReshapeOp>(user))
+    if (isa<IREE::Flow::DispatchTensorStoreOp, linalg::TensorCollapseShapeOp>(
+            user) ||
+        isa<IREE::Flow::DispatchTensorStoreOp, linalg::TensorExpandShapeOp>(
+            user))
       return false;
   }
   return true;
@@ -249,7 +257,8 @@ static bool canSetStoreValueAndTargetAsEquivalent(
         storeOp.getMixedStrides().empty())) {
     SmallVector<Value> mappedTensors = plan.getTensorsMappedToSameSet(value);
     for (auto v : mappedTensors) {
-      if (v.getDefiningOp<linalg::TensorReshapeOp>()) return false;
+      if (v.getDefiningOp<linalg::TensorCollapseShapeOp>()) return false;
+      if (v.getDefiningOp<linalg::TensorExpandShapeOp>()) return false;
     }
   }
 
@@ -373,11 +382,26 @@ static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
   return success();
 }
 
+/// Returns true if there is a a single use that is a subtensor_insert.
+static bool hasSingleSubTensorInsertNotDimUse(Value value) {
+  int numUsers = 0;
+  int numSubTensorInsertUsers = 0;
+  for (auto user : value.getUsers()) {
+    if (isa<SubTensorInsertOp>(user)) {
+      numSubTensorInsertUsers++;
+    } else if (!isa<memref::DimOp>(user)) {
+      numUsers++;
+    }
+  }
+  return numUsers == 1 && numSubTensorInsertUsers <= 1;
+}
+
 /// For operations that have a single operand and result, adds both to the same
 /// equivalence class.
 static LogicalResult analyseSingleOperandResultOp(Value source, Value result,
                                                   BufferizationPlan &plan) {
-  if (source.hasOneUse() || isFromReadOnlyTensor(source)) {
+  if (hasSingleSubTensorInsertNotDimUse(source) ||
+      isFromReadOnlyTensor(source)) {
     plan.unionSets(source, result);
     return success();
   }
@@ -405,10 +429,8 @@ static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
                                                 BufferizationPlan &plan) {
   if (dest.hasOneUse() && !isFromReadOnlyTensor(dest)) {
     plan.unionSets(dest, result);
-  }
-  if (source && plan.isEquivalent(source, dest)) {
-    return op->emitError(
-        "unexpected source and dest being mapped to same buffer");
+  } else if (source && plan.isEquivalent(source, dest)) {
+    return success();
   }
   plan.insert(dest);
   plan.insert(result);
@@ -469,8 +491,13 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return analyseLinalgOps(linalgOp, plan);
         })
-        .Case<linalg::TensorReshapeOp>(
-            [&](linalg::TensorReshapeOp tensorReshapeOp) {
+        .Case<linalg::TensorCollapseShapeOp>(
+            [&](linalg::TensorCollapseShapeOp tensorReshapeOp) {
+              return analyseSingleOperandResultOp(
+                  tensorReshapeOp.src(), tensorReshapeOp.result(), plan);
+            })
+        .Case<linalg::TensorExpandShapeOp>(
+            [&](linalg::TensorExpandShapeOp tensorReshapeOp) {
               return analyseSingleOperandResultOp(
                   tensorReshapeOp.src(), tensorReshapeOp.result(), plan);
             })
@@ -668,16 +695,31 @@ static Value getSubviewOpForTensorStoreOp(
   return subview;
 }
 
-/// Gets the reverse of a `linalg.tensor_reshape` op to get a memref type that
-/// can be used for in-place computation of the result of a disaptch region.
-static Value getReverseOfReshapeOp(OpBuilder &b,
-                                   linalg::TensorReshapeOp reshapeOp,
-                                   Value resultBuffer) {
+/// Gets the reverse of a `linalg.tensor_expand_shape` op to get a memref type
+/// that can be used for in-place computation of the result of a dispatch
+/// region.
+static Value getReverseOfExpandShapeOp(OpBuilder &b,
+                                       linalg::TensorExpandShapeOp expandOp,
+                                       Value resultBuffer) {
   auto memrefType = getMemrefTypeForTensor(
-      reshapeOp.getSrcType(), {},
+      expandOp.getSrcType(), {},
       resultBuffer.getType().cast<MemRefType>().getMemorySpaceAsInt());
-  return b.create<linalg::ReshapeOp>(reshapeOp.getLoc(), memrefType,
-                                     resultBuffer, reshapeOp.reassociation());
+  return b.create<linalg::CollapseShapeOp>(
+      expandOp.getLoc(), memrefType, resultBuffer, expandOp.reassociation());
+}
+
+/// Gets the reverse of a `linalg.tensor_collapse_shape` op to get a memref type
+/// that can be used for in-place computation of the result of a dispatch
+/// region.
+static Value getReverseOfCollapseShapeOp(
+    OpBuilder &b, linalg::TensorCollapseShapeOp collapseOp,
+    Value resultBuffer) {
+  auto memrefType = getMemrefTypeForTensor(
+      collapseOp.getSrcType(), {},
+      resultBuffer.getType().cast<MemRefType>().getMemorySpaceAsInt());
+  return b.create<linalg::ExpandShapeOp>(collapseOp.getLoc(), memrefType,
+                                         resultBuffer,
+                                         collapseOp.reassociation());
 }
 
 /// Gets the reverse of a `tensor.cast` op to get a memref type that
@@ -747,11 +789,17 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     Operation *op = value.getDefiningOp();
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
-            .Case<linalg::LinalgOp, SubTensorInsertOp, vector::TransferWriteOp>(
+            .Case<scf::ForOp, linalg::LinalgOp, SubTensorInsertOp,
+                  vector::TransferWriteOp>(
                 [&](auto op) { return resultBuffer; })
-            .Case<linalg::TensorReshapeOp>(
-                [&](linalg::TensorReshapeOp reshapeOp) {
-                  return getReverseOfReshapeOp(b, reshapeOp, resultBuffer);
+            .Case<linalg::TensorExpandShapeOp>(
+                [&](linalg::TensorExpandShapeOp expandOp) {
+                  return getReverseOfExpandShapeOp(b, expandOp, resultBuffer);
+                })
+            .Case<linalg::TensorCollapseShapeOp>(
+                [&](linalg::TensorCollapseShapeOp collapseOp) {
+                  return getReverseOfCollapseShapeOp(b, collapseOp,
+                                                     resultBuffer);
                 })
             .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
               return getReverseOfCastOp(b, castOp, resultBuffer);
@@ -793,10 +841,10 @@ static Value getAliasingBufferForResult(OpBuilder &b,
                          loadOp.getMixedSizes(), loadOp.getMixedStrides());
 }
 
-/// Converts a `linalg.tensor_reshape` operation to a `linalg.reshape`
+/// Converts a `linalg.tensor_expand_shape` operation to a `linalg.expand_shape`
 /// operation with the result aliasing the buffer for the operand.
 static Value getAliasingBufferForResult(OpBuilder &b,
-                                        linalg::TensorReshapeOp op,
+                                        linalg::TensorExpandShapeOp op,
                                         BlockAndValueMapping &bvm) {
   Location loc = op.getLoc();
   Value srcTensor = op.src();
@@ -807,7 +855,27 @@ static Value getAliasingBufferForResult(OpBuilder &b,
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
   auto reshapeResultType = getMemrefTypeForTensor(
       resultTensorType, {}, inputBufferType.getMemorySpaceAsInt());
-  Value bufferReshape = b.create<linalg::ReshapeOp>(
+  Value bufferReshape = b.create<linalg::ExpandShapeOp>(
+      loc, reshapeResultType, inputBuffer, op.reassociation());
+  return bufferReshape;
+}
+
+/// Converts a `linalg.tensor_collapse_shape` operation to a
+/// `linalg.collapse_shape` operation with the result aliasing the buffer for
+/// the operand.
+static Value getAliasingBufferForResult(OpBuilder &b,
+                                        linalg::TensorCollapseShapeOp op,
+                                        BlockAndValueMapping &bvm) {
+  Location loc = op.getLoc();
+  Value srcTensor = op.src();
+  RankedTensorType resultTensorType = op.getResultType();
+  Value inputBuffer = bvm.lookup(srcTensor);
+
+  // Create the reshape op.
+  MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
+  auto reshapeResultType = getMemrefTypeForTensor(
+      resultTensorType, {}, inputBufferType.getMemorySpaceAsInt());
+  Value bufferReshape = b.create<linalg::CollapseShapeOp>(
       loc, reshapeResultType, inputBuffer, op.reassociation());
   return bufferReshape;
 }
@@ -852,7 +920,12 @@ static SmallVector<Value> getScfForAliasingBuffers(scf::ForOp scfFor,
 static SmallVector<Value, 4> getAliasingBuffersForResults(
     OpBuilder &b, Operation *op, BlockAndValueMapping &bvm) {
   return TypeSwitch<Operation *, SmallVector<Value, 4>>(op)
-      .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorReshapeOp,
+      .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorCollapseShapeOp,
+            SubTensorOp, tensor::CastOp>(
+          [&](auto singleResultOp) -> SmallVector<Value, 4> {
+            return {getAliasingBufferForResult(b, singleResultOp, bvm)};
+          })
+      .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorExpandShapeOp,
             SubTensorOp, tensor::CastOp>(
           [&](auto singleResultOp) -> SmallVector<Value, 4> {
             return {getAliasingBufferForResult(b, singleResultOp, bvm)};
@@ -995,14 +1068,6 @@ static LogicalResult convertConstantOp(OpBuilder &b, ConstantOp constantOp,
   return success();
 }
 
-static LogicalResult convertDimOp(OpBuilder &b, memref::DimOp dimOp,
-                                  BlockAndValueMapping &bvm) {
-  if (Value v = bvm.lookupOrNull(dimOp.memrefOrTensor())) {
-    dimOp.memrefOrTensorMutable().assign(v);
-  }
-  return success();
-}
-
 static LogicalResult convertDispatchTieShapeOp(
     OpBuilder &b, IREE::Flow::DispatchTieShapeOp shapeOp,
     BlockAndValueMapping &bvm) {
@@ -1016,13 +1081,15 @@ static LogicalResult convertDispatchTieShapeOp(
 
 /// Converts a `tensor.extract` operation into a `load`.
 static LogicalResult convertTensorExtractOp(OpBuilder &b, tensor::ExtractOp op,
-                                            BlockAndValueMapping &bvm) {
+                                            const BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Value inputBuffer = bvm.lookup(op.tensor());
   Value load =
       b.createOrFold<memref::LoadOp>(op.getLoc(), inputBuffer, op.indices());
-  bvm.map(op.result(), load);
+  // Since the value is the scalar, and `bvm` is used to only track tensor ->
+  // memref mappings, just replace the uses directly.
+  op.result().replaceAllUsesWith(load);
   return success();
 }
 
@@ -1033,7 +1100,6 @@ static LogicalResult convertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp,
     BlockAndValueMapping &bvm, BufferizationPlan &plan) {
   if (plan.isEquivalent(storeOp.target(), storeOp.value())) {
-    storeOp->erase();
     return success();
   }
   OpBuilder::InsertionGuard g(b);
@@ -1045,7 +1111,6 @@ static LogicalResult convertInterfaceStoreTensorOp(
                       storeOp.getMixedSizes(), storeOp.getMixedStrides());
 
   b.create<linalg::CopyOp>(storeOp->getLoc(), storeFrom, subview);
-  storeOp->erase();
   return success();
 }
 
@@ -1086,17 +1151,6 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
   Value subViewOp = createSubviewOp(b, loc, resultBuffer, offsets, sizes,
                                     strides, subViewResultType);
   b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
-  return success();
-}
-
-/// Converts a vector.transfer_read op to use memref operands for source.
-static LogicalResult convertVectorTransferReadOp(
-    OpBuilder &b, vector::TransferReadOp transferReadOp,
-    BlockAndValueMapping &bvm) {
-  Value source = transferReadOp.source();
-  if (!source.getType().isa<RankedTensorType>()) return success();
-  Value memref = bvm.lookup(source);
-  transferReadOp.sourceMutable().assign(memref);
   return success();
 }
 
@@ -1265,13 +1319,13 @@ void LinalgBufferizePass::runOnFunction() {
     bvm.map(op, baseBuffer);
   });
 
-  auto conversionDispatch = [&](Operation *op) -> WalkResult {
+  // Visit all the operations that return `tensor`s and convert them to using
+  // `memref`s.
+  auto convertTensorProducingOps = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<ConstantOp>([&](ConstantOp constantOp) {
           return convertConstantOp(b, constantOp, bvm);
         })
-        .Case<memref::DimOp>(
-            [&](memref::DimOp dimOp) { return convertDimOp(b, dimOp, bvm); })
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return convertInterfaceStoreTensorOp(b, storeOp, bvm, plan);
@@ -1306,7 +1360,21 @@ void LinalgBufferizePass::runOnFunction() {
           }
           return convertScfForOp(b, forOp, bvm, plan);
         })
-        .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorReshapeOp,
+        .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorCollapseShapeOp,
+              SubTensorOp, tensor::CastOp>([&](auto aliasingOp) {
+          auto aliasingBuffers =
+              getAliasingBuffersForResults(b, aliasingOp, bvm);
+          if (failed(getOrAllocateResultBuffers(
+                  b, aliasingOp, aliasingOp->getOperand(0), aliasingBuffers,
+                  bvm, plan, allocationFn))) {
+            return failure();
+          }
+          copyFromAliasingBufferToResultBuffer(
+              b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
+              aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
+          return success();
+        })
+        .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorExpandShapeOp,
               SubTensorOp, tensor::CastOp>([&](auto aliasingOp) {
           auto aliasingBuffers =
               getAliasingBuffersForResults(b, aliasingOp, bvm);
@@ -1346,13 +1414,6 @@ void LinalgBufferizePass::runOnFunction() {
           }
           return convertSubTensorInsertOp(b, subTensorInsertOp, bvm, plan);
         })
-        .Case<tensor::ExtractOp>([&](tensor::ExtractOp extractOp) {
-          return convertTensorExtractOp(b, extractOp, bvm);
-        })
-        .Case<vector::TransferReadOp>(
-            [&](vector::TransferReadOp transferReadOp) {
-              return convertVectorTransferReadOp(b, transferReadOp, bvm);
-            })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
               if (failed(getOrAllocateResultBuffers(b, transferWriteOp,
@@ -1363,21 +1424,51 @@ void LinalgBufferizePass::runOnFunction() {
               return convertVectorTransferWriteOp(b, transferWriteOp, bvm,
                                                   plan);
             })
-        .Default([&](Operation *op) {
-          // Replace any scalar remapped operands to the new values.
-          // TODO(GH-5013): This is really hacky solution, but gets us past for
-          // the time being. This all should be replaced by a pattern.
+        .Default([&](Operation *op) { return success(); });
+  };
+  auto walkResult =
+      funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) -> WalkResult {
+        b.setInsertionPoint(op);
+        return convertTensorProducingOps(op);
+      });
+  if (walkResult.wasInterrupted()) {
+    return signalPassFailure();
+  }
+
+  // Lastly visit the non-tensor return operations that still use `tensor`
+  // values. These need to be updated to use the corresponding `memref` values,
+  // but dont need to update the block-and-value mapping.
+  auto convertNonTensorProducingOps = [&](Operation *op) -> LogicalResult {
+    return TypeSwitch<Operation *, LogicalResult>(op)
+        .Case<tensor::ExtractOp>([&](tensor::ExtractOp op) {
+          return convertTensorExtractOp(b, op, bvm);
+        })
+        .Case<memref::DimOp, vector::TransferReadOp>([&](auto op) {
           for (unsigned i : llvm::seq<unsigned>(0, op->getNumOperands())) {
             Value operand = op->getOperand(i);
-            if (operand.getType().isIntOrIndexOrFloat()) {
+            if (operand.getType().isa<RankedTensorType>()) {
               Value remappedVal = bvm.lookupOrNull(operand);
               if (remappedVal) op->setOperand(i, remappedVal);
             }
           }
           return success();
-        });
+        })
+        .Case<IREE::Flow::DispatchTensorStoreOp>([&](auto op) {
+          op.erase();
+          return success();
+        })
+        .Default([&](Operation *op) { return success(); });
   };
 
+  walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
+    b.setInsertionPoint(op);
+    return convertNonTensorProducingOps(op);
+  });
+  if (walkResult.wasInterrupted()) {
+    return signalPassFailure();
+  }
+
+  // Clean-up scf.for by removing cyclic loop dependainces.
   // Forward init arguments from outer scf.for loop to the inner loops.
   funcOp.walk<WalkOrder::PreOrder>([&](scf::ForOp scfForOp) {
     if (scfForOp.results().empty()) return;
@@ -1393,16 +1484,6 @@ void LinalgBufferizePass::runOnFunction() {
       regionArgs[i].replaceAllUsesWith(initArgs[i]);
     }
   });
-
-  auto walkResult =
-      funcOp.walk<WalkOrder::PostOrder>([&](Operation *op) -> WalkResult {
-        b.setInsertionPoint(op);
-        return conversionDispatch(op);
-      });
-
-  if (walkResult.wasInterrupted()) {
-    return signalPassFailure();
-  }
 }
 
 static Value defaultAllocationFn(OpBuilder &builder, Location loc,
