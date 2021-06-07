@@ -46,8 +46,7 @@ from common.benchmark_description import BenchmarkResults, get_output
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
 GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/google/iree"
 GITHUB_IREE_REPO_PREFIX = "https://github.com/google/iree"
-# TODO: Replace this with a bot account, probably iree-github-actions-bot.
-GITHUB_USER = "antiagainst"
+GITHUB_USER = "iree-github-actions-bot"
 IREE_PROJECT_ID = 'IREE'
 # The ratio below which benchmarks will be considered as similar with base.
 SIMILAR_BECNHMARK_THRESHOLD = 0.05
