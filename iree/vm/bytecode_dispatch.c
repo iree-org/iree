@@ -1230,12 +1230,16 @@ iree_status_t iree_vm_bytecode_dispatch(
         // Select LHS.
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
             true_value_is_move, true_value, type_def->ref_type, result));
-        if (false_value_is_move) iree_vm_ref_release(false_value);
+        if (false_value_is_move && false_value != result) {
+          iree_vm_ref_release(false_value);
+        }
       } else {
         // Select RHS.
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
             false_value_is_move, false_value, type_def->ref_type, result));
-        if (true_value_is_move) iree_vm_ref_release(true_value);
+        if (true_value_is_move && true_value != result) {
+          iree_vm_ref_release(true_value);
+        }
       }
     });
 
