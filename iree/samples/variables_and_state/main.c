@@ -9,9 +9,8 @@
 #include "iree/runtime/api.h"
 
 iree_status_t counter_get_value(iree_runtime_session_t* session,
-                                iree_hal_buffer_view_t** out_value) {
+                                int* out_value) {
   iree_runtime_call_t call;
-  // Exported function names match what we used in Python.
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
       session, iree_make_cstring_view("module.get_value"), &call));
 
@@ -19,27 +18,24 @@ iree_status_t counter_get_value(iree_runtime_session_t* session,
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
   }
+  iree_hal_buffer_view_t* buffer_view = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_runtime_call_outputs_pop_front_buffer_view(&call, out_value);
+    status =
+        iree_runtime_call_outputs_pop_front_buffer_view(&call, &buffer_view);
   }
+  iree_hal_buffer_mapping_t buffer_mapping;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_map_range(iree_hal_buffer_view_buffer(buffer_view),
+                                       IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                       IREE_WHOLE_BUFFER, &buffer_mapping);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_value = *buffer_mapping.contents.data;
+  }
+  iree_hal_buffer_unmap_range(&buffer_mapping);
+  iree_hal_buffer_view_release(buffer_view);
 
   iree_runtime_call_deinitialize(&call);
-  return iree_ok_status();
-}
-
-iree_status_t counter_print_current_value(iree_runtime_session_t* session) {
-  iree_hal_buffer_view_t* ret = NULL;
-
-  iree_status_t status = iree_ok_status();
-  if (iree_status_is_ok(status)) {
-    status = counter_get_value(session, &ret);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_fprint(stdout, ret,
-                                         /*max_element_count=*/64);
-  }
-
-  iree_hal_buffer_view_release(ret);
   return iree_ok_status();
 }
 
@@ -160,31 +156,33 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   fprintf(stdout, "Calling functions\n\n");
 
   // 1. get_value() // initial value
-  fprintf(stdout, "Initial get_value():\n");
-  IREE_RETURN_IF_ERROR(counter_print_current_value(session));
+  int value;
+  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  fprintf(stdout, "Initial get_value()    : %d\n", value);
 
   // 2. set_value(101)
   IREE_RETURN_IF_ERROR(counter_set_value(session, 101));
-  fprintf(stdout, "\nAfter set_value(101):\n");
-  IREE_RETURN_IF_ERROR(counter_print_current_value(session));
+  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  fprintf(stdout, "After set_value(101)   : %d\n", value);
 
   // 3. add_to_value(20)
   IREE_RETURN_IF_ERROR(counter_add_to_value(session, 20));
-  fprintf(stdout, "\nAfter add_to_value(20):\n");
-  IREE_RETURN_IF_ERROR(counter_print_current_value(session));
+  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  fprintf(stdout, "After add_to_value(20) : %d\n", value);
 
   // 4. add_to_value(-50)
   IREE_RETURN_IF_ERROR(counter_add_to_value(session, -50));
-  fprintf(stdout, "\nAfter add_to_value(-50):\n");
-  IREE_RETURN_IF_ERROR(counter_print_current_value(session));
+  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  fprintf(stdout, "After add_to_value(-50): %d\n", value);
 
   // 5. reset_value()
   IREE_RETURN_IF_ERROR(counter_reset_value(session));
-  fprintf(stdout, "\nAfter reset_value():\n");
-  IREE_RETURN_IF_ERROR(counter_print_current_value(session));
+  IREE_RETURN_IF_ERROR(counter_get_value(session, &value));
+  fprintf(stdout, "After reset_value()    : %d\n", value);
   //===-------------------------------------------------------------------===//
 
   //===-------------------------------------------------------------------===//
+  // Cleanup.
   iree_runtime_session_release(session);
   iree_runtime_instance_release(instance);
   //===-------------------------------------------------------------------===//
