@@ -941,15 +941,16 @@ static Value getAliasingBufferForResult(OpBuilder &b, SubTensorOp op,
 }
 
 /// Returns output buffers that aliases inputs.
-static SmallVector<Value> getScfForAliasingBuffers(scf::ForOp scfFor,
-                                                   BlockAndValueMapping &bvm) {
-  SmallVector<Value> alisedBuffers;
+static SmallVector<Value> getAliasingBuffersForResult(
+    scf::ForOp scfFor, BlockAndValueMapping &bvm) {
+  SmallVector<Value> aliasedBuffers(scfFor.results().size(), nullptr);
   for (int i = 0; i < scfFor.results().size(); ++i) {
     Value inputTensor = scfFor.initArgs()[i];
+    if (!inputTensor.getType().isa<RankedTensorType>()) continue;
     Value inputBuffer = bvm.lookup(inputTensor);
-    alisedBuffers.push_back(inputBuffer);
+    aliasedBuffers[i] = inputBuffer;
   }
-  return alisedBuffers;
+  return aliasedBuffers;
 }
 
 /// Returns a `memref` for every result that aliases the buffer for one of its
@@ -966,7 +967,7 @@ static SmallVector<Value, 4> getAliasingBuffersForResults(
             return {getAliasingBufferForReshapeResult(b, reshapeOp, bvm)};
           })
       .Case<scf::ForOp>([&](auto scfFor) -> SmallVector<Value> {
-        return getScfForAliasingBuffers(scfFor, bvm);
+        return getAliasingBuffersForResult(scfFor, bvm);
       })
       .Default([&](Operation *op) -> SmallVector<Value, 4> {
         return SmallVector<Value, 4>(op->getNumResults(), nullptr);
@@ -995,7 +996,10 @@ static LogicalResult getOrAllocateResultBuffers(
   assert(tiedOperands.size() == op->getNumResults());
   assert(aliasingBuffers.size() == op->getNumResults());
   for (auto result : llvm::enumerate(op->getResults())) {
-    if (bvm.contains(result.value())) continue;
+    if (!result.value().getType().isa<RankedTensorType>() ||
+        bvm.contains(result.value())) {
+      continue;
+    }
     Value buffer;
     if (tiedOperands[result.index()] && aliasingBuffers[result.index()] &&
         plan.isEquivalent(tiedOperands[result.index()], result.value())) {
