@@ -11,7 +11,6 @@
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Conversion/Passes.h"
-#include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -122,6 +121,8 @@ void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(mlir::createInlinerPass());
 
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(Flow::createPromoteI1ToI8Pass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 }

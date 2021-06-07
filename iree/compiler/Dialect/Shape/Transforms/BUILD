@@ -14,21 +14,13 @@ cc_library(
     name = "Transforms",
     srcs = [
         "CleanupPlaceholdersPass.cpp",
-        "ConvertHLOToShapeDialectPass.cpp",
-        "ConvertShapeToStandard.cpp",
         "FunctionSignatureExpansionPass.cpp",
-        "HoistShapeCalculationsPass.cpp",
-        "MaterializeShapeCalculations.cpp",
-        "MaterializeShapeCalculationsPass.cpp",
-        "TieDynamicShapesPass.cpp",
     ],
     hdrs = [
         "Passes.h",
-        "Patterns.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Shape/Plugins/XLA:XlaHloShapeBuilder",
         "//iree/compiler/Dialect/Shape/Utils:TypeConversion",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
@@ -40,6 +32,5 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
-        "@mlir-hlo//:hlo",
     ],
 )

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors='direct-hlo-client-lowering' -verify-diagnostics %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors -verify-diagnostics %s
 
 // Left and right shift operators are missing HLO->Linalg lowerings.
 func @shift_leftWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {

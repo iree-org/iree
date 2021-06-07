@@ -14,12 +14,6 @@ def ConvertHLOToLinalgOnTensors :
     Pass<"iree-codegen-hlo-to-linalg-on-tensors", "FuncOp"> {
   let summary = "Convert from XLA-HLO ops to Linalg ops on tensors";
   let constructor = "mlir::iree_compiler::createHLOToLinalgOnTensorsPass()";
-
-  let options = [
-    Option<"directHloClientLowering", "direct-hlo-client-lowering",
-        "bool", /*default=*/"true",
-        "Lower directly from the HLO client dialect.">,
-  ];
 }
 
 def DemoteF32ToF16 :

@@ -27,38 +27,15 @@ std::unique_ptr<OperationPass<FuncOp>> createExpandFunctionDynamicDimsPass();
 std::unique_ptr<OperationPass<FuncOp>>
 createExpandFunctionRankedShapeDimsPass();
 
-// For any dynamically shaped edges in a function, introduces an appropriate
-// get_ranked_shape and corresponding tie_shape op to make the association.
-//
-// Any op contained in a region transitively owned by an op with a name in
-// `doNotRecurseOpNames` is not tied.
-std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass(
-    ArrayRef<std::string> doNotRecurseOpNames = {});
-
-// Materializes shape calculations for any get_ranked_shape ops.
-std::unique_ptr<OperationPass<FuncOp>> createMaterializeShapeCalculationsPass();
-
 // Cleans up any unnecessary shape placeholder ops. Can be run after all
 // shape calculation code has been lowered.
 std::unique_ptr<OperationPass<FuncOp>> createCleanupShapePlaceholdersPass();
-
-// Converts shape-sensitive HLOs to be based on facilities in the shape
-// dialect.
-std::unique_ptr<OperationPass<FuncOp>> createConvertHLOToShapePass();
-
-// Best-effort hoisting of shape calculations to attempt to establish the
-// invariant that shapex.tie_shape second operand dominates the first operand.
-std::unique_ptr<OperationPass<FuncOp>> createHoistShapeCalculationsPass();
 
 // Register all Passes
 inline void registerShapePasses() {
   createExpandFunctionDynamicDimsPass();
   createExpandFunctionRankedShapeDimsPass();
-  createTieDynamicShapesPass();
-  createMaterializeShapeCalculationsPass();
   createCleanupShapePlaceholdersPass();
-  createConvertHLOToShapePass();
-  createHoistShapeCalculationsPass();
 }
 
 }  // namespace Shape
