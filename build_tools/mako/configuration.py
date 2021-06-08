@@ -127,17 +127,16 @@ def get_pixel4_default_target_list(skipped_target=None,
                  runtime_flags=[
                      "--task_topology_group_count=3",
                  ]),
-      TargetInfo(
-          driver="vulkan",
-          hal_target_backend="vulkan-spirv",
-          taskset="80",
-          mako_tag="vlk",
-          compilation_flags=[
-              "--iree-vulkan-target-triple=adreno-a640-android11",
-              "--iree-flow-inline-constants-max-byte-length=2048",
-              "--iree-flow-dispatch-formation-enable-operand-fusion",
-              "--iree-enable-fusion-with-reduction-ops",
-          ])
+      TargetInfo(driver="vulkan",
+                 hal_target_backend="vulkan-spirv",
+                 taskset="80",
+                 mako_tag="vlk",
+                 compilation_flags=[
+                     "--iree-vulkan-target-triple=adreno-a640-android11",
+                     "--iree-flow-inline-constants-max-byte-length=2048",
+                     "--iree-flow-dispatch-formation-enable-operand-fusion",
+                     "--iree-enable-fusion-with-reduction-ops",
+                 ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
   for target in targets:
