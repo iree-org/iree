@@ -102,13 +102,15 @@ static std::tuple<SmallVector<ShapedType>, SmallVector<ShapedType>>
 getInputOutputTypes(linalg::LinalgOp op) {
   SmallVector<ShapedType> inputTypes(op.getNumInputs()),
       outputTypes(op.getNumOutputs());
-  for (auto operand : enumerate(op.getInputOpOperands())) {
+  auto inputOperands = op.getInputOperands();
+  for (auto operand : enumerate(inputOperands)) {
     inputTypes[operand.index()] =
-        getUntiledType(operand.value().get()).dyn_cast<ShapedType>();
+        getUntiledType(operand.value()->get()).dyn_cast<ShapedType>();
   }
-  for (auto operand : enumerate(op.getOutputOpOperands())) {
+  auto outputOperands = op.getOutputOperands();
+  for (auto operand : enumerate(outputOperands)) {
     outputTypes[operand.index()] =
-        getUntiledType(operand.value().get()).dyn_cast<ShapedType>();
+        getUntiledType(operand.value()->get()).dyn_cast<ShapedType>();
   }
   return std::make_tuple(std::move(inputTypes), std::move(outputTypes));
 }
@@ -380,7 +382,8 @@ LogicalResult getGenericOpLaunchConfig(linalg::LinalgOp linalgOp,
   config.workgroupSize[0] = subgroupSize;
   config.workgroupSize[1] = 1;
   config.workgroupSize[2] = 1;
-  ShapedType outputShape = linalgOp.getOutputShapedType(0);
+  ShapedType outputShape =
+      linalgOp.getOutputOperand(0)->get().getType().cast<ShapedType>();
 
   SmallVector<int64_t, 4> candidateTileSizes;
   // When Vectororization is not enabled we skil the second level of tiling and

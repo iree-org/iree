@@ -13,6 +13,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassRegistry.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -29,26 +30,38 @@ class LowerExecutableTargetPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect, linalg::LinalgDialect,
-                    LLVM::LLVMDialect>();
+                    LLVM::LLVMDialect, vector::VectorDialect>();
   }
 
   LowerExecutableTargetPass(bool vectorize = true)
       : lowerToVectors(vectorize) {}
-  LowerExecutableTargetPass(const LowerExecutableTargetPass &pass) {
-    invokeLoweringPipelines = pass.invokeLoweringPipelines;
-    lowerToVectors = pass.lowerToVectors;
-  }
+  LowerExecutableTargetPass(const LowerExecutableTargetPass &pass) {}
 
   void runOnOperation() override;
 
  private:
-  Option<bool> invokeLoweringPipelines{
-      *this, "invoke-lowering-pipelines",
+  Option<bool> testLoweringConfiguration{
+      *this, "test-lowering-configuration",
       llvm::cl::desc(
-          "Invokes the pass pipeline to lower an hal.executable.target "
-          "operation into scalar/native-vector code. Defaults to true, but "
-          "can be set to false for testing purposes."),
-      llvm::cl::init(true)};
+          "Flag used for lit-testing the default configuration set for root "
+          "ops in hal.executable.targets. Defaults to false and is set to true "
+          "for lit tests. Not for general usage"),
+      llvm::cl::init(false)};
+
+  Option<std::string> useLoweringPipeline{
+      *this, "use-lowering-pipeline",
+      llvm::cl::desc("List of passes to be applied for lowering the "
+                     "hal.executable.target. Note that this is used for all "
+                     "hal.executable.targets, so might be useful when there is "
+                     "only one such operation. The specified pass pipeline is "
+                     "expected to work on the std.module op within the "
+                     "hal.executable.target operation")};
+
+  ListOption<int> workgroupSizes{
+      *this, "workgroup-size", llvm::cl::MiscFlags::CommaSeparated,
+      llvm::cl::desc(
+          "Specifies the workgroup size to use in x, y, z order. Is expected "
+          "for use only with use-lowering-pipeline option")};
 
   /// TODO(ravishankarm): Option to not generate any `vector.` instructions. The
   /// VMVX backend uses the same lowering as the CPU pass but there is no
@@ -59,31 +72,59 @@ class LowerExecutableTargetPass
 };
 }  // namespace
 
+/// The pipeline parser doesnt like strings that have `'` or `"` in them. But it
+/// is needed for demarcating the option value. So just drop them before sending
+/// it one.
+static StringRef sanitizePipelineString(StringRef input) {
+  if (input.empty()) return input;
+  // If first/last character is ' or ", drop them.
+  if (input.front() == '\'' || input.front() == '"') {
+    input = input.drop_front();
+  }
+  if (input.back() == '\'' || input.back() == '"') {
+    input = input.drop_back();
+  }
+  return input;
+}
+
 void LowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp moduleOp = targetOp.getInnerModule();
 
-  FailureOr<IREE::HAL::DispatchLoweringPassPipeline> setPipeline =
-      initCPULaunchConfig(moduleOp);
-  if (failed(setPipeline)) {
-    return signalPassFailure();
-  }
-
   OpPassManager executableLoweringPipeline(
       IREE::HAL::ExecutableTargetOp::getOperationName());
-  executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
-  OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
 
-  if (invokeLoweringPipelines) {
-    IREE::HAL::DispatchLoweringPassPipeline passPipeline =
-        setPipeline.getValue();
-    switch (passPipeline) {
-      case IREE::HAL::DispatchLoweringPassPipeline::CPUDefault:
-        addCPUDefaultPassPipeline(nestedModulePM);
-        break;
-      case IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization:
-        addCPUVectorizationPassPipeline(nestedModulePM, lowerToVectors);
-        break;
+  if (!useLoweringPipeline.empty()) {
+    // Use the pass pipeline specified in the command line.
+    SmallVector<int64_t, 4> dispatchWorkgroupSize;
+    dispatchWorkgroupSize.assign(workgroupSizes.begin(), workgroupSizes.end());
+    executableLoweringPipeline.addPass(
+        createSetNumWorkgroupsPass(dispatchWorkgroupSize));
+    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
+    if (failed(parsePassPipeline(sanitizePipelineString(useLoweringPipeline),
+                                 nestedModulePM))) {
+      return signalPassFailure();
+    }
+  } else {
+    // Use default heuristics.
+    FailureOr<IREE::HAL::TranslateExecutableInfo> translationInfo =
+        initCPULaunchConfig(moduleOp);
+    if (failed(translationInfo)) {
+      return signalPassFailure();
+    }
+    executableLoweringPipeline.addPass(
+        createSetNumWorkgroupsPass(translationInfo->workgroupSize));
+
+    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
+    if (!testLoweringConfiguration) {
+      switch (translationInfo->passPipeline) {
+        case IREE::HAL::DispatchLoweringPassPipeline::CPUDefault:
+          addCPUDefaultPassPipeline(nestedModulePM);
+          break;
+        case IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization:
+          addCPUVectorizationPassPipeline(nestedModulePM, lowerToVectors);
+          break;
+      }
     }
   }
 

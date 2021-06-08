@@ -228,16 +228,15 @@ def run_python_model_benchmark_suite(device_info,
                                                    model_benchmark_dir)
     print(f"--> benchmark: {benchmark_info} <--")
     android_relative_dir = os.path.relpath(model_benchmark_dir, model_root_dir)
-    android_flagfile_path = adb_push_to_tmp_dir(os.path.join(
-        model_benchmark_dir, MODEL_FLAGFILE_NAME),
-                                                android_relative_dir,
-                                                verbose=verbose)
+    adb_push_to_tmp_dir(os.path.join(model_benchmark_dir, MODEL_FLAGFILE_NAME),
+                        android_relative_dir,
+                        verbose=verbose)
 
     cmd = [
         "taskset",
         benchmark_info.deduce_taskset(),
         android_tool_path,
-        f"--flagfile={android_flagfile_path}",
+        f"--flagfile={MODEL_FLAGFILE_NAME}",
         f"--benchmark_repetitions={BENCHMARK_REPETITIONS}",
         "--benchmark_format=json",
     ]
@@ -316,6 +315,10 @@ def main(args):
   if device_info.gpu_name.lower() not in GPU_NAME_TO_TARGET_ARCH_MAP:
     raise ValueError(f"Unrecognized GPU name: '{device_info.gpu_name}'; "
                      "need to update the map")
+
+  # Clear the benchmark directory on the Android device first just in case
+  # there are leftovers from manual or failed runs.
+  adb_execute_in_dir(["rm", "-rf", "*"], relative_dir="", verbose=args.verbose)
 
   benchmarks = filter_python_model_benchmark_suite(device_info, args.build_dir,
                                                    args.verbose)

@@ -220,7 +220,8 @@ static void removeOneTripTiledLoops(MLIRContext *context, FuncOp funcOp,
   unsigned numTiledDims =
       std::min<size_t>(numParallelDims, kMaxWorkgroupDimCount);
 
-  ArrayRef<int64_t> outputShape = getUntiledShape(rootLinalgOp.getOutput(0));
+  ArrayRef<int64_t> outputShape =
+      getUntiledShape(rootLinalgOp.getOutputOperand(0)->get());
   if (outputShape.size() < numParallelDims) return;
 
   // TODO(ravishankarm, antiagainst): Its pure co-incidence that the
