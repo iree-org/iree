@@ -732,6 +732,9 @@ static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
   StringRef visibility;
   if (parser.parseOptionalKeyword(&visibility,
                                   {"public", "private", "nested"})) {
+    parser.emitError(
+        parser.getCurrentLocation(),
+        "expected valid visibility specifier (public, private or nested)");
     return failure();
   }
   StringAttr visibilityAttr = parser.getBuilder().getStringAttr(visibility);

@@ -25,7 +25,7 @@ iree_cc_test(
     ::arithmetic_ops
     ::arithmetic_ops_f32
     ::arithmetic_ops_i64
-    ::assignment_ops
+    # ::assignment_ops
     ::assignment_ops_i64
     ::comparison_ops
     ::comparison_ops_f32
@@ -68,14 +68,15 @@ iree_c_module(
     "arithmetic_ops_i64.h"
 )
 
-iree_c_module(
-  NAME
-    assignment_ops
-  SRC
-    "../assignment_ops.mlir"
-  H_FILE_OUTPUT
-    "assignment_ops.h"
-)
+# TODO(simon-camp): Reenable this test once the 'vm.select.ref' op is supported.
+# iree_c_module(
+#   NAME
+#     assignment_ops
+#   SRC
+#     "../assignment_ops.mlir"
+#   H_FILE_OUTPUT
+#     "assignment_ops.h"
+# )
 
 iree_c_module(
   NAME

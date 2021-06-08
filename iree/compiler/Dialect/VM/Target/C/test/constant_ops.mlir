@@ -7,15 +7,15 @@ vm.module @constant_ops {
   // CHECK-NEXT: iree_alignas(16) static const uint8_t constant_ops_buffer_2[] = {1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0};
 
   // Check the generated state struct
-  // CHECK-LABEL: struct constant_ops_state_s {
+  // CHECK-LABEL: struct constant_ops_state_t {
   // CHECK-NEXT: iree_allocator_t allocator;
   // CHECK-NEXT: uint8_t rwdata[0];
   // CHECK-NEXT: iree_vm_ref_t refs[0];
   // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[2];
   // CHECK-NEXT: };
 
-  vm.rodata @buffer_1 dense<[1, 2, 3]> : tensor<3xi8>
-  vm.rodata @buffer_2 dense<[1, 2, 3]> : tensor<3xi32>
+  vm.rodata private @buffer_1 dense<[1, 2, 3]> : tensor<3xi8>
+  vm.rodata private @buffer_2 dense<[1, 2, 3]> : tensor<3xi32>
 
   // check state initialization inside the alloc_state function
   // CHECK-LABEL: static iree_status_t constant_ops_alloc_state(

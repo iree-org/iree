@@ -1,6 +1,6 @@
 vm.module @ref_ops {
-    vm.rodata @buffer_i8 dense<[1, 2, 3]> : tensor<3xi8>
-    vm.rodata @buffer_i32 dense<[1, 2, 3]> : tensor<3xi32>
+    vm.rodata private @buffer_i8 dense<[1, 2, 3]> : tensor<3xi8>
+    vm.rodata private @buffer_i32 dense<[1, 2, 3]> : tensor<3xi32>
 
     vm.export @test_zero_ref_eq
     vm.func @test_zero_ref_eq() {

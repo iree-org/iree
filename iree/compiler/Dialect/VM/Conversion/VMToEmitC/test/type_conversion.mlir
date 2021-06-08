@@ -25,7 +25,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  vm.rodata @byte_buffer dense<[1, 2, 3]> : tensor<3xi32>
+  vm.rodata private @byte_buffer dense<[1, 2, 3]> : tensor<3xi32>
   // CHECK-LABEL: @ref
   vm.export @ref
   vm.func @ref(%arg0: i32) {
