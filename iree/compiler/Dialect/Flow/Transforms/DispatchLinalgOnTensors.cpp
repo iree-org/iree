@@ -1057,8 +1057,7 @@ static unsigned decideFusableLinalgOps(FuncOp funcOp) {
         if (!consumer ||
             consumer.getNumLoops() != consumer.getNumParallelLoops())
           continue;
-        AffineMap consumerIndexingMap =
-            consumer.getTiedIndexingMap(&use);
+        AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
         AffineMap producerIndexingMap =
             linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0));
         if (!consumerIndexingMap.isIdentity() ||

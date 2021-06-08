@@ -369,10 +369,9 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
 static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
                                       BufferizationPlan &plan) {
   if (!linalgOp.hasTensorSemantics()) return success();
-  auto results = linalgOp->getResults(); 
+  auto results = linalgOp->getResults();
   auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp);
-  for (auto it :
-       llvm::enumerate(llvm::zip(results, tiedOperands))) {
+  for (auto it : llvm::enumerate(llvm::zip(results, tiedOperands))) {
     Value resultTensor = std::get<0>(it.value());
     Value tiedOperand = std::get<1>(it.value());
     if (tiedOperand) {
@@ -1073,7 +1072,7 @@ static LogicalResult convertAnyLinalgOp(
     Value resultTensor = std::get<0>(it);
     Value resultBuffer = bvm.lookup(resultTensor);
 
-    OpOperand* outOperand = std::get<1>(it);
+    OpOperand *outOperand = std::get<1>(it);
     Value outTensor = outOperand->get();
     Value outBuffer = bvm.lookupOrNull(outTensor);
     if (outBuffer && !plan.isEquivalent(outTensor, resultTensor) &&
