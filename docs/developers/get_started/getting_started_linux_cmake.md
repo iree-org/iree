@@ -104,7 +104,7 @@ and execute a function in the compiled module:
 
 ```shell
 $ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/iree-run-module.mlir \
-  -function-input="i32=-2" -iree-hal-target-backends=vmvx -print-mlir
+  -function-input="f32=-2" -iree-hal-target-backends=vmvx -print-mlir
 ```
 
 ### LLVM Ahead-of-Time (AOT) backend
@@ -121,7 +121,6 @@ Translate a source MLIR into an IREE module:
 ```shell
 # Assuming in IREE source root
 $ ../iree-build/iree/tools/iree-translate \
-    -iree-input-type=mhlo \
     -iree-mlir-to-vm-bytecode-module \
     -iree-llvm-target-triple=x86_64-linux-gnu \
     -iree-hal-target-backends=dylib-llvm-aot \
@@ -136,10 +135,10 @@ $ ../iree-build/iree/tools/iree-run-module \
     --driver=dylib \
     --module_file=/tmp/simple-llvm_aot.vmfb \
     --entry_function=abs \
-    --function_input=i32=-5
+    --function_input=f32=-5
 
 EXEC @abs
-i32=5
+f32=5
 ```
 
 

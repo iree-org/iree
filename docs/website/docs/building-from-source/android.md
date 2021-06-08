@@ -111,7 +111,6 @@ Invoke the host compiler tools produce input files:
 
 ``` shell
 ../iree-build/install/bin/iree-translate \
-  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   iree/tools/test/iree-run-module.mlir \
@@ -132,5 +131,5 @@ Run the tool:
 adb shell /data/local/tmp/iree-run-module -driver=vmvx \
   -module_file=/data/local/tmp/iree-run-module-vmvx.vmfb \
   -entry_function=abs \
-  -function_inputs="i32=-5"
+  -function_inputs="f32=-5"
 ```

@@ -141,7 +141,7 @@ $ ../iree-build/iree/tools/iree-run-module \
   --module_file=/tmp/simple.vmfb \
   --driver=vmvx \
   --entry_function=abs \
-  --function_input=i32=-2
+  --function_input=f32=-2
 ```
 
 ### iree-check-module
@@ -154,6 +154,7 @@ runner for the IREE
 
 ```shell
 $ ../iree-build/iree/tools/iree-translate \
+  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/test/e2e/xla_ops/abs.mlir \
@@ -181,6 +182,7 @@ For example, to execute the contents of
 ```shell
 $ ../iree-build/iree/tools/iree-run-mlir \
   $PWD/iree/tools/test/iree-run-mlir.mlir \
+  -iree-input-type=mhlo \
   -function-input="i32=-2" \
   -iree-hal-target-backends=vmvx
 ```

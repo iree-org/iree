@@ -144,7 +144,6 @@ Translate a source MLIR into IREE module:
 ```shell
 # Assuming in IREE source root
 $ ../iree-build-host/install/bin/iree-translate \
-  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/tools/test/iree-run-module.mlir \
@@ -169,10 +168,10 @@ android $ ./iree-run-module \
           --driver=vmvx \
           --module_file=simple-vmvx.vmfb \
           --entry_function=abs \
-          --function_input=i32=-5
+          --function_input=f32=-5
 
 EXEC @abs
-i32=5
+f32=5
 ```
 
 ### Vulkan HAL backend
@@ -184,7 +183,6 @@ Translate a source MLIR into IREE module:
 
 ```shell
 $ ../iree-build-host/install/bin/iree-translate \
-    -iree-input-type=mhlo \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
     $PWD/iree/tools/test/iree-run-module.mlir \
@@ -209,10 +207,10 @@ android $ ./iree-run-module \
           --driver=vulkan \
           --module_file=simple-vulkan.vmfb \
           --entry_function=abs \
-          --function_input=i32=-5
+          --function_input=f32=-5
 
 EXEC @abs
-i32=5
+f32=5
 ```
 
 #### Common issues
@@ -262,7 +260,6 @@ Translate a source MLIR into an IREE module:
 
 ```shell
 $ ../iree-build-host/install/bin/iree-translate \
-  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=aarch64-linux-android \
@@ -288,8 +285,8 @@ android $ ./iree-run-module \
           --driver=dylib \
           --module_file=simple-llvm_aot.vmfb \
           --entry_function=abs \
-          --function_input=i32=-5
+          --function_input=f32=-5
 
 EXEC @abs
-i32=5
+f32=5
 ```

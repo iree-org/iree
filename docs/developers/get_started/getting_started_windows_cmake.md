@@ -113,7 +113,6 @@ Translate a source MLIR file into an IREE module:
 
 ```powershell
 > ..\iree-build\iree\tools\iree-translate.exe \
-  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   iree/tools/test/iree-run-module.mlir \
@@ -126,7 +125,6 @@ cross-compiling:
 
 ```powershell
 > ..\iree-build\iree\tools\iree-translate.exe \
-  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=x86_64-pc-windows-msvc \
@@ -148,11 +146,11 @@ Check out the contents of the 'tools' build directory:
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-mlir.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-module.mlir)
 and execute a function in the compiled module:
 
 ```powershell
-> ..\iree-build\iree\tools\iree-run-mlir.exe .\iree\tools\test\iree-run-mlir.mlir -function-input="i32=-2" -iree-hal-target-backends=vmvx -print-mlir
+> ..\iree-build\iree\tools\iree-run-mlir.exe .\iree\tools\test\iree-run-module.mlir -function-input="f32=-2" -iree-hal-target-backends=vmvx -print-mlir
 ```
 
 ### Further Reading

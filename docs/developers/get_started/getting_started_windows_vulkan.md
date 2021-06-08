@@ -115,10 +115,10 @@ Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-translate.exe`:
 ```powershell
 # -- CMake --
 > cmake --build ..\iree-build\ --target iree_tools_iree-translate
-> ..\iree-build\iree\tools\iree-translate.exe -iree-input-type=mhlo -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\iree-run-module.mlir -o .\build\module.vmfb
+> ..\iree-build\iree\tools\iree-translate.exe -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\iree-run-module.mlir -o .\build\module.vmfb
 
 # -- Bazel --
-> bazel run iree/tools:iree-translate -- -iree-input-type=mhlo -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\iree-run-module.mlir -o .\build\module.vmfb
+> bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\iree-run-module.mlir -o .\build\module.vmfb
 ```
 
 > Tip:<br>
@@ -136,14 +136,14 @@ Pass the flag `-driver=vulkan` to `iree-run-module.exe`:
     --driver=vulkan \
     --module_file=.\build\module.vmfb \
     --entry_function=abs \
-    --function_input=i32=-2
+    --function_input=f32=-2
 
 # -- Bazel --
 > bazel run iree/tools:iree-run-module -- \
     --driver=vulkan \
     --module_file=.\build\module.vmfb \
     --entry_function=abs \
-    --function_input=i32=-2
+    --function_input=f32=-2
 ```
 
 ## Running IREE's Vulkan Samples

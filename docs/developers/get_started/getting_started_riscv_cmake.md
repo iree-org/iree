@@ -92,7 +92,6 @@ Translate a source MLIR into IREE module:
 
 ```shell
 $ ../iree-build-host/install/bin/iree-translate \
-  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/tools/test/iree-run-module.mlir \
@@ -109,7 +108,7 @@ $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   --driver=vmvx \
   --module_file=/tmp/iree-run-module-vmvx.vmfb \
   --entry_function=abs \
-  --function_input=i32=-5
+  --function_input=f32=-5
 ```
 
 Output:
@@ -117,8 +116,7 @@ Output:
 ```
 I ../iree/tools/utils/vm_util.cc:227] Creating driver and device for 'vmvx'...
 EXEC @abs
-I ../iree/tools/utils/vm_util.cc:172] result[0]: Buffer<sint32[]>
-i32=5
+f32=5
 ```
 
 ### Dylib LLVM AOT backend
@@ -134,7 +132,6 @@ Translate a source MLIR into an IREE module:
 
 ```shell
 $ ../iree-build-host/install/bin/iree-translate \
-  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=riscv64 \
@@ -154,7 +151,7 @@ $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   --driver=dylib \
   --module_file=/tmp/iree-run-module-llvm_aot.vmfb \
   --entry_function=abs \
-  --function_input=i32=-5
+  --function_input=f32=-5
 ```
 
 Output:
@@ -162,8 +159,7 @@ Output:
 ```
 I ../iree/tools/utils/vm_util.cc:227] Creating driver and device for 'dylib'...
 EXEC @abs
-I ../iree/tools/utils/vm_util.cc:172] result[0]: Buffer<sint32[]>
-i32=5
+f32=5
 ```
 
 #### Enable RVV code-gen [Experimental]
@@ -172,7 +168,6 @@ VLS(Vector Length Specific) style codes.
 
 ```shell
 ../iree-build-host/install/bin/iree-translate \
--iree-input-type=mhlo \
 -iree-mlir-to-vm-bytecode-module \
 -iree-hal-target-backends=dylib-llvm-aot \
 -iree-llvm-target-triple=riscv64 \
