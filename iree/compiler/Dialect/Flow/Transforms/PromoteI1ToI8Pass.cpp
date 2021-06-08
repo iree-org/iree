@@ -65,7 +65,6 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
         firstUser = checkOp;
       }
     }
-
     rewriter.setInsertionPoint(firstUser);
 
     auto initTensor = rewriter.create<linalg::InitTensorOp>(
