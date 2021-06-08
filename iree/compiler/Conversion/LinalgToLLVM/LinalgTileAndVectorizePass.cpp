@@ -27,19 +27,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// TODO(ataei): Use pass options instead of global llvm flags.
-static llvm::cl::opt<bool> clEnablePromoteWorkgroupToFullTiles(
-    "iree-codegen-llvm-promote-workgroup-to-full-tiles",
-    llvm::cl::desc("Enable promoting wokgroup memory to full tiles allocated "
-                   "on the stack."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnableVectorContractAarch64AsmTo(
-    "iree-codegen-llvm-vector-contract-to-aarch64-asm",
-    llvm::cl::desc("Enable promoting wokgroup memory to full tiles allocated "
-                   "on the stack."),
-    llvm::cl::init(false));
-
 namespace {
 // Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
 // that is always templated on an op.
@@ -86,6 +73,18 @@ struct TileAndVectorizeWorkgroups
   /// same tiling scheme but avoid generating vector instructions. When VMVX can
   /// handle vector instructions, drop this options.
   bool lowerToVectors;
+
+  Option<bool> enablePromoteWorkgroupToFullTiles{
+      *this, "promote-workgroup-to-full-tiles",
+      llvm::cl::desc("Enable promoting wokgroup memory to full tiles allocated "
+                     "on the stack."),
+      llvm::cl::init(false)};
+
+  Option<bool> enableVectorContractToAarch64Asm{
+      *this, "vector-contract-to-aarch64-asm",
+      llvm::cl::desc("Enable promoting wokgroup memory to full tiles allocated "
+                     "on the stack."),
+      llvm::cl::init(false)};
 };
 }  // namespace
 
@@ -148,7 +147,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
   // Promotes workgroups subviews to a full-tile allocated on the stack.
-  if (clEnablePromoteWorkgroupToFullTiles) {
+  if (enablePromoteWorkgroupToFullTiles) {
     OwningRewritePatternList promotionPatterns(&getContext());
     promotionPatterns.insert<PromoteMatmulSubviewsPattern>(
         context,
@@ -175,7 +174,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
                   static_cast<unsigned>(TilingLevel::Level1Tiles));
             }),
         linalg::LinalgTransformationFilter(
-            Identifier::get(clEnablePromoteWorkgroupToFullTiles
+            Identifier::get(enablePromoteWorkgroupToFullTiles
                                 ? getWorkgroupMemoryMarker()
                                 : getWorkgroupMarker(),
                             context),
@@ -248,7 +247,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
       op->replaceAllUsesWith(contract);
   });
 
-  if (clEnableVectorContractAarch64AsmTo) {
+  if (enableVectorContractToAarch64Asm) {
     OwningRewritePatternList vectorToAArch64AsmPatterns(context);
     populateVectorContractToAArch64InlineAsm(vectorToAArch64AsmPatterns,
                                              context);

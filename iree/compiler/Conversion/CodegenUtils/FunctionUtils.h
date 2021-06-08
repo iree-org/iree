@@ -17,6 +17,9 @@ namespace iree_compiler {
 /// Returns true if the given `func` is a kernel dispatch entry point.
 bool isEntryPoint(FuncOp func);
 
+/// Given a module returns the entrypoint function within the module.
+FailureOr<FuncOp> getSingleEntryPointFunction(ModuleOp module);
+
 /// Returns the number of outer parallel loops of a linalgOp.
 unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
 
