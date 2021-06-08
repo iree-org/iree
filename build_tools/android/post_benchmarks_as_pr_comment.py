@@ -376,7 +376,12 @@ def post_to_gist(filename: str, content: str, verbose: bool = False):
 def get_previous_comment_on_pr(pr_number: str,
                                verbose: bool = False) -> Optional[int]:
   """Gets the previous comment's ID from GitHub."""
-  headers = {"Accept": "application/vnd.github.v3+json"}
+  # Increasing per_page limit requires user authentication.
+  api_token = get_required_env_var('GITHUB_TOKEN')
+  headers = {
+      "Accept": "application/vnd.github.v3+json",
+      "Authorization": f"token {api_token}",
+  }
   payload = json.dumps({"per_page": 100})
 
   api_endpoint = f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments"
@@ -386,9 +391,12 @@ def get_previous_comment_on_pr(pr_number: str,
         f"Failed to get PR comments from GitHub; error code: {response.status_code}"
     )
 
+  response = response.json()
+  if verbose:
+    print(response)
+
   # Find the last comment from GITHUB_USER and has the ABBR_PR_COMMENT_TITILE
   # keyword.
-  response = response.json()
   for comment in reversed(response):
     if (comment["user"]["login"] == GITHUB_USER) and (ABBR_PR_COMMENT_TITLE
                                                       in comment["body"]):
