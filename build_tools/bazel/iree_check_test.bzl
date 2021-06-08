@@ -23,6 +23,7 @@ def iree_check_test(
         compiler_flags = [],
         runner_args = [],
         tags = [],
+        timeout = None,
         **kwargs):
     """Creates an iree-check-module test for the specified source file.
 
@@ -37,6 +38,7 @@ def iree_check_test(
           are passed automatically.
       tags: additional tags to apply to the generated test. A tag "driver=DRIVER" is added
           automatically.
+      timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying run_binary_test.
     """
     bytecode_module_name = name + "_bytecode_module"
@@ -60,6 +62,7 @@ def iree_check_test(
         data = [":%s" % bytecode_module_name],
         test_binary = "//iree/tools:iree-check-module",
         tags = tags + ["driver=%s" % driver],
+        timeout = timeout,
         **kwargs
     )
 
@@ -71,6 +74,7 @@ def iree_check_single_backend_test_suite(
         compiler_flags = [],
         runner_args = [],
         tags = [],
+        timeout = None,
         **kwargs):
     """Creates a test suite of iree-check-module tests for a single backend/driver pair.
 
@@ -88,6 +92,7 @@ def iree_check_single_backend_test_suite(
           create a separate suite or iree_check_test.
       tags: tags to apply to the generated tests. Note that as in standard test suites, manual
           is treated specially and will also apply to the test suite itself.
+      timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
     tests = []
@@ -101,6 +106,7 @@ def iree_check_single_backend_test_suite(
             compiler_flags = compiler_flags,
             runner_args = runner_args,
             tags = tags,
+            timeout = timeout,
             **kwargs
         )
         tests.append(test_name)
