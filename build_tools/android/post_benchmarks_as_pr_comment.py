@@ -385,7 +385,7 @@ def get_previous_comment_on_pr(pr_number: str,
   payload = json.dumps({"per_page": 100})
 
   api_endpoint = f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments"
-  response = requests.post(api_endpoint, data=payload, headers=headers)
+  response = requests.get(api_endpoint, data=payload, headers=headers)
   if response.status_code != 200:
     raise requests.RequestException(
         f"Failed to get PR comments from GitHub; error code: {response.status_code}"
