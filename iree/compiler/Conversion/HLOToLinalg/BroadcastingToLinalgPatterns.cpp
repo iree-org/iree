@@ -546,7 +546,8 @@ struct ConvertSelectOp : public OpConversionPattern<chlo::BroadcastSelectOp> {
     }
 
     // Short-circuit if all types are statically equal.
-    if (predType == onTrueType && predType == onFalseType) {
+    if (predType.getShape() == onTrueType.getShape() &&
+        onTrueType == onFalseType) {
       // No broadcasting. This includes the 0d -> 0d case.
       rewriter.replaceOpWithNewOp<mhlo::SelectOp>(op, resultType, pred, onTrue,
                                                   onFalse);

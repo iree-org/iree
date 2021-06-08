@@ -111,6 +111,16 @@ func @selectv2_pred_scalar(%arg0: tensor<i1>, %arg1: tensor<2xi32>, %arg2: tenso
 }
 
 // -----
+// CHECK: #map = affine_map<() -> ()>
+// CHECK-LABEL: func @selectv2_all_scalar
+func @selectv2_all_scalar(%arg0: tensor<i1>, %arg1: tensor<f32>, %arg2: tensor<f32>) -> tensor<f32> {
+  // CHECK: linalg.generic
+  // CHECK-SAME: indexing_maps = [#map, #map, #map, #map]
+  %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<i1>, tensor<f32>, tensor<f32>) -> tensor<f32>
+  return %0: tensor<f32>
+}
+
+// -----
 // Note that broadcast_add is used as a proxy for all of the template
 // expansions. Tests below merely verify that the op has an expansion.
 // CHECK-LABEL: @andWithoutBroadcast
