@@ -79,7 +79,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     passManager.addPass(createLowerExecutableTargetPass());
     // Set target specific options.
     // TODO(ataei): This is temporary here, should move when target specific
-    // TODO(kooljblack): Update LLVM target tripple for "static" support.
 
     // overrides options grows.
     llvm::Triple triple(options_.targetTriple);
@@ -276,7 +275,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     {
       // NOTE: today we just use a single object file, however if we wanted to
       // scale code generation and linking we'd want to generate one per
-      // function (or something like that).
+      // function (or something like that). A single object file is also
+      // instrumental to static library generation (which only supports one
+      // object file per library).
       std::string objectData;
       if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
                                       &objectData))) {
@@ -298,11 +299,11 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                        "for multiple object files.";
       }
 
-      // Copy the static object file to the specified output path.
-      // Generate a header at that output path.
+      // Copy the static object file to the specified output along with
+      // generated header file.
       const std::string &libraryPath = options_.staticLibraryOutput;
       const auto library_name = objectFiles[0].path;
-      if (!OutputStaticLibrary(libraryName, queryFunctionName, libraryPath,
+      if (!outputStaticLibrary(libraryName, queryFunctionName, libraryPath,
                                objectFiles[0].path)) {
         return targetOp.emitError() << "Static library generation failed.";
       }
@@ -344,7 +345,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           bufferAttr);
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
-
     } else if (!options_.staticLibraryOutput.empty()) {
       // Embed the library name in the executable binary op. This informs the
       // loader which static library to load for the target binary.

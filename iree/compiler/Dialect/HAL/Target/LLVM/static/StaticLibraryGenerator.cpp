@@ -20,6 +20,7 @@
 
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -28,80 +29,83 @@ namespace HAL {
 
 namespace {
 
-void GenerateIntroComment(std::ofstream& f) {
-  f << "// Auto-generated static library header file.\n\n";
+void generateIntroComment(llvm::raw_ostream &os,
+  const std::string &library_name,
+  const std::string &query_function_name) {
+  os << "// === [" << library_name <<  "] static library ===\n";
+  os << "//\n";
+  os << "// To use:\n";
+  os << "//  - Include this header and generated object into your program \n";
+  os << "//  - At runtime: retrieve library name from host binary \n";
+  os << "//  - Query library from " << query_function_name << "()<< \n";
+  os << "//  - Feed library into static_library_loader \n";
+  os << "//\n";
+  os << "// === Automatically generated file. DO NOT EDIT! === \n\n";
 }
 
-void GenerateIfDefOpen(std::ofstream& f, const std::string& library_name) {
+void generateIfDefOpen(llvm::raw_ostream &os, const std::string &library_name) {
+  llvm::StringRef ref(library_name);
+  os << "#ifndef IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << ref.upper()
+    << "_\n";
+  os << "#define IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << ref.upper()
+    << "_\n";
+}
+
+void generateIfDefClose(llvm::raw_ostream &os, const std::string &library_name) {
   std::string uppercase = library_name;
   std::transform(uppercase.begin(), uppercase.end(), uppercase.begin(),
                  ::toupper);
-  f << "#ifndef IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << uppercase
-    << "_\n";
-  f << "#define IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << uppercase
+  os << "#endif // IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << uppercase
     << "_\n";
 }
 
-void GenerateIfDefClose(std::ofstream& f, const std::string& library_name) {
-  std::string uppercase = library_name;
-  std::transform(uppercase.begin(), uppercase.end(), uppercase.begin(),
-                 ::toupper);
-  f << "#endif // IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << uppercase
-    << "_\n";
+void generateExecutableLibraryInclude(llvm::raw_ostream &os) {
+  os << "\n#include \"iree/hal/local/executable_library.h\"\n";
 }
 
-void GenerateExecutableLibraryInclude(std::ofstream& f) {
-  f << "#include \"iree/hal/local/executable_library.h\"\n";
+void generateExternCOpen(llvm::raw_ostream &os) {
+  os << "\n#if __cplusplus\n";
+  os << "extern \"C\" {\n";
+  os << "#endif // __cplusplus\n\n";
 }
 
-void GenerateExternCOpen(std::ofstream& f) {
-  f << "\n#if __cplusplus\n";
-  f << "extern \"C\" {\n";
-  f << "#endif // __cplusplus\n\n";
+void generateExternCClose(llvm::raw_ostream &os) {
+  os << "\n#if __cplusplus\n";
+  os << "}\n";
+  os << "#endif // __cplusplus\n\n";
 }
 
-void GenerateExternCClose(std::ofstream& f) {
-  f << "\n#if __cplusplus\n";
-  f << "}\n";
-  f << "#endif // __cplusplus\n\n";
-}
-
-void GenerateQueryFunction(std::ofstream& f,
-                           const std::string& query_function_name) {
-  f << "const iree_hal_executable_library_header_t**\n";
-  f << query_function_name << "(\n";
-  f << "iree_hal_executable_library_version_t max_version, void* reserved);\n";
+void generateQueryFunction(llvm::raw_ostream &os,
+                           const std::string &query_function_name) {
+  os << "const iree_hal_executable_library_header_t**\n";
+  os << query_function_name << "(\n";
+  os << "iree_hal_executable_library_version_t max_version, void* reserved);\n";
 }
 
 }  // namespace
 
-bool GenerateExecutableLibraryHeader(const std::string& library_name,
-                                     const std::string& query_function_name,
-                                     const std::string& header_file_path) {
-  std::ofstream f(header_file_path, std::ios::out | std::ios::trunc);
+bool generateExecutableLibraryHeader(const std::string &library_name,
+                                     const std::string &query_function_name,
+                                     const std::string &header_file_path) {
+  std::error_code ec;
+  llvm::raw_fd_ostream os(header_file_path, ec);
 
-  GenerateIntroComment(f);
+  generateIntroComment(os, library_name, query_function_name);
+  generateIfDefOpen(os, library_name);
+  generateExecutableLibraryInclude(os);
+  generateExternCOpen(os);
+  generateQueryFunction(os, query_function_name);
+  generateExternCClose(os);
+  generateIfDefClose(os, library_name);
 
-  GenerateIfDefOpen(f, library_name);
-
-  GenerateExecutableLibraryInclude(f);
-
-  GenerateExternCOpen(f);
-
-  GenerateQueryFunction(f, query_function_name);
-
-  GenerateExternCClose(f);
-
-  GenerateIfDefClose(f, library_name);
-
-  f.close();
-  return f.good();
+  os.close();
+  return !os.has_error();
 }
 
-bool OutputStaticLibrary(const std::string& library_name,
-                         const std::string& query_function_name,
-                         const std::string& library_output_path,
-                         const std::string& temp_object_path) {
+bool outputStaticLibrary(const std::string &library_name,
+                         const std::string &query_function_name,
+                         const std::string &library_output_path,
+                         const std::string &temp_object_path) {
   llvm::SmallString<32> object_file_path(library_output_path);
   llvm::sys::path::replace_extension(object_file_path, ".o");
   llvm::SmallString<32> header_file_path(library_output_path);
@@ -114,7 +118,7 @@ bool OutputStaticLibrary(const std::string& library_name,
   }
 
   // Generate the header file
-  return GenerateExecutableLibraryHeader(library_name, query_function_name,
+  return generateExecutableLibraryHeader(library_name, query_function_name,
                                          header_file_path.c_str());
 }
 

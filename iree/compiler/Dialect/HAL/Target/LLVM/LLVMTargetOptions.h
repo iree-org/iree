@@ -52,8 +52,11 @@ struct LLVMTargetOptions {
   // True to keep linker artifacts for debugging.
   bool keepLinkerArtifacts = false;
 
-  // Path to produce static library ".o" file along with header ".h". Unused if
-  // empty.
+  // Build for IREE static library loading. This denotes the path produce object
+  // ".o" and header ".h" files for the library. The host binary provides the
+  // target for the library query function.  When this variable is set, static
+  // library output is activated. This option is incompatible with
+  // LLVMTargetOptions::linkEmbedded".
   std::string staticLibraryOutput;
 };
 

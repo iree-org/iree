@@ -153,9 +153,9 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   static llvm::cl::opt<std::string> clStaticLibraryOutputPath(
       "iree-llvm-static-library-output-path",
       llvm::cl::desc(
-          "Path for static library output (EX: \"path/to/static-library\"). "
+          "Path to output static object (EX: '/path/to/static-library.o'). "
           "This will produce the static library at the specified path along "
-          "a similarly named \".h\" file for static linking."),
+          "with a similarly named '.h' file for static linking."),
       llvm::cl::init(llvmTargetOptions.staticLibraryOutput));
   llvmTargetOptions.staticLibraryOutput = clStaticLibraryOutputPath;
 
