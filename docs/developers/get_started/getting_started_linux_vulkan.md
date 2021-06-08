@@ -117,10 +117,10 @@ Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-translate`:
 ```shell
 # -- CMake --
 $ cmake --build ../iree-build/ --target iree_tools_iree-translate
-$ ../iree-build/iree/tools/iree-translate -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv ./iree/tools/test/iree-run-module.mlir -o /tmp/module.vmfb
+$ ../iree-build/iree/tools/iree-translate -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv ./iree/samples/models/simple_abs.mlir -o /tmp/module.vmfb
 
 # -- Bazel --
-$ bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv $PWD/iree/tools/test/iree-run-module.mlir -o /tmp/module.vmfb
+$ bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv $PWD/iree/samples/models/simple_abs.mlir -o /tmp/module.vmfb
 ```
 
 > Tip:<br>
@@ -138,14 +138,14 @@ $ ../iree-build/iree/tools/iree-run-module \
     --driver=vulkan \
     --module_file=/tmp/module.vmfb \
     --entry_function=abs \
-    --function_input=i32=-2
+    --function_input=f32=-2
 
 # -- Bazel --
 $ bazel run iree/tools:iree-run-module -- \
     --driver=vulkan \
     --module_file=/tmp/module.vmfb \
     --entry_function=abs \
-    --function_input=i32=-2
+    --function_input=f32=-2
 ```
 
 ## Running IREE's Vulkan Samples

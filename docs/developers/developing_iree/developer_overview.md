@@ -88,7 +88,7 @@ $ ../iree-build/iree/tools/iree-opt \
 ```
 
 For a more complex example, here's how to run IREE's complete transformation
-pipeline targeting the VMLA backend on the
+pipeline targeting the VMVX backend on the
 [fullyconnected.mlir](https://github.com/google/iree/blob/main/iree/test/e2e/models/fullyconnected.mlir)
 model file:
 
@@ -118,8 +118,8 @@ For example, to translate `simple.mlir` to an IREE module:
 $ ../iree-build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
-  $PWD/iree/tools/test/iree-run-module.mlir \
-  -o /tmp/simple.vmfb
+  $PWD/iree/samples/models/simple_abs.mlir \
+  -o /tmp/simple_abs_vmvx.vmfb
 ```
 
 Custom translations may also be layered on top of `iree-translate`, see
@@ -133,15 +133,15 @@ and executes an exported main function using the provided inputs.
 
 This program can be used in sequence with `iree-translate` to translate a
 `.mlir` file to an IREE module and then execute it. Here is an example command
-that executes the simple `simple.vmfb` compiled from `simple.mlir` above on
-IREE's VMLA driver:
+that executes the simple `simple_abs_vmvx.vmfb` compiled from `simple_abs.mlir`
+above on IREE's VMVX driver:
 
 ```shell
 $ ../iree-build/iree/tools/iree-run-module \
-  --module_file=/tmp/simple.vmfb \
+  --module_file=/tmp/simple_abs_vmvx.vmfb \
   --driver=vmvx \
   --entry_function=abs \
-  --function_input=i32=-2
+  --function_input=f32=-2
 ```
 
 ### iree-check-module
@@ -154,6 +154,7 @@ runner for the IREE
 
 ```shell
 $ ../iree-build/iree/tools/iree-translate \
+  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/test/e2e/xla_ops/abs.mlir \
@@ -176,12 +177,12 @@ does some additional work that usually must be explicit, like marking every
 function as exported by default and running all of them.
 
 For example, to execute the contents of
-[iree/tools/test/iree-run-mlir.mlir](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-mlir.mlir):
+[iree/samples/models/simple_abs.mlir](https://github.com/google/iree/blob/main/iree/samples/models/simple_abs.mlir):
 
 ```shell
 $ ../iree-build/iree/tools/iree-run-mlir \
-  $PWD/iree/tools/test/iree-run-mlir.mlir \
-  -function-input="i32=-2" \
+  $PWD/iree/samples/models/simple_abs.mlir \
+  -function-input="f32=-2" \
   -iree-hal-target-backends=vmvx
 ```
 
@@ -193,7 +194,7 @@ file.
 For example, to inspect the module translated above:
 
 ```shell
-$ ../iree-build/iree/tools/iree-dump-module /tmp/simple.vmfb
+$ ../iree-build/iree/tools/iree-dump-module /tmp/simple_abs_vmvx.vmfb
 ```
 
 ### Useful generic flags

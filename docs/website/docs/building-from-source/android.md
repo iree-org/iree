@@ -113,8 +113,8 @@ Invoke the host compiler tools produce input files:
 ../iree-build/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
-  iree/tools/test/iree-run-module.mlir \
-  -o /tmp/iree-run-module-vmvx.vmfb
+  iree/samples/models/simple_abs.mlir \
+  -o /tmp/simple_abs_vmvx.vmfb
 ```
 
 Push the Android runtime tools to the device, along with any input files:
@@ -122,14 +122,14 @@ Push the Android runtime tools to the device, along with any input files:
 ``` shell
 adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
 adb shell chmod +x /data/local/tmp/iree-run-module
-adb push /tmp/iree-run-module-vmvx.vmfb /data/local/tmp/
+adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 ```
 
 Run the tool:
 
 ``` shell
 adb shell /data/local/tmp/iree-run-module -driver=vmvx \
-  -module_file=/data/local/tmp/iree-run-module-vmvx.vmfb \
+  -module_file=/data/local/tmp/simple_abs_vmvx.vmfb \
   -entry_function=abs \
-  -function_inputs="i32=-5"
+  -function_inputs="f32=-5"
 ```

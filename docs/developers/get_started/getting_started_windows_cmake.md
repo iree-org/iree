@@ -115,7 +115,7 @@ Translate a source MLIR file into an IREE module:
 > ..\iree-build\iree\tools\iree-translate.exe \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
-  iree/tools/test/iree-run-module.mlir \
+  iree/samples/models/simple_abs.mlir \
   -o %TMP%/simple-llvm_aot.vmfb
 ```
 
@@ -130,7 +130,7 @@ cross-compiling:
   -iree-llvm-target-triple=x86_64-pc-windows-msvc \
   -iree-llvm-target-cpu=host \
   -iree-llvm-target-cpu-features=host \
-  iree/tools/test/iree-run-module.mlir \
+  iree/samples/models/simple_abs.mlir \
   -o %TMP%/simple-llvm_aot.vmfb
 ```
 
@@ -146,11 +146,11 @@ Check out the contents of the 'tools' build directory:
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-mlir.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/iree/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```powershell
-> ..\iree-build\iree\tools\iree-run-mlir.exe .\iree\tools\test\iree-run-mlir.mlir -function-input="i32=-2" -iree-hal-target-backends=vmvx -print-mlir
+> ..\iree-build\iree\tools\iree-run-mlir.exe .\iree\samples\models\simple_abs.mlir -function-input="f32=-2" -iree-hal-target-backends=vmvx -print-mlir
 ```
 
 ### Further Reading

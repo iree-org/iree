@@ -78,6 +78,7 @@ func @add(%lhs: tensor<4xf32>, %rhs: tensor<4xf32>) -> tensor<4xf32>
 ```shell
 # First translate into a VM bytecode module using linalg on tensors path.
 $ ../iree-build/iree/tools/iree-translate \
+ -iree-input-type=mhlo \
  -iree-mlir-to-vm-bytecode-module \
  -iree-hal-target-backends=cuda \
  -iree-flow-dispatch-linalg-on-tensors \
