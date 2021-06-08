@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_EXECUTABLE_CACHE_H_
 #define IREE_HAL_EXECUTABLE_CACHE_H_
@@ -27,14 +19,14 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
 // Defines how the executable cache performs preparation.
-enum iree_hal_executable_caching_mode_e {
+enum iree_hal_executable_caching_mode_bits_t {
   // Allows the cache to reference the provided executable_data after it has
   // prepared the executable. Callers must ensure the data remains valid for the
   // lifetime of the cache. If memory mapping constant executable data from
@@ -80,7 +72,7 @@ enum iree_hal_executable_caching_mode_e {
 typedef uint32_t iree_hal_executable_caching_mode_t;
 
 // Defines an executable compilation specification.
-typedef struct {
+typedef struct iree_hal_executable_spec_t {
   // Specifies what caching the executable cache is allowed to perform and
   // (if supported) which transformations on the executable contents are
   // allowed.
@@ -131,7 +123,7 @@ void iree_hal_executable_spec_initialize(iree_hal_executable_spec_t* out_spec);
 //
 // Thread-safe - multiple threads may prepare executables (including the *same*
 // executable) simultaneously.
-typedef struct iree_hal_executable_cache_s iree_hal_executable_cache_t;
+typedef struct iree_hal_executable_cache_t iree_hal_executable_cache_t;
 
 // Creates an executable cache using the given identifier.
 // The identifier is provided to the backing cache API as way to partition
@@ -178,7 +170,7 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_cache_prepare_executable(
 // iree_hal_executable_cache_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_executable_cache_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

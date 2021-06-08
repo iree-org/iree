@@ -1,20 +1,12 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
-#include "emitc/Target/Cpp.h"
+#include "emitc/Target/Cpp/Cpp.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
@@ -62,8 +54,8 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   llvm::raw_ostream &output = emitter.ostream();
   std::string moduleName = moduleOp.getName().str();
 
-  output << "struct " << moduleName << "_s;\n";
-  output << "struct " << moduleName << "_state_s {\n";
+  output << "struct " << moduleName << "_t;\n";
+  output << "struct " << moduleName << "_state_t {\n";
 
   output << "iree_allocator_t allocator;\n";
   output << "uint8_t rwdata["
@@ -72,8 +64,8 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
          << moduleOp.ordinal_counts().getValue().global_refs() << "];\n";
   output << "};\n";
 
-  output << "typedef struct " << moduleName << "_s " << moduleName << "_t;\n";
-  output << "typedef struct " << moduleName << "_state_s " << moduleName
+  output << "typedef struct " << moduleName << "_t " << moduleName << "_t;\n";
+  output << "typedef struct " << moduleName << "_state_t " << moduleName
          << "_state_t;\n";
 
   output << "\n";
@@ -95,7 +87,7 @@ static LogicalResult printFuncOpArguments(IREE::VM::FuncOp &funcOp,
                                           mlir::emitc::CppEmitter &emitter) {
   return mlir::emitc::interleaveCommaWithError(
       funcOp.getArguments(), emitter.ostream(), [&](auto arg) -> LogicalResult {
-        if (failed(emitter.emitType(arg.getType()))) {
+        if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType()))) {
           return failure();
         }
         emitter.ostream() << " " << emitter.getOrCreateName(arg);
@@ -113,7 +105,7 @@ static LogicalResult printFuncOpResults(
         Type type = std::get<0>(tuple);
         std::string resultName = std::get<1>(tuple);
 
-        if (failed(emitter.emitType(type))) {
+        if (failed(emitter.emitType(*funcOp.getOperation(), type))) {
           return failure();
         }
         emitter.ostream() << " *" << resultName;
@@ -133,7 +125,8 @@ static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
       // the struct argument name here must not be changed.
       emitter.ostream() << "vm_global_store_i32(state->rwdata, "
                         << globalOp.ordinal() << ", ";
-      if (failed(emitter.emitAttribute(initialValue.getValue()))) {
+      if (failed(emitter.emitAttribute(*globalOp.getOperation(),
+                                       initialValue.getValue()))) {
         return globalOp.emitError() << "Unable to emit initial_value";
       }
       emitter.ostream() << ");\n";
@@ -348,7 +341,7 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
         // This shouldn't happen
         return failure();
       }
-      if (failed(emitter.emitType(arg.getType()))) {
+      if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType()))) {
         return failure();
       }
       output << " " << emitter.getOrCreateName(arg) << ";\n";

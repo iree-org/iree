@@ -1,19 +1,13 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_BASE_INTERNAL_DYNAMIC_LIBRARY_H_
 #define IREE_BASE_INTERNAL_DYNAMIC_LIBRARY_H_
+
+#include <stdint.h>
 
 #include "iree/base/api.h"
 
@@ -22,13 +16,13 @@ extern "C" {
 #endif
 
 // Defines the behavior of the dynamic library loader.
-enum iree_dynamic_library_flags_e {
+enum iree_dynamic_library_flag_bits_t {
   IREE_DYNAMIC_LIBRARY_FLAG_NONE = 0u,
 };
 typedef uint32_t iree_dynamic_library_flags_t;
 
 // Dynamic library (aka shared object) cross-platform wrapper.
-typedef struct iree_dynamic_library_s iree_dynamic_library_t;
+typedef struct iree_dynamic_library_t iree_dynamic_library_t;
 
 // Loads a system library using both the system library load paths and the given
 // file name. The path may may be absolute or relative.

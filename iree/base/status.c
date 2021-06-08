@@ -1,21 +1,15 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -283,19 +277,23 @@ IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
 
 // TODO(#55): move payload methods/types to header when API is stabilized.
 
+struct iree_status_handle_t {
+  uintptr_t value;
+};
+
 // Defines the type of an iree_status_payload_t.
-typedef enum {
+typedef enum iree_status_payload_type_e {
   // Opaque; payload may still be formatted by a formatter but is not possible
   // to retrieve by the programmatic APIs.
-  IREE_STATUS_PAYLOAD_TYPE_OPAQUE = 0u,
+  IREE_STATUS_PAYLOAD_TYPE_OPAQUE = 0,
   // A string message annotation of type iree_status_payload_message_t.
-  IREE_STATUS_PAYLOAD_TYPE_MESSAGE = 1u,
+  IREE_STATUS_PAYLOAD_TYPE_MESSAGE = 1,
   // Starting type ID for user payloads. IREE reserves all payloads with types
   // less than this.
   IREE_STATUS_PAYLOAD_TYPE_MIN_USER = 0x70000000u,
 } iree_status_payload_type_t;
 
-typedef struct iree_status_payload_s iree_status_payload_t;
+typedef struct iree_status_payload_t iree_status_payload_t;
 
 // Function that formats a payload into a human-readable string form for logs.
 typedef void(IREE_API_PTR* iree_status_payload_formatter_t)(
@@ -306,9 +304,9 @@ typedef void(IREE_API_PTR* iree_status_payload_formatter_t)(
 // Each status may have zero or more payloads associated with it that can later
 // be used to produce more detailed logging or programmatically query
 // information about an error.
-struct iree_status_payload_s {
+struct iree_status_payload_t {
   // Next payload in the status payload linked list.
-  struct iree_status_payload_s* next;
+  struct iree_status_payload_t* next;
   // Payload type identifier used for programmatic access to payloads. May be
   // IREE_STATUS_PAYLOAD_TYPE_OPAQUE if the payload cannot be accessed directly.
   iree_status_payload_type_t type;
@@ -321,7 +319,7 @@ struct iree_status_payload_s {
 };
 
 // A string message (IREE_STATUS_PAYLOAD_TYPE_MESSAGE).
-typedef struct {
+typedef struct iree_status_payload_message_t {
   iree_status_payload_t header;
   // String data reference. May point to an address immediately following this
   // struct (if copied) or a constant string reference in rodata.
@@ -331,7 +329,7 @@ typedef struct {
 // Allocated storage for an iree_status_t.
 // Only statuses that have either source information or payloads will have
 // storage allocated for them.
-typedef struct {
+typedef struct iree_status_storage_t {
   // Optional doubly-linked list of payloads associated with the status.
   // Head = first added, tail = last added.
   iree_status_payload_t* payload_head;

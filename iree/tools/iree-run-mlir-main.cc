@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // IREE source.mlir -> execution output test runner.
 // This is meant to be called from LIT for FileCheck tests, and tries to match
@@ -36,15 +28,23 @@
 // used to separate the compiler flags from the runtime flags, such as:
 //   iree-run-mlir -iree-hal-target-backends=vulkan-spirv -- --logtostderr
 
-#include <array>
+#include <cstring>
+#include <functional>
 #include <iostream>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
@@ -56,19 +56,34 @@
 #include "iree/tools/init_targets.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/ref_cc.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/ADT/iterator.h"
+#include "llvm/ADT/iterator_range.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/AsmState.h"
-#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BlockSupport.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 
 static llvm::cl::opt<std::string> input_file_flag{
@@ -481,7 +496,10 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
+  mlir::iree_compiler::registerIREEVMTranslationFlags();
   mlir::registerLLVMDialectTranslation(registry);
+  // Make sure command line options are registered.
+  (void)mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

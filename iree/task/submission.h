@@ -1,22 +1,17 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_TASK_SUBMISSION_H_
 #define IREE_TASK_SUBMISSION_H_
 
+#include <stdbool.h>
+
 #include "iree/base/api.h"
 #include "iree/task/list.h"
+#include "iree/task/task.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,7 +39,7 @@ extern "C" {
 //
 // Thread-compatible; designed to be used from a single thread producing the
 // submission.
-typedef struct iree_task_submission_s {
+typedef struct iree_task_submission_t {
   // List of tasks that are ready for execution immediately. Upon submission to
   // a queue the tasks will be passed on to the executor with no delay.
   //

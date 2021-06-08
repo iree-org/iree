@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_SEMAPHORE_H_
 #define IREE_HAL_SEMAPHORE_H_
@@ -25,7 +17,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
@@ -60,7 +52,7 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 // https://www.youtube.com/watch?v=SpE--Rf516Y
 // https://www.khronos.org/assets/uploads/developers/library/2018-xdc/Vulkan-Timeline-Semaphores-Part-1_Sep18.pdf
 // https://docs.microsoft.com/en-us/windows/win32/direct3d12/user-mode-heap-synchronization
-typedef struct iree_hal_semaphore_s iree_hal_semaphore_t;
+typedef struct iree_hal_semaphore_t iree_hal_semaphore_t;
 
 // Creates a semaphore that can be used with command queues owned by this
 // device. To use the semaphores with other devices or instances they must
@@ -121,7 +113,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
 // iree_hal_semaphore_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_semaphore_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

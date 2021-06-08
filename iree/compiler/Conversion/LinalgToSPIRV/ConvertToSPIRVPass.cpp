@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===- CovertToSPIRVPass.cpp - Pass for the final SPIR-V conversion -------===//
 //
@@ -321,9 +313,10 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// - tensor_to_memref can become a no-op since tensors are lowered to
   ///   !spv.array.
   /// - unrealized_conversion_cast with the same source and target type.
-  patterns
-      .insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<memref::BufferCastOp>,
-              RemoveIdentityConversionCast>(typeConverter, context);
+  patterns.insert<
+      FoldAsNoOp<linalg::CollapseShapeOp>, FoldAsNoOp<linalg::ExpandShapeOp>,
+      FoldAsNoOp<memref::BufferCastOp>, RemoveIdentityConversionCast>(
+      typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
       SPIRVConversionTarget::get(targetAttr);

@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/ConvertToLLVM.h"
 
@@ -20,13 +12,92 @@
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
+/// Scalarize math ops. It is needed to lower vector operation that don't have
+/// vector support in CUDA and ROCM device library.
+template <typename MathOpTy>
+struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
+  using OpRewritePattern<MathOpTy>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(MathOpTy mathOp,
+                                PatternRewriter &rewriter) const override {
+    auto vecType = mathOp.getType().template dyn_cast<VectorType>();
+    if (!vecType) return failure();
+    Location loc = mathOp.getLoc();
+    Value newVector = rewriter.create<ConstantOp>(
+        loc, vecType, rewriter.getZeroAttr(vecType));
+
+    for (int64_t element : llvm::seq(int64_t(0), vecType.getNumElements())) {
+      llvm::SmallVector<int64_t> indices;
+      int64_t projectIndex = element;
+      for (int64_t dim : llvm::seq(int64_t(0), vecType.getRank())) {
+        int64_t index = projectIndex % vecType.getDimSize(dim);
+        projectIndex = projectIndex / vecType.getDimSize(dim);
+        indices.push_back(index);
+      }
+      SmallVector<Value> newOperands;
+      for (Value operand : mathOp->getOperands()) {
+        newOperands.push_back(
+            rewriter.create<vector::ExtractOp>(loc, operand, indices));
+      }
+      Value scalarOp = rewriter.create<MathOpTy>(loc, newOperands);
+      newVector =
+          rewriter.create<vector::InsertOp>(loc, scalarOp, newVector, indices);
+    }
+    rewriter.replaceOp(mathOp, newVector);
+    return success();
+  }
+};
+
+/// Pass to test scalarization pattern.
+class ScalarizationTestPass
+    : public PassWrapper<ScalarizationTestPass, OperationPass<FuncOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<vector::VectorDialect>();
+  }
+  void runOnOperation() override {
+    OwningRewritePatternList patterns(&getContext());
+    populateScalarizeMathOps(patterns);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+  }
+};
+
+// Convention with the HAL side to pass kernel arguments.
+// The bindings are ordered based on binding index then compressed and mapped to
+// dense set of arguments.
+// This function looks at the symbols and return the mapping between binding
+// index and kernel argument index. For instance if the kernel has bindings 1,
+// 5, 6 it will return the mapping [1, 0], [5, 1], [6, 2]
+static llvm::SmallDenseMap<uint64_t, size_t> getKernelArgMapping(
+    Operation *func) {
+  llvm::SmallDenseMap<uint64_t, size_t> mapBindingArgIndex;
+  llvm::SmallVector<uint64_t> bindingUsed;
+  Operation *symbolTableOp = SymbolTable::getNearestSymbolTable(func);
+  SymbolTable::walkSymbolTables(symbolTableOp, true, [&](Operation *op, bool) {
+    if (auto interface = dyn_cast<IREE::HAL::InterfaceOp>(op)) {
+      interface.walk([&](Operation *symbolOp) {
+        if (auto binding = dyn_cast<IREE::HAL::InterfaceBindingOp>(symbolOp)) {
+          uint64_t bindingIndex = binding.binding().getZExtValue();
+          bindingUsed.push_back(bindingIndex);
+        }
+      });
+    }
+  });
+  std::sort(bindingUsed.begin(), bindingUsed.end());
+  for (auto binding : llvm::enumerate(bindingUsed)) {
+    mapBindingArgIndex[binding.value()] = binding.index();
+  }
+  return mapBindingArgIndex;
+}
 
 class ConvertFunc : public ConvertToLLVMPattern {
  public:
@@ -45,13 +116,16 @@ class ConvertFunc : public ConvertToLLVMPattern {
     assert(fnType.getNumInputs() == 0 && fnType.getNumResults() == 0);
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
-    SmallVector<Type, 8> llvmInputTypes;
+    llvm::SmallDenseMap<uint64_t, size_t> argMapping =
+        getKernelArgMapping(funcOp);
+    SmallVector<Type, 8> llvmInputTypes(argMapping.size());
     funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp input) {
       auto memrefType = input.getType().cast<MemRefType>();
       Type elType = memrefType.getElementType();
       auto llvmType =
           LLVM::LLVMPointerType::get(elType, memrefType.getMemorySpaceAsInt());
-      llvmInputTypes.push_back(llvmType);
+      uint64_t binding = input.queryBindingOp().binding().getZExtValue();
+      llvmInputTypes[argMapping[binding]] = llvmType;
     });
     signatureConverter.addInputs(llvmInputTypes);
 
@@ -99,18 +173,15 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     assert(llvmFuncOp.getNumArguments() > 0);
 
+    llvm::SmallDenseMap<uint64_t, size_t> argMapping =
+        getKernelArgMapping(llvmFuncOp);
     Location loc = op->getLoc();
     auto ireeBindingOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
     IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(operands);
     MemRefType memrefType =
         ireeBindingOp.getResult().getType().dyn_cast<MemRefType>();
-
-    // Fetch the interface binding op and extract the buffer index from void**.
-    auto symbol = SymbolTable::lookupNearestSymbolFrom(
-        op, op->getAttrOfType<SymbolRefAttr>("binding"));
-    auto interfaceBindingOp = cast<IREE::HAL::InterfaceBindingOp>(symbol);
-    Value llvmBufferBasePtr =
-        llvmFuncOp.getArgument(interfaceBindingOp.binding().getZExtValue());
+    uint64_t binding = ireeBindingOp.queryBindingOp().binding().getZExtValue();
+    Value llvmBufferBasePtr = llvmFuncOp.getArgument(argMapping[binding]);
     if (memrefType.hasStaticShape()) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);
@@ -188,6 +259,22 @@ void populateLLVMConversionPatterns(MLIRContext *context,
                         NVVM::BlockDimYOp, NVVM::BlockDimZOp>>(context);
   }
 }
+
+void populateScalarizeMathOps(RewritePatternSet &patterns) {
+  patterns.add<ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<AbsFOp>,
+               ScalarizeMathOp<math::AtanOp>, ScalarizeMathOp<math::Atan2Op>,
+               ScalarizeMathOp<CeilFOp>, ScalarizeMathOp<math::CosOp>,
+               ScalarizeMathOp<math::ExpOp>, ScalarizeMathOp<math::ExpM1Op>,
+               ScalarizeMathOp<FloorFOp>, ScalarizeMathOp<math::LogOp>,
+               ScalarizeMathOp<math::Log1pOp>, ScalarizeMathOp<math::Log10Op>,
+               ScalarizeMathOp<math::Log2Op>, ScalarizeMathOp<math::PowFOp>,
+               ScalarizeMathOp<math::RsqrtOp>, ScalarizeMathOp<math::SinOp>,
+               ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<math::TanhOp>>(
+      patterns.getContext());
+}
+
+static PassRegistration<ScalarizationTestPass> scalarization_test_pass(
+    "iree-llvmgpu-scalarize-math-op", "Test pass for scalarization patterns.");
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_DESCRIPTOR_SET_LAYOUT_H_
 #define IREE_HAL_DESCRIPTOR_SET_LAYOUT_H_
@@ -26,34 +18,32 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
 // Specifies the type of a descriptor in a descriptor set.
-enum iree_hal_descriptor_type_e {
-  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6u,
-  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7u,
-  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8u,
-  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9u,
-};
-typedef uint32_t iree_hal_descriptor_type_t;
+typedef enum iree_hal_descriptor_type_e {
+  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
+  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
+  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
+} iree_hal_descriptor_type_t;
 
 // Specifies the usage type of the descriptor set.
-enum iree_hal_descriptor_set_layout_usage_type_e {
+typedef enum iree_hal_descriptor_set_layout_usage_type_e {
   // Descriptor set will be initialized once and never changed.
-  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE = 0u,
+  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE = 0,
   // Descriptor set is never created and instead used with push descriptors.
-  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY = 1u,
-};
-typedef uint32_t iree_hal_descriptor_set_layout_usage_type_t;
+  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY = 1,
+} iree_hal_descriptor_set_layout_usage_type_t;
 
 // Specifies a descriptor set layout binding.
 //
 // Maps to VkDescriptorSetLayoutBinding.
-typedef struct {
+typedef struct iree_hal_descriptor_set_layout_binding_t {
   // The binding number of this entry and corresponds to a resource of the
   // same binding number in the executable interface.
   uint32_t binding;
@@ -77,7 +67,7 @@ typedef struct {
 //
 // Maps to VkDescriptorSetLayout:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayout.html
-typedef struct iree_hal_descriptor_set_layout_s
+typedef struct iree_hal_descriptor_set_layout_t
     iree_hal_descriptor_set_layout_t;
 
 // Creates a descriptor set layout with the given bindings.
@@ -100,7 +90,7 @@ IREE_API_EXPORT void iree_hal_descriptor_set_layout_release(
 // iree_hal_descriptor_set_layout_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_descriptor_set_layout_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

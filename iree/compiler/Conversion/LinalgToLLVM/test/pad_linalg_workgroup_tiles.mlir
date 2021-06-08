@@ -1,5 +1,7 @@
 // RUN: iree-opt %s -cse -iree-codegen-llvm-pad-linalg-workgroup-tiles -split-input-file | IreeFileCheck %s
 
+#config0 = {tileSizes = [[64, 64]]}
+#config1 = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
 module  {
   func @matmul_f32_5x3x5() {
     %c0 = constant 0 : index
@@ -28,8 +30,8 @@ module  {
         %13 = affine.min affine_map<(d0) -> (-d0 + 5, 64)>(%arg0)
         %14 = affine.min affine_map<(d0) -> (-d0 + 5, 64)>(%arg1)
         %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-        %16 = linalg.fill(%15, %cst) {__internal_linalg_transform__ = "workgroup"} : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%8, %10 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %16 = linalg.fill(%15, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config1} ins(%8, %10 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:5x5xf32>
       }
     }

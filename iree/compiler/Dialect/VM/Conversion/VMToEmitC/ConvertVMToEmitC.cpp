@@ -1,20 +1,12 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
-#include "emitc/Dialect/EmitC/EmitCDialect.h"
+#include "emitc/Dialect/EmitC/IR/EmitC.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -49,8 +41,8 @@ emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
       /*type=*/TypeRange{},
       /*callee=*/StringAttr::get(ctx, "VM_RETURN_IF_ERROR"),
       /*args=*/
-      ArrayAttr::get(
-          ctx, {rewriter.getIndexAttr(0), StringAttr::get(ctx, "local_refs")}),
+      ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                           emitc::OpaqueAttr::get(ctx, "local_refs")}),
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{callOp.getResult(0)});
   return callOp;
@@ -163,11 +155,13 @@ class ConstRefZeroOpConversion
 
   LogicalResult matchAndRewrite(IREE::VM::ConstRefZeroOp constRefZeroOp,
                                 PatternRewriter &rewriter) const final {
+    auto ctx = constRefZeroOp.getContext();
+
     StringRef typeString = "iree_vm_ref_t";
     auto type = emitc::OpaqueType::get(constRefZeroOp.getContext(), typeString);
 
     StringRef valueString = "{0}";
-    StringAttr value = rewriter.getStringAttr(valueString);
+    emitc::OpaqueAttr value = emitc::OpaqueAttr::get(ctx, valueString);
 
     rewriter.replaceOpWithNewOp<emitc::ConstOp>(constRefZeroOp, type, value);
     return success();
@@ -186,8 +180,12 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
   LogicalResult matchAndRewrite(
       LoadOpTy loadOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    auto ctx = loadOp.getContext();
+
     GlobalOpTy globalOp = lookupGlobalOp<LoadOpTy, GlobalOpTy>(loadOp);
-    if (!globalOp) return loadOp.emitError() << "Unable to find GlobalOp";
+    if (!globalOp) {
+      return loadOp.emitError() << "Unable to find GlobalOp";
+    }
 
     auto type = loadOp.getOperation()->getResultTypes();
     StringAttr callee = rewriter.getStringAttr(funcName);
@@ -196,7 +194,7 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
     // the buffer where globals live after code generation as well as the
     // state struct argument name are hardcoded here.
     ArrayAttr args = rewriter.getArrayAttr(
-        {rewriter.getStringAttr("state->rwdata"),
+        {emitc::OpaqueAttr::get(ctx, "state->rwdata"),
          rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
              globalOp.ordinal().getValue().getZExtValue()))});
     ArrayAttr templateArgs;
@@ -222,8 +220,12 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
   LogicalResult matchAndRewrite(
       StoreOpTy storeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    auto ctx = storeOp.getContext();
+
     GlobalOpTy globalOp = lookupGlobalOp<StoreOpTy, GlobalOpTy>(storeOp);
-    if (!globalOp) return storeOp.emitError() << "Unable to find GlobalOp";
+    if (!globalOp) {
+      return storeOp.emitError() << "Unable to find GlobalOp";
+    }
 
     auto type = storeOp.getOperation()->getResultTypes();
     StringAttr callee = rewriter.getStringAttr(funcName);
@@ -232,7 +234,7 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
     // the buffer where globals live after code generation as well as the
     // state struct argument name are hardcoded here.
     ArrayAttr args = rewriter.getArrayAttr(
-        {rewriter.getStringAttr("state->rwdata"),
+        {emitc::OpaqueAttr::get(ctx, "state->rwdata"),
          rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
              globalOp.ordinal().getValue().getZExtValue())),
          rewriter.getIndexAttr(0)});
@@ -296,7 +298,7 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
         /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
         /*args=*/
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             StringAttr::get(ctx, "local_refs")}),
+                             emitc::OpaqueAttr::get(ctx, "local_refs")}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
 
@@ -388,7 +390,8 @@ class ListAllocOpConversion
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
         /*callee=*/rewriter.getStringAttr(elementTypeConstructor),
-        /*args=*/ArrayAttr::get(ctx, {StringAttr::get(ctx, elementTypeStr)}),
+        /*args=*/
+        ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, elementTypeStr)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
@@ -401,7 +404,7 @@ class ListAllocOpConversion
     auto listOp = rewriter.create<emitc::ConstOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
-        /*value=*/StringAttr::get(ctx, "NULL"));
+        /*value=*/emitc::OpaqueAttr::get(ctx, "NULL"));
 
     auto listPtrOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
@@ -415,7 +418,7 @@ class ListAllocOpConversion
         /*callee=*/rewriter.getStringAttr("iree_vm_list_create"),
         /*args=*/
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0), rewriter.getIndexAttr(1),
-                             StringAttr::get(ctx, "state->allocator"),
+                             emitc::OpaqueAttr::get(ctx, "state->allocator"),
                              rewriter.getIndexAttr(2)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
@@ -441,7 +444,7 @@ class ListAllocOpConversion
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
         /*callee=*/rewriter.getStringAttr("VM_ARRAY_ELEMENT_ADDRESS"),
         /*args=*/
-        ArrayAttr::get(ctx, {StringAttr::get(ctx, "local_refs"),
+        ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, "local_refs"),
                              rewriter.getI32IntegerAttr(ordinal)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
@@ -503,7 +506,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
     auto valueOp = rewriter.create<emitc::ConstOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t"),
-        /*value=*/StringAttr::get(ctx, ""));
+        /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
     auto valuePtrOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
@@ -531,7 +534,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
         /*args=*/
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             StringAttr::get(ctx, "local_refs")}),
+                             emitc::OpaqueAttr::get(ctx, "local_refs")}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
 
@@ -540,9 +543,10 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*location=*/loc,
         /*callee=*/rewriter.getStringAttr("iree_vm_list_get_value_as"),
         /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0), rewriter.getIndexAttr(1),
-                             StringAttr::get(ctx, valueTypeEnum.getValue()),
-                             rewriter.getIndexAttr(2)}),
+        ArrayAttr::get(ctx,
+                       {rewriter.getIndexAttr(0), rewriter.getIndexAttr(1),
+                        emitc::OpaqueAttr::get(ctx, valueTypeEnum.getValue()),
+                        rewriter.getIndexAttr(2)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), getOp.index(),
@@ -617,7 +621,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*callee=*/rewriter.getStringAttr("VM_RETURN_IF_LIST_NULL"),
         /*args=*/
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             StringAttr::get(ctx, "local_refs")}),
+                             emitc::OpaqueAttr::get(ctx, "local_refs")}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{listDerefOp.getResult(0)});
 

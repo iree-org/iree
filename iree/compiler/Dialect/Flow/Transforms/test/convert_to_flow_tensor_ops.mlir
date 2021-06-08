@@ -117,9 +117,9 @@ func @rank_reducing_subtensor(%arg0: tensor<?x513xi32>) -> tensor<513xi32> {
 func @tensor_reshape(%arg0 : tensor<?x4x?x5x?x6xf32>, %arg1 : tensor<20x?x40xf32>)
     -> (tensor<?x5x?xf32>, tensor<5x4x?x4x2x4x5xf32>)
 {
-  %0 = linalg.tensor_reshape %arg0 [[0, 1, 2], [3], [4, 5]]
+  %0 = linalg.tensor_collapse_shape %arg0 [[0, 1, 2], [3], [4, 5]]
       : tensor<?x4x?x5x?x6xf32> into tensor<?x5x?xf32>
-  %1 = linalg.tensor_reshape %arg1 [[0, 1], [2, 3], [4, 5, 6]]
+  %1 = linalg.tensor_expand_shape %arg1 [[0, 1], [2, 3], [4, 5, 6]]
       : tensor<20x?x40xf32> into tensor<5x4x?x4x2x4x5xf32>
   return %0, %1 : tensor<?x5x?xf32>, tensor<5x4x?x4x2x4x5xf32>
 }
@@ -170,3 +170,31 @@ func @subtensor_insert_convert_rank_reducing
 //   CHECK-DAG:   %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[RESHAPE]], %[[ARG0]][%[[C4]], %[[C2]], %[[C0]]]
 //  CHECK-SAME:     : tensor<1x4x48xf32> -> tensor<?x24x48xf32>{%[[DIM]]}
+
+// -----
+
+func @rank_reducing_subtensor_insert_trailing_unit_dims
+   (%arg0 : tensor<49x20xf32>, %arg1 : tensor<1x50x20x1xf32>) -> tensor<1x50x20x1xf32> {
+  %0 = subtensor_insert %arg0 into %arg1[0, 1, 0, 0] [1, 49, 20, 1] [1, 1, 1, 1] : tensor<49x20xf32> into tensor<1x50x20x1xf32>
+  return %0 : tensor<1x50x20x1xf32>
+}
+// CHECK-LABEL: func @rank_reducing_subtensor_insert_trailing_unit_dims
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %{{.+}} : tensor<49x20xf32> -> tensor<1x49x20x1xf32>
+//       CHECK:   flow.tensor.update %[[RESHAPE]], %{{.+}}[%[[C0]], %[[C1]], %[[C0]], %[[C0]]] : tensor<1x49x20x1xf32> -> tensor<1x50x20x1xf32>
+
+// -----
+
+func @rank_reducing_subtensor_trailing_unit_dims
+   (%arg0 : tensor<1x50x20x1xf32>) -> tensor<49x20xf32> {
+  %0 = subtensor %arg0[0, 1, 0, 0] [1, 49, 20, 1] [1, 1, 1, 1] : tensor<1x50x20x1xf32> to tensor<49x20xf32>
+  return %0 : tensor<49x20xf32>
+}
+// CHECK-LABEL: func @rank_reducing_subtensor_trailing_unit_dims
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C49:.+]] = constant 49 : index
+//   CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//       CHECK:   %[[SUBTENSOR:.+]] = flow.tensor.slice %{{.+}}[%[[C0]], %[[C1]], %[[C0]], %[[C0]] for %[[C1]], %[[C49]], %[[C20]], %[[C1]]] : tensor<1x50x20x1xf32> -> tensor<1x49x20x1xf32>
+//       CHECK:   flow.tensor.reshape %[[SUBTENSOR]] : tensor<1x49x20x1xf32> -> tensor<49x20xf32>

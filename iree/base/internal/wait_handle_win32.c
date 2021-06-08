@@ -1,19 +1,21 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// NOTE: must be first to ensure that we can define settings for all includes.
+// clang-format off: must be included before all other headers.
 #include "iree/base/internal/wait_handle_impl.h"
+// clang-format on
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/api.h"
+#include "iree/base/internal/wait_handle.h"
+#include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
@@ -99,7 +101,7 @@ static bool iree_wait_primitive_compare_identical(
 // iree_wait_set_t
 //===----------------------------------------------------------------------===//
 
-struct iree_wait_set_s {
+struct iree_wait_set_t {
   iree_allocator_t allocator;
 
   // Total capacity of handles in the set (including duplicates).

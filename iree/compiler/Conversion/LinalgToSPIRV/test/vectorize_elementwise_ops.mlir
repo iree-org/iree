@@ -56,7 +56,8 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
 // transpose.
 // CHECK-LABEL: func @elementwise_transpose
 //   CHECK-NOT:   vector.transfer_read
-//       CHECK:   linalg.generic
+//       CHECK:   scf.for
+//       CHECK:     scf.for
 hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

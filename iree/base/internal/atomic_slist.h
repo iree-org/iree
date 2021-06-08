@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // NOTE: the best kind of synchronization is no synchronization; always try to
 // design your algorithm so that you don't need anything from this file :)
@@ -19,7 +11,9 @@
 #ifndef IREE_BASE_INTERNAL_ATOMIC_SLIST_H_
 #define IREE_BASE_INTERNAL_ATOMIC_SLIST_H_
 
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "iree/base/alignment.h"
 #include "iree/base/internal/atomics.h"
@@ -34,8 +28,8 @@ extern "C" {
 typedef void* iree_atomic_slist_intrusive_ptr_t;
 
 // DO NOT USE: implementation detail.
-typedef struct iree_atomic_slist_entry_s {
-  struct iree_atomic_slist_entry_s* next;
+typedef struct iree_atomic_slist_entry_t {
+  struct iree_atomic_slist_entry_t* next;
 } iree_atomic_slist_entry_t;
 
 // Lightweight contention-avoiding singly linked list.
@@ -137,15 +131,14 @@ void iree_atomic_slist_push_unsafe(iree_atomic_slist_t* list,
 iree_atomic_slist_entry_t* iree_atomic_slist_pop(iree_atomic_slist_t* list);
 
 // Defines the approximate order in which a span of flushed entries is returned.
-typedef uint32_t iree_atomic_slist_flush_order_t;
-enum {
+typedef enum iree_atomic_slist_flush_order_e {
   // |out_head| and |out_tail| will be set to a span of the entries roughly in
   // the order they were pushed to the list in LIFO (stack) order.
   //
   // Example:
   //    slist: C B A
   //   result: C B A (or when contended possibly C A B)
-  IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_LIFO,
+  IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_LIFO = 0,
   // |out_head| and |out_tail| will be set to the first and last entries
   // pushed respectively, turning this LIFO slist into a FIFO queue.
   //
@@ -153,7 +146,7 @@ enum {
   //    slist: C B A
   //   result: A B C (or when contended possibly B A C)
   IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_FIFO,
-};
+} iree_atomic_slist_flush_order_t;
 
 // Removes all items from the list and returns them in **APPROXIMATELY** the
 // |flush_order| requested. As there are no order guarantees there may be slight

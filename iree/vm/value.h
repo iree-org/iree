@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_VALUE_H_
 #define IREE_VM_VALUE_H_
@@ -27,7 +19,7 @@ extern "C" {
 typedef int32_t iree_vm_size_t;
 
 // Defines the type of a primitive value.
-typedef enum {
+typedef enum iree_vm_value_type_e {
   // Not a value type.
   IREE_VM_VALUE_TYPE_NONE = 0,
   // int8_t.
@@ -44,14 +36,14 @@ typedef enum {
   IREE_VM_VALUE_TYPE_F64 = 6,
 
   IREE_VM_VALUE_TYPE_MAX = IREE_VM_VALUE_TYPE_F64,
-  IREE_VM_VALUE_TYPE_COUNT = IREE_VM_VALUE_TYPE_MAX + 1,
+  IREE_VM_VALUE_TYPE_COUNT = IREE_VM_VALUE_TYPE_MAX + 1,  // used for lookup
 } iree_vm_value_type_t;
 
 // Maximum size, in bytes, of any value type we can represent.
 #define IREE_VM_VALUE_STORAGE_SIZE 8
 
 // A variant value type.
-typedef struct iree_vm_value {
+typedef struct iree_vm_value_t {
   iree_vm_value_type_t type;
   union {
     int8_t i8;

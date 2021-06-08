@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -29,9 +21,12 @@ class Convert1x1ConvolutionMatmulOp
 
   LogicalResult matchAndRewrite(linalg::ConvInputNHWCFilterHWCFOp convOp,
                                 PatternRewriter &rewriter) const override {
-    ShapedType inputShapeType = convOp.getInputShapedType(0);
-    ShapedType filterShapeType = convOp.getInputShapedType(1);
-    ShapedType outputShapeType = convOp.getOutputShapedType(0);
+    ShapedType inputShapeType =
+        convOp.getInputOperand(0)->get().getType().cast<ShapedType>();
+    ShapedType filterShapeType =
+        convOp.getInputOperand(1)->get().getType().cast<ShapedType>();
+    ShapedType outputShapeType =
+        convOp.getOutputOperand(0)->get().getType().cast<ShapedType>();
 
     auto inputShape = inputShapeType.getShape();
     auto filterShape = filterShapeType.getShape();
@@ -65,23 +60,23 @@ class Convert1x1ConvolutionMatmulOp
         RankedTensorType::get({outputShape[1] * outputShape[2], outputShape[3]},
                               outputShapeType.getElementType());
 
-    Value input = convOp.getInput(0);
-    Value filter = convOp.getInput(1);
-    Value output = convOp.getOutput(0);
+    Value input = convOp.getInputOperand(0)->get();
+    Value filter = convOp.getInputOperand(1)->get();
+    Value output = convOp.getOutputOperand(0)->get();
     auto loc = convOp.getLoc();
 
-    Value reshapedInput = rewriter.create<linalg::TensorReshapeOp>(
+    Value reshapedInput = rewriter.create<linalg::TensorCollapseShapeOp>(
         loc, reshapedInputType, input, reassociationIndices);
-    Value reshapedFilter = rewriter.create<linalg::TensorReshapeOp>(
+    Value reshapedFilter = rewriter.create<linalg::TensorCollapseShapeOp>(
         loc, reshapedFilterType, filter, reassociationIndices);
-    Value reshapedOutput = rewriter.create<linalg::TensorReshapeOp>(
+    Value reshapedOutput = rewriter.create<linalg::TensorCollapseShapeOp>(
         loc, reshapedOutputType, output, reassociationIndices);
 
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
         loc, reshapedOutputType, ArrayRef<Value>{reshapedInput, reshapedFilter},
         ArrayRef<Value>{reshapedOutput});
 
-    auto reshapedResult = rewriter.create<linalg::TensorReshapeOp>(
+    auto reshapedResult = rewriter.create<linalg::TensorExpandShapeOp>(
         loc, outputShapeType, matmulResult.getResults()[0],
         reassociationIndices);
 

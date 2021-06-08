@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // API Versioning
 // -----------------------------------------------------------------------------
@@ -100,6 +92,7 @@
 #define IREE_BASE_API_H_
 
 #include <assert.h>
+#include <errno.h>
 #include <memory.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -109,11 +102,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "iree/base/alignment.h"
-#include "iree/base/attributes.h"
-#include "iree/base/config.h"
-#include "iree/base/string_view.h"
-#include "iree/base/time.h"
+#include "iree/base/alignment.h"    // IWYU pragma: export
+#include "iree/base/attributes.h"   // IWYU pragma: export
+#include "iree/base/config.h"       // IWYU pragma: export
+#include "iree/base/string_view.h"  // IWYU pragma: export
+#include "iree/base/time.h"         // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {
@@ -166,7 +159,7 @@ extern "C" {
 // Well-known status codes matching iree::StatusCode.
 // Note that any code within IREE_STATUS_CODE_MASK is valid even if not
 // enumerated here. Always check for unhandled errors/have default conditions.
-typedef enum {
+typedef enum iree_status_code_e {
   IREE_STATUS_OK = 0,
   IREE_STATUS_CANCELLED = 1,
   IREE_STATUS_UNKNOWN = 2,
@@ -576,12 +569,11 @@ IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status);
 
 // Known versions of the API that can be referenced in code.
 // Out-of-bounds values are possible in forward-versioned changes.
-enum iree_api_version_e {
-  IREE_API_VERSION_0 = 0u,
+typedef enum iree_api_version_e {
+  IREE_API_VERSION_0 = 0,
   // Always set to the latest version of the library from source.
   IREE_API_VERSION_LATEST = IREE_API_VERSION_0,
-};
-typedef uint32_t iree_api_version_t;
+} iree_api_version_t;
 
 // Checks whether the |expected_version| of the caller matches the implemented
 // version of |out_actual_version|. Forward compatibility of the API is
@@ -598,6 +590,6 @@ iree_api_version_check(iree_api_version_t expected_version,
 }  // extern "C"
 #endif  // __cplusplus
 
-#include "iree/base/allocator.h"
+#include "iree/base/allocator.h"  // IWYU pragma: export
 
 #endif  // IREE_BASE_API_H_

@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
@@ -126,6 +118,14 @@ static void linkAndOptimize(llvm::Module &module,
   MPM.run(module);
 }
 
+/// Sanitize the function name as CUDA driver doesn't allow function names with
+/// '.' character.
+static std::string sanitizeNameForCuda(llvm::StringRef name) {
+  std::string sanitizedName(name);
+  std::replace(sanitizedName.begin(), sanitizedName.end(), '.', '_');
+  return sanitizedName;
+}
+
 class CUDATargetBackend final : public TargetBackend {
  public:
   CUDATargetBackend(CUDATargetOptions options) : options_(std::move(options)) {}
@@ -176,9 +176,13 @@ class CUDATargetBackend final : public TargetBackend {
                                      "dialect to the native llvm::Module";
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
+    std::vector<std::string> entryPointNames;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
+      // setName will make sure the function name is unique.
+      llvmFunc->setName(sanitizeNameForCuda(func.getName()));
+      entryPointNames.emplace_back(llvmFunc->getName());
       std::array<int32_t, 3> workgroup_size;
       for (auto it : llvm::enumerate(func->getAttr("llvmgpu_workgroup_size")
                                          .cast<DenseIntElementsAttr>()
@@ -232,9 +236,6 @@ class CUDATargetBackend final : public TargetBackend {
         builder, reinterpret_cast<const uint8_t *>(targetISA.c_str()),
         targetISA.size());
 
-    auto entryPointNames = llvm::to_vector<8>(
-        llvm::map_range(targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
-                        [&](auto op) { return op.getName(); }));
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
     iree_CUDABlockSizeDef_vec_start(builder);

@@ -46,7 +46,7 @@ func @unfoldable_constant() -> i32 {
 // -----
 
 // TODO(#5897): enable when vmvx supports dynamic shapes.
-// X-CHECK-LABEL: vm.rodata @dynamic_constant_const dense<3.000000e+00> : tensor<2x3xf32>
+// X-CHECK-LABEL: vm.rodata private @dynamic_constant_const dense<3.000000e+00> : tensor<2x3xf32>
 // X-CHECK: vm.func @dynamic_constant
 // func @dynamic_constant() -> tensor<?x?xf32> {
 //   // X-CHECK: vm.call @hal.buffer_view.dim

@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/Conversion/HLOToFlow/ConvertHLOToFlow.h"
 
@@ -39,35 +31,16 @@ struct ConstOpLowering : public OpRewritePattern<mhlo::ConstOp> {
   }
 };
 
-struct DynamicUpdateSliceOpLowering
-    : public OpRewritePattern<mhlo::DynamicUpdateSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(mhlo::DynamicUpdateSliceOp op,
-                                PatternRewriter &rewriter) const override {
-    auto startIndices = llvm::to_vector<4>(
-        llvm::map_range(op.start_indices(), [&](Value tensorValue) {
-          return rewriter.createOrFold<IndexCastOp>(
-              op.getLoc(),
-              rewriter.createOrFold<tensor::ExtractOp>(op.getLoc(),
-                                                       tensorValue),
-              rewriter.getIndexType());
-        }));
-    rewriter.replaceOpWithNewOp<IREE::Flow::TensorUpdateOp>(
-        op, op.operand(), startIndices, op.update());
-    return success();
-  }
-};
-
 }  // namespace
 
 void setupDirectHLOToFlowLegality(MLIRContext *context,
                                   ConversionTarget &conversionTarget) {
-  conversionTarget.addIllegalOp<mhlo::ConstOp, mhlo::DynamicUpdateSliceOp>();
+  conversionTarget.addIllegalOp<mhlo::ConstOp>();
 }
 
 void populateHLOToFlowPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns) {
-  patterns.insert<ConstOpLowering, DynamicUpdateSliceOpLowering>(context);
+  patterns.insert<ConstOpLowering>(context);
 }
 
 }  // namespace iree_compiler

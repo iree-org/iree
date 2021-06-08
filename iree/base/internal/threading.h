@@ -1,22 +1,15 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_BASE_INTERNAL_THREADING_H_
 #define IREE_BASE_INTERNAL_THREADING_H_
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
@@ -29,14 +22,14 @@ extern "C" {
 // iree_thread_t
 //==============================================================================
 
-typedef struct iree_thread_s iree_thread_t;
+typedef struct iree_thread_t iree_thread_t;
 
 // Specifies a thread's priority class.
 // These translate roughly to the same thing across all platforms, though they
 // are just a hint and the schedulers on various platforms may behave very
 // differently. When in doubt prefer to write code that works at the extremes
 // of the classes.
-enum iree_thread_priority_class_e {
+typedef enum iree_thread_priority_class_e {
   // Lowest possible priority used for background/idle work.
   // Maps to QOS_CLASS_BACKGROUND.
   IREE_THREAD_PRIORITY_CLASS_LOWEST = -2,
@@ -52,8 +45,7 @@ enum iree_thread_priority_class_e {
   // Highest possible priority used for interactive work.
   // Maps to QOS_CLASS_USER_INTERACTIVE.
   IREE_THREAD_PRIORITY_CLASS_HIGHEST = 2,
-};
-typedef int32_t iree_thread_priority_class_t;
+} iree_thread_priority_class_t;
 
 // Specifies the processor affinity for a particular thread.
 // Each platform handles this differently (if at all).
@@ -77,7 +69,7 @@ typedef int32_t iree_thread_priority_class_t;
 //
 // Windows:
 //   Stuff just works. Love it.
-typedef struct {
+typedef struct iree_thread_affinity_t {
   uint32_t specified : 1;
   uint32_t smt : 1;
   uint32_t group : 7;
@@ -89,7 +81,7 @@ void iree_thread_affinity_set_any(iree_thread_affinity_t* out_thread_affinity);
 
 // Thread creation parameters.
 // All are optional and the entire struct can safely be zero-initialized.
-typedef struct {
+typedef struct iree_thread_create_params_t {
   // Developer-visible name for the thread displayed in tooling.
   // May be omitted for the system-default name (usually thread ID).
   iree_string_view_t name;
@@ -143,7 +135,7 @@ void iree_thread_release(iree_thread_t* thread);
 // Returns a platform-defined thread ID for the given |thread|.
 uintptr_t iree_thread_id(iree_thread_t* thread);
 
-typedef struct iree_thread_override_s iree_thread_override_t;
+typedef struct iree_thread_override_t iree_thread_override_t;
 
 // Begins overriding the priority class of the given |thread|.
 // The priority of the thread will be the max of the base priority and the

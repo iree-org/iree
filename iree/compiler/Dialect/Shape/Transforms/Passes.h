@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_DIALECT_SHAPE_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_SHAPE_TRANSFORMS_PASSES_H_
@@ -35,38 +27,15 @@ std::unique_ptr<OperationPass<FuncOp>> createExpandFunctionDynamicDimsPass();
 std::unique_ptr<OperationPass<FuncOp>>
 createExpandFunctionRankedShapeDimsPass();
 
-// For any dynamically shaped edges in a function, introduces an appropriate
-// get_ranked_shape and corresponding tie_shape op to make the association.
-//
-// Any op contained in a region transitively owned by an op with a name in
-// `doNotRecurseOpNames` is not tied.
-std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass(
-    ArrayRef<std::string> doNotRecurseOpNames = {});
-
-// Materializes shape calculations for any get_ranked_shape ops.
-std::unique_ptr<OperationPass<FuncOp>> createMaterializeShapeCalculationsPass();
-
 // Cleans up any unnecessary shape placeholder ops. Can be run after all
 // shape calculation code has been lowered.
 std::unique_ptr<OperationPass<FuncOp>> createCleanupShapePlaceholdersPass();
-
-// Converts shape-sensitive HLOs to be based on facilities in the shape
-// dialect.
-std::unique_ptr<OperationPass<FuncOp>> createConvertHLOToShapePass();
-
-// Best-effort hoisting of shape calculations to attempt to establish the
-// invariant that shapex.tie_shape second operand dominates the first operand.
-std::unique_ptr<OperationPass<FuncOp>> createHoistShapeCalculationsPass();
 
 // Register all Passes
 inline void registerShapePasses() {
   createExpandFunctionDynamicDimsPass();
   createExpandFunctionRankedShapeDimsPass();
-  createTieDynamicShapesPass();
-  createMaterializeShapeCalculationsPass();
   createCleanupShapePlaceholdersPass();
-  createConvertHLOToShapePass();
-  createHoistShapeCalculationsPass();
 }
 
 }  // namespace Shape

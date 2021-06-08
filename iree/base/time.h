@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_BASE_TIME_H_
 #define IREE_BASE_TIME_H_
@@ -72,7 +64,7 @@ iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
 IREE_API_EXPORT iree_duration_t
 iree_absolute_deadline_to_timeout_ns(iree_time_t deadline_ns);
 
-typedef enum {
+typedef enum iree_timeout_type_e {
   // Timeout is defined by an absolute value `deadline_ns`.
   IREE_TIMEOUT_ABSOLUTE = 0,
   // Timeout is defined by a relative value `timeout_ns`.
@@ -80,7 +72,7 @@ typedef enum {
 } iree_timeout_type_t;
 
 // A timeout defined either by an absolute or relative value.
-typedef struct {
+typedef struct iree_timeout_t {
   iree_timeout_type_t type;
   iree_time_t nanos;
 } iree_timeout_t;

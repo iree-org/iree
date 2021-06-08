@@ -1,19 +1,10 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/LinalgToLLVM/LLVMCodeGenOptions.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -602,8 +593,10 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
 class ConvertToLLVMPass
     : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
  public:
-  ConvertToLLVMPass(LLVMCodegenOptions options) : options_(options) {}
-
+  ConvertToLLVMPass(bool unfuseFMA = false) { unfuseFMAOps = unfuseFMA; }
+  ConvertToLLVMPass(const ConvertToLLVMPass &pass) {
+    unfuseFMAOps = pass.unfuseFMAOps;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect>();
   }
@@ -611,7 +604,10 @@ class ConvertToLLVMPass
   void runOnOperation() override;
 
  private:
-  LLVMCodegenOptions options_;
+  Option<bool> unfuseFMAOps{
+      *this, "unfuse-fma-ops",
+      llvm::cl::desc("Enable rewriting llvm.fma to its unfused version."),
+      llvm::cl::init(false)};
 };
 
 }  // namespace
@@ -718,7 +714,7 @@ void ConvertToLLVMPass::runOnOperation() {
   // Post conversion patterns.
   {
     OwningRewritePatternList postPatterns(&getContext());
-    if (options_.unfuseFMAOps) {
+    if (unfuseFMAOps) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
       (void)applyPatternsAndFoldGreedily(module, std::move(postPatterns));
     }
@@ -726,18 +722,15 @@ void ConvertToLLVMPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
-    LLVMCodegenOptions options) {
-  return std::make_unique<ConvertToLLVMPass>(options);
+    bool unfuseFMAOps) {
+  return std::make_unique<ConvertToLLVMPass>(unfuseFMAOps);
 }
 
 static PassRegistration<ConvertToLLVMPass> pass(
     "iree-codegen-convert-to-llvm",
     "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to "
     "LLVMIR dialect",
-    [] {
-      return std::make_unique<ConvertToLLVMPass>(
-          getLLVMCodegenOptionsFromClOptions());
-    });
+    [] { return std::make_unique<ConvertToLLVMPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

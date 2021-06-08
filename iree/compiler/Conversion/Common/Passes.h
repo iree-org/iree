@@ -1,17 +1,10 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -61,9 +54,15 @@ std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass();
 /// backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
-/// Create a pass to convert a model using f32 type to the equivalent one
-/// using 16.
-std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
+/// Sets the number of workgroups to use for each entry point in the dispatch
+/// region.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
+
+/// After running the upstream TensorConstantBufferize pass, remove tensor_loads
+/// introduced for use only in tensor_extract. These can be folded to use a load
+/// of the created memref object that holds the constant values.
+std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

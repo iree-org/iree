@@ -1,17 +1,17 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstddef>
+#include <iostream>
+#include <ostream>
+#include <string>
+#include <vector>
+
+#include "iree/base/api.h"
+#include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
@@ -29,18 +29,18 @@ TEST_P(DriverTest, QueryAndCreateAvailableDevices) {
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(
       driver_, iree_allocator_system(), &device_infos, &device_info_count));
 
-  IREE_LOG(INFO) << "Driver has " << device_info_count << " device(s)";
+  std::cout << "Driver has " << device_info_count << " device(s)";
   for (iree_host_size_t i = 0; i < device_info_count; ++i) {
-    IREE_LOG(INFO) << "  Creating device '"
-                   << std::string(device_infos[i].name.data,
-                                  device_infos[i].name.size)
-                   << "'";
+    std::cout << "  Creating device '"
+              << std::string(device_infos[i].name.data,
+                             device_infos[i].name.size)
+              << "'";
     iree_hal_device_t* device = NULL;
     IREE_ASSERT_OK(iree_hal_driver_create_device(
         driver_, device_infos[i].device_id, iree_allocator_system(), &device));
     iree_string_view_t device_id = iree_hal_device_id(device);
-    IREE_LOG(INFO) << "  Created device with id: '"
-                   << std::string(device_id.data, device_id.size) << "'";
+    std::cout << "  Created device with id: '"
+              << std::string(device_id.data, device_id.size) << "'";
     iree_hal_device_release(device);
   }
 

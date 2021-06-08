@@ -1,22 +1,15 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_REF_H_
 #define IREE_VM_REF_H_
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"
@@ -31,7 +24,7 @@ extern "C" {
 // are correct at runtime. We don't allow control over the ref types from the
 // VM ops and as such we can use the type specified as a safe way to avoid
 // reinterpreting memory incorrectly.
-typedef enum {
+enum iree_vm_ref_type_bits_t {
   IREE_VM_REF_TYPE_NULL = 0,
 
   // NOTE: these type values are assigned dynamically right now. Treat them as
@@ -43,12 +36,13 @@ typedef enum {
   // Wildcard type that indicates that a value may be a ref type but of an
   // unspecified internal type.
   IREE_VM_REF_TYPE_ANY = 0x00FFFFFFu,
-} iree_vm_ref_type_t;
+};
+typedef uint32_t iree_vm_ref_type_t;
 
 // Base for iree_vm_ref_t object targets.
 //
 // Usage (C):
-//  typedef struct {
+//  typedef struct my_type_t {
 //    iree_vm_ref_object_t ref_object;
 //    int my_fields;
 //  } my_type_t;
@@ -64,7 +58,7 @@ typedef enum {
 //
 // Usage (C++):
 //  Prefer using iree::vm::RefObject as a base type.
-typedef struct {
+typedef struct iree_vm_ref_object_t {
   iree_atomic_ref_count_t counter;
 } iree_vm_ref_object_t;
 
@@ -78,7 +72,7 @@ typedef struct {
 // Ideally the iree_vm_ref_t is in-cache on the stack and the target ptr is
 // either in cache from a previous use or will be used again after manipulating
 // its ref count.
-typedef struct {
+typedef struct iree_vm_ref_t {
   // Pointer to the object. Type is resolved based on the |type| field.
   // Will be NULL if the reference points to nothing.
   void* ptr;
@@ -96,7 +90,7 @@ static_assert(
 typedef void(IREE_API_PTR* iree_vm_ref_destroy_t)(void* ptr);
 
 // Describes a type for the VM.
-typedef struct {
+typedef struct iree_vm_ref_type_descriptor_t {
   // Function called when references of this type reach 0 and should be
   // destroyed.
   iree_vm_ref_destroy_t destroy;
@@ -176,8 +170,12 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_wrap_retain(void* ptr,
 // Checks that the given reference-counted pointer |ref| is of |type|.
 static inline iree_status_t iree_vm_ref_check(const iree_vm_ref_t ref,
                                               iree_vm_ref_type_t type) {
-  return ref.type == type ? iree_ok_status()
-                          : iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  return IREE_LIKELY(ref.type == type)
+             ? iree_ok_status()
+             : iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                ref.type == IREE_VM_REF_TYPE_NULL
+                                    ? "ref is null"
+                                    : "ref type mismatch");
 }
 
 // Retains the reference-counted pointer |ref|.

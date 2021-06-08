@@ -1,16 +1,8 @@
-#// Copyright 2020 Google LLC
+#// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+#// Licensed under the Apache License v2.0 with LLVM Exceptions.
+#// See https://llvm.org/LICENSE.txt for license information.
+#// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_BASE_INTERNAL_FLATCC_H_
 #define IREE_BASE_INTERNAL_FLATCC_H_
@@ -29,21 +21,21 @@
 // NOTE: order matters for these includes so stop clang from messing with it:
 // clang-format off
 
-#include "flatcc/reflection/flatbuffers_common_reader.h"
-#include "iree/base/internal/flatcc_reader.h"
+#include "flatcc/reflection/flatbuffers_common_reader.h"  // IWYU pragma: export
+#include "iree/base/internal/flatcc_reader.h" // IWYU pragma: export
 
-#include "flatcc/flatcc_verifier.h"
-#include "iree/base/internal/flatcc_verifier.h"
+#include "flatcc/flatcc_verifier.h" // IWYU pragma: export
+#include "iree/base/internal/flatcc_verifier.h" // IWYU pragma: export
 
-#include "flatcc/flatcc_builder.h"
-#include "flatcc/reflection/flatbuffers_common_builder.h"
-#include "iree/base/internal/flatcc_builder.h"
+#include "flatcc/flatcc_builder.h" // IWYU pragma: export
+#include "flatcc/reflection/flatbuffers_common_builder.h" // IWYU pragma: export
+#include "iree/base/internal/flatcc_builder.h" // IWYU pragma: export
 
-#include "flatcc/flatcc_json_parser.h"
-#include "iree/base/internal/flatcc_json_parser.h"
+#include "flatcc/flatcc_json_parser.h" // IWYU pragma: export
+#include "iree/base/internal/flatcc_json_parser.h" // IWYU pragma: export
 
-#include "flatcc/flatcc_json_printer.h"
-#include "iree/base/internal/flatcc_json_printer.h"
+#include "flatcc/flatcc_json_printer.h" // IWYU pragma: export
+#include "iree/base/internal/flatcc_json_printer.h" // IWYU pragma: export
 
 // clang-format on
 

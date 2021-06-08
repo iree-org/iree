@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
 
@@ -66,15 +58,18 @@ iree_cc_binary(
     "iree-benchmark-module-main.cc"
   DEPS
     benchmark
+    iree::base
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::status
     iree::base::tracing
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
+    iree::vm::cc
   TESTONLY
 )
 
@@ -90,12 +85,15 @@ iree_cc_binary(
     iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
+    iree::base::logging
     iree::base::status
     iree::base::tracing
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::testing::gtest
     iree::tools::utils::vm_util
+    iree::vm
     iree::vm::bytecode_module
   TESTONLY
 )
@@ -107,8 +105,8 @@ iree_cc_binary(
     "iree-dump-module-main.cc"
   DEPS
     flatcc::runtime
+    iree::base
     iree::base::internal::file_io
-    iree::base::status
     iree::schemas::bytecode_module_def_c_fbs
     iree::tools::utils::vm_util
 )
@@ -165,7 +163,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms
-      iree::compiler::Dialect::Shape::Conversion
       iree::compiler::Dialect::Shape::IR
       iree::compiler::Dialect::Shape::Transforms
       iree::compiler::Dialect::VM::Analysis
@@ -222,6 +219,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_mlir_passes_and_dialects
       ::init_xla_dialects
       iree::compiler::Conversion::init_conversions
+      iree::compiler::Conversion::Conversion
       iree::compiler::Dialect::HAL::Conversion::Passes
     INCLUDES
       "${IREE_EMITC_INCLUDES}"
@@ -310,6 +308,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRTargetLLVMIRExport
       MLIRTranslation
       iree::compiler::Conversion::init_conversions
+      iree::compiler::Conversion::Conversion
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
@@ -352,8 +351,10 @@ if(${IREE_BUILD_COMPILER})
       absl::span
       iree::base
       iree::base::internal::flags
+      iree::base::logging
       iree::base::status
       iree::base::tracing
+      iree::compiler::Dialect::HAL::Target
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
@@ -363,6 +364,7 @@ if(${IREE_BUILD_COMPILER})
       iree::tools::utils::vm_util
       iree::vm
       iree::vm::bytecode_module
+      iree::vm::cc
     HOSTONLY
   )
 

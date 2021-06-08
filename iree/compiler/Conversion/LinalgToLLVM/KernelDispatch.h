@@ -1,29 +1,16 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cstdint>
-
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
-#include "llvm/ADT/SmallVector.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Operation.h"
-#include "mlir/IR/Value.h"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-enum class TilingLevel {
+enum class TilingLevel : unsigned {
   // Tile linalg operations to workgroup threads.
   WorkGroupTiles = 0,
   // Tile linalg operation on workgroup thread into L1 block tiles.
@@ -33,18 +20,7 @@ enum class TilingLevel {
   NumTileLevels = 3
 };
 
-struct TileSizeFn {
-  template <TilingLevel tilingLevel>
-  static llvm::SmallVector<Value, 4> get(OpBuilder &builder,
-                                         Operation *operation);
-};
-
-template <TilingLevel tilingLevel>
-llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op);
-
-Optional<LaunchConfig> initCPULaunchConfig(
-    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    ArrayRef<linalg::LinalgOp> linalgOps);
+IREE::HAL::TranslateExecutableInfo initCPULaunchConfig(ModuleOp moduleOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir

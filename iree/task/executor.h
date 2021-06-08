@@ -1,19 +1,13 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_TASK_EXECUTOR_H_
 #define IREE_TASK_EXECUTOR_H_
+
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
@@ -260,7 +254,7 @@ extern "C" {
 
 // A bitfield specifying the scheduling mode used for configuring how (or if)
 // work is balanced across queues.
-enum iree_task_scheduling_mode_e {
+enum iree_task_scheduling_mode_bits_t {
   // TODO(benvanik): batch, round-robin, FCFS, SJF, etc.
   // We can also allow for custom scheduling, though I'm skeptical of the value
   // of that. We should look into what GPUs do in hardware for balancing things
@@ -303,7 +297,7 @@ enum iree_task_scheduling_mode_e {
 typedef uint32_t iree_task_scheduling_mode_t;
 
 // Base task system executor interface.
-typedef struct iree_task_executor_s iree_task_executor_t;
+typedef struct iree_task_executor_t iree_task_executor_t;
 
 // Creates a task executor using the specified topology.
 // |topology| is only used during creation and need not live beyond this call.

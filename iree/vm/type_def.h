@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_TYPE_DEF_H_
 #define IREE_VM_TYPE_DEF_H_
@@ -31,7 +23,7 @@ extern "C" {
 // * i8: primitive value (value_type != 0)
 // * !vm.ref<?>: any ref value (ref_type == IREE_VM_REF_TYPE_ANY)
 // * !vm.ref<!foo>: ref value of type !foo (ref_type > 0)
-typedef struct {
+typedef struct iree_vm_type_def_t {
   iree_vm_value_type_t value_type : 8;
   iree_vm_ref_type_t ref_type : 24;
 } iree_vm_type_def_t;
@@ -69,7 +61,7 @@ static inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
 // An variant value that can be either a primitive value type or a ref type.
 // Each variant value stores its type but users are required to check the type
 // prior to accessing any of the data.
-typedef struct {
+typedef struct iree_vm_variant_t {
   iree_vm_type_def_t type;
   union {
     // TODO(benvanik): replace with iree_vm_value_t.

@@ -1,19 +1,20 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/internal/file_io.h"
 
+#include <cstdlib>
+#include <cstring>
+#include <ostream>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include "iree/base/logging.h"
+#include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -44,8 +45,7 @@ TEST(FileIO, ReadWriteContents) {
   auto path = GetUniquePath(kUniqueName);
 
   // File must not exist.
-  ASSERT_THAT(Status(iree_file_exists(path.c_str())),
-              StatusIs(StatusCode::kNotFound));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, iree_file_exists(path.c_str()));
 
   // Generate file contents.
   auto write_contents = GetUniqueContents(kUniqueName);

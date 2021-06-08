@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_BASE_INTERNAL_THREADING_IMPL_H_
 #define IREE_BASE_INTERNAL_THREADING_IMPL_H_
@@ -51,7 +43,7 @@ int iree_strncpy_s(char* dest, size_t destsz, const char* src, size_t count);
 typedef void (*iree_thread_set_priority_fn_t)(
     iree_thread_t* thread, iree_thread_priority_class_t priority_class);
 
-typedef struct {
+typedef struct iree_thread_override_list_t {
   iree_thread_set_priority_fn_t set_priority_fn;
   iree_thread_priority_class_t base_priority_class;
   iree_allocator_t allocator;

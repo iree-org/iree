@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_
 #define IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_
@@ -32,12 +24,7 @@ namespace TF {
 // Create a single pipeline that will run all the needed IREE-specific TF import
 // passes in the right order.
 void buildTFImportPassPipeline(OpPassManager &pm);
-
-void buildMHLOImportPassPipeline(OpPassManager &pm);
-
 void registerTFImportPassPipeline();
-
-void registerMHLOImportPassPipeline();
 
 //===----------------------------------------------------------------------===//
 // IREE-specific Passes For TensorFlow Import
@@ -45,14 +32,6 @@ void registerMHLOImportPassPipeline();
 
 // Converts the TF dialect to the XLA MHLO dialect.
 std::unique_ptr<FunctionPass> createConvertToMHLOPass();
-
-// Annotates an appropriate iree.abi attribute on public functions that
-// operate exclusively on tensor types. This corresponds to the expectations
-// of MHLO and is suitable for such programs.
-std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass();
-
-// Flattens tuple values in function signatures and blocks.
-std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 
 // In a module tagged with `tf_saved_model.semantics`, lowers
 // `tf_saved_model.global_variable`'s to `flow.variable`'s.
@@ -95,11 +74,8 @@ void registerAllDialects(mlir::DialectRegistry &registry);
 
 inline void registerAllPasses() {
   registerTFImportPassPipeline();
-  registerMHLOImportPassPipeline();
 
   createConvertToMHLOPass();
-  createEmitDefaultIREEABIPass();
-  createFlattenTuplesInCFGPass();
   createLowerGlobalTensorsPass();
   createLowerExportedFunctionsPass();
   createPrettifyDebugInfoPass();

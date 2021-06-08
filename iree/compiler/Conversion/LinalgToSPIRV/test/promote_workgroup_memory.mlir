@@ -68,10 +68,11 @@ hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "pr
 //  CHECK-SAME:       "copy_to_workgroup_memory"
 //       CHECK:     linalg.copy(%[[ARG1SV]], %[[SUBVIEW2]])
 //  CHECK-SAME:       "copy_to_workgroup_memory"
-//       CHECK:     linalg.matmul
-//  CHECK-SAME:       "workgroup_memory"
-//  CHECK-SAME:       ins(%[[SUBVIEW1]], %[[SUBVIEW2]]
-//  CHECK-SAME:      outs(%[[RET0SV]]
+//       CHECK:     scf.for
+//       CHECK:       scf.for
+//   CHECK-DAG:         memref.subview %[[SUBVIEW1]]
+//   CHECK-DAG:         memref.subview %[[SUBVIEW2]]
+//   CHECK-DAG:         memref.subview %[[RET0SV]]
 
 // -----
 
@@ -131,7 +132,9 @@ hal.executable @conv_promote_workgroup_memory attributes {sym_visibility = "priv
 //       CHECK:   %[[SUBVIEW1:.+]] = memref.subview %[[ALLOC1]]
 //       CHECK:   linalg.copy(%[[ARG1SV]], %[[SUBVIEW1]])
 //  CHECK-SAME:      "copy_to_workgroup_memory"
-//       CHECK:   linalg.conv_2d_input_nhwc_filter_hwcf
-//  CHECK-SAME:     "workgroup_memory"
-//  CHECK-SAME:     ins(%[[SUBVIEW1]], %[[ARG0]]
-//  CHECK-SAME:    outs(%[[RET0SV]]
+//       CHECK:   scf.for
+//       CHECK:     scf.for
+//       CHECK:       scf.for
+//   CHECK-DAG:         memref.subview %[[SUBVIEW1]]
+//   CHECK-DAG:         memref.subview %[[ARG0]]
+//   CHECK-DAG:         memref.subview %[[RET0SV]]

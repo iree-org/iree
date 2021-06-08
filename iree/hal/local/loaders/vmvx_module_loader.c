@@ -1,22 +1,21 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/local/loaders/vmvx_module_loader.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/tracing.h"
-#include "iree/hal/local/local_descriptor_set_layout.h"
+#include "iree/hal/api.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/local_executable_layout.h"
 #include "iree/modules/vmvx/module.h"
 #include "iree/vm/bytecode_module.h"
 
@@ -35,7 +34,7 @@
 
 #define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
 
-typedef struct {
+typedef struct iree_hal_vmvx_executable_t {
   iree_hal_local_executable_t base;
 
   // Context containing both the VMVX module and the loaded executable.
@@ -341,7 +340,7 @@ const iree_hal_local_executable_vtable_t iree_hal_vmvx_executable_vtable = {
 // iree_hal_vmvx_module_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_vmvx_module_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
   iree_vm_instance_t* instance;

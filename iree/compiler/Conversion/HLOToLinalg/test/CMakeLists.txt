@@ -14,9 +14,11 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "broadcasting.mlir"
+    "convert_complex_to_real.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
-    "pad_tensor_to_tensor.mlir"
+    "missing_legalizations.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

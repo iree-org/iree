@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
@@ -736,6 +728,16 @@ void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
 }
 
 static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
+  // TODO(#4670): Share across ops or upstream a custom directive
+  StringRef visibility;
+  if (parser.parseOptionalKeyword(&visibility,
+                                  {"public", "private", "nested"})) {
+    return failure();
+  }
+  StringAttr visibilityAttr = parser.getBuilder().getStringAttr(visibility);
+  result->attributes.push_back(parser.getBuilder().getNamedAttr(
+      SymbolTable::getVisibilityAttrName(), visibilityAttr));
+
   StringAttr nameAttr;
   Attribute valueAttr;
   if (failed(parser.parseSymbolName(nameAttr,
@@ -744,11 +746,19 @@ static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
       failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
     return failure();
   }
+
   return success();
 }
 
 static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   p << op.getOperationName() << ' ';
+
+  // TODO(#4670): Share across ops or upstream a custom directive
+  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
+  if (auto visibility = op->getAttrOfType<StringAttr>(visibilityAttrName)) {
+    p << visibility.getValue() << ' ';
+  }
+
   p.printSymbolName(op.sym_name());
   p << ' ';
   p.printAttribute(op.value());
@@ -1233,6 +1243,6 @@ Optional<MutableOperandRange> CondBreakOp::getMutableSuccessorOperands(
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/VM/IR/VMOpEncoder.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOpEncoder.cpp.inc"  // IWYU pragma: keep
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"  // IWYU pragma: keep

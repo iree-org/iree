@@ -1,31 +1,29 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_
 #define IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_
 
 #include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/Types.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterface.h.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOpInterface.h.inc"  // IWYU pragma: export
 
 class VMDialect : public Dialect {
  public:

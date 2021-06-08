@@ -1,19 +1,13 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_RUNTIME_CALL_H_
 #define IREE_RUNTIME_CALL_H_
+
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -23,7 +17,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_runtime_session_s iree_runtime_session_t;
+typedef struct iree_runtime_session_t iree_runtime_session_t;
 
 //===----------------------------------------------------------------------===//
 // iree_runtime_call_t
@@ -33,7 +27,7 @@ typedef struct iree_runtime_session_s iree_runtime_session_t;
 // or whether to consume inputs like this or by having separate call types.
 // For example, an async_call may make things more clear when using semaphores
 // without having to pollute this interface.
-enum iree_runtime_call_flags_e {
+enum iree_runtime_call_flag_bits_t {
   IREE_RUNTIME_CALL_FLAG_RESERVED = 0u,
 };
 typedef uint32_t iree_runtime_call_flags_t;
@@ -49,7 +43,7 @@ typedef uint32_t iree_runtime_call_flags_t;
 //
 // Thread-compatible; these are designed to be stack-local or embedded in a user
 // data structure that can provide synchronization when required.
-typedef struct iree_runtime_call_s {
+typedef struct iree_runtime_call_t {
   iree_runtime_session_t* session;
   iree_vm_function_t function;
   iree_vm_list_t* inputs;

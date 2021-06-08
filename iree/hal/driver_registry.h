@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_DRIVER_REGISTRY_H_
 #define IREE_HAL_DRIVER_REGISTRY_H_
@@ -43,7 +35,7 @@ extern "C" {
 // cost (and deal with the consequences).
 //
 // WARNING: this API is unstable until the HAL is fully ported. Do not use.
-typedef struct {
+typedef struct iree_hal_driver_factory_t {
   // TODO(benvanik): version field.
   IREE_API_UNSTABLE
 
@@ -85,7 +77,7 @@ typedef struct {
 // iree_hal_driver_registry_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_driver_registry_s iree_hal_driver_registry_t;
+typedef struct iree_hal_driver_registry_t iree_hal_driver_registry_t;
 
 // Returns the default per-process driver registry.
 // In simple applications this is usually where you want to go to register and

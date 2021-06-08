@@ -1,19 +1,13 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_LOCAL_ARENA_H_
 #define IREE_HAL_LOCAL_ARENA_H_
+
+#include <stddef.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomic_slist.h"
@@ -26,12 +20,14 @@ extern "C" {
 // iree_arena_block_pool_t
 //===----------------------------------------------------------------------===//
 
+struct iree_arena_block_t;
+
 // NOTE: this struct is at the *end* of allocated blocks such that we don't mess
 // with alignment - byte 0 of a block is always byte 0 of the allocation from
 // the system. We can do this as all blocks have the same size so computing the
 // footer offset from a pointer is easy.
-typedef struct iree_arena_block_s {
-  struct iree_arena_block_s* next;
+typedef struct iree_arena_block_t {
+  struct iree_arena_block_t* next;
 } iree_arena_block_t;
 
 // An atomic approximately LIFO singly-linked list.
@@ -47,7 +43,7 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_atomic_arena_block, iree_arena_block_t,
 //
 // Thread-safe; multiple threads may acquire and release blocks from the pool.
 // The underlying allocator must also be thread-safe.
-typedef struct {
+typedef struct iree_arena_block_pool_t {
   // Block size, in bytes. All blocks in the available_slist will have this
   // byte size which includes the iree_arena_block_t footer.
   iree_host_size_t total_block_size;
@@ -93,8 +89,8 @@ void iree_arena_block_pool_release(iree_arena_block_pool_t* block_pool,
 // iree_arena_allocator_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_arena_oversized_allocation_s {
-  struct iree_arena_oversized_allocation_s* next;
+typedef struct iree_arena_oversized_allocation_t {
+  struct iree_arena_oversized_allocation_t* next;
 } iree_arena_oversized_allocation_t;
 
 // A lightweight bump-pointer arena allocator using a shared block pool.
@@ -111,7 +107,7 @@ typedef struct iree_arena_oversized_allocation_s {
 // Thread-compatible; the shared block pool is thread-safe and may be used by
 // arenas on multiple threads but each arena must only be used by a single
 // thread.
-typedef struct {
+typedef struct iree_arena_allocator_t {
   // Fixed-size block pool used to acquire new blocks for the arena.
   iree_arena_block_pool_t* block_pool;
   // Total bytes allocated to the arena from the block pool or system allocator.

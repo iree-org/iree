@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_CUDA_DYNAMIC_SYMBOLS_H_
 #define IREE_HAL_CUDA_DYNAMIC_SYMBOLS_H_
@@ -27,12 +19,12 @@ extern "C" {
 // loads all the function declared in `dynamic_symbol_tables.def` and fail if
 // any of the symbol is not available. The functions signatures are matching
 // the declarations in `cuda.h`.
-typedef struct {
+typedef struct iree_hal_cuda_dynamic_symbols_t {
   iree_dynamic_library_t* loader_library;
 
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
-#include "iree/hal/cuda/dynamic_symbol_tables.h"
+#include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef CU_PFN_DECL
 } iree_hal_cuda_dynamic_symbols_t;
 

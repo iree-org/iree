@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===- BufferAllocViewCleanUpPass.cpp -------------------------------------===//
 //
@@ -52,14 +44,15 @@ namespace {
 ///       !flow.dispatch.tensor<readonly:864xf32>
 ///   %0 = flow.dispatch.tensor.load %subspan :
 ///       !flow.dispatch.tensor<readonly:864xf32> -> tensor<864xf32>
-struct FoldReshapeIntoInterfaceTensorLoad
-    : OpRewritePattern<linalg::TensorReshapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+template <typename TensorReshapeOp>
+struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
+  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::TensorReshapeOp reshapeOp,
+  LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
     auto loadOp =
-        reshapeOp.src().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+        reshapeOp.src()
+            .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     if (!loadOp) return failure();
 
     // Make sure we are loading the full incoming subspan. Otherwise we cannot
@@ -69,11 +62,14 @@ struct FoldReshapeIntoInterfaceTensorLoad
       return failure();
 
     auto subspanOp =
-        loadOp.source().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+        loadOp.source()
+            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!subspanOp) return failure();
 
     auto newSubspanType = IREE::Flow::DispatchTensorType::get(
-        subspanOp.getType().cast<IREE::Flow::DispatchTensorType>().getAccess(),
+        subspanOp.getType()
+            .template cast<IREE::Flow::DispatchTensorType>()
+            .getAccess(),
         reshapeOp.getResultType());
 
     Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
@@ -109,8 +105,10 @@ struct BufferAllocViewCleanUpPass
     : public PassWrapper<BufferAllocViewCleanUpPass, FunctionPass> {
   void runOnFunction() override {
     OwningRewritePatternList patterns(&getContext());
-    patterns.insert<FoldReshapeIntoInterfaceTensorLoad, RemoveDeadMemAllocs>(
-        &getContext());
+    patterns.insert<
+        FoldReshapeIntoInterfaceTensorLoad<linalg::TensorCollapseShapeOp>,
+        FoldReshapeIntoInterfaceTensorLoad<linalg::TensorExpandShapeOp>,
+        RemoveDeadMemAllocs>(&getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

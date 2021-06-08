@@ -2,7 +2,7 @@
 
 vm.module @global_ops {
   // check the generated state struct
-  // CHECK-LABEL: struct global_ops_state_s {
+  // CHECK-LABEL: struct global_ops_state_t {
   // CHECK-NEXT: iree_allocator_t allocator;
   // CHECK-NEXT: uint8_t rwdata[8];
   // CHECK-NEXT: iree_vm_ref_t refs[0];

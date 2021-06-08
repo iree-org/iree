@@ -17,6 +17,7 @@ iree_cc_library(
     "HALDialect.h"
     "HALOps.h"
     "HALTypes.h"
+    "LoweringConfig.h"
   TEXTUAL_HDRS
     "HALEnums.cpp.inc"
     "HALEnums.h.inc"
@@ -28,10 +29,15 @@ iree_cc_library(
     "HALStructs.h.inc"
     "HALTypeInterfaces.cpp.inc"
     "HALTypeInterfaces.h.inc"
+    "LoweringConfig.cpp.inc"
+    "LoweringConfig.h.inc"
+    "LoweringConfigEnums.cpp.inc"
+    "LoweringConfigEnums.h.inc"
   SRCS
     "HALOpFolders.cpp"
     "HALOps.cpp"
     "HALTypes.cpp"
+    "LoweringConfig.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -122,6 +128,26 @@ iree_tablegen_doc(
     "HALOps.td"
   OUTS
     -gen-dialect-doc HALDialect.md
+)
+
+iree_tablegen_library(
+  NAME
+    LoweringConfigGen
+  TD_FILE
+    "LoweringConfig.td"
+  OUTS
+    -gen-struct-attr-decls LoweringConfig.h.inc
+    -gen-struct-attr-defs LoweringConfig.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    LoweringConfigEnumGen
+  TD_FILE
+    "LoweringConfig.td"
+  OUTS
+    -gen-enum-decls LoweringConfigEnums.h.inc
+    -gen-enum-defs LoweringConfigEnums.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // NOTE: native_module_test.h contains documented examples of how to use this!
 
@@ -21,6 +13,7 @@
 
 #include "iree/base/api.h"
 #include "iree/vm/module.h"
+#include "iree/vm/stack.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +22,7 @@ extern "C" {
 // Describes an imported native function in a native module.
 // All of this information is assumed read-only and will be referenced for the
 // lifetime of any module created with the descriptor.
-typedef struct {
+typedef struct iree_vm_native_import_descriptor_t {
   // Fully-qualified function name (for example, 'other_module.foo').
   iree_string_view_t full_name;
 } iree_vm_native_import_descriptor_t;
@@ -37,7 +30,7 @@ typedef struct {
 // Describes an exported native function in a native module.
 // All of this information is assumed read-only and will be referenced for the
 // lifetime of any module created with the descriptor.
-typedef struct {
+typedef struct iree_vm_native_export_descriptor_t {
   // Module-local function name (for example, 'foo' for function 'module.foo').
   iree_string_view_t local_name;
 
@@ -58,7 +51,7 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_shim_t)(
     void* module_state, iree_vm_execution_result_t* out_result);
 
 // An entry in the function pointer table.
-typedef struct {
+typedef struct iree_vm_native_function_ptr_t {
   // A shim function that takes the VM ABI and maps it to the target ABI.
   iree_vm_native_function_shim_t shim;
   // Target function passed to the shim.
@@ -72,7 +65,7 @@ typedef struct {
 // The common native module code will use this descriptor to return metadata on
 // query, lookup exported functions, and call module-provided implementation
 // functions for state and call management.
-typedef struct {
+typedef struct iree_vm_native_module_descriptor_t {
   IREE_API_UNSTABLE
 
   // Name of the module prefixed on all exported functions.

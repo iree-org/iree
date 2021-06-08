@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.13.4)
 # Do not set MSVC warning flags like /W3 by default (since 3.15):
@@ -42,6 +34,7 @@ option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
@@ -88,6 +81,7 @@ endif()
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
+option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -229,6 +223,7 @@ include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_run_binary_test)
+include(iree_mlir_benchmark_suite)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -424,6 +419,11 @@ endif()
 # IREE top-level targets
 #-------------------------------------------------------------------------------
 
+if(${IREE_BUILD_BENCHMARKS})
+  # Add a top-level custom target to drive generating benchmark suites.
+  add_custom_target(iree-benchmark-suites)
+endif()
+
 if(${IREE_BUILD_DOCS})
   # Add a top-level custom target to drive generating all documentation.
   # Register it to the default target given that IREE_BUILD_DOCS is explicitly
@@ -446,6 +446,10 @@ add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
+if(${IREE_BUILD_EXPERIMENTAL_ROCM})
+  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
+  add_subdirectory(experimental/rocm)
+endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)

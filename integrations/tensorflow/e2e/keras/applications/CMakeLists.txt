@@ -27,7 +27,12 @@ iree_e2e_cartesian_product_test_suite(
     "MobileNet;MobileNetV2;ResNet50;VGG16;VGG19"
     "tf;tflite;iree_llvmaot;iree_vulkan"
   FAILING_CONFIGURATIONS
+    ",,,VGG16,tflite"
     ",,,VGG19,tflite"
+    ",,,VGG16,iree_llvmaot"
+    ",,,VGG19,iree_llvmaot"
+    ",,,VGG16,iree_vulkan"
+    ",,,VGG19,iree_vulkan"
   LABELS
     "manual"
 )

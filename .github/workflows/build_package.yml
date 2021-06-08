@@ -232,7 +232,7 @@ jobs:
         id: upload-release-assets
         uses: dwenegar/upload-release-assets@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
           assets_path: ./bindist/*

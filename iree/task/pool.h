@@ -1,20 +1,13 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_TASK_POOL_H_
 #define IREE_TASK_POOL_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"
@@ -29,7 +22,7 @@ extern "C" {
 // This struct is at the head of all task allocations made from the allocator.
 // It is used to form a linked list of all allocations made so that they can be
 // easily freed during pool teardown.
-typedef struct {
+typedef struct iree_task_allocation_header_t {
   // Next allocation in the linked list of allocations.
   iree_atomic_slist_intrusive_ptr_t* next;
 } iree_task_allocation_header_t;
@@ -50,7 +43,7 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_atomic_task_allocation,
 // Pools can either be fixed-size with a maximum number of available tasks that
 // can be outstanding at any time or growable to allow the pool to be grown
 // unbounded after initialization.
-typedef struct iree_task_pool_s {
+typedef struct iree_task_pool_t {
   // Allocator used for allocating/freeing each allocation block.
   iree_allocator_t allocator;
 

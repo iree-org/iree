@@ -30,6 +30,8 @@ iree_cc_test(
     "allocator_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -42,6 +44,8 @@ iree_cc_test(
     "buffer_mapping_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -54,6 +58,8 @@ iree_cc_test(
     "command_buffer_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -66,6 +72,8 @@ iree_cc_test(
     "descriptor_set_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -78,6 +86,8 @@ iree_cc_test(
     "descriptor_set_layout_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -90,6 +100,8 @@ iree_cc_test(
     "driver_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -102,6 +114,8 @@ iree_cc_test(
     "event_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -114,6 +128,8 @@ iree_cc_test(
     "executable_layout_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -126,6 +142,8 @@ iree_cc_test(
     "semaphore_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -138,6 +156,8 @@ iree_cc_test(
     "semaphore_submission_test.cc"
   DEPS
     ::cts_test_base
+    iree::base
+    iree::hal
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main

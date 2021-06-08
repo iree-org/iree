@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_BYTECODE_MODULE_IMPL_H_
 #define IREE_VM_BYTECODE_MODULE_IMPL_H_
@@ -50,7 +42,7 @@ extern "C" {
 #define IREE_REF_REGISTER_MASK 0x3FFF
 
 // A loaded bytecode module.
-typedef struct {
+typedef struct iree_vm_bytecode_module_t {
   // Interface routing to the bytecode module functions.
   // Must be first in the struct as we dereference the interface to find our
   // members below.
@@ -84,7 +76,7 @@ typedef struct {
 // only store the absolute minimum information to reduce our fixed overhead.
 // There's a big tradeoff though as a few extra bytes here can avoid non-trivial
 // work per import function invocation.
-typedef struct {
+typedef struct iree_vm_bytecode_import_t {
   // Import function in the source module.
   iree_vm_function_t function;
 
@@ -104,7 +96,7 @@ typedef struct {
 // This is allocated with a provided allocator as a single flat allocation.
 // This struct is a prefix to the allocation pointing into the dynamic offsets
 // of the allocation storage.
-typedef struct {
+typedef struct iree_vm_bytecode_module_state_t {
   // Combined rwdata storage for the entire module, including globals.
   // Aligned to 16 bytes (128-bits) for SIMD usage.
   iree_byte_span_t rwdata_storage;

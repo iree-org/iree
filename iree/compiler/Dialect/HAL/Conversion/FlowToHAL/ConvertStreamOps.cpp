@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
@@ -32,6 +24,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #define DEBUG_TYPE "iree-hal"
@@ -363,8 +356,11 @@ class StreamSchedulingState {
   }
 
   // Maps |tensorValue| to the backing storage buffer defined by |bufferRange|.
-  void mapTensorToBufferRange(Value tensorValue, BufferRange bufferRange) {
-    assert(!bufferRangeMap.count(tensorValue));
+  LogicalResult mapTensorToBufferRange(Value tensorValue,
+                                       BufferRange bufferRange) {
+    if (bufferRangeMap.count(tensorValue)) {
+      return failure();
+    }
     bufferRangeMap.insert(std::make_pair(tensorValue, bufferRange));
 
     // TODO(#5410): make alias propagation map through an indexing map for
@@ -372,6 +368,7 @@ class StreamSchedulingState {
     for (auto alias : valueAliases[tensorValue]) {
       bufferRangeMap.insert(std::make_pair(alias, bufferRange));
     }
+    return success();
   }
 
   // Returns a buffer range backing the given stream |tensorValue|.
@@ -489,10 +486,10 @@ static BufferRange allocateOutputBuffer(Value streamValue, Value externalValue,
 // Allocates all output buffers for the stream and populates the
 // |schedulingState| with the new mappings. Returns the set of output buffers
 // mapping 1:1 with the |streamOp| results.
-static SmallVector<Value> allocateOutputBuffers(
+static LogicalResult allocateOutputBuffers(
     IREE::Flow::ExStreamFragmentOp streamOp,
-    StreamSchedulingState &schedulingState,
-    ConversionPatternRewriter &rewriter) {
+    StreamSchedulingState &schedulingState, ConversionPatternRewriter &rewriter,
+    SmallVectorImpl<Value> &output) {
   auto tiedStreamOp = cast<IREE::TiedOpInterface>(streamOp.getOperation());
   auto &entryBlock = streamOp.body().front();
 
@@ -529,25 +526,33 @@ static SmallVector<Value> allocateOutputBuffers(
       bufferRange = allocateOutputBuffer(streamValue, externalValue,
                                          schedulingState, rewriter);
     }
-    assert(bufferRange.buffer);
+    if (!bufferRange.buffer) {
+      return streamOp.emitOpError() << "buffer range has no buffer";
+    }
     outputBuffers.push_back(bufferRange.buffer);
-    schedulingState.mapTensorToBufferRange(streamValue, bufferRange);
+    if (failed(
+            schedulingState.mapTensorToBufferRange(streamValue, bufferRange))) {
+      return streamOp.emitOpError() << "tensor was mapped to multiple buffer "
+                                       "ranges while allocating output buffers";
+    }
   }
 
-  return outputBuffers;
+  output = outputBuffers;
+  return success();
 }
 
 // Allocates transient buffers to store the intra-stream results and populates
 // the |schedulingState| with the new mappings.
-static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
-                                     LivenessIntervalList &livenessIntervals,
-                                     StreamSchedulingState &schedulingState,
-                                     ConversionPatternRewriter &rewriter) {
+static LogicalResult allocateTransientBuffers(
+    IREE::Flow::ExStreamFragmentOp streamOp,
+    LivenessIntervalList &livenessIntervals,
+    StreamSchedulingState &schedulingState,
+    ConversionPatternRewriter &rewriter) {
   // TODO(#5410): unify with slice/update handling below. We should have a
   // more generic way of handling these special ops and need to be able to hook
   // into ones that directly control aliasing behavior like slice/update.
   SmallPtrSet<Value, 16> coveredValues;
-  streamOp.walk([&](IREE::HAL::ConstantSubspanOp subspanOp) {
+  auto walkResult = streamOp.walk([&](IREE::HAL::ConstantSubspanOp subspanOp) {
     auto tensorValue = subspanOp.result();
     auto bufferValue = schedulingState.loadVariable(
         IREE::HAL::BufferType::get(rewriter.getContext()),
@@ -560,10 +565,20 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
         subspanOp.getLoc(), bufferValue.getType(), bufferValue, offsetValue,
         lengthValue);
     auto bufferRange = BufferRange{subspanValue, lengthValue};
-    schedulingState.mapTensorToBufferRange(tensorValue, bufferRange);
+    if (failed(
+            schedulingState.mapTensorToBufferRange(tensorValue, bufferRange))) {
+      return WalkResult::interrupt();
+    }
     schedulingState.forEachEquivalentTensorValue(
         tensorValue, [&](Value alias) { coveredValues.insert(alias); });
+    return WalkResult::advance();
   });
+
+  if (walkResult.wasInterrupted()) {
+    return streamOp.emitOpError() << "constant subspan op was mapped to "
+                                     "multiple buffer ranges while allocating "
+                                     "transient buffers";
+  }
 
   // Gather all of the transient values we need to allocate buffers for.
   SmallVector<Value> transientValues;
@@ -603,7 +618,7 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
   }
   if (transientValues.empty()) {
     // No transients required.
-    return;
+    return success();
   }
 
   // Insert the hal.allocator.pack op to compute the packed offsets and total
@@ -637,8 +652,13 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
         value.getLoc(), allocateOp.result().getType(), allocateOp.result(),
         offset, dynamicSliceSizes[i]);
     auto bufferRange = BufferRange{subspanValue, dynamicSliceSizes[i]};
-    schedulingState.mapTensorToBufferRange(value, bufferRange);
+    if (failed(schedulingState.mapTensorToBufferRange(value, bufferRange))) {
+      return streamOp.emitOpError()
+             << "tensor for buffer subspan was mapped to multiple buffer "
+                "ranges while allocating transient buffers";
+    }
   }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -751,84 +771,6 @@ static void recordInterfaceBindings(Value device, Value commandBuffer,
   }
 }
 
-// DEPRECATED: this is going away with the legacy linalg-on-buffers path.
-static LogicalResult recordLegacyBindings(
-    Value device, Value commandBuffer, IREE::Flow::DispatchOp &dispatchOp,
-    IREE::HAL::InterfaceOp &interfaceOp, Value executableLayout,
-    StreamSchedulingState &schedulingState,
-    ConversionPatternRewriter &rewriter) {
-  SmallVector<Value, 4> pushConstantValues;
-  for (auto inputValue : dispatchOp.operands()) {
-    if (inputValue.getType().isa<IndexType>() ||
-        inputValue.getType().isa<IntegerType>()) {
-      auto pushConstantValue = rewriter.getRemappedValue(inputValue);
-      // Need an explicit index cast to i32 since the
-      // CommandBufferPushConstantsOp is intrinsically i32 based.
-      if (inputValue.getType().isa<IndexType>()) {
-        pushConstantValue = rewriter.create<IndexCastOp>(
-            dispatchOp.getLoc(), rewriter.getIntegerType(32),
-            pushConstantValue);
-      }
-      pushConstantValues.push_back(pushConstantValue);
-    }
-  }
-  if (!pushConstantValues.empty()) {
-    uint64_t maxPushConstants =
-        interfaceOp.push_constants().hasValue()
-            ? interfaceOp.push_constants().getValue().getZExtValue()
-            : 0;
-    (void)maxPushConstants;
-    assert(pushConstantValues.size() <= maxPushConstants &&
-           "uniform buffer spilling not yet implemented");
-
-    rewriter.create<IREE::HAL::CommandBufferPushConstantsOp>(
-        dispatchOp.getLoc(), commandBuffer, executableLayout,
-        rewriter.getIndexAttr(0), pushConstantValues);
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "HAL recordPushBindings: "
-                          << *dispatchOp.getOperation() << "\n");
-  uint32_t setOrdinal = 0;
-  uint32_t bindingOrdinal = 0;
-  SmallVector<IREE::HAL::DescriptorSetBindingValue, 4> bindings;
-  auto zeroOffset = schedulingState.lookupOrCreateIndex(0, rewriter);
-  auto pushBinding =
-      [&](Value tensorValue,
-          IREE::HAL::MemoryAccessBitfield accessType) -> LogicalResult {
-    auto bufferRange = schedulingState.lookupTensorBufferRange(tensorValue);
-    bindings.push_back(std::make_tuple(
-        schedulingState.lookupOrCreateIndex(bindingOrdinal++, rewriter),
-        bufferRange.buffer, zeroOffset, bufferRange.length));
-    return success();
-  };
-  for (auto it : llvm::enumerate(dispatchOp.operands())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "  + OPERAND(" << it.index() << "): " << it.value() << "\n");
-    if (it.value().getType().isa<TensorType>()) {
-      if (failed(
-              pushBinding(it.value(), IREE::HAL::MemoryAccessBitfield::Read))) {
-        return failure();
-      }
-    }
-  }
-  for (auto it : llvm::enumerate(dispatchOp.results())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "  + RESULT(" << it.index() << "): " << it.value() << "\n");
-    if (dispatchOp.getTiedResultOperandIndex(it.index())) {
-      LLVM_DEBUG(llvm::dbgs() << "    TIED TO OPERAND; SKIP\n");
-    } else {
-      if (failed(pushBinding(it.value(),
-                             IREE::HAL::MemoryAccessBitfield::DiscardWrite))) {
-        return failure();
-      }
-    }
-  }
-  rewriter.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
-      dispatchOp.getLoc(), commandBuffer, executableLayout, setOrdinal,
-      bindings);
-  return success();
-}
-
 // Records a dispatch operation.
 static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                     IREE::Flow::DispatchOp &dispatchOp,
@@ -872,20 +814,11 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
           interfaceOp.push_constantsAttr(),
           interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
 
-      // HACK: switch off for new-style bindings population if the metadata is
-      // available.
-      if (auto bindingsAttr =
-              dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings")) {
-        recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
-                                executableLayout, bindingsAttr, schedulingState,
-                                rewriter);
-      } else {
-        if (failed(recordLegacyBindings(device, commandBuffer, dispatchOp,
-                                        interfaceOp, executableLayout,
-                                        schedulingState, rewriter))) {
-          return failure();
-        }
-      }
+      auto bindingsAttr = dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings");
+      assert(bindingsAttr);
+      recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
+                              executableLayout, bindingsAttr, schedulingState,
+                              rewriter);
 
       dispatchState.entryPointOp = entryPointOp;
       dispatchState.interfaceOp = interfaceOp;
@@ -1092,7 +1025,11 @@ class ExStreamFragmentOpConversion
               bufferValue,
               schedulingState.lookupOrComputeSize(streamValue, rewriter)};
         }
-        schedulingState.mapTensorToBufferRange(streamValue, bufferRange);
+        if (failed(schedulingState.mapTensorToBufferRange(streamValue,
+                                                          bufferRange))) {
+          return streamOp.emitOpError()
+                 << "tensor was mapped to multiple buffer ranges";
+        }
 
       } else {
         rewriter.replaceUsesOfBlockArgument(streamValue, bufferValue);
@@ -1102,8 +1039,11 @@ class ExStreamFragmentOpConversion
     // Allocate buffers for values that escape the stream via return.
     // These may alias input buffers above such as when an input is returned or
     // a return value is tied.
-    auto outputBuffers =
-        allocateOutputBuffers(streamOp, schedulingState, rewriter);
+    SmallVector<Value> outputBuffers;
+    if (failed(allocateOutputBuffers(streamOp, schedulingState, rewriter,
+                                     outputBuffers))) {
+      return failure();
+    }
 
     // Allocate all of the transient buffers used entirely within the stream.
     // These all end up aliased from a single slab allocation and use the
@@ -1111,8 +1051,10 @@ class ExStreamFragmentOpConversion
     // after we perform this allocation we can no longer safely rearrange the
     // ops as buffers will start to alias. All reordering must have happened
     // prior to this conversion.
-    allocateTransientBuffers(streamOp, livenessIntervals, schedulingState,
-                             rewriter);
+    if (failed(allocateTransientBuffers(streamOp, livenessIntervals,
+                                        schedulingState, rewriter))) {
+      return failure();
+    }
 
     // Allocate and begin the command buffer.
     // In a real version we would want to pick the device based on the placement

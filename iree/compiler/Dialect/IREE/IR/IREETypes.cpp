@@ -1,21 +1,14 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "llvm/ADT/BitVector.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/TypeSupport.h"
@@ -136,17 +129,22 @@ void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
   auto indices = getTiedResultOperandIndices(op);
   if (indices.empty()) {
     indices.resize(op->getNumResults(), TiedOpInterface::kUntiedIndex);
+  } else {
+    // Well, getTiedResultOperandIndices() returns indices into the full range
+    // of the op, but in the attribute, we expect to store ranges into the range
+    // returned by `getTiedOperandsIndexAndLength`.
+    auto tiedOp = cast<TiedOpInterface>(op);
+    unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+    for (auto &index : indices) {
+      if (index != TiedOpInterface::kUntiedIndex) index -= tiedOperandsOffset;
+    }
   }
+
   indices[resultIndex] = operandIndex.hasValue()
                              ? operandIndex.getValue()
                              : TiedOpInterface::kUntiedIndex;
-  auto indexType = IndexType::get(op->getContext());
   op->setAttr(TiedOpInterface::getStorageAttrName(),
-              ArrayAttr::get(op->getContext(),
-                             llvm::to_vector<8>(llvm::map_range(
-                                 indices, [&](int64_t v) -> Attribute {
-                                   return IntegerAttr::get(indexType, v);
-                                 }))));
+              Builder(op).getIndexArrayAttr(indices));
 }
 
 SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {

@@ -1,36 +1,32 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_TASK_POST_BATCH_H_
 #define IREE_TASK_POST_BATCH_H_
 
+#include <stdbool.h>
+
+#include "iree/base/config.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
 #include "iree/task/list.h"
+#include "iree/task/task.h"
 #include "iree/task/tuning.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_task_worker_s iree_task_worker_t;
+typedef struct iree_task_worker_t iree_task_worker_t;
 
 // Transient/stack-allocated structure for batching up tasks for posting to
 // worker mailboxes in single operations. This avoids the need to repeatedly
 // thrash caches during coordination as only during submission are the worker
 // mailboxes touched and only once per worker.
-typedef struct {
+typedef struct iree_task_post_batch_t {
   iree_task_executor_t* executor;
 
   // Local worker constructing the post batch.

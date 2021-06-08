@@ -1,21 +1,17 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/modules/hal/hal_module.h"
 
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
@@ -118,7 +114,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 // Module type definitions
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
   iree_hal_device_t* shared_device;
   // TODO(benvanik): types.
@@ -127,7 +123,7 @@ typedef struct {
 #define IREE_HAL_MODULE_CAST(module) \
   (iree_hal_module_t*)((uint8_t*)(module) + iree_vm_native_module_size());
 
-typedef struct {
+typedef struct iree_hal_module_state_t {
   iree_allocator_t host_allocator;
   iree_hal_device_t* shared_device;
   iree_hal_executable_cache_t* executable_cache;
@@ -1019,7 +1015,7 @@ static const iree_vm_native_function_ptr_t iree_hal_module_funcs_[] = {
           iree_vm_shim_##arg_types##_##ret_types,              \
       .target = (iree_vm_native_function_target_t)(target_fn), \
   },
-#include "iree/modules/hal/exports.inl"
+#include "iree/modules/hal/exports.inl"  // IWYU pragma: keep
 #undef EXPORT_FN
 };
 
@@ -1035,7 +1031,7 @@ static const iree_vm_native_export_descriptor_t iree_hal_module_exports_[] = {
       .reflection_attr_count = 0,                                  \
       .reflection_attrs = NULL,                                    \
   },
-#include "iree/modules/hal/exports.inl"
+#include "iree/modules/hal/exports.inl"  // IWYU pragma: keep
 #undef EXPORT_FN
 };
 static_assert(IREE_ARRAYSIZE(iree_hal_module_funcs_) ==

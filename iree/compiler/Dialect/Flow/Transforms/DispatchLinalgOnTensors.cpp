@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -269,7 +261,9 @@ static bool isDispatchableOp(Operation *op) {
 }
 
 static bool isAlwaysFusedIntoDispatchOp(Operation *op) {
-  return isDispatchableOp(op) && isa<linalg::TensorReshapeOp, SubTensorOp>(op);
+  return isDispatchableOp(op) &&
+         (isa<linalg::TensorCollapseShapeOp, SubTensorOp>(op) ||
+          isa<linalg::TensorExpandShapeOp, SubTensorOp>(op));
 }
 
 //===----------------------------------------------------------------------===//
@@ -367,7 +361,7 @@ static void pullInProducersInSameGroup(
         OpResult opResult = en.value().cast<OpResult>();
         auto maybeFusionInfo = linalg::fuseProducerOfTensor(
             rewriter, clonedOpToFuse->getResult(opResult.getResultNumber()),
-            tiledOp.getShapedOpOperand(en.index()));
+            *tiledOp.getInputAndOutputOperands()[en.index()]);
         if (!maybeFusionInfo.hasValue()) {
           DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs()
                                           << "failed to fuse with tensor\n");
@@ -413,6 +407,7 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
 
   llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
       insertAfterMap;
+  llvm::SetVector<Operation *> opSet(ops.begin(), ops.end());
   llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
   // For each operation compute the list of operations in `ops` that use its
   // results. Also compute the operations that form the leafs of the DAG of
@@ -420,9 +415,9 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   for (auto op : ops) {
     for (auto operand : op->getOperands()) {
       auto definingOp = operand.getDefiningOp();
-      if (!definingOp) continue;
+      if (!definingOp || !opSet.count(definingOp)) continue;
       insertAfterMap[definingOp].push_back(op);
-      if (leafOps.count(definingOp)) leafOps.remove(op);
+      if (leafOps.count(op)) leafOps.remove(op);
     }
   }
 
@@ -444,7 +439,6 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
   // number of uses of each operation). Given that the size of `ops` is at max
   // O(10), and not O(100), this is assumed to be reasonable.
-  // SmallVector<Operation *> readyOps = orderedOps;
   ArrayRef<Operation *> readyOps(orderedOps);
   size_t startPos = 0;
   while (!readyOps.empty()) {
@@ -457,7 +451,8 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
       if (processed.count(insertAfterOp)) continue;
       if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
             Operation *operandDefiningOp = operand.getDefiningOp();
-            return !operandDefiningOp || processed.count(operandDefiningOp);
+            return !operandDefiningOp || !opSet.count(operandDefiningOp) ||
+                   processed.count(operandDefiningOp);
           })) {
         // readyOps.push_back(insertAfterOp);
         orderedOps.push_back(insertAfterOp);
@@ -500,14 +495,6 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
     Operation *definingOp = outsideValue.getDefiningOp();
     if (!definingOp || !(isAlwaysClonedIntoDispatchOp(definingOp) ||
                          isAlwaysFusedIntoDispatchOp(definingOp))) {
-      valuesDefinedAbove.insert(outsideValue);
-      continue;
-    }
-    // Only clone if operation either has no operands, or the operation is in
-    // same basic block as the dispatch op. This could really be relaxed, but
-    // this is conservative for now.
-    if (definingOp->getNumOperands() != 0 &&
-        definingOp->getBlock() != dispatchOp->getBlock()) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }
@@ -556,7 +543,8 @@ static void tryToTieOperandsAndResults(
       return loadOp.source().cast<BlockArgument>();
     } else if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(tieOp)) {
       unsigned resultIndex = storeOp.value().cast<OpResult>().getResultNumber();
-      auto loadOp = linalgOp.getOutputTensors()[resultIndex]
+      auto loadOp = linalgOp.getOutputTensorOperands()[resultIndex]
+                        ->get()
                         .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
       if (!loadOp) return nullptr;
       return loadOp.source().cast<BlockArgument>();
@@ -1069,9 +1057,9 @@ static unsigned decideFusableLinalgOps(FuncOp funcOp) {
         if (!consumer ||
             consumer.getNumLoops() != consumer.getNumParallelLoops())
           continue;
-        AffineMap consumerIndexingMap =
-            consumer.getInputIndexingMap(use.getOperandNumber());
-        AffineMap producerIndexingMap = linalgOp.getOutputIndexingMap(0);
+        AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
+        AffineMap producerIndexingMap =
+            linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0));
         if (!consumerIndexingMap.isIdentity() ||
             producerIndexingMap.getResults() !=
                 consumerIndexingMap.getResults()) {
@@ -1118,7 +1106,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         return procInfo;
       },
       {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic}};
+       linalg::DistributionMethod::Cyclic},
+      DenseMap<StringRef,
+               std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 
   auto tileSizeFn = [&](OpBuilder &builder,
                         Operation *op) -> SmallVector<Value, 4> {

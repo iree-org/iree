@@ -22,12 +22,16 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "concatenate.mlir"
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
     "cosine.mlir"
     "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
     "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
@@ -42,6 +46,9 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
     "rsqrt.mlir"
@@ -58,6 +65,8 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
   LABELS
     "noasan"
     "nomsan"
@@ -87,9 +96,11 @@ iree_check_single_backend_test_suite(
     "dot.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
+    "finite.mlir"
     "floor.mlir"
     "gather.mlir"
     "iota.mlir"
@@ -106,6 +117,7 @@ iree_check_single_backend_test_suite(
     "reshape.mlir"
     "reverse.mlir"
     "rsqrt.mlir"
+    "scatter.mlir"
     "select.mlir"
     "sine.mlir"
     "slice.mlir"
@@ -119,6 +131,8 @@ iree_check_single_backend_test_suite(
     "dylib-llvm-aot"
   DRIVER
     "dylib"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -142,9 +156,11 @@ iree_check_single_backend_test_suite(
     "dot.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
+    "finite.mlir"
     "floor.mlir"
     "gather.mlir"
     "iota.mlir"
@@ -174,6 +190,8 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "vmvx"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -197,8 +215,10 @@ iree_check_single_backend_test_suite(
     "dot.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
+    "finite.mlir"
     "floor.mlir"
     "gather.mlir"
     "iota.mlir"
@@ -228,6 +248,8 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

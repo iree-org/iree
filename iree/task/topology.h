@@ -1,21 +1,15 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_TASK_TOPOLOGY_H_
 #define IREE_TASK_TOPOLOGY_H_
 
 #include <limits.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/threading.h"
@@ -38,13 +32,13 @@ typedef uint64_t iree_task_topology_group_mask_t;
 // Information about a particular group within the topology.
 // Groups may be of varying levels of granularity even within the same topology
 // based on how the topology is defined.
-typedef struct {
+typedef struct iree_task_topology_group_t {
   // Group index within the topology matching a particular bit in
   // iree_task_topology_group_mask_t.
   uint8_t group_index;
 
   // A name assigned to executor workers used for logging/tracing.
-  char name[16];
+  char name[15];
 
   // Processor index in the cpuinfo set.
   uint32_t processor_index;
@@ -83,7 +77,7 @@ void iree_task_topology_group_initialize(uint8_t group_index,
 // and attempt to derive some (hopefully) useful task system topology from it.
 // We can add the more common heuristics over time to the core and leave the
 // edge cases for applications to construct.
-typedef struct {
+typedef struct iree_task_topology_t {
   iree_host_size_t group_count;
   iree_task_topology_group_t groups[IREE_TASK_EXECUTOR_MAX_WORKER_COUNT];
 } iree_task_topology_t;

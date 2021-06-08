@@ -1,34 +1,28 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_LOCAL_ELF_ELF_LINKER_H_
 #define IREE_HAL_LOCAL_ELF_ELF_LINKER_H_
 
+#include <stdint.h>
+
 #include "iree/base/api.h"
-#include "iree/hal/local/elf/arch.h"
-#include "iree/hal/local/elf/elf_types.h"
+#include "iree/hal/local/elf/arch.h"       // IWYU pragma: export
+#include "iree/hal/local/elf/elf_types.h"  // IWYU pragma: export
 
 //==============================================================================
 // ELF symbol import table
 //==============================================================================
 
-typedef struct {
+typedef struct iree_elf_import_t {
   const char* sym_name;
   void* thunk_ptr;
 } iree_elf_import_t;
 
-typedef struct {
+typedef struct iree_elf_import_table_t {
   iree_host_size_t import_count;
   const iree_elf_import_t* imports;
 } iree_elf_import_table_t;
@@ -41,7 +35,7 @@ typedef struct {
 //==============================================================================
 
 // An ELF module mapped directly from memory.
-typedef struct {
+typedef struct iree_elf_module_t {
   // Base host virtual address the module is loaded into.
   uint8_t* vaddr_base;
   // Total size, in bytes, of the virtual address space reservation.

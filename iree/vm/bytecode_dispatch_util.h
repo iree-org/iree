@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_BYTECODE_DISPATCH_UTIL_H_
 #define IREE_VM_BYTECODE_DISPATCH_UTIL_H_
@@ -70,7 +62,7 @@
 // value.
 
 // Pointers to typed register storage.
-typedef struct {
+typedef struct iree_vm_registers_t {
   // Ordinal mask defining which ordinal bits are valid. All i32 indexing must
   // be ANDed with this mask.
   uint16_t i32_mask;
@@ -86,7 +78,7 @@ typedef struct {
 // Storage associated with each stack frame of a bytecode function.
 // NOTE: we cannot store pointers to the stack in here as the stack may be
 // reallocated.
-typedef struct {
+typedef struct iree_vm_bytecode_frame_storage_t {
   // Pointer to a register list within the stack frame where return registers
   // will be stored by callees upon return.
   const iree_vm_register_list_t* return_registers;
@@ -103,7 +95,7 @@ typedef struct {
 // Interleaved src-dst register sets for branch register remapping.
 // This structure is an overlay for the bytecode that is serialized in a
 // matching format.
-typedef struct {
+typedef struct iree_vm_register_remap_list_t {
   uint16_t size;
   struct pair {
     uint16_t src_reg;

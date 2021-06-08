@@ -52,7 +52,7 @@ vm.module @list_variant_ops {
   // vm.list.* with variant types
   //===--------------------------------------------------------------------===//
 
-  vm.rodata @byte_buffer dense<[1, 2, 3]> : tensor<3xi32>
+  vm.rodata private @byte_buffer dense<[1, 2, 3]> : tensor<3xi32>
 
   vm.export @test_variant
   vm.func @test_variant() {

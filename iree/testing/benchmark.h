@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_TESTING_BENCHMARK_H_
 #define IREE_TESTING_BENCHMARK_H_
@@ -33,7 +25,7 @@ extern "C" {
 // Benchmark state manipulator.
 // Passed to each benchmark during execution to control the benchmark state
 // or append information beyond just timing.
-typedef struct iree_benchmark_state_s {
+typedef struct iree_benchmark_state_t {
   // Internal implementation handle.
   void* impl;
 
@@ -90,21 +82,22 @@ void iree_benchmark_set_items_processed(iree_benchmark_state_t* state,
 // iree_benchmark_def_t
 //===----------------------------------------------------------------------===//
 
-typedef enum {
+enum iree_benchmark_flag_bits_t {
   IREE_BENCHMARK_FLAG_MEASURE_PROCESS_CPU_TIME = 1u << 0,
 
   IREE_BENCHMARK_FLAG_USE_REAL_TIME = 1u << 1,
   IREE_BENCHMARK_FLAG_USE_MANUAL_TIME = 1u << 2,
-} iree_benchmark_flags_t;
+};
+typedef uint32_t iree_benchmark_flags_t;
 
-typedef enum {
+typedef enum iree_benchmark_unit_e {
   IREE_BENCHMARK_UNIT_MILLISECOND = 0,
   IREE_BENCHMARK_UNIT_MICROSECOND,
   IREE_BENCHMARK_UNIT_NANOSECOND,
 } iree_benchmark_unit_t;
 
 // A benchmark case definition.
-typedef struct iree_benchmark_def_s {
+typedef struct iree_benchmark_def_t {
   // IREE_BENCHMARK_FLAG_* bitmask controlling benchmark behavior and reporting.
   iree_benchmark_flags_t flags;
 

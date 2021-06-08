@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/internal/flags.h"
 
@@ -20,6 +12,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "iree/base/api.h"
 
 #if IREE_FLAGS_ENABLE_CLI == 1
 
@@ -62,7 +56,7 @@ static iree_allocator_t iree_flags_leaky_allocator(void) {
 //===----------------------------------------------------------------------===//
 
 // Storage for registered flags.
-typedef struct {
+typedef struct iree_flag_t {
   // __FILE__ of flag definition.
   const char* file;
   // __LINE__ of flag definition.
@@ -82,7 +76,7 @@ typedef struct {
 } iree_flag_t;
 
 // State used for flag registration and reflection.
-typedef struct {
+typedef struct iree_flag_registry_t {
   const char* program_name;
   const char* usage;
 

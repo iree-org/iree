@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_ALLOCATOR_H_
 #define IREE_HAL_ALLOCATOR_H_
@@ -31,7 +23,7 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // A bitfield indicating compatible behavior for buffers in an allocator.
-enum iree_hal_buffer_compatibility_e {
+enum iree_hal_buffer_compatibility_bits_t {
   // Indicates (in the absence of other bits) the buffer is not compatible with
   // the allocator or device at all. Any attempts to use the buffer for any
   // usage will fail. This will happen if the buffer is device-local to another
@@ -65,7 +57,7 @@ typedef uint32_t iree_hal_buffer_compatibility_t;
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_allocator_s iree_hal_allocator_t;
+typedef struct iree_hal_allocator_t iree_hal_allocator_t;
 
 // Retains the given |allocator| for the caller.
 IREE_API_EXPORT void iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
@@ -151,7 +143,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
 // iree_hal_allocator_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_allocator_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 

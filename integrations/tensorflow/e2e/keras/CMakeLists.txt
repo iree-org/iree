@@ -39,8 +39,6 @@ iree_e2e_cartesian_product_test_suite(
     ",,,crnn,iree_llvmaot"
     ",,,gru,iree_llvmaot"
     ",,,lstm,iree_llvmaot"
-  LABELS
-    "nokokoro"
 )
 
 iree_e2e_cartesian_product_test_suite(
@@ -71,8 +69,6 @@ iree_e2e_cartesian_product_test_suite(
     ",,,tc_resnet,"
     ",,,xception,"
     ",,,crnn,iree_vulkan"
-  LABELS
-    "nokokoro"
 )
 
 iree_e2e_cartesian_product_test_suite(
@@ -105,8 +101,6 @@ iree_e2e_cartesian_product_test_suite(
     ",,,svdf_resnet,"
     ",,,tc_resnet,"
     ",,,xception,"
-  LABELS
-    "nokokoro"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

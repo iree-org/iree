@@ -1,22 +1,13 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/LinalgToLLVM/LLVMCodeGenOptions.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
@@ -85,15 +76,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    auto codeGenOptions = getLLVMCodegenOptionsFromClOptions();
+    passManager.addPass(createLowerExecutableTargetPass());
     // Set target specific options.
     // TODO(ataei): This is temporary here, should move when target specific
     // TODO(kooljblack): Update LLVM target tripple for "static" support.
 
     // overrides options grows.
     llvm::Triple triple(options_.targetTriple);
+    LLVMTransformPassPipelineOptions codeGenOptions;
     if (triple.isWasm()) {
-      // WebAssembly does not (yet) support FMA ops natively, so unfuse them.
       codeGenOptions.unfuseFMAOps = true;
     }
     buildLLVMTransformPassPipeline(passManager, codeGenOptions);
@@ -108,10 +99,12 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     if (sourceExecutableOps.size() <= 1) return success();
 
-    // Private symbols (i.e. llvm dialect private symbols) get deduped
-    // incorrectly by the link executables pass even though they should be
-    // treated as different symbols. For now just change the names of the
-    // private symbols to avoid conflicts.
+    // Ensure any LLVM symbol names we define are unique prior to linking.
+    //
+    // The link executables pass requires that there be no name conflicts
+    // between symbols with public MLIR Symbol visibility. LLVM dialect symbols
+    // use a different visibility mechanism, defaulting to public for MLIR
+    // Symbol visibility.
     unsigned moduleNumber = 0;
     for (auto sourceExecutableOp : enumerate(sourceExecutableOps)) {
       auto targetOps = llvm::to_vector<4>(

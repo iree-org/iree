@@ -1,21 +1,15 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree_tf_compiler/TF/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -40,7 +34,7 @@ namespace TF {
 // the IREE requires.
 class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::TF::TensorFlowDialect,
+    registry.insert<mlir::linalg::LinalgDialect, mlir::TF::TensorFlowDialect,
                     mlir::tf_executor::TensorFlowExecutorDialect,
                     mlir::tf_device::TensorFlowDeviceDialect,
                     mlir::tf_saved_model::TensorFlowSavedModelDialect,
@@ -78,23 +72,20 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
 
     // TF::PopulateLoweringTFPatterns(context, &patterns);
 
-    // Populate with CHLO->HLO lowerings to account for TF ops legalized to
-    // CHLO first.
-    chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
-
     // ConstantLike op is convenient to create splat constants, but is
     // canonicalized to plain HLO constant if statically shaped. Add the
     // canonicalization pattern to pattern list to enable multi-hop lowering.
     chlo::ConstantLikeOp::getCanonicalizationPatterns(patterns, context);
 
     ConversionTarget target(*context);
-    target.addIllegalDialect<chlo::HloClientDialect>();
+    target.addLegalDialect<chlo::HloClientDialect>();
     target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<shape::ShapeDialect>();
     target.addLegalDialect<tensor::TensorDialect>();
     target.addLegalOp<mlir::CallOp>();
     target.addLegalOp<mlir::tensor::CastOp>();
+    target.addLegalOp<mlir::memref::DimOp>();
 
     // TODO(suderman): Enable logicistic op for lowering once the op is
     // supported in IREE. Also, remove the numerically unstable ConvertSigmoidOp
@@ -137,7 +128,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
       *this, "legalize-chlo",
       llvm::cl::desc(
           "Also legalizes intermediate chlo ops to hlo (default true)"),
-      llvm::cl::init(true)};
+      llvm::cl::init(false)};
   Option<bool> use_tf2xla_fallback_{
       *this, "use-tf2xla-fallback",
       llvm::cl::desc(

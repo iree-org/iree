@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 """Macros for defining tests that run a module using iree-check-module."""
 
@@ -31,6 +23,7 @@ def iree_check_test(
         compiler_flags = [],
         runner_args = [],
         tags = [],
+        timeout = None,
         **kwargs):
     """Creates an iree-check-module test for the specified source file.
 
@@ -45,6 +38,7 @@ def iree_check_test(
           are passed automatically.
       tags: additional tags to apply to the generated test. A tag "driver=DRIVER" is added
           automatically.
+      timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying run_binary_test.
     """
     bytecode_module_name = name + "_bytecode_module"
@@ -68,6 +62,7 @@ def iree_check_test(
         data = [":%s" % bytecode_module_name],
         test_binary = "//iree/tools:iree-check-module",
         tags = tags + ["driver=%s" % driver],
+        timeout = timeout,
         **kwargs
     )
 
@@ -79,6 +74,7 @@ def iree_check_single_backend_test_suite(
         compiler_flags = [],
         runner_args = [],
         tags = [],
+        timeout = None,
         **kwargs):
     """Creates a test suite of iree-check-module tests for a single backend/driver pair.
 
@@ -96,6 +92,7 @@ def iree_check_single_backend_test_suite(
           create a separate suite or iree_check_test.
       tags: tags to apply to the generated tests. Note that as in standard test suites, manual
           is treated specially and will also apply to the test suite itself.
+      timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
     tests = []
@@ -109,6 +106,7 @@ def iree_check_single_backend_test_suite(
             compiler_flags = compiler_flags,
             runner_args = runner_args,
             tags = tags,
+            timeout = timeout,
             **kwargs
         )
         tests.append(test_name)

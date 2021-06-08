@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_DIALECT_FLOW_PASSES
 #define IREE_DIALECT_FLOW_PASSES
@@ -71,6 +63,12 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def PromoteI1ToI8 :
+    Pass<"iree-flow-promote-i1-to-i8", "FuncOp"> {
+  let summary = "Legalizes i1 tensor constants to i8s";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
+}
+
 def LegalizeInputTypes :
     Pass<"iree-flow-legalize-input-types", "ModuleOp"> {
   let summary = "Legalizes input types to ones supported by the IREE flow dialect";
@@ -90,16 +88,22 @@ def OutlineLargeConstants :
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass(25)";
 }
 
-def PrePartitioningConversion :
-    Pass<"iree-flow-pre-partitioning-conversion", "FuncOp"> {
-  let summary = "Dialect conversion prior to partitioning";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPrePartitioningConversionPass()";
+def PromoteTensorLoads :
+    Pass<"iree-flow-promote-tensor-loads", "FuncOp"> {
+  let summary = "Converts standard ops which match to flow.tensor.load (typically causing a read-back)";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteTensorLoadsPass()";
 }
 
 def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "ModuleOp"> {
   let summary = "Strips constant flow.variables and replaces them with splats.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
+}
+
+def VerifyCompilerInputLegality :
+    Pass<"iree-verify-compiler-input-legality", "ModuleOp"> {
+  let summary = "Verifies that only supported IR constructs are passed to the compiler.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyCompilerInputLegality()";
 }
 
 #endif  // IREE_DIALECT_FLOW_PASSES

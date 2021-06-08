@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Tests that our bytecode module can call through into our native module.
 
@@ -58,17 +50,15 @@ class TensorListModulesTest : public ::testing::Test {
     iree_hal_driver_release(hal_driver);
 
     IREE_CHECK_OK(iree_tensorlist_module_register_types());
-    IREE_CHECK_OK(
-        iree_tensorlist_module_create(iree_allocator_system(), &native_module_))
-        << "Native module failed to init";
+    IREE_CHECK_OK(iree_tensorlist_module_create(iree_allocator_system(),
+                                                &native_module_));
 
     const auto* module_file_toc = iree_tensorlist_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        iree_allocator_null(), iree_allocator_system(), &bytecode_module_))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {hal_module_, native_module_,
                                               bytecode_module_};
@@ -90,8 +80,7 @@ class TensorListModulesTest : public ::testing::Test {
     iree_vm_function_t function;
     IREE_CHECK_OK(bytecode_module_->lookup_function(
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_make_cstring_view(function_name), &function))
-        << "Exported function '" << function_name << "' not found";
+        iree_make_cstring_view(function_name), &function));
     return function;
   }
 

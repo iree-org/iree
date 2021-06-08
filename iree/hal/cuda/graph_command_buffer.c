@@ -1,29 +1,26 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/cuda/graph_command_buffer.h"
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/cuda_buffer.h"
-#include "iree/hal/cuda/cuda_event.h"
+#include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/native_executable.h"
 #include "iree/hal/cuda/status_util.h"
 
 // Command buffer implementation that directly maps to cuda graph.
 // This records the commands on the calling thread without additional threading
 // indirection.
-typedef struct {
+typedef struct iree_hal_cuda_graph_command_buffer_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
   iree_hal_command_buffer_mode_t mode;
@@ -38,7 +35,7 @@ typedef struct {
   void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;
 
-static const size_t max_binding_count = 64;
+#define IREE_HAL_CUDA_MAX_BINDING_COUNT 64
 
 extern const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable;
@@ -64,8 +61,8 @@ iree_status_t iree_hal_cuda_graph_command_buffer_allocate(
                        "cuGraphCreate");
   iree_hal_cuda_graph_command_buffer_t* command_buffer = NULL;
   size_t total_size = sizeof(*command_buffer) +
-                      max_binding_count * sizeof(void*) +
-                      max_binding_count * sizeof(CUdeviceptr);
+                      IREE_HAL_CUDA_MAX_BINDING_COUNT * sizeof(void*) +
+                      IREE_HAL_CUDA_MAX_BINDING_COUNT * sizeof(CUdeviceptr);
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, total_size, (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
@@ -80,8 +77,9 @@ iree_status_t iree_hal_cuda_graph_command_buffer_allocate(
     command_buffer->last_node = NULL;
 
     CUdeviceptr* device_ptrs =
-        (CUdeviceptr*)(command_buffer->current_descriptor + max_binding_count);
-    for (size_t i = 0; i < max_binding_count; i++) {
+        (CUdeviceptr*)(command_buffer->current_descriptor +
+                       IREE_HAL_CUDA_MAX_BINDING_COUNT);
+    for (size_t i = 0; i < IREE_HAL_CUDA_MAX_BINDING_COUNT; i++) {
       command_buffer->current_descriptor[i] = &device_ptrs[i];
     }
 
@@ -323,6 +321,21 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_constants(
                           "need cuda implementation");
 }
 
+// Tie together the binding index and its index in |bindings| array.
+typedef struct {
+  uint32_t index;
+  uint32_t binding;
+} iree_hal_cuda_binding_mapping_t;
+
+// Helper to sort the binding based on their binding index.
+static int compare_binding_index(const void* a, const void* b) {
+  const iree_hal_cuda_binding_mapping_t buffer_a =
+      *(const iree_hal_cuda_binding_mapping_t*)a;
+  const iree_hal_cuda_binding_mapping_t buffer_b =
+      *(const iree_hal_cuda_binding_mapping_t*)b;
+  return buffer_a.binding < buffer_b.binding ? -1 : 1;
+}
+
 static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_layout_t* executable_layout, uint32_t set,
@@ -330,15 +343,27 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+  // Convention with the compiler side. We map bindings to kernel argument.
+  // We compact the bindings to get a dense set of arguments and keep them order
+  // based on the binding index.
+  // Sort the binding based on the binding index and map the array index to the
+  // argument index.
+  iree_hal_cuda_binding_mapping_t binding_used[IREE_HAL_CUDA_MAX_BINDING_COUNT];
   for (iree_host_size_t i = 0; i < binding_count; i++) {
-    uint32_t arg_index = bindings[i].binding;
-    assert(arg_index < max_binding_count &&
-           "binding index larger than the max expected.");
+    iree_hal_cuda_binding_mapping_t buffer = {i, bindings[i].binding};
+    binding_used[i] = buffer;
+  }
+  qsort(binding_used, binding_count, sizeof(iree_hal_cuda_binding_mapping_t),
+        compare_binding_index);
+  assert(binding_count < IREE_HAL_CUDA_MAX_BINDING_COUNT &&
+         "binding count larger than the max expected.");
+  for (iree_host_size_t i = 0; i < binding_count; i++) {
+    iree_hal_descriptor_set_binding_t binding = bindings[binding_used[i].index];
     CUdeviceptr device_ptr =
         iree_hal_cuda_buffer_device_pointer(
-            iree_hal_buffer_allocated_buffer(bindings[i].buffer)) +
-        iree_hal_buffer_byte_offset(bindings[i].buffer) + bindings[i].offset;
-    *((CUdeviceptr*)command_buffer->current_descriptor[arg_index]) = device_ptr;
+            iree_hal_buffer_allocated_buffer(binding.buffer)) +
+        iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
+    *((CUdeviceptr*)command_buffer->current_descriptor[i]) = device_ptr;
   }
   return iree_ok_status();
 }

@@ -1,22 +1,15 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_BUFFER_VIEW_H_
 #define IREE_HAL_BUFFER_VIEW_H_
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/buffer.h"
@@ -33,7 +26,7 @@ extern "C" {
 // NOTE: these values must be in sync with
 //    iree/compiler/Dialect/HAL/IR/HALTypes.cpp
 
-enum iree_hal_numerical_type_e {
+enum iree_hal_numerical_type_bits_t {
   IREE_HAL_NUMERICAL_TYPE_UNKNOWN = 0x00u,
   IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED = 0x01u,
   IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED = 0x02u,
@@ -63,7 +56,7 @@ typedef uint8_t iree_hal_numerical_type_t;
 //   [numerical type] [reserved] [reserved] [number of bits]
 //
 // clang-format off
-enum iree_hal_element_type_e {
+enum iree_hal_element_types_t {
   IREE_HAL_ELEMENT_TYPE_NONE             = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             0),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_8         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             8),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_16        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            16),  // NOLINT
@@ -121,7 +114,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
 // effectively just `tuple(shape, type, buffer)`, and if the application is
 // already tracking this information in its own structures this entire type can
 // be ignored.
-typedef struct iree_hal_buffer_view_s iree_hal_buffer_view_t;
+typedef struct iree_hal_buffer_view_t iree_hal_buffer_view_t;
 
 // Creates a buffer view with the given |buffer|.
 // |out_buffer_view| must be released by the caller.

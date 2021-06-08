@@ -1,19 +1,14 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_BUFFER_H_
 #define IREE_VM_BUFFER_H_
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #include "iree/base/api.h"
 #include "iree/vm/ref.h"
@@ -25,7 +20,7 @@ extern "C" {
 // Describes where a byte buffer originates from, what guarantees can be made
 // about its lifetime and ownership, and how it may be accessed.
 // Note that buffers may always be read.
-enum iree_vm_buffer_access_e {
+enum iree_vm_buffer_access_bits_t {
   // The guest is allowed to write to the buffer.
   // If not specified the buffer is read-only.
   IREE_VM_BUFFER_ACCESS_MUTABLE = 1u << 0,
@@ -63,7 +58,7 @@ typedef uint32_t iree_vm_buffer_access_t;
 // For heap-allocated buffers created with iree_vm_buffer_create/clone/etc the
 // allocator is used to free the entire iree_vm_buffer_t and the co-allocated
 // buffer data that lives after it in memory.
-typedef struct {
+typedef struct iree_vm_buffer_t {
   iree_vm_ref_object_t ref_object;
   iree_vm_buffer_access_t access;
   iree_byte_span_t data;

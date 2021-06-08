@@ -1,7 +1,7 @@
 // ResNet model with placeholder weights, for testing.
 
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=dylib-llvm-aot %s -function-input="1x224x224x3xf32" | IreeFileCheck %s)
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=vulkan-spirv %s -function-input="1x224x224x3xf32" | IreeFileCheck %s)
+// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=dylib-llvm-aot %s -function-input="1x224x224x3xf32" | IreeFileCheck %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=vulkan-spirv %s -function-input="1x224x224x3xf32" | IreeFileCheck %s)
 
 module {
   flow.variable @"__iree_flow___sm_node188__m.layer-2.kernel" dense<1.000000e+00> : tensor<7x7x3x64xf32> attributes {noinline, sym_visibility = "private"}
