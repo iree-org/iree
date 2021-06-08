@@ -19,6 +19,6 @@ vm.module @constant_ops {
 
   // check state initialization inside the alloc_state function
   // CHECK-LABEL: static iree_status_t constant_ops_alloc_state(
-  // CHECK: iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_HOST, iree_make_byte_span((void*)constant_ops_buffer_1, sizeof(constant_ops_buffer_1)), iree_allocator_null(), &state->rodata_buffers[0]);
-  // CHECK-NEXT: iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_HOST, iree_make_byte_span((void*)constant_ops_buffer_2, sizeof(constant_ops_buffer_2)), iree_allocator_null(), &state->rodata_buffers[1]);
+  // CHECK: iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, iree_make_byte_span((void*)constant_ops_buffer_1, sizeof(constant_ops_buffer_1)), iree_allocator_null(), &state->rodata_buffers[0]);
+  // CHECK-NEXT: iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, iree_make_byte_span((void*)constant_ops_buffer_2, sizeof(constant_ops_buffer_2)), iree_allocator_null(), &state->rodata_buffers[1]);
 }

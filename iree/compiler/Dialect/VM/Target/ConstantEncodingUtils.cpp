@@ -125,6 +125,7 @@ LogicalResult serializeConstantArray(Location loc, ElementsAttr elementsAttr,
 
   return success();
 }
+
 }  // namespace VM
 }  // namespace IREE
 }  // namespace iree_compiler

@@ -15,6 +15,7 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
+
 LogicalResult serializeConstantArray(Location loc, ElementsAttr elementsAttr,
                                      size_t alignment, uint8_t *dst);
 }  // namespace VM

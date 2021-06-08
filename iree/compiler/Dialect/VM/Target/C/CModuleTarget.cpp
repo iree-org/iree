@@ -183,7 +183,7 @@ static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
     std::string buffer_name =
         moduleOp.getName().str() + "_" + rodataOp.getName().str();
     output << "iree_vm_buffer_initialize("
-           << "IREE_VM_BUFFER_ACCESS_ORIGIN_HOST, "
+           << "IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, "
            << "iree_make_byte_span("
            << "(void*)" << buffer_name << ", sizeof(" << buffer_name << ")), "
            << "iree_allocator_null(), "
