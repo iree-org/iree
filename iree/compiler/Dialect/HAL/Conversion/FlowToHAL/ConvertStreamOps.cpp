@@ -771,84 +771,6 @@ static void recordInterfaceBindings(Value device, Value commandBuffer,
   }
 }
 
-// DEPRECATED: this is going away with the legacy linalg-on-buffers path.
-static LogicalResult recordLegacyBindings(
-    Value device, Value commandBuffer, IREE::Flow::DispatchOp &dispatchOp,
-    IREE::HAL::InterfaceOp &interfaceOp, Value executableLayout,
-    StreamSchedulingState &schedulingState,
-    ConversionPatternRewriter &rewriter) {
-  SmallVector<Value, 4> pushConstantValues;
-  for (auto inputValue : dispatchOp.operands()) {
-    if (inputValue.getType().isa<IndexType>() ||
-        inputValue.getType().isa<IntegerType>()) {
-      auto pushConstantValue = rewriter.getRemappedValue(inputValue);
-      // Need an explicit index cast to i32 since the
-      // CommandBufferPushConstantsOp is intrinsically i32 based.
-      if (inputValue.getType().isa<IndexType>()) {
-        pushConstantValue = rewriter.create<IndexCastOp>(
-            dispatchOp.getLoc(), rewriter.getIntegerType(32),
-            pushConstantValue);
-      }
-      pushConstantValues.push_back(pushConstantValue);
-    }
-  }
-  if (!pushConstantValues.empty()) {
-    uint64_t maxPushConstants =
-        interfaceOp.push_constants().hasValue()
-            ? interfaceOp.push_constants().getValue().getZExtValue()
-            : 0;
-    (void)maxPushConstants;
-    assert(pushConstantValues.size() <= maxPushConstants &&
-           "uniform buffer spilling not yet implemented");
-
-    rewriter.create<IREE::HAL::CommandBufferPushConstantsOp>(
-        dispatchOp.getLoc(), commandBuffer, executableLayout,
-        rewriter.getIndexAttr(0), pushConstantValues);
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "HAL recordPushBindings: "
-                          << *dispatchOp.getOperation() << "\n");
-  uint32_t setOrdinal = 0;
-  uint32_t bindingOrdinal = 0;
-  SmallVector<IREE::HAL::DescriptorSetBindingValue, 4> bindings;
-  auto zeroOffset = schedulingState.lookupOrCreateIndex(0, rewriter);
-  auto pushBinding =
-      [&](Value tensorValue,
-          IREE::HAL::MemoryAccessBitfield accessType) -> LogicalResult {
-    auto bufferRange = schedulingState.lookupTensorBufferRange(tensorValue);
-    bindings.push_back(std::make_tuple(
-        schedulingState.lookupOrCreateIndex(bindingOrdinal++, rewriter),
-        bufferRange.buffer, zeroOffset, bufferRange.length));
-    return success();
-  };
-  for (auto it : llvm::enumerate(dispatchOp.operands())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "  + OPERAND(" << it.index() << "): " << it.value() << "\n");
-    if (it.value().getType().isa<TensorType>()) {
-      if (failed(
-              pushBinding(it.value(), IREE::HAL::MemoryAccessBitfield::Read))) {
-        return failure();
-      }
-    }
-  }
-  for (auto it : llvm::enumerate(dispatchOp.results())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "  + RESULT(" << it.index() << "): " << it.value() << "\n");
-    if (dispatchOp.getTiedResultOperandIndex(it.index())) {
-      LLVM_DEBUG(llvm::dbgs() << "    TIED TO OPERAND; SKIP\n");
-    } else {
-      if (failed(pushBinding(it.value(),
-                             IREE::HAL::MemoryAccessBitfield::DiscardWrite))) {
-        return failure();
-      }
-    }
-  }
-  rewriter.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
-      dispatchOp.getLoc(), commandBuffer, executableLayout, setOrdinal,
-      bindings);
-  return success();
-}
-
 // Records a dispatch operation.
 static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                     IREE::Flow::DispatchOp &dispatchOp,
@@ -892,20 +814,11 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
           interfaceOp.push_constantsAttr(),
           interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
 
-      // HACK: switch off for new-style bindings population if the metadata is
-      // available.
-      if (auto bindingsAttr =
-              dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings")) {
-        recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
-                                executableLayout, bindingsAttr, schedulingState,
-                                rewriter);
-      } else {
-        if (failed(recordLegacyBindings(device, commandBuffer, dispatchOp,
-                                        interfaceOp, executableLayout,
-                                        schedulingState, rewriter))) {
-          return failure();
-        }
-      }
+      auto bindingsAttr = dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings");
+      assert(bindingsAttr);
+      recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
+                              executableLayout, bindingsAttr, schedulingState,
+                              rewriter);
 
       dispatchState.entryPointOp = entryPointOp;
       dispatchState.interfaceOp = interfaceOp;
