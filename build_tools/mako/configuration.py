@@ -135,8 +135,7 @@ def get_pixel4_default_target_list(skipped_target=None,
           compilation_flags=[
               "--iree-vulkan-target-triple=adreno-a640-android11",
               "--iree-flow-inline-constants-max-byte-length=2048",
-              # TODO(GH-6086): Turn on the flag.
-              # "--iree-flow-dispatch-formation-enable-operand-fusion",
+              "--iree-flow-dispatch-formation-enable-operand-fusion",
               "--iree-enable-fusion-with-reduction-ops",
           ])
   ]
@@ -197,8 +196,7 @@ def get_s20_default_target_list(skipped_target=None,
               "--iree-vulkan-target-triple=valhall-g77-android11",
               # TODO(GH-5330): Revisit the number or delete the flag.
               "--iree-flow-inline-constants-max-byte-length=16",
-              # TODO(GH-6086): Turn on the flag.
-              # "--iree-flow-dispatch-formation-enable-operand-fusion"
+              "--iree-flow-dispatch-formation-enable-operand-fusion"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
