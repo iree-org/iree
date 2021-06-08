@@ -99,11 +99,11 @@ $ ../iree-build/iree/tools/iree-translate --help
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-module.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/iree/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```shell
-$ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/iree-run-module.mlir \
+$ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/samples/models/simple_abs.mlir \
   -function-input="f32=-2" -iree-hal-target-backends=vmvx -print-mlir
 ```
 
@@ -124,8 +124,8 @@ $ ../iree-build/iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-llvm-target-triple=x86_64-linux-gnu \
     -iree-hal-target-backends=dylib-llvm-aot \
-    iree/tools/test/iree-run-module.mlir \
-    -o /tmp/simple-llvm_aot.vmfb
+    iree/samples/models/simple_abs.mlir \
+    -o /tmp/simple_abs_dylib.vmfb
 ```
 
 Then run the compiled module using the `dylib` HAL driver:
@@ -133,7 +133,7 @@ Then run the compiled module using the `dylib` HAL driver:
 ```shell
 $ ../iree-build/iree/tools/iree-run-module \
     --driver=dylib \
-    --module_file=/tmp/simple-llvm_aot.vmfb \
+    --module_file=/tmp/simple_abs_dylib.vmfb \
     --entry_function=abs \
     --function_input=f32=-5
 

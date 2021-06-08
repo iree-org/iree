@@ -118,11 +118,11 @@ Check out what was built:
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/iree-run-mlir.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/iree/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```powershell
-> .\bazel-bin\iree\tools\iree-run-mlir.exe .\iree\tools\test\iree-run-mlir.mlir -function-input="i32=-2" -iree-hal-target-backends=vmvx -print-mlir
+> .\bazel-bin\iree\tools\iree-run-mlir.exe .\iree\samples\models\simple_abs.mlir -function-input="f32=-2" -iree-hal-target-backends=vmvx -print-mlir
 ```
 
 ### Further Reading

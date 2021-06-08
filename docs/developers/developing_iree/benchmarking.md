@@ -20,10 +20,9 @@ To use `iree-benchmark-module`, generate an IREE module for the target backend:
 
 ```shell
 $ bazel run //iree/tools:iree-translate -- \
-  -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
-  $PWD/iree/tools/test/iree-benchmark-module.mlir \
+  $PWD/iree/samples/models/simple_abs.mlir \
   -o /tmp/module.fb
 ```
 
@@ -34,7 +33,7 @@ $ bazel run //iree/tools:iree-benchmark-module -- \
   --module_file=/tmp/module.fb \
   --driver=vmvx \
   --entry_function=abs \
-  --function_input=i32=-2
+  --function_input=f32=-2
 ```
 
 You'll see output like
@@ -81,7 +80,7 @@ $ ./bazel-bin/iree/tools/iree-benchmark-module \
   --module_file=/tmp/module.fb \
   --driver=vmvx \
   --entry_function=abs \
-  --function_input=i32=-2
+  --function_input=f32=-2
 ```
 
 ```shell
