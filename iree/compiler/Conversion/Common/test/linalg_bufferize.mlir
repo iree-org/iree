@@ -2089,4 +2089,3 @@ module  {
 //        CHECK:                    linalg.matmul
 //   CHECK-SAME:                    ins(%[[LHS_L1_TILE]], %[[RHS_L1_TILE]]
 //   CHECK-SAME:                    outs(%[[DST_L1_TILE]]
-//        CHECK:                    linalg.copy(%[[DST_L1_TILE]], %[[DST_L1_TILE]])
