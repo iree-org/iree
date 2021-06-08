@@ -328,34 +328,35 @@ static LogicalResult analysePadTensorOp(linalg::PadTensorOp padTensorOp,
 static SmallVector<Value> getTiedOperandsForLinalgOps(
     linalg::LinalgOp linalgOp) {
   SmallVector<Value> tiedOperands(linalgOp.getOperation()->getNumResults());
-  for (auto outTensor : llvm::enumerate(linalgOp.getOutputs())) {
-    if (linalgOp.payloadUsesValueFromOutputOperandIndex(outTensor.index())) {
+  auto outputOperands = linalgOp.getOutputOperands();
+  for (auto outTensor : llvm::enumerate(outputOperands)) {
+    if (linalgOp.payloadUsesValueFromOperand(outTensor.value())) {
       // If the `outs` tensor has a single use (this op) and is not from a
       // read-only buffer, the `outs` tensor can be tied to the result.
-      if (outTensor.value().hasOneUse() &&
-          !isFromReadOnlyTensor(outTensor.value())) {
-        tiedOperands[outTensor.index()] = outTensor.value();
+      if (outTensor.value()->get().hasOneUse() &&
+          !isFromReadOnlyTensor(outTensor.value()->get())) {
+        tiedOperands[outTensor.index()] = outTensor.value()->get();
       }
     }
   }
-  for (auto result : llvm::enumerate(linalgOp.getOutputs())) {
+  for (auto result : llvm::enumerate(outputOperands)) {
     // If the output tensor is not actually used (for initialization) by this
     // op, we can reuse the result tensor's buffer for some operands.
     // TODO(#5040): A better way to handle this case is to allocate a buffer and
     // then vectorization + load-store forwarding to remove the intermediate
     // buffer. This requires vectorization to handle all cases downstream. This
     // is a WAR for current use cases.
-    if (linalgOp.payloadUsesValueFromOutputOperandIndex(result.index())) {
+    if (linalgOp.payloadUsesValueFromOperand(result.value())) {
       continue;
     }
-    for (auto input : llvm::enumerate(linalgOp.getInputTensors())) {
-      auto producerOp = input.value().getDefiningOp<linalg::LinalgOp>();
-      if (producerOp && input.value().hasOneUse() &&
-          input.value().getType() == result.value().getType() &&
-          linalgOp.getInputIndexingMap(input.index()) ==
-              linalgOp.getOutputIndexingMap(result.index())) {
+    for (auto input : linalgOp.getInputTensorsOpOperands()) {
+      auto producerOp = input->get().getDefiningOp<linalg::LinalgOp>();
+      if (producerOp && input->get().hasOneUse() &&
+          input->get().getType() == result.value()->get().getType() &&
+          linalgOp.getTiedIndexingMap(input) ==
+              linalgOp.getTiedIndexingMap(result.value())) {
         assert(!tiedOperands[result.index()]);
-        tiedOperands[result.index()] = input.value();
+        tiedOperands[result.index()] = input->get();
         break;
       }
     }
@@ -368,15 +369,15 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
 static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
                                       BufferizationPlan &plan) {
   if (!linalgOp.hasTensorSemantics()) return success();
+  auto results = linalgOp->getResults();
   auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp);
-  for (auto it :
-       llvm::enumerate(llvm::zip(linalgOp->getResults(), tiedOperands))) {
+  for (auto it : llvm::enumerate(llvm::zip(results, tiedOperands))) {
     Value resultTensor = std::get<0>(it.value());
     Value tiedOperand = std::get<1>(it.value());
     if (tiedOperand) {
       plan.unionSets(resultTensor, tiedOperand);
     }
-    plan.insert(linalgOp.getOutput(it.index()));
+    plan.insert(linalgOp.getOutputOperand(it.index())->get());
     plan.insert(resultTensor);
   }
   return success();
@@ -995,7 +996,8 @@ static LogicalResult getOrAllocateResultBuffers(
     BufferizationPlan &plan, WorkgroupMemoryAllocationFn allocationFn) {
   assert(tiedOperands.size() == op->getNumResults());
   assert(aliasingBuffers.size() == op->getNumResults());
-  for (auto result : llvm::enumerate(op->getResults())) {
+  auto results = op->getResults();
+  for (auto result : llvm::enumerate(results)) {
     if (!result.value().getType().isa<RankedTensorType>() ||
         bvm.contains(result.value())) {
       continue;
@@ -1064,15 +1066,17 @@ static LogicalResult convertAnyLinalgOp(
     newInputBuffers.push_back(inputBuffer);
   }
   SmallVector<Value, 2> newOutputBuffers;
-  for (auto it : llvm::enumerate(
-           llvm::zip(op.getOperation()->getResults(), op.getOutputs()))) {
-    Value resultTensor = std::get<0>(it.value());
+  auto results = op.getOperation()->getResults();
+  auto outputs = op.getOutputOperands();
+  for (auto it : llvm::zip(results, outputs)) {
+    Value resultTensor = std::get<0>(it);
     Value resultBuffer = bvm.lookup(resultTensor);
 
-    Value outTensor = std::get<1>(it.value());
+    OpOperand *outOperand = std::get<1>(it);
+    Value outTensor = outOperand->get();
     Value outBuffer = bvm.lookupOrNull(outTensor);
     if (outBuffer && !plan.isEquivalent(outTensor, resultTensor) &&
-        op.payloadUsesValueFromOutputOperandIndex(it.index())) {
+        op.payloadUsesValueFromOperand(outOperand)) {
       b.create<linalg::CopyOp>(loc, outBuffer, resultBuffer);
     }
     newOutputBuffers.push_back(resultBuffer);

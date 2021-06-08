@@ -21,9 +21,12 @@ class Convert1x1ConvolutionMatmulOp
 
   LogicalResult matchAndRewrite(linalg::ConvInputNHWCFilterHWCFOp convOp,
                                 PatternRewriter &rewriter) const override {
-    ShapedType inputShapeType = convOp.getInputShapedType(0);
-    ShapedType filterShapeType = convOp.getInputShapedType(1);
-    ShapedType outputShapeType = convOp.getOutputShapedType(0);
+    ShapedType inputShapeType =
+        convOp.getInputOperand(0)->get().getType().cast<ShapedType>();
+    ShapedType filterShapeType =
+        convOp.getInputOperand(1)->get().getType().cast<ShapedType>();
+    ShapedType outputShapeType =
+        convOp.getOutputOperand(0)->get().getType().cast<ShapedType>();
 
     auto inputShape = inputShapeType.getShape();
     auto filterShape = filterShapeType.getShape();
@@ -57,9 +60,9 @@ class Convert1x1ConvolutionMatmulOp
         RankedTensorType::get({outputShape[1] * outputShape[2], outputShape[3]},
                               outputShapeType.getElementType());
 
-    Value input = convOp.getInput(0);
-    Value filter = convOp.getInput(1);
-    Value output = convOp.getOutput(0);
+    Value input = convOp.getInputOperand(0)->get();
+    Value filter = convOp.getInputOperand(1)->get();
+    Value output = convOp.getOutputOperand(0)->get();
     auto loc = convOp.getLoc();
 
     Value reshapedInput = rewriter.create<linalg::TensorCollapseShapeOp>(
