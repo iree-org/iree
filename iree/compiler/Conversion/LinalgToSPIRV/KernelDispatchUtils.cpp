@@ -102,11 +102,13 @@ static std::tuple<SmallVector<ShapedType>, SmallVector<ShapedType>>
 getInputOutputTypes(linalg::LinalgOp op) {
   SmallVector<ShapedType> inputTypes(op.getNumInputs()),
       outputTypes(op.getNumOutputs());
-  for (auto operand : enumerate(op.getInputOperands())) {
+  auto inputOperands = op.getInputOperands();
+  for (auto operand : enumerate(inputOperands)) {
     inputTypes[operand.index()] =
         getUntiledType(operand.value()->get()).dyn_cast<ShapedType>();
   }
-  for (auto operand : enumerate(op.getOutputOperands())) {
+  auto outputOperands = op.getOutputOperands();
+  for (auto operand : enumerate(outputOperands)) {
     outputTypes[operand.index()] =
         getUntiledType(operand.value()->get()).dyn_cast<ShapedType>();
   }
