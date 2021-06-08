@@ -364,7 +364,7 @@ def post_to_gist(filename: str, content: str, verbose: bool = False):
 
   response = response.json()
   if verbose:
-    print(response)
+    print(f"Gist posting response: {response}")
 
   if response["truncated"]:
     raise requests.RequestException(f"Content too large and gotten truncated")
@@ -393,7 +393,7 @@ def get_previous_comment_on_pr(pr_number: str,
 
   response = response.json()
   if verbose:
-    print(response)
+    print(f"Previous comment query response: {response}")
 
   # Find the last comment from GITHUB_USER and has the ABBR_PR_COMMENT_TITILE
   # keyword.
