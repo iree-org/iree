@@ -488,9 +488,10 @@ struct ConvertRankedBroadcastBinaryOp : public ConversionPattern {
       auto resultExtent = computeBinaryResultExtent(
           rewriter, loc, lhsBcastExtents[i], rhsBcastExtents[i],
           isLhsExpansion[i], isRhsExpansion[i]);
-      if (!resultExtent)
+      if (!resultExtent) {
         return rewriter.notifyMatchFailure(op,
                                            "could not compute result extent");
+      }
       resultExtents[i] = *resultExtent;
       if (isLhsExpansion[i]) lhsNeedsBroadcast = true;
       if (isRhsExpansion[i]) rhsNeedsBroadcast = true;
@@ -663,9 +664,10 @@ struct ConvertSelectOp : public OpConversionPattern<chlo::BroadcastSelectOp> {
           rewriter, loc, predBcastExtents[i], thenBcastExtents[i],
           elseBcastExtents[i], isPredExpansion[i], isThenExpansion[i],
           isElseExpansion[i]);
-      if (!resultExtent)
+      if (!resultExtent) {
         return rewriter.notifyMatchFailure(op,
                                            "could not compute result extent");
+      }
       resultExtents[i] = *resultExtent;
       if (isPredExpansion[i]) predNeedsBroadcast = true;
       if (isThenExpansion[i]) thenNeedsBroadcast = true;
