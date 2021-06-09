@@ -409,6 +409,12 @@ py::object VmVariantList::GetAsNdarray(int index) {
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       dtype_code = "d";
       break;
+    case IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1):
+      // Due to layering issues it is not uncommon to get i1 buffer views
+      // and we just silently promote them to i8 since that is what they are.
+      // Really i1 should not exist at this boundary.
+      dtype_code = "b";
+      break;
     default:
       throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
   }
