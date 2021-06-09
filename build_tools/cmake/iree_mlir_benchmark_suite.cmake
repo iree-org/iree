@@ -7,7 +7,10 @@
 # iree_mlir_benchmark_suite()
 #
 # Generates benchmark suites for MLIR input modules. The generated artifacts
-# will be executed with `iree-benchmark-module`.
+# will be placed in the "<binary-root>/benchmark_suites/<category>" directory,
+# where "<category>" is the name of the immediate directory containing the
+# CMakeLists.txt. The generated artifacts are expected to be executed with
+# `iree-benchmark-module`.
 #
 # Parameters:
 #   MODULES: A list for model specification. Due to CMake's lack of nested list
@@ -15,7 +18,6 @@
 #       model takes six consecutive elements for the following information:
 #       - MODULE_NAMES: The input module's name.
 #       - MODULE_TAGS: A list of comma-separated tags for the input module.
-#       - MODULE_SOURCES: The initial generating source for the input module.
 #       - MLIR_SOURCES: The input file for each input module. It can be a file
 #           checked in the repository; it can also be a URL for downloading
 #           from the web. When it's a URL, the file should be a a direct .mlir
@@ -40,12 +42,12 @@
 #
 # 1)
 #
-# MODULE_NAMES, MODULE_TAGS, MODULE_SOURCES, MLIR_SOURCES, ENTRY_FUNCTIONS,
-# and FUNCTION_INPUTS together provide good flexiblity for specifying the MLIR
-# input module and its metadata. For example, we can generate modules with
-# idential name from different sources (TensorFlow, TFLite, PyTorch, etc.),
-# and we can transform the same input module differently for benchmarking
-# different aspects like fp32 vs fp16.
+# MODULE_NAMES, MODULE_TAGS, MLIR_SOURCES, ENTRY_FUNCTIONS, and FUNCTION_INPUTS
+# together provide good flexiblity for specifying the MLIRinput module and its
+# metadata. For example, we can generate modules with idential name from
+# different sources (TensorFlow, TFLite, PyTorch, etc.), and we can transform
+# the same input module differently for benchmarking different aspects like
+# fp32 vs fp16.
 #
 # 2)
 #
@@ -70,7 +72,7 @@ function(iree_mlir_benchmark_suite)
   )
 
   # All fields' names for each module.
-  set(_FIELD_NAMES "_MODULE_NAME" "_MODULE_TAGS" "_MODULE_SOURCE"
+  set(_FIELD_NAMES "_MODULE_NAME" "_MODULE_TAGS"
                    "_MLIR_SOURCE" "_ENTRY_FUNCTION" "_FUNCTION_INPUTS")
   list(LENGTH _FIELD_NAMES _FIELD_COUNT)
   math(EXPR _MAX_FIELD_INDEX "${_FIELD_COUNT} - 1")
@@ -97,9 +99,12 @@ function(iree_mlir_benchmark_suite)
       list(GET _RULE_MODULES ${_INDEX} ${_FIELD_NAME})
     endforeach()
 
+    # Use the last directory's name as the category.
+    get_filename_component(_CATEGORY "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
+
     # Generate all benchmarks to the root build directory. This helps for
     # discovering them and execute them on devices.
-    set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_MODULE_SOURCE}")
+    set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_CATEGORY}")
     set(_VMFB_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/vmfb")
 
     # The source file used to generate benchmark artifacts.

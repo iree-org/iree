@@ -10,16 +10,15 @@
 # Benchmark models                                                             #
 #                                                                              #
 # Each module specification should be a list that contains the following       #
-# fields: MODULE_NAME, MODULE_TAGS, MODULE_SOURCE, MLIR_SOURCE,                #
-# ENTRY_FUNCTION, FUNCTION_INPUTS. See iree_mlir_benchmark_suite definition    #
-# for details about these fields.                                              #
+# fields: MODULE_NAME, MODULE_TAGS, MLIR_SOURCE, ENTRY_FUNCTION,               #
+# FUNCTION_INPUTS. See iree_mlir_benchmark_suite definition for details about  #
+# these fields.                                                                #
 #                                                                              #
 ################################################################################
 
 set(MOBILENET_V2_MODULE
   "MobileNetV2"     # MODULE_NAME
   "fp32,imagenet"   # MODULE_TAGS
-  "TensorFlow"      # MODULE_SOURCE
   "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz" # MLIR_SOURCE
   "call"            # ENTRY_FUNCTION
   "1x224x224x3xf32" # FUNCTION_INPUTS
@@ -28,7 +27,6 @@ set(MOBILENET_V2_MODULE
 set(MOBILENET_V3SMALL_MODULE
   "MobileNetV3Small" # MODULE_NAME
   "fp32,imagenet"    # MODULE_TAGS
-  "TensorFlow"       # MODULE_SOURCE
   "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz" # MLIR_SOURCE
   "call"             # ENTRY_FUNCTION
   "1x224x224x3xf32"  # FUNCTION_INPUTS
