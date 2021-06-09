@@ -8,8 +8,8 @@
 #define IREE_HAL_LOCAL_TASK_COMMAND_BUFFER_H_
 
 #include "iree/base/api.h"
+#include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
-#include "iree/hal/local/arena.h"
 #include "iree/hal/local/task_queue_state.h"
 #include "iree/task/scope.h"
 #include "iree/task/task.h"
