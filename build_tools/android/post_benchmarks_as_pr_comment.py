@@ -43,6 +43,7 @@ from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 from common.benchmark_description import BenchmarkResults, get_output
 
+ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
 GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/google/iree"
 GITHUB_IREE_REPO_PREFIX = "https://github.com/google/iree"
@@ -323,7 +324,7 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
                                         SIMILAR_BECNHMARK_THRESHOLD))
 
   # Compose the abbreviated benchmark tables.
-  abbr_table = [md.header("Abbreviated Benchmark Summary", 2)]
+  abbr_table = [md.header(ABBR_PR_COMMENT_TITLE, 2)]
   abbr_table.append(commit_info)
   abbr_table.append(
       categorize_benchmarks_into_tables(all_benchmarks,
@@ -363,7 +364,7 @@ def post_to_gist(filename: str, content: str, verbose: bool = False):
 
   response = response.json()
   if verbose:
-    print(response)
+    print(f"Gist posting response: {response}")
 
   if response["truncated"]:
     raise requests.RequestException(f"Content too large and gotten truncated")
@@ -372,26 +373,67 @@ def post_to_gist(filename: str, content: str, verbose: bool = False):
   return f"https://gist.github.com/{GITHUB_USER}/{gist_id}"
 
 
-def comment_on_pr(content, verbose: bool = False):
-  """Posts the given content as comments to the current pull request."""
-  pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
-  # Buildkite sets this to "false" if not running on a PR:
-  # https://buildkite.com/docs/pipelines/environment-variables#bk-env-vars-buildkite-pull-request
-  if pr_number == "false":
-    raise ValueError("Not a pull request")
-
+def get_previous_comment_on_pr(pr_number: str,
+                               verbose: bool = False) -> Optional[int]:
+  """Gets the previous comment's ID from GitHub."""
+  # Increasing per_page limit requires user authentication.
   api_token = get_required_env_var('GITHUB_TOKEN')
   headers = {
       "Accept": "application/vnd.github.v3+json",
       "Authorization": f"token {api_token}",
   }
-  payload = json.dumps({"event": "COMMENT", "body": content})
+  payload = json.dumps({"per_page": 100})
 
-  api_endpoint = f"{GITHUB_IREE_API_PREFIX}/pulls/{pr_number}/reviews"
-  request = requests.post(api_endpoint, data=payload, headers=headers)
-  if request.status_code != 200:
+  api_endpoint = f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments"
+  response = requests.get(api_endpoint, data=payload, headers=headers)
+  if response.status_code != 200:
     raise requests.RequestException(
-        f"Failed to comment on GitHub; error code: {request.status_code}")
+        f"Failed to get PR comments from GitHub; error code: {response.status_code}"
+    )
+
+  response = response.json()
+  if verbose:
+    print(f"Previous comment query response: {response}")
+
+  # Find the last comment from GITHUB_USER and has the ABBR_PR_COMMENT_TITILE
+  # keyword.
+  for comment in reversed(response):
+    if (comment["user"]["login"] == GITHUB_USER) and (ABBR_PR_COMMENT_TITLE
+                                                      in comment["body"]):
+      return comment["id"]
+  return None
+
+
+def create_comment_on_pr(pr_number: str, content: str, verbose: bool = False):
+  """Posts the given content as comments to the current pull request."""
+  api_token = get_required_env_var('GITHUB_TOKEN')
+  headers = {
+      "Accept": "application/vnd.github.v3+json",
+      "Authorization": f"token {api_token}",
+  }
+  payload = json.dumps({"body": content})
+
+  api_endpoint = f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments"
+  response = requests.post(api_endpoint, data=payload, headers=headers)
+  if response.status_code != 201:
+    raise requests.RequestException(
+        f"Failed to comment on GitHub; error code: {response.status_code}")
+
+
+def update_comment_on_pr(comment_id: int, content: str, verbose: bool = False):
+  """Updates the content of the given comment."""
+  api_token = get_required_env_var('GITHUB_TOKEN')
+  headers = {
+      "Accept": "application/vnd.github.v3+json",
+      "Authorization": f"token {api_token}",
+  }
+  payload = json.dumps({"body": content})
+
+  api_endpoint = f"{GITHUB_IREE_API_PREFIX}/issues/comments/{comment_id}"
+  response = requests.patch(api_endpoint, data=payload, headers=headers)
+  if response.status_code != 200:
+    raise requests.RequestException(
+        f"Failed to comment on GitHub; error code: {response.status_code}")
 
 
 def parse_arguments():
@@ -433,12 +475,24 @@ def main(args):
 
   if args.dry_run:
     print(full_md, "\n\n", abbr_md)
+    return
+
+  pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
+  # Buildkite sets this to "false" if not running on a PR:
+  # https://buildkite.com/docs/pipelines/environment-variables#bk-env-vars-buildkite-pull-request
+  if pr_number == "false":
+    raise ValueError("Not a pull request")
+
+  build_number = get_required_env_var("BUILDKITE_BUILD_NUMBER")
+  filename = f"iree-full-benchmark-result-{build_number}.md"
+  gist_url = post_to_gist(filename, full_md, args.verbose)
+  abbr_md = abbr_md.replace("<<placeholder-link>>", gist_url)
+
+  previous_comment = get_previous_comment_on_pr(pr_number, args.verbose)
+  if previous_comment is not None:
+    update_comment_on_pr(previous_comment, abbr_md, args.verbose)
   else:
-    build_number = get_required_env_var("BUILDKITE_BUILD_NUMBER")
-    filename = f"iree-full-benchmark-result-{build_number}.md"
-    gist_url = post_to_gist(filename, full_md, args.verbose)
-    abbr_md = abbr_md.replace("<<placeholder-link>>", gist_url)
-    comment_on_pr(abbr_md, args.verbose)
+    create_comment_on_pr(pr_number, abbr_md, args.verbose)
 
 
 if __name__ == "__main__":
