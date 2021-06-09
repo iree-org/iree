@@ -4,36 +4,28 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# iree_check_lists_have_same_size()
-#
-# Note that the caller should pass in the list variables themselves to
-# LIST1 and LIST2, not the list variables' values.
-function(iree_check_lists_have_same_size LIST1 LIST2)
-  list(LENGTH "${LIST1}" _LIST1_COUNT)
-  list(LENGTH "${LIST2}" _LIST2_COUNT)
-  if(NOT _LIST1_COUNT EQUAL _LIST2_COUNT)
-    message(SEND_ERROR "${LIST1} count ${_LIST1_COUNT} does not "
-                       "match ${LIST2} count ${_LIST2_COUNT}"
-    )
-  endif()
-endfunction()
-
 # iree_mlir_benchmark_suite()
 #
 # Generates benchmark suites for MLIR input modules. The generated artifacts
-# will be executed with `iree-benchmark-module`.
+# will be placed in the "<binary-root>/benchmark_suites/<category>" directory,
+# where "<category>" is the name of the immediate directory containing the
+# CMakeLists.txt. The generated artifacts are expected to be executed with
+# `iree-benchmark-module`.
 #
 # Parameters:
-#   MODULE_NAMES: A list of input module names.
-#   MODULE_TAGS: A list of tags for each input module.
-#   MODULE_SOURCES: The initial generating source for each input module.
-#   MLIR_SOURCES: The input file for each input module. It can be a file in
-#       checked in the repository; it can also be a URL for downloading from.
-#       the web. When it's a URL, the file should be a a direct .mlir file
-#       or a tarball containing a .mlir file; for both cases, the .mlir file
-#       should have a name matching the one in MODULE_NAMES.
-#   ENTRY_FUNCTIONS: The entry function name for each input module.
-#   FUNCTION_INPUTS: A list of entry function inputs for each input module.
+#   MODULES: A list for model specification. Due to CMake's lack of nested list
+#       support, all model's specification is put in the same list, where each
+#       model takes six consecutive elements for the following information:
+#       - MODULE_NAMES: The input module's name.
+#       - MODULE_TAGS: A list of comma-separated tags for the input module.
+#       - MLIR_SOURCES: The input file for each input module. It can be a file
+#           checked in the repository; it can also be a URL for downloading
+#           from the web. When it's a URL, the file should be a a direct .mlir
+#           file or a tarball containing a .mlir file; for both cases, the .mlir
+#           file should have a name matching the one in MODULE_NAMES.
+#       - ENTRY_FUNCTIONS: The entry function name for the input module.
+#       - FUNCTION_INPUTS: A list of comma-separated entry function inputs for
+#           the input module.
 #   BENCHMARK_MODES: A list strings, where ech one of them is a comma-
 #       separated list of benchmark mode tags.
 #   TARGET_BACKEND: The compiler target backend.
@@ -50,17 +42,12 @@ endfunction()
 #
 # 1)
 #
-# MODULE_NAMES, MODULE_TAGS, MODULE_SOURCES, MLIR_SOURCES, ENTRY_FUNCTIONS,
-# and FUNCTION_INPUTS together provide good flexiblity for specifying the MLIR
-# input module and its metadata. For example, we can generate modules with
-# idential name from different sources (TensorFlow, TFLite, PyTorch, etc.),
-# and we can transform the same input module differently for benchmarking
-# different aspects like fp32 vs fp16.
-#
-# Note that the above parameters are all lists and they should have the name
-# number of elements. This enables us to use the same CMake function call to
-# generate benchmarks for many models and share the specification of
-# translation/runtime configurations.
+# MODULE_NAMES, MODULE_TAGS, MLIR_SOURCES, ENTRY_FUNCTIONS, and FUNCTION_INPUTS
+# together provide good flexiblity for specifying the MLIRinput module and its
+# metadata. For example, we can generate modules with idential name from
+# different sources (TensorFlow, TFLite, PyTorch, etc.), and we can transform
+# the same input module differently for benchmarking different aspects like
+# fp32 vs fp16.
 #
 # 2)
 #
@@ -81,30 +68,44 @@ function(iree_mlir_benchmark_suite)
     _RULE
     ""
     "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
-    "BENCHMARK_MODES;ENTRY_FUNCTIONS;FUNCTION_INPUTS;MLIR_SOURCES;MODULE_NAMES;MODULE_SOURCES;MODULE_TAGS;TRANSLATION_FLAGS;RUNTIME_FLAGS"
+    "BENCHMARK_MODES;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
-  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_MODULE_TAGS)
-  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_MODULE_SOURCES)
-  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_MLIR_SOURCES)
-  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_ENTRY_FUNCTIONS)
-  iree_check_lists_have_same_size(_RULE_MODULE_NAMES _RULE_FUNCTION_INPUTS)
+  # All fields' names for each module.
+  set(_FIELD_NAMES "_MODULE_NAME" "_MODULE_TAGS"
+                   "_MLIR_SOURCE" "_ENTRY_FUNCTION" "_FUNCTION_INPUTS")
+  list(LENGTH _FIELD_NAMES _FIELD_COUNT)
+  math(EXPR _MAX_FIELD_INDEX "${_FIELD_COUNT} - 1")
 
-  # Loop over all modules and their sources to create targets.
-  list(LENGTH _RULE_MODULE_NAMES _MODULE_NAMES_COUNT)
-  math(EXPR _MAX_INDEX "${_MODULE_NAMES_COUNT} - 1")
-  foreach(_INDEX RANGE 0 "${_MAX_INDEX}")
+  # Make sure we have some multiple of six elements.
+  list(LENGTH _RULE_MODULES _MODULE_TOTAL_ELEMENT_COUNT)
+  math(EXPR _MODULE_COUNT
+       "${_MODULE_TOTAL_ELEMENT_COUNT} / ${_FIELD_COUNT}")
+  math(EXPR _MODULE_ELEMENT_REMAINDER
+       "${_MODULE_TOTAL_ELEMENT_COUNT} % ${_FIELD_COUNT}")
+  if(NOT ${_MODULE_ELEMENT_REMAINDER} EQUAL 0)
+    message(SEND_ERROR "MODULES expected to have some multiple of six "
+                       "elements; some module has missing/redundant fields.")
+  endif()
+
+  # Loop over all modules to create targets.
+  math(EXPR _MAX_MODULE_INDEX "${_MODULE_COUNT} - 1")
+  foreach(_MODULE_INDEX RANGE 0 "${_MAX_MODULE_INDEX}")
+    # Loop over all elements for the current module and assign them to the
+    # corresponding field names for later use.
+    foreach(_FIELD_INDEX RANGE 0 "${_MAX_FIELD_INDEX}")
+      list(GET _FIELD_NAMES ${_FIELD_INDEX} _FIELD_NAME)
+      math(EXPR _INDEX "${_MODULE_INDEX} * ${_FIELD_COUNT} + ${_FIELD_INDEX}")
+      list(GET _RULE_MODULES ${_INDEX} ${_FIELD_NAME})
+    endforeach()
+
+    # Use the last directory's name as the category.
+    get_filename_component(_CATEGORY "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
+
     # Generate all benchmarks to the root build directory. This helps for
     # discovering them and execute them on devices.
-    list(GET _RULE_MODULE_SOURCES ${_INDEX} _MODULE_SOURCE)
-    set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_MODULE_SOURCE}")
+    set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_CATEGORY}")
     set(_VMFB_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/vmfb")
-
-    list(GET _RULE_MODULE_NAMES ${_INDEX} _MODULE_NAME)
-    list(GET _RULE_MODULE_TAGS ${_INDEX} _MODULE_TAGS)
-    list(GET _RULE_MLIR_SOURCES ${_INDEX} _MLIR_SOURCE)
-    list(GET _RULE_ENTRY_FUNCTIONS ${_INDEX} _ENTRY_FUNCTION)
-    list(GET _RULE_FUNCTION_INPUTS ${_INDEX} _FUNCTION_INPUTS)
 
     # The source file used to generate benchmark artifacts.
     set(_SOURCE_FILE "${_MLIR_SOURCE}")
@@ -240,5 +241,5 @@ function(iree_mlir_benchmark_suite)
       # Mark dependency so that we have one target to drive them all.
       add_dependencies(iree-benchmark-suites "${_FLAGFILE_GEN_TARGET_NAME}")
     endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
-  endforeach(_INDEX RANGE 0 "${_MAX_INDEX}")
+  endforeach(_MODULE_INDEX RANGE 0 "${_MAX_MODULE_INDEX}")
 endfunction()

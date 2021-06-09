@@ -9,68 +9,44 @@
 #                                                                              #
 # Benchmark models                                                             #
 #                                                                              #
-# All the lists should have the same number of elements. Each list describes   #
-# one aspect of the model. Elements at the same index are for the same model.  #
-#                                                                              #
-# Normally models to be benchmarked should be placed here becuase all          #
-# benchmark cases will be enabled for them. There might exist cases where we   #
-# cannot enable all the benchmark cases for one model; then they should be     #
-# placed directly in the cmake function calls in the next section.             #
+# Each module specification should be a list that contains the following       #
+# fields: MODULE_NAME, MODULE_TAGS, MLIR_SOURCE, ENTRY_FUNCTION,               #
+# FUNCTION_INPUTS. See iree_mlir_benchmark_suite definition for details about  #
+# these fields.                                                                #
 #                                                                              #
 ################################################################################
 
-set(BENCHMARK_MODULE_NAMES
-  "MobileNetV2"
-  "MobileNetV3Small"
+set(MOBILENET_V2_MODULE
+  "MobileNetV2"     # MODULE_NAME
+  "fp32,imagenet"   # MODULE_TAGS
+  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz" # MLIR_SOURCE
+  "call"            # ENTRY_FUNCTION
+  "1x224x224x3xf32" # FUNCTION_INPUTS
 )
 
-# Each element is a comma-separated list.
-set(BENCHMARK_MODULE_TAGS
-  "fp32,imagenet"
-  "fp32,imagenet"
-)
-
-set(BENCHMARK_MODULE_SOURCES
-  "TensorFlow"
-  "TensorFlow"
-)
-
-set(BENCHMARK_MLIR_SOURCES
-  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-b0c5c584.tar.gz"
-  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz"
-)
-
-set(BENCHMARK_ENTRY_FUNCTIONS
-  "call"
-  "call"
-)
-
-# Each element is a comma-separated list.
-set(BENCHMARK_FUNCTION_INPUTS
-  "1x224x224x3xf32"
-  "1x224x224x3xf32"
+set(MOBILENET_V3SMALL_MODULE
+  "MobileNetV3Small" # MODULE_NAME
+  "fp32,imagenet"    # MODULE_TAGS
+  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-b0c5c584.tar.gz" # MLIR_SOURCE
+  "call"             # ENTRY_FUNCTION
+  "1x224x224x3xf32"  # FUNCTION_INPUTS
 )
 
 ################################################################################
 #                                                                              #
-# Benchmark cases                                                              #
+# Benchmark suites                                                             #
+#                                                                              #
+# Each suite benchmarks a list of modules with some specific configuration,    #
+# typically involving different translation/runtime flags and targeting        #
+# different IREE drivers and hardware architectures.                           #
 #                                                                              #
 ################################################################################
 
 # CPU, VMVX, 3-thread, little-core, full-inference
 iree_mlir_benchmark_suite(
-  MODULE_NAMES
-    ${BENCHMARK_MODULE_NAMES}
-  MODULE_TAGS
-    ${BENCHMARK_MODULE_TAGS}
-  MODULE_SOURCES
-    ${BENCHMARK_MODULE_SOURCES}
-  MLIR_SOURCES
-    ${BENCHMARK_MLIR_SOURCES}
-  ENTRY_FUNCTIONS
-    ${BENCHMARK_ENTRY_FUNCTIONS}
-  FUNCTION_INPUTS
-    ${BENCHMARK_FUNCTION_INPUTS}
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
     "3-thread,little-core,full-inference"
@@ -89,18 +65,9 @@ iree_mlir_benchmark_suite(
 
 # CPU, Dylib-Sync, big/little-core, full-inference
 iree_mlir_benchmark_suite(
-  MODULE_NAMES
-    ${BENCHMARK_MODULE_NAMES}
-  MODULE_TAGS
-    ${BENCHMARK_MODULE_TAGS}
-  MODULE_SOURCES
-    ${BENCHMARK_MODULE_SOURCES}
-  MLIR_SOURCES
-    ${BENCHMARK_MLIR_SOURCES}
-  ENTRY_FUNCTIONS
-    ${BENCHMARK_ENTRY_FUNCTIONS}
-  FUNCTION_INPUTS
-    ${BENCHMARK_FUNCTION_INPUTS}
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
     "big-core,full-inference"
@@ -122,18 +89,9 @@ iree_mlir_benchmark_suite(
 
 # CPU, Dylib, 1-thread, big/little-core, full-inference
 iree_mlir_benchmark_suite(
-  MODULE_NAMES
-    ${BENCHMARK_MODULE_NAMES}
-  MODULE_TAGS
-    ${BENCHMARK_MODULE_TAGS}
-  MODULE_SOURCES
-    ${BENCHMARK_MODULE_SOURCES}
-  MLIR_SOURCES
-    ${BENCHMARK_MLIR_SOURCES}
-  ENTRY_FUNCTIONS
-    ${BENCHMARK_ENTRY_FUNCTIONS}
-  FUNCTION_INPUTS
-    ${BENCHMARK_FUNCTION_INPUTS}
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference"
@@ -157,18 +115,9 @@ iree_mlir_benchmark_suite(
 
 # CPU, Dylib, 3-thread, big/little-core, full-inference
 iree_mlir_benchmark_suite(
-  MODULE_NAMES
-    ${BENCHMARK_MODULE_NAMES}
-  MODULE_TAGS
-    ${BENCHMARK_MODULE_TAGS}
-  MODULE_SOURCES
-    ${BENCHMARK_MODULE_SOURCES}
-  MLIR_SOURCES
-    ${BENCHMARK_MLIR_SOURCES}
-  ENTRY_FUNCTIONS
-    ${BENCHMARK_ENTRY_FUNCTIONS}
-  FUNCTION_INPUTS
-    ${BENCHMARK_FUNCTION_INPUTS}
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
     "3-thread,big-core,full-inference"
@@ -192,18 +141,9 @@ iree_mlir_benchmark_suite(
 
 # GPU, Vulkan, Adreno, full-inference
 iree_mlir_benchmark_suite(
-  MODULE_NAMES
-    ${BENCHMARK_MODULE_NAMES}
-  MODULE_TAGS
-    ${BENCHMARK_MODULE_TAGS}
-  MODULE_SOURCES
-    ${BENCHMARK_MODULE_SOURCES}
-  MLIR_SOURCES
-    ${BENCHMARK_MLIR_SOURCES}
-  ENTRY_FUNCTIONS
-    ${BENCHMARK_ENTRY_FUNCTIONS}
-  FUNCTION_INPUTS
-    ${BENCHMARK_FUNCTION_INPUTS}
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
     "full-inference"
@@ -223,18 +163,9 @@ iree_mlir_benchmark_suite(
 
 # GPU, Vulkan, Adreno, kernel-execution
 iree_mlir_benchmark_suite(
-  MODULE_NAMES
-    ${BENCHMARK_MODULE_NAMES}
-  MODULE_TAGS
-    ${BENCHMARK_MODULE_TAGS}
-  MODULE_SOURCES
-    ${BENCHMARK_MODULE_SOURCES}
-  MLIR_SOURCES
-    ${BENCHMARK_MLIR_SOURCES}
-  ENTRY_FUNCTIONS
-    ${BENCHMARK_ENTRY_FUNCTIONS}
-  FUNCTION_INPUTS
-    ${BENCHMARK_FUNCTION_INPUTS}
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
     "kernel-execution"
@@ -257,18 +188,9 @@ iree_mlir_benchmark_suite(
 
 # GPU, Vulkan, Mali, full-inference
 iree_mlir_benchmark_suite(
-  MODULE_NAMES
-    ${BENCHMARK_MODULE_NAMES}
-  MODULE_TAGS
-    ${BENCHMARK_MODULE_TAGS}
-  MODULE_SOURCES
-    ${BENCHMARK_MODULE_SOURCES}
-  MLIR_SOURCES
-    ${BENCHMARK_MLIR_SOURCES}
-  ENTRY_FUNCTIONS
-    ${BENCHMARK_ENTRY_FUNCTIONS}
-  FUNCTION_INPUTS
-    ${BENCHMARK_FUNCTION_INPUTS}
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
     "full-inference"
@@ -288,18 +210,9 @@ iree_mlir_benchmark_suite(
 
 # GPU, Vulkan, Mali, kernel-execution
 iree_mlir_benchmark_suite(
-  MODULE_NAMES
-    ${BENCHMARK_MODULE_NAMES}
-  MODULE_TAGS
-    ${BENCHMARK_MODULE_TAGS}
-  MODULE_SOURCES
-    ${BENCHMARK_MODULE_SOURCES}
-  MLIR_SOURCES
-    ${BENCHMARK_MLIR_SOURCES}
-  ENTRY_FUNCTIONS
-    ${BENCHMARK_ENTRY_FUNCTIONS}
-  FUNCTION_INPUTS
-    ${BENCHMARK_FUNCTION_INPUTS}
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
     "kernel-execution"
