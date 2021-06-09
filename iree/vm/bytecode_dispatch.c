@@ -256,7 +256,8 @@ static iree_status_t iree_vm_bytecode_external_leave(
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
-        iree_vm_ref_move(
+        iree_vm_ref_retain_or_move(
+            src_reg & IREE_REF_REGISTER_MOVE_BIT,
             &callee_registers->ref[src_reg & callee_registers->ref_mask],
             (iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
