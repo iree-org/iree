@@ -9,6 +9,7 @@
 // Putting this in HAL dialect for now.
 include "iree/compiler/Dialect/HAL/IR/HALDialect.td"
 
+// List of pre-existing pipelines for translating executables.
 def CPU_Default
     : I32EnumAttrCase<"CPUDefault", 0>;
 def CPU_Vectorization
@@ -26,6 +27,14 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
 def TileSizesListAttr :
     TypedArrayAttrBase<I64ArrayAttr,
                        "list of tile sizes for all levels"> { }
+
+// Attribute that captures information needed for translating the executables.
+def TranslationInfoAttr :
+  StructAttr<"TranslationInfo", HAL_Dialect, [
+    StructFieldAttr<"passPipeline", DispatchLoweringPassPipelineEnum>,
+    StructFieldAttr<"workloadPerWorkgroup",
+        DefaultValuedAttr<I64ArrayAttr, "{}">>,
+  ]>;
 
 // Attribute that carries information needed to perform
 // tiling/vectorization, etc.

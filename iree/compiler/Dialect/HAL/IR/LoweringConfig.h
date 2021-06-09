@@ -15,13 +15,14 @@
 #ifndef IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
 #define IREE_COMPILER_CONVERSION_COMMON_LOWERINGCONFIG_H_
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 // clang-format off
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h.inc"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfigEnums.h.inc"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h.inc"
 // clang-format on
 
 namespace mlir {
@@ -29,27 +30,43 @@ namespace iree_compiler {
 
 namespace IREE {
 namespace HAL {
-/// Struct that for a given hal.target.executable defines how it is translated.
-// TODO(ravishankarm): This could also be converted to an attribute on the
-// hal.executable.target
-struct TranslateExecutableInfo {
-  DispatchLoweringPassPipeline passPipeline;
-  SmallVector<int64_t, 3> workgroupSize;
-};
 
-inline bool operator==(const TranslateExecutableInfo &lhs,
-                       const TranslateExecutableInfo &rhs) {
-  return lhs.passPipeline == rhs.passPipeline &&
-         lhs.workgroupSize == rhs.workgroupSize;
+inline bool operator==(const TranslationInfo &lhs, const TranslationInfo &rhs) {
+  return lhs.passPipeline() == rhs.passPipeline() &&
+         lhs.workloadPerWorkgroup() == rhs.workloadPerWorkgroup();
 }
 
-inline bool operator!=(const TranslateExecutableInfo &lhs,
-                       const TranslateExecutableInfo &rhs) {
+inline bool operator!=(const TranslationInfo &lhs, const TranslationInfo &rhs) {
   return !(lhs == rhs);
 }
 
 }  // namespace HAL
 }  // namespace IREE
+
+//===----------------------------------------------------------------------===//
+// Helpers for getting/setting information needed to lower an executable. These
+// are information that are stored as attributes on the
+// `hal.executable.entry_point`
+//===----------------------------------------------------------------------===//
+
+/// Builder method for IREE::HAL::TranslationInfoAttr.
+IREE::HAL::TranslationInfo buildTranslationInfo(
+    IREE::HAL::DispatchLoweringPassPipeline passPipeline,
+    ArrayRef<int64_t> workloadPerWorkgroup, MLIRContext *context);
+
+/// Gets the translate executable info attribute value associated with
+/// `entryPointOp`.
+IREE::HAL::TranslationInfo getTranslationInfo(
+    IREE::HAL::ExecutableEntryPointOp entryPointOp);
+
+/// Set the translate executable info with the entry point op. Returns a failure
+/// if these have already been set for the `entryPointOp` and are incompatible
+/// with what is being set.
+// TODO(ravishankarm, benvanik): Eventually all the information needed for the
+// lowering will be consolidated into a single attribute with richer
+// information.
+LogicalResult setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
+                                 IREE::HAL::TranslationInfo translationInfo);
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting the `hal.lowering.*` attributes that drive the
@@ -86,9 +103,9 @@ using TileSizesListType = SmallVector<SmallVector<int64_t, 4>, 1>;
 using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t, 4>>;
 
 /// Construct a lowering configuration.
-IREE::HAL::LoweringConfig getConfigAttr(TileSizesListTypeRef tileSizes,
-                                        ArrayRef<int64_t> nativeVectorSize,
-                                        MLIRContext *context);
+IREE::HAL::LoweringConfig buildConfigAttr(TileSizesListTypeRef tileSizes,
+                                          ArrayRef<int64_t> nativeVectorSize,
+                                          MLIRContext *context);
 
 /// Get the tile sizes for all levels.
 TileSizesListType getTileSizes(IREE::HAL::LoweringConfig config);

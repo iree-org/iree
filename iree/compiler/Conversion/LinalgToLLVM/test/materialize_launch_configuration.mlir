@@ -52,8 +52,7 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG0:.+]] = {tileSizes = {{\[}}[64, 64]{{\]}}}
-//  CHECK-DAG: #[[CONFIG1:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}[64, 64], [32, 32, 32], [4, 4, 4]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}[64, 64], [32, 32, 32], [4, 4, 4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point @matmul_tensors
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
@@ -63,12 +62,8 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 //  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
-//      CHECK: linalg.copy
-// CHECK-SAME:   lowering.config = #[[CONFIG0]]
 //      CHECK: linalg.matmul
-// CHECK-SAME:   lowering.config = #[[CONFIG1]]
-//      CHECK: linalg.copy
-// CHECK-SAME:   lowering.config = #[[CONFIG0]]
+// CHECK-SAME:   lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -91,7 +86,7 @@ hal.executable @add_no_config attributes {sym_visibility = "private"} {
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>
-        linalg.generic {__internal_linalg_transform__ = "workgroup"} {
+        linalg.generic {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                            affine_map<(d0, d1) -> (d1)>,
                            affine_map<(d0, d1) -> (d0, d1)>],
@@ -346,8 +341,7 @@ hal.executable @batch_matmul_tensors attributes {sym_visibility = "private"} {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG0:.+]] = {tileSizes = {{\[}}[1, 32, 32]{{\]}}
-//  CHECK-DAG: #[[CONFIG1:.+]] = {nativeVectorSize = [1, 4, 4, 4], tileSizes = {{\[}}[1, 32, 32], [1, 16, 16, 16], [1, 4, 4, 4]{{\]}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [1, 4, 4, 4], tileSizes = {{\[}}[1, 32, 32], [1, 16, 16, 16], [1, 4, 4, 4]{{\]}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //      CHECK: hal.executable.entry_point @batch_matmul_tensors
 // CHECK-NEXT: (%[[ARG0:[a-zA-Z0-9]+]]: index
@@ -356,9 +350,5 @@ hal.executable @batch_matmul_tensors attributes {sym_visibility = "private"} {
 //  CHECK-DAG:  %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //  CHECK-DAG:  %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
 //      CHECK:  hal.return %[[D0]], %[[D1]], %[[ARG2]]
-//      CHECK:  linalg.copy
-// CHECK-SAME:    lowering.config = #[[CONFIG0]]
 //      CHECK:  linalg.batch_matmul
-// CHECK-SAME:    lowering.config = #[[CONFIG1]]
-//      CHECK:  linalg.copy
-// CHECK-SAME:    lowering.config = #[[CONFIG0]]
+// CHECK-SAME:    lowering.config = #[[CONFIG]]

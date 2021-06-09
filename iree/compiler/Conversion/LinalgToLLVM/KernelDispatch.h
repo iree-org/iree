@@ -20,7 +20,7 @@ enum class TilingLevel : unsigned {
   NumTileLevels = 3
 };
 
-IREE::HAL::TranslateExecutableInfo initCPULaunchConfig(ModuleOp moduleOp);
+LogicalResult initCPULaunchConfig(ModuleOp moduleOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir
