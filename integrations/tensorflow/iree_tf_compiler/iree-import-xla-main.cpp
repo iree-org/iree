@@ -260,9 +260,8 @@ int main(int argc, char **argv) {
 
   // Note that we emit the ABI last since any needed function-level
   // transformations (i.e. de-tupling, etc) should have been done.
-  // TODO: Uncomment this to enable IREE native bindings.
-  // pm.addNestedPass<FuncOp>(
-  //     iree_integrations::TF::createEmitDefaultIREEABIPass());
+  pm.addNestedPass<FuncOp>(
+      iree_integrations::MHLO::createEmitDefaultIREEABIPass());
 
   if (failed(pm.run(*module))) {
     llvm::errs()

@@ -34,10 +34,10 @@ namespace iree_compiler {
 // whole end-to-end with options for bindings/targets/etc.
 struct BindingOptions {
   // Whether to include runtime support functions for the IREE native ABI.
-  bool native = false;
+  bool native = true;
   // Whether to include runtime support functions and metadata required for
   // SIP-compatible bindings (like bindings/python/iree).
-  bool sip = true;
+  bool sip = false;
   // Whether to include runtime support functions required for the IREE TFLite
   // API compatibility bindings.
   bool tflite = false;
@@ -51,12 +51,12 @@ static BindingOptions getBindingOptionsFromFlags() {
       "iree-native-bindings-support",
       llvm::cl::desc(
           "Include runtime support for native IREE ABI-compatible bindings"),
-      llvm::cl::init(false), llvm::cl::cat(bindingOptionsCategory)};
+      llvm::cl::init(true), llvm::cl::cat(bindingOptionsCategory)};
 
   static llvm::cl::opt<bool> *bindingsSIPFlag = new llvm::cl::opt<bool>{
       "iree-sip-bindings-support",
       llvm::cl::desc("Include runtime support for SIP-compatible bindings"),
-      llvm::cl::init(true), llvm::cl::cat(bindingOptionsCategory)};
+      llvm::cl::init(false), llvm::cl::cat(bindingOptionsCategory)};
 
   static llvm::cl::opt<bool> *bindingsTFLiteFlag = new llvm::cl::opt<bool>{
       "iree-tflite-bindings-support",
