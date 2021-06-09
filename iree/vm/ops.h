@@ -323,7 +323,7 @@ static inline int32_t vm_cmp_nz_i64(int64_t operand) {
 }
 
 //===------------------------------------------------------------------===//
-// Utility macros (Used for things that EmitC can't hadnle)
+// Utility macros (Used for things that EmitC can't handle)
 //===------------------------------------------------------------------===//
 
 // Get the address of an array element
