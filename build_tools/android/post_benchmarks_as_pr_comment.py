@@ -274,7 +274,7 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     tables.append(md.header("Similar Benchmarks", 3))
     tables.append(sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
-    tables.append(md.header("Similar Benchmarks", 3))
+    tables.append(md.header("Raw Benchmarks", 3))
     raw_list = [
         (k, v.mean_time, v.median_time, v.stddev_time) for k, v in raw.items()
     ]
