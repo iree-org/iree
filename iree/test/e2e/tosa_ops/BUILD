@@ -62,7 +62,7 @@ LLVM_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "matmul.mlir", # TOSA matmul is being refactored to be batched
+        "matmul.mlir",  # TOSA matmul is being refactored to be batched
     ],
 )
 
@@ -116,7 +116,7 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "matmul.mlir", # TOSA matmul is being refactored to be batched
+        "matmul.mlir",  # TOSA matmul is being refactored to be batched
         "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],
 )
@@ -178,7 +178,7 @@ VULKAN_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "fully_connected.mlir",  # Currently failing on vulkan.
-        "matmul.mlir", # TOSA matmul is being refactored to be batched
+        "matmul.mlir",  # TOSA matmul is being refactored to be batched
         "reduce.mlir",  # Currently failing on vulkan.
         "max_pool.mlir",  # Currently failing on vulkan.
     ],
