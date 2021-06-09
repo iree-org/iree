@@ -1018,8 +1018,7 @@ class ExStreamFragmentOpConversion
                   streamOp.getLoc(),
                   IREE::HAL::BufferType::get(rewriter.getContext()),
                   bufferValue),
-              rewriter.createOrFold<IREE::HAL::BufferViewByteLengthOp>(
-                  streamOp.getLoc(), bufferValue)};
+              schedulingState.lookupOrComputeSize(streamValue, rewriter)};
         } else {
           bufferRange = BufferRange{
               bufferValue,
