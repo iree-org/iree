@@ -202,13 +202,6 @@ Optional<Extent> computeBinaryResultExtent(OpBuilder &builder, Location loc,
   }
 
   // Both are dynamic. Compute the max.
-  // TODO: Remove this.
-  // Value lhsIsGreater = builder.create<CmpIOp>(loc, CmpIPredicate::sge,
-  //                                             lhsExtentValue,
-  //                                             rhsExtentValue);
-  // Value resultExtent = builder.create<SelectOp>(loc, lhsIsGreater,
-  //                                               lhsExtentValue,
-  //                                               rhsExtentValue);
   return Extent(lhsExtentValue);
 }
 
