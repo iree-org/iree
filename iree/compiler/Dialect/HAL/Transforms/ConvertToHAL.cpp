@@ -65,8 +65,8 @@ class ConvertToHALPass
 
     OwningRewritePatternList patterns(&getContext());
 
-    setupIREEToHALLegality(context, conversionTarget);
-    populateIREEToHALPatterns(context, patterns);
+    populateIREEToHALPatterns(context, conversionTarget, typeConverter,
+                              patterns);
 
     setupCompilerHintsLegality(context, conversionTarget, typeConverter);
     populatePreserveCompilerHintsPatterns(context, patterns);

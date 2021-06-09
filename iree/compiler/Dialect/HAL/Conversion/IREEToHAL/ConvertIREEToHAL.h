@@ -17,13 +17,11 @@ namespace iree_compiler {
 // TODO(gcmn): Use conversion interfaces. Requires breaking circular dependency
 // between HAL and IREE dialects.
 
-// Appends all patterns for lowering IREE ops to HAL buffer ops.
-void populateIREEToHALPatterns(MLIRContext *context,
+// Appends all patterns for lowering IREE ops to HAL buffer ops and sets their
+// legality.
+void populateIREEToHALPatterns(MLIRContext *context, ConversionTarget &target,
+                               TypeConverter &typeConverter,
                                OwningRewritePatternList &patterns);
-
-// Setup the |conversionTarget| op legality to ensure helpful error messages for
-// IREE ops we know should always be converted.
-void setupIREEToHALLegality(MLIRContext *context, ConversionTarget &target);
 
 }  // namespace iree_compiler
 }  // namespace mlir
