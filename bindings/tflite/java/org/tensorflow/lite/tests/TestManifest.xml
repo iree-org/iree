@@ -7,7 +7,7 @@
  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.google.iree" >
+    package="org.tensorflow.lite" >
 
   <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="29" />
 
@@ -15,8 +15,8 @@
       android:name="androidx.test.runner.AndroidJUnitRunner"
       android:functionalTest="false"
       android:handleProfiling="false"
-      android:label="Tests com.google.iree"
-      android:targetPackage="com.google.iree" />
+      android:label="Tests org.tensorflow.lite"
+      android:targetPackage="org.tensorflow.lite" />
 
   <application android:label="InterpreterTest">
     <uses-library android:name="android.test.runner" />
