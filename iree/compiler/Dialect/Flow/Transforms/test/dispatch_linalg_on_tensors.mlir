@@ -869,3 +869,28 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
 //       CHECK:     subtensor
 //       CHECK:     flow.return
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func @scf_for(%arg0: tensor<4xi32>, %arg1: tensor<4xi32>) -> tensor<4xi32> {
+  %c1 = constant 1 : index
+  %c4 = constant 4 : index
+  %c0 = constant 0 : index
+  %0 = scf.for %arg2 = %c0 to %c4 step %c1 iter_args(%arg3 = %arg0) -> (tensor<4xi32>) {
+    %1 = scf.for %arg4 = %c0 to %c4 step %c1 iter_args(%arg5 = %arg3) -> (tensor<4xi32>) {
+      %2 = addi %arg1, %arg5 : tensor<4xi32>
+      scf.yield %2 : tensor<4xi32>
+    }
+    scf.yield %1 : tensor<4xi32>
+  }
+  return %0 : tensor<4xi32>
+}
+// CHECK-LABEL: func @scf_for(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<4xi32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<4xi32>
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+//  CHECK-SAME:     (%[[ARG1]], %[[ARG0]])
+//       CHECK:     %[[FOR_RESULT:.+]] = scf.for
+//       CHECK:       scf.for
+//       CHECK:   flow.dispatch.tensor.store %[[FOR_RESULT]]
+//       CHECK:   return %[[RESULT]]

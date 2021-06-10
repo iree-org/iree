@@ -251,10 +251,13 @@ static bool isDispatchableOp(Operation *op) {
   if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
     return false;
   }
+  // subtensor/subtensor_insert/scf.for ops are dispatchable.
+  if (isa<scf::ForOp, SubTensorOp, SubTensorInsertOp>(op)) {
+    return true;
+  }
   // Linalg ops are marked dispatchable.
   if ((op->getDialect() !=
-       op->getContext()->getLoadedDialect<linalg::LinalgDialect>()) &&
-      !isa<SubTensorOp, SubTensorInsertOp>(op)) {
+       op->getContext()->getLoadedDialect<linalg::LinalgDialect>())) {
     return false;
   }
   return !isAlwaysClonedIntoDispatchOp(op);
