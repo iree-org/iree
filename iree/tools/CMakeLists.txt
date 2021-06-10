@@ -336,6 +336,20 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
+      iree-mlir-lsp-server
+    SRCS
+      "iree-mlir-lsp-server.cc"
+    DEPS
+      ::init_passes_and_dialects
+      MLIRIR
+      MLIRLspServerLib
+      MLIRSupport
+      ${IREE_OPT_CONDITIONAL_DEPS}
+    PUBLIC
+  )
+
+  iree_cc_binary(
+    NAME
       iree-run-mlir
     SRCS
       "iree-run-mlir-main.cc"
