@@ -4,7 +4,7 @@ hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.target @cuda, filter="cuda" {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   module  {
-    func @add_dispatch_0() {
+    func @add_dispatch_0() attributes {llvmgpu_workgroup_size = dense<[32, 1, 1]> : vector<3xi64>} {
       %c0 = constant 0 : index
       %c1024 = constant 1024 : index
       %0 = hal.interface.binding.subspan @io::@ro0[%c0] : memref<1024xf32>
@@ -20,7 +20,7 @@ hal.executable.target @cuda, filter="cuda" {
         %6 = memref.subview %0[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
         %7 = memref.subview %1[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
         %8 = memref.subview %2[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
-        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>, memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) outs(%8 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        linalg.generic {lowering.config = {tileSizes = [[128], [], [4]]}, indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>, memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) outs(%8 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
         ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
           %9 = addf %arg1, %arg2 : f32
           linalg.yield %9 : f32
@@ -44,7 +44,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.target @cuda, filter="cuda" {
   hal.executable.entry_point @dot_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index}
   module  {
-    func @dot_dispatch_0() {
+    func @dot_dispatch_0() attributes {llvmgpu_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
       %cst = constant 0.000000e+00 : f32
       %c0 = constant 0 : index
       %c1024 = constant 1024 : index
@@ -68,8 +68,8 @@ hal.executable.target @cuda, filter="cuda" {
           %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg1)[%workgroup_size_x]
           %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x1024xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
           %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<1024x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, f32
-          linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
+          linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, f32
+          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
         }
       }
       return
@@ -115,7 +115,7 @@ hal.executable.target @cuda, filter="cuda" {
 //     CHECK-DAG:      %[[A:.+]] = memref.subview %17[%[[IND0]], 0] [2, 4] [1, 1] : memref<2x4xf32, #{{.*}}, 3> to memref<2x4xf32, #{{.*}}, 3>
 //     CHECK-DAG:      %[[B:.+]] = memref.subview %18[0, %[[IND1]]] [4, 4] [1, 1] : memref<4x256xf32, #{{.*}}, 3> to memref<4x4xf32, #{{.*}}, 3>
 //     CHECK-DAG:      %[[C:.+]] = memref.subview %11[%[[IND0]], %[[IND1]]] [2, 4] [1, 1] : memref<2x256xf32, #{{.*}}> to memref<2x4xf32, #{{.*}}>
-//         CHECK:      linalg.matmul {__internal_linalg_transform__ = "vectorize", is_root_op, launch_info_key = "__op_num_0__"} ins(%[[A]], %[[B]] : memref<2x4xf32, #{{.*}}, 3>, memref<4x4xf32, #{{.*}}, 3>) outs(%[[C]] : memref<2x4xf32, #{{.*}}>)
+//         CHECK:      linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<2x4xf32, #{{.*}}, 3>, memref<4x4xf32, #{{.*}}, 3>) outs(%[[C]] : memref<2x4xf32, #{{.*}}>)
 //         CHECK:    }
 //         CHECK:  }
 
@@ -126,7 +126,7 @@ hal.executable @reduction_dispatch {
 hal.executable.target @cuda, filter="cuda" {
     hal.executable.entry_point @predict_dispatch_153 attributes {interface = @io, ordinal = 0 : index}
     module  {
-      func @predict_dispatch_153() {
+      func @predict_dispatch_153() attributes {llvmgpu_workgroup_size = dense<[32, 1, 1]> : vector<3xi64>} {
         %c0 = constant 0 : index
         %cst = constant 0x7FC00000 : f32
         %cst_0 = constant 0xFF800000 : f32

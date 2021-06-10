@@ -149,6 +149,8 @@ void LowerExecutableTargetPass::runOnOperation() {
         case IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization:
           addCPUVectorizationPassPipeline(nestedModulePM, lowerToVectors);
           break;
+        default:
+          llvm_unreachable("Unsupported pipeline on CPU target.");
       }
     }
   }
