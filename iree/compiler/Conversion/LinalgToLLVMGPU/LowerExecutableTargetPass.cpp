@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -31,9 +30,8 @@ class LowerExecutableTargetPass
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::HAL::HALDialect, linalg::LinalgDialect, LLVM::LLVMDialect,
-                vector::VectorDialect, gpu::GPUDialect>();
+    registry.insert<IREE::HAL::HALDialect, linalg::LinalgDialect,
+                    vector::VectorDialect, gpu::GPUDialect>();
   }
 
   LowerExecutableTargetPass() = default;

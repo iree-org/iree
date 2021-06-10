@@ -136,7 +136,6 @@ IREE::HAL::TranslateExecutableInfo initGPULaunchConfig(ModuleOp moduleOp) {
   info.passPipeline =
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   info.workgroupSize.append({1, 1, 1});
-  auto entryPointFn = getSingleEntryPointFunction(moduleOp);
   linalg::LinalgOp rootOperation;
   auto funcOps = moduleOp.getOps<FuncOp>();
   assert(llvm::hasSingleElement(funcOps));

@@ -106,7 +106,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.addPass(createLowerExecutableTargetGPUPass());
-  OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to LLVM+NVVM/ROCDL ops.
   //
