@@ -34,12 +34,12 @@ cc_library(
         ":LLVMIRPasses",
         ":LLVMTargetOptions",
         ":LinkerTool",
+        ":StaticLibraryGenerator",
         "//iree/base/internal:flatcc",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Dialect/HAL/Target",
-        "//iree/compiler/Dialect/HAL/Target/LLVM/static:StaticLibraryGenerator",
         "//iree/compiler/Utils",
         "//iree/schemas:dylib_executable_def_c_fbs",
         "@llvm-project//llvm:AArch64AsmParser",
@@ -113,5 +113,18 @@ cc_library(
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
+    ],
+)
+
+cc_library(
+    name = "StaticLibraryGenerator",
+    srcs = [
+        "StaticLibraryGenerator.cpp",
+    ],
+    hdrs = [
+        "StaticLibraryGenerator.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
     ],
 )

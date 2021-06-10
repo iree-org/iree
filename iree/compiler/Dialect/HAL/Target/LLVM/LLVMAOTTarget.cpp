@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/static/StaticLibraryGenerator.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/dylib_executable_def_builder.h"
