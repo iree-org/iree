@@ -22,6 +22,7 @@ iree_cc_library(
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "KernelConfig.cpp"
+    "LowerExecutableTargetPass.cpp"
     "Passes.cpp"
     "RemoveTrivialLoops.cpp"
     "TileAndDistribute.cpp"
