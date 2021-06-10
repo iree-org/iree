@@ -36,8 +36,8 @@
 // and manager of the lifetime of the tasks.
 typedef struct iree_hal_task_command_buffer_t {
   iree_hal_resource_t resource;
+  iree_allocator_t host_allocator;
 
-  iree_hal_device_t* device;
   iree_task_scope_t* scope;
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
@@ -105,13 +105,11 @@ static iree_hal_task_command_buffer_t* iree_hal_task_command_buffer_cast(
 }
 
 iree_status_t iree_hal_task_command_buffer_create(
-    iree_hal_device_t* device, iree_task_scope_t* scope,
-    iree_hal_command_buffer_mode_t mode,
+    iree_task_scope_t* scope, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
-    iree_arena_block_pool_t* block_pool,
+    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
-  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
@@ -131,13 +129,12 @@ iree_status_t iree_hal_task_command_buffer_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_task_command_buffer_t* command_buffer = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(iree_hal_device_host_allocator(device),
-                            sizeof(*command_buffer), (void**)&command_buffer);
+  iree_status_t status = iree_allocator_malloc(
+      host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_task_command_buffer_vtable,
                                  &command_buffer->resource);
-    command_buffer->device = device;
+    command_buffer->host_allocator = host_allocator;
     command_buffer->scope = scope;
     command_buffer->mode = mode;
     command_buffer->allowed_categories = command_categories;
@@ -165,8 +162,7 @@ static void iree_hal_task_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
-  iree_allocator_t host_allocator =
-      iree_hal_device_host_allocator(command_buffer->device);
+  iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_task_command_buffer_reset(command_buffer);
