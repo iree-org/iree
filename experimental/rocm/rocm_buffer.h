@@ -25,7 +25,7 @@ iree_status_t iree_hal_rocm_buffer_wrap(
 // Returns the rocm base pointer for the given |buffer|.
 // This is the entire allocated_buffer and must be offset by the buffer
 // byte_offset and byte_length when used.
-void **iree_hal_rocm_buffer_device_pointer(iree_hal_buffer_t *buffer);
+hipDeviceptr_t iree_hal_rocm_buffer_device_pointer(iree_hal_buffer_t *buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

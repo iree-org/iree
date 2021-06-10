@@ -118,7 +118,8 @@ static iree_status_t iree_hal_rocm_buffer_flush_range(
   return iree_ok_status();
 }
 
-void **iree_hal_rocm_buffer_device_pointer(iree_hal_buffer_t *base_buffer) {
+hipDeviceptr_t iree_hal_rocm_buffer_device_pointer(
+    iree_hal_buffer_t *base_buffer) {
   iree_hal_rocm_buffer_t *buffer = iree_hal_rocm_buffer_cast(base_buffer);
   return buffer->device_ptr;
 }
