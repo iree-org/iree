@@ -152,9 +152,7 @@ static bool shouldInlineIntoClosure(Value value) {
   } else if (auto variableLoadOp =
                  dyn_cast<IREE::Flow::VariableLoadOp>(definingOp)) {
     // If the variable is immutable then we can inline the reference to it.
-    auto variableOp =
-        SymbolTable::lookupNearestSymbolFrom<IREE::Flow::VariableOp>(
-            definingOp, variableLoadOp.variable());
+    auto variableOp = variableLoadOp.getLoadedVariable();
     return !variableOp.is_mutable();
   }
   return false;

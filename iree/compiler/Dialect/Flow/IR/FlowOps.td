@@ -101,6 +101,10 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [
   let verifier = [{ return verifyVariableLoadOp(*this); }];
 
   let hasFolder = 1;
+
+  let extraClassDeclaration = [{
+    IREE::Flow::VariableOp getLoadedVariable();
+  }];
 }
 
 def FLOW_VariableLoadIndirectOp : FLOW_Op<"variable.load.indirect"> {
