@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -17,14 +18,15 @@ namespace iree_compiler {
 /// Returns true if the given `func` is a kernel dispatch entry point.
 bool isEntryPoint(FuncOp func);
 
-/// Given a module returns the entrypoint function within the module.
-FailureOr<FuncOp> getSingleEntryPointFunction(ModuleOp module);
-
-/// Returns the number of outer parallel loops of a linalgOp.
-unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
+/// Returns a map from function symbol name to corresponding entry point op.
+llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
+    ModuleOp module);
 
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
+
+/// Returns the number of outer parallel loops of a linalgOp.
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
 
 /// Returns the untiled type of a tiled view for both tensor and memref
 /// types. Either walks the `ViewOpInterface` chain (for memrefs) or the

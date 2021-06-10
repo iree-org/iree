@@ -16,17 +16,6 @@ namespace iree_compiler {
 
 bool isEntryPoint(FuncOp func) { return func.isPublic(); }
 
-FailureOr<FuncOp> getSingleEntryPointFunction(ModuleOp module) {
-  auto entryPointFns = llvm::to_vector<1>(llvm::make_filter_range(
-      module.getOps<FuncOp>(), [&](FuncOp op) { return isEntryPoint(op); }));
-  if (!llvm::hasSingleElement(entryPointFns)) {
-    module.emitError(
-        "cannot handle modules with multiple entry point functions.");
-    return {};
-  }
-  return entryPointFns[0];
-}
-
 unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
   return op.iterator_types()
       .getValue()
@@ -45,6 +34,17 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
     }
   }
   return nullptr;
+}
+
+llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
+    ModuleOp module) {
+  auto targetOp =
+      module.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
+  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
+  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+    entryPointOps[op.sym_name()] = op;
+  }
+  return entryPointOps;
 }
 
 /// Walk up the defs of the view, to get the untiled value. Either walks up
