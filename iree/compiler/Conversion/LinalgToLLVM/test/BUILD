@@ -27,6 +27,7 @@ iree_lit_test_suite(
             "matmul_vectorization.mlir",
             "pad_linalg_workgroup_tiles.mlir",
             "plan_conv_loop_order.mlir",
+            "tile_pad_and_vectorize_workgroups.mlir",
             "unfused_fma.mlir",
         ],
         include = ["*.mlir"],

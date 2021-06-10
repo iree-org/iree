@@ -63,6 +63,7 @@ inline void registerLinalgToLLVMPasses() {
     createLinalgTileAndVectorizeWorkgroupsPass();
     createUnfusedFMAOpsPass();
     createPadLinalgWorkgroupTilesPass();
+    createTilePadAndVectorizeWorkgroupsPass();
     return true;
   }();
   (void)init_once;

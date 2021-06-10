@@ -21,6 +21,7 @@ cc_library(
         "PadLinalgWorkgroupTiles.cpp",
         "Passes.cpp",
         "PlanConvLoopOrder.cpp",
+        "TilePadAndVectorizeWorkgroups.cpp",
         "UnfuseFMAOps.cpp",
     ],
     hdrs = [
