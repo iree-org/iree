@@ -57,6 +57,7 @@ iree_cc_library(
     MLIRSCFToStandard
     MLIRShape
     MLIRShapeOpsTransforms
+    MLIRShapeToStandard
     MLIRStandard
     MLIRSupport
     MLIRTensor
