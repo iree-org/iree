@@ -48,10 +48,41 @@ void LowerExecutableTargetPass::runOnOperation() {
   OpPassManager executableLoweringPipeline(
       IREE::HAL::ExecutableTargetOp::getOperationName());
 
-  FailureOr<IREE::HAL::TranslateExecutableInfo> translationInfo =
-      initGPULaunchConfig(moduleOp);
-  if (failed(translationInfo)) {
+  if (failed(initGPULaunchConfig(moduleOp))) {
     return signalPassFailure();
+  }
+  // There might be multiple entry points in the module. Currently, all of
+  // them need to have the same pipeline.
+  // TODO(ravishankarm): This is strange that this is not enforced
+  // structurally, but something to address later on. For now this restriction
+  // is fine.
+  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
+      getAllEntryPoints(moduleOp);
+  Optional<IREE::HAL::DispatchLoweringPassPipeline> passPipeline;
+  SmallVector<int64_t, 4> workloadPerWorkgroup;
+  for (auto &it : entryPoints) {
+    auto entryPointOp = it.second;
+    if (IREE::HAL::TranslationInfo translationInfo =
+            getTranslationInfo(entryPointOp)) {
+      IREE::HAL::DispatchLoweringPassPipeline currPipeline =
+          translationInfo.passPipeline().getValue();
+      if (ArrayAttr workloadPerWorkgroupAttr =
+              translationInfo.workloadPerWorkgroup()) {
+        workloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
+            workloadPerWorkgroupAttr,
+            [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+      }
+      if (passPipeline) {
+        if (currPipeline != passPipeline.getValue()) {
+          moduleOp.emitError(
+              "unhandled compilation of entry point function with different "
+              "pass pipelines within a module");
+          return signalPassFailure();
+        }
+        continue;
+      }
+      passPipeline = currPipeline;
+    }
   }
   auto funcOps = moduleOp.getOps<FuncOp>();
   FuncOp funcOp = *funcOps.begin();
@@ -61,9 +92,9 @@ void LowerExecutableTargetPass::runOnOperation() {
       "llvmgpu_workgroup_size",
       DenseElementsAttr::get<int64_t>(
           VectorType::get(3, IntegerType::get(moduleOp.getContext(), 64)),
-          translationInfo->workgroupSize));
+          workloadPerWorkgroup));
 
-  switch (translationInfo->passPipeline) {
+  switch (*passPipeline) {
     case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute:
       addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
       break;

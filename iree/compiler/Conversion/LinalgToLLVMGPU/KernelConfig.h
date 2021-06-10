@@ -13,7 +13,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-IREE::HAL::TranslateExecutableInfo initGPULaunchConfig(ModuleOp moduleOp);
+LogicalResult initGPULaunchConfig(ModuleOp moduleOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir
