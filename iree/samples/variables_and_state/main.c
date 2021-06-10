@@ -166,7 +166,7 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   fprintf(stdout, "Calling functions\n\n");
 
   // 1. get_value() // initial value
-  int value;
+  int value = -1;
   if (iree_status_is_ok(status)) {
     status = counter_get_value(session, &value);
   }
