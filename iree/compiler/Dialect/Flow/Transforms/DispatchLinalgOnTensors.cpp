@@ -361,7 +361,7 @@ static void pullInProducersInSameGroup(
         OpResult opResult = en.value().cast<OpResult>();
         auto maybeFusionInfo = linalg::fuseProducerOfTensor(
             rewriter, clonedOpToFuse->getResult(opResult.getResultNumber()),
-            tiledOp.getShapedOpOperand(en.index()));
+            *tiledOp.getInputAndOutputOperands()[en.index()]);
         if (!maybeFusionInfo.hasValue()) {
           DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs()
                                           << "failed to fuse with tensor\n");
@@ -543,7 +543,8 @@ static void tryToTieOperandsAndResults(
       return loadOp.source().cast<BlockArgument>();
     } else if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(tieOp)) {
       unsigned resultIndex = storeOp.value().cast<OpResult>().getResultNumber();
-      auto loadOp = linalgOp.getOutputTensors()[resultIndex]
+      auto loadOp = linalgOp.getOutputTensorOperands()[resultIndex]
+                        ->get()
                         .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
       if (!loadOp) return nullptr;
       return loadOp.source().cast<BlockArgument>();
@@ -1056,9 +1057,9 @@ static unsigned decideFusableLinalgOps(FuncOp funcOp) {
         if (!consumer ||
             consumer.getNumLoops() != consumer.getNumParallelLoops())
           continue;
-        AffineMap consumerIndexingMap =
-            consumer.getInputIndexingMap(use.getOperandNumber());
-        AffineMap producerIndexingMap = linalgOp.getOutputIndexingMap(0);
+        AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
+        AffineMap producerIndexingMap =
+            linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0));
         if (!consumerIndexingMap.isIdentity() ||
             producerIndexingMap.getResults() !=
                 consumerIndexingMap.getResults()) {

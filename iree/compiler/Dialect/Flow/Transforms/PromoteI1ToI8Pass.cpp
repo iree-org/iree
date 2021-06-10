@@ -59,7 +59,13 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
     // needed as it is possible we are reusing an existing ConstantOp
     // containing the same values that occurs in a future line. Moving to the
     // first use case avoids declaring out of order operations.
-    rewriter.setInsertionPoint(*op.getResult().getUsers().begin());
+    Operation *firstUser = *op.getResult().getUsers().begin();
+    for (auto checkOp : op.getResult().getUsers()) {
+      if (checkOp->isBeforeInBlock(firstUser)) {
+        firstUser = checkOp;
+      }
+    }
+    rewriter.setInsertionPoint(firstUser);
 
     auto initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, ArrayRef<Value>({}), resultTy.getShape(),

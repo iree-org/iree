@@ -134,10 +134,10 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
 TEST(VMRefTest, WrappingRequriesTypeRegistration) {
   iree_vm_ref_t ref = {0};
   int dummy = 0;
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_vm_ref_wrap_assign(&dummy, static_cast<iree_vm_ref_type_t>(1234),
-                              &ref));
+  iree_status_t status = iree_vm_ref_wrap_assign(
+      &dummy, static_cast<iree_vm_ref_type_t>(1234), &ref);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+  iree_status_free(status);
 }
 
 // Tests that wrapping releases any existing ref in out_ref.
@@ -153,17 +153,19 @@ TEST(VMRefTest, WrappingReleasesExisting) {
 TEST(VMRefTest, CheckNull) {
   iree_vm_ref_t null_ref = {0};
   IREE_EXPECT_OK(iree_vm_ref_check(null_ref, IREE_VM_REF_TYPE_NULL));
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_vm_ref_check(null_ref, static_cast<iree_vm_ref_type_t>(1234)));
+  iree_status_t status =
+      iree_vm_ref_check(null_ref, static_cast<iree_vm_ref_type_t>(1234));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+  iree_status_free(status);
 }
 
 // Tests type checks.
 TEST(VMRefTest, Check) {
   iree_vm_ref_t a_ref = MakeRef<A>("AType");
   IREE_EXPECT_OK(iree_vm_ref_check(a_ref, A::kTypeID));
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        iree_vm_ref_check(a_ref, B::kTypeID));
+  iree_status_t status = iree_vm_ref_check(a_ref, B::kTypeID);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+  iree_status_free(status);
   iree_vm_ref_release(&a_ref);
 }
 
@@ -322,9 +324,10 @@ TEST(VMRefTest, RetainOrMoveCheckedMismatch) {
   // Retain.
   iree_vm_ref_t a_ref_0 = MakeRef<A>("AType");
   iree_vm_ref_t a_ref_1 = {0};
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        iree_vm_ref_retain_or_move_checked(
-                            /*is_move=*/0, &a_ref_0, B::kTypeID, &a_ref_1));
+  iree_status_t status = iree_vm_ref_retain_or_move_checked(
+      /*is_move=*/0, &a_ref_0, B::kTypeID, &a_ref_1);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+  iree_status_free(status);
   EXPECT_EQ(0, iree_vm_ref_equal(&a_ref_0, &a_ref_1));
   EXPECT_EQ(1, ReadCounter(&a_ref_0));
   iree_vm_ref_release(&a_ref_0);
@@ -332,9 +335,10 @@ TEST(VMRefTest, RetainOrMoveCheckedMismatch) {
   // Move.
   iree_vm_ref_t b_ref_0 = MakeRef<B>("BType");
   iree_vm_ref_t b_ref_1 = {0};
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        iree_vm_ref_retain_or_move_checked(
-                            /*is_move=*/1, &b_ref_0, A::kTypeID, &b_ref_1));
+  status = iree_vm_ref_retain_or_move_checked(
+      /*is_move=*/1, &b_ref_0, A::kTypeID, &b_ref_1);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+  iree_status_free(status);
   EXPECT_EQ(1, ReadCounter(&b_ref_0));
   iree_vm_ref_release(&b_ref_0);
 }

@@ -21,6 +21,7 @@ iree_cc_library(
     "ResolveShapeOps.cpp"
   DEPS
     MLIRAffine
+    MLIRComplex
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms

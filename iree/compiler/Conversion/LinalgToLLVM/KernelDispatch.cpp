@@ -66,9 +66,20 @@ static llvm::cl::opt<int> genericOpsWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(128));
 
+/// Usually the tile sizes for the first level of tiling decides the workgroup
+/// size for the dispatch on the CPU backend. This is a general helper that
+/// converts tile sizes of the first level into workgroup sizes.
+static SmallVector<int64_t, 3> getWorkgroupSizeFromTileSizes(
+    ArrayRef<int64_t> distributedTileSizes) {
+  if (distributedTileSizes.size() > kNumMaxParallelDims) {
+    distributedTileSizes = distributedTileSizes.take_back(kNumMaxParallelDims);
+  }
+  return llvm::to_vector<3>(llvm::reverse(distributedTileSizes));
+}
+
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
-static Optional<IREE::HAL::DispatchLoweringPassPipeline> setRootConfig(
+static Optional<IREE::HAL::TranslateExecutableInfo> setRootConfig(
     linalg::ContractionOpInterface contractionOp) {
   assert(!hasLoweringConfig(contractionOp) &&
          "illegal to update configuration of root");
@@ -107,7 +118,9 @@ static Optional<IREE::HAL::DispatchLoweringPassPipeline> setRootConfig(
     IREE::HAL::LoweringConfig config =
         getConfigAttr(tileSizes, nativeVectorSize, contractionOp->getContext());
     setLoweringConfig(contractionOp, config);
-    return IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization;
+    return IREE::HAL::TranslateExecutableInfo{
+        IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization,
+        getWorkgroupSizeFromTileSizes(tileSizes[0])};
   }
   if (contractionOp.isRowMajorBatchMatmul()) {
     // TODO(ataei, ravishankarm): This should just use the configuration for
@@ -123,7 +136,9 @@ static Optional<IREE::HAL::DispatchLoweringPassPipeline> setRootConfig(
     IREE::HAL::LoweringConfig config =
         getConfigAttr(tileSizes, nativeVectorSize, contractionOp->getContext());
     setLoweringConfig(contractionOp, config);
-    return IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization;
+    return IREE::HAL::TranslateExecutableInfo{
+        IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization,
+        getWorkgroupSizeFromTileSizes(tileSizes[0])};
   }
   return llvm::None;
 }
@@ -132,7 +147,7 @@ static Optional<IREE::HAL::DispatchLoweringPassPipeline> setRootConfig(
 /// (i.e. workgroup-level) to stay consistent with the distribution done at the
 /// Flow dialect level, where the last `kNumMaxParallelDims` of the outer
 /// parallel loops are distributed.
-SmallVector<int64_t, 4> getDistributedWorkgroupTileSizes(
+static SmallVector<int64_t, 4> getTileSizesForWorkgroupDistribution(
     int64_t numOuterParallelLoops, ArrayRef<int64_t> workgroupTileSizes) {
   SmallVector<int64_t, 4> distributedTileSizes =
       llvm::to_vector<4>(workgroupTileSizes);
@@ -144,23 +159,28 @@ SmallVector<int64_t, 4> getDistributedWorkgroupTileSizes(
 
 /// Sets the lowering configuration for dispatch region with root op being a
 /// generic op.
-static Optional<IREE::HAL::DispatchLoweringPassPipeline> setRootConfig(
+static Optional<IREE::HAL::TranslateExecutableInfo> setRootConfig(
     linalg::GenericOp genericOp) {
   int64_t numOuterParallelLoops = getNumOuterParallelLoops(genericOp);
   SmallVector<int64_t, 4> workgroupTileSizes(numOuterParallelLoops,
                                              genericOpsWorkgroupTileSize);
-  workgroupTileSizes = getDistributedWorkgroupTileSizes(numOuterParallelLoops,
-                                                        workgroupTileSizes);
+  workgroupTileSizes = getTileSizesForWorkgroupDistribution(
+      numOuterParallelLoops, workgroupTileSizes);
   TileSizesListType tileSizes = {workgroupTileSizes};
   IREE::HAL::LoweringConfig config =
       getConfigAttr(tileSizes, ArrayRef<int64_t>{}, genericOp->getContext());
   setLoweringConfig(genericOp, config);
-  return IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization;
+  return IREE::HAL::TranslateExecutableInfo{
+      IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization,
+      getWorkgroupSizeFromTileSizes(tileSizes[0])};
 }
 
 /// Sets the configuration for a linalg op that is not the root of the
 /// dispatch. The configuration should use the tile sizes of the first level of
 /// tiling passed in through `firstLevelTileSizes` for correctness.
+// TODO(ravishankarm): This method should be deleted. The root configuration
+// must be enough. The pass pipeline must use the root configuration as the
+// driver of transformations. Leave it as is for now.
 LogicalResult setNonRootConfig(linalg::LinalgOp linalgOp,
                                ArrayRef<int64_t> parallelLoopTileSizes) {
   int64_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
@@ -181,22 +201,22 @@ LogicalResult setNonRootConfig(linalg::LinalgOp linalgOp,
 
 /// Finds the root operation in the given list of linalg operations and sets its
 /// configuration. Returns the root operation.
-static LogicalResult setRootConfig(
+static FailureOr<IREE::HAL::TranslateExecutableInfo> setRootConfig(
     ArrayRef<linalg::LinalgOp> linalgOps,
-    Optional<IREE::HAL::DispatchLoweringPassPipeline> &passPipeline,
     SmallVectorImpl<int64_t> &parallelLoopTileSizes) {
   // First iterate over all operations to find the root operations and set its
   // lowering configuration (that are not linalg.generic).
   linalg::LinalgOp rootOp = nullptr;
 
+  Optional<IREE::HAL::TranslateExecutableInfo> passPipeline;
   auto checkOrUpdatePassPipeline =
       [&](linalg::LinalgOp linalgOp,
-          Optional<IREE::HAL::DispatchLoweringPassPipeline> opPassPipeline)
+          Optional<IREE::HAL::TranslateExecutableInfo> opPassPipeline)
       -> LogicalResult {
     if (!opPassPipeline) return success();
     if (passPipeline && passPipeline.getValue() != opPassPipeline.getValue()) {
       return linalgOp.emitError(
-          "mismatch in pass-pipeline chosen for ops in dispatch region");
+          "mismatch in translation configuration for ops in dispatch region");
     }
     if (!passPipeline) {
       passPipeline = opPassPipeline.getValue();
@@ -208,13 +228,12 @@ static LogicalResult setRootConfig(
   for (auto linalgOp : linalgOps) {
     if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
     auto opPassPipeline =
-        TypeSwitch<Operation *,
-                   Optional<IREE::HAL::DispatchLoweringPassPipeline>>(
+        TypeSwitch<Operation *, Optional<IREE::HAL::TranslateExecutableInfo>>(
             linalgOp.getOperation())
             .Case<linalg::ContractionOpInterface>(
                 [&](auto op) { return setRootConfig(op); })
             .Default([](Operation *)
-                         -> Optional<IREE::HAL::DispatchLoweringPassPipeline> {
+                         -> Optional<IREE::HAL::TranslateExecutableInfo> {
               return llvm::None;
             });
     auto status = checkOrUpdatePassPipeline(linalgOp, opPassPipeline);
@@ -239,7 +258,7 @@ static LogicalResult setRootConfig(
   }
 
   // If still no root operation, use default.
-  if (!passPipeline) return success();
+  if (!passPipeline) return failure();
 
   parallelLoopTileSizes =
       getTileSizes(rootOp, static_cast<unsigned>(TilingLevel::WorkGroupTiles));
@@ -247,8 +266,9 @@ static LogicalResult setRootConfig(
   // Some consistency checks.
   int64_t numOuterParallelLoops = getNumOuterParallelLoops(rootOp);
   if (parallelLoopTileSizes.size() != numOuterParallelLoops) {
-    return rootOp.emitError(
+    LogicalResult status = rootOp.emitError(
         "expected as many tiles sizes as the parallel loops of the operation");
+    return status;
   }
   auto distributedStart =
       std::max<int64_t>(0, numOuterParallelLoops - kNumMaxParallelDims);
@@ -257,24 +277,33 @@ static LogicalResult setRootConfig(
   if (distributedStart &&
       llvm::any_of(parallelLoopTileSizesRef.take_front(distributedStart),
                    [](int64_t v) -> bool { return v; })) {
-    return rootOp.emitError(
+    LogicalResult status = rootOp.emitError(
         "expected non-distributed parallel loop tile size to be 0");
+    return status;
   }
   if (llvm::any_of(parallelLoopTileSizesRef.take_back(numOuterParallelLoops -
                                                       distributedStart),
                    [](int64_t v) -> bool { return !v; })) {
-    return rootOp.emitError(
+    LogicalResult status = rootOp.emitError(
         "expected distributed parallel loop tile size to be non-zero");
+    return status;
   }
-  return success();
+  return passPipeline.getValue();
 }
 
-FailureOr<IREE::HAL::DispatchLoweringPassPipeline> initCPULaunchConfig(
-    ModuleOp moduleOp) {
+IREE::HAL::TranslateExecutableInfo initCPULaunchConfig(ModuleOp moduleOp) {
+  // By default, the CPU backend will just lower the ops in the dispatch region
+  // as is with no distribution.
+  IREE::HAL::TranslateExecutableInfo pipelineOnFailure = {
+      IREE::HAL::DispatchLoweringPassPipeline::CPUDefault, {}};
   // The current linalg based lowering only tested for a single function case.
+  auto entryPointFn = getSingleEntryPointFunction(moduleOp);
+  if (failed(entryPointFn)) {
+    return pipelineOnFailure;
+  }
   auto funcOps = moduleOp.getOps<FuncOp>();
   if (!llvm::hasSingleElement(funcOps)) {
-    return IREE::HAL::DispatchLoweringPassPipeline::CPUDefault;
+    return pipelineOnFailure;
   }
   FuncOp funcOp = *funcOps.begin();
   SmallVector<linalg::LinalgOp, 4> linalgOps;
@@ -282,34 +311,34 @@ FailureOr<IREE::HAL::DispatchLoweringPassPipeline> initCPULaunchConfig(
   // If there are no linalg ops, not using Linalg based lowering.
   if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops)) ||
       linalgOps.empty()) {
-    return IREE::HAL::DispatchLoweringPassPipeline::CPUDefault;
+    return pipelineOnFailure;
   }
 
-  Optional<IREE::HAL::DispatchLoweringPassPipeline> passPipelineOpt;
   SmallVector<int64_t> parallelLoopTileSizes;
-  if (failed(
-          setRootConfig(linalgOps, passPipelineOpt, parallelLoopTileSizes)) ||
-      !passPipelineOpt) {
-    return IREE::HAL::DispatchLoweringPassPipeline::CPUDefault;
+  auto passPipeline = setRootConfig(linalgOps, parallelLoopTileSizes);
+  if (failed(passPipeline)) {
+    return pipelineOnFailure;
   }
-  auto passPipeline = passPipelineOpt.getValue();
 
   // Set the configuration of all other linalg operations that are not the root
   // operation.
+  // TODO(ravishankarm): The configuration of the root must drive the lowering
+  // completely. This step should be removed.
   LogicalResult status = success();
   for (auto linalgOp : linalgOps) {
     if (hasLoweringConfig(linalgOp)) continue;
     status = setNonRootConfig(linalgOp, parallelLoopTileSizes);
-    if (failed(status)) break;
+    if (failed(status)) {
+      break;
+    }
   }
   if (failed(status)) {
     for (auto linalgOp : linalgOps) {
       eraseLoweringConfig(linalgOp);
     }
-    return IREE::HAL::DispatchLoweringPassPipeline::CPUDefault;
+    return pipelineOnFailure;
   }
-
-  return passPipeline;
+  return passPipeline.getValue();
 }
 
 }  // namespace iree_compiler

@@ -146,8 +146,8 @@ Translate a source MLIR into IREE module:
 $ ../iree-build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
-  $PWD/iree/tools/test/iree-run-module.mlir \
-  -o /tmp/simple-vmvx.vmfb
+  $PWD/iree/samples/models/simple_abs.mlir \
+  -o /tmp/simple_abs_vmvx.vmfb
 ```
 
 Then push the IREE runtime executable and module to the device:
@@ -155,7 +155,7 @@ Then push the IREE runtime executable and module to the device:
 ```shell
 $ adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
 $ adb shell chmod +x /data/local/tmp/iree-run-module
-$ adb push /tmp/simple-vmvx.vmfb /data/local/tmp/
+$ adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 ```
 
 Log into Android:
@@ -166,12 +166,12 @@ $ adb shell
 android $ cd /data/local/tmp/
 android $ ./iree-run-module \
           --driver=vmvx \
-          --module_file=simple-vmvx.vmfb \
+          --module_file=simple_abs_vmvx.vmfb \
           --entry_function=abs \
-          --function_input=i32=-5
+          --function_input=f32=-5
 
 EXEC @abs
-i32=5
+f32=5
 ```
 
 ### Vulkan HAL backend
@@ -185,8 +185,8 @@ Translate a source MLIR into IREE module:
 $ ../iree-build-host/install/bin/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
-    $PWD/iree/tools/test/iree-run-module.mlir \
-    -o /tmp/simple-vulkan.vmfb
+    $PWD/iree/samples/models/simple_abs.mlir \
+    -o /tmp/simple_abs_vulkan.vmfb
 ```
 
 Then push the IREE runtime executable and module to the device:
@@ -194,7 +194,7 @@ Then push the IREE runtime executable and module to the device:
 ```shell
 $ adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
 $ adb shell chmod +x /data/local/tmp/iree-run-module
-$ adb push /tmp/simple-vulkan.vmfb /data/local/tmp/
+$ adb push /tmp/simple_abs_vulkan.vmfb /data/local/tmp/
 ```
 
 Log into Android:
@@ -205,12 +205,12 @@ $ adb shell
 android $ cd /data/local/tmp/
 android $ ./iree-run-module \
           --driver=vulkan \
-          --module_file=simple-vulkan.vmfb \
+          --module_file=simple_abs_vulkan.vmfb \
           --entry_function=abs \
-          --function_input=i32=-5
+          --function_input=f32=-5
 
 EXEC @abs
-i32=5
+f32=5
 ```
 
 #### Common issues
@@ -263,8 +263,8 @@ $ ../iree-build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=aarch64-linux-android \
-  $PWD/iree/tools/test/iree-run-module.mlir \
-  -o /tmp/simple-llvm_aot.vmfb
+  $PWD/iree/samples/models/simple_abs.mlir \
+  -o /tmp/simple_abs_dylib.vmfb
 ```
 
 Then push the IREE runtime executable and module to the device:
@@ -272,7 +272,7 @@ Then push the IREE runtime executable and module to the device:
 ```shell
 $ adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
 $ adb shell chmod +x /data/local/tmp/iree-run-module
-$ adb push /tmp/simple-llvm_aot.vmfb /data/local/tmp/
+$ adb push /tmp/simple_abs_dylib.vmfb /data/local/tmp/
 ```
 
 Log into Android:
@@ -283,10 +283,10 @@ $ adb shell
 android $ cd /data/local/tmp/
 android $ ./iree-run-module \
           --driver=dylib \
-          --module_file=simple-llvm_aot.vmfb \
+          --module_file=simple_abs_dylib.vmfb \
           --entry_function=abs \
-          --function_input=i32=-5
+          --function_input=f32=-5
 
 EXEC @abs
-i32=5
+f32=5
 ```

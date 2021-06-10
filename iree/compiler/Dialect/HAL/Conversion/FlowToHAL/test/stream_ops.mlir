@@ -43,12 +43,22 @@ func @multipleDispatches(%input: tensor<128xf32>) -> tensor<128xf32> {
     //      CHECK: hal.command_buffer.dispatch.symbol
     // CHECK-SAME:   target(@ex0::@vmvx::@entry0)
     //      CHECK: hal.command_buffer.execution_barrier
-    %1 = flow.dispatch @ex0::@entry0[%arg1](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
+    %1 = flow.dispatch @ex0::@entry0[%arg1](%arg2) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"s0b0", 0 : index>,
+        #hal.ex.result_buffer<"s0b1", 0 : index>
+      ]
+    } : (tensor<128xf32>) -> tensor<128xf32>
     //      CHECK: hal.command_buffer.push_descriptor_set
     //      CHECK: hal.command_buffer.dispatch.symbol
     // CHECK-SAME:   target(@ex0::@vmvx::@entry0)
     //      CHECK: hal.command_buffer.execution_barrier
-    %2 = flow.dispatch @ex0::@entry0[%arg1](%1) : (tensor<128xf32>) -> tensor<128xf32>
+    %2 = flow.dispatch @ex0::@entry0[%arg1](%1) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"s0b0", 0 : index>,
+        #hal.ex.result_buffer<"s0b1", 0 : index>
+      ]
+    } : (tensor<128xf32>) -> tensor<128xf32>
     flow.return %2 : tensor<128xf32>
   }
   // CHECK: hal.command_buffer.end<%[[CMD]]
@@ -237,7 +247,7 @@ func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> te
 // -----
 
 hal.executable @ex0 {
-  hal.interface @interface attributes {push_constants = 2 : index} {
+  hal.interface @interface attributes {push_constants = 1 : index} {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
@@ -267,9 +277,27 @@ func @dispatchWithShapeTies(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x1
   // allocation is covering all ops.
   %0 = flow.ex.stream.fragment(%cst, %arg0, %bs) : (index, tensor<?x128xf32>{%cst}, index) -> tensor<?x128xf32>{%cst} =
       (%arg1: index, %arg2: tensor<?x128xf32>, %arg3: index) -> tensor<?x128xf32> {
-    %3 = flow.dispatch @ex0::@entry0[%arg1](%arg2, %arg3) : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
-    %5 = flow.dispatch @ex0::@entry0[%arg1](%3, %arg3) : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
-    %7 = flow.dispatch @ex0::@entry0[%arg1](%5, %arg3) : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
+    %3 = flow.dispatch @ex0::@entry0[%arg1](%arg2, %arg3) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"s0b0", 0 : index>,
+        #hal.ex.push_constant<0 : index, 1 : index>,
+        #hal.ex.result_buffer<"s0b1", 0 : index>
+      ]
+    } : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
+    %5 = flow.dispatch @ex0::@entry0[%arg1](%3, %arg3) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"s0b0", 0 : index>,
+        #hal.ex.push_constant<0 : index, 1 : index>,
+        #hal.ex.result_buffer<"s0b1", 0 : index>
+      ]
+    } : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
+    %7 = flow.dispatch @ex0::@entry0[%arg1](%5, %arg3) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"s0b0", 0 : index>,
+        #hal.ex.push_constant<0 : index, 1 : index>,
+        #hal.ex.result_buffer<"s0b1", 0 : index>
+      ]
+    } : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
     flow.return %7 : tensor<?x128xf32>
   }
   return %0 : tensor<?x128xf32>
@@ -307,7 +335,12 @@ func @staticTiledDispatch(%input: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
     // CHECK-NEXT:     %c1 = (%{{.+}} : !hal.buffer)[%c0, %c114688]
     //      CHECK: hal.command_buffer.dispatch.symbol
     // CHECK-SAME:   target(@ex::@tgt::@entry)
-    %0 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7](%arg3) : (tensor<7x4x24xf32>) -> tensor<4x7x1024xf32>
+    %0 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7](%arg3) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"arg0", 0 : index>,
+        #hal.ex.result_buffer<"ret0", 0 : index>
+      ]
+    } : (tensor<7x4x24xf32>) -> tensor<4x7x1024xf32>
     flow.return %0 : tensor<4x7x1024xf32>
   }
   // CHECK: hal.command_buffer.end<%[[CMD]]
@@ -339,15 +372,15 @@ func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: ind
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %2 = flow.ex.stream.fragment(%arg0, %arg1, %arg2, %c1024, %c512) : (tensor<7x?x24x?xf32>{%arg1, %arg2}, index, index, index, index) -> tensor<?x?x1024xf32>{%arg2, %arg1} =
       (%arg3: tensor<7x?x24x?xf32>, %arg4: index, %arg5: index, %arg6: index, %arg7: index) -> tensor<?x?x1024xf32> {
-    //      CHECK: hal.command_buffer.push_constants<%[[CMD]]
-    // CHECK-SAME:   layout(%executable_layout
-    // CHECK-SAME:   offset(0)
-    // CHECK-SAME:   values([%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}]) : i32, i32, i32, i32
     //      CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]]
     // CHECK-SAME:   layout(%executable_layout : !hal.executable_layout)[%c0]
     // CHECK-SAME:   bindings([
     // CHECK-NEXT:     %c0 = (%[[INPUT]] : !hal.buffer)[%c0, %2],
     // CHECK-NEXT:     %c1 = (%{{.+}} : !hal.buffer)[%c0, %5]
+    //      CHECK: hal.command_buffer.push_constants<%[[CMD]]
+    // CHECK-SAME:   layout(%executable_layout
+    // CHECK-SAME:   offset(0)
+    // CHECK-SAME:   values([%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}]) : i32, i32, i32, i32
 
     // CHECK: #hal.device.match.id<"dylib*">(
     // CHECK-SAME: %[[CMD_INNER:.+]] = %cmd : !hal.command_buffer,
@@ -358,7 +391,16 @@ func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: ind
     //      CHECK: hal.command_buffer.dispatch.symbol<%[[CMD_INNER]]
     // CHECK-SAME:   target(@ex::@tgt::@entry)
     // CHECK-SAME:   workgroups([%[[COUNT_X]], %[[COUNT_Y]], %[[COUNT_Z]]])
-    %6 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7](%arg3, %arg4, %arg5, %arg5, %arg4) : (tensor<7x?x24x?xf32>{%arg4, %arg5}, index, index, index, index) -> tensor<?x?x1024xf32>{%arg5, %arg4}
+    %6 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7](%arg3, %arg4, %arg5, %arg5, %arg4) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"arg0", 0 : index>,
+        #hal.ex.push_constant<0 : index, 1 : index>,
+        #hal.ex.push_constant<1 : index, 2 : index>,
+        #hal.ex.push_constant<2 : index, 3 : index>,
+        #hal.ex.push_constant<3 : index, 4 : index>,
+        #hal.ex.result_buffer<"ret0", 0 : index>
+      ]
+    } : (tensor<7x?x24x?xf32>{%arg4, %arg5}, index, index, index, index) -> tensor<?x?x1024xf32>{%arg5, %arg4}
     flow.return %6 : tensor<?x?x1024xf32>
   }
   // CHECK: hal.command_buffer.end<%[[CMD]]
@@ -415,7 +457,12 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
     // CHECK-SAME:   bindings([
     // CHECK-NEXT:     %c0 = (%[[FILL]] : !hal.buffer)[%c0, %c4],
     // CHECK-NEXT:     %c1 = (%[[OUTPUT]] : !hal.buffer)[%c0, %c108]
-    %3 = flow.dispatch @pad_dispatch_0::@pad_dispatch_0[%c9, %c3, %c1](%arg0) : (tensor<i32>) -> tensor<3x9xi32>
+    %3 = flow.dispatch @pad_dispatch_0::@pad_dispatch_0[%c9, %c3, %c1](%arg0) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"ro0", 0 : index>,
+        #hal.ex.result_buffer<"wo1", 0 : index>
+      ]
+    } : (tensor<i32>) -> tensor<3x9xi32>
     //      CHECK: %[[LAYOUT1:.+]] = hal.executable_layout.lookup
     // CHECK-SAME:   layouts([
     // CHECK-SAME:     #hal.descriptor_set_layout_binding<0, "StorageBuffer", R>,
@@ -425,7 +472,12 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
     // CHECK-SAME:   bindings([
     // CHECK-NEXT:     %c0 = (%[[INPUT]] : !hal.buffer)[%c0, %c24],
     // CHECK-NEXT:     %c1 = (%[[OUTPUT]] : !hal.buffer)[%c0, %c108]
-    %4 = flow.dispatch @pad_dispatch_1::@pad_dispatch_1[%c9, %c3, %c1](%arg1, %3) : (tensor<2x3xi32>, tensor<3x9xi32>) -> %3
+    %4 = flow.dispatch @pad_dispatch_1::@pad_dispatch_1[%c9, %c3, %c1](%arg1, %3) {
+      hal.bindings = [
+        #hal.ex.operand_buffer<"ro0", 0 : index>,
+        #hal.ex.operand_buffer<"rw1", 1 : index>
+      ]
+    } : (tensor<2x3xi32>, tensor<3x9xi32>) -> %3
     flow.return %4 : tensor<3x9xi32>
   }
   return %0 : tensor<3x9xi32>

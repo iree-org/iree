@@ -446,6 +446,11 @@ add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
+
+if(${IREE_BUILD_BENCHMARKS})
+  add_subdirectory(iree/benchmark)
+endif()
+
 if(${IREE_BUILD_EXPERIMENTAL_ROCM})
   add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
   add_subdirectory(experimental/rocm)

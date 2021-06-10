@@ -136,14 +136,14 @@ Pass the flag `-driver=vulkan` to `iree-run-module.exe`:
     --driver=vulkan \
     --module_file=.\build\module.vmfb \
     --entry_function=abs \
-    --function_input=i32=-2
+    --function_input=f32=-2
 
 # -- Bazel --
 > bazel run iree/tools:iree-run-module -- \
     --driver=vulkan \
     --module_file=.\build\module.vmfb \
     --entry_function=abs \
-    --function_input=i32=-2
+    --function_input=f32=-2
 ```
 
 ## Running IREE's Vulkan Samples
