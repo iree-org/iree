@@ -263,10 +263,11 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
 // Exposed via the --iree-mlir-to-vm-c-module translation.
 static LogicalResult translateFromMLIRToVMCModule(
     ModuleOp moduleOp, BindingOptions bindingOptions,
+    InputDialectOptions inputOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions,
     IREE::VM::CTargetOptions cTargetOptions, llvm::raw_ostream &output) {
-  auto result = translateFromMLIRToVM(moduleOp, bindingOptions,
+  auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
                                       executableOptions, targetOptions);
   if (failed(result)) {
     return result;

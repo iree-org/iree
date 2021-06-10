@@ -12,6 +12,7 @@ if(${IREE_ENABLE_EMITC})
       VMToEmitC
     HDRS
       "ConvertVMToEmitC.h"
+      "EmitCTypeConverter.h"
     SRCS
       "ConvertVMToEmitC.cpp"
     DEPS
@@ -19,6 +20,8 @@ if(${IREE_ENABLE_EMITC})
       MLIRPass
       MLIREmitC
       MLIRTransforms
+      iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
+      iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
     INCLUDES
