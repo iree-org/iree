@@ -624,7 +624,8 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
     return nullptr;
   }
 
-  // If its a static allocation hoist it all the begining of the function.
+  // If its a static allocation hoist it all the way up at begining of the
+  // function.
   if (dynamicDims.empty()) {
     auto funcOp = op->getParentOfType<FuncOp>();
     OpBuilder::InsertionGuard g(b);
