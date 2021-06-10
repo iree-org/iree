@@ -177,9 +177,9 @@ struct InsertImmutabilityPreservingStreamClones
         didClone = true;
       }
 
-      // TODO(GH-5492): This is a temporary solution to address the issue
-      // where we aggreate constants in a read-only buffer but still see
-      // inplace updates to them. Force clones for such constants for now.
+      // TODO(#5492): This is a temporary solution to address the issue where we
+      // aggreate constants in a read-only buffer but still see inplace updates
+      // to them. Force clones for such constants for now.
       if (updatesConstantInStream(tiedOperand, tiedOp)) {
         rewriter.setInsertionPoint(tiedOp);
         auto clonedOperand = rewriter.createOrFold<TensorCloneOp>(
