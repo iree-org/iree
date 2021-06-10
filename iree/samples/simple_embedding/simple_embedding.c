@@ -19,8 +19,6 @@
 // Compiled module embedded here to avoid file IO:
 #if IREE_ARCH_RISCV_64
 #include "iree/samples/simple_embedding/simple_embedding_test_llvm_aot_rv64.h"
-#elif IREE_STATIC_LIBRARY
-#include "iree/samples/simple_embedding/static_module.h"
 #else
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_c.h"
 #endif
@@ -48,9 +46,6 @@ iree_status_t Run() {
 #if IREE_ARCH_RISCV_64
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_simple_embedding_rv64_test_module_create();
-#elif IREE_STATIC_LIBRARY
-  const struct iree_file_toc_t* module_file_toc =
-      iree_samples_static_embedding_module_create();
 #else
   // Note the setup here only supports native build. The bytecode is not built
   // for the cross-compile execution. The code can be compiled but it will

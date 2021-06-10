@@ -25,21 +25,6 @@ iree_c_embed_data(
   PUBLIC
 )
 
-iree_c_embed_data(
-  NAME
-    static_embedding_module
-  SRCS
-    "data/static_embedding_module.vmfb"
-  C_FILE_OUTPUT
-    "static_module.c"
-  H_FILE_OUTPUT
-    "static_module.h"
-  IDENTIFIER
-    "iree_samples_static_embedding_module"
-  FLATTEN
-  PUBLIC
-)
-
 if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
    OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
   return()
@@ -64,28 +49,6 @@ iree_cc_binary(
     iree::task::api
     iree::vm
     iree::vm::bytecode_module
-)
-
-iree_cc_binary(
-  NAME
-    simple_embedding_static
-  SRCS
-    "device_static.c"
-    "simple_embedding.c"
-  DEPS
-    ::static_embedding_module
-    iree::base
-    iree::hal
-    iree::hal::local
-    iree::hal::local::loaders::static_library_loader
-    iree::hal::local::task_driver
-    iree::modules::hal
-    iree::task::api
-    iree::vm
-    iree::vm::bytecode_module
-    ${CMAKE_CURRENT_SOURCE_DIR}/static_embedding_module.o
-  DEFINES
-    "IREE_STATIC_LIBRARY=1"
 )
 
 iree_cc_binary(
