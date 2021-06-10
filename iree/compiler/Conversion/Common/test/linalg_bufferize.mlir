@@ -177,6 +177,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @tile_from_pointwise_lhs()
+//       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan @io::@TENSOR_LHS
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan @io::@TENSOR_RHS
 //   CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan @io::@TENSOR_INIT
@@ -185,7 +186,6 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
 //   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
 //   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[LHS]] :
 //  CHECK-SAME:         outs(%[[ALLOC]]
@@ -234,6 +234,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read|Write"
 }
 // CHECK-LABEL: func @tile_from_pointwise_lhs_inplace()
+//       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan @io::@TENSOR_LHS
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan @io::@TENSOR_RHS
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @io::@TENSOR_INIT
@@ -241,7 +242,6 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
 //   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
 //   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[LHS]] :
 //  CHECK-SAME:         outs(%[[ALLOC]]
@@ -1172,12 +1172,12 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @pooling_nhwc_sum
+//       CHECK:   %[[WINDOW:.+]] = memref.alloc() : memref<2x3xf32>
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan @io::@ro1[%c0] : memref<1x4x6x1xf32>
 //   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @io::@ro0[%c0] : memref<f32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@wo2[%c0] : memref<1x2x2x1xf32>
 //       CHECK:   %[[INIT_VAL:.+]] = memref.load %[[INIT]][] : memref<f32>
 //       CHECK:   linalg.fill(%[[RET0]], %[[INIT_VAL]]) : memref<1x2x2x1xf32>, f32
-//       CHECK:   %[[WINDOW:.+]] = memref.alloc() : memref<2x3xf32>
 //       CHECK:   linalg.pooling_nhwc_sum
 //  CHECK-SAME:     dilations = dense<1> : vector<2xi64>
 //  CHECK-SAME:     strides = dense<[2, 3]> : vector<2xi64>
@@ -1381,10 +1381,9 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
 }
 
 // CHECK-LABEL: func @dont_use_buffer_for_operand_when_output_tensor_used()
-
-//      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @interface_io::@wo3
 //      CHECK: %[[ALLOC:.+]] = memref.alloc
-// CHECK-NEXT: linalg.fill(%[[ALLOC]], %{{.+}})
+//      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @interface_io::@wo3
+//      CHECK: linalg.fill(%[[ALLOC]], %{{.+}})
 // CHECK-NEXT: linalg.conv_2d_input_nhwc_filter_hwcf
 // CHECK-SAME:   outs(%[[ALLOC]] : memref<1x112x112x32xf32>)
 // CHECK-NEXT: linalg.fill(%[[OUTPUT]], %{{.+}})
@@ -1745,6 +1744,8 @@ module  {
 }
 
 // CHECK-LABEL: func @padded_matmul()
+// CHECK-DAG: %[[LHS_PADDED:.+]] = memref.alloc() : memref<64x32xf32>
+// CHECK-DAG: %[[RHS_PADDED:.+]] = memref.alloc() : memref<32x16xf32>
 // CHECK-DAG: %[[C0:.+]] = constant 0.000000e+00 : f32
 // CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<12544x27xf32>
 // CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<27x16xf32>
@@ -1753,11 +1754,9 @@ module  {
 // CHECK-DAG: %[[RHS_V:.+]] = memref.subview %[[RHS]][0, %{{.*}}] [27, 16] [1, 1]
 // CHECK-DAG: %[[DST_V:.+]] = memref.subview %[[DST]][%{{.*}}, %{{.*}}] [64, 16] [1, 1]
 //     CHECK: linalg.fill(%[[DST_V]], %[[C0]])
-//     CHECK: %[[LHS_PADDED:.+]] = memref.alloc() : memref<64x32xf32>
 //     CHECK: linalg.fill(%[[LHS_PADDED]], %[[C0]]) : memref<64x32xf32>, f32
 //     CHECK: %[[LHS_PADDED_INTER:.+]] = memref.subview %[[LHS_PADDED]][0, 0] [64, 27] [1, 1]
 //     CHECK: linalg.copy(%[[LHS_V]], %[[LHS_PADDED_INTER]])
-//     CHECK: %[[RHS_PADDED:.+]] = memref.alloc() : memref<32x16xf32>
 //     CHECK: linalg.fill(%[[RHS_PADDED]], %[[C0]]) : memref<32x16xf32>, f32
 //     CHECK: %[[RHS_PADDED_INTER:.+]] = memref.subview %[[RHS_PADDED]][0, 0] [27, 16] [1, 1]
 //     CHECK: linalg.copy(%[[RHS_V]], %[[RHS_PADDED_INTER]])
@@ -1815,9 +1814,12 @@ hal.interface @io attributes {sym_visibility = "private"} {
 }
 //      CHECK: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (4, -d0 + s0)>
 //      CHECK: func @dot_general_padded
-//   CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
-//   CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
-//   CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//   CHECK-DAG:      %[[ALLOC_RET0:.+]] = memref.alloc
+//   CHECK-DAG:      %[[ALLOC_ARG1:.+]] = memref.alloc
+//   CHECK-DAG:      %[[ALLOC_ARG0:.+]] = memref.alloc
+//   CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[{{.*}}] : memref<?x?xf32>
+//   CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1[{{.*}}] : memref<?x?xf32>
+//   CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[{{.*}}] : memref<?x?xf32>
 //   CHECK-DAG:  %[[M:.+]] = hal.interface.load.constant offset = 0
 //   CHECK-DAG:  %[[N:.+]] = hal.interface.load.constant offset = 1
 //       CHECK:  scf.for %[[IV0:.+]] = %{{.+}} to %[[M]]
@@ -1826,15 +1828,11 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:      %[[TILE_N:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[N]]]
 //   CHECK-DAG:      %[[ARG0_SV:.+]] = memref.subview %[[ARG0]]
 //   CHECK-DAG:      %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
-//       CHECK:      %[[ALLOC_ARG0:.+]] = memref.alloc
-//       CHECK:      linalg.fill(%[[ALLOC_ARG0]]
+//       CHECK:       linalg.fill(%[[ALLOC_ARG0]]
 //       CHECK:      %[[ALLOC_ARG0_SV:.+]] = memref.subview %[[ALLOC_ARG0]]
-//       CHECK:      linalg.copy(%[[ARG0_SV]]
-//       CHECK:      %[[ALLOC_ARG1:.+]] = memref.alloc
+//       CHECK:       linalg.copy(%[[ARG0_SV]], %[[ALLOC_ARG0_SV]])
 //       CHECK:      linalg.fill(%[[ALLOC_ARG1]]
-//       CHECK:      %[[ALLOC_ARG1_SV:.+]] = memref.subview %[[ALLOC_ARG1]]
 //       CHECK:      linalg.copy(%[[ARG1_SV]]
-//       CHECK:      %[[ALLOC_RET0:.+]] = memref.alloc
 //       CHECK:      linalg.fill(%[[ALLOC_RET0]]
 //       CHECK:      linalg.matmul
 //  CHECK-SAME:        ins(%[[ALLOC_ARG0]], %[[ALLOC_ARG1]]
@@ -1904,16 +1902,16 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //   CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 //   CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//   CHECK-DAG:  %[[ALLOC_ARG0:.+]] = memref.alloc() : memref<1x16x16x3x3x8xf32>
+//   CHECK-DAG:  %[[ALLOC_ARG1:.+]] = memref.alloc() : memref<3x3x8x4xf32>
+//   CHECK-DAG:  %[[ALLOC_RET0:.+]] = memref.alloc() : memref<1x16x16x4xf32>
 //       CHECK:  scf.for
 //       CHECK:    scf.for
 //       CHECK:      scf.for
 //   CHECK-DAG:      %[[ARG0_SV:.+]] = memref.subview %[[ARG0]]
 //   CHECK-DAG:      %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
-//   CHECK-DAG:      %[[ALLOC_ARG1:.+]] = memref.alloc()
 //   CHECK-DAG:      linalg.copy(%[[ARG1_SV]], %[[ALLOC_ARG1]])
-//   CHECK-DAG:      %[[ALLOC_RET0:.+]] = memref.alloc()
 //   CHECK-DAG:      linalg.fill(%[[ALLOC_RET0]]
-//   CHECK-DAG:      %[[ALLOC_ARG0:.+]] = memref.alloc()
 //       CHECK:      linalg.generic
 //  CHECK-SAME:        ins(%[[ARG0_SV]]
 //  CHECK-SAME:        outs(%[[ALLOC_ARG0]]
