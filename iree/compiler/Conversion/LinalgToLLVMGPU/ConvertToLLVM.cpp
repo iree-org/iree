@@ -182,6 +182,19 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
         ireeBindingOp.getResult().getType().dyn_cast<MemRefType>();
     uint64_t binding = ireeBindingOp.queryBindingOp().binding().getZExtValue();
     Value llvmBufferBasePtr = llvmFuncOp.getArgument(argMapping[binding]);
+    // Add the byte offset.
+    Value llvmBufferBasei8Ptr = rewriter.create<LLVM::BitcastOp>(
+        loc,
+        LLVM::LLVMPointerType::get(rewriter.getIntegerType(8),
+                                   llvmBufferBasePtr.getType()
+                                       .cast<LLVM::LLVMPointerType>()
+                                       .getAddressSpace()),
+        llvmBufferBasePtr);
+    llvmBufferBasei8Ptr = rewriter.create<LLVM::GEPOp>(
+        loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
+        adaptor.byte_offset());
+    llvmBufferBasePtr = rewriter.create<LLVM::BitcastOp>(
+        loc, llvmBufferBasePtr.getType(), llvmBufferBasei8Ptr);
     if (memrefType.hasStaticShape()) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);
