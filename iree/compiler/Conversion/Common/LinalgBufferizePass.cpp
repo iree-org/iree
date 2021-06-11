@@ -349,7 +349,7 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
     if (linalgOp.payloadUsesValueFromOperand(result.value())) {
       continue;
     }
-    for (auto input : linalgOp.getInputTensorsOpOperands()) {
+    for (auto input : linalgOp.getInputTensorOperands()) {
       auto producerOp = input->get().getDefiningOp<linalg::LinalgOp>();
       if (producerOp && input->get().hasOneUse() &&
           input->get().getType() == result.value()->get().getType() &&
@@ -1051,13 +1051,13 @@ static LogicalResult convertAnyLinalgOp(
   Location loc = op.getLoc();
   SmallVector<Value, 2> newInputBuffers;
   newInputBuffers.reserve(op.getNumInputs());
-  for (Value v : op.getInputs()) {
+  for (OpOperand *opOperand : op.getInputOperands()) {
     // For `linalg.poolin_*` ops, the input might be from a
     // `linalg.init_tensor`. In such cases, the `BlockAndValueMapping` wont have
     // a mapping for the buffer. Allocate a buffer for these.
-    Value inputBuffer = bvm.lookupOrNull(v);
+    Value inputBuffer = bvm.lookupOrNull(opOperand->get());
     if (!inputBuffer) {
-      OpResult definingOpResult = v.dyn_cast<OpResult>();
+      OpResult definingOpResult = opOperand->get().dyn_cast<OpResult>();
       if (!definingOpResult) return failure();
       inputBuffer = allocateBufferForResult(b, definingOpResult.getOwner(),
                                             definingOpResult.getResultNumber(),
