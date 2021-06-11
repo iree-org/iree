@@ -6,6 +6,7 @@
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
@@ -71,6 +72,43 @@ class TransposeUnitDimToShapeCast
   }
 };
 
+// Pattern to replace subtensor , vector.transfer_write, subtensor_insert with a
+// single vector.transfer_write if its the same tensor slice.
+class FoldSubTensorWriteToSubTensorInsert
+    : public OpRewritePattern<SubTensorInsertOp> {
+ public:
+  using OpRewritePattern<SubTensorInsertOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(SubTensorInsertOp subTensorInsertOp,
+                                PatternRewriter& rewriter) const override {
+    auto vecTransferOp = dyn_cast<vector::TransferWriteOp>(
+        subTensorInsertOp.source().getDefiningOp());
+    if (!vecTransferOp) return failure();
+
+    auto subTensorOp =
+        dyn_cast<SubTensorOp>(vecTransferOp.source().getDefiningOp());
+    if (!subTensorOp) return failure();
+
+    // Check its the same tensor slice.
+    if (subTensorOp.source() != subTensorInsertOp.dest()) return failure();
+    if (subTensorInsertOp.offsets().size() != subTensorOp.offsets().size())
+      return failure();
+    for (int i = 0; i < subTensorInsertOp.offsets().size(); ++i) {
+      if (subTensorOp.offsets()[i] != subTensorInsertOp.offsets()[i]) {
+        return failure();
+      }
+    }
+    for (auto index : vecTransferOp.indices()) {
+      if (!mlir::isEqualConstantInt(index, 0)) return failure();
+    }
+
+    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+        subTensorInsertOp, vecTransferOp.vector(), subTensorInsertOp.dest(),
+        subTensorInsertOp.offsets());
+    return success();
+  }
+};
+
 struct VectorTransferOptimizationPass
     : public PassWrapper<VectorTransferOptimizationPass, FunctionPass> {
   void runOnFunction() override {
@@ -80,7 +118,9 @@ struct VectorTransferOptimizationPass
     // to transfer reads.
     OwningRewritePatternList patterns(&getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-    patterns.add<TransposeUnitDimToShapeCast>(&getContext());
+    patterns
+        .add<TransposeUnitDimToShapeCast, FoldSubTensorWriteToSubTensorInsert>(
+            &getContext());
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
     vector::transferOpflowOpt(funcOp);
