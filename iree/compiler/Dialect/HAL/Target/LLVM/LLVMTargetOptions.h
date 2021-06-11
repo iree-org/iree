@@ -52,11 +52,11 @@ struct LLVMTargetOptions {
   // True to keep linker artifacts for debugging.
   bool keepLinkerArtifacts = false;
 
-  // Build for IREE static library loading. This denotes the path produce object
-  // ".o" and header ".h" files for the library. The host binary provides the
-  // target for the library query function.  When this variable is set, static
-  // library output is activated. This option is incompatible with
-  // LLVMTargetOptions::linkEmbedded".
+  // Build for IREE static library loading using this output path for
+  // a "{staticLibraryOutput}.o" object file and "{staticLibraryOutput}.h"
+  // header file.
+  //
+  // This option is incompatible with the linkEmbedded option.
   std::string staticLibraryOutput;
 };
 

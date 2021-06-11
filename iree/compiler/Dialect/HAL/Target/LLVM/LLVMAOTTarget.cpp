@@ -79,7 +79,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     passManager.addPass(createLowerExecutableTargetPass());
     // Set target specific options.
     // TODO(ataei): This is temporary here, should move when target specific
-
     // overrides options grows.
     llvm::Triple triple(options_.targetTriple);
     LLVMTransformPassPipelineOptions codeGenOptions;
@@ -324,6 +323,12 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
           << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
+    }
+
+    if (options_.linkEmbedded && !options_.staticLibraryOutput.empty()) {
+      return targetOp.emitError()
+             << "Cannot embed ELF and produce static library simultaneously. "
+                "Please choose one option or the other. ";
     }
 
     if (options_.linkEmbedded) {

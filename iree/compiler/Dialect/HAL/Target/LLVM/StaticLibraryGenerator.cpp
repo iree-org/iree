@@ -30,9 +30,9 @@ namespace HAL {
 namespace {
 
 void generateIntroComment(llvm::raw_ostream &os,
-  const std::string &library_name,
-  const std::string &query_function_name) {
-  os << "// === [" << library_name <<  "] static library ===\n";
+                          const std::string &library_name,
+                          const std::string &query_function_name) {
+  os << "// === [" << library_name << "] static library ===\n";
   os << "//\n";
   os << "// To use:\n";
   os << "//  - Include this header and generated object into your program \n";
@@ -46,17 +46,18 @@ void generateIntroComment(llvm::raw_ostream &os,
 void generateIfDefOpen(llvm::raw_ostream &os, const std::string &library_name) {
   llvm::StringRef ref(library_name);
   os << "#ifndef IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << ref.upper()
-    << "_\n";
+     << "_\n";
   os << "#define IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << ref.upper()
-    << "_\n";
+     << "_\n";
 }
 
-void generateIfDefClose(llvm::raw_ostream &os, const std::string &library_name) {
+void generateIfDefClose(llvm::raw_ostream &os,
+                        const std::string &library_name) {
   std::string uppercase = library_name;
   std::transform(uppercase.begin(), uppercase.end(), uppercase.begin(),
                  ::toupper);
   os << "#endif // IREE_GENERATED_STATIC_EXECUTABLE_LIBRARY_" << uppercase
-    << "_\n";
+     << "_\n";
 }
 
 void generateExecutableLibraryInclude(llvm::raw_ostream &os) {
