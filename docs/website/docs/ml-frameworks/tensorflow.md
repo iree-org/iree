@@ -48,7 +48,7 @@ is used as the entry point for IREE compilation flow:
 ``` python
 import tensorflow.compat.v2 as tf
 loaded_model = tf.saved_model.load('/path/to/downloaded/model/')
-print(list(imported_with_signatures.signatures.keys()))
+print(list(loaded_model.signatures.keys()))
 ```
 
 !!! note
