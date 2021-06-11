@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===----------------------------------------------------------------------===//
 //
@@ -142,8 +134,7 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
             analyzeMemRefValue(arg);
           }
         })
-        .Case<memref::AllocOp, IREE::PlaceholderOp,
-              IREE::HAL::InterfaceBindingSubspanOp>(
+        .Case<memref::AllocOp, IREE::HAL::InterfaceBindingSubspanOp>(
             [this](auto op) { analyzeMemRefValue(op); });
   });
 }
@@ -337,23 +328,6 @@ class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
   }
 };
 
-class ProcessPlaceHolder final
-    : public MemRefConversionPattern<IREE::PlaceholderOp> {
- public:
-  using MemRefConversionPattern<IREE::PlaceholderOp>::MemRefConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::PlaceholderOp placeholder, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = placeholder.getType().dyn_cast<MemRefType>();
-    if (!memrefType) return failure();
-    auto vecMemRef = getVectorizedMemRefType(rewriter, placeholder.getResult());
-    if (!vecMemRef) return failure();
-    rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
-        placeholder, *vecMemRef, ValueRange(), placeholder->getAttrs());
-    return success();
-  }
-};
-
 class ProcessInterfaceBinding final
     : public MemRefConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
  public:
@@ -374,14 +348,11 @@ class ProcessInterfaceBinding final
   }
 };
 
-/// Translates vector.transfer_read with less than 4 scalars into reading each
-/// scalar and then compose the vector.
-///
-/// This is a very specific pattern for handling corner cases and boundary
-/// cases. For example, in vision models we can have the initial image with
-/// three channels. We cannot perform the native load4 there; by performing
-/// scalar read we lose some benefits of load4 but we can still make sure the
-/// overall vectorization does not fail.
+/// Scalarizes remaining vector transfer that couldn't be converted to
+/// vevtor load operations.
+
+/// This is very specific to SPIR-V as pointer cannot be casted to vector type
+/// if any of the memory access is not vector.
 struct ScalarizeVectorTransferRead final
     : public OpRewritePattern<vector::TransferReadOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -389,37 +360,56 @@ struct ScalarizeVectorTransferRead final
                                 PatternRewriter &rewriter) const override {
     VectorType vectorType = readOp.getType();
     Type scalarType = vectorType.getElementType();
-    if (vectorType.getRank() != 1 || vectorType.getDimSize(0) >= 4)
+    if (vectorType.getRank() != 1 ||
+        !readOp.permutation_map().isMinorIdentity())
       return failure();
 
     Location loc = readOp.getLoc();
-
-    SmallVector<Value, 4> scalars;
-    SmallVector<Value, 4> indices(readOp.indices().begin(),
-                                  readOp.indices().end());
-    for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      indices.back() = rewriter.createOrFold<ConstantIndexOp>(loc, i);
-      scalars.push_back(rewriter.create<memref::LoadOp>(
-          loc, scalarType, readOp.source(), indices));
-    }
-
     Value newVector = rewriter.create<ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      Value index = rewriter.createOrFold<ConstantOp>(
-          loc, rewriter.getI32Type(), rewriter.getI32IntegerAttr(i));
-      newVector = rewriter.create<vector::InsertElementOp>(loc, scalars[i],
-                                                           newVector, index);
+      SmallVector<Value, 4> indices(readOp.indices().begin(),
+                                    readOp.indices().end());
+      indices.back() = rewriter.createOrFold<AddIOp>(
+          loc, indices.back(), rewriter.createOrFold<ConstantIndexOp>(loc, i));
+      Value scalar = rewriter.create<memref::LoadOp>(loc, scalarType,
+                                                     readOp.source(), indices);
+      newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
     }
-
     rewriter.replaceOp(readOp, newVector);
-
     return success();
   }
 };
 
-class VectorizeMemRefPass final
-    : public PassWrapper<VectorizeMemRefPass, OperationPass<ModuleOp>> {
+struct ScalarizeVectorTransferWrite final
+    : public OpRewritePattern<vector::TransferWriteOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
+                                PatternRewriter &rewriter) const override {
+    VectorType vectorType = writeOp.getVectorType();
+    if (vectorType.getRank() != 1 ||
+        !writeOp.permutation_map().isMinorIdentity())
+      return failure();
+
+    Location loc = writeOp.getLoc();
+
+    for (int i = 0; i < vectorType.getDimSize(0); ++i) {
+      SmallVector<Value, 4> indices(writeOp.indices().begin(),
+                                    writeOp.indices().end());
+      indices.back() = rewriter.createOrFold<AddIOp>(
+          loc, indices.back(), rewriter.createOrFold<ConstantIndexOp>(loc, i));
+      Value scalar =
+          rewriter.create<vector::ExtractOp>(loc, writeOp.vector(), i);
+      rewriter.create<memref::StoreOp>(loc, scalar, writeOp.source(), indices);
+    }
+    rewriter.eraseOp(writeOp);
+    return success();
+  }
+};
+
+class VectorizeMemRefLoadStorePass final
+    : public PassWrapper<VectorizeMemRefLoadStorePass,
+                         OperationPass<ModuleOp>> {
   void runOnOperation() override;
 
  private:
@@ -455,7 +445,7 @@ LogicalResult ProcessFuncArg::matchAndRewrite(
   return success();
 }
 
-void VectorizeMemRefPass::runOnOperation() {
+void VectorizeMemRefLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
   ModuleOp module = getOperation();
@@ -466,8 +456,8 @@ void VectorizeMemRefPass::runOnOperation() {
   RewritePatternSet conversionPatterns(context);
   conversionPatterns
       .add<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
-           ProcessAlloc, ProcessPlaceHolder, ProcessInterfaceBinding>(
-          context, *memrefUsageAnalysis);
+           ProcessAlloc, ProcessInterfaceBinding>(context,
+                                                  *memrefUsageAnalysis);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
@@ -478,10 +468,6 @@ void VectorizeMemRefPass::runOnOperation() {
   target.addDynamicallyLegalOp<memref::AllocOp>([&](memref::AllocOp alloc) {
     return !memrefUsageAnalysis->vectorizeMemRef(alloc);
   });
-  target.addDynamicallyLegalOp<IREE::PlaceholderOp>(
-      [&](IREE::PlaceholderOp placeholder) {
-        return !memrefUsageAnalysis->vectorizeMemRef(placeholder);
-      });
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&](IREE::HAL::InterfaceBindingSubspanOp bindingOp) {
         return !memrefUsageAnalysis->vectorizeMemRef(bindingOp);
@@ -497,17 +483,19 @@ void VectorizeMemRefPass::runOnOperation() {
 
   for (FuncOp func : module.getOps<FuncOp>()) {
     RewritePatternSet rewritingPatterns(context);
-    rewritingPatterns.add<ScalarizeVectorTransferRead>(context);
+    rewritingPatterns
+        .add<ScalarizeVectorTransferRead, ScalarizeVectorTransferWrite>(
+            context);
 
     (void)applyPatternsAndFoldGreedily(func, std::move(rewritingPatterns));
   }
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemrefLoadStorePass() {
-  return std::make_unique<VectorizeMemRefPass>();
+  return std::make_unique<VectorizeMemRefLoadStorePass>();
 }
 
-static PassRegistration<VectorizeMemRefPass> pass(
+static PassRegistration<VectorizeMemRefLoadStorePass> pass(
     "iree-spirv-vectorize-memref-load-store",
     "Vectorize interface memrefs and their load/store for better memory "
     "access");

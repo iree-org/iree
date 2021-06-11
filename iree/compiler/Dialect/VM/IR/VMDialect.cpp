@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 
@@ -30,7 +22,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterface.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOpInterface.cpp.inc"  // IWYU pragma: keep
 
 namespace {
 
@@ -61,11 +53,18 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
     }
     if (auto globalLoadOp = dyn_cast<GlobalLoadI32Op>(op)) {
       os << globalLoadOp.global();
+    } else if (auto globalLoadOp = dyn_cast<GlobalLoadI64Op>(op)) {
+      os << globalLoadOp.global();
+    } else if (auto globalLoadOp = dyn_cast<GlobalLoadF32Op>(op)) {
+      os << globalLoadOp.global();
+    } else if (auto globalLoadOp = dyn_cast<GlobalLoadF64Op>(op)) {
+      os << globalLoadOp.global();
     } else if (auto globalLoadOp = dyn_cast<GlobalLoadRefOp>(op)) {
       os << globalLoadOp.global();
     } else if (isa<ConstRefZeroOp>(op)) {
       os << "null";
-    } else if (isa<ConstI32ZeroOp>(op) || isa<ConstI64ZeroOp>(op)) {
+    } else if (isa<ConstI32ZeroOp>(op) || isa<ConstI64ZeroOp>(op) ||
+               isa<ConstF32ZeroOp>(op) || isa<ConstF64ZeroOp>(op)) {
       os << "zero";
     } else if (auto constOp = dyn_cast<ConstI32Op>(op)) {
       getIntegerName(constOp.value().dyn_cast<IntegerAttr>(), os);
@@ -75,7 +74,9 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       os << rodataOp.rodata();
     } else if (auto refType =
                    op->getResult(0).getType().dyn_cast<IREE::VM::RefType>()) {
-      if (refType.getObjectType().isa<ListType>()) {
+      if (refType.getObjectType().isa<BufferType>()) {
+        os << "buffer";
+      } else if (refType.getObjectType().isa<ListType>()) {
         os << "list";
       } else {
         os << "ref";
@@ -198,7 +199,7 @@ VMDialect::VMDialect(MLIRContext *context)
 
 #define GET_OP_LIST
   addOperations<
-#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"  // IWYU pragma: keep
       >();
 }
 
@@ -230,7 +231,10 @@ void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
 Type VMDialect::parseType(DialectAsmParser &parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (spec.consume_front("list")) {
+  if (spec.consume_front("buffer")) {
+    return IREE::VM::RefType::getChecked(
+        IREE::VM::BufferType::get(loc.getContext()), loc);
+  } else if (spec.consume_front("list")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
           << "malformed list type '" << parser.getFullSymbolSpec() << "'";
@@ -279,7 +283,9 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
 void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
   if (auto refType = type.dyn_cast<IREE::VM::RefType>()) {
     auto objectType = refType.getObjectType();
-    if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
+    if (auto bufferType = objectType.dyn_cast<IREE::VM::BufferType>()) {
+      printType(bufferType, os);
+    } else if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
       printType(listType, os);
     } else if (objectType.isa<IREE::VM::OpaqueType>()) {
       os << "ref<?>";
@@ -288,6 +294,8 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
     }
   } else if (type.isa<IREE::VM::OpaqueType>()) {
     os << "opaque";
+  } else if (type.isa<IREE::VM::BufferType>()) {
+    os << "buffer";
   } else if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
     os << "list<";
     if (listType.getElementType().isa<OpaqueType>()) {
@@ -319,6 +327,18 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
       return builder.create<VM::ConstI64ZeroOp>(loc);
     }
     return builder.create<VM::ConstI64Op>(loc, convertedValue);
+  } else if (ConstF32Op::isBuildableWith(value, type)) {
+    auto convertedValue = ConstF32Op::convertConstValue(value);
+    if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
+      return builder.create<VM::ConstF32ZeroOp>(loc);
+    }
+    return builder.create<VM::ConstF32Op>(loc, convertedValue);
+  } else if (ConstF64Op::isBuildableWith(value, type)) {
+    auto convertedValue = ConstF64Op::convertConstValue(value);
+    if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
+      return builder.create<VM::ConstF64ZeroOp>(loc);
+    }
+    return builder.create<VM::ConstF64Op>(loc, convertedValue);
   } else if (type.isa<IREE::VM::RefType>()) {
     // The only constant type we support for refs is null so we can just
     // emit that here.

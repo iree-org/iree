@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -29,6 +21,17 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+// MAP_JIT and related utilities are only available on MacOS 11.0+.
+#if defined(MAC_OS_VERSION_11_0) && \
+    MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_11_0
+#define IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0(expr) \
+  if (__builtin_available(macOS 11.0, *)) {      \
+    expr                                         \
+  }
+#else
+#define IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0(expr)
+#endif  // MAC_OS_VERSION_11_0
+
 //==============================================================================
 // Memory subsystem information and control
 //==============================================================================
@@ -44,9 +47,21 @@ void iree_memory_query_info(iree_memory_info_t* out_info) {
   out_info->can_allocate_executable_pages = true;
 }
 
-void iree_memory_jit_context_begin() { pthread_jit_write_protect_np(0); }
+void iree_memory_jit_context_begin(void) {
+  IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0({
+    if (pthread_jit_write_protect_supported_np()) {
+      pthread_jit_write_protect_np(0);
+    }
+  });
+}
 
-void iree_memory_jit_context_end() { pthread_jit_write_protect_np(1); }
+void iree_memory_jit_context_end(void) {
+  IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0({
+    if (pthread_jit_write_protect_supported_np()) {
+      pthread_jit_write_protect_np(1);
+    }
+  });
+}
 
 //==============================================================================
 // Virtual address space manipulation
@@ -71,9 +86,11 @@ iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
 
   int mmap_prot = PROT_NONE;
   int mmap_flags = MAP_PRIVATE | MAP_ANON | MAP_NORESERVE;
-  if (flags & IREE_MEMORY_VIEW_FLAG_EXECUTE) {
-    mmap_flags |= MAP_JIT;
-  }
+  IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0({
+    if (flags & IREE_MEMORY_VIEW_FLAG_MAY_EXECUTE) {
+      mmap_flags |= MAP_JIT;
+    }
+  });
 
   iree_status_t status = iree_ok_status();
   void* base_address =

@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -57,6 +49,28 @@ static void eraseDeadAllocAndStores(FuncOp funcOp) {
 
 namespace {
 
+// Pattern to canonialize tranpose where only one dimension is not unit
+// dimension. In this case the transpose is a no-op and should be simplified
+// before getting to the conversion to llvm/spirv.
+// TODO(thomasraoux): This should be moved in
+// `populateCastAwayVectorLeadingOneDimPatterns` but might need more discussion
+// on the semantic of transpose in this case.
+class TransposeUnitDimToShapeCast
+    : public OpRewritePattern<vector::TransposeOp> {
+ public:
+  using OpRewritePattern<vector::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::TransposeOp op,
+                                PatternRewriter& rewriter) const override {
+    unsigned numNonUnitSrcDim = llvm::count_if(
+        op.getVectorType().getShape(), [](int64_t dim) { return dim != 1; });
+    if (numNonUnitSrcDim > 1) return failure();
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(op, op.getResultType(),
+                                                     op.vector());
+    return success();
+  }
+};
+
 struct VectorTransferOptimizationPass
     : public PassWrapper<VectorTransferOptimizationPass, FunctionPass> {
   void runOnFunction() override {
@@ -66,6 +80,7 @@ struct VectorTransferOptimizationPass
     // to transfer reads.
     OwningRewritePatternList patterns(&getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+    patterns.add<TransposeUnitDimToShapeCast>(&getContext());
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
     vector::transferOpflowOpt(funcOp);

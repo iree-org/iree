@@ -10,35 +10,42 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    -gen-pass-decls Passes.h.inc
+)
+
 iree_cc_library(
   NAME
     Transforms
   HDRS
     "DestructiveUpdateUtils.h"
-    "DispatchConfig.h"
     "Passes.h"
+    "Passes.h.inc"
   SRCS
     "ConvertToFlowTensorOps.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
-    "DispatchConfig.cpp"
     "DispatchLinalgOnTensors.cpp"
-    "DispatchabilityAnalysis.cpp"
     "ExpandVariableDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
-    "FoldCompatibleDispatchRegions.cpp"
     "FormStreams.cpp"
     "HLOToHLOPreprocessing.cpp"
     "HoistUnstreamableOps.cpp"
-    "IdentifyDispatchRegions2.cpp"
     "InjectDispatchTracing.cpp"
     "LegalizeInputTypes.cpp"
     "OutlineDispatchRegions.cpp"
-    "OutlineDispatchRegions2.cpp"
     "OutlineLargeConstants.cpp"
+    "PassDetail.h"
     "Passes.cpp"
-    "PrePostPartitioningConversion.cpp"
+    "PromoteI1ToI8Pass.cpp"
+    "PromoteTensorLoads.cpp"
     "StripAndSplatConstantVariables.cpp"
+    "VerifyCompilerInputLegality.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -50,26 +57,26 @@ iree_cc_library(
     MLIRSCFToStandard
     MLIRShape
     MLIRShapeOpsTransforms
+    MLIRShapeToStandard
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTosa
     MLIRTosaToLinalg
     MLIRTosaToSCF
     MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Conversion::HLOToHLO
-    iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
+    iree::compiler::Conversion::Common
+    iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLinalg
-    iree::compiler::Dialect::Flow::Analysis
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::Flow::Conversion
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Utils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::Conversion
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
@@ -83,3 +90,8 @@ set_property(SOURCE
   PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+# TODO: For some reason, these dependencies are not being added automatically.
+add_dependencies(
+  iree_compiler_Dialect_Flow_Transforms_Transforms
+  iree_compiler_Dialect_Flow_Transforms_PassesIncGen
+)

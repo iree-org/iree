@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
@@ -32,24 +24,20 @@ iree_lit_test_suite(
             "dispatch_linalg_on_tensors_fusion.mlir",
             "expand_variable_dynamic_dims.mlir",
             "export_benchmark_funcs.mlir",
-            "fold_compatible_dispatch_regions.mlir",
             "form_streams.mlir",
             "hlo_to_hlo_preprocessing.mlir",
             "hlo_to_hlo_preprocessing_canoncalize_dot_general.mlir",
             "hlo_to_hlo_preprocessing_extract_pad_from_conv.mlir",
             "hoist_unstreamable_ops.mlir",
-            "identify_dispatch_regions2_enable_matmul_fusion.mlir",
-            "identify_dispatch_regions2_hlo.mlir",
-            "identify_dispatch_regions2_linalg.mlir",
-            "identify_dispatch_regions2_shapes.mlir",
-            "identify_dispatch_regions2_std_fusion.mlir",
             "inject_dispatch_tracing.mlir",
             "legalize_input_types.mlir",
-            "outline_dispatch_regions2.mlir",
+            "outline_dispatch_regions.mlir",
             "outline_large_constants.mlir",
-            "pre_partitioning_conversion.mlir",
+            "promote_i1_to_i8.mlir",
+            "promote_tensor_loads.mlir",
             "strip_and_splat_constant_variables.mlir",
             "transformation.mlir",
+            "verify_compiler_input_legality.mlir",
         ],
         include = ["*.mlir"],
     ),

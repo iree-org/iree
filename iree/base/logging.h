@@ -1,16 +1,28 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+//===----------------------------------------------------------------------===//
+//                                                                            //
+//  (             (      (                                             (      //
+//  )\ )          )\ )   )\ )           (       (        *   )         )\ )   //
+// (()/(    (    (()/(  (()/(   (       )\      )\     ` )  /(   (    (()/(   //
+//  /(_))   )\    /(_))  /(_))  )\    (((_)  ((((_)(    ( )(_))  )\    /(_))  //
+// (_))_   ((_)  (_))   (_))   ((_)   )\___   )\ _ )\  (_(_())  ((_)  (_))_   //
+//  |   \  | __| | _ \  | _ \  | __| ((/ __|  (_)_\(_) |_   _|  | __|  |   \  //
+//  | |) | | _|  |  _/  |   /  | _|   | (__    / _ \     | |    | _|   | |) | //
+//  |___/  |___| |_|    |_|_\  |___|   \___|  /_/ \_\    |_|    |___|  |___/  //
+//                                                                            //
+//===----------------------------------------------------------------------===//
+// TODO(#2843): replace this file with a C sink API. IREE itself should not
+// perform any logging by default and instead route all logging through a
+// pluggable interface (similar to how we have iree_allocator_t to plug in
+// allocators). This will allow applications to scope their logging (critical
+// in multi-tenant situations where logs need to route back to clients), bring
+// their own logging libraries, and support logging on platforms we otherwise
+// cannot. The code in this file is currently C++ only and not great.
 
 #ifndef IREE_BASE_LOGGING_H_
 #define IREE_BASE_LOGGING_H_
@@ -55,9 +67,12 @@
 //   They are useful when problems are definitely unrelated to program flow,
 //   e.g. when validating user input.
 
+#include <cstddef>
 #include <cstdint>
+#include <ios>
 #include <limits>
 #include <sstream>
+#include <string>
 
 #include "iree/base/attributes.h"
 

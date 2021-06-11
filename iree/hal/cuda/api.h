@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // See iree/base/api.h for documentation on the API conventions used.
 
@@ -29,19 +21,19 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // CUDA driver creation options.
-typedef struct {
+typedef struct iree_hal_cuda_driver_options_t {
   // Index of the default CUDA device to use within the list of available
   // devices.
   int default_device_index;
 } iree_hal_cuda_driver_options_t;
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_cuda_driver_options_initialize(
+IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
     iree_hal_cuda_driver_options_t* out_options);
 
 // Creates a CUDA HAL driver that manage its own CUcontext.
 //
 // |out_driver| must be released by the caller (see |iree_hal_driver_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_cuda_driver_create(
+IREE_API_EXPORT iree_status_t iree_hal_cuda_driver_create(
     iree_string_view_t identifier,
     const iree_hal_cuda_driver_options_t* options,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);

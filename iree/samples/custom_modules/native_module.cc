@@ -1,27 +1,27 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/samples/custom_modules/native_module.h"
 
 #include <atomic>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 
+#include "absl/types/span.h"
 #include "iree/base/api.h"
+#include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/native_module_cc.h"
+#include "iree/vm/ref_cc.h"
 
 //===----------------------------------------------------------------------===//
 // !custom.message type
@@ -37,7 +37,7 @@ static iree_vm_ref_type_descriptor_t iree_custom_message_descriptor = {0};
 // The descriptor that is registered at startup defines how to manage the
 // lifetime of the type (such as which destruction function is called, if any).
 // See ref.h for more information and additional utilities.
-typedef struct iree_custom_message {
+typedef struct iree_custom_message_t {
   // Ideally first; used to track the reference count of the object.
   iree_vm_ref_object_t ref_object;
   // Allocator the message was created from.
@@ -178,7 +178,7 @@ class CustomModuleState final {
     vm::ref<iree_hal_buffer_view_t> buffer_view;
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_parse(message->value, host_local_allocator_.get(),
-                                   allocator_, &buffer_view),
+                                   &buffer_view),
         "parsing value '%.*s'", (int)message->value.size, message->value.data);
     return std::move(buffer_view);
   }

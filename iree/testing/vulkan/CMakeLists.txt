@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 if(NOT "${IREE_HAL_DRIVER_VULKAN}" OR NOT "${IREE_BUILD_SAMPLES}")
   return()
@@ -49,7 +41,7 @@ iree_cc_library(
     "vulkan_gui_util.cc"
   DEPS
     imgui::imgui
-    iree::base::api
+    iree::base
     iree::base::logging
     iree::hal::vulkan
     SDL2::SDL2
@@ -63,7 +55,6 @@ iree_cc_binary(
     "iree-run-module-vulkan-gui-main.cc"
   DEPS
     ::vulkan_gui_util
-    absl::flags
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::main

@@ -1,23 +1,15 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "bindings/tflite/interpreter.h"
 
 #include "bindings/tflite/model.h"
 #include "bindings/tflite/shim.h"
 #include "bindings/tflite/tensor.h"
-#include "iree/base/threading.h"
+#include "iree/base/internal/call_once.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
@@ -51,8 +43,8 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
   // TODO(benvanik): figure out how we want to emulate device selection; may
   // just say "whatever is first" on a query.
   // iree_string_view_t driver_name = driver_infos[0].driver_name;
-  // NOTE: currently the sample file is compiled only with vmla.
-  iree_string_view_t driver_name = iree_make_cstring_view("vmla");
+  // NOTE: currently the sample file is compiled only with vmvx.
+  iree_string_view_t driver_name = iree_make_cstring_view("vmvx");
 
   // TODO(benvanik): switch to iree_hal_driver_registry_try_create when
   // implemented.
@@ -126,8 +118,8 @@ static iree_status_t _TfLiteInterpreterShapeFrameInitialize(
 // will release any resources that may be retained and is required.
 static void _TfLiteInterpreterShapeFrameDeinitialize(
     _TfLiteInterpreterShapeFrame* frame) {
-  iree_vm_list_deinitialize(frame->shape_list);
   iree_vm_list_deinitialize(frame->arg_list);
+  iree_vm_list_deinitialize(frame->shape_list);
 }
 
 // Reads the shape value in the frame storage from the prior application.
@@ -236,7 +228,7 @@ static iree_status_t _TfLiteInterpreterRefreshIOShapes(
 static iree_host_size_t _TfLiteInterpreterCalculateSize(
     const TfLiteModel* model) {
   iree_host_size_t total_size =
-      iree_math_align(sizeof(TfLiteInterpreter), iree_max_align_t);
+      iree_host_align(sizeof(TfLiteInterpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
       iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());
@@ -267,7 +259,7 @@ static iree_status_t _TfLiteInterpreterAllocate(
   _TfLiteModelRetain(interpreter->model);
 
   uint8_t* p = (uint8_t*)interpreter +
-               iree_math_align(sizeof(*interpreter), iree_max_align_t);
+               iree_host_align(sizeof(*interpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
       iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());

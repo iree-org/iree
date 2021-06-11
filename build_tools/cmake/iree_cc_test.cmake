@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
 include(iree_installed_test)
@@ -20,7 +12,7 @@ include(iree_installed_test)
 # CMake function to imitate Bazel's cc_test rule.
 #
 # Parameters:
-# NAME: name of target (see Usage below)
+# NAME: name of target. This name is used for the generated executable and
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
@@ -31,8 +23,9 @@ include(iree_installed_test)
 #     automatically.
 #
 # Note:
-# By default, iree_cc_test will always create a binary named iree_${NAME}.
-# This will also add it to ctest list as iree_${NAME}.
+# iree_cc_test will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
+# iree_base_foo_test.
+#
 #
 # Usage:
 # iree_cc_library(
@@ -69,9 +62,25 @@ function(iree_cc_test)
 
   # Prefix the library with the package name, so we get: iree_package_name
   iree_package_name(_PACKAGE_NAME)
+  iree_package_ns(_PACKAGE_NS)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_executable(${_NAME} "")
+  # Alias the iree_package_name test binary to iree::package::name.
+  # This lets us more clearly map to Bazel and makes it possible to
+  # disambiguate the underscores in paths vs. the separators.
+  add_executable(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+
+  # If the test binary name matches the package then treat it as a default.
+  # For example, foo/bar/ library 'bar' would end up as 'foo::bar'. This isn't
+  # likely to be common for tests, but is consistent with the behavior for
+  # libraries.
+  iree_package_dir(_PACKAGE_DIR)
+  if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
+    add_executable(${_PACKAGE_NS} ALIAS ${_NAME})
+  endif()
+
+  set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   target_sources(${_NAME}
     PRIVATE
       ${_RULE_SRCS}
@@ -97,7 +106,7 @@ function(iree_cc_test)
   )
 
   # Replace dependencies passed by ::name with iree::package::name
-  iree_package_ns(_PACKAGE_NS)
+
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
   target_link_libraries(${_NAME}
@@ -131,7 +140,7 @@ function(iree_cc_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_REL_DIR}/${_NAME}"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_NAME}>"
     )
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match

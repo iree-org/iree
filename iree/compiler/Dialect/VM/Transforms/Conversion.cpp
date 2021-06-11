@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <memory>
 #include <tuple>
@@ -22,9 +14,15 @@
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
+#include "iree/compiler/Dialect/VM/Conversion/MathToVM/ConvertMathToVM.h"
+#include "iree/compiler/Dialect/VM/Conversion/MemRefToVM/ConvertMemRefToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -84,10 +82,13 @@ class ConversionPass
       : targetOptions_(targetOptions) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, IREE::VM::VMDialect, StandardOpsDialect>();
+    registry.insert<IREEDialect, IREE::VM::VMDialect, StandardOpsDialect,
+                    math::MathDialect, AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {
+    if (getOperation().getBody()->empty()) return;
+
     auto *context = &getContext();
     VMConversionTarget conversionTarget(context);
     IREE::VM::TypeConverter typeConverter(targetOptions_);
@@ -123,7 +124,15 @@ class ConversionPass
     OwningRewritePatternList conversionPatterns(&getContext());
     populateIREEToVMPatterns(context, typeConverter, conversionPatterns);
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
+    populateMathToVMPatterns(context, typeConverter, conversionPatterns);
+    populateMemRefToVMPatterns(context, conversionTarget, typeConverter,
+                               conversionPatterns);
+    populateAffineToStdConversionPatterns(conversionPatterns);
     conversionPatterns.insert<ElideTieShapeOp>(context);
+
+    conversionTarget.addIllegalDialect<StandardOpsDialect>();
+    conversionTarget.addIllegalDialect<AffineDialect>();
+    conversionTarget.addIllegalDialect<math::MathDialect>();
 
     // Populate patterns from all used dialects, providing the imports they
     // registered earlier.

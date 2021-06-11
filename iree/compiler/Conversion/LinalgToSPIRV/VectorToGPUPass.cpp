@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===---- VectorToGPUPass.cpp - Pass for the final SPIR-V conversion ------===//
 //
@@ -23,7 +15,6 @@
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -90,7 +81,8 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   });
   target->markUnknownOpDynamicallyLegal([](Operation *) { return true; });
   OwningRewritePatternList tileAndDistributePattern(&getContext());
-  populateLinalgTileAndDistributePatterns(context, tileAndDistributePattern);
+  populateTileAndDistributeLinalgCopyPatterns(context,
+                                              tileAndDistributePattern);
   if (failed(applyPartialConversion(funcOp, *target,
                                     std::move(tileAndDistributePattern)))) {
     return signalPassFailure();
@@ -113,132 +105,10 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
-// Lower vector contract to a single scalar or vector mulf+addf. Insert casts to
-// convert from N-D vector to 1D vector or scalar.
-class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
- public:
-  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::ContractionOp op,
-                                PatternRewriter &rewriter) const override {
-    auto iteratorTypes = op.iterator_types().getValue();
-    if (!isReductionIterator(iteratorTypes.back()) ||
-        op.getContractingDimMap().size() > 1)
-      return failure();
-    if (op.getLhsType().getNumElements() != 1) return failure();
-    auto accType = op.getAccType().cast<VectorType>();
-    auto rhsType = op.getRhsType();
-    unsigned vecSize = accType.getNumElements();
-    if (accType != rhsType || !(vecSize >= 1 && vecSize <= 4) ||
-        accType.getShape().back() != vecSize)
-      return failure();
-    auto loc = op.getLoc();
-    VectorType vecType = VectorType::get(
-        vecSize, op.getResultType().cast<VectorType>().getElementType());
-    llvm::SmallVector<int64_t, 4> zero(iteratorTypes.size() - 1, 0);
-    Value lhs = rewriter.create<vector::ExtractOp>(loc, op.lhs(), zero);
-    Value rhs, acc;
-    if (vecSize == 1) {
-      rhs = rewriter.create<vector::ExtractOp>(loc, op.rhs(), zero);
-      acc = rewriter.create<vector::ExtractOp>(loc, op.acc(), zero);
-    } else {
-      lhs = rewriter.create<vector::BroadcastOp>(loc, vecType, lhs);
-      rhs = rewriter.create<vector::ShapeCastOp>(loc, vecType, op.rhs());
-      acc = rewriter.create<vector::ShapeCastOp>(loc, vecType, op.acc());
-    }
-    Value newOp = rewriter.create<MulFOp>(loc, lhs, rhs);
-    newOp = rewriter.create<AddFOp>(loc, newOp, acc);
-    if (vecSize == 1)
-      newOp =
-          rewriter.create<vector::BroadcastOp>(loc, op.getResultType(), newOp);
-    else
-      newOp =
-          rewriter.create<vector::ShapeCastOp>(loc, op.getResultType(), newOp);
-    rewriter.replaceOp(op, newOp);
-    return success();
-  }
-};
-
-// Lower elementwise operation from N-D vector to 1-D vectors that can be
-// natively supported.
-// TODO(thomasraoux):  Move this to MLIR core vector transformations.
-class ElementwiseLowering : public RewritePattern {
- public:
-  ElementwiseLowering(MLIRContext *context)
-      : RewritePattern(MatchAnyOpTypeTag(), 0, context) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    if (!OpTrait::hasElementwiseMappableTraits(op) || op->getNumResults() != 1)
-      return failure();
-    auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>();
-    if (!vecType || vecType.getRank() == 1) return failure();
-
-    SmallVector<Value, 4> newOperands;
-    for (Value operand : op->getOperands()) {
-      if (auto opVecType = operand.getType().dyn_cast<VectorType>()) {
-        auto newType = VectorType::get({opVecType.getNumElements()},
-                                       opVecType.getElementType());
-        newOperands.push_back(rewriter.create<vector::ShapeCastOp>(
-            op->getLoc(), newType, operand));
-      } else {
-        newOperands.push_back(operand);
-      }
-    }
-    OperationState state(op->getLoc(), op->getName());
-    state.addAttributes(op->getAttrs());
-    state.addOperands(newOperands);
-    state.addTypes({VectorType::get({vecType.getNumElements()},
-                                    vecType.getElementType())});
-    Operation *newOp = rewriter.createOperation(state);
-    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(op, vecType,
-                                                     newOp->getResult(0));
-    return success();
-  }
-};
-
-// Lower ExtractStridedSliceOp to an ExtractOp instruction that can be natively
-// converted to SPIR-V. Add a BroadcastOp to keep the type consistent, we expect
-// the Broadcast to be removed by canonicalization.
-class ExtractStridedLowering
-    : public OpRewritePattern<vector::ExtractStridedSliceOp> {
- public:
-  using OpRewritePattern<vector::ExtractStridedSliceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::ExtractStridedSliceOp op,
-                                PatternRewriter &rewriter) const override {
-    // Only handle cases extracting a degenerated vector so that we can generate
-    // an extractOp with scalar destination.
-    if (op.getResult().getType().cast<VectorType>().getNumElements() != 1)
-      return failure();
-    auto loc = op.getLoc();
-    SmallVector<int64_t, 4> offsets = llvm::to_vector<4>(
-        llvm::map_range(op.offsets().getAsRange<IntegerAttr>(),
-                        [](IntegerAttr attr) { return attr.getInt(); }));
-    offsets.resize(op.getVectorType().getRank(), 0);
-    Value newOp = rewriter.create<vector::ExtractOp>(loc, op.vector(), offsets);
-    newOp = rewriter.create<vector::BroadcastOp>(loc, op.getResult().getType(),
-                                                 newOp);
-    rewriter.replaceOp(op, newOp);
-    return success();
-  }
-};
-
-// Lower vector ops to instructions that can be later converted to SPIR-V.
-void ConvertVectorToGPUPass::lowerVectorOps(FuncOp funcOp,
-                                            MLIRContext *context) {
-  OwningRewritePatternList patterns(&getContext());
-  patterns.insert<VectorContractLowering, ExtractStridedLowering,
-                  ElementwiseLowering>(context);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
-}
-
 void ConvertVectorToGPUPass::runOnOperation() {
   MLIRContext *context = &getContext();
   FuncOp funcOp = getOperation();
   tileAndVectorizeLinalgCopy(funcOp, context);
-
-  lowerVectorOps(funcOp, context);
 }
 }  // namespace
 

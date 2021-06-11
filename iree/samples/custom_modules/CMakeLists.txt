@@ -8,8 +8,8 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_TARGET_BACKEND_VMLA}" OR
-   NOT "${IREE_HAL_DRIVER_VMLA}")
+if(NOT "${IREE_TARGET_BACKEND_VMVX}" OR
+   NOT "${IREE_HAL_DRIVER_VMVX}")
   return()
 endif()
 
@@ -20,8 +20,8 @@ iree_bytecode_module(
     custom_modules_test_module
   SRC
     "custom_modules_test.mlir"
-  CC_NAMESPACE
-    "iree::samples::custom_modules"
+  C_IDENTIFIER
+    "iree_samples_custom_modules_test_module"
   TRANSLATE_TOOL
     iree_samples_custom_modules_dialect_custom-translate
   FLAGS
@@ -36,13 +36,12 @@ iree_cc_test(
   SRCS
     "custom_modules_test.cc"
   DEPS
-    ::custom_modules_test_module_cc
+    ::custom_modules_test_module_c
     ::native_module
-    absl::strings
-    iree::base::api
+    iree::base
     iree::base::logging
-    iree::hal::api
-    iree::hal::vmla::registration
+    iree::hal
+    iree::hal::vmvx::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main
@@ -59,8 +58,10 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
-    iree::base::api
-    iree::hal::api
+    absl::span
+    iree::base
+    iree::base::status
+    iree::hal
     iree::modules::hal
     iree::vm
     iree::vm::cc

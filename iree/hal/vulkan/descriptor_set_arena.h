@@ -1,27 +1,26 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_VULKAN_DESCRIPTOR_SET_ARENA_H_
 #define IREE_HAL_VULKAN_DESCRIPTOR_SET_ARENA_H_
 
+#include <stdint.h>
+
 #include <array>
 #include <vector>
 
+#include "iree/base/api.h"
 #include "iree/base/status.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
+#include "iree/hal/vulkan/dynamic_symbols.h"
+#include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_executable.h"
 #include "iree/hal/vulkan/util/arena.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
 namespace hal {
@@ -36,24 +35,25 @@ class DescriptorSetArena final {
   // Allocates and binds a descriptor set from the arena.
   // The command buffer will have the descriptor set containing |bindings| bound
   // to it.
-  Status BindDescriptorSet(VkCommandBuffer command_buffer,
-                           iree_hal_executable_layout_t* executable_layout,
-                           uint32_t set, iree_host_size_t binding_count,
-                           const iree_hal_descriptor_set_binding_t* bindings);
+  iree_status_t BindDescriptorSet(
+      VkCommandBuffer command_buffer,
+      iree_hal_executable_layout_t* executable_layout, uint32_t set,
+      iree_host_size_t binding_count,
+      const iree_hal_descriptor_set_binding_t* bindings);
 
   // Flushes all pending writes to descriptor sets allocated from the arena and
   // returns a group that - when dropped - will release the descriptor sets
   // back to the pools they were allocated from.
-  StatusOr<DescriptorSetGroup> Flush();
+  DescriptorSetGroup Flush();
 
  private:
   const DynamicSymbols& syms() const { return *logical_device_->syms(); }
 
   // Pushes the descriptor set to the command buffer, if supported.
-  Status PushDescriptorSet(VkCommandBuffer command_buffer,
-                           iree_hal_executable_layout_t* executable_layout,
-                           uint32_t set, iree_host_size_t binding_count,
-                           const iree_hal_descriptor_set_binding_t* bindings);
+  void PushDescriptorSet(VkCommandBuffer command_buffer,
+                         iree_hal_executable_layout_t* executable_layout,
+                         uint32_t set, iree_host_size_t binding_count,
+                         const iree_hal_descriptor_set_binding_t* bindings);
 
   VkDeviceHandle* logical_device_;
   DescriptorPoolCache* descriptor_pool_cache_;

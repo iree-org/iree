@@ -1,19 +1,11 @@
 # Lint-as: python3
 """Core compiler interface."""
 
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
@@ -32,7 +24,35 @@ __all__ = [
 ]
 
 # Default testing backend for invoking the compiler.
-DEFAULT_TESTING_BACKENDS = ["vmla"]
+# TODO: Remove these. In the absence of default profiles, though, it is better
+# to centralize.
+DEFAULT_TESTING_BACKENDS = ["dylib-llvm-aot"]
+DEFAULT_TESTING_DRIVER = "dylib"
+
+
+class InputType(Enum):
+  """The type of input pipeline to run prior to the core compiler."""
+  NONE = "none"
+  MHLO = "mhlo"
+  TOSA = "tosa"
+
+  @staticmethod
+  def parse(spec: Union[str, "InputType"]) -> "InputType":
+    """Parses or returns an InputType.
+
+    Args:
+      spec: An InputType instance or the case-insensitive name of one of the
+        enum values.
+    Returns:
+      An InputType instance.
+    """
+    if isinstance(spec, InputType):
+      return spec
+    spec = spec.upper().replace("-", "_")
+    if spec not in InputType.__members__:
+      raise ValueError(f"For input_type= argument, expected one of: "
+                       f"{', '.join(InputType.__members__.keys())}")
+    return InputType[spec]
 
 
 class OutputFormat(Enum):
@@ -70,6 +90,8 @@ class CompilerOptions:
     target_backends: List of str names of target backends to compile into
       the binary. The resulting binary will run on targets that match one
       or more of the compiled backends.
+    input_type: The type of input legalization to perform prior to full
+      compilation. Defaults to none.
     output_format: Override the output format. See the OutputFormat enum.
       Values can either be an enum value or a case-insensitive name of
       the option. Typically used for debugging
@@ -81,6 +103,8 @@ class CompilerOptions:
       returned MLIR.
     output_generic_mlir: Use the generic (and more portable) MLIR formatting for
       any saved or returned MLIR instead of the per-dialect custom assembly.
+    extended_diagnostics: Outputs extended information on diagnostics,
+      potentially outputting very verbosely (defaults to False).
     strip_debug_ops: Whether to strip high level operations used to aid
       debugging.
     strip_source_map: Whether to strip source map information (used to generate
@@ -98,12 +122,14 @@ class CompilerOptions:
                *,
                output_file: Optional[str] = None,
                target_backends: Sequence[str] = (),
+               input_type: Union[InputType, str] = InputType.NONE,
                output_format: Union[OutputFormat,
                                     str] = OutputFormat.FLATBUFFER_BINARY,
                extra_args: Sequence[str] = (),
                optimize: bool = True,
                output_mlir_debuginfo: bool = True,
                output_generic_mlir: bool = False,
+               extended_diagnostics: bool = False,
                strip_debug_ops: bool = False,
                strip_source_map: bool = False,
                strip_symbols: bool = False,
@@ -112,11 +138,13 @@ class CompilerOptions:
                enable_benchmark: bool = False):
     self.output_file = output_file
     self.target_backends = target_backends
+    self.input_type = InputType.parse(input_type)
     self.output_format = OutputFormat.parse(output_format)
     self.extra_args = extra_args
     self.optimize = optimize
     self.output_mlir_debuginfo = output_mlir_debuginfo
     self.output_generic_mlir = output_generic_mlir
+    self.extended_diagnostics = extended_diagnostics
     self.strip_debug_ops = strip_debug_ops
     self.strip_source_map = strip_source_map
     self.strip_symbols = strip_symbols
@@ -142,6 +170,7 @@ def build_compile_command_line(input_file: str,
   cl = [
       iree_translate,
       input_file,
+      f"--iree-input-type={options.input_type.value}",
       f"--iree-vm-bytecode-module-output-format={options.output_format.value}",
   ]
   for target_backend in options.target_backends:
@@ -159,6 +188,11 @@ def build_compile_command_line(input_file: str,
     cl.append("--mlir-print-debuginfo")
   if options.output_generic_mlir:
     cl.append("--mlir-print-op-generic")
+  if options.extended_diagnostics:
+    # Note that different tools have different defaults, so be explicit.
+    cl.append("--mlir-print-op-on-diagnostic=true")
+  else:
+    cl.append("--mlir-print-op-on-diagnostic=false")
 
   # Other options to set if specified.
   if options.strip_debug_ops:

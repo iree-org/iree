@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # ***THIS FILE DOES NOT BUILD WITH BAZEL***
 #
@@ -54,14 +46,6 @@ iree_e2e_cartesian_product_test_suite(
         {
             # SavedModelV2 (classification/4) not available.
             "model": "amoebanet_a_n18_f448",
-        },
-        {
-            # Failing on vmla with negative inputs.
-            "model": [
-                "nasnet_large",
-                "nasnet_mobile",
-            ],
-            "target_backends": "iree_vmla",
         },
         {
             # Failing llvmjit and vulkan:
@@ -141,6 +125,8 @@ iree_e2e_cartesian_product_test_suite(
             "mobilenet_v2_100_224",
             "mobilenet_v2_130_224",
             "mobilenet_v2_140_224",
+            # MobileNetV3
+            "mobilenet_v3_large_100_224",
             "nasnet_mobile",
             "nasnet_large",
             "pnasnet_large",
@@ -156,7 +142,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_vulkan",
         ],
     },

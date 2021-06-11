@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
 
@@ -25,8 +17,8 @@ include(CMakeParseArguments)
 #     default flag set is "-iree-mlir-to-vm-bytecode-module".
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
 #     tool is "iree-translate".
-# CC_NAMESPACE: Wraps everything in a C++ namespace.
-# C_OUTPUT: Control flag to generate c embed code instead.
+# C_IDENTIFIER: Identifier to use for generate c embed code.
+#     If omitted then no C embed code will be generated.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
 #     will be in ${PACKAGE}/internal.
@@ -40,8 +32,8 @@ include(CMakeParseArguments)
 function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY;C_OUTPUT"
-    "NAME;SRC;TRANSLATE_TOOL;CC_NAMESPACE"
+    "PUBLIC;TESTONLY"
+    "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER"
     "FLAGS"
     ${ARGN}
   )
@@ -86,32 +78,12 @@ function(iree_bytecode_module)
     set(_PUBLIC_ARG "PUBLIC")
   endif()
 
-  if(DEFINED _RULE_CC_NAMESPACE)
-    iree_cc_embed_data(
-      NAME
-        "${_RULE_NAME}_cc"
-      IDENTIFIER
-        "${_RULE_NAME}"
-      GENERATED_SRCS
-        "${_RULE_NAME}.vmfb"
-      CC_FILE_OUTPUT
-        "${_RULE_NAME}.cc"
-      H_FILE_OUTPUT
-        "${_RULE_NAME}.h"
-      CPP_NAMESPACE
-        "${_RULE_CC_NAMESPACE}"
-      FLATTEN
-      "${_PUBLIC_ARG}"
-      "${_TESTONLY_ARG}"
-    )
-  endif()
-
-  if(_RULE_C_OUTPUT)
+  if(_RULE_C_IDENTIFIER)
     iree_c_embed_data(
       NAME
         "${_RULE_NAME}_c"
       IDENTIFIER
-        "${_RULE_NAME}_c"
+        "${_RULE_C_IDENTIFIER}"
       GENERATED_SRCS
         "${_RULE_NAME}.vmfb"
       C_FILE_OUTPUT

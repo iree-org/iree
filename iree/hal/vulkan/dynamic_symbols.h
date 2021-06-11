@@ -1,31 +1,24 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_VULKAN_DYNAMIC_SYMBOLS_H_
 #define IREE_HAL_VULKAN_DYNAMIC_SYMBOLS_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format off: must be included before all other headers.
+#include "iree/hal/vulkan/vulkan_headers.h"  // IWYU pragma: export
 // clang-format on
 
 #include <cstdint>
 #include <functional>
 #include <memory>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/status.h"
-#include "iree/hal/vulkan/dynamic_symbol_tables.h"
+#include "iree/hal/vulkan/dynamic_symbol_tables.h"  // IWYU pragma: export
 #include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
@@ -75,8 +68,8 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
   //
   // After the instance is created the caller must use LoadFromInstance (or
   // LoadFromDevice) to load the remaining symbols.
-  static StatusOr<ref_ptr<DynamicSymbols>> Create(
-      const GetProcAddrFn& get_proc_addr);
+  static iree_status_t Create(const GetProcAddrFn& get_proc_addr,
+                              ref_ptr<DynamicSymbols>* out_syms);
 
   // Loads all required and optional Vulkan functions from the Vulkan loader.
   // This will look for a Vulkan loader on the system (like libvulkan.so) and
@@ -85,14 +78,15 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
   // The loaded function pointers will point to thunks in the ICD. This may
   // enable additional debug checking and more readable stack traces (as
   // errors come from within the ICD, where we have symbols).
-  static StatusOr<ref_ptr<DynamicSymbols>> CreateFromSystemLoader();
+  static iree_status_t CreateFromSystemLoader(
+      ref_ptr<DynamicSymbols>* out_syms);
 
   // Loads all required and optional Vulkan functions from the given instance.
   //
   // The loaded function pointers will point to thunks in the ICD. This may
   // enable additional debug checking and more readable stack traces (as
   // errors come from within the ICD, where we have symbols).
-  Status LoadFromInstance(VkInstance instance);
+  iree_status_t LoadFromInstance(VkInstance instance);
 
   // Loads all required and optional Vulkan functions from the given device,
   // falling back to the instance when required.
@@ -100,7 +94,7 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
   // This attempts to directly query the methods from the device, bypassing any
   // ICD or shim layers. These methods will generally have less overhead at
   // runtime as they need not jump through the various trampolines.
-  Status LoadFromDevice(VkInstance instance, VkDevice device);
+  iree_status_t LoadFromDevice(VkInstance instance, VkDevice device);
 
   // Define members for each function pointer.
   // See dynamic_symbol_tables.h for the full list of methods.

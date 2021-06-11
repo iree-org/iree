@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 iree_add_all_subdirs()
 
@@ -37,17 +29,22 @@ iree_cc_library(
     "tensor.c"
     "tensor.h"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
   PUBLIC
 )
+
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
 
 iree_cc_test(
   NAME
@@ -56,9 +53,9 @@ iree_cc_test(
     "smoke_test.cc"
   DEPS
     ::shim
-    bindings::tflite::testdata::add_dynamic_cc
-    bindings::tflite::testdata::add_multi_cc
-    bindings::tflite::testdata::add_static_cc
+    bindings::tflite::testdata::add_dynamic_c
+    bindings::tflite::testdata::add_multi_c
+    bindings::tflite::testdata::add_static_c
     iree::testing::gtest
     iree::testing::gtest_main
 )

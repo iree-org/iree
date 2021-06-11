@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Vulkan GUI utility functions
 // Other matters here: we need to pull in this first to make sure Vulkan API
@@ -18,7 +10,6 @@
 #include "iree/testing/vulkan/vulkan_gui_util.h"
 
 // Other dependencies (helpers, etc.)
-#include "absl/flags/flag.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/main.h"
@@ -29,29 +20,44 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
-ABSL_FLAG(std::string, module_file, "-",
+IREE_FLAG(string, module_file, "-",
           "File containing the module to load that contains the entry "
           "function. Defaults to stdin.");
 
-ABSL_FLAG(std::string, entry_function, "",
+IREE_FLAG(string, entry_function, "",
           "Name of a function contained in the module specified by input_file "
           "to run.");
 
-ABSL_FLAG(std::vector<std::string>, function_inputs, {},
-          "A comma-separated list of of input buffers of the format:"
-          "[shape]xtype=[value]\n"
-          "2x2xi32=1 2 3 4\n"
-          "Optionally, brackets may be used to separate the element values. "
-          "They are ignored by the parser.\n"
-          "2x2xi32=[[1 2][3 4]]\n"
-          "Due to the absence of repeated flags in absl, commas should not be "
-          "used to separate elements. They are reserved for separating input "
-          "values:\n"
-          "2x2xi32=[[1 2][3 4]], 1x2xf32=[[1 2]]");
-
-ABSL_FLAG(std::string, function_inputs_file, "",
-          "Provides a file for input shapes and optional values (see "
-          "ParseToVariantListFromFile in vm_util.h for details)");
+static iree_status_t parse_function_input(iree_string_view_t flag_name,
+                                          void* storage,
+                                          iree_string_view_t value) {
+  auto* list = (std::vector<std::string>*)storage;
+  list->push_back(std::string(value.data, value.size));
+  return iree_ok_status();
+}
+static void print_function_input(iree_string_view_t flag_name, void* storage,
+                                 FILE* file) {
+  auto* list = (std::vector<std::string>*)storage;
+  if (list->empty()) {
+    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
+  } else {
+    for (size_t i = 0; i < list->size(); ++i) {
+      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
+              list->at(i).c_str());
+    }
+  }
+}
+static std::vector<std::string> FLAG_function_inputs;
+IREE_FLAG_CALLBACK(
+    parse_function_input, print_function_input, &FLAG_function_inputs,
+    function_input,
+    "An input value or buffer of the format:\n"
+    "  [shape]xtype=[value]\n"
+    "  2x2xi32=1 2 3 4\n"
+    "Optionally, brackets may be used to separate the element values:\n"
+    "  2x2xi32=[[1 2][3 4]]\n"
+    "Each occurrence of the flag indicates an input in the order they were\n"
+    "specified on the command line.");
 
 static VkAllocationCallbacks* g_Allocator = NULL;
 static VkInstance g_Instance = VK_NULL_HANDLE;
@@ -89,13 +95,12 @@ void CleanupVulkanWindow() {
 }
 
 Status GetModuleContentsFromFlags(std::string* out_contents) {
-  auto module_file = absl::GetFlag(FLAGS_module_file);
+  auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
     *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
                                 std::istreambuf_iterator<char>()};
   } else {
-    IREE_RETURN_IF_ERROR(
-        file_io::GetFileContents(module_file.c_str(), out_contents));
+    IREE_RETURN_IF_ERROR(GetFileContents(module_file.c_str(), out_contents));
   }
   return OkStatus();
 }
@@ -106,11 +111,9 @@ Status RunModuleAndUpdateImGuiWindow(
     iree_hal_device_t* device, iree_vm_context_t* context,
     iree_vm_function_t function, const std::string& function_name,
     const vm::ref<iree_vm_list_t>& function_inputs,
-    const std::vector<RawSignatureParser::Description>& output_descs,
     const std::string& window_title) {
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                           output_descs.size(),
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            iree_allocator_system(), &outputs));
 
   IREE_LOG(INFO) << "EXEC @" << function_name;
@@ -119,7 +122,7 @@ Status RunModuleAndUpdateImGuiWindow(
                                       iree_allocator_system()));
 
   std::ostringstream oss;
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get(), &oss));
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get(), &oss));
 
   outputs.reset();
 
@@ -144,7 +147,7 @@ Status RunModuleAndUpdateImGuiWindow(
 }  // namespace
 
 extern "C" int iree_main(int argc, char** argv) {
-  iree_flags_parse_checked(&argc, &argv);
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
       iree_hal_driver_registry_default()));
 
@@ -322,7 +325,7 @@ extern "C" int iree_main(int argc, char** argv) {
   IREE_LOG(INFO) << "Context with modules is ready for use";
 
   // Lookup the entry point function.
-  std::string entry_function = absl::GetFlag(FLAGS_entry_function);
+  std::string entry_function = FLAG_entry_function;
   iree_vm_function_t main_function;
   IREE_CHECK_OK(bytecode_module->lookup_function(
       bytecode_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
@@ -334,30 +337,12 @@ extern "C" int iree_main(int argc, char** argv) {
                                 main_function_name.size)
                  << "'";
 
-  IREE_CHECK_OK(ValidateFunctionAbi(main_function));
-
-  std::vector<RawSignatureParser::Description> main_function_input_descs;
-  IREE_CHECK_OK(ParseInputSignature(main_function, &main_function_input_descs));
   vm::ref<iree_vm_list_t> main_function_inputs;
-  if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
-    if (!absl::GetFlag(FLAGS_function_inputs).empty()) {
-      IREE_LOG(FATAL) << "Expected only one of function_inputs and "
-                         "function_inputs_file to be set";
-    }
-    IREE_CHECK_OK(ParseToVariantListFromFile(
-        main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
-        absl::GetFlag(FLAGS_function_inputs_file), &main_function_inputs));
-  } else {
-    IREE_CHECK_OK(ParseToVariantList(
-        main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
-        absl::GetFlag(FLAGS_function_inputs), &main_function_inputs));
-  }
+  IREE_CHECK_OK(ParseToVariantList(iree_hal_device_allocator(iree_vk_device),
+                                   FLAG_function_inputs,
+                                   &main_function_inputs));
 
-  std::vector<RawSignatureParser::Description> main_function_output_descs;
-  IREE_CHECK_OK(
-      ParseOutputSignature(main_function, &main_function_output_descs));
-
-  const std::string& window_title = absl::GetFlag(FLAGS_module_file);
+  const std::string window_title = std::string(FLAG_module_file);
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
@@ -400,7 +385,7 @@ extern "C" int iree_main(int argc, char** argv) {
     // Custom window.
     auto status = RunModuleAndUpdateImGuiWindow(
         iree_vk_device, iree_context, main_function, entry_function,
-        main_function_inputs, main_function_output_descs, window_title);
+        main_function_inputs, window_title);
     if (!status.ok()) {
       IREE_LOG(FATAL) << status;
       done = true;

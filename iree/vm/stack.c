@@ -1,21 +1,16 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/vm/stack.h"
 
+#include <assert.h>
+#include <stdbool.h>
 #include <string.h>
 
+#include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/module.h"
@@ -129,7 +124,7 @@
 // frames without exposing their exact structure through the API. This makes it
 // easier for us to add/version additional information or hide implementation
 // details.
-typedef struct iree_vm_stack_frame_header {
+typedef struct iree_vm_stack_frame_header_t {
   // Size, in bytes, of the frame header and frame payload including registers.
   // Adding this value to the base header pointer will yield the next available
   // memory location. Ensure that it does not exceed the total
@@ -138,7 +133,7 @@ typedef struct iree_vm_stack_frame_header {
 
   // Pointer to the parent stack frame, usually immediately preceding this one
   // in the frame storage. May be NULL.
-  struct iree_vm_stack_frame_header* parent;
+  struct iree_vm_stack_frame_header_t* parent;
 
   // Stack frame type used to determine which fields are valid.
   iree_vm_stack_frame_type_t type;
@@ -158,7 +153,7 @@ typedef struct iree_vm_stack_frame_header {
 // Core stack storage. This will be mapped either into dynamic memory allocated
 // by the member allocator or static memory allocated externally. Static stacks
 // cannot grow when storage runs out while dynamic ones will resize their stack.
-struct iree_vm_stack {
+struct iree_vm_stack_t {
   // NOTE: to get better cache hit rates we put the most frequently accessed
   // members first.
 
@@ -195,7 +190,7 @@ struct iree_vm_stack {
 // Stack implementation
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
+IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_state_resolver_t state_resolver,
     iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
   IREE_ASSERT_ARGUMENT(out_stack);
@@ -216,7 +211,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
   stack->allocator = allocator;
 
   iree_host_size_t storage_offset =
-      iree_math_align(sizeof(iree_vm_stack_t), 16);
+      iree_host_align(sizeof(iree_vm_stack_t), 16);
   stack->frame_storage_capacity = storage.data_length - storage_offset;
   stack->frame_storage_size = 0;
   stack->frame_storage = storage.data + storage_offset;
@@ -229,8 +224,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
+IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   while (stack->top) {
@@ -244,7 +238,7 @@ iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_allocate(
+IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
     iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
     iree_vm_stack_t** out_stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -267,7 +261,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_allocate(
   return status;
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_free(iree_vm_stack_t* stack) {
+IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_allocator_t allocator = stack->allocator;
@@ -278,19 +272,19 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_free(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL
-iree_vm_stack_current_frame(iree_vm_stack_t* stack) {
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_current_frame(
+    iree_vm_stack_t* stack) {
   return stack->top ? &stack->top->frame : NULL;
 }
 
-IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL
-iree_vm_stack_parent_frame(iree_vm_stack_t* stack) {
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_parent_frame(
+    iree_vm_stack_t* stack) {
   if (!stack->top) return NULL;
   iree_vm_stack_frame_header_t* parent_header = stack->top->parent;
   return parent_header ? &parent_header->frame : NULL;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
+IREE_API_EXPORT iree_status_t iree_vm_stack_query_module_state(
     iree_vm_stack_t* stack, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state) {
   return stack->state_resolver.query_module_state(stack->state_resolver.self,
@@ -370,7 +364,7 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
+IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
     iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
     iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn,
@@ -432,7 +426,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_stack_function_leave(iree_vm_stack_t* stack) {
   if (IREE_UNLIKELY(!stack->top)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,

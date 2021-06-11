@@ -73,17 +73,15 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     Vulkan::Headers
-    absl::span
-    absl::strings
-    iree::base::api
+    iree::base
     iree::base::core_headers
-    iree::base::flatcc
     iree::base::internal
+    iree::base::internal::flatcc
+    iree::base::internal::synchronization
     iree::base::logging
     iree::base::status
-    iree::base::synchronization
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::vulkan::util::arena
     iree::hal::vulkan::util::intrusive_list
     iree::hal::vulkan::util::ref_ptr
@@ -104,6 +102,7 @@ iree_cc_library(
     "vulkan_headers.h"
   DEPS
     Vulkan::Headers
+    iree::base
     iree::base::core_headers
     iree::base::internal::dynamic_library
     iree::base::status
@@ -119,6 +118,7 @@ iree_cc_test(
     "dynamic_symbols_test.cc"
   DEPS
     ::dynamic_symbols
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

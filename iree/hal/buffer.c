@@ -1,20 +1,14 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/buffer.h"
 
 #include <inttypes.h>
+#include <stddef.h>
+#include <string.h>
 
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
@@ -115,8 +109,7 @@ static const iree_hal_buffer_vtable_t iree_hal_subspan_buffer_vtable = {
 
 IREE_HAL_API_RETAIN_RELEASE(buffer);
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_buffer_validate_memory_type(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
     iree_hal_memory_type_t actual_memory_type,
     iree_hal_memory_type_t expected_memory_type) {
   if (IREE_UNLIKELY(
@@ -132,7 +125,7 @@ iree_hal_buffer_validate_memory_type(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_validate_access(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_access(
     iree_hal_memory_access_t allowed_memory_access,
     iree_hal_memory_access_t required_memory_access) {
   if (IREE_UNLIKELY(!iree_any_bit_set(
@@ -155,7 +148,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_validate_access(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_buffer_validate_usage(iree_hal_buffer_usage_t allowed_usage,
                                iree_hal_buffer_usage_t required_usage) {
   if (IREE_UNLIKELY(!iree_all_bits_set(allowed_usage, required_usage))) {
@@ -170,7 +163,7 @@ iree_hal_buffer_validate_usage(iree_hal_buffer_usage_t allowed_usage,
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_validate_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_range(
     iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length) {
   // Check if the start of the range runs off the end of the buffer.
@@ -257,13 +250,10 @@ static iree_status_t iree_hal_buffer_calculate_range(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_hal_buffer_overlap_t IREE_API_CALL
-iree_hal_buffer_test_overlap(iree_hal_buffer_t* lhs_buffer,
-                             iree_device_size_t lhs_offset,
-                             iree_device_size_t lhs_length,
-                             iree_hal_buffer_t* rhs_buffer,
-                             iree_device_size_t rhs_offset,
-                             iree_device_size_t rhs_length) {
+IREE_API_EXPORT iree_hal_buffer_overlap_t iree_hal_buffer_test_overlap(
+    iree_hal_buffer_t* lhs_buffer, iree_device_size_t lhs_offset,
+    iree_device_size_t lhs_length, iree_hal_buffer_t* rhs_buffer,
+    iree_device_size_t rhs_offset, iree_device_size_t rhs_length) {
   if (iree_hal_buffer_allocated_buffer(lhs_buffer) !=
       iree_hal_buffer_allocated_buffer(rhs_buffer)) {
     // Not even the same buffers.
@@ -295,7 +285,7 @@ iree_hal_buffer_test_overlap(iree_hal_buffer_t* lhs_buffer,
              : IREE_HAL_BUFFER_OVERLAP_DISJOINT;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_subspan(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
     iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
@@ -328,65 +318,65 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_subspan(
                                         out_buffer);
 }
 
-IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
-iree_hal_buffer_allocator(const iree_hal_buffer_t* buffer) {
+IREE_API_EXPORT iree_hal_allocator_t* iree_hal_buffer_allocator(
+    const iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->allocator;
 }
 
-IREE_API_EXPORT iree_hal_buffer_t* IREE_API_CALL
-iree_hal_buffer_allocated_buffer(const iree_hal_buffer_t* buffer) {
+IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_allocated_buffer(
+    const iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->allocated_buffer;
 }
 
-IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_allocation_size(const iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->allocation_size;
 }
 
-IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_byte_offset(const iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->byte_offset;
 }
 
-IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_byte_length(const iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->byte_length;
 }
 
 IREE_API_EXPORT
-iree_hal_memory_type_t IREE_API_CALL
-iree_hal_buffer_memory_type(const iree_hal_buffer_t* buffer) {
+iree_hal_memory_type_t iree_hal_buffer_memory_type(
+    const iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->memory_type;
 }
 
 IREE_API_EXPORT
-iree_hal_memory_access_t IREE_API_CALL
-iree_hal_buffer_allowed_access(const iree_hal_buffer_t* buffer) {
+iree_hal_memory_access_t iree_hal_buffer_allowed_access(
+    const iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->allowed_access;
 }
 
 IREE_API_EXPORT
-iree_hal_buffer_usage_t IREE_API_CALL
-iree_hal_buffer_allowed_usage(const iree_hal_buffer_t* buffer) {
+iree_hal_buffer_usage_t iree_hal_buffer_allowed_usage(
+    const iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->allowed_usage;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
                      iree_device_size_t byte_length) {
   const uint8_t zero = 0;
   return iree_hal_buffer_fill(buffer, byte_offset, byte_length, &zero, 1);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
                      iree_device_size_t byte_length, const void* pattern,
                      iree_host_size_t pattern_length) {
@@ -475,7 +465,7 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_read_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length) {
   if (data_length == 0) {
@@ -498,7 +488,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_read_data(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_write_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length) {
   if (data_length == 0) {
@@ -527,7 +517,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_write_data(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_copy_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length) {
@@ -605,7 +595,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_copy_data(
 // Mapping / iree_hal_buffer_mapping_impl_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_buffer_mapping_impl_t {
   // Must be first (as in iree_hal_buffer_mapping_t).
   // Stores both the offset data pointer and the byte_length of the mapping.
   iree_byte_span_t contents;
@@ -628,7 +618,7 @@ static_assert(offsetof(iree_hal_buffer_mapping_impl_t, contents) ==
                   offsetof(iree_hal_buffer_mapping_t, contents),
               "contents byte span must match the external struct offset");
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
     iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree_hal_buffer_mapping_t* out_buffer_mapping) {
@@ -664,8 +654,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map_range(
   return status;
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* base_buffer_mapping) {
+IREE_API_EXPORT void iree_hal_buffer_unmap_range(
+    iree_hal_buffer_mapping_t* base_buffer_mapping) {
   IREE_ASSERT_ARGUMENT(base_buffer_mapping);
   iree_hal_buffer_mapping_impl_t* buffer_mapping =
       (iree_hal_buffer_mapping_impl_t*)base_buffer_mapping;
@@ -677,7 +667,7 @@ iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* base_buffer_mapping) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_invalidate_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(
     iree_hal_buffer_mapping_t* base_buffer_mapping,
     iree_device_size_t byte_offset, iree_device_size_t byte_length) {
   IREE_ASSERT_ARGUMENT(base_buffer_mapping);
@@ -693,7 +683,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_invalidate_range(
                                                     byte_length);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_flush_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_flush_range(
     iree_hal_buffer_mapping_t* base_buffer_mapping,
     iree_device_size_t byte_offset, iree_device_size_t byte_length) {
   IREE_ASSERT_ARGUMENT(base_buffer_mapping);
@@ -709,7 +699,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_flush_range(
                                                byte_length);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_mapping_subspan(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
     iree_hal_buffer_mapping_t* base_buffer_mapping,
     iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, iree_byte_span_t* out_span) {

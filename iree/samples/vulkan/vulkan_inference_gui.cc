@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Vulkan Graphics + IREE API Integration Sample.
 
@@ -34,7 +26,7 @@
 #include "iree/base/logging.h"
 
 // Compiled module embedded here to avoid file IO:
-#include "iree/samples/vulkan/simple_mul_bytecode_module.h"
+#include "iree/samples/vulkan/simple_mul_bytecode_module_c.h"
 
 static VkAllocationCallbacks* g_Allocator = NULL;
 static VkInstance g_Instance = VK_NULL_HANDLE;
@@ -234,8 +226,8 @@ extern "C" int iree_main(int argc, char** argv) {
 
   // Load bytecode module from embedded data.
   IREE_LOG(INFO) << "Loading simple_mul.mlir...";
-  const auto* module_file_toc =
-      iree::samples::vulkan::simple_mul_bytecode_module_create();
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_vulkan_simple_mul_bytecode_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
@@ -394,11 +386,13 @@ extern "C" int iree_main(int argc, char** argv) {
         iree_hal_buffer_view_t* input0_buffer_view = nullptr;
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
         IREE_CHECK_OK(iree_hal_buffer_view_create(
-            input0_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-            /*shape=*/&kElementCount, /*shape_rank=*/1, &input0_buffer_view));
+            input0_buffer,
+            /*shape=*/&kElementCount, /*shape_rank=*/1,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, &input0_buffer_view));
         IREE_CHECK_OK(iree_hal_buffer_view_create(
-            input1_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-            /*shape=*/&kElementCount, /*shape_rank=*/1, &input1_buffer_view));
+            input1_buffer,
+            /*shape=*/&kElementCount, /*shape_rank=*/1,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, &input1_buffer_view));
         iree_hal_buffer_release(input0_buffer);
         iree_hal_buffer_release(input1_buffer);
         // Marshal inputs through a VM variant list.

@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -130,16 +122,31 @@ class GlobalInitializationPass
   // Returns {} if the constant is zero.
   std::pair<LogicalResult, Value> createConst(Location loc, Attribute value,
                                               OpBuilder &builder) {
-    if (auto intValue = value.dyn_cast<IntegerAttr>()) {
-      if (intValue.getValue().isNullValue()) {
+    if (auto integerAttr = value.dyn_cast<IntegerAttr>()) {
+      if (integerAttr.getValue().isNullValue()) {
         // Globals are zero-initialized by default.
         return {success(), {}};
       }
-      switch (intValue.getValue().getBitWidth()) {
+      switch (integerAttr.getType().getIntOrFloatBitWidth()) {
         case 32:
-          return {success(), builder.createOrFold<ConstI32Op>(loc, intValue)};
+          return {success(),
+                  builder.createOrFold<ConstI32Op>(loc, integerAttr)};
         case 64:
-          return {success(), builder.createOrFold<ConstI64Op>(loc, intValue)};
+          return {success(),
+                  builder.createOrFold<ConstI64Op>(loc, integerAttr)};
+        default:
+          return {failure(), {}};
+      }
+    } else if (auto floatAttr = value.dyn_cast<FloatAttr>()) {
+      if (floatAttr.getValue().isZero()) {
+        // Globals are zero-initialized by default.
+        return {success(), {}};
+      }
+      switch (floatAttr.getType().getIntOrFloatBitWidth()) {
+        case 32:
+          return {success(), builder.createOrFold<ConstF32Op>(loc, floatAttr)};
+        case 64:
+          return {success(), builder.createOrFold<ConstF64Op>(loc, floatAttr)};
         default:
           return {failure(), {}};
       }
@@ -150,13 +157,24 @@ class GlobalInitializationPass
   // Stores a value to a global; the global must be mutable.
   LogicalResult storePrimitiveGlobal(Location loc, StringRef symName,
                                      Value value, OpBuilder &builder) {
-    if (auto intType = value.getType().dyn_cast<IntegerType>()) {
-      switch (intType.getIntOrFloatBitWidth()) {
+    if (auto integerType = value.getType().dyn_cast<IntegerType>()) {
+      switch (integerType.getIntOrFloatBitWidth()) {
         case 32:
           builder.create<GlobalStoreI32Op>(loc, value, symName);
           return success();
         case 64:
           builder.create<GlobalStoreI64Op>(loc, value, symName);
+          return success();
+        default:
+          return failure();
+      }
+    } else if (auto floatType = value.getType().dyn_cast<FloatType>()) {
+      switch (floatType.getIntOrFloatBitWidth()) {
+        case 32:
+          builder.create<GlobalStoreF32Op>(loc, value, symName);
+          return success();
+        case 64:
+          builder.create<GlobalStoreF64Op>(loc, value, symName);
           return success();
         default:
           return failure();

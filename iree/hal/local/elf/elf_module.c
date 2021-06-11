@@ -1,23 +1,17 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/local/elf/elf_module.h"
 
 #include <inttypes.h>
+#include <string.h>
 
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/local/elf/arch.h"
 #include "iree/hal/local/elf/platform.h"
 
 //==============================================================================
@@ -25,7 +19,7 @@
 //==============================================================================
 
 // Fields taken from the ELF headers used only during verification and loading.
-typedef struct {
+typedef struct iree_elf_module_load_state_t {
   iree_memory_info_t memory_info;
   const iree_elf_ehdr_t* ehdr;
   const iree_elf_phdr_t* phdr_table;  // ehdr.e_phnum has count

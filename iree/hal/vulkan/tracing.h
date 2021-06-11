@@ -1,24 +1,19 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_VULKAN_TRACING_H_
 #define IREE_HAL_VULKAN_TRACING_H_
 
-// clang-format off: Must be included before all other headers:
+// clang-format off: must be included before all other headers.
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/handle_util.h"
 
@@ -71,7 +66,7 @@ extern "C" {
 //
 // Thread-compatible: external synchronization is required if using from
 // multiple threads (same as with VkQueue itself).
-typedef struct iree_hal_vulkan_tracing_context_s
+typedef struct iree_hal_vulkan_tracing_context_t
     iree_hal_vulkan_tracing_context_t;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION

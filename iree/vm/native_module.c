@@ -1,23 +1,20 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/vm/native_module.h"
+
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "iree/vm/stack.h"
 
 // Native module implementation allocated for all modules.
-typedef struct {
+typedef struct iree_vm_native_module_t {
   // Interface containing default function pointers.
   // base_interface.self will be the self pointer to iree_vm_native_module_t.
   //
@@ -40,7 +37,7 @@ typedef struct {
   const iree_vm_native_module_descriptor_t* descriptor;
 } iree_vm_native_module_t;
 
-IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size() {
+IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size(void) {
   return sizeof(iree_vm_native_module_t);
 }
 
@@ -74,19 +71,14 @@ static iree_status_t iree_vm_native_module_verify_descriptor(
 
 static void IREE_API_PTR iree_vm_native_module_destroy(void* self) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
+  iree_allocator_t allocator = module->allocator;
 
   // Destroy the optional user-provided self.
-  if (module->self == module) {
-    iree_allocator_t allocator = module->allocator;
-    if (module->user_interface.destroy) {
-      module->user_interface.destroy(module->self);
-    }
-    iree_allocator_free(allocator, module);
-  } else {
-    if (module->user_interface.destroy) {
-      module->user_interface.destroy(module->self);
-    }
+  if (module->user_interface.destroy) {
+    module->user_interface.destroy(module->self);
   }
+
+  iree_allocator_free(allocator, module);
 }
 
 static iree_string_view_t IREE_API_PTR iree_vm_native_module_name(void* self) {
@@ -336,7 +328,7 @@ iree_vm_native_module_resume_call(void* self, iree_vm_stack_t* stack,
                           "native module does not support resume");
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_create(
+IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
@@ -382,7 +374,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_create(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_initialize(
+IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_allocator_t allocator, iree_vm_module_t* base_module) {

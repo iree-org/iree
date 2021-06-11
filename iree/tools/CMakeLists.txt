@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
 
@@ -29,9 +21,9 @@ if("${IREE_TARGET_BACKEND_METAL-SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::MetalSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_METALSPIRV_TARGET")
 endif()
-if("${IREE_TARGET_BACKEND_VMLA}")
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMLA)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMLA_TARGET")
+if("${IREE_TARGET_BACKEND_VMVX}")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMVX)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMVX_TARGET")
 endif()
 if("${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
@@ -40,6 +32,10 @@ endif()
 if("${IREE_TARGET_BACKEND_CUDA}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::CUDA)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_CUDA_TARGET")
+endif()
+if("${IREE_TARGET_BACKEND_ROCM}")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::ROCM)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
 endif()
 
 if(IREE_ENABLE_EMITC)
@@ -58,22 +54,44 @@ endif()
 iree_cc_binary(
   NAME
     iree-benchmark-module
-  OUT
-    iree-benchmark-module
   SRCS
     "iree-benchmark-module-main.cc"
   DEPS
-    absl::flags
-    absl::flags_parse
-    absl::flags_usage
-    absl::strings
     benchmark
+    iree::base
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::status
     iree::base::tracing
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
+    iree::tools::utils::vm_util
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::cc
+  TESTONLY
+)
+
+iree_cc_binary(
+  NAME
+    iree-check-module
+  SRCS
+    "iree-check-module-main.cc"
+  DEPS
+    iree::modules::check::native_module
+    absl::strings
+    iree::base
+    iree::base::core_headers
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::base::logging
+    iree::base::status
+    iree::base::tracing
+    iree::hal
+    iree::hal::drivers
+    iree::modules::hal
+    iree::testing::gtest
     iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
@@ -82,53 +100,23 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
-    iree-check-module
-  OUT
-    iree-check-module
-  SRCS
-    "iree-check-module-main.cc"
-  DEPS
-    iree::modules::check::native_module
-    absl::flags
-    absl::strings
-    iree::base::api
-    iree::base::core_headers
-    iree::base::internal::file_io
-    iree::base::internal::flags
-    iree::base::status
-    iree::base::tracing
-    iree::hal::drivers
-    iree::modules::hal
-    iree::testing::gtest
-    iree::tools::utils::vm_util
-    iree::vm::bytecode_module
-  TESTONLY
-)
-
-iree_cc_binary(
-  NAME
-    iree-dump-module
-  OUT
     iree-dump-module
   SRCS
     "iree-dump-module-main.cc"
   DEPS
     flatcc::runtime
+    iree::base
     iree::base::internal::file_io
-    iree::base::status
     iree::schemas::bytecode_module_def_c_fbs
+    iree::tools::utils::vm_util
 )
 
 iree_cc_binary(
   NAME
     iree-run-module
-  OUT
-    iree-run-module
   SRCS
     "iree-run-module-main.cc"
   DEPS
-    absl::flags
-    absl::strings
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::status
@@ -165,22 +153,21 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_passes.h"
     DEPS
       MLIRIR
+      iree::compiler::Bindings::Native::Transforms
       iree::compiler::Bindings::TFLite::Transforms
-      iree::compiler::Dialect::Flow::Analysis
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
-      iree::compiler::Dialect::Shape::Conversion
+      iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
+      iree::compiler::Dialect::Modules::VMVX::Transforms
       iree::compiler::Dialect::Shape::IR
       iree::compiler::Dialect::Shape::Transforms
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Transforms
-      iree::compiler::Dialect::VMLA::IR::VMLADialect
-      iree::compiler::Dialect::VMLA::Transforms
       iree::compiler::Dialect::Vulkan::IR
       iree::compiler::Translation::IREEVM
     PUBLIC
@@ -232,6 +219,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_mlir_passes_and_dialects
       ::init_xla_dialects
       iree::compiler::Conversion::init_conversions
+      iree::compiler::Conversion::Conversion
       iree::compiler::Dialect::HAL::Conversion::Passes
     INCLUDES
       "${IREE_EMITC_INCLUDES}"
@@ -320,6 +308,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRTargetLLVMIRExport
       MLIRTranslation
       iree::compiler::Conversion::init_conversions
+      iree::compiler::Conversion::Conversion
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
@@ -332,8 +321,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-translate
-    OUT
-      iree-translate
     DEPS
       ::iree_translate_main
     HOSTONLY
@@ -342,8 +329,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-opt
-    OUT
-      iree-opt
     DEPS
       ::iree_opt_main
     HOSTONLY
@@ -351,8 +336,20 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
-      iree-run-mlir
-    OUT
+      iree-mlir-lsp-server
+    SRCS
+      "iree-mlir-lsp-server.cc"
+    DEPS
+      ::init_passes_and_dialects
+      MLIRIR
+      MLIRLspServerLib
+      MLIRSupport
+      ${IREE_OPT_CONDITIONAL_DEPS}
+    PUBLIC
+  )
+
+  iree_cc_binary(
+    NAME
       iree-run-mlir
     SRCS
       "iree-run-mlir-main.cc"
@@ -365,22 +362,23 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRSupport
       MLIRTargetLLVMIRExport
-      absl::flags
       absl::span
-      absl::strings
-      iree::base::api
+      iree::base
       iree::base::internal::flags
+      iree::base::logging
       iree::base::status
       iree::base::tracing
+      iree::compiler::Dialect::HAL::Target
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
-      iree::hal::api
+      iree::hal
       iree::hal::drivers
       iree::modules::hal
       iree::tools::utils::vm_util
       iree::vm
       iree::vm::bytecode_module
+      iree::vm::cc
     HOSTONLY
   )
 
@@ -400,24 +398,24 @@ if(${IREE_BUILD_COMPILER})
 
   # CMake always needs to custom targets to drive custom commands. We have to
   # give it a different name.
-  add_custom_target(_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck)
+  add_custom_target(iree_tools_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck)
 
   # But custom target doesn't have the TARGET_FILE property, which we need, so
-  # wrap it yet again in an executable. This is marke as an imported executable
-  # because otherwise CMake would try to compile it as C++. The executable
-  # target has to have a different name than the output file of the custom
-  # command... (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
-  add_executable(IreeFileCheck_exe IMPORTED GLOBAL)
+  # wrap it yet again in an executable. This is marked as an imported executable
+  # because otherwise CMake would try to compile it as C++.
+  add_executable(iree_tools_IreeFileCheck IMPORTED GLOBAL)
   set_property(
     TARGET
-    IreeFileCheck_exe
+    iree_tools_IreeFileCheck
     PROPERTY IMPORTED_LOCATION
     "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck"
   )
-  add_dependencies(IreeFileCheck_exe _IreeFileCheck_Driver)
-  # Finally do our normal aliasing trick to make this accessible as a qualified
-  # target name throughout the project.
-  add_executable(iree_tools_IreeFileCheck ALIAS IreeFileCheck_exe)
+  add_dependencies(iree_tools_IreeFileCheck iree_tools_IreeFileCheck_Driver)
+  # Finally do our normal aliasing tricks to make this accessible as a qualified
+  # target name throughout the project. Accessing this as an unqualified target
+  # is not supported as the name would conflict with the file name, which CMake
+  # does not support (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
+  add_executable(iree::tools::IreeFileCheck ALIAS iree_tools_IreeFileCheck)
 
   if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
     add_custom_target(BundledLLVMFileCheck ALL

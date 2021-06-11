@@ -20,10 +20,11 @@ iree_cc_library(
   SRCS
     "driver_module.c"
   DEPS
+    iree::base
     iree::base::core_headers
     iree::base::status
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::cuda
   DEFINES
     "IREE_HAL_HAVE_CUDA_DRIVER_MODULE=1"

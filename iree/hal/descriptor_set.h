@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_DESCRIPTOR_SET_H_
 #define IREE_HAL_DESCRIPTOR_SET_H_
@@ -27,7 +19,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
@@ -43,7 +35,7 @@ typedef struct iree_hal_device_s iree_hal_device_t;
 // be applied at the time the binding is recording into the command buffer.
 //
 // Maps to VkDescriptorSetBinding.
-typedef struct {
+typedef struct iree_hal_descriptor_set_binding_t {
   // The binding number of this entry and corresponds to a resource of the
   // same binding number in the executable interface.
   uint32_t binding;
@@ -73,37 +65,37 @@ typedef struct {
 //
 // Maps to VkDescriptorSet:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSet.html
-typedef struct iree_hal_descriptor_set_s iree_hal_descriptor_set_t;
+typedef struct iree_hal_descriptor_set_t iree_hal_descriptor_set_t;
 
 // Creates a descriptor set of the given layout and bindings.
 // Descriptor sets are immutable and retain their bindings.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
+IREE_API_EXPORT iree_status_t iree_hal_descriptor_set_create(
     iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings,
     iree_hal_descriptor_set_t** out_descriptor_set);
 
 // Retains the given |set| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_descriptor_set_retain(iree_hal_descriptor_set_t* descriptor_set);
+IREE_API_EXPORT void iree_hal_descriptor_set_retain(
+    iree_hal_descriptor_set_t* descriptor_set);
 
 // Releases the given |set| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_descriptor_set_release(iree_hal_descriptor_set_t* descriptor_set);
+IREE_API_EXPORT void iree_hal_descriptor_set_release(
+    iree_hal_descriptor_set_t* descriptor_set);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_descriptor_set_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_descriptor_set_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 
   void(IREE_API_PTR* destroy)(iree_hal_descriptor_set_t* descriptor_set);
 } iree_hal_descriptor_set_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_descriptor_set_destroy(iree_hal_descriptor_set_t* descriptor_set);
+IREE_API_EXPORT void iree_hal_descriptor_set_destroy(
+    iree_hal_descriptor_set_t* descriptor_set);
 
 #ifdef __cplusplus
 }  // extern "C"

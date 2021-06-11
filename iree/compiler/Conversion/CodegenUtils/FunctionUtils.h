@@ -1,21 +1,14 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 #define IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -25,25 +18,25 @@ namespace iree_compiler {
 /// Returns true if the given `func` is a kernel dispatch entry point.
 bool isEntryPoint(FuncOp func);
 
-/// Returns the attribute name used to record the binding associated with an
-/// iree.placeholder operation.
-inline const char* getBindingAttrName() { return "binding"; }
-
-/// Returns the attribute name used to record argument position in the (operand
-/// + result) list of shaped types of the dispatch region.
-inline const char* getOperandResultNumAttrName() {
-  return "operand_result_index";
-}
-
-/// Returns the number of outer parallel loops of a linalgOp.
-unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
+/// Returns a map from function symbol name to corresponding entry point op.
+llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
+    ModuleOp module);
 
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
-/// Gets the source type of ops that implement ViewOpInterface recursively. Can
-/// be used to get the untiled operands from a tiled operation.
-Value getViewSource(Value view);
+/// Returns the number of outer parallel loops of a linalgOp.
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
+
+/// Returns the untiled type of a tiled view for both tensor and memref
+/// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
+/// `subtensor` op chain (for tensors).
+Type getUntiledType(Value tiledView);
+
+/// Returns the untiled type of a tiled view for both tensor and memref
+/// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
+/// `subtensor` op chain (for tensors).
+ArrayRef<int64_t> getUntiledShape(Value tiledView);
 
 }  // namespace iree_compiler
 }  // namespace mlir

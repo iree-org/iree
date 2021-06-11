@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # ***THIS FILE DOES NOT BUILD WITH BAZEL***
 #
@@ -34,13 +26,13 @@ DOC = """
 applications_test_manual is for manual testing of all keras vision models.
 Test will run only manually with all parameters specified manually, for example:
 bazel run -c opt integrations/tensorflow/e2e/keras/applications:applications_test_manual -- \
---target_backends=tf,iree_vmla \
+--target_backends=tf,iree_llvmaot \
 --data=imagenet \
 --url=https://storage.googleapis.com/iree_models/ \
 --model=ResNet50
 
 Command arguments description:
---target_backends: can be combination of these: tf,iree_vmla
+--target_backends: can be combination of these: tf,iree_llvmaot
 --data: can be 'imagenet' or 'cifar10'.
     imagenet - input image size (1, 224, 224, 3)
     cifar10 - input image size (1, 32, 32, 3) - it is used for quick tests
@@ -111,8 +103,15 @@ iree_e2e_cartesian_product_test_suite(
     failing_configurations = [
         # Frequently OOMs
         {
-            "target_backends": "tflite",
-            "model": "VGG19",
+            "target_backends": [
+                "tflite",
+                "iree_llvmaot",
+                "iree_vulkan",
+            ],
+            "model": [
+                "VGG16",
+                "VGG19",
+            ],
         },
     ],
     matrix = {
@@ -130,7 +129,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -168,7 +166,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -207,7 +204,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -234,6 +230,22 @@ iree_e2e_cartesian_product_test_suite(
 iree_e2e_cartesian_product_test_suite(
     name = "imagenet_non_hermetic_tests",
     size = "enormous",
+    failing_configurations = [
+        # TODO(b/186579218): Fix linalg-on-tensors failures in these.
+        {
+            "target_backends": [
+                "iree_llvmaot",
+                "iree_vulkan",
+            ],
+            "model": [
+                "InceptionResNetV2",
+                "InceptionV3",
+                "NASNetLarge",
+                "NASNetMobile",
+                "ResNet152V2",
+            ],
+        },
+    ],
     matrix = {
         "src": "applications_test.py",
         "reference_backend": "tf",
@@ -243,7 +255,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],

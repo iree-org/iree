@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // An implementation of the C11 stdatomics.h utilities we use (which is limited
 // to a subset of types for now). We need this for non-C11-compliant platforms
@@ -29,6 +21,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "iree/base/target_platform.h"
 
@@ -66,17 +59,17 @@ extern "C" {
 #if defined(IREE_COMPILER_MSVC)
 
 // Atomics using the Win32 Interlocked* APIs.
-#include "iree/base/internal/atomics_msvc.h"
+#include "iree/base/internal/atomics_msvc.h"  // IWYU pragma: export
 
 #elif defined(IREE_COMPILER_CLANG)
 
 // C11 atomics using Clang builtins.
-#include "iree/base/internal/atomics_clang.h"
+#include "iree/base/internal/atomics_clang.h"  // IWYU pragma: export
 
 #elif defined(IREE_COMPILER_GCC)
 
 // Atomics for GCC (compatible with both C and C++).
-#include "iree/base/internal/atomics_gcc.h"
+#include "iree/base/internal/atomics_gcc.h"  // IWYU pragma: export
 
 #else
 
@@ -139,6 +132,18 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
   iree_atomic_fetch_add_int32(count_ptr, 1, iree_memory_order_relaxed)
 #define iree_atomic_ref_count_dec(count_ptr) \
   iree_atomic_fetch_sub_int32(count_ptr, 1, iree_memory_order_release)
+
+// Aborts the program if the given reference count value is not 0.
+// This should be avoided in all situations but those where continuing execution
+// would be invalid. If a reference object is allocated on the stack and the
+// parent function is about to return it *must* have a ref count of 1: anything
+// else that may be retaining the object will hold a pointer to (effectively)
+// uninitialized stack memory.
+#define iree_atomic_ref_count_abort_if_uses(count_ptr)                         \
+  if (IREE_UNLIKELY(iree_atomic_load_int32(count_ptr,                          \
+                                           iree_memory_order_seq_cst) != 1)) { \
+    abort();                                                                   \
+  }
 
 #ifdef __cplusplus
 }  // extern "C"

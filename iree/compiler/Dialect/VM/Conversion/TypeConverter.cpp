@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 
@@ -79,6 +71,37 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     return llvm::None;
   });
 
+  // Convert floating-point types.
+  addConversion([this](FloatType floatType) -> Optional<Type> {
+    if (floatType.getIntOrFloatBitWidth() < 32) {
+      if (targetOptions_.f32Extension) {
+        // Promote f16 -> f32.
+        return FloatType::getF32(floatType.getContext());
+      } else {
+        // f32 is not supported; can't compile.
+        return llvm::None;
+      }
+    } else if (floatType.isF32()) {
+      if (targetOptions_.f32Extension) {
+        return floatType;
+      } else {
+        // f32 is not supported; can't compile.
+        return llvm::None;
+      }
+    } else if (floatType.isF64()) {
+      if (targetOptions_.f64Extension) {
+        // f64 is supported by the VM, use directly.
+        return floatType;
+      } else if (targetOptions_.f32Extension &&
+                 targetOptions_.truncateUnsupportedFloats) {
+        // f64 is not supported and we still want to compile, so truncate to
+        // f32 (unsafe if all bits are actually required!).
+        return FloatType::getF32(floatType.getContext());
+      }
+    }
+    return llvm::None;
+  });
+
   // Convert index types to the target bit width.
   addConversion([this](IndexType indexType) -> Optional<Type> {
     return IntegerType::get(indexType.getContext(), targetOptions_.indexBits);
@@ -87,7 +110,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   // Vectors are used for arbitrary byte storage.
   addConversion([](VectorType vectorType) -> Optional<Type> {
     return IREE::VM::RefType::get(
-        IREE::ByteBufferType::get(vectorType.getContext()));
+        IREE::VM::BufferType::get(vectorType.getContext()));
   });
 
   // Convert ranked shape types (expanding all dims).
@@ -119,6 +142,10 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     }
     return builder.create<IndexCastOp>(loc, type, inputs.front());
   });
+
+  addTargetMaterialization(
+      [](OpBuilder &builder, IntegerType type, ValueRange inputs,
+         Location loc) -> Value { return inputs.front(); });
 }
 
 }  // namespace VM

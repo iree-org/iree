@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 
@@ -108,32 +100,60 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return writeUint32(typeOrdinal);
   }
 
-  LogicalResult encodeIntAttr(IntegerAttr value) override {
-    auto attr = value.cast<IntegerAttr>();
+  LogicalResult encodePrimitiveAttr(Attribute attr) override {
     unsigned int bitWidth = attr.getType().getIntOrFloatBitWidth();
-    uint64_t limitedValue = attr.getValue().extractBitsAsZExtValue(bitWidth, 0);
-    switch (bitWidth) {
-      case 8:
-        return writeUint8(static_cast<uint8_t>(limitedValue));
-      case 16:
-        return writeUint16(static_cast<uint16_t>(limitedValue));
-      case 32:
-        return writeUint32(static_cast<uint32_t>(limitedValue));
-      case 64:
-        return writeUint64(static_cast<uint64_t>(limitedValue));
-      default:
-        return currentOp_->emitOpError()
-               << "attribute of bitwidth " << bitWidth << " not supported";
+    if (auto integerAttr = attr.dyn_cast<IntegerAttr>()) {
+      uint64_t limitedValue =
+          integerAttr.getValue().extractBitsAsZExtValue(bitWidth, 0);
+      switch (bitWidth) {
+        case 8:
+          return writeUint8(static_cast<uint8_t>(limitedValue));
+        case 16:
+          return writeUint16(static_cast<uint16_t>(limitedValue));
+        case 32:
+          return writeUint32(static_cast<uint32_t>(limitedValue));
+        case 64:
+          return writeUint64(static_cast<uint64_t>(limitedValue));
+        default:
+          return currentOp_->emitOpError()
+                 << "attribute of bitwidth " << bitWidth << " not supported";
+      }
+    } else if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
+      switch (bitWidth) {
+        case 32: {
+          union {
+            float f32;
+            uint32_t u32;
+          } value;
+          value.f32 = floatAttr.getValue().convertToFloat();
+          return writeUint32(value.u32);
+        }
+        case 64: {
+          union {
+            double f64;
+            uint64_t u64;
+          } value;
+          value.f64 = floatAttr.getValue().convertToDouble();
+          return writeUint64(value.u64);
+        }
+        default:
+          return currentOp_->emitOpError()
+                 << "attribute of bitwidth " << bitWidth << " not supported";
+      }
+    } else {
+      return currentOp_->emitOpError()
+             << "attribute type not supported for primitive serialization: "
+             << attr;
     }
   }
 
-  LogicalResult encodeIntArrayAttr(DenseIntElementsAttr value) override {
+  LogicalResult encodePrimitiveArrayAttr(DenseElementsAttr value) override {
     if (value.getNumElements() > UINT16_MAX ||
         failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";
     }
     for (auto el : value.getAttributeValues()) {
-      if (failed(encodeIntAttr(el.cast<IntegerAttr>()))) {
+      if (failed(encodePrimitiveAttr(el))) {
         return currentOp_->emitOpError() << "failed to encode element " << el;
       }
     }
@@ -199,8 +219,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeResult(Value value) override {
-    uint16_t reg =
-        registerAllocation_->mapUseToRegister(value, currentOp_, 0).encode();
+    uint16_t reg = registerAllocation_->mapToRegister(value).encode();
     return writeUint16(reg);
   }
 

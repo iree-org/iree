@@ -1,22 +1,14 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 namespace iree.vm;
 
-// 'Bytecode MODule'.
-file_identifier "BMOD";
-file_extension "module";
+// IREE bytecode module.
+file_identifier "IREE";
+file_extension "vmfb";
 
 // Arbitrary key/value reflection attribute.
 table ReflectionAttrDef {
@@ -50,7 +42,7 @@ table FunctionSignatureDef {
   // Function level reflection attributes.
   // These are typically used to communicate additional ABI metadata needed
   // for dynamic invocation and host language mapping.
-  // See: docs/design_docs/function_abi.md
+  // See: docs/developers/design_docs/function_abi.md
   reflection_attrs:[ReflectionAttrDef];
 }
 

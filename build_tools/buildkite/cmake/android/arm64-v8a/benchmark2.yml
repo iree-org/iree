@@ -1,0 +1,78 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Pipeline steps for https://buildkite.com/iree/iree-benchmark
+
+steps:
+  - label: "Build"
+    commands:
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:eb72a4864f30ba53868cf23caf44e60aca35a36682ed1b1a5fa37cd9fda8855c build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a"
+      - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' -czvf benchmark-suites.tgz build-host/benchmark_suites"
+      - "tar -czvf iree-android-tools.tgz build-android/iree/tools/iree-*-module"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
+    agents:
+      - "queue=build"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    artifact_paths:
+      - "benchmark-suites.tgz"
+      - "iree-android-tools.tgz"
+
+  - wait
+
+  - label: "Benchmark on Pixel 4 (snapdragon-855, adreno-640)"
+    commands:
+      - "buildkite-agent artifact download --step Build benchmark-suites.tgz ./"
+      - "buildkite-agent artifact download --step Build iree-android-tools.tgz ./"
+      - "tar -xzvf benchmark-suites.tgz"
+      - "tar -xzvf iree-android-tools.tgz"
+      - "python3 build_tools/android/run_benchmarks.py --benchmark_tool=build-android/iree/tools/iree-benchmark-module -o benchmark-results-pixel-4.json --verbose build-host/"
+      - "rm -rf build-host/ build-android/"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
+    agents:
+      - "android-soc=snapdragon-855"
+      - "android-version=11"
+      - "queue=benchmark-android"
+    artifact_paths: "benchmark-results-pixel-4.json"
+    timeout_in_minutes: "30"
+
+  - label: "Benchmark on Galaxy S20 (exynos-990, mali-g77)"
+    commands:
+      - "buildkite-agent artifact download --step Build benchmark-suites.tgz ./"
+      - "buildkite-agent artifact download --step Build iree-android-tools.tgz ./"
+      - "tar -xzvf benchmark-suites.tgz"
+      - "tar -xzvf iree-android-tools.tgz"
+      - "python3 build_tools/android/run_benchmarks.py --benchmark_tool=build-android/iree/tools/iree-benchmark-module -o benchmark-results-galaxy-s20.json --verbose build-host/"
+      - "rm -rf build-host/ build-android/"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
+    agents:
+      - "android-soc=exynos-990"
+      - "android-version=11"
+      - "queue=benchmark-android"
+    artifact_paths: "benchmark-results-galaxy-s20.json"
+    timeout_in_minutes: "30"
+
+  - wait
+
+  - label: "Comment benchmark results on pull request"
+    commands:
+      - "buildkite-agent artifact download benchmark-results-*.json ./"
+      - "python3 build_tools/android/post_benchmarks_as_pr_comment.py --verbose --query-base benchmark-results-*.json"
+      - "rm benchmark-results-*.json"
+    key: "post-on-pr"
+    if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark')"
+    agents:
+      - "queue=report"
+
+  - label: "Push benchmark results to dashboard"
+    commands:
+      - "buildkite-agent artifact download benchmark-results-*.json ./"
+      - "python3 build_tools/android/upload_benchmarks_to_dashboard.py --verbose benchmark-results-*.json"
+      - "rm benchmark-results-*.json"
+    key: "upload-to-dashboard"
+    branches: "main"
+    agents:
+      - "queue=report"

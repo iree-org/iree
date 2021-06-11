@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_DETAIL_H_
 #define IREE_HAL_DETAIL_H_
@@ -45,21 +37,21 @@ extern "C" {
 
 // Defines the iree_hal_<type_name>_retain/_release methods.
 #define IREE_HAL_API_RETAIN_RELEASE(type_name)                           \
-  IREE_API_EXPORT void IREE_API_CALL iree_hal_##type_name##_destroy(     \
+  IREE_API_EXPORT void iree_hal_##type_name##_destroy(                   \
       iree_hal_##type_name##_t* type_name) {                             \
     if (IREE_LIKELY(type_name)) {                                        \
       IREE_HAL_VTABLE_DISPATCH(type_name, iree_hal_##type_name, destroy) \
       (type_name);                                                       \
     }                                                                    \
   }                                                                      \
-  IREE_API_EXPORT void IREE_API_CALL iree_hal_##type_name##_retain(      \
+  IREE_API_EXPORT void iree_hal_##type_name##_retain(                    \
       iree_hal_##type_name##_t* type_name) {                             \
     if (IREE_LIKELY(type_name)) {                                        \
       iree_atomic_ref_count_inc(                                         \
           &((iree_hal_resource_t*)(type_name))->ref_count);              \
     }                                                                    \
   }                                                                      \
-  IREE_API_EXPORT void IREE_API_CALL iree_hal_##type_name##_release(     \
+  IREE_API_EXPORT void iree_hal_##type_name##_release(                   \
       iree_hal_##type_name##_t* type_name) {                             \
     if (IREE_LIKELY(type_name) &&                                        \
         iree_atomic_ref_count_dec(                                       \

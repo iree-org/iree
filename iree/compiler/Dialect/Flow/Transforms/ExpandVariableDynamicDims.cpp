@@ -1,21 +1,14 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -29,8 +22,7 @@ namespace IREE {
 namespace Flow {
 
 class ExpandVariableDynamicDimsPass
-    : public PassWrapper<ExpandVariableDynamicDimsPass,
-                         OperationPass<ModuleOp>> {
+    : public ExpandVariableDynamicDimsBase<ExpandVariableDynamicDimsPass> {
  public:
   ExpandVariableDynamicDimsPass() = default;
 
@@ -139,11 +131,6 @@ class ExpandVariableDynamicDimsPass
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass() {
   return std::make_unique<ExpandVariableDynamicDimsPass>();
 }
-
-static PassRegistration<ExpandVariableDynamicDimsPass> pass(
-    "iree-flow-expand-variable-dynamic-dims",
-    "Expands !shapex.ranked_shape dynamic dimensions stored in variables.",
-    [] { return std::make_unique<ExpandVariableDynamicDimsPass>(); });
 
 }  // namespace Flow
 }  // namespace IREE

@@ -1,19 +1,12 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
@@ -41,21 +34,7 @@ c_embed_data(
     c_file_output = "simple_embedding_test_llvm_aot_rv64.c",
     flatten = True,
     h_file_output = "simple_embedding_test_llvm_aot_rv64.h",
-)
-
-cc_binary(
-    name = "simple_embedding_run",
-    srcs = ["simple_embedding_run.c"],
-    deps = [
-        ":simple_embedding_test_bytecode_module_c",
-        ":simple_embedding_test_llvm_aot_rv64",
-        "//iree/base:api",
-        "//iree/hal:api",
-        "//iree/hal/drivers",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-    ],
+    identifier = "iree_samples_simple_embedding_rv64_test_module",
 )
 
 iree_cmake_extra_content(
@@ -68,15 +47,76 @@ endif()
     inline = True,
 )
 
+cc_binary(
+    name = "simple_embedding_dylib",
+    srcs = [
+        "device_dylib.c",
+        "simple_embedding.c",
+    ],
+    deps = [
+        ":simple_embedding_test_bytecode_module_c",
+        ":simple_embedding_test_llvm_aot_rv64",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/hal/local:task_driver",
+        "//iree/hal/local/loaders:embedded_library_loader",
+        "//iree/hal/local/loaders:legacy_library_loader",
+        "//iree/modules/hal",
+        "//iree/task:api",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+    ],
+)
+
+cc_binary(
+    name = "simple_embedding_vulkan",
+    srcs = [
+        "device_vulkan.c",
+        "simple_embedding.c",
+    ],
+    deps = [
+        ":simple_embedding_test_bytecode_module_c",
+        ":simple_embedding_test_llvm_aot_rv64",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/vulkan/registration",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+    ],
+)
+
+cc_binary(
+    name = "simple_embedding_local_sync",
+    srcs = [
+        "device_local_sync.c",
+        "simple_embedding.c",
+    ],
+    deps = [
+        ":simple_embedding_test_bytecode_module_c",
+        ":simple_embedding_test_llvm_aot_rv64",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/hal/local:sync_driver",
+        "//iree/hal/local/loaders:legacy_library_loader",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+    ],
+)
+
 iree_bytecode_module(
     name = "simple_embedding_test_bytecode_module",
     src = "simple_embedding_test.mlir",
-    c_output = True,
-    cc_namespace = "iree::samples",
+    c_identifier = "iree_samples_simple_embedding_test_module",
     flags = [
+        "-iree-input-type=mhlo",
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",
         "-iree-hal-target-backends=vulkan-spirv",
+        "-iree-llvm-debug-symbols=false",
     ],
 )
 
@@ -95,23 +135,17 @@ endif()
     inline = True,
 )
 
-cc_test(
-    name = "simple_embedding_test",
-    srcs = ["simple_embedding_test.cc"],
-    deps = [
-        ":simple_embedding_test_bytecode_module_cc",
-        "//iree/base:api",
-        "//iree/base:logging",
-        "//iree/hal:api",
-        "//iree/hal/dylib/registration",
-        "//iree/hal/vulkan/registration",
-        "//iree/modules/hal",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-        "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
+run_binary_test(
+    name = "simple_embedding_dylib_test",
+    test_binary = ":simple_embedding_dylib",
+)
+
+run_binary_test(
+    name = "simple_embedding_local_sync_test",
+    test_binary = ":simple_embedding_local_sync",
+)
+
+run_binary_test(
+    name = "simple_embedding_vulkan_test",
+    test_binary = ":simple_embedding_vulkan",
 )

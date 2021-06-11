@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -39,9 +31,9 @@ void iree_memory_query_info(iree_memory_info_t* out_info) {
   out_info->can_allocate_executable_pages = true;
 }
 
-void iree_memory_jit_context_begin() {}
+void iree_memory_jit_context_begin(void) {}
 
-void iree_memory_jit_context_end() {}
+void iree_memory_jit_context_end(void) {}
 
 //==============================================================================
 // Virtual address space manipulation
@@ -94,7 +86,11 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
 // IREE_ELF_CLEAR_CACHE can be defined externally to override this default
 // behavior.
 #if !defined(IREE_ELF_CLEAR_CACHE)
-#if defined __has_builtin
+// __has_builtin was added in GCC 10, so just hard-code the availability
+// for < 10, special cased here so it can be dropped once no longer needed.
+#if defined __GNUC__ && __GNUC__ < 10
+#define IREE_ELF_CLEAR_CACHE(start, end) __builtin___clear_cache(start, end)
+#elif defined __has_builtin
 #if __has_builtin(__builtin___clear_cache)
 #define IREE_ELF_CLEAR_CACHE(start, end) __builtin___clear_cache(start, end)
 #endif  // __builtin___clear_cache

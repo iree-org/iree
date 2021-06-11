@@ -1,21 +1,20 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/vm/invocation.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/vm/ref.h"
+#include "iree/vm/stack.h"
+#include "iree/vm/value.h"
 
 // Marshals caller arguments from the variant list to the ABI convention.
 static iree_status_t iree_vm_invoke_marshal_inputs(
@@ -47,19 +46,33 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
     switch (cconv_arguments.data[cconv_i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32: {
+      case IREE_VM_CCONV_TYPE_I32: {
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             inputs, arg_i, IREE_VM_VALUE_TYPE_I32, &value));
         memcpy(p, &value.i32, sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
-      case IREE_VM_CCONV_TYPE_INT64: {
+      case IREE_VM_CCONV_TYPE_I64: {
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             inputs, arg_i, IREE_VM_VALUE_TYPE_I64, &value));
         memcpy(p, &value.i64, sizeof(int64_t));
         p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_F32: {
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            inputs, arg_i, IREE_VM_VALUE_TYPE_F32, &value));
+        memcpy(p, &value.f32, sizeof(float));
+        p += sizeof(float);
+      } break;
+      case IREE_VM_CCONV_TYPE_F64: {
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            inputs, arg_i, IREE_VM_VALUE_TYPE_F64, &value));
+        memcpy(p, &value.f64, sizeof(double));
+        p += sizeof(double);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         // TODO(benvanik): see if we can't remove this retain by instead relying
@@ -101,15 +114,25 @@ static iree_status_t iree_vm_invoke_marshal_outputs(
     switch (cconv_results.data[cconv_i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
-      case IREE_VM_CCONV_TYPE_INT32: {
+      case IREE_VM_CCONV_TYPE_I32: {
         iree_vm_value_t value = iree_vm_value_make_i32(*(int32_t*)p);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
         p += sizeof(int32_t);
       } break;
-      case IREE_VM_CCONV_TYPE_INT64: {
+      case IREE_VM_CCONV_TYPE_I64: {
         iree_vm_value_t value = iree_vm_value_make_i64(*(int64_t*)p);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
         p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_F32: {
+        iree_vm_value_t value = iree_vm_value_make_f32(*(float*)p);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
+        p += sizeof(float);
+      } break;
+      case IREE_VM_CCONV_TYPE_F64: {
+        iree_vm_value_t value = iree_vm_value_make_f64(*(double*)p);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
+        p += sizeof(double);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         IREE_RETURN_IF_ERROR(
@@ -176,7 +199,7 @@ static iree_status_t iree_vm_invoke_within(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(
+IREE_API_EXPORT iree_status_t iree_vm_invoke(
     iree_vm_context_t* context, iree_vm_function_t function,
     const iree_vm_invocation_policy_t* policy, iree_vm_list_t* inputs,
     iree_vm_list_t* outputs, iree_allocator_t allocator) {

@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #-------------------------------------------------------------------------------
 # Abseil configuration
@@ -321,8 +313,11 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-ldl"
+    "-lm"
     ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
+  MSVC
+    "-natvis:${CMAKE_SOURCE_DIR}/iree/iree.natvis"
 )
 
 # Add to LINKOPTS on a binary to configure it for X/Wayland/Windows/etc
@@ -350,12 +345,18 @@ if(${IREE_SIZE_OPTIMIZED})
       "/Gy"
       "/DNDEBUG"
       "/DIREE_STATUS_MODE=0"
-      "/PDB"
+      "/DIREE_FLAGS_ENABLE_CLI=0"
+      "/DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
+      "/DIREE_VM_EXT_I64_ENABLE=0"
+      "/DIREE_VM_EXT_F32_ENABLE=0"
       "/Os"
       "/Oy"
+      "/Zi"
+      "/c"
   )
   iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS
     MSVC_OR_CLANG_CL
+      "-DEBUG:FULL"
       "-LTCG"
       "-opt:ref,icf"
   )
@@ -436,7 +437,7 @@ set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
 
 # TODO(ataei): Use optional build time targets selection for LLVMAOT.
-set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64;RISCV;NVPTX"
+set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64;RISCV;NVPTX;AMDGPU"
     CACHE STRING "" FORCE)
 
 set(LLVM_ENABLE_PROJECTS "mlir" CACHE STRING "" FORCE)

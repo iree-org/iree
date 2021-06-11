@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <algorithm>
 #include <numeric>
@@ -109,6 +101,23 @@ static bool hasUsersInStreamAfterUpdate(Value value, Operation *updateOp) {
   return false;
 }
 
+// Returns true if the given |operand| is a constant tied to a result of
+// |updateOp| and the |updateOp| has inplace update semantics.
+static bool updatesConstantInStream(Value operand, Operation *updateOp) {
+  // Only two ops have inplace update semantics thus far. (TensorReshapeOp,
+  // which also implements TiedOpInterface, is fine.) Checking the explicit
+  // op list is not good; we should have an op interface.
+  if (!isa<DispatchOp, TensorUpdateOp>(updateOp)) return false;
+
+  // For loaded variables, check whether it's mutable. Immutable variables will
+  // be aggregated into one read-only buffer.
+  if (auto varLoadOp = operand.getDefiningOp<VariableLoadOp>()) {
+    return !varLoadOp.getLoadedVariable().is_mutable();
+  }
+
+  return false;
+}
+
 /// Inserts clones into the stream as required by tied results.
 /// This is required to preserve the immutable tensor semantics required by the
 /// SSA use-def chain.
@@ -142,7 +151,7 @@ struct InsertImmutabilityPreservingStreamClones
         }
       }
     }
-    return didClone ? success() : failure();
+    return success(didClone);
   }
 
   bool insertTiedClones(TiedOpInterface tiedOp,
@@ -160,7 +169,24 @@ struct InsertImmutabilityPreservingStreamClones
         SmallPtrSet<Operation *, 1> excludedOps;
         excludedOps.insert(tiedOp.getOperation());
         excludedOps.insert(clonedOperand.getDefiningOp());
-        tiedOperand.replaceAllUsesExcept(clonedOperand, excludedOps);
+        tiedOperand.replaceUsesWithIf(clonedOperand, [&](OpOperand &use) {
+          Operation *user = use.getOwner();
+          return !excludedOps.count(user) &&
+                 user->getBlock() == clonedOperand.getDefiningOp()->getBlock();
+        });
+        didClone = true;
+      }
+
+      // TODO(#5492): This is a temporary solution to address the issue where we
+      // aggreate constants in a read-only buffer but still see inplace updates
+      // to them. Force clones for such constants for now.
+      if (updatesConstantInStream(tiedOperand, tiedOp)) {
+        rewriter.setInsertionPoint(tiedOp);
+        auto clonedOperand = rewriter.createOrFold<TensorCloneOp>(
+            tiedOperand.getLoc(), tiedOperand);
+        tiedOperand.replaceUsesWithIf(clonedOperand, [&](OpOperand &use) {
+          return use.getOwner() == tiedOp.getOperation();
+        });
         didClone = true;
       }
     }
@@ -350,11 +376,6 @@ void VariableStoreIndirectOp::getCanonicalizationPatterns(
 // Dispatch ops
 //===----------------------------------------------------------------------===//
 
-void DispatchRegionOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ClosureOptimizationPattern<DispatchRegionOp>>(context);
-}
-
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>>(context);
@@ -431,6 +452,17 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
   }
 };
 
+/// Returns the canonical type of the result of the load op.
+struct DispatchTensorLoadReturnTypeCanonicalizer {
+  RankedTensorType operator()(DispatchTensorLoadOp loadOp,
+                              ArrayRef<OpFoldResult> mixedOffsets,
+                              ArrayRef<OpFoldResult> mixedSizes,
+                              ArrayRef<OpFoldResult> mixedStrides) {
+    return DispatchTensorLoadOp::inferResultType(
+        loadOp.source().getType().cast<DispatchTensorType>(), mixedSizes);
+  }
+};
+
 /// A canonicalizer wrapper to replace DispatchTensorLoadOps.
 struct DispatchTensorLoadOpCanonicalizer {
   void operator()(PatternRewriter &rewriter, DispatchTensorLoadOp op,
@@ -444,11 +476,12 @@ struct DispatchTensorLoadOpCanonicalizer {
 
 void DispatchTensorLoadOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ConvertDimOfDispatchInputLoadToDispatchShape,
-                 ConvertDispatchInputLoadOfTensorToSubTensor,
-                 OpWithOffsetSizesAndStridesConstantArgumentFolder<
-                     DispatchTensorLoadOp, DispatchTensorLoadOpCanonicalizer>>(
-      context);
+  results.insert<
+      ConvertDimOfDispatchInputLoadToDispatchShape,
+      ConvertDispatchInputLoadOfTensorToSubTensor,
+      OpWithOffsetSizesAndStridesConstantArgumentFolder<
+          DispatchTensorLoadOp, DispatchTensorLoadReturnTypeCanonicalizer,
+          DispatchTensorLoadOpCanonicalizer>>(context);
 }
 
 // Inlining producers of an input to the dispatch region results in the
@@ -462,6 +495,33 @@ OpFoldResult DispatchTensorLoadOp::fold(ArrayRef<Attribute> operands) {
     return source();
   }
   return {};
+}
+
+//===----------------------------------------------------------------------===//
+// flow.dispatch.tensor.store
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct FoldCastOpIntoDispatchStoreOp
+    : public OpRewritePattern<DispatchTensorStoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    if (!storeOp.value().getDefiningOp<tensor::CastOp>()) return failure();
+    auto parentOp = storeOp.value().getDefiningOp<tensor::CastOp>();
+    rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
+        storeOp, parentOp.source(), storeOp.target(), storeOp.offsets(),
+        storeOp.sizes(), storeOp.strides(), storeOp.static_offsets(),
+        storeOp.static_sizes(), storeOp.static_strides());
+    return success();
+  }
+};
+}  // namespace
+
+void DispatchTensorStoreOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldCastOpIntoDispatchStoreOp>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -567,7 +627,8 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
 
 static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                                ShapedType rhsType, ValueRange rhsDynamicDims) {
-  if (lhsType.hasStaticShape() && lhsType == rhsType) {
+  if (lhsType.hasStaticShape() &&
+      lhsType.getNumElements() == rhsType.getNumElements()) {
     // Static shape equivalence means we can fast-path the check.
     return true;
   }

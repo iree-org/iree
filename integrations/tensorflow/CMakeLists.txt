@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # TensorFlow builds through bazel, and IREE maintains all of its TensorFlow
 # dependent code under this directory tree. The CMake support is limited to
@@ -30,15 +22,15 @@ set(IREE_TF_TOOLS_ROOT
     CACHE STRING "Root directory for IREE TensorFlow integration binaries")
 
 
-if(${IREE_BUILD_TENSORFLOW_COMPILER})
-  add_executable(iree_tf_compiler_iree-tf-import IMPORTED GLOBAL)
-  set_property(TARGET iree_tf_compiler_iree-tf-import
+if(${IREE_BUILD_TENSORFLOW_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
+  add_executable(iree_tf_compiler_iree-import-tf IMPORTED GLOBAL)
+  set_property(TARGET iree_tf_compiler_iree-import-tf
     PROPERTY IMPORTED_LOCATION
-        "${IREE_TF_TOOLS_ROOT}/iree-tf-import"
+        "${IREE_TF_TOOLS_ROOT}/iree-import-tf"
   )
 endif()
 
-if(${IREE_BUILD_TFLITE_COMPILER})
+if(${IREE_BUILD_TFLITE_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
   add_executable(iree_tf_compiler_iree-import-tflite IMPORTED GLOBAL)
   set_property(TARGET iree_tf_compiler_iree-import-tflite
     PROPERTY IMPORTED_LOCATION
@@ -46,7 +38,7 @@ if(${IREE_BUILD_TFLITE_COMPILER})
   )
 endif()
 
-if(${IREE_BUILD_XLA_COMPILER})
+if(${IREE_BUILD_XLA_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
   add_executable(iree_tf_compiler_iree-import-xla IMPORTED GLOBAL)
   set_property(TARGET iree_tf_compiler_iree-import-xla
     PROPERTY IMPORTED_LOCATION

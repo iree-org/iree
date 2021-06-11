@@ -14,7 +14,7 @@ func @device_allocator(%device: !hal.device) -> !hal.allocator {
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
 func @device_query_i32(%device: !hal.device) -> (i1, i32) {
   // CHECK: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
-  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[KEY]]) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> (i32, i32)
+  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[KEY]]) : (!vm.ref<!hal.device>, !vm.buffer) -> (i32, i32)
   %ok, %value = hal.device.query<%device : !hal.device> key("foo") : i1, i32
   // CHECK: return %[[RET]]#0, %[[RET]]#1
   return %ok, %value : i1, i32

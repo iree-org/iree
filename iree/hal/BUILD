@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # HAL (Hardware Abstraction Layer).
 # Subdirectories contain implementations for different hardware and
@@ -25,10 +17,9 @@ package(
 #===------------------------------------------------------------------------===#
 # Public API
 #===------------------------------------------------------------------------===#
-# TODO(benvanik): rename to :hal
 
 cc_library(
-    name = "api",
+    name = "hal",
     srcs = [
         "allocator.c",
         "allocator.h",
@@ -38,7 +29,6 @@ cc_library(
         "buffer_heap.c",
         "buffer_heap_impl.h",
         "buffer_view.c",
-        "buffer_view.cc",
         "buffer_view.h",
         "command_buffer.c",
         "command_buffer.h",
@@ -65,7 +55,7 @@ cc_library(
         "resource.h",
         "semaphore.c",
         "semaphore.h",
-        "string_util.cc",
+        "string_util.c",
         "string_util.h",
     ],
     hdrs = [
@@ -73,15 +63,11 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
-        "//iree/base:threading",
         "//iree/base:tracing",
         "//iree/base/internal",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-        "@half//:includes",
+        "//iree/base/internal:synchronization",
     ],
 )
 
@@ -89,8 +75,8 @@ cc_test(
     name = "string_util_test",
     srcs = ["string_util_test.cc"],
     deps = [
-        ":api",
-        "//iree/base:core_headers",
+        ":hal",
+        "//iree/base",
         "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",

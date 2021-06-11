@@ -1,21 +1,14 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -239,6 +232,78 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
 void ExSharedDeviceOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "device");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.tensor.cast
+//===----------------------------------------------------------------------===//
+
+void TensorCastOp::build(OpBuilder &builder, OperationState &result,
+                         Type resultType, Value source,
+                         ArrayRef<NamedAttribute> attrs) {
+  SmallVector<Value> dynamicDims;
+  if (source.getType().isa<IREE::HAL::BufferViewType>()) {
+    auto shapedType = resultType.cast<ShapedType>();
+    for (int64_t i = 0; i < shapedType.getRank(); ++i) {
+      if (!shapedType.isDynamicDim(i)) continue;
+      dynamicDims.push_back(builder.createOrFold<IREE::HAL::BufferViewDimOp>(
+          result.location, builder.getIndexType(), source,
+          builder.getIndexAttr(i)));
+    }
+  } else {
+    dynamicDims =
+        Shape::buildOrFindDynamicDimsForValue(result.location, source, builder);
+  }
+  build(builder, result, resultType, source, dynamicDims, attrs);
+}
+
+void TensorCastOp::build(OpBuilder &builder, OperationState &result,
+                         Type resultType, Value source, ValueRange dynamicDims,
+                         ArrayRef<NamedAttribute> attrs) {
+  result.addTypes({resultType});
+  result.addOperands({source});
+  result.addOperands({dynamicDims});
+  result.addAttributes(attrs);
+  result.addAttribute(
+      "operand_segment_sizes",
+      builder.getI32VectorAttr({
+          static_cast<int32_t>(1),
+          static_cast<int32_t>(
+              source.getType().isa<TensorType>() ? dynamicDims.size() : 0),
+          static_cast<int32_t>(resultType.isa<TensorType>() ? dynamicDims.size()
+                                                            : 0),
+      }));
+}
+
+Value TensorCastOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
+  if (source().getType().isa<TensorType>()) {
+    return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
+                                           builder);
+  } else {
+    return buildResultRankedShape(idx, builder);
+  }
+}
+
+Value TensorCastOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
+  if (target().getType().isa<TensorType>()) {
+    return Shape::buildRankedShapeForValue(getLoc(), target(), target_dims(),
+                                           builder);
+  } else {
+    return buildOperandRankedShape(idx, builder);
+  }
+}
+
+Value TensorCastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::TiedOpInterface::findTiedBaseValue(source());
+}
+
+::llvm::Optional<unsigned> TensorCastOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // source
+}
+
+SmallVector<int64_t, 4> TensorCastOp::getTiedResultOperandIndices() {
+  return {0};  // source
 }
 
 //===----------------------------------------------------------------------===//
@@ -1581,42 +1646,6 @@ void InterfaceWorkgroupSizeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   getAsmResultNamesForInterfaceWorkgroupOp("workgroup_size_", dimension(),
                                            result(), setNameFn);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.interface.load.tensor
-//===----------------------------------------------------------------------===//
-
-InterfaceBindingOp InterfaceLoadTensorOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
-//===----------------------------------------------------------------------===//
-// hal.interface.store.tensor
-//===----------------------------------------------------------------------===//
-
-InterfaceBindingOp InterfaceStoreTensorOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
-//===----------------------------------------------------------------------===//
-// hal.interface.load.tensor.tile
-//===----------------------------------------------------------------------===//
-
-InterfaceBindingOp InterfaceLoadTensorTileOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
-//===----------------------------------------------------------------------===//
-// hal.interface.store.tensor.tile
-//===----------------------------------------------------------------------===//
-
-InterfaceBindingOp InterfaceStoreTensorTileOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
 }
 
 //===----------------------------------------------------------------------===//

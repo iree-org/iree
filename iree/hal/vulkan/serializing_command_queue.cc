@@ -1,28 +1,23 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/vulkan/serializing_command_queue.h"
 
+#include <cstdint>
 #include <memory>
+#include <type_traits>
 
-#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
 #include "iree/hal/vulkan/emulated_semaphore.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/tracing.h"
+#include "iree/hal/vulkan/util/arena.h"
 
 namespace iree {
 namespace hal {
@@ -108,10 +103,11 @@ iree_status_t TryToPrepareSemaphores(
 // waiting on |wait_semaphores| and signalling |signal_semaphores|. Necessary
 // structures are allocated from |arena| and the result `VkSubmitInfo` is
 // written to |submit_info|.
-void PrepareSubmitInfo(absl::Span<const VkSemaphore> wait_semaphore_handles,
-                       absl::Span<const VkCommandBuffer> command_buffer_handles,
-                       absl::Span<const VkSemaphore> signal_semaphore_handles,
-                       VkSubmitInfo* submit_info, Arena* arena) {
+void PrepareSubmitInfo(
+    const std::vector<VkSemaphore>& wait_semaphore_handles,
+    const std::vector<VkCommandBuffer>& command_buffer_handles,
+    const std::vector<VkSemaphore>& signal_semaphore_handles,
+    VkSubmitInfo* submit_info, Arena* arena) {
   // TODO(benvanik): see if we can go to finer-grained stages.
   // For example, if this was just queue ownership transfers then we can use
   // the pseudo-stage of VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT.
@@ -407,7 +403,7 @@ void SerializingCommandQueue::AbortQueueSubmission() {
   iree_slim_mutex_unlock(&queue_mutex_);
 }
 
-void SerializingCommandQueue::SignalFences(absl::Span<VkFence> fences) {
+void SerializingCommandQueue::SignalFences(const std::vector<VkFence>& fences) {
   const auto span_contains = [fences](VkFence fence) {
     for (VkFence f : fences) {
       if (f == fence) return true;

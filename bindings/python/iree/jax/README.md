@@ -19,7 +19,7 @@ import iree.jax
 import jax
 import jax.numpy as jnp
 
-# 'backend' is one of 'vmla', 'llvmaot' and 'vulkan' and defaults to 'llvmaot'.
+# 'backend' is one of 'vmvx', 'llvmaot' and 'vulkan' and defaults to 'llvmaot'.
 @iree.jax.jit(backend="llvmaot")
 def linear_relu_layer(params, x):
   w, b = params
@@ -95,8 +95,12 @@ using `iree-run-module`:
 adb push /tmp/mlp_apply.vmfb /data/local/tmp/
 adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
 adb shell /data/local/tmp/iree-run-module \
-  -module_file=/data/local/tmp/mlp_apply.vmfb \
-  -function_inputs="128xf32,784x128xf32,10xf32,128x10xf32,1x28x28x1xf32" \
-  -driver=dylib \
-  -entry_function=main
+  --driver=dylib \
+  --module_file=/data/local/tmp/mlp_apply.vmfb \
+  --entry_function=main \
+  --function_input=128xf32 \
+  --function_input=784x128xf32 \
+  --function_input=10xf32 \
+  --function_input=128x10xf32 \
+  --function_input=1x28x28x1xf32
 ```

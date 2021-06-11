@@ -9,3 +9,13 @@ func @tensorIO(%arg0 : tensor<1x1xi32>) -> tensor<1x1xi32> {
   // CHECK-NEXT: return %[[BB0]] : !hal.buffer
   return %0 : tensor<1x1xi32>
 }
+
+// -----
+
+// CHECK-LABEL: func @select(%arg0: i1, %arg1: !hal.buffer, %arg2: !hal.buffer) -> !hal.buffer
+func @select(%arg0: i1, %arg1: tensor<i32>, %arg2: tensor<i32>) -> tensor<i32> {
+  // CHECK: %[[RES:.+]] = select %arg0, %arg1, %arg2 : !hal.buffer
+  %0 = select %arg0, %arg1, %arg2 : tensor<i32>
+  // CHECK: return %[[RES]] : !hal.buffer
+  return %0 : tensor<i32>
+}

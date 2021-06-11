@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 
@@ -23,12 +15,37 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
+#include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-IREEDialect::IREEDialect(MLIRContext* context)
+// Used to control inlining behavior.
+struct IREEInlinerInterface : public DialectInlinerInterface {
+  using DialectInlinerInterface::DialectInlinerInterface;
+
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    // Sure!
+    return true;
+  }
+
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+};
+
+IREEDialect::IREEDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<IREEDialect>()) {
+  addInterfaces<IREEInlinerInterface>();
   registerTypes();
 #define GET_OP_LIST
   addOperations<
@@ -36,7 +53,7 @@ IREEDialect::IREEDialect(MLIRContext* context)
       >();
 }
 
-Type IREEDialect::parseType(DialectAsmParser& parser) const {
+Type IREEDialect::parseType(DialectAsmParser &parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
   if (spec == "variant") {
@@ -83,7 +100,7 @@ Type IREEDialect::parseType(DialectAsmParser& parser) const {
   return Type();
 }
 
-void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
+void IREEDialect::printType(Type type, DialectAsmPrinter &os) const {
   if (type.isa<IREE::VariantType>()) {
     os << "variant";
   } else if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {

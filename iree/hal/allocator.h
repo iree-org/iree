@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_ALLOCATOR_H_
 #define IREE_HAL_ALLOCATOR_H_
@@ -31,7 +23,7 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // A bitfield indicating compatible behavior for buffers in an allocator.
-enum iree_hal_buffer_compatibility_e {
+enum iree_hal_buffer_compatibility_bits_t {
   // Indicates (in the absence of other bits) the buffer is not compatible with
   // the allocator or device at all. Any attempts to use the buffer for any
   // usage will fail. This will happen if the buffer is device-local to another
@@ -65,18 +57,17 @@ typedef uint32_t iree_hal_buffer_compatibility_t;
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_allocator_s iree_hal_allocator_t;
+typedef struct iree_hal_allocator_t iree_hal_allocator_t;
 
 // Retains the given |allocator| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
+IREE_API_EXPORT void iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
 
 // Releases the given |allocator| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_allocator_release(iree_hal_allocator_t* allocator);
+IREE_API_EXPORT void iree_hal_allocator_release(
+    iree_hal_allocator_t* allocator);
 
 // Returns the host allocator used for allocating host objects.
-IREE_API_EXPORT iree_allocator_t IREE_API_CALL
+IREE_API_EXPORT iree_allocator_t
 iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator);
 
 // Returns a bitmask indicating what operations with buffers of the given type
@@ -110,7 +101,7 @@ iree_hal_allocator_query_buffer_compatibility(
 // Fails if it is not possible to allocate and satisfy all placements for the
 // requested |allowed_usage|.
 // |out_buffer| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
     iree_hal_buffer_t** out_buffer);
@@ -129,7 +120,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
 //
 // Fails if the allocator cannot access host memory in this way.
 // |out_buffer| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
@@ -144,7 +135,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
 // used in file IO or tests). Buffers allocated with this will not be compatible
 // with real device allocators and will likely incur a copy (or failure) if
 // used.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_create_heap(
+IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
     iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator);
 
@@ -152,7 +143,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_create_heap(
 // iree_hal_allocator_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_allocator_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 
@@ -179,8 +170,8 @@ typedef struct {
       iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
 } iree_hal_allocator_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_allocator_destroy(iree_hal_allocator_t* allocator);
+IREE_API_EXPORT void iree_hal_allocator_destroy(
+    iree_hal_allocator_t* allocator);
 
 #ifdef __cplusplus
 }  // extern "C"

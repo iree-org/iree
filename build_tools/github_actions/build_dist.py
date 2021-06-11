@@ -1,16 +1,8 @@
-# Copyright 2021 Google LLC
+# Copyright 2021 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Builds the main distribution package.
 
 This script runs as the CIBW_BEFORE_BUILD command within cibuildwheel:
@@ -77,6 +69,7 @@ THIS_DIR = os.path.realpath(os.path.dirname(__file__))
 CMAKE_CI_SCRIPT = os.path.join(THIS_DIR, "cmake_ci.py")
 BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "bindings", "python",
                                       "build_requirements.txt")
+CI_REQUIREMENTS_TXT = os.path.join(THIS_DIR, "ci_requirements.txt")
 CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
 INSTALL_TARGET = ("install"
                   if platform.system() == "Windows" else "install/strip")
@@ -111,6 +104,8 @@ def install_python_requirements():
   print("Installing python requirements...")
   subprocess.check_call(
       [sys.executable, "-m", "pip", "install", "-r", BUILD_REQUIREMENTS_TXT])
+  subprocess.check_call(
+      [sys.executable, "-m", "pip", "install", "-r", CI_REQUIREMENTS_TXT])
 
 
 def configure_bazel():
@@ -333,7 +328,7 @@ def build_py_tf_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building TF import tool with Bazel ***")
-  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-tf-import")
+  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-tf")
 
   # CMake configure.
   print("*** Configuring ***")

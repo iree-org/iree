@@ -1,20 +1,15 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/task/pool.h"
 
+#include <stdint.h>
+
 #include "iree/base/internal/math.h"
+#include "iree/base/tracing.h"
 
 // Minimum byte size of a block in bytes, including the tasks as well as the
 // allocation header. This is here to allow us to reduce the number of times
@@ -56,11 +51,11 @@ static iree_status_t iree_task_pool_grow(iree_task_pool_t* pool,
   // Note that we pad out our header to iree_max_align_t bytes so that all tasks
   // are aligned on the same boundaries as required by atomic operations.
   iree_host_size_t header_size =
-      iree_math_align(sizeof(iree_task_allocation_header_t), iree_max_align_t);
+      iree_host_align(sizeof(iree_task_allocation_header_t), iree_max_align_t);
   iree_host_size_t pow2_block_size = iree_math_round_up_to_pow2_u64(
       header_size + minimum_capacity * pool->task_size);
   iree_host_size_t aligned_block_size =
-      iree_math_align(pow2_block_size, IREE_TASK_POOL_BLOCK_ALIGNMENT);
+      iree_host_align(pow2_block_size, IREE_TASK_POOL_BLOCK_ALIGNMENT);
   if (aligned_block_size < IREE_TASK_POOL_MIN_BLOCK_SIZE) {
     aligned_block_size = IREE_TASK_POOL_MIN_BLOCK_SIZE;
   }

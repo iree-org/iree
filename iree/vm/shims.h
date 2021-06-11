@@ -1,23 +1,20 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_SHIMS_H_
 #define IREE_VM_SHIMS_H_
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/base/attributes.h"
 #include "iree/base/target_platform.h"
+#include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 #include "iree/vm/value.h"
@@ -36,7 +33,7 @@
                               IREE_VM_ABI_TYPE_NAME(types), body)
 
 #define IREE_VM_ABI_FIXED_STRUCT_IMPL(types, struct_type, body)        \
-  typedef struct iree_vm_abi_##types##_s body IREE_ATTRIBUTE_PACKED    \
+  typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED    \
       struct_type;                                                     \
   static inline struct_type* iree_vm_abi_##types##_checked_deref(      \
       iree_byte_span_t buffer) {                                       \
@@ -51,7 +48,7 @@
 #define IREE_VM_ABI_FIELD_SIZE(type, member) sizeof(((type*)NULL)->member)
 #define IREE_VM_ABI_VLA_STRUCT_IMPL(types, vla_count, vla_field, struct_type, \
                                     body)                                     \
-  typedef struct iree_vm_abi_##types##_s body IREE_ATTRIBUTE_PACKED           \
+  typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED           \
       struct_type;                                                            \
   static inline struct_type* iree_vm_abi_##types##_checked_deref(             \
       iree_byte_span_t buffer) {                                              \
@@ -156,7 +153,7 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
 #endif  // IREE_COMPILER_MSVC
 
 // Special case for void (empty args/rets) as C structs can't have a 0 length.
-typedef struct {
+typedef struct iree_vm_abi_v_t {
   int unused;
 } iree_vm_abi_v_t;
 static inline iree_vm_abi_v_t* iree_vm_abi_v_checked_deref(
@@ -216,6 +213,12 @@ IREE_VM_ABI_FIXED_STRUCT(rii, {
   iree_vm_ref_t r0;
   int32_t i1;
   int32_t i2;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(rif, {
+  iree_vm_ref_t r0;
+  int32_t i1;
+  float f2;
 });
 
 IREE_VM_ABI_FIXED_STRUCT(riii, {
@@ -375,6 +378,7 @@ IREE_VM_ABI_DECLARE_SHIM(r, v);
 IREE_VM_ABI_DECLARE_SHIM(rCiD, i);
 IREE_VM_ABI_DECLARE_SHIM(rCrD, v);
 IREE_VM_ABI_DECLARE_SHIM(ri, i);
+IREE_VM_ABI_DECLARE_SHIM(ri, f);
 IREE_VM_ABI_DECLARE_SHIM(ri, r);
 IREE_VM_ABI_DECLARE_SHIM(ri, v);
 IREE_VM_ABI_DECLARE_SHIM(riCiD, r);
@@ -382,6 +386,8 @@ IREE_VM_ABI_DECLARE_SHIM(riCiiiD, r);
 IREE_VM_ABI_DECLARE_SHIM(riCrD, r);
 IREE_VM_ABI_DECLARE_SHIM(rii, i);
 IREE_VM_ABI_DECLARE_SHIM(rii, r);
+IREE_VM_ABI_DECLARE_SHIM(rii, v);
+IREE_VM_ABI_DECLARE_SHIM(rif, v);
 IREE_VM_ABI_DECLARE_SHIM(riii, r);
 IREE_VM_ABI_DECLARE_SHIM(riii, v);
 IREE_VM_ABI_DECLARE_SHIM(riirii, r);

@@ -1,23 +1,19 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
+#include "iree/hal/buffer.h"
 #include "iree/hal/buffer_heap_impl.h"
-#include "iree/hal/detail.h"
+#include "iree/hal/resource.h"
 
-typedef struct iree_hal_heap_allocator_s {
+typedef struct iree_hal_heap_allocator_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_string_view_t identifier;
@@ -25,7 +21,7 @@ typedef struct iree_hal_heap_allocator_s {
 
 static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable;
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_create_heap(
+IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
     iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(out_allocator);

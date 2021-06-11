@@ -16,10 +16,13 @@ iree_lit_test_suite(
   SRCS
     "affinemin_canonicalization.mlir"
     "canonicalize_interface_load_store.mlir"
+    "f32Tof16.mlir"
     "flatten_memref_subspan.mlir"
+    "fold_tensor_extract_op.mlir"
+    "forop_canonicalization.mlir"
     "linalg_bufferize.mlir"
-    "linalg_rewrite_destructive_updates.mlir"
     "remove_dead_allocs.mlir"
+    "transpose_canonicalization.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

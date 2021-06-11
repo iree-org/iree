@@ -1,20 +1,12 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 """Rules for compiling IREE executables, modules, and archives."""
 
-load("//build_tools/embed_data:build_defs.bzl", "c_embed_data", "cc_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 # TODO(benvanik): port to a full starlark rule, document, etc.
 def iree_bytecode_module(
@@ -22,8 +14,7 @@ def iree_bytecode_module(
         src,
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
-        cc_namespace = None,
-        c_output = False,
+        c_identifier = "",
         **kwargs):
     native.genrule(
         name = name,
@@ -45,25 +36,11 @@ def iree_bytecode_module(
         **kwargs
     )
 
-    # Embed the module for use in C++. This avoids the need for file IO in
-    # tests and samples that would otherwise complicate execution/porting.
-    if cc_namespace:
-        cc_embed_data(
-            name = "%s_cc" % (name),
-            identifier = name,
-            srcs = ["%s.vmfb" % (name)],
-            cc_file_output = "%s.cc" % (name),
-            h_file_output = "%s.h" % (name),
-            cpp_namespace = cc_namespace,
-            flatten = True,
-            **kwargs
-        )
-
     # Embed the module for use in C.
-    if c_output:
+    if c_identifier:
         c_embed_data(
             name = "%s_c" % (name),
-            identifier = "%s_c" % (name),
+            identifier = c_identifier,
             srcs = ["%s.vmfb" % (name)],
             c_file_output = "%s_c.c" % (name),
             h_file_output = "%s_c.h" % (name),

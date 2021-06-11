@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
 
@@ -188,7 +180,12 @@ function(external_cc_library)
   endif()
 
   add_library(${_RULE_PACKAGE}::${_RULE_NAME} ALIAS ${_NAME})
-  if(${_RULE_PACKAGE} STREQUAL ${_RULE_NAME})
+  # If the library name matches the final component of the package then treat it
+  # as a default. For example, 'foo::bar' library 'bar' would end up as
+  # 'foo::bar'.
+  string(REGEX REPLACE "^.*::" "" _PACKAGE_DIR ${_RULE_PACKAGE})
+  if(${_PACKAGE_DIR} STREQUAL ${_RULE_NAME})
+
     add_library(${_RULE_PACKAGE} ALIAS ${_NAME})
   endif()
 endfunction()

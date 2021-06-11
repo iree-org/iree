@@ -1,20 +1,15 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/vm/bytecode_module.h"
 
-#include "iree/base/alignment.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
@@ -50,6 +45,14 @@ static bool iree_vm_bytecode_module_resolve_type(
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i64")) == 0) {
     out_type->value_type = IREE_VM_VALUE_TYPE_I64;
+    return true;
+  } else if (iree_vm_flatbuffer_strcmp(full_name,
+                                       iree_make_cstring_view("f32")) == 0) {
+    out_type->value_type = IREE_VM_VALUE_TYPE_F32;
+    return true;
+  } else if (iree_vm_flatbuffer_strcmp(full_name,
+                                       iree_make_cstring_view("f64")) == 0) {
+    out_type->value_type = IREE_VM_VALUE_TYPE_F64;
     return true;
   } else if (iree_vm_flatbuffer_strcmp(
                  full_name, iree_make_cstring_view("!vm.opaque")) == 0) {
@@ -515,32 +518,32 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
 
   uint8_t* base_ptr = (uint8_t*)state;
   iree_host_size_t offset =
-      iree_align(sizeof(iree_vm_bytecode_module_state_t), 16);
+      iree_host_align(sizeof(iree_vm_bytecode_module_state_t), 16);
 
   if (state) {
     state->rwdata_storage =
         iree_make_byte_span(base_ptr + offset, rwdata_storage_capacity);
   }
-  offset += iree_align(rwdata_storage_capacity, 16);
+  offset += iree_host_align(rwdata_storage_capacity, 16);
 
   if (state) {
     state->global_ref_count = global_ref_count;
     state->global_ref_table = (iree_vm_ref_t*)(base_ptr + offset);
   }
-  offset += iree_align(global_ref_count * sizeof(iree_vm_ref_t), 16);
+  offset += iree_host_align(global_ref_count * sizeof(iree_vm_ref_t), 16);
 
   if (state) {
     state->rodata_ref_count = rodata_ref_count;
-    state->rodata_ref_table = (iree_vm_ro_byte_buffer_t*)(base_ptr + offset);
+    state->rodata_ref_table = (iree_vm_buffer_t*)(base_ptr + offset);
   }
-  offset += iree_align(rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_t), 16);
+  offset += iree_host_align(rodata_ref_count * sizeof(iree_vm_buffer_t), 16);
 
   if (state) {
     state->import_count = import_function_count;
     state->import_table = (iree_vm_bytecode_import_t*)(base_ptr + offset);
   }
   offset +=
-      iree_align(import_function_count * sizeof(*state->import_table), 16);
+      iree_host_align(import_function_count * sizeof(*state->import_table), 16);
 
   return offset;
 }
@@ -575,12 +578,13 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   for (int i = 0; i < state->rodata_ref_count; ++i) {
     iree_vm_RodataSegmentDef_table_t segment =
         iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
-    iree_vm_ro_byte_buffer_t* ref = &state->rodata_ref_table[i];
-    iree_atomic_ref_count_init(&ref->ref_object.counter);
-    ref->origin = IREE_VM_BYTE_BUFFER_ORIGIN_MODULE;
-    ref->data.data = iree_vm_RodataSegmentDef_data(segment);
-    ref->data.data_length =
-        flatbuffers_uint8_vec_len(iree_vm_RodataSegmentDef_data(segment));
+    iree_vm_buffer_t* ref = &state->rodata_ref_table[i];
+    iree_vm_buffer_initialize(
+        IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE,
+        iree_make_byte_span(
+            (uint8_t*)iree_vm_RodataSegmentDef_data(segment),
+            flatbuffers_uint8_vec_len(iree_vm_RodataSegmentDef_data(segment))),
+        iree_allocator_null(), ref);
   }
 
   *out_module_state = (iree_vm_module_state_t*)state;
@@ -599,6 +603,12 @@ static void iree_vm_bytecode_module_free_state(
   // Release remaining global references.
   for (int i = 0; i < state->global_ref_count; ++i) {
     iree_vm_ref_release(&state->global_ref_table[i]);
+  }
+
+  // Ensure all rodata references are unused and deinitialized.
+  for (int i = 0; i < state->rodata_ref_count; ++i) {
+    iree_vm_buffer_t* ref = &state->rodata_ref_table[i];
+    iree_vm_buffer_deinitialize(ref);
   }
 
   iree_allocator_free(state->allocator, module_state);
@@ -717,7 +727,7 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
     iree_const_byte_span_t flatbuffer_data,
     iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
     iree_vm_module_t** out_module) {

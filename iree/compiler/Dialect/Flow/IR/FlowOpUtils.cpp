@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 
@@ -160,9 +152,7 @@ static bool shouldInlineIntoClosure(Value value) {
   } else if (auto variableLoadOp =
                  dyn_cast<IREE::Flow::VariableLoadOp>(definingOp)) {
     // If the variable is immutable then we can inline the reference to it.
-    auto variableOp =
-        SymbolTable::lookupNearestSymbolFrom<IREE::Flow::VariableOp>(
-            definingOp, variableLoadOp.variable());
+    auto variableOp = variableLoadOp.getLoadedVariable();
     return !variableOp.is_mutable();
   }
   return false;
@@ -176,8 +166,10 @@ static bool shouldInlineIntoClosure(Value value) {
 // multiple times. That's fine, as anything we can inline here is something we
 // should also be able to CSE and that happens later on anyway.
 static void inlineClosureOperands(ClosureOpInterface &closureOp,
-                                  Block &entryBlock) {
-  auto builder = OpBuilder::atBlockBegin(&entryBlock);
+                                  Block &entryBlock,
+                                  PatternRewriter &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointToStart(&entryBlock);
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto outerValue = opArg.value();
     auto *sourceOp = outerValue.getDefiningOp();
@@ -195,7 +187,7 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
     if (closureOp.canClosureContainOp(sourceOp) &&
         shouldInlineIntoClosure(outerValue)) {
       // Clone the op (with regions).
-      auto *clonedOp = builder.clone(*sourceOp);
+      auto *clonedOp = rewriter.clone(*sourceOp);
 
       // Ensure we are using the right result in the case of ops with multiple
       // results. If we only end up using a single result then canonicalization
@@ -212,8 +204,8 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
   }
 }
 
-bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
-                           PatternRewriter *rewriter) {
+LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
+                                    PatternRewriter &rewriter) {
   // NOTE: the block is transferred to the new op; we can update it in place.
   Block &entryBlock = closureOp.getClosureBodyRegion().front();
 
@@ -222,7 +214,7 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
   // then elide below. When we do inline things the operands will be changed
   // such that the following work is guaranteed to happen and thus our op will
   // be rebuilt.
-  inlineClosureOperands(closureOp, entryBlock);
+  inlineClosureOperands(closureOp, entryBlock, rewriter);
 
   // Build data structure for unused operand elision.
   SmallVector<unsigned, 4> elidedOperands;
@@ -252,7 +244,10 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
   SmallVector<Value, 4> preservedResults;
   SmallVector<unsigned, 4> elidedResults;
   for (auto result : llvm::enumerate(closureOp.getClosureResults())) {
-    if (result.value().use_empty()) {
+    // You can drop a result if the use is empty, and that it is only written to
+    // within the dispatch region.
+    if (result.value().use_empty() &&
+        !closureOp.isOutputReadWithinRegion(result.index())) {
       elidedResults.push_back(result.index());
     } else {
       preservedResults.push_back(result.value());
@@ -261,18 +256,13 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
 
   if (elidedOperands.empty() && elidedResults.empty()) {
     // No optimization required.
-    return false;
+    return failure();
   }
 
   if (elidedResults.size() == closureOp.getClosureResults().size()) {
     // The op is completely unused - delete it.
-    if (rewriter) {
-      rewriter->eraseOp(closureOp);
-    } else {
-      closureOp.erase();
-    }
-    closureOp = {};
-    return true;
+    rewriter.eraseOp(closureOp);
+    return success();
   }
 
   // Replace duplicate block arguments.
@@ -290,14 +280,8 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
   }
 
   // Clone the op with the elidable operands and results removed.
-  OpBuilder builder(closureOp);
   auto newOp = closureOp.cloneReplacementExcludingOperandsAndResults(
-      elidedOperands, elidedResults);
-  if (rewriter) {
-    rewriter->insert(newOp);
-  } else {
-    builder.insert(newOp);
-  }
+      elidedOperands, elidedResults, rewriter);
 
   // Replace original uses of the closure results.
   for (auto oldNewResult :
@@ -306,14 +290,9 @@ bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
   }
 
   // Erase the original op.
-  if (rewriter) {
-    rewriter->eraseOp(closureOp);
-  } else {
-    closureOp.erase();
-  }
+  rewriter.eraseOp(closureOp);
 
-  closureOp = newOp;
-  return true;
+  return success();
 }
 
 }  // namespace Flow

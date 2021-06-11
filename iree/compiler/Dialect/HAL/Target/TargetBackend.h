@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_TARGETBACKEND_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_TARGETBACKEND_H_
@@ -125,7 +117,7 @@ class TargetBackend {
   // Returns a name for the backend used to differentiate between other targets.
   virtual std::string name() const = 0;
   // Returns a filter pattern for the backend as expected to be matched with a
-  // call to matchPattern. For example, 'vulkan-v1.1' or 'vmla*'.
+  // call to matchPattern. For example, 'vulkan-v1.1' or 'vmvx*'.
   virtual std::string filter_pattern() const = 0;
 
   // Queries for compile-time known buffer constraints.
@@ -245,8 +237,7 @@ class TargetBackend {
   //     hal.executable.target @target, filter="target-backend" {
   //       hal.executable.entry_point @main attributes {
   //         interface = @main_io,
-  //         ordinal = 0 : index,
-  //         signature = (tensor<4xf32>) -> tensor<4xf32>
+  //         ordinal = 0 : index
   //       }
   //       module { ... }
   //     }

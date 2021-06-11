@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # pylint: disable=missing-docstring
 """Updates LLVM-dependent submodules based on the current LLVM commit.
@@ -21,7 +13,7 @@ third_party/mlir-hlo submodules to commits that match the LLVM commit in the
 third_party/llvm-project submodule. We have special conditions around these
 submodules since they are synced as part of the integration of LLVM into
 Google's source repository. See
-https://google.github.io/iree/developing-iree/repository-management#the-special-relationship-with-llvm-and-tensorflow.
+https://github.com/google/iree/blob/main/docs/developers/developing_iree/repository_management.md#the-special-relationship-with-llvm-and-tensorflow.
 
 Typical usage:
   Syntax: ./scripts/git/update_to_llvm_syncpoint.py

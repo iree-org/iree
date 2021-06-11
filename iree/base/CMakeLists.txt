@@ -1,26 +1,25 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    api
+    base
   HDRS
     "api.h"
   SRCS
+    "allocator.c"
+    "allocator.h"
     "api.c"
+    "status.c"
+    "string_view.c"
+    "string_view.h"
+    "time.c"
+    "time.h"
   DEPS
     ::core_headers
     ::tracing
@@ -33,7 +32,7 @@ iree_cc_library(
   HDRS
     "alignment.h"
     "attributes.h"
-    "math.h"
+    "config.h"
     "target_platform.h"
   PUBLIC
 )
@@ -48,30 +47,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    flatcc
-  HDRS
-    "flatcc.h"
-  DEPS
-    ::flatcc_dummy
-    flatcc::runtime
-  PUBLIC
-)
-
-flatbuffer_c_library(
-  NAME
-    flatcc_dummy
-  SRCS
-    "flatcc.fbs"
-  FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     logging
   HDRS
     "logging.h"
@@ -80,8 +55,7 @@ iree_cc_library(
   DEPS
     ::core_headers
     ::tracing
-    absl::flags
-    absl::str_format
+    iree::base::internal::flags
   PUBLIC
 )
 
@@ -131,93 +105,13 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
-  NAME
-    synchronization
-  HDRS
-    "synchronization.h"
-  SRCS
-    "synchronization.c"
-  DEPS
-    ::api
-    ::core_headers
-    ::tracing
-    iree::base::internal
-  PUBLIC
-)
-
-iree_cc_binary(
-  NAME
-    synchronization_benchmark
-  SRCS
-    "synchronization_benchmark.cc"
-  DEPS
-    ::synchronization
-    benchmark
-    iree::testing::benchmark_main
-  TESTONLY
-)
-
-iree_run_binary_test(
-  NAME
-    synchronization_benchmark_test
-  TEST_BINARY
-    ::synchronization_benchmark
-  ARGS
-    "--benchmark_min_time=0"
-)
-
 iree_cc_test(
   NAME
-    synchronization_test
+    string_view_test
   SRCS
-    "synchronization_test.cc"
+    "string_view_test.cc"
   DEPS
-    ::synchronization
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    threading
-  HDRS
-    "threading.h"
-  SRCS
-    "threading.c"
-    "threading_darwin.c"
-    "threading_impl.h"
-    "threading_pthreads.c"
-    "threading_win32.c"
-  DEPS
-    ::api
-    ::core_headers
-    ::synchronization
-    ::tracing
-    iree::base::internal
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    threading_benchmark
-  SRCS
-    "threading_benchmark.cc"
-  DEPS
-    ::threading
-    benchmark
-    iree::testing::benchmark_main
-)
-
-iree_cc_test(
-  NAME
-    threading_test
-  SRCS
-    "threading_impl.h"
-    "threading_test.cc"
-  DEPS
-    ::synchronization
-    ::threading
+    ::base
     iree::testing::gtest
     iree::testing::gtest_main
 )

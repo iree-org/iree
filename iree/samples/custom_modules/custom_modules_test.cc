@@ -1,26 +1,16 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Tests that our bytecode module can call through into our native module.
 
-#include "absl/strings/string_view.h"
 #include "iree/base/api.h"
-#include "iree/base/logging.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/samples/custom_modules/custom_modules_test_module.h"
+#include "iree/samples/custom_modules/custom_modules_test_module_c.h"
 #include "iree/samples/custom_modules/native_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -33,7 +23,7 @@ namespace {
 class CustomModulesTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+    IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(
         iree_hal_driver_registry_default()));
   }
 
@@ -45,7 +35,7 @@ class CustomModulesTest : public ::testing::Test {
     // TODO(benvanik): make a 'don't care' helper method.
     iree_hal_driver_t* hal_driver = nullptr;
     IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
-        iree_hal_driver_registry_default(), iree_make_cstring_view("vmla"),
+        iree_hal_driver_registry_default(), iree_make_cstring_view("vmvx"),
         iree_allocator_system(), &hal_driver));
     iree_hal_device_t* hal_device = nullptr;
     IREE_CHECK_OK(iree_hal_driver_create_default_device(
@@ -58,17 +48,15 @@ class CustomModulesTest : public ::testing::Test {
 
     IREE_CHECK_OK(iree_custom_native_module_register_types());
     IREE_CHECK_OK(iree_custom_native_module_create(iree_allocator_system(),
-                                                   &native_module_))
-        << "Native module failed to init";
+                                                   &native_module_));
 
     const auto* module_file_toc =
-        iree::samples::custom_modules::custom_modules_test_module_create();
+        iree_samples_custom_modules_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        iree_allocator_null(), iree_allocator_system(), &bytecode_module_))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {hal_module_, native_module_,
                                               bytecode_module_};
@@ -85,13 +73,11 @@ class CustomModulesTest : public ::testing::Test {
     iree_vm_instance_release(instance_);
   }
 
-  iree_vm_function_t LookupFunction(absl::string_view function_name) {
+  iree_vm_function_t LookupFunction(const char* function_name) {
     iree_vm_function_t function;
     IREE_CHECK_OK(bytecode_module_->lookup_function(
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
-        &function))
-        << "Exported function '" << function_name << "' not found";
+        iree_make_cstring_view(function_name), &function));
     return function;
   }
 

@@ -21,7 +21,7 @@ iree_cc_library(
   DEPS
     ::arch
     ::platform
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
@@ -34,7 +34,7 @@ iree_cc_test(
     "elf_module_test.cc"
   DEPS
     ::elf_module
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::hal::local::elf::testdata::simple_mul_dispatch
     iree::hal::local::executable_library
@@ -55,7 +55,7 @@ iree_cc_library(
     "arch/x86_64.c"
     "elf_types.h"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
@@ -72,7 +72,7 @@ iree_cc_library(
     "platform/linux.c"
     "platform/windows.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
   PUBLIC

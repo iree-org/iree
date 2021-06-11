@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # ***THIS FILE DOES NOT BUILD WITH BAZEL***
 #
@@ -243,48 +235,6 @@ TFLITE_FAILING = [
 ]
 
 # keep sorted
-VMLA_FAILING = [
-    "argmax",
-    "argmin",
-    "asinh",
-    "bessel_i0",
-    "bessel_i0e",
-    "bessel_i1",
-    "bessel_i1e",
-    "betainc",
-    "bincount",
-    "confusion_matrix",
-    "count_nonzero",
-    "cumprod",
-    "cumulative_logsumexp",
-    "divide",  # Failing for integer inputs because iree doesn't output 'f64'.
-    "erfinv",
-    "igamma",
-    "igammac",
-    "in_top_k",
-    "ndtri",
-    "nextafter",
-    "pow",  # Failing for integer inputs.
-    "reduce_euclidean_norm",
-    "reduce_prod",
-    "segment_max",
-    "segment_mean",
-    "segment_min",
-    "segment_prod",
-    "segment_sum",
-    "sign",
-    "sobol_sample",
-    "softsign",
-    "top_k",
-    "unsorted_segment_max",
-    "unsorted_segment_mean",
-    "unsorted_segment_min",
-    "unsorted_segment_prod",
-    "unsorted_segment_sqrt_n",
-    "unsorted_segment_sum",
-]
-
-# keep sorted
 LLVM_FAILING = [
     "acos",
     "argmax",
@@ -416,11 +366,6 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": "tflite",
         },
         {
-            # Failing on vmla.
-            "functions": VMLA_FAILING,
-            "target_backends": "iree_vmla",
-        },
-        {
             # Failing on llvm.
             "functions": LLVM_FAILING,
             "target_backends": "iree_llvmaot",
@@ -440,7 +385,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -537,90 +481,6 @@ TFLITE_FAILING_DYNAMIC = [
     "subtract",
     "tan",
     "truediv",
-    "unsorted_segment_max",
-    "unsorted_segment_mean",
-    "unsorted_segment_min",
-    "unsorted_segment_prod",
-    "unsorted_segment_sqrt_n",
-    "unsorted_segment_sum",
-    "xdivy",
-    "xlog1py",
-    "xlogy",
-    "zero_fraction",
-    "zeta",
-]
-
-# keep sorted
-VMLA_FAILING_DYNAMIC = [
-    "acos",
-    "acosh",
-    "argmax",
-    "argmin",
-    "asinh",
-    "atanh",
-    "bessel_i0",
-    "bessel_i0e",
-    "bessel_i1",
-    "bessel_i1e",
-    "betainc",
-    "bincount",
-    "confusion_matrix",
-    "count_nonzero",
-    "cumprod",
-    "cumsum",
-    "cumulative_logsumexp",
-    "digamma",
-    "divide",
-    "divide_no_nan",
-    "erfc",
-    "erfinv",
-    "expm1",
-    "floordiv",
-    "floormod",
-    "igamma",
-    "igammac",
-    "in_top_k",
-    "invert_permutation",
-    "is_non_decreasing",
-    "is_strictly_increasing",
-    "lbeta",
-    "lgamma",
-    "log1p",
-    "log_sigmoid",
-    "logical_and",
-    "logical_not",
-    "logical_or",
-    "logical_xor",
-    "mod",
-    "multiply_no_nan",
-    "ndtri",
-    "nextafter",
-    "polygamma",
-    "pow",
-    "reduce_all",
-    "reduce_any",
-    "reduce_euclidean_norm",
-    "reduce_logsumexp",
-    "reduce_max",
-    "reduce_mean",
-    "reduce_min",
-    "reduce_prod",
-    "reduce_std",
-    "reduce_sum",
-    "reduce_variance",
-    "rint",
-    "round",
-    "segment_max",
-    "segment_mean",
-    "segment_min",
-    "segment_prod",
-    "segment_sum",
-    "sign",
-    "sinh",
-    "sobol_sample",
-    "softplus",
-    "softsign",
-    "top_k",
     "unsorted_segment_max",
     "unsorted_segment_mean",
     "unsorted_segment_min",
@@ -888,11 +748,6 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": "tflite",
         },
         {
-            # Failing on vmla.
-            "functions": VMLA_FAILING_DYNAMIC,
-            "target_backends": "iree_vmla",
-        },
-        {
             # Failing on llvm.
             "functions": LLVM_FAILING_DYNAMIC,
             "target_backends": "iree_llvmaot",
@@ -912,7 +767,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
@@ -974,42 +828,6 @@ COMPLEX_FUNCTIONS = [
     "tan",
     "tanh",
     "truediv",
-    "xdivy",
-    "xlog1py",
-    "xlogy",
-    "zero_fraction",
-]
-
-# keep sorted
-VMLA_FAILING_COMPLEX = [
-    "asinh",
-    "atanh",
-    "cos",
-    "cosh",
-    "count_nonzero",
-    "cumprod",
-    "cumsum",
-    "divide",
-    "divide_no_nan",
-    "expm1",
-    "log",
-    "log1p",
-    "multiply_no_nan",
-    "negative",
-    "pow",
-    "reciprocal",
-    "reciprocal_no_nan",
-    "reduce_euclidean_norm",
-    "reduce_std",
-    "reduce_variance",
-    "rsqrt",
-    "sigmoid",
-    "sign",
-    "sin",
-    "sinh",
-    "sqrt",
-    "tan",
-    "tanh",
     "xdivy",
     "xlog1py",
     "xlogy",
@@ -1098,11 +916,6 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": "tflite",
         },
         {
-            # Failing on vmla.
-            "functions": VMLA_FAILING_COMPLEX,
-            "target_backends": "iree_vmla",
-        },
-        {
             # Failing on llvm.
             "functions": LLVM_FAILING_COMPLEX,
             "target_backends": "iree_llvmaot",
@@ -1122,7 +935,6 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],

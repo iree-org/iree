@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
 
@@ -63,11 +55,11 @@ function(iree_run_binary_test)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   iree_package_ns(_PACKAGE_NS)
-  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
+  iree_package_path(_PACKAGE_PATH)
   set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
 
+  # Replace binary passed by relative ::name with iree::package::name
   string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _TEST_BINARY_TARGET ${_RULE_TEST_BINARY})
-  string(REPLACE "::" "_" _TEST_BINARY_EXECUTABLE ${_TEST_BINARY_TARGET})
 
   if(ANDROID)
     set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
@@ -80,7 +72,7 @@ function(iree_run_binary_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_TEST_BINARY_EXECUTABLE}>"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_TEST_BINARY_TARGET}>"
         ${_RULE_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
@@ -89,7 +81,7 @@ function(iree_run_binary_test)
     set(
       _ENVIRONMENT_VARS
         TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
-        TEST_EXECUTABLE=$<TARGET_FILE:${_TEST_BINARY_EXECUTABLE}>
+        TEST_EXECUTABLE=$<TARGET_FILE:${_TEST_BINARY_TARGET}>
         TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
@@ -99,7 +91,7 @@ function(iree_run_binary_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-        "$<TARGET_FILE:${_TEST_BINARY_EXECUTABLE}>"
+        "$<TARGET_FILE:${_TEST_BINARY_TARGET}>"
         ${_RULE_ARGS}
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")

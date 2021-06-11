@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "bindings/python/iree/runtime/function_abi.h"
 
@@ -368,7 +360,7 @@ void MapBufferAttrs(Py_buffer& py_view,
 
 void PackScalar(const RawSignatureParser::Description& desc, py::handle py_arg,
                 VmVariantList& f_args) {
-  iree_vm_value value;
+  iree_vm_value_t value;
   value.type = IREE_VM_VALUE_TYPE_I32;
   switch (desc.scalar.type) {
     case AbiConstants::ScalarType::kUint8:
@@ -684,8 +676,8 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
                 desc.scalar.type)]);
         iree_hal_buffer_view_t* buffer_view;
         CheckApiStatus(
-            iree_hal_buffer_view_create(raw_buffer, element_type, dims.data(),
-                                        dims.size(), &buffer_view),
+            iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
+                                        element_type, &buffer_view),
             "Error allocating buffer_view");
         iree_hal_buffer_release(raw_buffer);
         iree_vm_ref_t buffer_view_ref =
@@ -772,8 +764,8 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* buffer_view;
   CheckApiStatus(
-      iree_hal_buffer_view_create(raw_buffer, element_type, dims.data(),
-                                  dims.size(), &buffer_view),
+      iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
+                                  element_type, &buffer_view),
       "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);

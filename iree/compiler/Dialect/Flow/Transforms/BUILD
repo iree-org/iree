@@ -1,17 +1,10 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
@@ -20,49 +13,61 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["-gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    td_srcs = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
 cc_library(
     name = "Transforms",
     srcs = [
         "ConvertToFlowTensorOps.cpp",
         "DeduplicateExecutables.cpp",
         "DestructiveUpdateUtils.cpp",
-        "DispatchConfig.cpp",
         "DispatchLinalgOnTensors.cpp",
-        "DispatchabilityAnalysis.cpp",
         "ExpandVariableDynamicDims.cpp",
         "ExportBenchmarkFuncs.cpp",
-        "FoldCompatibleDispatchRegions.cpp",
         "FormStreams.cpp",
         "HLOToHLOPreprocessing.cpp",
         "HoistUnstreamableOps.cpp",
-        "IdentifyDispatchRegions2.cpp",
         "InjectDispatchTracing.cpp",
         "LegalizeInputTypes.cpp",
         "OutlineDispatchRegions.cpp",
-        "OutlineDispatchRegions2.cpp",
         "OutlineLargeConstants.cpp",
+        "PassDetail.h",
         "Passes.cpp",
-        "PrePostPartitioningConversion.cpp",
+        "PromoteI1ToI8Pass.cpp",
+        "PromoteTensorLoads.cpp",
         "StripAndSplatConstantVariables.cpp",
+        "VerifyCompilerInputLegality.cpp",
     ],
     hdrs = [
         "DestructiveUpdateUtils.h",
-        "DispatchConfig.h",
         "Passes.h",
+        "Passes.h.inc",
     ],
     deps = [
-        "//iree/compiler/Conversion/HLOToHLO",
-        "//iree/compiler/Conversion/HLOToLinalg:HLOToLinalgOnTensors",
+        ":PassesIncGen",
+        "//iree/compiler/Conversion:PassHeaders",
+        "//iree/compiler/Conversion/Common",
+        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/LinalgToLinalg",
-        "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/Conversion",
         "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",
         "//iree/compiler/Dialect/Flow/Conversion/StandardToFlow",
         "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/Flow/Utils",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/Shape/Conversion",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/Shape/Utils:TypeConversion",
@@ -76,10 +81,12 @@ cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:Shape",
+        "@llvm-project//mlir:ShapeToStandard",
         "@llvm-project//mlir:ShapeTransforms",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToLinalg",
         "@llvm-project//mlir:TosaToSCF",
         "@llvm-project//mlir:TosaToStandard",

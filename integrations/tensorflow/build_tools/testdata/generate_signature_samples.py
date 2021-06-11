@@ -1,29 +1,21 @@
 # Lint as: python3
-# Copyright 2021 Google LLC
+# Copyright 2021 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Generates sample models for excercising various function signatures.
 
 Usage:
   generate_signature_samples.py /tmp/sigs.sm
 
-This can then be fed into iree-tf-import to process it:
+This can then be fed into iree-import-tf to process it:
 
 Fully convert to IREE input (run all import passes):
-  iree-tf-import /tmp/sigs.sm
+  iree-import-tf /tmp/sigs.sm
 
 Import only (useful for crafting test cases for the import pipeline):
-  iree-tf-import -o /dev/null -save-temp-tf-input=- /tmp/sigs.sm
+  iree-import-tf -o /dev/null -save-temp-tf-input=- /tmp/sigs.sm
 
 Can be further lightly pre-processed via:
   | iree-tf-opt --tf-standard-pipeline

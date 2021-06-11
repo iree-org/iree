@@ -20,10 +20,12 @@ iree_cc_library(
   DEPS
     absl::span
     absl::strings
+    iree::base
     iree::base::internal::file_io
-    iree::base::signature_parser
+    iree::base::logging
     iree::base::status
-    iree::hal::api
+    iree::base::tracing
+    iree::hal
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
@@ -39,13 +41,31 @@ iree_cc_test(
   DEPS
     ::vm_util
     absl::strings
-    iree::base::api
-    iree::hal::api
-    iree::hal::vmla::registration
+    iree::base
+    iree::hal
+    iree::hal::vmvx::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
+    iree::vm::cc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# image utility library based on stb_image.h in https://github.com/nothings/stb
+
+iree_cc_library(
+  NAME
+    image_util
+  HDRS
+    "image_util.h"
+  SRCS
+    "image_util.c"
+  DEPS
+    iree::base
+    iree::base::tracing
+    iree::hal
+    stblib::stb_image
+  PUBLIC
+)

@@ -105,3 +105,44 @@ func @dynamicUpdateSliceImmutability(
   // CHECK: return %[[RET]]
   return %ret : tensor<2x4xi32>
 }
+
+// -----
+
+// Testing inserted clones: a clone here is required as we cannot update %_large_const in-place.
+
+// CHECK-LABEL: func @insertCloneForUpdatedConstant
+func @insertCloneForUpdatedConstant(%input: tensor<2x2xi32>) -> tensor<4x4xi32> {
+  %4 = flow.ex.stream.fragment(%input) : (tensor<2x2xi32>) -> tensor<4x4xi32> =
+      (%arg0: tensor<2x2xi32>) -> tensor<4x4xi32> {
+    %c4 = constant 4 : index
+    %c1 = constant 1 : index
+    // CHECK: %[[LOAD:.+]] = flow.variable.load @_large_const
+    %5 = flow.variable.load @_large_const : tensor<4x4xi32>
+    // CHECK: %[[CLONE:.+]] = flow.tensor.clone %[[LOAD]]
+    // CHECK: flow.dispatch @pad_dispatch::@pad_dispatch[{{.+}}](%{{.+}}, %[[CLONE]])
+    %6 = flow.dispatch @pad_dispatch::@pad_dispatch[%c4, %c4, %c1](%arg0, %5) : (tensor<2x2xi32>, tensor<4x4xi32>) -> %5
+    flow.return %6 : tensor<4x4xi32>
+  }
+  return %4 : tensor<4x4xi32>
+}
+
+flow.variable @_large_const dense<0> : tensor<4x4xi32> attributes {noinline, sym_visibility = "private"}
+
+// -----
+
+// CHECK-LABEL: func @insertCloneForUpdatedConstant
+func @insertCloneForUpdatedConstant(%input: tensor<2xi32>) -> tensor<7xi32> {
+  %4 = flow.ex.stream.fragment(%input) : (tensor<2xi32>) -> tensor<7xi32> =
+      (%arg0: tensor<2xi32>) -> tensor<7xi32> {
+    %c3 = constant 3 : index
+    // CHECK: %[[LOAD:.+]] = flow.variable.load @_large_const
+    %5 = flow.variable.load @_large_const : tensor<7xi32>
+    // CHECK: %[[CLONE:.+]] = flow.tensor.clone %[[LOAD]]
+    // CHECK: flow.tensor.update %{{.+}}, %[[CLONE]]
+    %6 = flow.tensor.update %arg0, %5[%c3] : tensor<2xi32> -> tensor<7xi32>
+    flow.return %6 : tensor<7xi32>
+  }
+  return %4 : tensor<7xi32>
+}
+
+flow.variable @_large_const dense<0> : tensor<7xi32> attributes {noinline, sym_visibility = "private"}

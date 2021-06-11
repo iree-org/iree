@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
 include(iree_installed_test)
@@ -54,15 +46,16 @@ function(iree_lit_test)
     return()
   endif()
 
+  iree_package_ns(_PACKAGE_NS)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   get_filename_component(_TEST_FILE_PATH ${_RULE_TEST_FILE} ABSOLUTE)
 
+  list(TRANSFORM _RULE_DATA REPLACE "^::" "${_PACKAGE_NS}::")
   set(_DATA_DEP_PATHS)
   foreach(_DATA_DEP ${_RULE_DATA})
-    string(REPLACE "::" "_" _DATA_DEP_NAME ${_DATA_DEP})
-    list(APPEND _DATA_DEP_PATHS $<TARGET_FILE:${_DATA_DEP_NAME}>)
+    list(APPEND _DATA_DEP_PATHS $<TARGET_FILE:${_DATA_DEP}>)
   endforeach(_DATA_DEP)
 
   iree_package_ns(_PACKAGE_NS)

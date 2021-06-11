@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -115,7 +107,7 @@ class CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
                                       op.getOperation()->getAttrDictionary());
     rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
         op, adaptor.condition(), op.trueDest(), adaptor.trueDestOperands(),
-        op.falseDest(), op.falseDestOperands());
+        op.falseDest(), adaptor.falseDestOperands());
     return success();
   }
 };
@@ -132,6 +124,21 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   }
 };
 
+class SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::SelectOp selectOp, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    mlir::SelectOp::Adaptor adaptor(operands);
+    rewriter.replaceOpWithNewOp<mlir::SelectOp>(selectOp, adaptor.condition(),
+                                                adaptor.true_value(),
+                                                adaptor.false_value());
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateStandardStructuralToHALPatterns(MLIRContext *context,
@@ -139,7 +146,8 @@ void populateStandardStructuralToHALPatterns(MLIRContext *context,
                                              TypeConverter &converter) {
   patterns
       .insert<FuncOpSignatureConversion, CallOpConversion, BranchOpConversion,
-              CondBranchOpConversion, ReturnOpConversion>(converter, context);
+              CondBranchOpConversion, ReturnOpConversion, SelectOpConversion>(
+          converter, context);
 }
 
 }  // namespace iree_compiler

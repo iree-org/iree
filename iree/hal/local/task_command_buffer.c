@@ -1,23 +1,23 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/local/task_command_buffer.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_layout.h"
+#include "iree/task/affinity_set.h"
 #include "iree/task/list.h"
 #include "iree/task/submission.h"
 #include "iree/task/task.h"
@@ -34,10 +34,10 @@
 // additional allocations required during recording or execution. That means our
 // command buffer here is essentially just a builder for the task system types
 // and manager of the lifetime of the tasks.
-typedef struct {
+typedef struct iree_hal_task_command_buffer_t {
   iree_hal_resource_t resource;
+  iree_allocator_t host_allocator;
 
-  iree_hal_device_t* device;
   iree_task_scope_t* scope;
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
@@ -105,13 +105,11 @@ static iree_hal_task_command_buffer_t* iree_hal_task_command_buffer_cast(
 }
 
 iree_status_t iree_hal_task_command_buffer_create(
-    iree_hal_device_t* device, iree_task_scope_t* scope,
-    iree_hal_command_buffer_mode_t mode,
+    iree_task_scope_t* scope, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
-    iree_arena_block_pool_t* block_pool,
+    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
-  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
@@ -131,13 +129,12 @@ iree_status_t iree_hal_task_command_buffer_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_task_command_buffer_t* command_buffer = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(iree_hal_device_host_allocator(device),
-                            sizeof(*command_buffer), (void**)&command_buffer);
+  iree_status_t status = iree_allocator_malloc(
+      host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_task_command_buffer_vtable,
                                  &command_buffer->resource);
-    command_buffer->device = device;
+    command_buffer->host_allocator = host_allocator;
     command_buffer->scope = scope;
     command_buffer->mode = mode;
     command_buffer->allowed_categories = command_categories;
@@ -165,8 +162,7 @@ static void iree_hal_task_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
-  iree_allocator_t host_allocator =
-      iree_hal_device_host_allocator(command_buffer->device);
+  iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_task_command_buffer_reset(command_buffer);
@@ -460,7 +456,7 @@ static iree_status_t iree_hal_task_command_buffer_discard_buffer(
 // We'd want to do some measurement for when it's worth it; filling a 200KB
 // buffer: maybe not, filling a 200MB buffer: yeah.
 
-typedef struct {
+typedef struct iree_hal_cmd_fill_buffer_t {
   iree_task_call_t task;
   iree_hal_buffer_t* target_buffer;
   iree_device_size_t target_offset;
@@ -512,7 +508,7 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
 // iree_hal_command_buffer_update_buffer
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_cmd_update_buffer_t {
   iree_task_call_t task;
   iree_hal_buffer_t* target_buffer;
   iree_device_size_t target_offset;
@@ -568,7 +564,7 @@ static iree_status_t iree_hal_task_command_buffer_update_buffer(
 // We'd want to do some measurement for when it's worth it; copying a 200KB
 // buffer: maybe not, copying a 200MB buffer: yeah.
 
-typedef struct {
+typedef struct iree_hal_cmd_copy_buffer_t {
   iree_task_call_t task;
   iree_hal_buffer_t* source_buffer;
   iree_device_size_t source_offset;
@@ -708,7 +704,7 @@ static iree_status_t iree_hal_task_command_buffer_bind_descriptor_set(
 // iree_hal_command_buffer_dispatch
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_cmd_dispatch_t {
   iree_task_dispatch_t task;
   iree_hal_local_executable_t* executable;
   int32_t ordinal;

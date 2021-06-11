@@ -1,34 +1,28 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Tests that our bytecode module can call through into our native module.
 
-#include "absl/strings/string_view.h"
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
 #include "absl/types/span.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
-#include "third_party/half/half.hpp"
 
 namespace iree {
 namespace {
@@ -36,14 +30,14 @@ namespace {
 class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+    IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(
         iree_hal_driver_registry_default()));
     // TODO(benvanik): move to instance-based registration.
     IREE_ASSERT_OK(iree_hal_module_register_types());
 
     iree_hal_driver_t* hal_driver = nullptr;
     IREE_ASSERT_OK(iree_hal_driver_registry_try_create_by_name(
-        iree_hal_driver_registry_default(), iree_make_cstring_view("vmla"),
+        iree_hal_driver_registry_default(), iree_make_cstring_view("vmvx"),
         iree_allocator_system(), &hal_driver));
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
@@ -97,7 +91,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(
         buffer.get(), 0, contents.data(), contents.size() * sizeof(int32_t)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_SINT_32, shape.data(), shape.size(),
+        buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_SINT_32,
         &*out_buffer_view));
   }
 
@@ -120,8 +114,8 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(
         buffer.get(), 0, contents.data(), contents.size() * sizeof(uint16_t)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_FLOAT_16, shape.data(),
-        shape.size(), &*out_buffer_view));
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_16, &*out_buffer_view));
   }
 
   void CreateFloat32BufferView(absl::Span<const float> contents,
@@ -142,8 +136,8 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer.get(), 0, contents.data(),
                                               contents.size() * sizeof(float)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape.data(),
-        shape.size(), &*out_buffer_view));
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, &*out_buffer_view));
   }
 
   void CreateFloat64BufferView(absl::Span<const double> contents,
@@ -164,38 +158,36 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(
         buffer.get(), 0, contents.data(), contents.size() * sizeof(double)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), IREE_HAL_ELEMENT_TYPE_FLOAT_64, shape.data(),
-        shape.size(), &*out_buffer_view));
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_64, &*out_buffer_view));
   }
 
-  Status Invoke(absl::string_view function_name) {
+  iree_status_t Invoke(const char* function_name) {
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(
         check_module_->lookup_function(
             check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-            iree_string_view_t{function_name.data(), function_name.size()},
-            &function),
-        "exported function '%.*s' not found", (int)function_name.size(),
-        function_name.data());
+            iree_make_cstring_view(function_name), &function),
+        "exported function '%s' not found", function_name);
     // TODO(#2075): don't directly invoke native functions like this.
     return iree_vm_invoke(context_, function,
                           /*policy=*/nullptr, inputs_.get(),
                           /*outputs=*/nullptr, iree_allocator_system());
   }
 
-  Status Invoke(absl::string_view function_name,
-                std::vector<iree_vm_value> args) {
+  iree_status_t Invoke(const char* function_name,
+                       std::vector<iree_vm_value_t> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, args.size(),
                             iree_allocator_system(), &inputs_));
-    for (iree_vm_value& arg : args) {
+    for (auto& arg : args) {
       IREE_RETURN_IF_ERROR(iree_vm_list_push_value(inputs_.get(), &arg));
     }
     return Invoke(function_name);
   }
 
-  Status Invoke(absl::string_view function_name,
-                std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
+  iree_status_t Invoke(const char* function_name,
+                       std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, args.size(),
                             iree_allocator_system(), &inputs_));
@@ -555,8 +547,7 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContents3DFullMessageFailure) {
 TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferF16Success) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
-  uint16_t contents[] = {
-      half_float::detail::float2half<std::round_to_nearest>(1.f)};
+  uint16_t contents[] = {iree_math_f32_to_f16(1.f)};
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(contents, shape, &rhs));
@@ -567,15 +558,11 @@ TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferF16Success) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
   uint16_t lhs_contents[] = {
-      half_float::detail::float2half<std::round_to_nearest>(1.0f),
-      half_float::detail::float2half<std::round_to_nearest>(1.99999f),
-      half_float::detail::float2half<std::round_to_nearest>(0.00001f),
-      half_float::detail::float2half<std::round_to_nearest>(4.0f)};
+      iree_math_f32_to_f16(1.0f), iree_math_f32_to_f16(1.99999f),
+      iree_math_f32_to_f16(0.00001f), iree_math_f32_to_f16(4.0f)};
   uint16_t rhs_contents[] = {
-      half_float::detail::float2half<std::round_to_nearest>(1.00001f),
-      half_float::detail::float2half<std::round_to_nearest>(2.0f),
-      half_float::detail::float2half<std::round_to_nearest>(0.0f),
-      half_float::detail::float2half<std::round_to_nearest>(4.0f)};
+      iree_math_f32_to_f16(1.00001f), iree_math_f32_to_f16(2.0f),
+      iree_math_f32_to_f16(0.0f), iree_math_f32_to_f16(4.0f)};
   int32_t shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(rhs_contents, shape, &rhs));
@@ -585,10 +572,8 @@ TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferF16Success) {
 TEST_F(CheckTest, ExpectAlmostEqDifferentContentsF16Failure) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
-  uint16_t lhs_contents[] = {
-      half_float::detail::float2half<std::round_to_nearest>(1.f)};
-  uint16_t rhs_contents[] = {
-      half_float::detail::float2half<std::round_to_nearest>(2.f)};
+  uint16_t lhs_contents[] = {iree_math_f32_to_f16(1.f)};
+  uint16_t rhs_contents[] = {iree_math_f32_to_f16(2.f)};
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(rhs_contents, shape, &rhs));

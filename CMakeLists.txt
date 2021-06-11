@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.13.4)
 # Do not set MSVC warning flags like /W3 by default (since 3.15):
@@ -42,10 +34,12 @@ option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
-option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects." ON)
+option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
 
+option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
@@ -64,7 +58,8 @@ set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision informat
 # Note that this is a normal CMake variable used to gate build features (not
 # a cache variable that is user-settable).
 set(IREE_ENABLE_TENSORFLOW OFF)
-if(${IREE_BUILD_TENSORFLOW_COMPILER} OR
+if(${IREE_BUILD_TENSORFLOW_ALL} OR
+   ${IREE_BUILD_TENSORFLOW_COMPILER} OR
    ${IREE_BUILD_TFLITE_COMPILER} OR
    ${IREE_BUILD_XLA_COMPILER})
   set(IREE_ENABLE_TENSORFLOW ON)
@@ -84,15 +79,15 @@ endif()
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
-option(IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER "Builds experimental Model-Builder sub-project." OFF)
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
+option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
+if(${IREE_BUILD_SAMPLES})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
 endif()
 
@@ -123,7 +118,7 @@ endif()
 set(IREE_ALL_HAL_DRIVERS
   Cuda
   DyLib
-  VMLA
+  VMVX
   Vulkan
 )
 
@@ -160,12 +155,13 @@ set(IREE_ALL_TARGET_BACKENDS
   DYLIB-LLVM-AOT
   WASM-LLVM-AOT
   Metal-SPIRV
+  ROCM
   Vulkan-SPIRV
-  VMLA
+  VMVX
 )
 
-if( IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all" )
-  set( IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS} )
+if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
+  set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
 endif()
 message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
 
@@ -219,7 +215,6 @@ include(iree_cc_library)
 include(iree_cc_test)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
-include(iree_cc_embed_data)
 include(iree_c_embed_data)
 include(iree_bytecode_module)
 include(iree_c_module)
@@ -228,6 +223,7 @@ include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_run_binary_test)
+include(iree_mlir_benchmark_suite)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -299,11 +295,6 @@ endfunction()
 function(add_iree_mlir_src_dep llvm_monorepo_path)
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
-
-  # experimental model builder uses vulkan runner.
-  if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
-    set(MLIR_VULKAN_RUNNER_ENABLED ON)
-  endif()
 
   add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
@@ -388,20 +379,17 @@ include(external_cc_library)
 include(flatbuffer_c_library)
 
 add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/cuda_headers EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/half EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
-# ruy must come after cpuinfo so it uses already-defined targets.
-add_subdirectory(third_party/ruy EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if (NOT CMAKE_CROSSCOMPILING)
@@ -431,6 +419,11 @@ endif()
 # IREE top-level targets
 #-------------------------------------------------------------------------------
 
+if(${IREE_BUILD_BENCHMARKS})
+  # Add a top-level custom target to drive generating benchmark suites.
+  add_custom_target(iree-benchmark-suites)
+endif()
+
 if(${IREE_BUILD_DOCS})
   # Add a top-level custom target to drive generating all documentation.
   # Register it to the default target given that IREE_BUILD_DOCS is explicitly
@@ -447,11 +440,21 @@ add_subdirectory(build_tools/embed_data/)
 add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/modules)
+add_subdirectory(iree/runtime)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
+
+if(${IREE_BUILD_BENCHMARKS})
+  add_subdirectory(iree/benchmark)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL_ROCM})
+  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
+  add_subdirectory(experimental/rocm)
+endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
@@ -475,10 +478,6 @@ endif()
 
 if(${IREE_BUILD_EMBEDDING_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples/simple_embedding)
-endif()
-
-if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
-  add_subdirectory(experimental/ModelBuilder)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_REMOTING})

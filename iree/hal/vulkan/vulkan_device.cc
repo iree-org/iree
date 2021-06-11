@@ -1,26 +1,17 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/vulkan/vulkan_device.h"
 
-#include <functional>
-#include <utility>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
-#include "absl/strings/str_cat.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/command_queue.h"
@@ -39,7 +30,10 @@
 #include "iree/hal/vulkan/nop_executable_cache.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/timepoint_util.h"
 #include "iree/hal/vulkan/tracing.h"
+#include "iree/hal/vulkan/util/arena.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 #include "iree/hal/vulkan/vma_allocator.h"
 
 using namespace iree::hal::vulkan;
@@ -48,8 +42,7 @@ using namespace iree::hal::vulkan;
 // iree_hal_vulkan_device_t extensibility util
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_query_extensibility_set(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     iree_hal_vulkan_features_t requested_features,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
     const char** out_string_values, iree_host_size_t* out_string_count) {
@@ -166,7 +159,7 @@ iree_hal_vulkan_query_extensibility_set(
 
 #define IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY_INDEX (-1)
 
-typedef struct {
+typedef struct iree_hal_vulkan_queue_family_info_t {
   uint32_t dispatch_index;
   iree_host_size_t dispatch_queue_count;
   uint32_t transfer_index;
@@ -327,7 +320,7 @@ static iree_status_t iree_hal_vulkan_build_queue_sets(
 // iree_hal_vulkan_device_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_vulkan_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 
@@ -380,7 +373,7 @@ static iree_hal_vulkan_device_t* iree_hal_vulkan_device_cast(
   return (iree_hal_vulkan_device_t*)base_value;
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_device_options_initialize(
+IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->flags = 0;
@@ -838,7 +831,7 @@ iree_status_t iree_hal_vulkan_device_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_wrap_device(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     iree_string_view_t identifier,
     const iree_hal_vulkan_device_options_t* options,
     const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,

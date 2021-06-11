@@ -18,14 +18,15 @@ iree_cc_library(
   SRCS
     "embedded_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
     iree::hal::local::elf::elf_module
+    iree::hal::local::executable_library
   DEFINES
-    "IREE_HAL_HAVE_ELF_LIBRARY_LOADER=1"
+    "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1"
   PUBLIC
 )
 
@@ -37,13 +38,14 @@ iree_cc_library(
   SRCS
     "legacy_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
-    iree::base::flatcc
     iree::base::internal::dynamic_library
+    iree::base::internal::flatcc
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
+    iree::hal::local::executable_library
     iree::schemas::dylib_executable_def_c_fbs
   DEFINES
     "IREE_HAL_HAVE_LEGACY_LIBRARY_LOADER=1"
@@ -58,10 +60,11 @@ iree_cc_library(
   SRCS
     "static_library_loader.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
+    iree::hal::local::executable_library
   DEFINES
     "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
   PUBLIC
@@ -75,38 +78,38 @@ iree_cc_library(
   SRCS
     "system_library_loader.c"
   DEPS
-    iree::base::api
-    iree::base::flatcc
+    iree::base
     iree::base::internal::file_io
+    iree::base::internal::flatcc
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
+    iree::hal::local::executable_library
   DEFINES
     "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
   PUBLIC
 )
 
-if(${IREE_HAL_DRIVER_VMLA})
+if(${IREE_HAL_DRIVER_VMVX})
 
 iree_cc_library(
   NAME
-    vmla_module_loader
+    vmvx_module_loader
   HDRS
-    "vmla_module_loader.h"
+    "vmvx_module_loader.h"
   SRCS
-    "vmla_module_loader.cc"
+    "vmvx_module_loader.c"
   DEPS
-    iree::base::api
-    iree::base::flatcc
+    iree::base
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::hal::local
-    iree::modules::vmla::op_module
-    iree::schemas::vmla_executable_def_c_fbs
+    iree::hal::local::executable_library
+    iree::modules::vmvx
     iree::vm
     iree::vm::bytecode_module
   DEFINES
-    "IREE_HAL_HAVE_VMLA_MODULE_LOADER=1"
+    "IREE_HAL_HAVE_VMVX_MODULE_LOADER=1"
   PUBLIC
 )
 

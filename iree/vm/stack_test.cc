@@ -1,25 +1,14 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/vm/stack.h"
-
-#include <cstring>
 
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/vm/ref.h"
 
 namespace {
 
@@ -137,8 +126,9 @@ TEST(VMStackTest, UnbalancedPop) {
   IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver,
                                   iree_allocator_system());
 
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
-                        ::iree::Status(iree_vm_stack_function_leave(stack)));
+  iree_status_t status = iree_vm_stack_function_leave(stack);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION, status);
+  iree_status_free(status);
 
   iree_vm_stack_deinitialize(stack);
 }
@@ -202,11 +192,10 @@ TEST(VMStackTest, ModuleStateQueryFailure) {
   iree_vm_function_t function_a = {MODULE_A_SENTINEL,
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 0};
   iree_vm_stack_frame_t* frame_a = nullptr;
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_INTERNAL,
-      ::iree::Status(iree_vm_stack_function_enter(
-          stack, &function_a, IREE_VM_STACK_FRAME_NATIVE, 0, NULL, &frame_a)));
-
+  iree_status_t status = iree_vm_stack_function_enter(
+      stack, &function_a, IREE_VM_STACK_FRAME_NATIVE, 0, NULL, &frame_a);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INTERNAL, status);
+  iree_status_free(status);
   iree_vm_stack_deinitialize(stack);
 }
 

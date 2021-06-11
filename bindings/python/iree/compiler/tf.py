@@ -1,19 +1,11 @@
 # Lint-as: python3
 """TensorFlow compiler interface."""
 
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
@@ -34,7 +26,7 @@ __all__ = [
     "ImportType",
 ]
 
-_TF_IMPORT_TOOL = "iree-tf-import"
+_TF_IMPORT_TOOL = "iree-import-tf"
 
 
 def is_available():
@@ -105,7 +97,7 @@ class ImportOptions(CompilerOptions):
       import_type: Type of import to perform. See ImportType enum.
       saved_model_tags: Set of tags to export (signature def/v1 saved models
         only).
-      import_extra_args: Extra arguments to pass to the iree-tf-import tool.
+      import_extra_args: Extra arguments to pass to the iree-import-tf tool.
       save_temp_tf_input: Optionally save the IR that is input to the
         TensorFlow pipeline.
       save_temp_iree_input: Optionally save the IR that is the result of the

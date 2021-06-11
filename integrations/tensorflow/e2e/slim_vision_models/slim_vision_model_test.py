@@ -1,17 +1,9 @@
 # Lint as: python3
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Test all vision models from slim lib."""
 
 import posixpath
@@ -41,8 +33,6 @@ flags.DEFINE_string(
     'tf_hub_url', None, 'Base URL for the models to test. URL at the time of '
     'writing:\nhttps://tfhub.dev/google/imagenet/')
 
-# Classification mode; 4 - is a format of the model (SavedModel TF v2).
-MODE = 'classification/4'
 LARGE_MODELS = ['amoebanet_a_n18_f448', "nasnet_large", "pnasnet_large"]
 
 
@@ -54,9 +44,19 @@ def get_input_shape():
     # from their TFHub name.
     size = int(FLAGS.model.split('_')[-1])
     return (1, size, size, 3)
+  elif FLAGS.model.startswith('mobilenet_v3_large'):
+    size = int(FLAGS.model.split('_')[-1])
+    return (1, size, size, 3)
   else:
     # Default input shape.
     return (1, 224, 224, 3)
+
+
+def get_mode(model_name):
+  if model_name.startswith('mobilenet_v3'):
+    return 'classification/5'
+  # Classification mode; 4 - is a format of the model (SavedModel TF v2).
+  return 'classification/4'
 
 
 class SlimVisionModule(tf.Module):
@@ -64,7 +64,8 @@ class SlimVisionModule(tf.Module):
   def __init__(self):
     super().__init__()
     tf_utils.set_random_seed()
-    model_path = posixpath.join(FLAGS.tf_hub_url, FLAGS.model, MODE)
+    model_path = posixpath.join(FLAGS.tf_hub_url, FLAGS.model,
+                                get_mode(FLAGS.model))
     hub_layer = hub.KerasLayer(model_path)
     self.m = tf.keras.Sequential([hub_layer])
     input_shape = get_input_shape()

@@ -1,22 +1,16 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/modules/tensorlist/native_module.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 #include "absl/types/span.h"
@@ -114,8 +108,8 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
 
       iree_hal_buffer_view_t* slice = nullptr;
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-          subview_buffer.get(), iree_hal_buffer_view_element_type(tensor.get()),
-          element_shape.data(), element_shape.size(), &slice));
+          subview_buffer.get(), element_shape.data(), element_shape.size(),
+          iree_hal_buffer_view_element_type(tensor.get()), &slice));
       list->SetItem(i, slice);
     }
     return list;
@@ -176,9 +170,9 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
       result_shape.push_back(dim);
     }
     vm::ref<iree_hal_buffer_view_t> result_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        result_buffer.get(), type, result_shape.data(), result_shape.size(),
-        &result_view));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
+                                    result_shape.size(), type, &result_view));
     return std::move(result_view);
   }
 
@@ -251,9 +245,9 @@ class TensorList final : public iree::vm::RefObject<TensorList> {
       result_shape.push_back(dim);
     }
     vm::ref<iree_hal_buffer_view_t> result_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        result_buffer.get(), type, result_shape.data(), result_shape.size(),
-        &result_view));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
+                                    result_shape.size(), type, &result_view));
 
     return std::move(result_view);
   }
@@ -323,7 +317,7 @@ struct ref_type_descriptor<TensorList> {
 };
 }  // namespace vm
 
-extern "C" iree_status_t iree_tensorlist_module_register_types() {
+extern "C" iree_status_t iree_tensorlist_module_register_types(void) {
   static bool has_registered = false;
   if (has_registered) return iree_ok_status();
   IREE_VM_REGISTER_CC_TYPE(TensorList, "tensorlist.list",

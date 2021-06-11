@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Tests for common transforms.
 
@@ -29,10 +21,13 @@ iree_lit_test_suite(
         [
             "affinemin_canonicalization.mlir",
             "canonicalize_interface_load_store.mlir",
+            "f32Tof16.mlir",
             "flatten_memref_subspan.mlir",
+            "fold_tensor_extract_op.mlir",
+            "forop_canonicalization.mlir",
             "linalg_bufferize.mlir",
-            "linalg_rewrite_destructive_updates.mlir",
             "remove_dead_allocs.mlir",
+            "transpose_canonicalization.mlir",
         ],
         include = ["*.mlir"],
     ),

@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_STACK_H_
 #define IREE_VM_STACK_H_
@@ -47,7 +39,7 @@ extern "C" {
 // The maximum size of VM stack storage; anything larger is probably a bug.
 #define IREE_VM_STACK_MAX_SIZE (1 * 1024 * 1024)
 
-enum {
+typedef enum iree_vm_stack_frame_type_e {
   // Represents an `[external]` frame that needs to marshal args/results.
   // These frames have no source location and are tracked so that we know when
   // transitions occur into/out-of external code.
@@ -58,8 +50,7 @@ enum {
   IREE_VM_STACK_FRAME_NATIVE = 1,
   // VM stack frame in bytecode using internal register storage.
   IREE_VM_STACK_FRAME_BYTECODE = 2,
-};
-typedef uint8_t iree_vm_stack_frame_type_t;
+} iree_vm_stack_frame_type_t;
 
 // A single stack frame within the VM.
 //
@@ -67,7 +58,7 @@ typedef uint8_t iree_vm_stack_frame_type_t;
 // accessed members **LAST**. This is because the custom frame storage data
 // immediately follows this struct in memory and is highly likely to be touched
 // by the callee immediately and repeatedly.
-typedef struct iree_vm_stack_frame {
+typedef struct iree_vm_stack_frame_t {
   // Function that the stack frame is within.
   iree_vm_function_t function;
 
@@ -102,7 +93,7 @@ typedef void(IREE_API_PTR* iree_vm_stack_frame_cleanup_fn_t)(
     iree_vm_stack_frame_t* frame);
 
 // A state resolver that can allocate or lookup module state.
-typedef struct iree_vm_state_resolver {
+typedef struct iree_vm_state_resolver_t {
   void* self;
   iree_status_t(IREE_API_PTR* query_module_state)(
       void* state_resolver, iree_vm_module_t* module,
@@ -112,7 +103,7 @@ typedef struct iree_vm_state_resolver {
 // A fiber stack used for storing stack frame state during execution.
 // All required state is stored within the stack and no host thread-local state
 // is used allowing us to execute multiple fibers on the same host thread.
-typedef struct iree_vm_stack iree_vm_stack_t;
+typedef struct iree_vm_stack_t iree_vm_stack_t;
 
 // Defines and initializes an inline VM stack.
 // The stack will be ready for use and must be deinitialized with
@@ -152,14 +143,13 @@ typedef struct iree_vm_stack iree_vm_stack_t;
 //  ...
 //  iree_vm_stack_deinitialize(stack);
 //  // stack_storage can now be reused/freed/etc
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
+IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_state_resolver_t state_resolver,
     iree_allocator_t allocator, iree_vm_stack_t** out_stack);
 
 // Deinitializes a statically-allocated |stack| previously initialized with
 // iree_vm_stack_initialize.
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
+IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
 
 // Allocates a dynamically-growable stack.
 //
@@ -175,23 +165,23 @@ iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
 //  iree_vm_stack_allocate(..., iree_allocator_system(), &stack);
 //  ...
 //  iree_vm_stack_free(stack);
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_stack_allocate(iree_vm_state_resolver_t state_resolver,
                        iree_allocator_t allocator, iree_vm_stack_t** out_stack);
 
 // Frees a dynamically-allocated |stack| from iree_vm_stack_allocate.
-IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_free(iree_vm_stack_t* stack);
+IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack);
 
 // Returns the current stack frame or nullptr if the stack is empty.
-IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL
-iree_vm_stack_current_frame(iree_vm_stack_t* stack);
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_current_frame(
+    iree_vm_stack_t* stack);
 
 // Returns the parent stack frame or nullptr if the stack is empty.
-IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL
-iree_vm_stack_parent_frame(iree_vm_stack_t* stack);
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_parent_frame(
+    iree_vm_stack_t* stack);
 
 // Queries the context-specific module state for the given module.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
+IREE_API_EXPORT iree_status_t iree_vm_stack_query_module_state(
     iree_vm_stack_t* stack, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state);
 
@@ -203,14 +193,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
 // callee data. |frame_cleanup_fn| will be called when the frame is left either
 // normally via an iree_vm_stack_function_leave call or if an error occurs and
 // the stack needs to be torn down.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
+IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
     iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
     iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn,
     iree_vm_stack_frame_t** out_callee_frame);
 
 // Leaves the current stack frame.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_vm_stack_function_leave(iree_vm_stack_t* stack);
 
 #ifdef __cplusplus

@@ -19,9 +19,9 @@ iree_cc_library(
     "native_module.cc"
   DEPS
     absl::span
-    iree::base::api
+    iree::base
     iree::base::status
-    iree::hal::api
+    iree::hal
     iree::modules::hal
     iree::vm
     iree::vm::cc
@@ -37,8 +37,8 @@ iree_bytecode_module(
     tensorlist_test_module
   SRC
     "tensorlist_test.mlir"
-  CC_NAMESPACE
-    "iree::modules::tensorlist"
+  C_IDENTIFIER
+    "iree_tensorlist_test_module"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=dylib-llvm-aot"
@@ -53,13 +53,12 @@ iree_cc_test(
     "tensorlist_test.cc"
   DEPS
     ::native_module
-    ::tensorlist_test_module_cc
+    ::tensorlist_test_module_c
     absl::span
-    absl::strings
-    iree::base::api
+    iree::base
     iree::base::logging
-    iree::hal::api
-    iree::hal::vmla::registration
+    iree::hal
+    iree::hal::vmvx::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main

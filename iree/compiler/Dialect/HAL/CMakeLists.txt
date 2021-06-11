@@ -10,17 +10,17 @@
 
 iree_add_all_subdirs()
 
-iree_cc_embed_data(
+iree_c_embed_data(
   NAME
     hal_imports
   SRCS
     "hal.imports.mlir"
-  CC_FILE_OUTPUT
-    "hal.imports.cc"
+  C_FILE_OUTPUT
+    "hal.imports.c"
   H_FILE_OUTPUT
     "hal.imports.h"
-  CPP_NAMESPACE
-    "mlir::iree_compiler"
+  IDENTIFIER
+    "iree_hal_imports"
   FLATTEN
   PUBLIC
 )

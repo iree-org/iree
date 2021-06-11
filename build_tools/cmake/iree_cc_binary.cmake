@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
 
@@ -20,7 +12,6 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: name of target (see Usage below)
-# OUT: OUTPUT_NAME for the target. Defaults to NAME.
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
@@ -31,7 +22,10 @@ include(CMakeParseArguments)
 # HOSTONLY: host only; compile using host toolchain when cross-compiling
 #
 # Note:
-# By default, iree_cc_binary will always create a binary named iree_${NAME}.
+# iree_cc_binary will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
+# iree_base_foo with two alias (readonly) targets, a qualified
+# ${PACKAGE_NS}::${NAME} and an unqualified ${NAME}. Thus NAME must be globally
+# unique in the project.
 #
 # Usage:
 # iree_cc_library(
@@ -56,7 +50,7 @@ function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
     "HOSTONLY;TESTONLY"
-    "NAME;OUT"
+    "NAME"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
   )
@@ -67,10 +61,31 @@ function(iree_cc_binary)
 
   # Prefix the library with the package name, so we get: iree_package_name
   iree_package_name(_PACKAGE_NAME)
+  iree_package_ns(_PACKAGE_NS)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_executable(${_NAME} "")
+  # Alias the iree_package_name binary to iree::package::name.
+  # This lets us more clearly map to Bazel and makes it possible to
+  # disambiguate the underscores in paths vs. the separators.
+  add_executable(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+
+  # If the binary name matches the package then treat it as a default. For
+  # example, foo/bar/ library 'bar' would end up as 'foo::bar'. This isn't
+  # likely to be common for binaries, but is consistent with the behavior for
+  # libraries and in Bazel.
+  iree_package_dir(_PACKAGE_DIR)
+  if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
+    add_executable(${_PACKAGE_NS} ALIAS ${_NAME})
+  endif()
+
+  # Finally, since we have so few binaries and we also want to support
+  # installing from a separate host build, binaries get an unqualified global
+  # alias. This means binary names must be unique across the whole project.
+  # (We could consider making this configurable).
   add_executable(${_RULE_NAME} ALIAS ${_NAME})
+
+  set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   if(_RULE_SRCS)
     target_sources(${_NAME}
       PRIVATE
@@ -83,11 +98,6 @@ function(iree_cc_binary)
       PRIVATE
         ${_DUMMY_SRC}
     )
-  endif()
-  if(_RULE_OUT)
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_OUT}")
-  else()
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   endif()
   target_include_directories(${_NAME} SYSTEM
     PUBLIC
@@ -110,7 +120,6 @@ function(iree_cc_binary)
   )
 
   # Replace dependencies passed by ::name with iree::package::name
-  iree_package_ns(_PACKAGE_NS)
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
   target_link_libraries(${_NAME}

@@ -1,28 +1,20 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/bytecode_module_size_benchmark_module.h"
+#include "iree/vm/bytecode_module_size_benchmark_module_c.h"
 
 extern "C" int main(int argc, char** argv) {
   iree_vm_instance_t* instance = nullptr;
   iree_vm_instance_create(iree_allocator_system(), &instance);
 
   const auto* module_file_toc =
-      iree::vm::bytecode_module_size_benchmark_module_create();
+      iree_vm_bytecode_module_size_benchmark_module_create();
   iree_vm_module_t* module = nullptr;
   iree_vm_bytecode_module_create(
       iree_const_byte_span_t{

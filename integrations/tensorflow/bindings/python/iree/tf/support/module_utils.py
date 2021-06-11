@@ -1,17 +1,9 @@
 # Lint as: python3
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Utilities for compiling 'tf.Module's"""
 
 # TODO(#4131) python>=3.7: Use postponed type annotations.
@@ -283,8 +275,7 @@ class CompiledModule(object):
 class _IreeFunctionWrapper(_FunctionWrapper):
   """Wraps an IREE function, making it callable."""
 
-  def __init__(self, context: iree.runtime.SystemContext,
-               f: iree.runtime.system_api.BoundFunction):
+  def __init__(self, context: iree.runtime.SystemContext, f):
     self._context = context
     self._f = f
 
@@ -293,7 +284,13 @@ class _IreeFunctionWrapper(_FunctionWrapper):
 
   def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
     """Get cxx serialized inputs and outputs for this function."""
-    return self._f.get_serialized_values()
+    if hasattr(self._f, "get_serialized_values"):
+      # TODO: The native ABI does not implement this, and if still needed,
+      # it should not be implemented this way (maybe a thread local trace
+      # listener).
+      return self._f.get_serialized_values()
+    else:
+      return ("",), ("",)
 
 
 class IreeCompiledModule(CompiledModule):
@@ -421,7 +418,7 @@ class IreeCompiledModule(CompiledModule):
     """Reinitializes all stateful variables."""
     # set_random_seed is not needed here because the model_class.__init__ is not
     # called.
-    self._context = iree.runtime.SystemContext(modules=[self._vm_module],
+    self._context = iree.runtime.SystemContext(vm_modules=[self._vm_module],
                                                config=self._config)
 
   def __getattr__(self, attr: str) -> _IreeFunctionWrapper:
@@ -879,15 +876,15 @@ class BackendInfo:
           "driver": None,
           "compiler_targets": None,
       },
-      "iree_vmla": {
+      "iree_vmvx": {
           "compiled_module_class": IreeCompiledModule,
-          "driver": "vmla",
-          "compiler_targets": ["vmla"]
+          "driver": "vmvx",
+          "compiler_targets": ["vmvx"]
       },
       "iree_vulkan": {
           "compiled_module_class": IreeCompiledModule,
           "driver": "vulkan",
-          "compiler_targets": ["vulkan-*"]
+          "compiler_targets": ["vulkan-spirv"]
       },
       "iree_llvmaot": {
           "compiled_module_class": IreeCompiledModule,
@@ -901,12 +898,12 @@ class BackendInfo:
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
-        'tf', 'tflite', 'iree_vmla', 'iree_vulkan', 'iree_llvmaot'.
+        'tf', 'tflite', 'iree_vmvx', 'iree_vulkan', 'iree_llvmaot'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
 
     Raises:
-      KeyError: if backend_name is not one of ['tf', 'tflite', 'iree_vmla',
+      KeyError: if backend_name is not one of ['tf', 'tflite', 'iree_vmvx',
         'iree_vulkan', 'iree_llvmaot'].
       ValueError: if backend_id doesn't start with backend_name.
     """

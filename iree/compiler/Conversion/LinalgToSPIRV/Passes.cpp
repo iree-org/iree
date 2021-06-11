@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===- Passes.cpp - Pipeline from HLO to Linalg to SPIR-V -----------------===//
 //
@@ -21,13 +13,13 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 
 #include "iree/compiler/Conversion/Common/Passes.h"
-#include "iree/compiler/Conversion/HLOToHLO/Passes.h"
-#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToVector/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
@@ -83,14 +75,10 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     - The Linalg op is kept untouched.
   //
   //===--------------------------------------------------------------------===//
-  if (options.usingLinalgOnTensors) {
-    // flow.dispatch.workgroups performed abstract tiling and distribution. Make
-    // them concrete now since we know the target and settings now.
-    pm.addPass(createConcretizeTileAmongWorkgroupsPass(options));
-  } else {
-    pm.addPass(createSplitDispatchFunctionPass());
-    pm.addPass(createTileAndDistributeAmongWorkgroupsPass(options));
-  }
+
+  // flow.dispatch.workgroups performed abstract tiling and distribution. Make
+  // them concrete now since we know the target and settings now.
+  pm.addPass(createConcretizeTileAmongWorkgroupsPass(options));
 
   pm.addPass(createTileAndVectorizeInOneWorkgroupPass(options));
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
@@ -103,10 +91,8 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     workgroups.
   //   - Linalg ops are converted to loop.for ops and mapped to workitems.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createConvertToGPUPass(options));
-  if (options.enableVectorization) {
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorToGPUPass());
-  }
+  pm.addPass(createConvertToGPUPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorToGPUPass());
   pm.nest<ModuleOp>().addPass(createLowerAffinePass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
@@ -120,27 +106,22 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - Load/store on std.subview ops are converted into load/store on the
   //     original buffers.
   //===--------------------------------------------------------------------===//
-  if (options.enableVectorization) {
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createVectorTransferOptimizationPass());
-  }
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+      createVectorTransferOptimizationPass());
   pm.nest<ModuleOp>().addPass(memref::createFoldSubViewOpsPass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
-  if (options.enableVectorization) {
-    pm.nest<ModuleOp>().addPass(createVectorizeMemrefLoadStorePass());
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createForOpCanonicalizationPass());
-    pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
-    pm.nest<ModuleOp>().addPass(createCSEPass());
-  }
+  pm.nest<ModuleOp>().addPass(createVectorizeMemrefLoadStorePass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+      createConvertVectorToCooperativeMatrixPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addPass(createCSEPass());
 
-  if (options.usingLinalgOnTensors) {
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createFlattenMemRefSubspanPass());
-    pm.nest<ModuleOp>().addPass(createLowerAffinePass());
-    pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
-    pm.nest<ModuleOp>().addPass(createCSEPass());
-  }
+  pm.nest<ModuleOp>().addPass(createFlattenMemRefSubspanPass());
+  pm.nest<ModuleOp>().addPass(createLowerAffinePass());
+  pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addPass(createCSEPass());
 
   //===--------------------------------------------------------------------===//
   // Final conversion to SPIR-V dialect.

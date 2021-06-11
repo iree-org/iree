@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_BASE_INTERNAL_STATUS_H_
 #define IREE_BASE_INTERNAL_STATUS_H_
@@ -20,10 +12,11 @@
 #endif  // !__cplusplus
 
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
+#include <type_traits>
 
-#include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/attributes.h"
 #include "iree/base/logging.h"
@@ -143,22 +136,20 @@ class Status final {
 
   // Creates a status with the specified code and error message.
   // If `code` is kOk, `message` is ignored.
-  Status(StatusCode code, absl::string_view message) {
+  Status(StatusCode code, const char* message) {
     if (IREE_UNLIKELY(code != StatusCode::kOk)) {
-      value_ = message.empty()
+      value_ = (!message || !strlen(message))
                    ? iree_status_from_code(code)
-                   : iree_status_allocate(
-                         static_cast<iree_status_code_t>(code),
-                         /*file=*/nullptr, /*line=*/0,
-                         iree_make_string_view(message.data(), message.size()));
+                   : iree_status_allocate(static_cast<iree_status_code_t>(code),
+                                          /*file=*/nullptr, /*line=*/0,
+                                          iree_make_cstring_view(message));
     }
   }
-  Status(StatusCode code, SourceLocation location, absl::string_view message) {
+  Status(StatusCode code, SourceLocation location, const char* message) {
     if (IREE_UNLIKELY(code != StatusCode::kOk)) {
-      value_ = iree_status_allocate(
-          static_cast<iree_status_code_t>(code), location.file_name(),
-          location.line(),
-          iree_make_string_view(message.data(), message.size()));
+      value_ = iree_status_allocate(static_cast<iree_status_code_t>(code),
+                                    location.file_name(), location.line(),
+                                    iree_make_cstring_view(message));
     }
   }
 
@@ -231,19 +222,6 @@ IREE_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
 IREE_MUST_USE_RESULT static inline bool IsOk(const iree_status_t& status) {
   return iree_status_is_ok(status);
 }
-
-// TODO(#2843): better logging of status checks.
-#undef IREE_CHECK_OK
-#undef IREE_QCHECK_OK
-#undef IREE_DCHECK_OK
-#define IREE_CHECK_OK_IMPL(status, val) \
-  auto status = ::iree::Status(val);    \
-  IREE_CHECK(::iree::IsOk(status)) << (status)
-#define IREE_CHECK_OK(val) \
-  IREE_CHECK_OK_IMPL(IREE_STATUS_IMPL_CONCAT_(_status, __LINE__), val)
-
-#define IREE_QCHECK_OK(val) IREE_QCHECK_EQ(::iree::StatusCode::kOk, (val))
-#define IREE_DCHECK_OK(val) IREE_DCHECK_EQ(::iree::StatusCode::kOk, (val))
 
 }  // namespace iree
 

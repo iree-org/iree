@@ -1,21 +1,10 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Common types and utilities used in the IREE codebase.
-
-load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -28,8 +17,17 @@ package(
 #===------------------------------------------------------------------------===#
 
 cc_library(
-    name = "api",
-    srcs = ["api.c"],
+    name = "base",
+    srcs = [
+        "allocator.c",
+        "allocator.h",
+        "api.c",
+        "status.c",
+        "string_view.c",
+        "string_view.h",
+        "time.c",
+        "time.h",
+    ],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],
     deps = [
@@ -47,6 +45,7 @@ cc_library(
     hdrs = [
         "alignment.h",
         "attributes.h",
+        "config.h",
         "target_platform.h",
     ],
 )
@@ -61,26 +60,6 @@ cc_library(
 #===------------------------------------------------------------------------===#
 
 cc_library(
-    name = "flatcc",
-    hdrs = ["flatcc.h"],
-    deps = [
-        ":flatcc_dummy",
-        "@com_github_dvidelabs_flatcc//:runtime",
-    ],
-)
-
-iree_flatbuffer_c_library(
-    name = "flatcc_dummy",
-    srcs = ["flatcc.fbs"],
-    flatcc_args = [
-        "--reader",
-        "--builder",
-        "--verifier",
-        "--json",
-    ],
-)
-
-cc_library(
     name = "logging",
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
@@ -93,8 +72,7 @@ cc_library(
     deps = [
         ":core_headers",
         ":tracing",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings:str_format",
+        "//iree/base/internal:flags",
     ],
 )
 
@@ -131,90 +109,18 @@ cc_test(
     name = "status_test",
     srcs = ["status_test.cc"],
     deps = [
+        ":base",
         ":status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
 
-cc_library(
-    name = "synchronization",
-    srcs = ["synchronization.c"],
-    hdrs = ["synchronization.h"],
-    deps = [
-        ":api",
-        ":core_headers",
-        ":tracing",
-        "//iree/base/internal",
-    ],
-)
-
-cc_binary(
-    name = "synchronization_benchmark",
-    testonly = True,
-    srcs = ["synchronization_benchmark.cc"],
-    deps = [
-        ":synchronization",
-        "//iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-run_binary_test(
-    name = "synchronization_benchmark_test",
-    args = ["--benchmark_min_time=0"],
-    test_binary = ":synchronization_benchmark",
-)
-
 cc_test(
-    name = "synchronization_test",
-    srcs = ["synchronization_test.cc"],
+    name = "string_view_test",
+    srcs = ["string_view_test.cc"],
     deps = [
-        ":synchronization",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "threading",
-    srcs = [
-        "threading.c",
-        "threading_darwin.c",
-        "threading_impl.h",
-        "threading_pthreads.c",
-        "threading_win32.c",
-    ],
-    hdrs = ["threading.h"],
-    deps = [
-        ":api",
-        ":core_headers",
-        ":synchronization",
-        ":tracing",
-        "//build_tools:default_linkopts",
-        "//iree/base/internal",
-    ],
-)
-
-cc_test(
-    name = "threading_benchmark",
-    srcs = ["threading_benchmark.cc"],
-    deps = [
-        ":threading",
-        "//iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-cc_test(
-    name = "threading_test",
-    srcs = [
-        "threading_impl.h",
-        "threading_test.cc",
-    ],
-    deps = [
-        ":synchronization",
-        ":threading",
+        ":base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

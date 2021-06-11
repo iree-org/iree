@@ -1,18 +1,13 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/local/task_queue.h"
+
+#include <stddef.h>
+#include <string.h>
 
 #include "iree/base/tracing.h"
 #include "iree/hal/local/task_command_buffer.h"
@@ -105,7 +100,7 @@ static void iree_hal_semaphore_list_release(iree_hal_semaphore_list_t* list) {
 // to wait as the implicit queue ordering ensures that the signals would have
 // happened prior to the sequence command being executed. Cross-queue semaphores
 // will still cause waits if they have not yet been signaled.
-typedef struct {
+typedef struct iree_hal_task_queue_wait_cmd_t {
   // Call to iree_hal_task_queue_wait_cmd.
   iree_task_call_t task;
 
@@ -175,7 +170,7 @@ static iree_status_t iree_hal_task_queue_wait_cmd_allocate(
 // Task to issue all the command buffers in the batch.
 // After this task completes the commands have been issued but have not yet
 // completed and the issued commands may complete in any order.
-typedef struct {
+typedef struct iree_hal_task_queue_issue_cmd_t {
   // Call to iree_hal_task_queue_issue_cmd.
   iree_task_call_t task;
 
@@ -266,7 +261,7 @@ static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
 // it. The task is issued only once all commands from all command buffers in
 // the submission complete. Semaphores will be signaled and dependent
 // submissions may be issued.
-typedef struct {
+typedef struct iree_hal_task_queue_retire_cmd_t {
   // Call to iree_hal_task_queue_retire_cmd.
   iree_task_call_t task;
 

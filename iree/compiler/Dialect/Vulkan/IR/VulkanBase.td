@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_DIALECT_VULKAN_BASE
 #define IREE_DIALECT_VULKAN_BASE
@@ -98,14 +90,62 @@ def VK_KHR_shader_float16_int8 : StrEnumAttrCase<"VK_KHR_shader_float16_int8">;
 def VK_KHR_spirv_1_4 : StrEnumAttrCase<"VK_KHR_spirv_1_4">;
 def VK_KHR_storage_buffer_storage_class : StrEnumAttrCase<"VK_KHR_storage_buffer_storage_class">;
 def VK_KHR_variable_pointers: StrEnumAttrCase<"VK_KHR_variable_pointers">;
-def VK_NV_Cooperative_matrix : StrEnumAttrCase<"VK_NV_cooperative_matrix">;
+def VK_NV_cooperative_matrix : StrEnumAttrCase<"VK_NV_cooperative_matrix">;
 
 def VK_ExtensionAttr :
     VK_StrEnumAttr<"Extension", "supported Vulkan extension", [
       VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
       VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class,
-      VK_KHR_variable_pointers, VK_NV_Cooperative_matrix
+      VK_KHR_variable_pointers, VK_NV_cooperative_matrix
     ]>;
+
+//===----------------------------------------------------------------------===//
+// Target triple
+//===----------------------------------------------------------------------===//
+
+def VK_TTA_Unknown   : I32EnumAttrCase<"Unknown", 0, "unknown">;
+// Software emulated GPU
+def VK_TTA_CPU       : I32EnumAttrCase<"CPU", 1, "cpu">;
+// AMD GPU
+def VK_TTA_RDNAv1    : I32EnumAttrCase<"AMD_RDNAv1", 100, "rdna1">;
+def VK_TTA_RDNAv2    : I32EnumAttrCase<"AMD_RDNAv2", 101, "rdna2">;
+// ARM Mali GPU
+def VK_TTA_Valhall   : I32EnumAttrCase<"ARM_Valhall", 203, "valhall">;
+// NVIDIA GPU
+def VK_TTA_Turing    : I32EnumAttrCase<"NV_Turing", 301, "turing">;
+def VK_TTA_Ampere    : I32EnumAttrCase<"NV_Ampere", 302, "ampere">;
+// Qualcomm Adreno GPU
+def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 400, "adreno">;
+
+def VK_TargetArchAttr : VK_I32EnumAttr<
+  "TargetTripleArch", "recognized target architecture", [
+    VK_TTA_Unknown, VK_TTA_CPU, VK_TTA_RDNAv1, VK_TTA_RDNAv2,
+    VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere, VK_TTA_Adreno,
+  ]>;
+
+def VK_TTP_Unknown     : I32EnumAttrCase<"Unknown", 0, "unknown">;
+// Qualcomm Adreno GPU
+def VK_TTP_Adreno640   : I32EnumAttrCase<"Adreno_640", 100, "a640">;
+def VK_TTP_Adreno650   : I32EnumAttrCase<"Adreno_650", 101, "a650">;
+def VK_TTP_Adreno660   : I32EnumAttrCase<"Adreno_660", 102, "a660">;
+// Software emulated GPU
+def VK_TTP_SwiftShader : I32EnumAttrCase<"SwiftShader", 200, "swiftshader">;
+
+def VK_TargetProductAttr : VK_I32EnumAttr<
+  "TargetTripleProduct", "recognized target product", [
+    VK_TTP_Unknown, VK_TTP_Adreno650, VK_TTP_Adreno660, VK_TTP_SwiftShader,
+  ]>;
+
+def VK_TTOS_Unknown   : I32EnumAttrCase<"Unknown", 0, "unknown">;
+def VK_TTOS_Android11 : I32EnumAttrCase<"Android11", 2, "android11">;
+def VK_TTOS_Linux     : I32EnumAttrCase<"Linux", 3, "linux">;
+def VK_TTOS_Windows   : I32EnumAttrCase<"Windows", 4, "windows">;
+
+def VK_TargetOSAttr : VK_I32EnumAttr<
+  "TargetTripleOS", "recognized target operating system", [
+    VK_TTOS_Unknown, VK_TTOS_Android11, VK_TTOS_Linux,
+    VK_TTOS_Windows,
+  ]>;
 
 //===----------------------------------------------------------------------===//
 // Subgroup features

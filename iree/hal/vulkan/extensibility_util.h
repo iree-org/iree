@@ -1,26 +1,19 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
 #define IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
 
+#include "iree/base/api.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/util/arena.h"
 
 // A list of NUL-terminated strings (so they can be passed directly to Vulkan).
-typedef struct {
+typedef struct iree_hal_vulkan_string_list_t {
   iree_host_size_t count;
   const char** values;
 } iree_hal_vulkan_string_list_t;
@@ -63,7 +56,7 @@ iree_status_t iree_hal_vulkan_match_available_device_extensions(
 // We must use this to query support instead of just detecting symbol names as
 // ICDs will resolve the functions sometimes even if they don't support the
 // extension (or we didn't ask for it to be enabled).
-typedef struct {
+typedef struct iree_hal_vulkan_instance_extensions_t {
   // VK_EXT_debug_utils is enabled and a debug messenger is registered.
   // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/chap44.html#VK_EXT_debug_utils
   bool debug_utils : 1;
@@ -78,7 +71,7 @@ iree_hal_vulkan_populate_enabled_instance_extensions(
 // We must use this to query support instead of just detecting symbol names as
 // ICDs will resolve the functions sometimes even if they don't support the
 // extension (or we didn't ask for it to be enabled).
-typedef struct {
+typedef struct iree_hal_vulkan_device_extensions_t {
   // VK_KHR_push_descriptor is enabled and vkCmdPushDescriptorSetKHR is valid.
   bool push_descriptors : 1;
   // VK_KHR_timeline_semaphore is enabled.

@@ -1,17 +1,10 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -45,11 +38,6 @@ void addLinalgBufferizePasses(
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 
-/// Pass to rewrite Linalg on tensors destructive updates into updates through
-/// memory.
-std::unique_ptr<OperationPass<FuncOp>>
-createLinalgRewriteDestructiveUpdatesPass();
-
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 
@@ -57,14 +45,24 @@ std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 /// scf.for.
 std::unique_ptr<FunctionPass> createForOpCanonicalizationPass();
 
-// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
-// allocations and view operations.
+/// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
+/// allocations and view operations.
 std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass();
 
-// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
-// subspan ops to the consumer load/store ops, in preparation for lowering to
-// backends that require linearized access.
-std::unique_ptr<FunctionPass> createFlattenMemRefSubspanPass();
+/// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
+/// subspan ops to the consumer load/store ops, in preparation for lowering to
+/// backends that require linearized access.
+std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
+
+/// Sets the number of workgroups to use for each entry point in the dispatch
+/// region.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
+
+/// After running the upstream TensorConstantBufferize pass, remove tensor_loads
+/// introduced for use only in tensor_extract. These can be folded to use a load
+/// of the created memref object that holds the constant values.
+std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -1,30 +1,26 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_VULKAN_SERIALIZING_COMMAND_QUEUE_H_
 #define IREE_HAL_VULKAN_SERIALIZING_COMMAND_QUEUE_H_
 
-// clang-format off: Must be included before all other headers:
+// clang-format off: must be included before all other headers.
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
+#include <stddef.h>
+
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "iree/base/status.h"
-#include "iree/base/synchronization.h"
+#include "iree/base/api.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
@@ -73,7 +69,7 @@ class SerializingCommandQueue final : public CommandQueue {
   void AbortQueueSubmission();
 
   // Informs this queue that the given |fences| are known to have signaled.
-  void SignalFences(absl::Span<VkFence> fences);
+  void SignalFences(const std::vector<VkFence>& fences);
 
  private:
   // A submission batch together with the fence to singal its status.

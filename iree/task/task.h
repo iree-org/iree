@@ -1,42 +1,38 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_TASK_TASK_H_
 #define IREE_TASK_TASK_H_
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
-#include "iree/base/synchronization.h"
 #include "iree/task/affinity_set.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_task_list_s iree_task_list_t;
-typedef struct iree_task_pool_s iree_task_pool_t;
-typedef struct iree_task_scope_s iree_task_scope_t;
-typedef struct iree_task_submission_s iree_task_submission_t;
+typedef struct iree_task_list_t iree_task_list_t;
+typedef struct iree_task_pool_t iree_task_pool_t;
+typedef struct iree_task_scope_t iree_task_scope_t;
+typedef struct iree_task_submission_t iree_task_submission_t;
 
 //==============================================================================
 // Task header for internal tracking
 //==============================================================================
 
 // Specifies the type of a task and how executors handle it.
-enum iree_task_type_e {
+enum iree_task_type_bits_t {
   // Task is a no-op (performs no work) and exists for flexibility.
   IREE_TASK_TYPE_NOP = 0u,
 
@@ -87,7 +83,7 @@ enum iree_task_type_e {
 };
 typedef uint8_t iree_task_type_t;
 
-enum iree_task_flags_e {
+enum iree_task_flag_bits_t {
   // The wait handle the task is specified to wait on has resolved and the task
   // can now be considered complete.
   IREE_TASK_FLAG_WAIT_COMPLETED = 1u << 0,
@@ -119,7 +115,7 @@ enum iree_task_flags_e {
 };
 typedef uint16_t iree_task_flags_t;
 
-typedef struct iree_task_s iree_task_t;
+typedef struct iree_task_t iree_task_t;
 
 // A function called to cleanup tasks.
 // The provided |status| is unowned and must be cloned if used beyond the scope
@@ -131,7 +127,7 @@ typedef void(IREE_API_PTR* iree_task_cleanup_fn_t)(iree_task_t* task,
 // Tasks have an iree_task_type_t that defines which parameters are valid and
 // how the executor is to treat the task. Dependency edges can be defined that
 // determine the execution order of tasks within the executors.
-struct iree_alignas(iree_max_align_t) iree_task_s {
+struct iree_alignas(iree_max_align_t) iree_task_t {
   // Instrusive pointer used to store tasks within iree_task_list_t and
   // iree_atomic_task_list_t singly-linked lists. This must come first in the
   // structure so that it is at the appropriate alignment.
@@ -239,7 +235,7 @@ typedef iree_status_t(IREE_API_PTR* iree_task_call_closure_fn_t)(
     iree_task_submission_t* pending_submission);
 
 // A function closure representing the function to call and its arguments.
-typedef struct {
+typedef struct iree_task_call_closure_t {
   // Function called per tile invocation.
   iree_task_call_closure_fn_t fn;
 
@@ -357,7 +353,7 @@ void iree_task_fence_initialize(iree_task_scope_t* scope,
 // IREE_TASK_TYPE_WAIT
 //==============================================================================
 
-typedef struct {
+typedef struct iree_task_wait_t {
   // Task header: implementation detail, do not use.
   iree_task_t header;
 
@@ -390,7 +386,7 @@ void iree_task_wait_initialize(iree_task_scope_t* scope,
 // If we find ourselves with a lot of hardware-specific counters (vs more
 // generic ones like 'l2 cache misses' or 'ipc') then we can sprinkle in some
 // #ifdefs.
-typedef struct {
+typedef struct iree_task_dispatch_statistics_t {
   // TODO(benvanik): statistics counters.
   // NOTE: each of these increases the command buffer storage requirements; we
   // should always guard these with a compiler flag.
@@ -404,7 +400,7 @@ void iree_task_dispatch_statistics_merge(
     const iree_task_dispatch_statistics_t* source,
     iree_task_dispatch_statistics_t* target);
 
-typedef struct {
+typedef struct iree_task_tile_storage_t {
   // TODO(benvanik): coroutine storage.
   // Ideally we'll be able to have a fixed coroutine storage size per dispatch
   // (via @llvm.coro.size) such that we can preallocate all of the storage for
@@ -443,7 +439,7 @@ typedef iree_alignas(iree_max_align_t) struct {
   // TODO(benvanik): per-tile coroutine storage.
 } iree_task_tile_context_t;
 
-typedef struct iree_task_dispatch_s iree_task_dispatch_t;
+typedef struct iree_task_dispatch_t iree_task_dispatch_t;
 
 // Shared state for all shards processing a dispatch.
 typedef iree_alignas(iree_max_align_t) struct {
@@ -473,7 +469,7 @@ typedef iree_status_t(IREE_API_PTR* iree_task_dispatch_closure_fn_t)(
     iree_task_submission_t* pending_submission);
 
 // A function closure representing the function to call and its arguments.
-typedef struct {
+typedef struct iree_task_dispatch_closure_t {
   // Function called per tile invocation.
   iree_task_dispatch_closure_fn_t fn;
 
@@ -515,7 +511,7 @@ static inline iree_task_dispatch_closure_t iree_task_make_dispatch_closure(
 //     -> dispatch_slice([2-3, 1, 1])
 //     -> dispatch_slice([4-5, 1, 1])
 //   completion_task run after all slices complete
-typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_s {
+typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_t {
   // Task header: implementation detail, do not use.
   iree_task_t header;
 

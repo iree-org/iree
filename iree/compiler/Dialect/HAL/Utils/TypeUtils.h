@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_DIALECT_HAL_UTILS_TYPEUTILS_H_
 #define IREE_COMPILER_DIALECT_HAL_UTILS_TYPEUTILS_H_
@@ -40,19 +32,6 @@ Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder);
 // Returns the number of bytes an element of the given type occupies
 // post-conversion. For example, the size of i1 would be '1 byte'.
 int32_t getRoundedElementByteWidth(Type type);
-
-// Converts a `tensor` type with an arbitrary element size to one supported by
-// the HAL ABI. For example, `tensor<4x8xi1>` is converted to `tensor<4x8xi8>`.
-TensorType convertTensorTypeToABIType(TensorType sourceType);
-
-// Returns an array of i32 values representing the shape of the |shapedType|.
-SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
-                                         OpBuilder &builder);
-
-// Returns an array of i32 values representing the shape of the |shapedValue|.
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
-                                                   Value shapedValue,
-                                                   OpBuilder &builder);
 
 // Returns the size of |value| as an index type.
 // The returned value may either be produced at the current insertion site or

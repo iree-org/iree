@@ -1,23 +1,17 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/driver_registry.h"
 
-#include "iree/base/synchronization.h"
-#include "iree/base/threading.h"
+#include <stddef.h>
+#include <string.h>
+
+#include "iree/base/internal/call_once.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/detail.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_driver_registry_t
@@ -35,7 +29,7 @@
 // isolating/sandboxing/multi-versioning).
 #define IREE_HAL_MAX_DRIVER_FACTORY_COUNT 8
 
-struct iree_hal_driver_registry_s {
+struct iree_hal_driver_registry_t {
   iree_slim_mutex_t mutex;
 
   // Factories in registration order. As factories are unregistered the list is
@@ -53,15 +47,14 @@ static void iree_hal_driver_registry_default_initialize(void) {
   iree_slim_mutex_initialize(&iree_hal_driver_registry_default_.mutex);
 }
 
-IREE_API_EXPORT iree_hal_driver_registry_t* IREE_API_CALL
-iree_hal_driver_registry_default() {
+IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default(
+    void) {
   iree_call_once(&iree_hal_driver_registry_default_flag_,
                  iree_hal_driver_registry_default_initialize);
   return &iree_hal_driver_registry_default_;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_register_factory(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_register_factory(
     iree_hal_driver_registry_t* registry,
     const iree_hal_driver_factory_t* factory) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -101,8 +94,7 @@ iree_hal_driver_registry_register_factory(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_unregister_factory(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
     iree_hal_driver_registry_t* registry,
     const iree_hal_driver_factory_t* factory) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -163,7 +155,7 @@ static iree_host_size_t iree_hal_driver_info_copy(
   return storage_size;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_enumerate(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
     iree_hal_driver_registry_t* registry, iree_allocator_t allocator,
     iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count) {
@@ -196,7 +188,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_enumerate(
 
   // Allocate the required memory for both the driver infos and the string
   // storage in a single block.
-  iree_host_size_t total_driver_infos_size = iree_math_align(
+  iree_host_size_t total_driver_infos_size = iree_host_align(
       total_driver_info_count * sizeof(iree_hal_driver_info_t), 8);
   if (iree_status_is_ok(status)) {
     status = iree_allocator_malloc(allocator,
@@ -237,7 +229,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_enumerate(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_try_create(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_t* registry, iree_hal_driver_id_t driver_id,
     iree_allocator_t allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(registry);
@@ -271,8 +263,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_registry_try_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_try_create_by_name(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
     iree_allocator_t allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(registry);

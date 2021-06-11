@@ -30,7 +30,8 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: vm.func @const_ref_zero
   vm.func @const_ref_zero() -> !vm.ref<?> {
-    // CHECK: %[[NULL:.+]] = "emitc.const"() {value = "{0}"} : () -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[REF:.+]] = emitc.call "VM_ARRAY_ELEMENT_ADDRESS"() {args = [#emitc.opaque<"local_refs">, 0 : i32]} : () -> !emitc.opaque<"iree_vm_ref_t*">
+    // CHECK: emitc.call "iree_vm_ref_release"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t*">) -> ()
     %null = vm.const.ref.zero : !vm.ref<?>
     vm.return
   }

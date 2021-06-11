@@ -1,28 +1,26 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_TASK_WORKER_H_
 #define IREE_TASK_WORKER_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
+#include "iree/base/api.h"
 #include "iree/base/internal/prng.h"
-#include "iree/base/synchronization.h"
-#include "iree/base/threading.h"
+#include "iree/base/internal/synchronization.h"
+#include "iree/base/internal/threading.h"
 #include "iree/base/tracing.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
 #include "iree/task/list.h"
 #include "iree/task/queue.h"
+#include "iree/task/task.h"
+#include "iree/task/topology.h"
 #include "iree/task/tuning.h"
 
 #ifdef __cplusplus
@@ -38,20 +36,19 @@ extern "C" {
 // NOTE: state values are ordered such that </> comparisons can be used; ensure
 // that for example all states after resuming are > SUSPENDED and all states
 // before exiting are < EXITING.
-enum iree_task_worker_state_e {
+typedef enum iree_task_worker_state_e {
   // Worker has been created in a suspended state and must be resumed to wake.
-  IREE_TASK_WORKER_STATE_SUSPENDED = 0u,
+  IREE_TASK_WORKER_STATE_SUSPENDED = 0,
   // Worker is idle or actively processing tasks (either its own or others).
-  IREE_TASK_WORKER_STATE_RUNNING = 1u,
+  IREE_TASK_WORKER_STATE_RUNNING = 1,
   // Worker should exit (or is exiting) and will soon enter the zombie state.
   // Coordinators can request workers to exit by setting their state to this and
   // then waking.
-  IREE_TASK_WORKER_STATE_EXITING = 2u,
+  IREE_TASK_WORKER_STATE_EXITING = 2,
   // Worker has exited and entered a 🧟 state (waiting for join).
   // The thread handle is still valid and must be destroyed.
-  IREE_TASK_WORKER_STATE_ZOMBIE = 3u,
-};
-typedef int32_t iree_task_worker_state_t;
+  IREE_TASK_WORKER_STATE_ZOMBIE = 3,
+} iree_task_worker_state_t;
 
 // A worker within the executor pool.
 //
@@ -59,7 +56,7 @@ typedef int32_t iree_task_worker_state_t;
 // techniques. The alignment of the entire iree_task_worker_t as well as the
 // alignment and padding between particular fields is carefully (though perhaps
 // not yet correctly) selected; see the 'LAYOUT' comments below.
-typedef struct iree_task_worker_s {
+typedef struct iree_task_worker_t {
   // A LIFO mailbox used by coordinators to post tasks to this worker.
   // As workers self-nominate to be coordinators and fan out dispatch slices
   // they can directly emplace those slices into the workers that should execute

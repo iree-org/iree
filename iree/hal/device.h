@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_DEVICE_H_
 #define IREE_HAL_DEVICE_H_
@@ -19,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/descriptor_set.h"
 #include "iree/hal/descriptor_set_layout.h"
@@ -46,8 +39,8 @@ typedef uintptr_t iree_hal_device_id_t;
 // request of the calling application. Note that certain features may disable
 // runtime optimizations or require compilation flags to ensure the required
 // metadata is present in executables.
-enum iree_hal_device_feature_e {
-  IREE_HAL_DEVICE_FEATURE_NONE = 0,
+enum iree_hal_device_feature_bits_t {
+  IREE_HAL_DEVICE_FEATURE_NONE = 0u,
 
   // Device supports executable debugging.
   // When present executables *may* be compiled with
@@ -55,26 +48,26 @@ enum iree_hal_device_feature_e {
   // debugging related methods. Note that if the input executables do not have
   // embedded debugging information they still may not be able to perform
   // disassembly or fine-grained breakpoint insertion.
-  IREE_HAL_DEVICE_FEATURE_SUPPORTS_DEBUGGING = 1 << 0,
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_DEBUGGING = 1u << 0,
 
   // Device supports executable coverage information.
   // When present executables *may* be compiled with
   // IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_COVERAGE and will produce
   // coverage buffers during dispatch. Note that input executables must have
   // partial embedded debug information to allow mapping back to source offsets.
-  IREE_HAL_DEVICE_FEATURE_SUPPORTS_COVERAGE = 1 << 1,
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_COVERAGE = 1u << 1,
 
   // Device supports executable and command queue profiling.
   // When present executables *may* be compiled with
   // IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING and will produce
   // profiling buffers during dispatch. Note that input executables must have
   // partial embedded debug information to allow mapping back to source offsets.
-  IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING = 1 << 2,
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING = 1u << 2,
 };
 typedef uint32_t iree_hal_device_feature_t;
 
 // Describes an enumerated HAL device.
-typedef struct {
+typedef struct iree_hal_device_info_t {
   // Opaque handle used by drivers. Not valid across driver instances.
   iree_hal_device_id_t device_id;
   // Name of the device as returned by the API.
@@ -84,7 +77,7 @@ typedef struct {
 // A list of semaphores and their corresponding payloads.
 // When signaling each semaphore will be set to the new payload value provided.
 // When waiting each semaphore must reach or exceed the payload value.
-typedef struct {
+typedef struct iree_hal_semaphore_list_t {
   iree_host_size_t count;
   iree_hal_semaphore_t** semaphores;
   uint64_t* payload_values;
@@ -104,7 +97,7 @@ typedef struct {
 // Note that as the HAL only models timeline semaphores we take the payload
 // values directly in this struct; see:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkTimelineSemaphoreSubmitInfo.html
-typedef struct {
+typedef struct iree_hal_submission_batch_t {
   // Semaphores to wait on prior to executing any command buffer.
   iree_hal_semaphore_list_t wait_semaphores;
 
@@ -117,42 +110,39 @@ typedef struct {
 } iree_hal_submission_batch_t;
 
 // Defines how a multi-wait operation treats the results of multiple semaphores.
-enum iree_hal_wait_mode_e {
+typedef enum iree_hal_wait_mode_e {
   // Waits for all semaphores to reach or exceed their specified values.
   IREE_HAL_WAIT_MODE_ALL = 0,
   // Waits for one or more semaphores to reach or exceed their specified values.
   IREE_HAL_WAIT_MODE_ANY = 1,
-};
-typedef uint8_t iree_hal_wait_mode_t;
+} iree_hal_wait_mode_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 // Retains the given |device| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_device_retain(iree_hal_device_t* device);
+IREE_API_EXPORT void iree_hal_device_retain(iree_hal_device_t* device);
 
 // Releases the given |device| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_device_release(iree_hal_device_t* device);
+IREE_API_EXPORT void iree_hal_device_release(iree_hal_device_t* device);
 
 // Returns the device identifier.
 // This identifier may vary based on the runtime device type; for example, a
 // Vulkan device may return `vulkan-v1.1` or `vulkan-v1.2-spec1`.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+IREE_API_EXPORT iree_string_view_t
 iree_hal_device_id(iree_hal_device_t* device);
 
 // Returns the host allocator used for objects.
-IREE_API_EXPORT iree_allocator_t IREE_API_CALL
+IREE_API_EXPORT iree_allocator_t
 iree_hal_device_host_allocator(iree_hal_device_t* device);
 
 // Returns a reference to the allocator of the device that can be used for
 // allocating buffers.
-IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
-iree_hal_device_allocator(iree_hal_device_t* device);
+IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
+    iree_hal_device_t* device);
 
 // Queries a configuration value as an int32_t.
 // The |key| will be provided to the device driver to interpret in a
@@ -166,7 +156,7 @@ iree_hal_device_allocator(iree_hal_device_t* device);
 //
 // Returned values must remain the same for the lifetime of the device as
 // callers may cache them to avoid redundant calls.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_query_i32(
+IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     iree_hal_device_t* device, iree_string_view_t key, int32_t* out_value);
 
 // Submits one or more batches of work to a device queue.
@@ -184,7 +174,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_query_i32(
 // executing its command buffers in the order they are defined but allowing the
 // command buffers to complete out-of-order. See:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkQueueSubmit.html
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
@@ -199,7 +189,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
 //
 // See iree_hal_device_queue_submit for more information about the queuing
 // behavior and iree_hal_semaphore_wait for the waiting  behavior.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
+IREE_API_EXPORT iree_status_t iree_hal_device_submit_and_wait(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches,
@@ -224,7 +214,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_submit_and_wait(
 // Returns IREE_STATUS_ABORTED if one or more semaphores has failed. Callers can
 // use iree_hal_semaphore_query on the semaphores to find the ones that have
 // failed and get the status.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_wait_semaphores(
+IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
 
@@ -245,7 +235,7 @@ iree_hal_device_wait_idle(iree_hal_device_t* device, iree_timeout_t timeout);
 // iree_hal_device_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_device_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 
@@ -317,8 +307,7 @@ typedef struct {
                                          iree_timeout_t timeout);
 } iree_hal_device_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_device_destroy(iree_hal_device_t* device);
+IREE_API_EXPORT void iree_hal_device_destroy(iree_hal_device_t* device);
 
 #ifdef __cplusplus
 }  // extern "C"

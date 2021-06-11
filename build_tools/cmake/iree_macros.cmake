@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
 
@@ -110,7 +102,10 @@ endfunction()
 #
 # Paramters:
 # - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
-# - EXECUTABLE: the executable to get its path.
+# - EXECUTABLE: the executable to get its path. Note that this needs to be the
+#     name of the executable target when not cross compiling and the basename of
+#     the binary when importing a binary from a host build. Thus this should be
+#     the global unqualified name of the binary, not the fully-specified name.
 function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
   if (NOT CMAKE_CROSSCOMPILING OR TARGET "${EXECUTABLE}")
     # We can either expect the target to be defined as part of this CMake

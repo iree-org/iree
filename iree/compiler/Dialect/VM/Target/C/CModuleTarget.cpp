@@ -1,25 +1,18 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
-#include "emitc/Target/Cpp.h"
+#include "emitc/Target/Cpp/Cpp.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
+#include "iree/compiler/Dialect/VM/Target/ConstantEncodingUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -56,24 +49,65 @@ static void printSeparatingComment(llvm::raw_ostream &output) {
             "//"
          << std::string(77, '=') << "\n";
 }
+static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
+                                        mlir::emitc::CppEmitter &emitter) {
+  llvm::raw_ostream &output = emitter.ostream();
+  std::string moduleName = moduleOp.getName().str();
 
+  for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
+    ElementsAttr value = rodataOp.value();
+    auto bitwidth = value.getType().getElementTypeBitWidth();
+    size_t size = value.getNumElements() * (bitwidth / 8);
+    SmallVector<uint8_t, 32> byteBuffer;
+    byteBuffer.resize(size);
+
+    constexpr size_t kDefaultRodataAlignment = 16;
+
+    size_t alignment =
+        rodataOp.alignment()
+            ? static_cast<size_t>(rodataOp.alignment().getValue())
+            : 0;
+    if (alignment == 0) alignment = kDefaultRodataAlignment;
+
+    if (failed(serializeConstantArray(rodataOp.getLoc(), value, alignment,
+                                      byteBuffer.data()))) {
+      return rodataOp.emitError() << "error during serialization";
+    }
+
+    std::string buffer_name =
+        moduleOp.getName().str() + "_" + rodataOp.getName().str();
+
+    output << "iree_alignas(" << alignment << ") static const uint8_t "
+           << buffer_name << "[] = {";
+    llvm::interleaveComma(byteBuffer, output, [&](uint8_t value) {
+      output << static_cast<unsigned int>(value);
+    });
+    output << "};\n";
+  }
+
+  output << "\n";
+
+  return success();
+}
 static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
                                             mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
   std::string moduleName = moduleOp.getName().str();
 
-  output << "struct " << moduleName << "_s;\n";
-  output << "struct " << moduleName << "_state_s {\n";
+  output << "struct " << moduleName << "_t;\n";
+  output << "struct " << moduleName << "_state_t {\n";
 
   output << "iree_allocator_t allocator;\n";
   output << "uint8_t rwdata["
          << moduleOp.ordinal_counts().getValue().global_bytes() << "];\n";
   output << "iree_vm_ref_t refs["
          << moduleOp.ordinal_counts().getValue().global_refs() << "];\n";
+  output << "iree_vm_buffer_t rodata_buffers["
+         << moduleOp.ordinal_counts().getValue().rodatas() << "];\n";
   output << "};\n";
 
-  output << "typedef struct " << moduleName << "_s " << moduleName << "_t;\n";
-  output << "typedef struct " << moduleName << "_state_s " << moduleName
+  output << "typedef struct " << moduleName << "_t " << moduleName << "_t;\n";
+  output << "typedef struct " << moduleName << "_state_t " << moduleName
          << "_state_t;\n";
 
   output << "\n";
@@ -95,7 +129,7 @@ static LogicalResult printFuncOpArguments(IREE::VM::FuncOp &funcOp,
                                           mlir::emitc::CppEmitter &emitter) {
   return mlir::emitc::interleaveCommaWithError(
       funcOp.getArguments(), emitter.ostream(), [&](auto arg) -> LogicalResult {
-        if (failed(emitter.emitType(arg.getType()))) {
+        if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType()))) {
           return failure();
         }
         emitter.ostream() << " " << emitter.getOrCreateName(arg);
@@ -113,7 +147,7 @@ static LogicalResult printFuncOpResults(
         Type type = std::get<0>(tuple);
         std::string resultName = std::get<1>(tuple);
 
-        if (failed(emitter.emitType(type))) {
+        if (failed(emitter.emitType(*funcOp.getOperation(), type))) {
           return failure();
         }
         emitter.ostream() << " *" << resultName;
@@ -121,8 +155,8 @@ static LogicalResult printFuncOpResults(
       });
 }
 
-static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
-                                       mlir::emitc::CppEmitter &emitter) {
+static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
+                                     mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
 
   for (auto globalOp : moduleOp.getOps<IREE::VM::GlobalI32Op>()) {
@@ -133,7 +167,8 @@ static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
       // the struct argument name here must not be changed.
       emitter.ostream() << "vm_global_store_i32(state->rwdata, "
                         << globalOp.ordinal() << ", ";
-      if (failed(emitter.emitAttribute(initialValue.getValue()))) {
+      if (failed(emitter.emitAttribute(*globalOp.getOperation(),
+                                       initialValue.getValue()))) {
         return globalOp.emitError() << "Unable to emit initial_value";
       }
       emitter.ostream() << ");\n";
@@ -142,8 +177,19 @@ static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
              << "Initializers for globals not supported yet";
     }
   }
+  // TODO(simon-camp): Support globals with different element type
 
-  // TODO(simon-camp): Support vm.global.i64 and vm.global.ref
+  for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
+    std::string buffer_name =
+        moduleOp.getName().str() + "_" + rodataOp.getName().str();
+    output << "iree_vm_buffer_initialize("
+           << "IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, "
+           << "iree_make_byte_span("
+           << "(void*)" << buffer_name << ", sizeof(" << buffer_name << ")), "
+           << "iree_allocator_null(), "
+           << "&state->rodata_buffers[" << rodataOp.ordinal() << "]"
+           << ");\n";
+  }
 
   return success();
 }
@@ -348,7 +394,7 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
         // This shouldn't happen
         return failure();
       }
-      if (failed(emitter.emitType(arg.getType()))) {
+      if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType()))) {
         return failure();
       }
       output << " " << emitter.getOrCreateName(arg) << ";\n";
@@ -567,8 +613,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "state->allocator = allocator;\n";
 
   // initialize globals
-  if (failed(initializeGlobals(moduleOp, emitter))) {
-    return moduleOp.emitError() << "Failed to emit global initialization";
+  if (failed(initializeState(moduleOp, emitter))) {
+    return moduleOp.emitError() << "Failed to emit state members";
   }
 
   output << "*out_module_state = (iree_vm_module_state_t*)state;\n"
@@ -640,6 +686,7 @@ static LogicalResult canonicalizeModule(
 
   PassManager passManager(context);
   mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
 
   if (targetOptions.optimize) {
@@ -706,6 +753,10 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   mlir::emitc::CppEmitter emitter(output, /*restrictToC=*/true,
                                   /*forwardDeclareVariables=*/true);
   mlir::emitc::CppEmitter::Scope scope(emitter);
+
+  if (failed(printRodataBuffers(moduleOp, emitter))) {
+    return failure();
+  }
 
   // build struct definitions
   if (failed(printStructDefinitions(moduleOp, emitter))) {

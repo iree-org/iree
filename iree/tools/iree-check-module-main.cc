@@ -1,49 +1,47 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <array>
+#include <cstdio>
 #include <iostream>
+#include <iterator>
+#include <string>
+#include <type_traits>
+#include <utility>
 
-#include "absl/flags/flag.h"
-#include "absl/strings/match.h"
-#include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/tools/utils/vm_util.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/api.h"
 
 // On Windows stdin defaults to text mode and will get weird line ending
 // expansion that will corrupt the input binary.
 #if defined(IREE_PLATFORM_WINDOWS)
 #include <fcntl.h>
 #include <io.h>
+
 #define IREE_FORCE_BINARY_STDIN() _setmode(_fileno(stdin), O_BINARY)
 #else
 #define IREE_FORCE_BINARY_STDIN()
 #endif  // IREE_PLATFORM_WINDOWS
 
-ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
+IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
-ABSL_FLAG(
+IREE_FLAG(
     bool, expect_failure, false,
     "Whether running module is expected to fail. If set, failing "
     "statuses from function evaluation are logged and ignored and all "
@@ -80,7 +78,7 @@ class CheckModuleTest : public ::testing::Test {
   iree_vm_context_t* context_ = nullptr;
 };
 
-Status Run(std::string module_file_path, int* out_exit_code) {
+iree_status_t Run(std::string module_file_path, int* out_exit_code) {
   IREE_TRACE_SCOPE0("iree-check-module");
   *out_exit_code = 1;
 
@@ -97,14 +95,14 @@ Status Run(std::string module_file_path, int* out_exit_code) {
                               std::istreambuf_iterator<char>()};
   } else {
     IREE_RETURN_IF_ERROR(
-        file_io::GetFileContents(module_file_path.c_str(), &module_data));
+        GetFileContents(module_file_path.c_str(), &module_data));
   }
 
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
   iree_vm_module_t* check_module = nullptr;
@@ -116,50 +114,38 @@ Status Run(std::string module_file_path, int* out_exit_code) {
   for (iree_host_size_t ordinal = 0;
        ordinal < module_signature.export_function_count; ++ordinal) {
     iree_vm_function_t function;
-    iree_string_view_t export_name_sv;
+    iree_string_view_t export_name;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
                              input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                             ordinal, &function, &export_name_sv),
+                             ordinal, &function, &export_name),
                          "looking up function export %zu", ordinal);
 
-    // TODO(gcmn): Implicit conversion from iree to absl string view.
-    auto export_name =
-        absl::string_view(export_name_sv.data, export_name_sv.size);
-
-    iree_string_view_t module_name_iree_sv = iree_vm_module_name(input_module);
-    auto module_name =
-        absl::string_view(module_name_iree_sv.data, module_name_iree_sv.size);
-    if (absl::StartsWith(export_name, "__") ||
-        export_name.find('$') != absl::string_view::npos) {
+    iree_string_view_t module_name = iree_vm_module_name(input_module);
+    if (iree_string_view_starts_with(export_name,
+                                     iree_make_cstring_view("__")) ||
+        iree_string_view_find_char(export_name, '$', 0) !=
+            IREE_STRING_VIEW_NPOS) {
       // Skip internal or special functions.
       continue;
     }
 
-    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-    std::vector<RawSignatureParser::Description> input_descs;
-    IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-    std::vector<RawSignatureParser::Description> output_descs;
-    IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
-    if (!input_descs.empty() || !output_descs.empty()) {
-      iree_string_view_t sig_f = iree_vm_function_reflection_attr(
-          &function, iree_make_cstring_view("f"));
-      RawSignatureParser sig_parser;
-      auto sig_str = sig_parser.FunctionSignatureToString(
-          absl::string_view{sig_f.data, sig_f.size});
-      if (!sig_str.has_value()) {
-        return iree_make_status(
-            IREE_STATUS_INVALID_ARGUMENT,
-            "parsing function signature '%.*s': ", (int)sig_f.size, sig_f.data);
-      }
+    iree_vm_function_signature_t signature =
+        iree_vm_function_signature(&function);
+    iree_host_size_t argument_count = 0;
+    iree_host_size_t result_count = 0;
+    IREE_RETURN_IF_ERROR(iree_vm_function_call_count_arguments_and_results(
+        &signature, &argument_count, &result_count));
+    if (argument_count || result_count) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "expected function with no inputs or outputs, "
                               "but export '%.*s' has signature '%.*s'",
-                              (int)export_name.size(), export_name.data(),
-                              (int)sig_f.size, sig_f.data);
+                              (int)export_name.size, export_name.data,
+                              (int)signature.calling_convention.size,
+                              signature.calling_convention.data);
     }
 
     ::testing::RegisterTest(
-        module_name.data(), export_name.data(), nullptr,
+        module_name.data, export_name.data, nullptr,
         std::to_string(ordinal).c_str(), __FILE__, __LINE__,
         [&instance, modules, function]() -> CheckModuleTest* {
           return new CheckModuleTest(instance, modules, function);
@@ -173,13 +159,16 @@ Status Run(std::string module_file_path, int* out_exit_code) {
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  iree_flags_parse_checked(&argc, &argv);
+  // Pass through flags to gtest (allowing --help to fall through).
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
   ::testing::InitGoogleTest(&argc, argv);
@@ -193,12 +182,11 @@ extern "C" int main(int argc, char** argv) {
   auto module_file_path = std::string(argv[1]);
 
   int exit_code = 1;
-  auto status = Run(std::move(module_file_path), &exit_code);
-  int ret = status.ok() ? exit_code : 1;
-  if (absl::GetFlag(FLAGS_expect_failure)) {
+  iree_status_t status = Run(std::move(module_file_path), &exit_code);
+  int ret = iree_status_is_ok(status) ? exit_code : 1;
+  if (FLAG_expect_failure) {
     if (ret == 0) {
       std::cout << "Test passed but expected failure\n";
-      std::cout << status;
       return 1;
     }
     std::cout << "Test failed as expected\n";
@@ -207,7 +195,7 @@ extern "C" int main(int argc, char** argv) {
 
   if (ret != 0) {
     std::cout << "Test failed\n";
-    std::cout << status;
+    std::cout << Status(std::move(status));
   }
 
   return ret;

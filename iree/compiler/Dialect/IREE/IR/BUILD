@@ -1,19 +1,11 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -65,11 +57,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "IREEInterfacesGen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "IREEOpInterfaces.h.inc"),
-        ("-gen-op-interface-defs", "IREEOpInterfaces.cpp.inc"),
+        (
+            ["-gen-op-interface-decls"],
+            "IREEOpInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "IREEOpInterfaces.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEInterfaces.td",
@@ -79,11 +77,17 @@ gentbl(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "IREEOpsGen",
     tbl_outs = [
-        ("-gen-op-decls", "IREEOps.h.inc"),
-        ("-gen-op-defs", "IREEOps.cpp.inc"),
+        (
+            ["-gen-op-decls"],
+            "IREEOps.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "IREEOps.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEOps.td",
@@ -97,7 +101,10 @@ gentbl(
 iree_tablegen_doc(
     name = "IREEDialectDocGen",
     tbl_outs = [
-        ("-gen-dialect-doc", "IREEDialect.md"),
+        (
+            ["-gen-dialect-doc"],
+            "IREEDialect.md",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEOps.td",

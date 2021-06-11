@@ -19,6 +19,8 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
   LABELS
     "noasan"
     "nomsan"

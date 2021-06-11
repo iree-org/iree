@@ -1,16 +1,8 @@
-# Copyright 2021 Google LLC
+# Copyright 2021 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 package(
     default_visibility = ["//visibility:public"],
@@ -34,7 +26,7 @@ cc_library(
     deps = [
         ":arch",
         ":platform",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -45,7 +37,7 @@ cc_test(
     srcs = ["elf_module_test.cc"],
     deps = [
         ":elf_module",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/hal/local:executable_library",
         "//iree/hal/local/elf/testdata:simple_mul_dispatch",
@@ -72,7 +64,7 @@ cc_library(
         "arch.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -90,7 +82,7 @@ cc_library(
         "platform.h",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],

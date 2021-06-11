@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===--- FusionOfTensorsOps.cpp - Pass to fuse operations on tensors-------===//
 //
@@ -20,7 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -28,45 +21,21 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+static llvm::cl::opt<bool> clEnableFusionWithReductionOps(
+    "iree-enable-fusion-with-reduction-ops",
+    llvm::cl::desc("Allow fusing generic ops with reductions"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
-
 namespace {
-/// Pattern to fuse hal.interface.load.tensor -> linalg.tensor_reshape
-struct FuseWithHALInterfaceLoadTensor
-    : public OpRewritePattern<linalg::TensorReshapeOp> {
-  using OpRewritePattern<linalg::TensorReshapeOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(linalg::TensorReshapeOp reshapeOp,
-                                PatternRewriter &rewriter) const override {
-    auto loadOp =
-        reshapeOp.src().getDefiningOp<IREE::HAL::InterfaceLoadTensorOp>();
-    if (!loadOp) return failure();
-    rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceLoadTensorOp>(
-        reshapeOp, reshapeOp.getResultType(), loadOp.offset(),
-        loadOp->getAttrs());
-    return success();
-  }
-};
 
-/// Pattern to fuse linalg.tensor_reshape -> hal.interface.store.tensor
-struct FuseWithHALInterfaceStoreTensor
-    : public OpRewritePattern<IREE::HAL::InterfaceStoreTensorOp> {
-  using OpRewritePattern<IREE::HAL::InterfaceStoreTensorOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::HAL::InterfaceStoreTensorOp storeOp,
-                                PatternRewriter &rewriter) const override {
-    auto reshapeOp = storeOp.operand().getDefiningOp<linalg::TensorReshapeOp>();
-    if (!reshapeOp) return failure();
-    SmallVector<Value, 2> operands = {reshapeOp.src(), storeOp.offset()};
-    rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceStoreTensorOp>(
-        storeOp, ArrayRef<Type>(), operands, storeOp->getAttrs());
-    return success();
-  }
-};
+using linalg::LinalgOp;
 
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
 struct FusionOfTensorOpsPass
-    : public PassWrapper<FusionOfTensorOpsPass, OperationPass<>> {
+    : public FusionOfTensorOpsBase<FusionOfTensorOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::HAL::HALDialect, linalg::LinalgDialect>();
@@ -77,27 +46,22 @@ struct FusionOfTensorOpsPass
     OwningRewritePatternList interfacePatterns(&getContext());
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
-    interfacePatterns.insert<FuseWithHALInterfaceLoadTensor,
-                             FuseWithHALInterfaceStoreTensor>(context);
-    FrozenRewritePatternSet frozenInterfacePatterns(
-        std::move(interfacePatterns));
-
-    (void)applyPatternsAndFoldGreedily(op->getRegions(),
-                                       frozenInterfacePatterns);
 
     // Only fuse operations where all uses of the producer are generic or
     // indexed generic operations. If an operation is used in a named op, it
     // will be computed anyway, so the consumers can just use that value.
     linalg::ControlElementwiseOpsFusionFn controlFn =
         [](const OpResult &producer, const OpOperand &consumer) {
-          // TODO(GH-5045): Enable fusion with reduction consumer. Currently
-          // vectorization doesn't handle generic ops with reduction iterators
-          // we will disable for now to allow vectorizing producer pointwise
-          // ops.
-          auto consumerOp = consumer.getOwner();
-          if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
-              dyn_cast<linalg::LinalgOp>(consumerOp).getNumReductionLoops()) {
-            return false;
+          // TODO(GH-5611): Enable fusion with reduction consumer for all
+          // targets. Currently vectorization doesn't handle generic ops with
+          // reduction iterators we will disable for now to allow vectorizing
+          // producer pointwise ops to avoid performance regressions on CPU.
+          if (!clEnableFusionWithReductionOps) {
+            auto consumerOp = consumer.getOwner();
+            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
+                dyn_cast<LinalgOp>(consumerOp).getNumReductionLoops()) {
+              return false;
+            }
           }
 
           llvm::SmallDenseSet<Operation *, 4> numUsers;
@@ -108,27 +72,57 @@ struct FusionOfTensorOpsPass
           }
           return numUsers.empty();
         };
-
+    // Simple heuristic to decide if reshaope should be folded in the linalg.
+    // If the source of the reshape is a linalg op fold to potentially allow the
+    // two linalg ops to be fused. Otherwise leave it to avoid adding dimensions
+    // to the consumer linalg op.
+    linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
+        [](const OpResult &producer, const OpOperand &consumer) {
+          auto collapseOp =
+              producer.getDefiningOp<linalg::TensorCollapseShapeOp>();
+          if (collapseOp)
+            return collapseOp.src().getDefiningOp<LinalgOp>() != nullptr;
+          auto expandOp = producer.getDefiningOp<linalg::TensorExpandShapeOp>();
+          if (expandOp)
+            return expandOp.src().getDefiningOp<LinalgOp>() != nullptr;
+          return false;
+        };
     linalg::populateElementwiseOpsFusionPatterns(
-        fusionPatterns, linalg::LinalgElementwiseFusionOptions()
-                            .setAllowFoldingUnitDimReshapes(true)
-                            .setControlElementwiseOpsFusionFn(controlFn));
+        fusionPatterns,
+        linalg::LinalgElementwiseFusionOptions()
+            .setControlFoldingReshapes(foldReshapeBetweenLinalgFn)
+            .setControlElementwiseOpsFusionFn(controlFn));
 
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(fusionPatterns));
 
+    OwningRewritePatternList reshapeCanonicalizations(&getContext());
+    linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
+        reshapeCanonicalizations);
+    linalg::TensorCollapseShapeOp::getCanonicalizationPatterns(
+        reshapeCanonicalizations, context);
+    linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
+        reshapeCanonicalizations, context);
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
-                                       frozenInterfacePatterns);
+                                       std::move(reshapeCanonicalizations));
+
+    // Push the remaining reshapes down the graphs.
+    OwningRewritePatternList pushReshapePatterns(&getContext());
+    linalg::populatePushReshapeOpsPatterns(pushReshapePatterns);
+    linalg::TensorCollapseShapeOp::getCanonicalizationPatterns(
+        pushReshapePatterns, context);
+    linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
+        pushReshapePatterns, context);
+    (void)applyPatternsAndFoldGreedily(op->getRegions(),
+                                       std::move(pushReshapePatterns));
   }
 };
+
 }  // namespace
 
 std::unique_ptr<Pass> createFusionOfTensorOpsPass() {
   return std::make_unique<FusionOfTensorOpsPass>();
 }
-
-static PassRegistration<FusionOfTensorOpsPass> pass(
-    "iree-codegen-fusion-of-tensor-ops", "Fuse operations on tensors");
 
 }  // namespace iree_compiler
 }  // namespace mlir

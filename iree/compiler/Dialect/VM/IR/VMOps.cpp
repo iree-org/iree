@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
@@ -82,18 +74,18 @@ static LogicalResult verifyModuleOp(ModuleOp op) {
 
 static ParseResult parseFuncOp(OpAsmParser &parser, OperationState *result) {
   auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
-                          ArrayRef<Type> results, impl::VariadicFlag,
-                          std::string &) {
+                          ArrayRef<Type> results,
+                          function_like_impl::VariadicFlag, std::string &) {
     return builder.getFunctionType(argTypes, results);
   };
-  return impl::parseFunctionLikeOp(parser, *result, /*allowVariadic=*/false,
-                                   buildFuncType);
+  return function_like_impl::parseFunctionLikeOp(
+      parser, *result, /*allowVariadic=*/false, buildFuncType);
 }
 
 static void printFuncOp(OpAsmPrinter &p, FuncOp &op) {
   FunctionType fnType = op.getType();
-  impl::printFunctionLikeOp(p, op, fnType.getInputs(), /*isVariadic=*/false,
-                            fnType.getResults());
+  function_like_impl::printFunctionLikeOp(
+      p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
 
 void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
@@ -108,15 +100,10 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
     return;
   }
 
-  unsigned numInputs = type.getNumInputs();
-  assert(numInputs == argAttrs.size() &&
+  assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  SmallString<8> argAttrName;
-  for (unsigned i = 0; i < numInputs; ++i) {
-    if (argAttrs[i] && !argAttrs[i].empty()) {
-      result.addAttribute(getArgAttrName(i, argAttrName), argAttrs[i]);
-    }
-  }
+  function_like_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                           /*resultAttrs=*/llvm::None);
 }
 
 Block *FuncOp::addEntryBlock() {
@@ -227,18 +214,15 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
     return parser.emitError(parser.getCurrentLocation())
            << "invalid result type list";
   }
-  for (int i = 0; i < argAttrs.size(); ++i) {
-    SmallString<8> argName;
-    mlir::impl::getArgAttrName(i, argName);
-    result->addAttribute(argName, argAttrs[i]);
-  }
+  function_like_impl::addArgAndResultAttrs(builder, *result, argAttrs,
+                                           /*resultAttrs=*/llvm::None);
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
 
   auto functionType =
       FunctionType::get(result->getContext(), argTypes, resultTypes);
-  result->addAttribute(mlir::impl::getTypeAttrName(),
+  result->addAttribute(mlir::function_like_impl::getTypeAttrName(),
                        TypeAttr::get(functionType));
 
   // No clue why this is required.
@@ -270,12 +254,12 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
   } else if (op.getNumFuncResults() > 1) {
     p << " -> (" << op.getType().getResults() << ")";
   }
-  mlir::impl::printFunctionAttributes(p, op, op.getNumFuncArguments(),
-                                      op.getNumFuncResults(),
-                                      /*elided=*/
-                                      {
-                                          "is_variadic",
-                                      });
+  mlir::function_like_impl::printFunctionAttributes(
+      p, op, op.getNumFuncArguments(), op.getNumFuncResults(),
+      /*elided=*/
+      {
+          "is_variadic",
+      });
 }
 
 void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
@@ -289,15 +273,10 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
     return;
   }
 
-  unsigned numInputs = type.getNumInputs();
-  assert(numInputs == argAttrs.size() &&
+  assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  SmallString<8> argAttrName;
-  for (unsigned i = 0; i < numInputs; ++i) {
-    if (argAttrs[i] && !argAttrs[i].empty()) {
-      result.addAttribute(getArgAttrName(i, argAttrName), argAttrs[i]);
-    }
-  }
+  function_like_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                           /*resultAttrs=*/llvm::None);
 }
 
 LogicalResult ImportOp::verifyType() {
@@ -451,6 +430,16 @@ void GlobalLoadI64Op::getEffects(
   addMemoryEffectsForGlobal<GlobalI64Op>(*this, global(), effects);
 }
 
+void GlobalLoadF32Op::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  addMemoryEffectsForGlobal<GlobalF32Op>(*this, global(), effects);
+}
+
+void GlobalLoadF64Op::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  addMemoryEffectsForGlobal<GlobalF64Op>(*this, global(), effects);
+}
+
 void GlobalLoadRefOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   addMemoryEffectsForGlobal<GlobalRefOp>(*this, global(), effects);
@@ -499,8 +488,7 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
 //===----------------------------------------------------------------------===//
 
 template <typename T>
-static ParseResult parseConstIntegerOp(OpAsmParser &parser,
-                                       OperationState *result) {
+static ParseResult parseConstOp(OpAsmParser &parser, OperationState *result) {
   Attribute valueAttr;
   NamedAttrList dummyAttrs;
   if (failed(parser.parseAttribute(valueAttr, "value", dummyAttrs))) {
@@ -521,7 +509,7 @@ static ParseResult parseConstIntegerOp(OpAsmParser &parser,
 }
 
 template <typename T>
-static void printConstIntegerOp(OpAsmPrinter &p, T &op) {
+static void printConstOp(OpAsmPrinter &p, T &op) {
   p << op.getOperationName() << ' ';
   p.printAttribute(op.value());
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
@@ -548,6 +536,26 @@ static bool isConstIntegerBuildableWith(Attribute value, Type type) {
 }
 
 template <int SZ>
+static bool isConstFloatBuildableWith(Attribute value, Type type) {
+  // FlatSymbolRefAttr can only be used with a function type.
+  if (value.isa<FlatSymbolRefAttr>()) {
+    return false;
+  }
+  // Otherwise, the attribute must have the same type as 'type'.
+  if (value.getType() != type) {
+    return false;
+  }
+  Type elementType;
+  if (auto floatAttr = value.dyn_cast<FloatAttr>()) {
+    elementType = floatAttr.getType();
+  } else if (auto elementsAttr = value.dyn_cast<ElementsAttr>()) {
+    elementType = elementsAttr.getType().getElementType();
+  }
+  if (!elementType) return false;
+  return elementType.getIntOrFloatBitWidth() == SZ;
+}
+
+template <int SZ>
 static Attribute convertConstIntegerValue(Attribute value) {
   assert(isConstIntegerBuildableWith<SZ>(value, value.getType()));
   Builder builder(value.getContext());
@@ -563,6 +571,42 @@ static Attribute convertConstIntegerValue(Attribute value) {
   } else if (auto v = value.dyn_cast<ElementsAttr>()) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, integerType);
+    if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
+      return SplatElementsAttr::get(adjustedType, elements.getSplatValue());
+    } else {
+      return DenseElementsAttr::get(
+          adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
+    }
+  }
+  llvm_unreachable("unexpected attribute type");
+  return Attribute();
+}
+
+static FloatType getFloatType(int bitwidth, MLIRContext *context) {
+  switch (bitwidth) {
+    case 16:
+      return FloatType::getF16(context);
+    case 32:
+      return FloatType::getF32(context);
+    case 64:
+      return FloatType::getF64(context);
+    default:
+      llvm_unreachable("unhandled floating point type");
+      return {};
+  }
+}
+
+template <int SZ>
+static Attribute convertConstFloatValue(Attribute value) {
+  assert(isConstFloatBuildableWith<SZ>(value, value.getType()));
+  Builder builder(value.getContext());
+  auto floatType = getFloatType(SZ, value.getContext());
+  int32_t dims = 1;
+  if (auto v = value.dyn_cast<FloatAttr>()) {
+    return FloatAttr::get(floatType, v.getValue());
+  } else if (auto v = value.dyn_cast<ElementsAttr>()) {
+    dims = v.getNumElements();
+    ShapedType adjustedType = VectorType::get({dims}, floatType);
     if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
       return SplatElementsAttr::get(adjustedType, elements.getSplatValue());
     } else {
@@ -618,6 +662,50 @@ void ConstI64Op::build(OpBuilder &builder, OperationState &result,
   return build(builder, result, builder.getI64IntegerAttr(value));
 }
 
+// static
+bool ConstF32Op::isBuildableWith(Attribute value, Type type) {
+  return isConstFloatBuildableWith<32>(value, type);
+}
+
+// static
+Attribute ConstF32Op::convertConstValue(Attribute value) {
+  return convertConstFloatValue<32>(value);
+}
+
+void ConstF32Op::build(OpBuilder &builder, OperationState &result,
+                       Attribute value) {
+  Attribute newValue = convertConstValue(value);
+  result.addAttribute("value", newValue);
+  result.addTypes(newValue.getType());
+}
+
+void ConstF32Op::build(OpBuilder &builder, OperationState &result,
+                       float value) {
+  return build(builder, result, builder.getF32FloatAttr(value));
+}
+
+// static
+bool ConstF64Op::isBuildableWith(Attribute value, Type type) {
+  return isConstFloatBuildableWith<64>(value, type);
+}
+
+// static
+Attribute ConstF64Op::convertConstValue(Attribute value) {
+  return convertConstFloatValue<64>(value);
+}
+
+void ConstF64Op::build(OpBuilder &builder, OperationState &result,
+                       Attribute value) {
+  Attribute newValue = convertConstValue(value);
+  result.addAttribute("value", newValue);
+  result.addTypes(newValue.getType());
+}
+
+void ConstF64Op::build(OpBuilder &builder, OperationState &result,
+                       double value) {
+  return build(builder, result, builder.getF64FloatAttr(value));
+}
+
 void ConstI32ZeroOp::build(OpBuilder &builder, OperationState &result) {
   result.addTypes(builder.getIntegerType(32));
 }
@@ -626,12 +714,33 @@ void ConstI64ZeroOp::build(OpBuilder &builder, OperationState &result) {
   result.addTypes(builder.getIntegerType(64));
 }
 
+void ConstF32ZeroOp::build(OpBuilder &builder, OperationState &result) {
+  result.addTypes(builder.getF32Type());
+}
+
+void ConstF64ZeroOp::build(OpBuilder &builder, OperationState &result) {
+  result.addTypes(builder.getF64Type());
+}
+
 void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
                            Type objectType) {
   result.addTypes(objectType);
 }
 
 static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
+  // TODO(#4670): Share across ops or upstream a custom directive
+  StringRef visibility;
+  if (parser.parseOptionalKeyword(&visibility,
+                                  {"public", "private", "nested"})) {
+    parser.emitError(
+        parser.getCurrentLocation(),
+        "expected valid visibility specifier (public, private or nested)");
+    return failure();
+  }
+  StringAttr visibilityAttr = parser.getBuilder().getStringAttr(visibility);
+  result->attributes.push_back(parser.getBuilder().getNamedAttr(
+      SymbolTable::getVisibilityAttrName(), visibilityAttr));
+
   StringAttr nameAttr;
   Attribute valueAttr;
   if (failed(parser.parseSymbolName(nameAttr,
@@ -640,11 +749,19 @@ static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
       failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
     return failure();
   }
+
   return success();
 }
 
 static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   p << op.getOperationName() << ' ';
+
+  // TODO(#4670): Share across ops or upstream a custom directive
+  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
+  if (auto visibility = op->getAttrOfType<StringAttr>(visibilityAttrName)) {
+    p << visibility.getValue() << ' ';
+  }
+
   p.printSymbolName(op.sym_name());
   p << ' ';
   p.printAttribute(op.value());
@@ -670,7 +787,8 @@ void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
                              StringRef rodataName,
                              ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("rodata", builder.getSymbolRefAttr(rodataName));
-  auto type = IREE::VM::RefType::get(ByteBufferType::get(builder.getContext()));
+  auto type =
+      IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
   result.addTypes({type});
   result.addAttributes(attrs);
 }
@@ -1128,6 +1246,6 @@ Optional<MutableOperandRange> CondBreakOp::getMutableSuccessorOperands(
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/VM/IR/VMOpEncoder.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOpEncoder.cpp.inc"  // IWYU pragma: keep
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"  // IWYU pragma: keep

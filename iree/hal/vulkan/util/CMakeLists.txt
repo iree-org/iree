@@ -18,7 +18,6 @@ iree_cc_library(
   SRCS
     "arena.cc"
   DEPS
-    absl::span
     iree::base::core_headers
     iree::base::logging
   PUBLIC

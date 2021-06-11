@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
@@ -31,17 +23,20 @@ endif()
 
 cc_library(
     name = "registration",
-    srcs = ["driver_module.cc"],
+    srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
     defines = [
         "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/hal:api",
+        "//iree/base",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/local",
         "//iree/hal/local:task_driver",
         "//iree/hal/local/loaders:embedded_library_loader",
         "//iree/hal/local/loaders:legacy_library_loader",
-        "@com_google_absl//absl/flags:flag",
+        "//iree/task:api",
     ],
 )
 
@@ -53,7 +48,9 @@ cc_library(
         "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/hal:api",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/local",
         "//iree/hal/local:sync_driver",
         "//iree/hal/local/loaders:legacy_library_loader",
     ],

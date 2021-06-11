@@ -1,29 +1,23 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/vm/instance.h"
+
+#include <stddef.h>
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/builtin_types.h"
 
-struct iree_vm_instance {
+struct iree_vm_instance_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 };
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
+IREE_API_EXPORT iree_status_t iree_vm_instance_create(
     iree_allocator_t allocator, iree_vm_instance_t** out_instance) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_instance);
@@ -50,15 +44,13 @@ static void iree_vm_instance_destroy(iree_vm_instance_t* instance) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_instance_retain(iree_vm_instance_t* instance) {
+IREE_API_EXPORT void iree_vm_instance_retain(iree_vm_instance_t* instance) {
   if (instance) {
     iree_atomic_ref_count_inc(&instance->ref_count);
   }
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_instance_release(iree_vm_instance_t* instance) {
+IREE_API_EXPORT void iree_vm_instance_release(iree_vm_instance_t* instance) {
   if (instance && iree_atomic_ref_count_dec(&instance->ref_count) == 1) {
     iree_vm_instance_destroy(instance);
   }

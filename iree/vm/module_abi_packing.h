@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_VM_MODULE_ABI_PACKING_H_
 #define IREE_VM_MODULE_ABI_PACKING_H_
@@ -426,10 +418,8 @@ struct ParamUnpack<absl::string_view> {
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
-    if (reg_ptr->type ==
-        ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()->type) {
-      auto byte_span =
-          reinterpret_cast<iree_vm_ro_byte_buffer_t*>(reg_ptr->ptr)->data;
+    if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::get()->type) {
+      auto byte_span = reinterpret_cast<iree_vm_buffer_t*>(reg_ptr->ptr)->data;
       out_param = absl::string_view{
           reinterpret_cast<const char*>(byte_span.data), byte_span.data_length};
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
@@ -439,9 +429,8 @@ struct ParamUnpack<absl::string_view> {
           "have %.*s but expected %.*s",
           (int)iree_vm_ref_type_name(reg_ptr->type).size,
           iree_vm_ref_type_name(reg_ptr->type).data,
-          (int)ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()
-              ->type_name.size,
-          ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()->type_name.data);
+          (int)ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.size,
+          ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.data);
     } else {
       // NOTE: empty string is allowed here!
       out_param = {};

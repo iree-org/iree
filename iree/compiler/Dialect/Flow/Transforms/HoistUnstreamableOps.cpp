@@ -1,22 +1,15 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <algorithm>
 #include <iterator>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/SmallVector.h"
@@ -66,11 +59,11 @@ namespace {
 //
 // This pass shares similar goals to HoistShapeCalculationsPass, but is not
 // limited to shape calculation operations.
-class HoistUnstreamableOps
-    : public PassWrapper<HoistUnstreamableOps, FunctionPass> {
+class HoistUnstreamableOpsPass
+    : public HoistUnstreamableOpsBase<HoistUnstreamableOpsPass> {
  public:
-  void runOnFunction() override {
-    auto func = getFunction();
+  void runOnOperation() override {
+    auto func = getOperation();
     for (Block &block : func) {
       // TODO(gcmn): isBeforeInBlock is O(n) with repeated block modification,
       // making this quadratic.
@@ -96,12 +89,8 @@ class HoistUnstreamableOps
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass() {
-  return std::make_unique<HoistUnstreamableOps>();
+  return std::make_unique<HoistUnstreamableOpsPass>();
 }
-
-static PassRegistration<HoistUnstreamableOps> pass(
-    "iree-flow-hoist-unstreamable-ops",
-    "Hoist ops that cannot be captured in streams to the top of their block.");
 
 }  // namespace Flow
 }  // namespace IREE

@@ -1,32 +1,29 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/vulkan/vulkan_driver.h"
 
-#include <memory>
+#include <cstdint>
+#include <cstring>
 
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/debug_reporter.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/arena.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 #include "iree/hal/vulkan/vulkan_device.h"
 
 using namespace iree::hal::vulkan;
 
-typedef struct {
+typedef struct iree_hal_vulkan_driver_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
 
@@ -64,7 +61,7 @@ static iree_hal_vulkan_driver_t* iree_hal_vulkan_driver_cast(
   return (iree_hal_vulkan_driver_t*)base_value;
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_driver_options_initialize(
+IREE_API_EXPORT void iree_hal_vulkan_driver_options_initialize(
     iree_hal_vulkan_driver_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->api_version = VK_API_VERSION_1_2;
@@ -207,7 +204,7 @@ static iree_status_t iree_hal_vulkan_driver_compute_enabled_extensibility_sets(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create(
     iree_string_view_t identifier,
     const iree_hal_vulkan_driver_options_t* options,
     iree_hal_vulkan_syms_t* opaque_syms, iree_allocator_t host_allocator,
@@ -263,8 +260,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_driver_create_using_instance(
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create_using_instance(
     iree_string_view_t identifier,
     const iree_hal_vulkan_driver_options_t* options,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,

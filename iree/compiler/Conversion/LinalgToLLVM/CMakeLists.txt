@@ -10,33 +10,22 @@
 
 iree_add_all_subdirs()
 
-iree_tablegen_library(
-  NAME
-    FoldTensorExtractOpIncGen
-  TD_FILE
-    "FoldTensorExtractOp.td"
-  OUTS
-    -gen-rewriters FoldTensorExtractOp.cpp.inc
-)
-
 iree_cc_library(
   NAME
     LinalgToLLVM
   HDRS
     "KernelDispatch.h"
-    "LLVMCodeGenOptions.h"
     "Passes.h"
   SRCS
     "ConvertToLLVM.cpp"
-    "FoldTensorExtractOpPass.cpp"
     "KernelDispatch.cpp"
-    "LLVMCodeGenOptions.cpp"
-    "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"
     "LinalgVectorizePass.cpp"
-    "MaterializeCPULaunchConfigurationPass.cpp"
+    "LowerExecutableTargetPass.cpp"
+    "PadLinalgWorkgroupTiles.cpp"
     "Passes.cpp"
     "PlanConvLoopOrder.cpp"
+    "TilePadAndVectorizeWorkgroups.cpp"
     "UnfuseFMAOps.cpp"
   DEPS
     LLVMSupport
@@ -66,9 +55,8 @@ iree_cc_library(
     MLIRVectorToSCF
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToHLO
-    iree::compiler::Conversion::LinalgToLLVM::FoldTensorExtractOpIncGen
     iree::compiler::Conversion::VectorToLLVM
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR

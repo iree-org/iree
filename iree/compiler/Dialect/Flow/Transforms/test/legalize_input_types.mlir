@@ -9,7 +9,7 @@ func @constantI64() -> i64 {
 }
 
 // CHECK-LABEL: func @argUI64
-// CHECK-SAME: (%{{.*}}: i32) -> i32
+// CHECK-SAME: (%{{.*}}: ui32) -> ui32
 func @argUI64(%arg: ui64) -> ui64 {
   return %arg : ui64
 }
@@ -23,9 +23,9 @@ func @hloConstantI64() -> tensor<1xi64> {
 }
 
 // CHECK-LABEL: func @hloConstantUI64
-// CHECK-SAME: () -> tensor<1xi32>
+// CHECK-SAME: () -> tensor<1xui32>
 func @hloConstantUI64() -> tensor<1xui64> {
-  // CHECK-NEXT: mhlo.constant dense<123> : tensor<1xi32>
+  // CHECK-NEXT: mhlo.constant dense<123> : tensor<1xui32>
   %c123 = mhlo.constant dense<123> : tensor<1xui64>
   return %c123 : tensor<1xui64>
 }

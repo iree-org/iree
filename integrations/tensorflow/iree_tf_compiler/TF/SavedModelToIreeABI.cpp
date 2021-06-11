@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // TensorFlow exported functions support a structured calling convention
 // consisting of fixed-arity lists and dicts flattened onto linear arguments
@@ -115,11 +107,27 @@ struct StructureLevel {
   // Children (must be heap allocated due to recursion).
   std::vector<StructureLevel> children;
 
+  // The root argument level is still just a list but has a special dict
+  // child in which to shove kwargs. Once everything is constructed, if the
+  // kwargs dict is not empty, it is added as the last child.
+  bool isRootArgs = false;
+  std::unique_ptr<StructureLevel> kwargs;
+
+  // If this is the kwargs dict level, it will have this bit set.
+  bool isKwargs = false;
+
   static StructureLevel leafValue(int valueIndex) {
     return StructureLevel{LevelType::Value, valueIndex};
   }
 
-  static StructureLevel list() { return StructureLevel{LevelType::List}; }
+  static StructureLevel createRootArgsList() {
+    StructureLevel ret = StructureLevel{LevelType::List};
+    ret.isRootArgs = true;
+    ret.kwargs =
+        std::unique_ptr<StructureLevel>(new StructureLevel{LevelType::Dict});
+    ret.kwargs->isKwargs = true;
+    return ret;
+  }
 
   Type getIrType(Builder builder) {
     auto variantType =
@@ -163,7 +171,7 @@ struct StructureLevel {
             json::Value(type == LevelType::List ? "slist" : "stuple"));
         int lastIndex = 0;
         for (auto &child : children) {
-          for (int j = lastIndex; j < child.ikey; ++j) {
+          for (int j = children.size(); j < child.ikey; ++j) {
             typeRecord.push_back(json::Value(nullptr));
           }
           lastIndex = child.valueIndex;
@@ -173,7 +181,8 @@ struct StructureLevel {
       }
       case LevelType::Dict: {
         json::Array typeRecord;
-        typeRecord.push_back(json::Value("sdict"));
+        typeRecord.push_back(isKwargs ? json::Value("sdict_kwargs")
+                                      : json::Value("sdict"));
         for (auto &child : children) {
           json::Array nvRecord;
           nvRecord.push_back(child.skey);
@@ -241,6 +250,8 @@ struct StructureLevel {
                                      builder.getIndexAttr(getNeededListSize()));
       Value listValue = builder.create<iree_compiler::IREE::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
+      builder.create<iree_compiler::IREE::ListResizeOp>(loc, listValue,
+                                                        listSizeValue);
       for (StructureLevel &child : children) {
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
@@ -258,6 +269,8 @@ struct StructureLevel {
                                      builder.getIndexAttr(getNeededListSize()));
       Value listValue = builder.create<iree_compiler::IREE::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
+      builder.create<iree_compiler::IREE::ListResizeOp>(loc, listValue,
+                                                        listSizeValue);
       for (auto it : llvm::enumerate(children)) {
         StructureLevel &child = it.value();
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
@@ -285,6 +298,12 @@ struct StructureLevel {
   }
 
   void normalize() {
+    // Handle root kwargs.
+    if (isRootArgs && !kwargs->children.empty()) {
+      kwargs->ikey = children.size();
+      children.push_back(std::move(*kwargs));
+    }
+
     // Sort by key.
     if (type == LevelType::List || type == LevelType::Tuple) {
       std::sort(
@@ -300,7 +319,7 @@ struct StructureLevel {
   }
 
   StructureLevel *bindValue(Location loc, int newValueIndex, Type valueType,
-                            ArrayAttr indexPathAttr) {
+                            ArrayAttr indexPathAttr, bool bindTuple = false) {
     StructureLevel *current = this;
     // Move forward through non terminal path segments.
     for (Attribute indexAttr : indexPathAttr) {
@@ -310,7 +329,8 @@ struct StructureLevel {
         if (!current) return nullptr;
       } else if (auto intAttr = indexAttr.dyn_cast<IntegerAttr>()) {
         int childIndex = intAttr.getInt();
-        current = current->allocateChild(loc, childIndex);
+        current =
+            current->allocateChild(loc, childIndex, /*asTuple=*/bindTuple);
         if (!current) return nullptr;
       } else {
         emitError(loc)
@@ -334,9 +354,14 @@ struct StructureLevel {
   StructureLevel *allocateChild(Location loc, StringRef childKey) {
     if (type == LevelType::None) type = LevelType::Dict;
     if (type != LevelType::Dict) {
-      emitError(loc) << "structure path mismatch: dereference a non-dict "
-                     << "with a dict key '" << childKey << "'";
-      return nullptr;
+      // Special case for root-args: shove it into the kwargs.
+      if (isRootArgs) {
+        return kwargs->allocateChild(loc, childKey);
+      } else {
+        emitError(loc) << "structure path mismatch: dereference a non-dict "
+                       << "with a dict key '" << childKey << "'";
+        return nullptr;
+      }
     }
     for (auto &child : children) {
       if (child.skey == childKey) return &child;
@@ -348,8 +373,10 @@ struct StructureLevel {
     return &children.back();
   }
 
-  StructureLevel *allocateChild(Location loc, int childIndex) {
-    if (type == LevelType::None) type = LevelType::List;
+  StructureLevel *allocateChild(Location loc, int childIndex,
+                                bool asTuple = false) {
+    if (type == LevelType::None)
+      type = asTuple ? LevelType::Tuple : LevelType::List;
     if (type != LevelType::List && type != LevelType::Tuple) {
       emitError(loc) << "structure path mismatch: dereference a non-sequence "
                      << "with a sequence key " << childIndex;
@@ -377,7 +404,7 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   json::Array refReturns;
 
   // Process each flattened argument into the argsRoot.
-  StructureLevel argsRoot = StructureLevel::list();
+  StructureLevel argsRoot = StructureLevel::createRootArgsList();
   SmallVector<StructureLevel *> flattenedArgLevels;
   for (int i = 0, e = internalFunc.getNumArguments(); i < e; i++) {
     auto indexPathAttr = internalFunc.getArgAttrOfType<mlir::ArrayAttr>(
@@ -407,8 +434,12 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
              << " on result " << i;
     }
     internalFunc.removeResultAttr(i, savedModelIndexPathIdent);
+    // TODO: The TensorFlow SavedModel attribute system does not distinguish
+    // lists from tuples, but TensorFlow internally does. Until this is
+    // plumbed through somehow, arbitrarily emit results as tuples as that
+    // was determined by someone at some point to be more canonical.
     if (!resultsRoot.bindValue(loc, i, internalFuncType.getResult(i),
-                               indexPathAttr)) {
+                               indexPathAttr, /*bindTuple=*/true)) {
       return failure();
     }
   }
@@ -417,7 +448,7 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // towards multi-return safe by converting to tuple.
   // TODO: Investigate upstream whether there are additional signals to be
   // plumbed.
-  bool isMultiResult = resultsRoot.type == LevelType::List;
+  bool isMultiResult = resultsRoot.type == LevelType::Tuple;
 
   // Build the wrapper function type.
   SmallVector<Type> wrapperArgTypes;

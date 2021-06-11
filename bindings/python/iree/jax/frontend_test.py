@@ -1,16 +1,8 @@
-# Copyright 2021 Google LLC
+# Copyright 2021 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from absl.testing import absltest
 import iree.jax
@@ -77,43 +69,7 @@ class JAXFrontendTest(absltest.TestCase):
         },
         jnp.zeros((1, 32)),
     ]
-    binary = iree.jax.aot(pytree_func, *trace_args, target_backends=["vmla"])
-
-  def test_jit_get_binary(self):
-
-    @iree.jax.jit(backend="vmla")
-    def scaled_dot_product_attention(q, k, v):
-      # Subscripts:
-      #   q: seq_len_q, k: seq_len_kv, d: att_depth_qk, v: att_depth_v
-      qk = jnp.einsum("...qd, ...kd -> ...qk", q, k)
-      soft_qk = jax.nn.softmax(qk / np.sqrt(k.shape[-1]), axis=-1)
-      return jnp.einsum("...qk, ...kv -> ...qv", soft_qk, v)
-
-    np.random.seed(0)
-    inputs_1 = [normal((2, 4, 5, 8)) for _ in range(3)]
-    vmla_result_1 = scaled_dot_product_attention(*inputs_1)
-    jax_result_1 = scaled_dot_product_attention._function(*inputs_1)
-    np.testing.assert_allclose(vmla_result_1, jax_result_1, **TOLERANCE)
-
-    inputs_2 = [normal((2, 1, 6, 8)) for _ in range(3)]
-    vmla_result_2 = scaled_dot_product_attention(*inputs_2)
-    jax_result_2 = scaled_dot_product_attention._function(*inputs_2)
-    np.testing.assert_allclose(vmla_result_2, jax_result_2, **TOLERANCE)
-
-    # Test that the binaries are different.
-    binary_1 = scaled_dot_product_attention.get_binary(*inputs_1)
-    binary_2 = scaled_dot_product_attention.get_binary(*inputs_2)
-    self.assertNotEqual(binary_1, binary_2)
-
-    # Test that the binary gives the same result.
-    cpp_vm_module = iree.runtime.VmModule.from_flatbuffer(binary_1)
-    module = iree.runtime.load_module(cpp_vm_module,
-                                      config=iree.runtime.Config("vmla"))
-    binary_result_1 = module.main(*inputs_1)
-    np.testing.assert_equal(binary_result_1, vmla_result_1)
-
-    with self.assertRaises(ValueError):
-      bad_input_shape = module.main(*inputs_2)
+    binary = iree.jax.aot(pytree_func, *trace_args, target_backends=["vmvx"])
 
   def test_jit_pytree_return(self):
 

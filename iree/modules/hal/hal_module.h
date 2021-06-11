@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_MODULES_HAL_HAL_MODULE_H_
 #define IREE_MODULES_HAL_HAL_MODULE_H_
@@ -45,14 +37,30 @@ extern "C" {
 
 // Registers the custom types used by the HAL module.
 // WARNING: not thread-safe; call at startup before using.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_module_register_types();
+IREE_API_EXPORT iree_status_t iree_hal_module_register_types(void);
 
 // Creates the HAL module initialized to use a specific |device|.
 // Each context using this module will share the device and have compatible
 // allocations.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
                        iree_vm_module_t** out_module);
+
+// Returns the device currently in use by the HAL module.
+// Returns NULL if no device has been initialized yet.
+IREE_API_EXPORT iree_hal_device_t* iree_hal_module_state_device(
+    iree_vm_module_state_t* module_state);
+
+// TODO(benvanik): generate these list helpers:
+
+IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_assign(
+    const iree_vm_list_t* list, iree_host_size_t i);
+
+IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_retain(
+    const iree_vm_list_t* list, iree_host_size_t i);
+
+IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_view_retain(
+    iree_vm_list_t* list, iree_host_size_t i, iree_hal_buffer_view_t* value);
 
 #ifdef __cplusplus
 }  // extern "C"

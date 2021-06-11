@@ -1,24 +1,21 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 #include "iree/hal/cuda/api.h"
 #include "iree/hal/cuda/cuda_device.h"
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/status_util.h"
 
-typedef struct {
+typedef struct iree_hal_cuda_driver_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   // Identifier used for the driver in the IREE driver registry.
@@ -41,7 +38,7 @@ static iree_hal_cuda_driver_t* iree_hal_cuda_driver_cast(
   return (iree_hal_cuda_driver_t*)base_value;
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_hal_cuda_driver_options_initialize(
+IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
     iree_hal_cuda_driver_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->default_device_index = 0;
@@ -82,7 +79,7 @@ static void iree_hal_cuda_driver_destroy(iree_hal_driver_t* base_driver) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_cuda_driver_create(
+IREE_API_EXPORT iree_status_t iree_hal_cuda_driver_create(
     iree_string_view_t identifier,
     const iree_hal_cuda_driver_options_t* options,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {

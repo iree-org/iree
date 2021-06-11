@@ -43,13 +43,13 @@ vm.module @my_module {
 
 // CHECK-LABEL: @switch_ref
 vm.module @my_module {
-  vm.func @switch_ref(%arg0 : i32) -> !vm.ref<!iree.byte_buffer> {
-    %0 = "make_buffer"() : () -> !vm.ref<!iree.byte_buffer>
-    %1 = "make_buffer"() : () -> !vm.ref<!iree.byte_buffer>
-    %2 = "make_buffer"() : () -> !vm.ref<!iree.byte_buffer>
-    %3 = "make_buffer"() : () -> !vm.ref<!iree.byte_buffer>
-    // CHECK: vm.switch.ref %arg0[%0, %1, %2] else %3 : !vm.ref<!iree.byte_buffer>
-    %4 = vm.switch.ref %arg0[%0, %1, %2] else %3 : !vm.ref<!iree.byte_buffer>
-    vm.return %4 : !vm.ref<!iree.byte_buffer>
+  vm.func @switch_ref(%arg0 : i32) -> !vm.buffer {
+    %0 = "make_buffer"() : () -> !vm.buffer
+    %1 = "make_buffer"() : () -> !vm.buffer
+    %2 = "make_buffer"() : () -> !vm.buffer
+    %3 = "make_buffer"() : () -> !vm.buffer
+    // CHECK: vm.switch.ref %arg0[%0, %1, %2] else %3 : !vm.buffer
+    %4 = vm.switch.ref %arg0[%0, %1, %2] else %3 : !vm.buffer
+    vm.return %4 : !vm.buffer
   }
 }

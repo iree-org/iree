@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_DIALECT_IREE_OPS
 #define IREE_DIALECT_IREE_OPS
@@ -69,29 +61,6 @@ def IREE_ByteBufferConstantOp : IREE_PureOp<"byte_buffer.constant"> {
   let assemblyFormat = [{
     attr-dict `:` type($result) `=` $value
   }];
-}
-
-//===----------------------------------------------------------------------===//
-// Executable ABI DO NOT ADD THINGS HERE
-//===----------------------------------------------------------------------===//
-
-// ***WARNING***: this is going away soon - please don't extend or add more
-// things like this to this file. Ops should go to the dialect they relate to
-// (HAL, in this case).
-def IREE_PlaceholderOp : IREE_Op<"placeholder", [MemoryEffects<[MemAlloc]>]> {
-  let summary = "A placeholder op to feed a value/buffer into computation";
-  let description = [{
-    This op is intended as a way to represent a value or buffer that will be fed
-    into computation. It can host additional attributes related to the value or
-    buffer. This op can be used for the cases where one need to feed in value or
-    buffer to computation in a function but cannot do that via the function
-    argument due to ABI or contract issues.
-  }];
-
-  let arguments = (ins StrAttr:$purpose);
-  let results = (outs Res<AnyType, "", [MemAlloc]>:$output);
-
-  let assemblyFormat = [{ `for` $purpose attr-dict `:` type($output) }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -187,7 +156,8 @@ def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
 // new SSA values. This would make optimizing the list usage much easier and
 // enable hoisting/CSE of list access/mutation.
 
-def IREE_ListCreateOp : IREE_PureOp<"list.create"> {
+def IREE_ListCreateOp : IREE_PureOp<
+    "list.create", [MemoryEffects<[MemAlloc]>]> {
   let summary = [{creates a new empty list}];
   let description = [{
     Creates a new empty list with an optional initial capacity.
@@ -203,7 +173,7 @@ def IREE_ListCreateOp : IREE_PureOp<"list.create"> {
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` type($result)";
 }
 
-def IREE_ListSizeOp : IREE_Op<"list.size"> {
+def IREE_ListSizeOp : IREE_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   let summary = [{the size of the list in elements}];
   let description = [{
     Returns the current size of the list in elements.
@@ -219,7 +189,7 @@ def IREE_ListSizeOp : IREE_Op<"list.size"> {
   let assemblyFormat = "operands attr-dict `:` type($list)";
 }
 
-def IREE_ListResizeOp : IREE_Op<"list.resize"> {
+def IREE_ListResizeOp : IREE_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   let summary = [{resizes the list to a new count in elements}];
   let description = [{
     Resizes the list to contain `new_size` elements. This will either truncate
@@ -235,7 +205,7 @@ def IREE_ListResizeOp : IREE_Op<"list.resize"> {
   let assemblyFormat = "operands attr-dict `:` type($list)";
 }
 
-def IREE_ListGetOp : IREE_Op<"list.get"> {
+def IREE_ListGetOp : IREE_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   let summary = [{element accessor}];
   let description = [{
     Returns the value of the element at the given index. Note that the value
@@ -255,7 +225,7 @@ def IREE_ListGetOp : IREE_Op<"list.get"> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-def IREE_ListSetOp : IREE_Op<"list.set"> {
+def IREE_ListSetOp : IREE_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let summary = [{element mutator}];
   let description = [{
     Sets the element at the given index to the new value.

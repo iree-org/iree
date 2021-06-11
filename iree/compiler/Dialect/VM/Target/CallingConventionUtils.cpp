@@ -1,16 +1,8 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
 
@@ -37,14 +29,24 @@ LogicalResult encodeCallingConventionType(Operation *op, Type type,
   if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
     s.push_back('r');
     return success();
-  } else if (auto intType = type.dyn_cast<IntegerType>()) {
-    switch (intType.getIntOrFloatBitWidth()) {
+  } else if (auto integerType = type.dyn_cast<IntegerType>()) {
+    switch (integerType.getIntOrFloatBitWidth()) {
       default:
       case 32:
         s.push_back('i');
         return success();
       case 64:
         s.push_back('I');
+        return success();
+    }
+  } else if (auto floatType = type.dyn_cast<FloatType>()) {
+    switch (floatType.getIntOrFloatBitWidth()) {
+      default:
+      case 32:
+        s.push_back('f');
+        return success();
+      case 64:
+        s.push_back('F');
         return success();
     }
   } else if (auto tupleType = type.dyn_cast<TupleType>()) {

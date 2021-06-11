@@ -1,18 +1,10 @@
 #!/bin/bash
 
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Simulates the behavior of Kokoro on a local machine.
 # Usage:
@@ -22,7 +14,8 @@
 # Just does the part of the Kokoro setup that we care about and invokes the
 # given build script.
 # An optional second parameter can be used to specify a different repo to clone
-# from. Especially useful for cloning the current git repo.
+# from. Especially useful for cloning the current git repo. If there's any local
+# change, be sure to commit it before running this simulation.
 #   ./build_tools/kokoro/gcp_ubuntu/simulate_kokoro.sh \
 #     build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh \
 #     "${PWD?}/.git"

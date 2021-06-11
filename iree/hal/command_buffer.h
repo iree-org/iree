@@ -1,16 +1,8 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_HAL_COMMAND_BUFFER_H_
 #define IREE_HAL_COMMAND_BUFFER_H_
@@ -21,6 +13,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/descriptor_set.h"
+#include "iree/hal/descriptor_set_layout.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_layout.h"
@@ -30,14 +23,14 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_device_s iree_hal_device_t;
+typedef struct iree_hal_device_t iree_hal_device_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
 // A bitfield specifying the mode of operation for a command buffer.
-enum iree_hal_command_buffer_mode_e {
+enum iree_hal_command_buffer_mode_bits_t {
   // Command buffer will be submitted once and never used again.
   // This may enable in-place patching of command buffers that reduce overhead
   // when it's known that command buffers will not be reused.
@@ -71,7 +64,7 @@ enum iree_hal_command_buffer_mode_e {
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
 // A bitfield specifying the category of commands in a command queue.
-enum iree_hal_command_category_e {
+enum iree_hal_command_category_bits_t {
   // Command is considered a transfer operation (memcpy, etc).
   IREE_HAL_COMMAND_CATEGORY_TRANSFER = 1u << 0,
   // Command is considered a dispatch operation (dispatch/execute).
@@ -104,7 +97,7 @@ typedef uint64_t iree_hal_queue_affinity_t;
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
 // Maps to VkPipelineStageFlagBits.
-enum iree_hal_execution_stage_e {
+enum iree_hal_execution_stage_bits_t {
   // Top of the pipeline when commands are initially issued by the device.
   IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE = 1u << 0,
   // Stage of the pipeline when dispatch parameter data is consumed.
@@ -123,7 +116,7 @@ typedef uint32_t iree_hal_execution_stage_t;
 // Bitfield specifying flags controlling an execution dependency.
 //
 // Maps to VkDependencyFlags.
-enum iree_hal_execution_barrier_flags_e {
+enum iree_hal_execution_barrier_flag_bits_t {
   IREE_HAL_EXECUTION_BARRIER_FLAG_NONE = 0,
 };
 typedef uint32_t iree_hal_execution_barrier_flags_t;
@@ -131,7 +124,7 @@ typedef uint32_t iree_hal_execution_barrier_flags_t;
 // Bitfield specifying which scopes will access memory and how.
 //
 // Maps to VkAccessFlagBits.
-enum iree_hal_access_scope_e {
+enum iree_hal_access_scope_bits_t {
   // Read access to indirect command data as part of an indirect dispatch.
   IREE_HAL_ACCESS_SCOPE_INDIRECT_COMMAND_READ = 1u << 0,
   // Constant uniform buffer reads by the device.
@@ -162,7 +155,7 @@ typedef uint32_t iree_hal_access_scope_t;
 // completely changing execution contexts).
 //
 // Maps to VkMemoryBarrier.
-typedef struct {
+typedef struct iree_hal_memory_barrier_t {
   // All access scopes prior-to the barrier (inclusive).
   iree_hal_access_scope_t source_scope;
   // All access scopes following the barrier (inclusive).
@@ -175,7 +168,7 @@ typedef struct {
 // reordering.
 //
 // Maps to VkBufferMemoryBarrier.
-typedef struct {
+typedef struct iree_hal_buffer_barrier_t {
   // All access scopes prior-to the barrier (inclusive).
   iree_hal_access_scope_t source_scope;
   // All access scopes following the barrier (inclusive).
@@ -226,7 +219,7 @@ typedef struct {
 // to record commands from multiple threads. Command buffers must not be mutated
 // between when they have are submitted for execution on a queue and when the
 // semaphore fires indicating the completion of their execution.
-typedef struct iree_hal_command_buffer_s iree_hal_command_buffer_t;
+typedef struct iree_hal_command_buffer_t iree_hal_command_buffer_t;
 
 // Creates a command buffer ready to begin recording, possibly reusing an
 // existing one from the |device| pool.
@@ -234,46 +227,45 @@ typedef struct iree_hal_command_buffer_s iree_hal_command_buffer_t;
 // |queue_affinity| specifies the device queues the command buffer may be
 // submitted to. The queue affinity provided to iree_hal_device_queue_submit
 // must match or be a subset of the |queue_affinity|.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Retains the given |command_buffer| for the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_command_buffer_retain(iree_hal_command_buffer_t* command_buffer);
+IREE_API_EXPORT void iree_hal_command_buffer_retain(
+    iree_hal_command_buffer_t* command_buffer);
 
 // Releases the given |command_buffer| from the caller.
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_command_buffer_release(iree_hal_command_buffer_t* command_buffer);
+IREE_API_EXPORT void iree_hal_command_buffer_release(
+    iree_hal_command_buffer_t* command_buffer);
 
 // Returns a bitmask indicating the behavior of the command buffer.
-IREE_API_EXPORT iree_hal_command_buffer_mode_t IREE_API_CALL
+IREE_API_EXPORT iree_hal_command_buffer_mode_t
 iree_hal_command_buffer_mode(const iree_hal_command_buffer_t* command_buffer);
 
 // Returns a bitmask indicating which command categories this command buffer
 // can record.
-IREE_API_EXPORT iree_hal_command_category_t IREE_API_CALL
+IREE_API_EXPORT iree_hal_command_category_t
 iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer);
 
 // Resets and begins recording into the command buffer, clearing all
 // previously recorded contents.
 // The command buffer must not be in-flight.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_command_buffer_begin(iree_hal_command_buffer_t* command_buffer);
 
 // Ends recording into the command buffer.
 // This must be called prior to submitting the command buffer for execution.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT iree_status_t
 iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer);
 
 // Defines a memory dependency between commands recorded before and after the
 // barrier. One or more memory or buffer barriers can be specified to indicate
 // between which stages or buffers the dependencies exist.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_execution_barrier(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
@@ -288,8 +280,7 @@ iree_hal_command_buffer_execution_barrier(
 //
 // Events are only valid within a single command buffer. Events can only be
 // used on non-transfer queues.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_signal_event(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_signal_event(
     iree_hal_command_buffer_t* command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask);
 
@@ -298,7 +289,7 @@ iree_hal_command_buffer_signal_event(
 //
 // Events are only valid within a single command buffer. Events can only be
 // used on non-transfer queues.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_reset_event(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_reset_event(
     iree_hal_command_buffer_t* command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask);
 
@@ -312,7 +303,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_reset_event(
 // Events are only valid within a single command buffer. Events remain
 // signaled even after waiting and must be reset to be reused. Events can only
 // be used on non-transfer queues.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_wait_events(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wait_events(
     iree_hal_command_buffer_t* command_buffer, iree_host_size_t event_count,
     const iree_hal_event_t** events,
     iree_hal_execution_stage_t source_stage_mask,
@@ -330,8 +321,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_wait_events(
 // For buffers allocated with IREE_HAL_MEMORY_TYPE_TRANSIENT this may allow
 // the device queue to reclaim the memory used by the buffer earlier than
 // otherwise possible.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_discard_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_discard_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* buffer);
 
 // Fills the target buffer with the given repeating value.
@@ -339,7 +329,7 @@ iree_hal_command_buffer_discard_buffer(
 // length are aligned to the natural alignment of the value.
 // The target buffer must be compatible with the devices owned by this
 // device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length,
     const void* pattern, iree_host_size_t pattern_length);
@@ -353,13 +343,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
 // call returns.
 // The |target_buffer| must be compatible with the devices owned by this
 // device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_update_buffer(iree_hal_command_buffer_t* command_buffer,
-                                      const void* source_buffer,
-                                      iree_host_size_t source_offset,
-                                      iree_hal_buffer_t* target_buffer,
-                                      iree_device_size_t target_offset,
-                                      iree_device_size_t length);
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_update_buffer(
+    iree_hal_command_buffer_t* command_buffer, const void* source_buffer,
+    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length);
 
 // Copies a range of one buffer to another.
 // Both buffers must be compatible with the devices owned by this device
@@ -369,7 +356,7 @@ iree_hal_command_buffer_update_buffer(iree_hal_command_buffer_t* command_buffer,
 //
 // This can be used to perform device->host, host->device, and device->device
 // copies.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length);
@@ -380,8 +367,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
 // Push constants are treated as opaque bytes, meaning that they may be
 // bit-casted floats, bit-packed booleans, etc. |offset| and |values_length| are
 // in bytes.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_push_constants(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length);
@@ -393,8 +379,7 @@ iree_hal_command_buffer_push_constants(
 // The descriptor set will remain bound and valid so long as the executable
 // layouts used by dispatches are compatible (same descriptor layouts and push
 // constant sizes).
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_push_descriptor_set(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_layout_t* executable_layout, uint32_t set,
     iree_host_size_t binding_count,
@@ -410,8 +395,7 @@ iree_hal_command_buffer_push_descriptor_set(
 // If any dynamic descriptor types are defined in the descriptor set layout then
 // the dynamic offsets must be provided. These offsets will be added to the base
 // offset of the descriptor layout binding.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_bind_descriptor_set(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_bind_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_layout_t* executable_layout, uint32_t set,
     iree_hal_descriptor_set_t* descriptor_set,
@@ -428,7 +412,7 @@ iree_hal_command_buffer_bind_descriptor_set(
 //
 // Fails if the queue does not support dispatch operations (as indicated by
 // can_dispatch).
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z);
@@ -441,8 +425,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
 //
 // The buffer must have been allocated with IREE_HAL_BUFFER_USAGE_DISPATCH and
 // be of IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_dispatch_indirect(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
@@ -463,8 +446,7 @@ iree_hal_command_buffer_dispatch_indirect(
 // or availability rules. Instead, validation ensures that no command references
 // memory outside of the allowed ranges or accesses memory in violation of the
 // allowed usage or access rights.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_wrap_validation(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wrap_validation(
     iree_hal_device_t* device, iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_command_buffer_t** out_command_buffer);
 
@@ -472,7 +454,7 @@ iree_hal_command_buffer_wrap_validation(
 // iree_hal_command_buffer_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_command_buffer_vtable_t {
   // << HAL C porting in progress >>
   IREE_API_UNSTABLE
 
@@ -564,8 +546,8 @@ typedef struct {
       iree_device_size_t workgroups_offset);
 } iree_hal_command_buffer_vtable_t;
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_hal_command_buffer_destroy(iree_hal_command_buffer_t* command_buffer);
+IREE_API_EXPORT void iree_hal_command_buffer_destroy(
+    iree_hal_command_buffer_t* command_buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

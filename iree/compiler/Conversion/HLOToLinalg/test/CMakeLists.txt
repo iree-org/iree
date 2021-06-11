@@ -14,12 +14,11 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "concatenate.mlir"
-    "decompose_hlo_clamp.mlir"
+    "broadcasting.mlir"
+    "convert_complex_to_real.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
-    "fusion.mlir"
-    "pad_tensor_to_tensor.mlir"
+    "missing_legalizations.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

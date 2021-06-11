@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // IREE source.mlir -> execution output test runner.
 // This is meant to be called from LIT for FileCheck tests, and tries to match
@@ -36,17 +28,23 @@
 // used to separate the compiler flags from the runtime flags, such as:
 //   iree-run-mlir -iree-hal-target-backends=vulkan-spirv -- --logtostderr
 
+#include <cstring>
+#include <functional>
 #include <iostream>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
-#include "absl/flags/flag.h"
-#include "absl/strings/match.h"
-#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
@@ -58,19 +56,34 @@
 #include "iree/tools/init_targets.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/ref_cc.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/ADT/iterator.h"
+#include "llvm/ADT/iterator_range.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/AsmState.h"
-#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BlockSupport.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 
 static llvm::cl::opt<std::string> input_file_flag{
@@ -118,13 +131,6 @@ static llvm::cl::list<std::string> function_inputs_flag{
     "function-input",
     llvm::cl::desc("Input shapes and optional values"),
     llvm::cl::ZeroOrMore,
-};
-
-static llvm::cl::opt<std::string> function_inputs_file_flag{
-    "function-input-file",
-    llvm::cl::desc("Provides a file for input shapes and optional values (see "
-                   "ParseToVariantListFromFile in vm_util.h for details)"),
-    llvm::cl::init(""),
 };
 
 static llvm::cl::opt<bool> run_flag{
@@ -207,6 +213,7 @@ Status PrepareModule(std::string target_backend,
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verifyPasses);
   mlir::applyPassManagerCLOptions(pass_manager);
+  mlir::applyDefaultTimingPassManagerCLOptions(pass_manager);
   mlir::iree_compiler::buildDefaultIREEVMTransformPassPipeline(pass_manager);
   if (failed(pass_manager.run(mlir_module.get()))) {
     return iree_make_status(IREE_STATUS_INTERNAL,
@@ -267,35 +274,23 @@ Status PrepareModule(std::string target_backend,
 Status EvaluateFunction(iree_vm_context_t* context,
                         iree_hal_allocator_t* allocator,
                         iree_vm_function_t function,
-                        absl::string_view export_name) {
+                        iree_string_view_t export_name) {
   IREE_TRACE_SCOPE();
 
-  std::cout << "EXEC @" << export_name << std::endl;
-  std::vector<RawSignatureParser::Description> input_descs;
-  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
-  vm::ref<iree_vm_list_t> inputs;
-  if (!function_inputs_file_flag.empty()) {
-    if (!function_inputs_flag.empty()) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "expected only one of function_inputs and "
-                              "function_inputs_file to be set");
-    }
-    IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
-        input_descs, allocator, function_inputs_file_flag, &inputs));
-  } else {
-    auto function_inputs_list = absl::MakeConstSpan(
-        function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
-        function_inputs_flag.size());
-    IREE_RETURN_IF_ERROR(ParseToVariantList(input_descs, allocator,
-                                            function_inputs_list, &inputs));
-  }
+  std::cout << "EXEC @" << std::string(export_name.data, export_name.size)
+            << std::endl;
 
-  std::vector<RawSignatureParser::Description> output_descs;
-  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
+  // Parse input values from the flags.
+  vm::ref<iree_vm_list_t> inputs;
+  auto function_inputs_list = absl::MakeConstSpan(
+      function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
+      function_inputs_flag.size());
+  IREE_RETURN_IF_ERROR(
+      ParseToVariantList(allocator, function_inputs_list, &inputs));
+
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                           output_descs.size(),
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
@@ -304,14 +299,14 @@ Status EvaluateFunction(iree_vm_context_t* context,
                                       iree_allocator_system()));
 
   // Print outputs.
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()));
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()));
 
   return OkStatus();
 }
 
 // Evaluates all exported functions within given module.
 Status EvaluateFunctions(iree_vm_instance_t* instance,
-                         absl::string_view driver_name,
+                         const std::string& driver_name,
                          const std::string& flatbuffer_data) {
   IREE_TRACE_SCOPE0("EvaluateFunctions");
 
@@ -331,25 +326,25 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   }
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(driver_name, &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(driver_name.c_str(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
     iree_vm_function_t function;
-    iree_string_view_t export_name_isv;
+    iree_string_view_t export_name;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
                              bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                             ordinal, &function, &export_name_isv),
+                             ordinal, &function, &export_name),
                          "Looking up function export %d", ordinal);
-    absl::string_view export_name(export_name_isv.data, export_name_isv.size);
-    if (absl::StartsWith(export_name, "__") ||
-        export_name.find('$') != absl::string_view::npos) {
+    if (iree_string_view_starts_with(export_name,
+                                     iree_make_cstring_view("__")) ||
+        iree_string_view_find_char(export_name, '$', 0) !=
+            IREE_STRING_VIEW_NPOS) {
       // Skip internal or special functions.
       return OkStatus();
     }
-    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
     // Create the context we'll use for this (ensuring that we can't interfere
     // with other running evaluations, such as when in a multithreaded test
@@ -501,7 +496,10 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
+  mlir::iree_compiler::registerIREEVMTranslationFlags();
   mlir::registerLLVMDialectTranslation(registry);
+  // Make sure command line options are registered.
+  (void)mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.
@@ -520,7 +518,8 @@ extern "C" int main(int argc, char** argv) {
   }
   argc_absl += run_args_flag.size();
   char** argv_absl_ptr = argv_absl.data();
-  iree_flags_parse_checked(&argc_absl, &argv_absl_ptr);
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc_absl,
+                           &argv_absl_ptr);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
 

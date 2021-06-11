@@ -1,19 +1,11 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -58,11 +50,17 @@ cc_library(
     ],
 )
 
-gentbl(
+gentbl_cc_library(
     name = "custom_ops_gen",
     tbl_outs = [
-        ("-gen-op-decls", "custom_ops.h.inc"),
-        ("-gen-op-defs", "custom_ops.cc.inc"),
+        (
+            ["-gen-op-decls"],
+            "custom_ops.h.inc",
+        ),
+        (
+            ["-gen-op-defs"],
+            "custom_ops.cc.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "custom_ops.td",
@@ -74,13 +72,13 @@ gentbl(
     ],
 )
 
-cc_embed_data(
+c_embed_data(
     name = "custom_imports",
     srcs = ["custom.imports.mlir"],
-    cc_file_output = "custom.imports.cc",
-    cpp_namespace = "mlir::iree_compiler::IREE::Custom",
+    c_file_output = "custom.imports.c",
     flatten = True,
     h_file_output = "custom.imports.h",
+    identifier = "iree_custom_imports",
 )
 
 cc_library(

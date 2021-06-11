@@ -5,7 +5,7 @@
 > Note:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;The TensorFlow integrations are currently being
   refactored. The `bazel` build is deprecated. Refer to
-  https://google.github.io/iree/get-started/getting-started-python for a general
+  https://google.github.io/iree/building-from-source/optional-features/ for a general
   overview of how to build and execute the e2e tests.
 
 This is a collection of e2e tests that compile a TensorFlow model with IREE (and
@@ -24,9 +24,9 @@ instructions.
 ## Vulkan Setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
-[this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)),
+[this doc](https://google.github.io/iree/deployment-configurations/gpu-vulkan/)),
 then you can run the manual test targets with
-`--target_backends=tf,iree_vmla,iree_llvmaot` (that is, by omitting
+`--target_backends=tf,iree_vmvx,iree_llvmaot` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
 The test suites can be run excluding Vulkan by specifying
@@ -47,11 +47,11 @@ When using Keras models or tf.Modules with functions that IREE can't compile,
 
 ```python
 from iree.tf.support import module_utils
-vmla_module = module_utils.IreeCompiledModule(
+vmvx_module = module_utils.IreeCompiledModule(
     module_class=KerasTFModuleClass,
-    backend_info=module_utils.BackendInfo('iree_vmla'),
+    backend_info=module_utils.BackendInfo('iree_vmvx'),
     exported_names=['predict'])
-vmla_module.predict(...)
+vmvx_module.predict(...)
 ```
 
 ## Running Tests
@@ -67,11 +67,11 @@ bazel run //integrations/tensorflow/e2e:conv_test_manual
 bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=tf
 
 # Run conv_test comparing the VMLA backend and TensorFlow.
-bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=iree_vmla
+bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=iree_vmvx
 
 # Run conv_test comparing the VMLA backend to itself multiple times.
 bazel run //integrations/tensorflow/e2e:conv_test_manual -- \
-  --reference_backend=iree_vmla --target_backends=iree_vmla,iree_vmla
+  --reference_backend=iree_vmvx --target_backends=iree_vmvx,iree_vmvx
 ```
 
 For reproducibility of the unit tests `CompiledModule()` sets the random seeds
@@ -297,7 +297,7 @@ The generated directory structure for each module is as follows:
   │   # MLIR for ModuleName in TF's input dialect.
   ├── iree_input.mlir
   │   # tf_input.mlir translated to IREE MLIR.
-  ├── iree_vmla
+  ├── iree_vmvx
   │   # Or any other IREE backend.
   │   ├── compiled.vmfb
   │   │   # A flatbuffer containing IREE's compiled code.
@@ -329,14 +329,14 @@ method. For example:
 
 ```python
 ref_trace = Trace.load("/tmp/iree/modules/ModuleName/tf_ref/traces/predict/")
-tar_trace = Trace.load("/tmp/iree/modules/ModuleName/iree_vmla/traces/predict/")
+tar_trace = Trace.load("/tmp/iree/modules/ModuleName/iree_vmvx/traces/predict/")
 abs_diff = np.abs(ref_trace.calls[0].outputs[0] - tar_trace.calls[0].outputs[0])
 print(np.mean(abs_diff))
 ```
 
 Traces are named after the trace functions defined in their unittests. So in the
 `SimpleArithmeticModule` example above, the `trace_dir` would be
-`/tmp/iree/modules/SimpleArithmeticModule/iree_vmla/traces/simple_mul/`.
+`/tmp/iree/modules/SimpleArithmeticModule/iree_vmvx/traces/simple_mul/`.
 
 ## Benchmarking E2E Modules
 
@@ -344,7 +344,8 @@ We use our end-to-end TensorFlow integrations tests to generate tested
 compilation and benchmarking artifacts. This allows us to validate that our
 benchmarks are behaving as we expect them to, and to run them using valid inputs
 for each model. An overview of how to run benchmarks on IREE and TFLite can be
-found in [this doc](https://google.github.io/iree/developing-iree/e2e-benchmarking).
+found in
+[this doc](https://github.com/google/iree/blob/main/docs/developers/developing_iree/e2e_benchmarking.md).
 
 ## Debugging Tests
 

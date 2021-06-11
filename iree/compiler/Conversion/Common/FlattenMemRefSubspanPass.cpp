@@ -1,22 +1,14 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===- FlattenMemRefSubspanPass.cpp - Flatten n-D MemRef subspan ----------===//
 //
 // This file implements a pass to flatten n-D MemRef subspan ops to 1-D MemRef
 // ones and folds the byte offsets on subspan ops to the consumer load/store
-// ops, in preparation for lowering to SPIR-V.
+// ops, in preparation for lowering to the final target.
 //
 // This pass is needed because of how MemRef is used by subspan ops:
 //
@@ -45,8 +37,10 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Matchers.h"
@@ -100,6 +94,64 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
 //===----------------------------------------------------------------------===//
 // Flattening Patterns
 //===----------------------------------------------------------------------===//
+
+/// Flattens memref global ops with more than 1 dimensions to 1 dimension.
+struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  static Attribute flattenAttribute(Attribute value, ShapedType newType) {
+    if (!value) return value;
+    if (auto splatAttr = value.dyn_cast<SplatElementsAttr>()) {
+      return splatAttr.reshape(newType);
+    } else if (auto denseAttr = value.dyn_cast<DenseElementsAttr>()) {
+      return denseAttr.reshape(newType);
+    }
+    return {};
+  }
+
+  LogicalResult matchAndRewrite(
+      memref::GlobalOp globalOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto oldType = globalOp.type().dyn_cast<MemRefType>();
+    if (!oldType || !oldType.getAffineMaps().empty()) return failure();
+
+    auto tensorType = RankedTensorType::get({oldType.getNumElements()},
+                                            oldType.getElementType());
+    auto memRefType =
+        MemRefType::get({oldType.getNumElements()}, oldType.getElementType(),
+                        {}, oldType.getMemorySpace());
+    auto newInitialValue =
+        flattenAttribute(globalOp.initial_valueAttr(), tensorType);
+    rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+        globalOp, globalOp.sym_name(), globalOp.sym_visibilityAttr(),
+        memRefType, newInitialValue, globalOp.constant());
+    return success();
+  }
+};
+
+/// Flattens memref global load ops with more than 1 dimensions to 1 dimension.
+struct FlattenGetGlobal final
+    : public OpConversionPattern<memref::GetGlobalOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      memref::GetGlobalOp getOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto oldType = getOp.getType().dyn_cast<MemRefType>();
+    if (!oldType || !oldType.getAffineMaps().empty()) return failure();
+
+    auto globalOp = dyn_cast_or_null<memref::GlobalOp>(
+        SymbolTable::lookupNearestSymbolFrom(getOp, getOp.nameAttr()));
+    if (!globalOp) return failure();
+
+    auto loadedValue = rewriter.createOrFold<memref::GetGlobalOp>(
+        getOp.getLoc(), globalOp.type(), getOp.nameAttr());
+
+    auto newType = getTypeConverter()->convertType(oldType).cast<ShapedType>();
+    rewriter.replaceOpWithNewOp<memref::CastOp>(getOp, newType, loadedValue);
+    return success();
+  }
+};
 
 /// Flattens memref subspan ops with more than 1 dimensions to 1 dimension.
 struct FlattenBindingSubspan final
@@ -166,6 +218,10 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
 
     Value linearIndex = linearizeIndices(
         loadOp.getMemRefType(), loadOp.getIndices(), loadOp.getLoc(), rewriter);
+    if (!linearIndex) {
+      return loadOp.emitOpError() << "failed to linearize index";
+    }
+
     rewriter.replaceOpWithNewOp<memref::LoadOp>(loadOp, adaptor.memref(),
                                                 linearIndex);
     return success();
@@ -189,8 +245,98 @@ struct LinearizeStoreIndices final
     Value linearIndex =
         linearizeIndices(storeOp.getMemRefType(), storeOp.getIndices(),
                          storeOp.getLoc(), rewriter);
+    if (!linearIndex) {
+      return storeOp.emitOpError() << "failed to linearize index";
+    }
+
     rewriter.replaceOpWithNewOp<memref::StoreOp>(storeOp, adaptor.value(),
                                                  adaptor.memref(), linearIndex);
+    return success();
+  }
+};
+
+/// Linearizes indices in vector.transfer_read ops.
+struct LinearizeTransferReadIndices final
+    : public OpConversionPattern<vector::TransferReadOp> {
+  using OpConversionPattern<vector::TransferReadOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      vector::TransferReadOp transferReadOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!transferReadOp.permutation_map().isMinorIdentity()) {
+      return rewriter.notifyMatchFailure(
+          transferReadOp, "cannot convert op with non-minor identity map");
+    }
+    vector::TransferReadOp::Adaptor adaptor(
+        operands, transferReadOp->getAttrDictionary());
+    if (!isRankZeroOrOneMemRef(adaptor.source().getType())) {
+      return rewriter.notifyMatchFailure(
+          transferReadOp, "expected converted memref of rank <= 1");
+    }
+    Value linearIndex = linearizeIndices(
+        transferReadOp.getShapedType().cast<MemRefType>(),
+        transferReadOp.indices(), transferReadOp.getLoc(), rewriter);
+    if (!linearIndex) {
+      return transferReadOp.emitOpError() << "failed to linearize index";
+    }
+
+    rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+        transferReadOp, transferReadOp.getVectorType(), adaptor.source(),
+        linearIndex, rewriter.getDimIdentityMap(), transferReadOp.padding(),
+        transferReadOp.in_boundsAttr());
+    return success();
+  }
+};
+
+/// Linearizes indices in vector.transfer_write ops.
+struct LinearizeTransferWriteIndices final
+    : public OpConversionPattern<vector::TransferWriteOp> {
+  using OpConversionPattern<vector::TransferWriteOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      vector::TransferWriteOp transferWriteOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!transferWriteOp.permutation_map().isMinorIdentity()) {
+      return rewriter.notifyMatchFailure(
+          transferWriteOp, "cannot convert op with non-minor identity map");
+    }
+    vector::TransferWriteOp::Adaptor adaptor(
+        operands, transferWriteOp->getAttrDictionary());
+    if (!isRankZeroOrOneMemRef(adaptor.source().getType())) {
+      return rewriter.notifyMatchFailure(
+          transferWriteOp, "expected converted memref of rank <= 1");
+    }
+    Value linearIndex = linearizeIndices(
+        transferWriteOp.getShapedType().cast<MemRefType>(),
+        transferWriteOp.indices(), transferWriteOp.getLoc(), rewriter);
+    if (!linearIndex) {
+      return transferWriteOp.emitOpError() << "failed to linearize index";
+    }
+
+    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+        transferWriteOp, adaptor.vector(), adaptor.source(), linearIndex,
+        rewriter.getDimIdentityMap(), transferWriteOp.in_boundsAttr());
+    return success();
+  }
+};
+
+/// Adjusts unrealized_conversion_cast ops' inputs to flattened memref values.
+struct AdjustConversionCast final
+    : public OpConversionPattern<UnrealizedConversionCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      UnrealizedConversionCastOp castOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (castOp->getNumOperands() != 1) return failure();
+
+    Value input = operands.front();
+    if (!isRankZeroOrOneMemRef(input.getType())) {
+      return rewriter.notifyMatchFailure(
+          castOp, "expected converted memref of rank <= 1");
+    }
+    rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
+        castOp, castOp.getResultTypes(), input);
     return success();
   }
 };
@@ -285,7 +431,7 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
 //===----------------------------------------------------------------------===//
 
 struct FlattenMemRefSubspanPass
-    : public PassWrapper<FlattenMemRefSubspanPass, FunctionPass> {
+    : public PassWrapper<FlattenMemRefSubspanPass, OperationPass<ModuleOp>> {
   FlattenMemRefSubspanPass() {}
   FlattenMemRefSubspanPass(const FlattenMemRefSubspanPass &pass) {}
 
@@ -293,18 +439,29 @@ struct FlattenMemRefSubspanPass
     registry.insert<AffineDialect, memref::MemRefDialect>();
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     // First flatten the dimensions of subspan op and their consumer load/store
     // ops. This requires setting up conversion targets with type converter.
 
     MLIRContext &context = getContext();
     FlattenMemRefTypeConverter typeConverter;
     RewritePatternSet flattenPatterns(&context);
-    flattenPatterns.add<FlattenBindingSubspan, LinearizeLoadIndices,
-                        LinearizeStoreIndices>(typeConverter, &context);
+    flattenPatterns.add<FlattenGlobal, FlattenGetGlobal, FlattenBindingSubspan,
+                        LinearizeLoadIndices, LinearizeStoreIndices,
+                        LinearizeTransferReadIndices,
+                        LinearizeTransferWriteIndices, AdjustConversionCast>(
+        typeConverter, &context);
 
     ConversionTarget target(context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+    target.addDynamicallyLegalOp<memref::GlobalOp>(
+        [](memref::GlobalOp globalOp) {
+          return isRankZeroOrOneMemRef(globalOp.type());
+        });
+    target.addDynamicallyLegalOp<memref::GetGlobalOp>(
+        [](memref::GetGlobalOp getOp) {
+          return isRankZeroOrOneMemRef(getOp.getType());
+        });
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
         [](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
           return isRankZeroOrOneMemRef(subspanOp.getType());
@@ -315,10 +472,25 @@ struct FlattenMemRefSubspanPass
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
       return isRankZeroOrOneMemRef(storeOp.getMemRefType());
     });
+    target.addDynamicallyLegalOp<vector::TransferReadOp>(
+        [](vector::TransferReadOp readOp) {
+          return isRankZeroOrOneMemRef(
+              readOp.source().getType().cast<MemRefType>());
+        });
+    target.addDynamicallyLegalOp<vector::TransferWriteOp>(
+        [](vector::TransferWriteOp writeOp) {
+          return isRankZeroOrOneMemRef(
+              writeOp.source().getType().cast<MemRefType>());
+        });
+    target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
+        [](UnrealizedConversionCastOp castOp) {
+          return castOp->getNumOperands() == 1 &&
+                 isRankZeroOrOneMemRef(castOp->getOperandTypes().front());
+        });
 
     // Use partial conversion here so that we can ignore allocations created by
     // promotion and their load/store ops.
-    if (failed(applyPartialConversion(getFunction(), target,
+    if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(flattenPatterns)))) {
       return signalPassFailure();
     }
@@ -329,13 +501,13 @@ struct FlattenMemRefSubspanPass
     foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
                      FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(&context);
 
-    (void)applyPatternsAndFoldGreedily(getFunction(), std::move(foldPatterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(foldPatterns));
   }
 };
 
 }  // namespace
 
-std::unique_ptr<FunctionPass> createFlattenMemRefSubspanPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass() {
   return std::make_unique<FlattenMemRefSubspanPass>();
 }
 

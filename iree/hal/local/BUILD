@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Default implementations for HAL types that use the host resources.
 # These are generally just wrappers around host heap memory and host threads.
@@ -21,24 +13,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# TODO(benvanik): replace iree/base/arena.h with this one. We still want the
-# old-style arena for pure stack use; we may be able to do that with a change
-# to block pool that allows for on-stack initialization (iree_stack_arena_t
-# that has storage for one block inside itself and then dynamically allocates
-# new ones if needed). That way we have only one arena implementation and can
-# easily use the iree_allocator_t interface without worry.
-cc_library(
-    name = "arena",
-    srcs = ["arena.c"],
-    hdrs = ["arena.h"],
-    deps = [
-        "//iree/base:api",
-        "//iree/base:core_headers",
-        "//iree/base:synchronization",
-        "//iree/base/internal:atomic_slist",
-    ],
-)
-
 # TODO(benvanik): move into base/? may be useful for other backends or for other
 # parts of the system (like modules handling IO/RPC).
 cc_library(
@@ -46,11 +20,11 @@ cc_library(
     srcs = ["event_pool.c"],
     hdrs = ["event_pool.h"],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:synchronization",
         "//iree/base/internal:wait_handle",
     ],
 )
@@ -61,6 +35,21 @@ cc_library(
 )
 
 cc_test(
+    name = "executable_library_benchmark",
+    srcs = ["executable_library_benchmark.c"],
+    deps = [
+        ":executable_library",
+        ":local",
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/local/loaders:embedded_library_loader",
+        "//iree/testing:benchmark",
+    ],
+)
+
+cc_test(
     name = "executable_library_test",
     srcs = [
         "executable_library_demo.c",
@@ -68,7 +57,7 @@ cc_test(
         "executable_library_test.c",
     ],
     deps = [
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/hal/local:executable_library",
     ],
@@ -96,11 +85,11 @@ cc_library(
     ],
     deps = [
         ":executable_library",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
-        "//iree/hal:api",
+        "//iree/hal",
     ],
 )
 
@@ -119,16 +108,14 @@ cc_library(
         "sync_semaphore.h",
     ],
     deps = [
-        ":arena",
         ":local",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
-        "//iree/base/internal:wait_handle",
-        "//iree/hal:api",
-        "//iree/task",
+        "//iree/base/internal:arena",
+        "//iree/base/internal:synchronization",
+        "//iree/hal",
     ],
 )
 
@@ -153,16 +140,17 @@ cc_library(
         "task_semaphore.h",
     ],
     deps = [
-        ":arena",
         ":event_pool",
+        ":executable_library",
         ":local",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:arena",
+        "//iree/base/internal:synchronization",
         "//iree/base/internal:wait_handle",
-        "//iree/hal:api",
+        "//iree/hal",
         "//iree/task",
     ],
 )

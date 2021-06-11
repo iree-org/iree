@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # HAL implementation using Vulkan and (likely) SPIR-V executables.
 
@@ -91,21 +83,19 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":dynamic_symbols",
-        "//iree/base:api",
+        "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:flatcc",
         "//iree/base:logging",
         "//iree/base:status",
-        "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base/internal",
-        "//iree/hal:api",
+        "//iree/base/internal:flatcc",
+        "//iree/base/internal:synchronization",
+        "//iree/hal",
         "//iree/hal/vulkan/util:arena",
         "//iree/hal/vulkan/util:intrusive_list",
         "//iree/hal/vulkan/util:ref_ptr",
         "//iree/schemas:spirv_executable_def_c_fbs",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
         "@iree_vulkan_headers//:vulkan_headers",
         "@vulkan_memory_allocator//:impl_header_only",
     ],
@@ -124,6 +114,7 @@ cc_library(
         "dynamic_symbol_tables.h",
     ],
     deps = [
+        "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",
@@ -139,6 +130,7 @@ cc_test(
     tags = ["driver=vulkan"],
     deps = [
         ":dynamic_symbols",
+        "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 
@@ -57,7 +49,10 @@ class ByteBufferConstantOpConversion
       IREE::ByteBufferConstantOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::RodataInlineOp>(
-        op, IREE::VM::RefType::get(op.getType()), op.value());
+        op,
+        IREE::VM::RefType::get(
+            IREE::VM::BufferType::get(rewriter.getContext())),
+        op.value());
     return success();
   }
 };
@@ -75,9 +70,8 @@ class UnreachableOpConversion
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(
         srcOp,
-        rewriter.createOrFold<mlir::ConstantIntOp>(
-            srcOp.getLoc(), static_cast<int32_t>(IREE::StatusCode::Unknown),
-            32),
+        rewriter.createOrFold<IREE::VM::ConstI32Op>(
+            srcOp.getLoc(), static_cast<int32_t>(IREE::StatusCode::Unknown)),
         srcOp.message());
     return success();
   }
@@ -138,6 +132,12 @@ class ListGetOpConversion : public OpConversionPattern<IREE::ListGetOp> {
     } else if (resultType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetI64Op>(
           srcOp, resultType, srcOperands.list(), srcOperands.index());
+    } else if (resultType.isF32()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ListGetF32Op>(
+          srcOp, resultType, srcOperands.list(), srcOperands.index());
+    } else if (resultType.isF64()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ListGetF64Op>(
+          srcOp, resultType, srcOperands.list(), srcOperands.index());
     } else if (!resultType.isIntOrIndexOrFloat()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetRefOp>(
           srcOp, resultType, srcOperands.list(), srcOperands.index());
@@ -161,6 +161,12 @@ class ListSetOpConversion : public OpConversionPattern<IREE::ListSetOp> {
     } else if (valueType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetI64Op>(
           srcOp, srcOperands.list(), srcOperands.index(), srcOperands.value());
+    } else if (valueType.isF32()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ListSetF32Op>(
+          srcOp, srcOperands.list(), srcOperands.index(), srcOperands.value());
+    } else if (valueType.isF64()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ListSetF64Op>(
+          srcOp, srcOperands.list(), srcOperands.index(), srcOperands.value());
     } else if (!valueType.isIntOrIndexOrFloat()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetRefOp>(
           srcOp, srcOperands.list(), srcOperands.index(), srcOperands.value());
@@ -179,6 +185,15 @@ void populateIREEToVMPatterns(MLIRContext *context,
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<ByteBufferConstantOpConversion>(typeConverter, context);
   patterns.insert<UnreachableOpConversion>(typeConverter, context);
+
+  typeConverter.addConversion([](IREE::ByteBufferType type) -> Optional<Type> {
+    return IREE::VM::RefType::get(IREE::VM::BufferType::get(type.getContext()));
+  });
+  typeConverter.addConversion(
+      [](IREE::MutableByteBufferType type) -> Optional<Type> {
+        return IREE::VM::RefType::get(
+            IREE::VM::BufferType::get(type.getContext()));
+      });
 
   typeConverter.addConversion(
       [&typeConverter](IREE::ListType type) -> Optional<Type> {

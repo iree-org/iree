@@ -1,22 +1,21 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_UTILS_FLATBUFFERUTILS_H_
 #define IREE_COMPILER_UTILS_FLATBUFFERUTILS_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include <functional>
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -24,8 +23,9 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-// NOTE: order matters here as some of the LLVM includes conflict.
-#include "iree/base/flatcc.h"
+// clang-format off: order matters here as some of the LLVM includes conflict:
+#include "iree/base/internal/flatcc.h"
+// clang-format on
 
 namespace mlir {
 namespace iree_compiler {
@@ -169,13 +169,13 @@ class raw_flatbuffer_uint8_vec_ostream : public llvm::raw_ostream {
   void write_impl(const char *Ptr, size_t Size) override {
     flatbuffers_uint8_vec_append(builder,
                                  reinterpret_cast<const uint8_t *>(Ptr), Size);
+    pos += Size;
   }
 
-  uint64_t current_pos() const override {
-    return tell() - GetNumBytesInBuffer();
-  }
+  uint64_t current_pos() const override { return pos - GetNumBytesInBuffer(); }
 
   flatcc_builder_t *builder;
+  uint64_t pos = 0;
 };
 
 }  // namespace iree_compiler

@@ -84,17 +84,16 @@ func @packMixedStaticDynamic(%allocator: !hal.allocator, %size_a: index, %size_b
   // CHECK-DAG: %c15 = constant 15 : index
   // CHECK-DAG: %0 = addi %arg1, %c15 : index
   // CHECK-DAG: %1 = and %0, %c-16 : index
-  // CHECK-DAG: %2 = addi %1, %c208 : index
-  // CHECK-DAG: %3 = addi %2, %c15 : index
-  // CHECK-DAG: %4 = and %3, %c-16 : index
-  // CHECK-DAG: %5 = addi %arg2, %c15 : index
-  // CHECK-DAG: %6 = and %5, %c-16 : index
-  // CHECK-DAG: %7 = addi %4, %6 : index
-  // CHECK-DAG: %8 = addi %7, %c15 : index
-  // CHECK-DAG: %9 = and %8, %c-16 : index
-  // CHECK-DAG: %10 = addi %9, %c15 : index
-  // CHECK-DAG: %11 = and %10, %c-16 : index
+  // CHECK-DAG: %2 = addi %1, %c223 : index
+  // CHECK-DAG: %3 = and %2, %c-16 : index
+  // CHECK-DAG: %4 = addi %arg2, %c15 : index
+  // CHECK-DAG: %5 = and %4, %c-16 : index
+  // CHECK-DAG: %6 = addi %3, %5 : index
+  // CHECK-DAG: %7 = addi %6, %c15 : index
+  // CHECK-DAG: %8 = and %7, %c-16 : index
+  // CHECK-DAG: %9 = addi %8, %c15 : index
+  // CHECK-DAG: %10 = and %9, %c-16 : index
 
-  // CHECK-DAG: return %11, %c0, %c208, %4, %c0
+  // CHECK-DAG: return %10, %c0, %c208, %3, %c0
   return %t#0, %t#1, %t#2, %t#3, %t#4 : index, index, index, index, index
 }

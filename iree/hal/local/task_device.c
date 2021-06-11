@@ -1,25 +1,20 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/local/task_device.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/local/arena.h"
 #include "iree/hal/local/event_pool.h"
 #include "iree/hal/local/local_descriptor_set.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
-#include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/local/task_command_buffer.h"
@@ -29,7 +24,7 @@
 
 #define IREE_HAL_LOCAL_TASK_EVENT_POOL_CAPACITY 32
 
-typedef struct {
+typedef struct iree_hal_task_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 
@@ -230,8 +225,9 @@ static iree_status_t iree_hal_task_device_create_command_buffer(
   iree_host_size_t queue_index = iree_hal_task_device_select_queue(
       device, command_categories, queue_affinity);
   return iree_hal_task_command_buffer_create(
-      base_device, &device->queues[queue_index].scope, mode, command_categories,
-      queue_affinity, &device->large_block_pool, out_command_buffer);
+      &device->queues[queue_index].scope, mode, command_categories,
+      queue_affinity, &device->large_block_pool, device->host_allocator,
+      out_command_buffer);
 }
 
 static iree_status_t iree_hal_task_device_create_descriptor_set(

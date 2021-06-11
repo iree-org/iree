@@ -1,16 +1,8 @@
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 package(
     default_visibility = ["//visibility:public"],
@@ -37,20 +29,16 @@ cc_library(
         "ConcretizeTileAmongWorkgroupsPass.cpp",
         "ConvertToGPUPass.cpp",
         "ConvertToSPIRVPass.cpp",
-        "CooperativeMatrixAnalysis.cpp",
         "FoldGPUProcessorIDUses.cpp",
         "KernelDispatchUtils.cpp",
-        "LinalgTileAndDistributePass.cpp",
-        "MatMulVectorizationTest.cpp",
         "Passes.cpp",
-        "SplitDispatchFunctionPass.cpp",
         "TileAndVectorizeInOneWorkgroupPass.cpp",
         "Utils.cpp",
+        "VectorToCooperativeMatrixPass.cpp",
         "VectorToGPUPass.cpp",
         "VectorizeMemrefLoadStorePass.cpp",
     ],
     hdrs = [
-        "CooperativeMatrixAnalysis.h",
         "KernelDispatchUtils.h",
         "MemorySpace.h",
         "Passes.h",
@@ -58,9 +46,9 @@ cc_library(
     ],
     deps = [
         ":CodeGenOptionUtils",
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
-        "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/LinalgToVector",
         "//iree/compiler/Dialect/Flow/IR",
@@ -73,6 +61,7 @@ cc_library(
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRV",
         "@llvm-project//mlir:GPUTransforms",

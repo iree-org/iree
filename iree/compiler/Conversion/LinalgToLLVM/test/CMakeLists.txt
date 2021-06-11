@@ -14,15 +14,15 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "fold_tensor_extract_op.mlir"
     "hal_interface_bindings.mlir"
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"
     "linalg_vectorize.mlir"
     "materialize_launch_configuration.mlir"
     "matmul_vectorization.mlir"
+    "pad_linalg_workgroup_tiles.mlir"
     "plan_conv_loop_order.mlir"
-    "tile_and_distribute.mlir"
+    "tile_pad_and_vectorize_workgroups.mlir"
     "unfused_fma.mlir"
   DATA
     iree::tools::IreeFileCheck

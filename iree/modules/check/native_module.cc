@@ -1,34 +1,31 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/modules/check/native_module.h"
 
-#include <math.h>
-
+#include <cassert>
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
-#include <cstring>
+#include <memory>
 #include <sstream>
+#include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
-#include "absl/strings/str_cat.h"
+#include "absl/types/span.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/native_module_cc.h"
-#include "third_party/half/half.hpp"
+#include "iree/vm/ref_cc.h"
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation
@@ -71,7 +68,7 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   return AbslSpan<uint8_t>(lhs_bytes) == AbslSpan<uint8_t>(rhs_bytes);
 }
 
-static constexpr float floatPrecisionThreshold = 0.0001f;
+static constexpr float kF32PrecisionThreshold = 0.0001f;
 
 template <typename T>
 bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
@@ -79,12 +76,14 @@ bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   auto rhs_span = AbslSpan<T>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (fabs(lhs_span[i] - rhs_span[i]) > floatPrecisionThreshold) {
+    if (fabs(lhs_span[i] - rhs_span[i]) > kF32PrecisionThreshold) {
       return false;
     }
   }
   return true;
 }
+
+static constexpr float kF16PrecisionThreshold = 0.001f;
 
 bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
                          iree_byte_span_t rhs_bytes) {
@@ -92,9 +91,8 @@ bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
   auto rhs_span = AbslSpan<uint16_t>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
-    if (fabs(half_float::detail::half2float<float>(lhs_span[i]) -
-             half_float::detail::half2float<float>(rhs_span[i])) >
-        floatPrecisionThreshold) {
+    if (fabs(iree_math_f16_to_f32(lhs_span[i]) -
+             iree_math_f16_to_f32(rhs_span[i])) > kF16PrecisionThreshold) {
       return false;
     }
   }

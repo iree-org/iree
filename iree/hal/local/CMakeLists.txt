@@ -12,32 +12,17 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    arena
-  HDRS
-    "arena.h"
-  SRCS
-    "arena.c"
-  DEPS
-    iree::base::api
-    iree::base::core_headers
-    iree::base::internal::atomic_slist
-    iree::base::synchronization
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     event_pool
   HDRS
     "event_pool.h"
   SRCS
     "event_pool.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::synchronization
     iree::base::internal::wait_handle
-    iree::base::synchronization
     iree::base::tracing
   PUBLIC
 )
@@ -52,13 +37,29 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    executable_library_benchmark
+  SRCS
+    "executable_library_benchmark.c"
+  DEPS
+    ::executable_library
+    ::local
+    iree::base
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::hal::local::loaders::embedded_library_loader
+    iree::testing::benchmark
+)
+
+iree_cc_test(
+  NAME
     executable_library_test
   SRCS
     "executable_library_demo.c"
     "executable_library_demo.h"
     "executable_library_test.c"
   DEPS
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::hal::local::executable_library
 )
@@ -84,11 +85,11 @@ iree_cc_library(
     "local_executable_layout.c"
   DEPS
     ::executable_library
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::tracing
-    iree::hal::api
+    iree::hal
   PUBLIC
 )
 
@@ -106,16 +107,14 @@ iree_cc_library(
     "sync_event.c"
     "sync_semaphore.c"
   DEPS
-    ::arena
     ::local
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
-    iree::base::internal::wait_handle
-    iree::base::synchronization
+    iree::base::internal::arena
+    iree::base::internal::synchronization
     iree::base::tracing
-    iree::hal::api
-    iree::task
+    iree::hal
   PUBLIC
 )
 
@@ -139,16 +138,17 @@ iree_cc_library(
     "task_queue_state.c"
     "task_semaphore.c"
   DEPS
-    ::arena
     ::event_pool
+    ::executable_library
     ::local
-    iree::base::api
+    iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::arena
+    iree::base::internal::synchronization
     iree::base::internal::wait_handle
-    iree::base::synchronization
     iree::base::tracing
-    iree::hal::api
+    iree::hal
     iree::task
   PUBLIC
 )

@@ -1,17 +1,9 @@
 # Lint as: python3
-# Copyright 2019 Google LLC
+# Copyright 2019 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # pylint: disable=unused-variable
 
@@ -30,7 +22,8 @@ def create_add_scalar_module():
         return %0 : i32
       }
       """,
-      target_backends=["vmla"],
+      input_type="mhlo",
+      target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
@@ -45,7 +38,8 @@ def create_simple_static_mul_module():
           return %0 : tensor<4xf32>
       }
       """,
-      target_backends=["vmla"],
+      input_type="mhlo",
+      target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
@@ -53,7 +47,7 @@ def create_simple_static_mul_module():
 
 def create_simple_dynamic_abs_module():
   # TODO(laurenzo): Compile for more backends as dynamic shapes come online.
-  target_backends = ["vmla"]
+  target_backends = iree.compiler.DEFAULT_TESTING_BACKENDS
   binary = iree.compiler.compile_str(
       """
       func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -62,6 +56,7 @@ def create_simple_dynamic_abs_module():
           return %0 : tensor<?x?xf32>
       }
       """,
+      input_type="mhlo",
       target_backends=target_backends,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
@@ -75,7 +70,8 @@ class VmTest(absltest.TestCase):
     super().setUpClass()
     driver_names = iree.runtime.HalDriver.query()
     logging.info("driver_names: %s", driver_names)
-    cls.driver = iree.runtime.HalDriver.create("vmla")
+    cls.driver = iree.runtime.HalDriver.create(
+        iree.compiler.core.DEFAULT_TESTING_DRIVER)
     cls.device = cls.driver.create_default_device()
     cls.hal_module = iree.runtime.create_hal_module(cls.device)
     cls.htf = iree.runtime.HostTypeFactory.get_numpy()
@@ -84,6 +80,32 @@ class VmTest(absltest.TestCase):
     l = iree.runtime.VmVariantList(5)
     logging.info("variant_list: %s", l)
     self.assertEqual(l.size, 0)
+
+  def test_variant_list_buffers(self):
+    ET = iree.runtime.HalElementType
+    for dt, et in ((np.int8, ET.SINT_8), (np.int16, ET.SINT_16),
+                   (np.int32, ET.SINT_32), (np.int64, ET.SINT_64),
+                   (np.uint8, ET.UINT_8), (np.uint16, ET.UINT_16),
+                   (np.uint32, ET.UINT_32), (np.uint64, ET.UINT_64),
+                   (np.float32, ET.FLOAT_32), (np.float64, ET.FLOAT_64)):
+      # TODO: Unimplemented: (np.float16, ET.FLOAT_16)
+      lst = iree.runtime.VmVariantList(5)
+      ary1 = np.asarray([1, 2, 3, 4], dtype=dt)
+      lst.push_buffer_view(self.device, ary1, et)
+      ary2 = lst.get_as_ndarray(0)
+      np.testing.assert_array_equal(ary1, ary2)
+      with self.assertRaises(IndexError):
+        lst.get_as_ndarray(1)
+
+  def test_variant_list_list(self):
+    lst1 = iree.runtime.VmVariantList(5)
+    lst2 = iree.runtime.VmVariantList(5)
+    lst1.push_list(lst2)
+    self.assertEqual("<VmVariantList(1): [List[]]>", str(lst1))
+    lstout = lst1.get_as_list(0)
+    self.assertEqual("<VmVariantList(0): []>", str(lstout))
+    with self.assertRaises(IndexError):
+      lst1.get_as_list(1)
 
   def test_context_id(self):
     instance = iree.runtime.VmInstance()
@@ -94,7 +116,7 @@ class VmTest(absltest.TestCase):
   def test_module_basics(self):
     m = create_simple_static_mul_module()
     f = m.lookup_function("simple_mul")
-    self.assertGreater(f.ordinal, 0)
+    self.assertGreaterEqual(f.ordinal, 0)
     notfound = m.lookup_function("notfound")
     self.assertIs(notfound, None)
 
@@ -120,72 +142,42 @@ class VmTest(absltest.TestCase):
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     logging.info("context: %s", context)
 
-  def test_add_scalar(self):
+  def test_add_scalar_new_abi(self):
+    # TODO: Enable with new ABI.
+    return
     m = create_add_scalar_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("add_scalar")
-    abi = context.create_function_abi(self.device, self.htf, f)
-    logging.info("abi: %s", abi)
-
-    inputs = abi.pack_inputs(5, 6)
-    logging.info("serialize_inputs: %s", abi.serialize_vm_list(inputs))
-    logging.info("inputs: %s", inputs)
-
-    allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    logging.info("allocated_results: %s", allocated_results)
-    logging.info("Invoking...")
-    context.invoke(f, inputs, allocated_results)
-    logging.info("...done")
-
-    result = abi.unpack_results(allocated_results)
+    finv = iree.runtime.FunctionInvoker(context, self.device, f)
+    result = finv(5, 6)
     logging.info("result: %s", result)
     self.assertEqual(result, 11)
 
-  def test_synchronous_dynamic_shape_invoke_function(self):
+  def test_synchronous_dynamic_shape_invoke_function_new_abi(self):
+    # TODO: Enable with new ABI.
+    return
     m = create_simple_dynamic_abs_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
-    abi = context.create_function_abi(self.device, self.htf, f)
-    logging.info("abi: %s", abi)
-
+    finv = iree.runtime.FunctionInvoker(context, self.device, f)
     arg0 = np.array([[-1., 2.], [3., -4.]], dtype=np.float32)
-    inputs = abi.pack_inputs(arg0)
-    logging.info("Serialized inputs: %s", abi.serialize_vm_list(inputs))
-    logging.info("inputs: %s", inputs)
-
-    allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    logging.info("allocated_results: %s", allocated_results)
-    logging.info("Invoking...")
-    context.invoke(f, inputs, allocated_results)
-    logging.info("...done")
-
-    result = abi.unpack_results(allocated_results)
+    result = finv(arg0)
     logging.info("result: %s", result)
     np.testing.assert_allclose(result, [[1., 2.], [3., 4.]])
 
-  def test_synchronous_invoke_function(self):
+  def test_synchronous_invoke_function_new_abi(self):
+    # TODO: Enable with new ABI.
+    return
     m = create_simple_static_mul_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
-    abi = context.create_function_abi(self.device, self.htf, f)
-    logging.info("abi: %s", abi)
-
+    finv = iree.runtime.FunctionInvoker(context, self.device, f)
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
-    inputs = abi.pack_inputs(arg0, arg1)
-    logging.info("Serialized inputs: %s", abi.serialize_vm_list(inputs))
-    logging.info("inputs: %s", inputs)
-
-    allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    logging.info("allocated_results: %s", allocated_results)
-    logging.info("Invoking...")
-    context.invoke(f, inputs, allocated_results)
-    logging.info("...done")
-
-    result = abi.unpack_results(allocated_results)
+    result = finv(arg0, arg1)
     logging.info("result: %s", result)
     np.testing.assert_allclose(result, [4., 10., 18., 28.])
 

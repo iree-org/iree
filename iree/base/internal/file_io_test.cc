@@ -1,19 +1,20 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/internal/file_io.h"
 
+#include <cstdlib>
+#include <cstring>
+#include <ostream>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include "iree/base/logging.h"
+#include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -39,18 +40,33 @@ std::string GetUniqueContents(const char* unique_name) {
   return std::string("Test with name ") + unique_name + "\n";
 }
 
-TEST(FileIo, GetSetContents) {
-  constexpr const char* kUniqueName = "GetSetContents";
+TEST(FileIO, ReadWriteContents) {
+  constexpr const char* kUniqueName = "ReadWriteContents";
   auto path = GetUniquePath(kUniqueName);
-  ASSERT_THAT(FileExists(path.c_str()), StatusIs(StatusCode::kNotFound));
-  auto to_write = GetUniqueContents(kUniqueName);
 
-  IREE_ASSERT_OK(SetFileContents(
+  // File must not exist.
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, iree_file_exists(path.c_str()));
+
+  // Generate file contents.
+  auto write_contents = GetUniqueContents(kUniqueName);
+
+  // Write the contents to disk.
+  IREE_ASSERT_OK(iree_file_write_contents(
       path.c_str(),
-      iree_make_const_byte_span(to_write.data(), to_write.size())));
-  std::string read;
-  IREE_ASSERT_OK(GetFileContents(path.c_str(), &read));
-  EXPECT_EQ(to_write, read);
+      iree_make_const_byte_span(write_contents.data(), write_contents.size())));
+
+  // Read the contents from disk.
+  iree_byte_span_t read_contents;
+  IREE_ASSERT_OK(iree_file_read_contents(path.c_str(), iree_allocator_system(),
+                                         &read_contents));
+
+  // Expect the contents are equal.
+  EXPECT_EQ(write_contents.size(), read_contents.data_length);
+  EXPECT_EQ(memcmp(write_contents.data(), read_contents.data,
+                   read_contents.data_length),
+            0);
+
+  iree_allocator_free(iree_allocator_system(), read_contents.data);
 }
 
 }  // namespace

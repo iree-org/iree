@@ -1,29 +1,25 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/command_buffer.h"
 
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
+#include "iree/hal/resource.h"
 
 #define _VTABLE_DISPATCH(command_buffer, method_name) \
   IREE_HAL_VTABLE_DISPATCH(command_buffer, iree_hal_command_buffer, method_name)
 
 IREE_HAL_API_RETAIN_RELEASE(command_buffer);
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
@@ -51,13 +47,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
   return status;
 }
 
-IREE_API_EXPORT iree_hal_command_buffer_mode_t IREE_API_CALL
+IREE_API_EXPORT iree_hal_command_buffer_mode_t
 iree_hal_command_buffer_mode(const iree_hal_command_buffer_t* command_buffer) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   return _VTABLE_DISPATCH(command_buffer, mode)(command_buffer);
 }
 
-IREE_API_EXPORT iree_hal_command_category_t IREE_API_CALL
+IREE_API_EXPORT iree_hal_command_category_t
 iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer) {
   IREE_ASSERT_ARGUMENT(command_buffer);
@@ -83,8 +79,7 @@ iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer) {
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_execution_barrier(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
@@ -103,8 +98,7 @@ iree_hal_command_buffer_execution_barrier(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_signal_event(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_signal_event(
     iree_hal_command_buffer_t* command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
   IREE_ASSERT_ARGUMENT(command_buffer);
@@ -116,7 +110,7 @@ iree_hal_command_buffer_signal_event(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_reset_event(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_reset_event(
     iree_hal_command_buffer_t* command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
   IREE_ASSERT_ARGUMENT(command_buffer);
@@ -128,7 +122,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_reset_event(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_wait_events(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wait_events(
     iree_hal_command_buffer_t* command_buffer, iree_host_size_t event_count,
     const iree_hal_event_t** events,
     iree_hal_execution_stage_t source_stage_mask,
@@ -150,8 +144,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_wait_events(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_discard_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_discard_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(buffer);
@@ -162,7 +155,7 @@ iree_hal_command_buffer_discard_buffer(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length,
     const void* pattern, iree_host_size_t pattern_length) {
@@ -176,13 +169,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_update_buffer(iree_hal_command_buffer_t* command_buffer,
-                                      const void* source_buffer,
-                                      iree_host_size_t source_offset,
-                                      iree_hal_buffer_t* target_buffer,
-                                      iree_device_size_t target_offset,
-                                      iree_device_size_t length) {
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_update_buffer(
+    iree_hal_command_buffer_t* command_buffer, const void* source_buffer,
+    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(source_buffer);
   IREE_ASSERT_ARGUMENT(target_buffer);
@@ -194,7 +184,7 @@ iree_hal_command_buffer_update_buffer(iree_hal_command_buffer_t* command_buffer,
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
@@ -207,8 +197,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_push_constants(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
@@ -225,8 +214,7 @@ iree_hal_command_buffer_push_constants(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_push_descriptor_set(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_layout_t* executable_layout, uint32_t set,
     iree_host_size_t binding_count,
@@ -241,8 +229,7 @@ iree_hal_command_buffer_push_descriptor_set(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_bind_descriptor_set(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_bind_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_layout_t* executable_layout, uint32_t set,
     iree_hal_descriptor_set_t* descriptor_set,
@@ -260,7 +247,7 @@ iree_hal_command_buffer_bind_descriptor_set(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
@@ -274,8 +261,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_command_buffer_dispatch_indirect(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_t* workgroups_buffer,

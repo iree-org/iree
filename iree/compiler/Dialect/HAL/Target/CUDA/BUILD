@@ -1,18 +1,11 @@
-# Copyright 2021 Google LLC
+# Copyright 2021 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -28,6 +21,14 @@ endif()
 """,
 )
 
+c_embed_data(
+    name = "cuda_libdevice",
+    srcs = ["@cuda//:libdevice_root"],
+    c_file_output = "libdevice.c",
+    flatten = True,
+    h_file_output = "libdevice.h",
+)
+
 cc_library(
     name = "CUDA",
     srcs = [
@@ -37,12 +38,16 @@ cc_library(
         "CUDATarget.h",
     ],
     deps = [
-        "//iree/base:flatcc",
-        "//iree/compiler/Conversion/LinalgToNVVM",
+        ":cuda_libdevice",
+        "//iree/base/internal:flatcc",
+        "//iree/compiler/Conversion/LinalgToLLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
         "//iree/schemas:cuda_executable_def_c_fbs",
+        "@llvm-project//llvm:BitReader",
         "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:IPO",
+        "@llvm-project//llvm:Linker",
         "@llvm-project//llvm:NVPTXCodeGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",

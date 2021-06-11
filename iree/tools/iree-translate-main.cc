@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // IREE translation main entry function.
 //
@@ -18,6 +10,11 @@
 // PassManger and do transformations on the IR before translating to other
 // formats. Thus we use our own main entry function because we register
 // Dialects and PassManager CLI options.
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <type_traits>
 
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
@@ -27,16 +24,22 @@
 #include "iree/tools/init_targets.h"
 #include "iree/tools/init_translations.h"
 #include "iree/tools/init_xla_dialects.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/Timing.h"
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Translation.h"
@@ -79,6 +82,8 @@ int main(int argc, char **argv) {
 #endif  // IREE_HAVE_EMITC_DIALECT
   mlir::iree_compiler::registerIreeTranslations();
   mlir::iree_compiler::registerLinalgToSPIRVPasses();
+  // Make sure command line options are registered.
+  (void)mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.
@@ -88,6 +93,7 @@ int main(int argc, char **argv) {
   mlir::registerAsmPrinterCLOptions();
   // Register pass manager command-line options like -print-ir-*.
   mlir::registerPassManagerCLOptions();
+  mlir::registerDefaultTimingManagerCLOptions();
 
   // Add flags for all the registered translations.
   llvm::cl::opt<const mlir::TranslateFunction *, false, mlir::TranslationParser>

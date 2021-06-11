@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_DIALECT_FLOW_BASE
 #define IREE_DIALECT_FLOW_BASE
@@ -94,13 +86,6 @@ def FLOW_ExecutableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariablePtr : AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 
-def FLOW_Workload : AnyTypeOf<[Index]> {
-  let description = [{
-    Describes the total untiled invocations along one or more dimensions.
-    Tiling may later divide this value for workgroup sizes.
-  }];
-}
-
 def FLOW_TensorAccessCanReadPred : CPred<[{
   $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
       IREE::Flow::TensorAccess::ReadOnly ||
@@ -152,21 +137,6 @@ def FLOW_WritableDispatchTensor : DialectType<
     to query the metadata about the tensor (such as its shape) as well as store
     to the backing tensor representation.
   }];
-}
-
-// Use no padding and clamp the window to the valid area, possibly stopping
-// early prior to having covered all data.
-def FLOW_PM_ClampWindowToFit : I32EnumAttrCase<"ClampWindowToFit", 0>;
-// Use initial values for padding when windows cross dimension boundaries.
-def FLOW_PM_PadBorder : I32EnumAttrCase<"PadBorder", 1>;
-// Describes the padding applied for a windowed operation like convolution,
-// where a window is placed inside a base area.
-def FLOW_PaddingModeAttr :
-    I32EnumAttr<"PaddingMode", "Padding mode", [
-      FLOW_PM_ClampWindowToFit,
-      FLOW_PM_PadBorder,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
 }
 
 #endif  // IREE_DIALECT_FLOW_BASE

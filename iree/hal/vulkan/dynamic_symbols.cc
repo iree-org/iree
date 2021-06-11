@@ -1,23 +1,16 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <type_traits>
 
-#include "iree/base/attributes.h"
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"
@@ -69,6 +62,8 @@ static constexpr const FunctionPtrInfo kDynamicFunctionPtrInfos[] = {
 static const char* kVulkanLoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_ANDROID)
     "libvulkan.so",
+#elif defined(IREE_PLATFORM_IOS) || defined(IREE_PLATFORM_MACOS)
+    "libvulkan.dylib",
 #elif defined(IREE_PLATFORM_WINDOWS)
     "vulkan-1.dll",
 #else
@@ -76,8 +71,8 @@ static const char* kVulkanLoaderSearchNames[] = {
 #endif  // IREE_PLATFORM_ANDROID
 };
 
-Status ResolveFunctions(DynamicSymbols* syms,
-                        const DynamicSymbols::GetProcAddrFn& get_proc_addr) {
+iree_status_t ResolveFunctions(
+    DynamicSymbols* syms, const DynamicSymbols::GetProcAddrFn& get_proc_addr) {
   // Resolve the method the shared object uses to resolve other functions.
   // Some libraries will export all symbols while others will only export this
   // single function.
@@ -141,24 +136,27 @@ Status ResolveFunctions(DynamicSymbols* syms,
     }
   }
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 }  // namespace
 
 // static
-StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
-    const GetProcAddrFn& get_proc_addr) {
+iree_status_t DynamicSymbols::Create(const GetProcAddrFn& get_proc_addr,
+                                     ref_ptr<DynamicSymbols>* out_syms) {
   IREE_TRACE_SCOPE0("DynamicSymbols::Create");
 
   auto syms = make_ref<DynamicSymbols>();
   IREE_RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
   syms->FixupExtensionFunctions();
-  return syms;
+
+  *out_syms = std::move(syms);
+  return iree_ok_status();
 }
 
 // static
-StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
+iree_status_t DynamicSymbols::CreateFromSystemLoader(
+    ref_ptr<DynamicSymbols>* out_syms) {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
 
   iree_dynamic_library_t* loader_library = NULL;
@@ -189,15 +187,18 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
         return fn;
       }));
   syms->FixupExtensionFunctions();
-  return syms;
+
+  *out_syms = std::move(syms);
+  return iree_ok_status();
 }
 
-Status DynamicSymbols::LoadFromInstance(VkInstance instance) {
+iree_status_t DynamicSymbols::LoadFromInstance(VkInstance instance) {
   IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromInstance");
   return LoadFromDevice(instance, VK_NULL_HANDLE);
 }
 
-Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
+iree_status_t DynamicSymbols::LoadFromDevice(VkInstance instance,
+                                             VkDevice device) {
   IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromDevice");
 
   if (!instance) {
@@ -237,7 +238,7 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
 
   FixupExtensionFunctions();
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
 DynamicSymbols::DynamicSymbols() = default;

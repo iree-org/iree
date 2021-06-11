@@ -1,21 +1,32 @@
-// Copyright 2021 Google LLC
+// Copyright 2021 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_BASE_ATTRIBUTES_H_
 #define IREE_BASE_ATTRIBUTES_H_
 
 #include "iree/base/target_platform.h"
+
+//===----------------------------------------------------------------------===//
+// API/ABI interop
+//===----------------------------------------------------------------------===//
+
+// Denotes a method exported by the IREE API.
+// Any call annotated with this will be relatively stable.
+// Calls without this are considered private to the IREE implementation and
+// should not be relied upon.
+#ifdef __cplusplus
+#define IREE_API_EXPORT extern "C"
+#else
+#define IREE_API_EXPORT
+#endif  // __cplusplus
+
+// Denotes a function pointer that is exposed as part of the IREE API.
+// Example:
+//   iree_status_t(IREE_API_PTR* some_callback)(int value);
+#define IREE_API_PTR
 
 //===----------------------------------------------------------------------===//
 // IREE_HAVE_ATTRIBUTE

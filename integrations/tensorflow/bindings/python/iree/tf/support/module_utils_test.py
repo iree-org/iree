@@ -1,17 +1,9 @@
 # Lint as: python3
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Tests for iree.tf.support.module_utils."""
 
 import os
@@ -57,7 +49,7 @@ class RandomInitModule(tf.Module):
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
   def test_artifact_saving(self):
-    backend_info = module_utils.BackendInfo('iree_vmla')
+    backend_info = module_utils.BackendInfo('iree_vmvx')
     with tempfile.TemporaryDirectory() as artifacts_dir:
       tf_module = ConstantModule()
       iree_module_utils, compiled_path = (
@@ -77,7 +69,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters([
       ('tensorflow', 'tf'),
-      ('vmla', 'iree_vmla'),
+      ('vmvx', 'iree_vmvx'),
   ])
   def test_unaltered_state(self, backend_name):
     backend_info = module_utils.BackendInfo(backend_name)
@@ -94,7 +86,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters([
       ('tensorflow', 'tf'),
-      ('vmla', 'iree_vmla'),
+      ('vmvx', 'iree_vmvx'),
   ])
   def test_random_initialization(self, backend_name):
     backend_info = module_utils.BackendInfo(backend_name)

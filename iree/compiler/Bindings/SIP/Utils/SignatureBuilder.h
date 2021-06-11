@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_BINDINGS_SIP_UTILS_SIGNATURE_BUILDER_H_
 #define IREE_COMPILER_BINDINGS_SIP_UTILS_SIGNATURE_BUILDER_H_
@@ -81,7 +73,7 @@ class SignatureBuilder {
 // -----------------------------------------------------------------------------
 
 // Mangles raw function signatures.
-// See docs/design_docs/function_abi.md.
+// See docs/developers/design_docs/function_abi.md.
 class RawSignatureMangler {
  public:
   static SignatureBuilder ToFunctionSignature(const SignatureBuilder& inputs,
@@ -122,8 +114,8 @@ class RawSignatureMangler {
 // Mangles function signatures according to the Sip (Structured Index Path) V1
 // scheme.
 //
-// Mangler for the 'sip' ABI. See docs/design_docs/function_abi.md in the
-// documentation.
+// Mangler for the 'sip' ABI. See docs/developers/design_docs/function_abi.md
+// in the documentation.
 class SipSignatureMangler {
  public:
   enum class IndexMode {

@@ -1,16 +1,8 @@
-# Copyright 2020 Google LLC
+# Copyright 2020 The IREE Authors
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # ***THIS FILE DOES NOT BUILD WITH BAZEL***
 #
@@ -89,14 +81,6 @@ iree_e2e_cartesian_product_test_suite(
     name = "keyword_spotting_tests",
     failing_configurations = [
         {
-            # TODO(#4065): VMLA raises INVALID_ARGUMENT errors after DeviceQueue failure.
-            "model": [
-                "att_mh_rnn",
-                "att_rnn",
-            ],
-            "target_backends": "iree_vmla",
-        },
-        {
             "model": [
                 # Timing out on SwiftShader
                 "att_mh_rnn",
@@ -127,15 +111,10 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
     },
-    tags = [
-        # Kokoro doesn't have kws_streaming installed
-        "nokokoro",
-    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
@@ -159,6 +138,12 @@ iree_e2e_cartesian_product_test_suite(
             # These models do not currently support streaming.
             "model": NON_STREAMING_KEYWORD_SPOTTING_MODELS,
         },
+        {
+            "model": [
+                "crnn",  # TODO(b/188221333): Get this test working.
+            ],
+            "target_backends": "iree_vulkan",
+        },
     ],
     matrix = {
         "src": "keyword_spotting_streaming_test.py",
@@ -168,15 +153,10 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
     },
-    tags = [
-        # Kokoro doesn't have kws_streaming installed
-        "nokokoro",
-    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
@@ -198,7 +178,6 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": [
                 "tf",
                 "tflite",
-                "iree_vmla",
                 "iree_llvmaot",
                 "iree_vulkan",
             ],
@@ -216,15 +195,10 @@ iree_e2e_cartesian_product_test_suite(
         "target_backends": [
             "tf",
             "tflite",
-            "iree_vmla",
             "iree_llvmaot",
             "iree_vulkan",
         ],
     },
-    tags = [
-        # Kokoro doesn't have kws_streaming installed
-        "nokokoro",
-    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",

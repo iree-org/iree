@@ -1,16 +1,8 @@
-// Copyright 2019 Google LLC
+// Copyright 2019 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Tests covering the dispatch logic for individual ops.
 //
@@ -32,7 +24,7 @@
 namespace {
 
 struct TestParams {
-  const iree::iree_file_toc_t& module_file;
+  const struct iree_file_toc_t& module_file;
   std::string function_name;
 };
 
@@ -47,16 +39,16 @@ std::vector<TestParams> GetModuleTestParams() {
 
   IREE_CHECK_OK(iree_vm_register_builtin_types());
 
-  auto* module_file_toc = iree::vm::test::all_bytecode_modules_cc_create();
-  for (size_t i = 0; i < iree::vm::test::all_bytecode_modules_cc_size(); ++i) {
+  const struct iree_file_toc_t* module_file_toc =
+      all_bytecode_modules_c_create();
+  for (size_t i = 0; i < all_bytecode_modules_c_size(); ++i) {
     const auto& module_file = module_file_toc[i];
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file.data),
             module_file.size},
-        iree_allocator_null(), iree_allocator_system(), &module))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &module));
     iree_vm_module_signature_t signature = module->signature(module->self);
     test_params.reserve(test_params.size() + signature.export_function_count);
     for (int i = 0; i < signature.export_function_count; ++i) {
@@ -85,8 +77,7 @@ class VMBytecodeDispatchTest
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(test_params.module_file.data),
             test_params.module_file.size},
-        iree_allocator_null(), iree_allocator_system(), &bytecode_module_))
-        << "Bytecode module failed to load";
+        iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
@@ -100,13 +91,11 @@ class VMBytecodeDispatchTest
     iree_vm_instance_release(instance_);
   }
 
-  iree_status_t RunFunction(absl::string_view function_name) {
+  iree_status_t RunFunction(const char* function_name) {
     iree_vm_function_t function;
     IREE_CHECK_OK(bytecode_module_->lookup_function(
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
-        &function))
-        << "Exported function '" << function_name << "' not found";
+        iree_make_cstring_view(function_name), &function));
 
     return iree_vm_invoke(context_, function,
                           /*policy=*/nullptr, /*inputs=*/nullptr,
@@ -122,7 +111,7 @@ TEST_P(VMBytecodeDispatchTest, Check) {
   const auto& test_params = GetParam();
   bool expect_failure = absl::StartsWith(test_params.function_name, "fail_");
 
-  iree_status_t status = RunFunction(test_params.function_name);
+  iree_status_t status = RunFunction(test_params.function_name.c_str());
   if (iree_status_is_ok(status)) {
     if (expect_failure) {
       GTEST_FAIL() << "Function expected failure but succeeded";

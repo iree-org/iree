@@ -1,29 +1,20 @@
-// Copyright 2020 Google LLC
+// Copyright 2020 The IREE Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/tools/utils/vm_util.h"
-
-#include <sstream>
 
 #include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmla/registration/driver_module.h"
+#include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
+#include "iree/vm/ref_cc.h"
 
 namespace iree {
 namespace {
@@ -31,13 +22,13 @@ namespace {
 class VmUtilTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+    IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(
         iree_hal_driver_registry_default()));
   }
 
   virtual void SetUp() {
     IREE_ASSERT_OK(iree_hal_module_register_types());
-    IREE_ASSERT_OK(CreateDevice("vmla", &device_));
+    IREE_ASSERT_OK(CreateDevice("vmvx", &device_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 
@@ -49,66 +40,44 @@ class VmUtilTest : public ::testing::Test {
 
 TEST_F(VmUtilTest, ParsePrintBuffer) {
   absl::string_view buf_string = "2x2xi32=[42 43][44 45]";
-  RawSignatureParser::Description desc;
-  desc.type = RawSignatureParser::Type::kBuffer;
-  desc.buffer.scalar_type = AbiConstants::ScalarType::kSint32;
-  desc.dims = {2, 2};
-
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(
-      ParseToVariantList({desc}, allocator_, {buf_string}, &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(allocator_, {buf_string}, &variant_list));
   std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
-  EXPECT_EQ(os.str(), absl::StrCat(buf_string, "\n"));
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
+  EXPECT_EQ(os.str(),
+            absl::StrCat("result[0]: hal.buffer_view\n", buf_string, "\n"));
 }
 
 TEST_F(VmUtilTest, ParsePrintScalar) {
-  absl::string_view input_string = "i32=42";
-  RawSignatureParser::Description desc;
-  desc.type = RawSignatureParser::Type::kScalar;
-  desc.scalar.type = AbiConstants::ScalarType::kSint32;
-
+  absl::string_view input_string = "42";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(
-      ParseToVariantList({desc}, allocator_, {input_string}, &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(allocator_, {input_string}, &variant_list));
   std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
-  EXPECT_EQ(os.str(), absl::StrCat(input_string, "\n"));
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
+  EXPECT_EQ(os.str(), absl::StrCat("result[0]: i32=", input_string, "\n"));
 }
 
 TEST_F(VmUtilTest, ParsePrintRank0Buffer) {
   absl::string_view buf_string = "i32=42";
-  RawSignatureParser::Description desc;
-  desc.type = RawSignatureParser::Type::kBuffer;
-  desc.buffer.scalar_type = AbiConstants::ScalarType::kSint32;
-
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(
-      ParseToVariantList({desc}, allocator_, {buf_string}, &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(allocator_, {buf_string}, &variant_list));
   std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
-  EXPECT_EQ(os.str(), absl::StrCat(buf_string, "\n"));
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
+  EXPECT_EQ(os.str(),
+            absl::StrCat("result[0]: hal.buffer_view\n", buf_string, "\n"));
 }
 
 TEST_F(VmUtilTest, ParsePrintMultipleBuffers) {
   absl::string_view buf_string1 = "2x2xi32=[42 43][44 45]";
-  RawSignatureParser::Description desc1;
-  desc1.type = RawSignatureParser::Type::kBuffer;
-  desc1.buffer.scalar_type = AbiConstants::ScalarType::kSint32;
-  desc1.dims = {2, 2};
-
   absl::string_view buf_string2 = "2x3xf64=[1 2 3][4 5 6]";
-  RawSignatureParser::Description desc2;
-  desc2.type = RawSignatureParser::Type::kBuffer;
-  desc2.buffer.scalar_type = AbiConstants::ScalarType::kIeeeFloat64;
-  desc2.dims = {2, 3};
-
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList({desc1, desc2}, allocator_,
-                                    {buf_string1, buf_string2}, &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(allocator_, {buf_string1, buf_string2},
+                                    &variant_list));
   std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList({desc1, desc2}, variant_list.get(), &os));
-  EXPECT_EQ(os.str(), absl::StrCat(buf_string1, "\n", buf_string2, "\n"));
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
+  EXPECT_EQ(os.str(),
+            absl::StrCat("result[0]: hal.buffer_view\n", buf_string1,
+                         "\nresult[1]: hal.buffer_view\n", buf_string2, "\n"));
 }
 
 }  // namespace
