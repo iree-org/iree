@@ -165,6 +165,12 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto libraryName =
         targetOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
+    // Validate flags for output mode.
+    if (options_.linkEmbedded && !options_.staticLibraryOutput.empty()) {
+      return targetOp.emitError()
+             << "cannot embed ELF and produce static library simultaneously";
+    }
+
     // Specialize the module to the target triple.
     // The executable will have been cloned into other ExecutableTargetOps for
     // other triples so it's fine to mutate in-place.
@@ -294,8 +300,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     if (!options_.staticLibraryOutput.empty()) {
       if (objectFiles.size() != 1) {
         // Static library output only supports single object libraries.
-        return targetOp.emitError() << "Static library generation unsupported "
-                                       "for multiple object files.";
+        return targetOp.emitError() << "generating static libraries from "
+                                       "multiple object files is not supported";
       }
 
       // Copy the static object file to the specified output along with
@@ -304,7 +310,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       const auto library_name = objectFiles[0].path;
       if (!outputStaticLibrary(libraryName, queryFunctionName, libraryPath,
                                objectFiles[0].path)) {
-        return targetOp.emitError() << "Static library generation failed.";
+        return targetOp.emitError() << "static library generation failed";
       }
     }
 
@@ -323,12 +329,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
           << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
-    }
-
-    if (options_.linkEmbedded && !options_.staticLibraryOutput.empty()) {
-      return targetOp.emitError()
-             << "Cannot embed ELF and produce static library simultaneously. "
-                "Please choose one option or the other. ";
     }
 
     if (options_.linkEmbedded) {
@@ -360,7 +360,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
           targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
           libraryNameVector);
-      binaryOp.mime_typeAttr(executableBuilder.getStringAttr("text/plain"));
     } else {
       FlatbufferBuilder builder;
       iree_DyLibExecutableDef_start_as_root(builder);
