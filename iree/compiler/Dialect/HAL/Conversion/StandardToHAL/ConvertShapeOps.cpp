@@ -58,8 +58,13 @@ class BackingBufferBufferViewDimPattern
     assert(index.hasValue() && "expect constant index in `std.dim` operation");
 
     auto dimIndex = rewriter.getIndexAttr(index.getValue());
+    auto bufferView = adaptor.getBufferView();
+    if (!bufferView) {
+      return rewriter.notifyMatchFailure(
+          dimOp, "could not adapt to producing buffer view");
+    }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewDimOp>(
-        dimOp, dimOp.getResult().getType(), adaptor.getBufferView(), dimIndex);
+        dimOp, dimOp.getResult().getType(), bufferView, dimIndex);
     return success();
   }
 };
@@ -79,9 +84,13 @@ class BackingBufferBufferViewRankPattern : public OpConversionPattern<RankOp> {
     }
     auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
         rankOp.getLoc(), rankOp.getOperand(), rawOperands[0], rewriter);
-
+    auto bufferView = adaptor.getBufferView();
+    if (!bufferView) {
+      return rewriter.notifyMatchFailure(
+          rankOp, "could not adapt to producing buffer view");
+    }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewRankOp>(
-        rankOp, rankOp.getResult().getType(), adaptor.getBufferView());
+        rankOp, rankOp.getResult().getType(), bufferView);
     return success();
   }
 };

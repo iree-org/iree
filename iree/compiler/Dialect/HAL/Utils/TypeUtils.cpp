@@ -173,16 +173,26 @@ Value TensorRewriteAdaptor::getBuffer() {
 Value TensorRewriteAdaptor::getBufferView() {
   if (isBufferView()) {
     return newValue_;
-  } else if (auto bufferViewBufferOp =
-                 llvm::dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
-                     newValue_.getDefiningOp())) {
-    return bufferViewBufferOp.buffer_view();
-  } else {
-    auto shapeDims = getShapeDims();
-    if (!shapeDims) return {};
-    return rewriter_.createOrFold<IREE::HAL::BufferViewCreateOp>(
-        loc_, newValue_, getElementType(), *shapeDims);
   }
+
+  // Attempt to "look through" the Buffer to a producing BufferView.
+  // This is only intended to be robust enough to reverse through the
+  // conversions above which may have been introduced.
+  // This is not super robust and should be replaced with a more holistic
+  // mechanism for tracking back to producing shaped type.
+  if (newValue_.getType().isa<IREE::HAL::BufferType>()) {
+    if (auto getBufferOp =
+            llvm::dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
+                newValue_.getDefiningOp())) {
+      return getBufferOp.getOperand();
+    }
+  }
+
+  // Fallback to (failable) dynamic resolution by inspecting producers.
+  auto shapeDims = getShapeDims();
+  if (!shapeDims) return {};
+  return rewriter_.createOrFold<IREE::HAL::BufferViewCreateOp>(
+      loc_, newValue_, getElementType(), *shapeDims);
 }
 
 TensorType TensorRewriteAdaptor::getTensorType() {
