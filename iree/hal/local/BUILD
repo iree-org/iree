@@ -13,25 +13,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# TODO(benvanik): replace iree/base/arena.h with this one. We still want the
-# old-style arena for pure stack use; we may be able to do that with a change
-# to block pool that allows for on-stack initialization (iree_stack_arena_t
-# that has storage for one block inside itself and then dynamically allocates
-# new ones if needed). That way we have only one arena implementation and can
-# easily use the iree_allocator_t interface without worry.
-cc_library(
-    name = "arena",
-    srcs = ["arena.c"],
-    hdrs = ["arena.h"],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/base/internal:atomic_slist",
-        "//iree/base/internal:synchronization",
-    ],
-)
-
 # TODO(benvanik): move into base/? may be useful for other backends or for other
 # parts of the system (like modules handling IO/RPC).
 cc_library(
@@ -127,12 +108,12 @@ cc_library(
         "sync_semaphore.h",
     ],
     deps = [
-        ":arena",
         ":local",
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:arena",
         "//iree/base/internal:synchronization",
         "//iree/hal",
     ],
@@ -159,7 +140,6 @@ cc_library(
         "task_semaphore.h",
     ],
     deps = [
-        ":arena",
         ":event_pool",
         ":executable_library",
         ":local",
@@ -167,6 +147,7 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:arena",
         "//iree/base/internal:synchronization",
         "//iree/base/internal:wait_handle",
         "//iree/hal",

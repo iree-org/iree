@@ -237,7 +237,6 @@ public final class Interpreter implements AutoCloseable {
     if (outputs == null || outputs.isEmpty()) {
       throw new IllegalArgumentException("Input error: Outputs should not be null or empty.");
     }
-    checkInitialized();
 
     if (!tensorsAllocated) {
       allocateTensors();

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_LOCAL_ARENA_H_
-#define IREE_HAL_LOCAL_ARENA_H_
+#ifndef IREE_BASE_INTERNAL_ARENA_H_
+#define IREE_BASE_INTERNAL_ARENA_H_
 
 #include <stddef.h>
 
@@ -150,4 +150,4 @@ iree_allocator_t iree_arena_allocator(iree_arena_allocator_t* arena);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_LOCAL_ARENA_H_
+#endif  // IREE_BASE_INTERNAL_ARENA_H_

@@ -338,12 +338,12 @@ void ConvertToSPIRVPass::runOnOperation() {
   auto spvModule = builder.create<spirv::ModuleOp>(
       moduleOp.getLoc(), spirv::AddressingModel::Logical,
       spirv::MemoryModel::GLSL450);
-  Operation *terminator = spvModule.getBlock().getTerminator();
+  Block *body = spvModule.getBody();
   Dialect *spvDialect = spvModule->getDialect();
   for (Operation &op : llvm::make_early_inc_range(*moduleOp.getBody())) {
     // Skip the newly created spv.module itself.
     if (&op == spvModule) continue;
-    if (op.getDialect() == spvDialect) op.moveBefore(terminator);
+    if (op.getDialect() == spvDialect) op.moveBefore(body, body->end());
   }
 }
 

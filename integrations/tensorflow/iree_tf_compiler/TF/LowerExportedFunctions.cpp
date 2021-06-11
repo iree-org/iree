@@ -91,8 +91,8 @@ class LowerExportedFunctionsPass
       SipSignatureMangler inputsMangler;
       SipSignatureMangler resultsMangler;
       SmallVector<NamedAttribute, 3> funcReflectAttrs;
-      funcReflectAttrs.push_back(
-          builder.getNamedAttr(abiIdent, builder.getStringAttr(sipIdent)));
+      funcReflectAttrs.push_back(builder.getNamedAttr(
+          abiIdent, builder.getStringAttr(sipIdent.strref())));
       funcReflectAttrs.push_back(
           builder.getNamedAttr(abiVersionIdent, builder.getI32IntegerAttr(1)));
 

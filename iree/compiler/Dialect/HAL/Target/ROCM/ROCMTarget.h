@@ -29,7 +29,7 @@ void registerROCMTargetBackends(
     std::function<ROCMTargetOptions()> queryOptions);
 
 // Links LLVM module to ROC Device Library Bit Code
-void LinkROCDLIfNecessary(llvm::Module *module);
+void LinkROCDLIfNecessary(llvm::Module *module, std::string targetChip);
 
 // Compiles ISAToHsaco Code
 std::string createHsaco(const std::string isa, StringRef name);

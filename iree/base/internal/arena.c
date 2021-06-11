@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/arena.h"
+#include "iree/base/internal/arena.h"
 
 #include <stdint.h>
 #include <string.h>

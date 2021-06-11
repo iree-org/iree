@@ -230,6 +230,17 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "iree-mlir-lsp-server",
+    srcs = ["iree-mlir-lsp-server.cc"],
+    deps = [
+        ":init_passes_and_dialects",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MlirLspServerLib",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
 cc_binary(
     name = "iree-run-mlir",
     srcs = ["iree-run-mlir-main.cc"],

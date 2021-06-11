@@ -72,6 +72,13 @@ static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {
   InitOnceExecuteOnce(flag, iree_call_once_callback_impl, (PVOID)&param, NULL);
 }
 
+#elif IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
+// No-op when the thread control is disabled.
+#define IREE_ONCE_FLAG_INIT 1
+#define iree_once_flag uint32_t
+static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {}
+
 #else
 
 // Fallback using pthread_once:

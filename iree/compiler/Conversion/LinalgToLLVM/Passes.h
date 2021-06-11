@@ -23,6 +23,9 @@ std::unique_ptr<FunctionPass> createPlanConvLoopOrderPass();
 /// vector size.
 std::unique_ptr<OperationPass<FuncOp>> createPadLinalgWorkgroupTilesPass();
 
+/// Multi-level tiling, padding and vectorization of  linalg ops on tensors.
+std::unique_ptr<FunctionPass> createTilePadAndVectorizeWorkgroupsPass();
+
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass(
     bool lowerToVectors = true);
