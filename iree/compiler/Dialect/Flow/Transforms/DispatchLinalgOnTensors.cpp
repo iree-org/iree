@@ -64,21 +64,6 @@ namespace Flow {
 static unsigned kNumMaxParallelDims = 3;
 
 namespace {
-
-/// Returns the dynamic dimensions of the given `value`, assuming it has a
-/// shaped type.
-SmallVector<Value, 4> getDynamicDims(OpBuilder &builder, Location loc,
-                                     Value value) {
-  SmallVector<Value, 4> dynamicDims;
-  for (auto shape : enumerate(value.getType().cast<ShapedType>().getShape())) {
-    if (shape.value() == ShapedType::kDynamicSize) {
-      dynamicDims.push_back(
-          builder.createOrFold<memref::DimOp>(loc, value, shape.index()));
-    }
-  }
-  return dynamicDims;
-}
-
 /// PatternRewriter that allows replacing only a subset of uses.
 /// Since this only adds a method, it can just be static_cast'ed to when
 /// applying a rewrite.
@@ -906,18 +891,6 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
       return failure();
     }
 
-    // If this is a standalone fill op, we don't need to create a dispatch
-    // region for it; just use flow.tensor.splat so we can leverage DMA
-    // functionalities.
-    Location loc = op->getLoc();
-    if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
-      SmallVector<Value, 4> dynamicDims =
-          getDynamicDims(rewriter, loc, fillOp.output());
-      rewriter.replaceOpWithNewOp<TensorSplatOp>(op, fillOp.output().getType(),
-                                                 fillOp.value(), dynamicDims);
-      return success();
-    }
-
     // The workgroup count is based on the result shape.
     Optional<SmallVector<SmallVector<Value>>> resultShapesOpt =
         getResultShapes(rewriter, op);
@@ -932,6 +905,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     // the flow has three elements of workload size (x, y, z) by linearizing the
     // workloads for all higher dimensions greater than or equal to
     // kNumMaxParallelDims.
+    Location loc = op->getLoc();
     SmallVector<Value, 4> count(resultShapes[0].begin(), resultShapes[0].end());
     if (count.size() > kNumMaxParallelDims) {
       unsigned numSymbols = 0;

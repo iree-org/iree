@@ -346,12 +346,18 @@ func @fuse_tensor_update_with_fill(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %
 //  CHECK-SAME:   %[[ARG5:[a-zA-Z0-9]+]]: index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//       CHECK:   %[[VAL:.+]] = tensor.extract %[[ARG1]][]
 //   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP]]()[%[[ARG2]], %[[ARG4]], %[[D0]]]
 //   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP]]()[%[[ARG3]], %[[ARG5]], %[[D1]]]
-//       CHECK:   %[[RESULT:.+]] = flow.tensor.splat %[[VAL]] : tensor<?x?xf32>{%[[RD0]], %[[RD1]]}
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+//  CHECK-SAME:    [%[[RD1]], %[[RD0]], %[[C1]]]
+//  CHECK-SAME:    (%[[ARG1]], %[[RD0]], %[[RD1]])
+//   CHECK-DAG:      %[[VAL:.+]] = tensor.extract
+//   CHECK-DAG:      %[[INIT:.+]] = linalg.init_tensor
+//       CHECK:      %[[RETURN:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
+//       CHECK:      flow.dispatch.tensor.store %[[RETURN]], {{.*}}
+//  CHECK-NEXT:      flow.return
 //       CHECK:   flow.tensor.update %[[ARG0]], %[[RESULT]]
 
 // -----
@@ -486,7 +492,12 @@ func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32
 //      CHECK: func @subtensor_insert
 // CHECK-SAME: (%[[INPUT:.+]]: tensor<1x224x224x3xf32>)
 //
-//      CHECK: %[[FILL:.+]] = constant dense<0.000000e+00> : tensor<1x225x225x3xf32>
+//      CHECK:   %[[FILL:.+]] = flow.dispatch.workgroups[{{.+}}]() : () -> tensor<1x225x225x3xf32> =
+// CHECK-NEXT:       (%[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x225x225x3xf32>) {
+//      CHECK:     linalg.init_tensor
+// CHECK-NEXT:     %[[TENSOR:.+]] = linalg.fill
+// CHECK-NEXT:     flow.dispatch.tensor.store %[[TENSOR]], %[[OUTPUT]], {{.*}}
+// CHECK-NEXT:     flow.return
 //
 //      CHECK:   %[[PAD:.+]] = flow.dispatch.workgroups[{{.+}}](%[[INPUT]], %[[FILL]]) : (tensor<1x224x224x3xf32>, tensor<1x225x225x3xf32>) -> %[[FILL]] =
 // CHECK-NEXT:       (%[[SRC:.+]]: !flow.dispatch.tensor<readonly:1x224x224x3xf32>, %[[DST:.+]]: !flow.dispatch.tensor<readwrite:1x225x225x3xf32>) {
