@@ -318,7 +318,8 @@ def main(args):
 
   # Clear the benchmark directory on the Android device first just in case
   # there are leftovers from manual or failed runs.
-  adb_execute_in_dir(["rm", "-rf", "*"], relative_dir="", verbose=args.verbose)
+  get_output(["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
+             verbose=args.verbose)
 
   benchmarks = filter_python_model_benchmark_suite(device_info, args.build_dir,
                                                    args.verbose)
@@ -345,9 +346,8 @@ def main(args):
 
   if not args.no_clean:
     # Clear the benchmark directory on the Android device.
-    adb_execute_in_dir(["rm", "-rf", "*"],
-                       relative_dir="",
-                       verbose=args.verbose)
+    get_output(["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
+               verbose=args.verbose)
 
 
 if __name__ == "__main__":
