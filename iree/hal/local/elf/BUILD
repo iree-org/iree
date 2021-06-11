@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -32,18 +34,21 @@ cc_library(
     ],
 )
 
-cc_test(
-    name = "elf_module_test",
-    srcs = ["elf_module_test.cc"],
+cc_binary(
+    name = "elf_module_test_binary",
+    srcs = ["elf_module_test_main.c"],
     deps = [
         ":elf_module",
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/hal/local:executable_library",
         "//iree/hal/local/elf/testdata:simple_mul_dispatch",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
     ],
+)
+
+run_binary_test(
+    name = "elf_module_test",
+    test_binary = ":elf_module_test_binary",
 )
 
 #===------------------------------------------------------------------------===#

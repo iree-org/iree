@@ -27,19 +27,24 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_binary(
   NAME
-    elf_module_test
+    elf_module_test_binary
   SRCS
-    "elf_module_test.cc"
+    "elf_module_test_main.c"
   DEPS
     ::elf_module
     iree::base
     iree::base::core_headers
     iree::hal::local::elf::testdata::simple_mul_dispatch
     iree::hal::local::executable_library
-    iree::testing::gtest
-    iree::testing::gtest_main
+)
+
+iree_run_binary_test(
+  NAME
+    "elf_module_test"
+  TEST_BINARY
+    ::elf_module_test_binary
 )
 
 iree_cc_library(
