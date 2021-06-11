@@ -28,7 +28,6 @@ iree_lit_test_suite(
         [
             "dynamic_abs.mlir",
             "dynamic_add.mlir",
-            "dynamic_compare_and_select.mlir",
             "dynamic_dot.mlir",
             "dynamic_torch_index_select_high_rank.mlir",
             "dynamic_torch_index_select_negative.mlir",
@@ -43,6 +42,7 @@ iree_lit_test_suite(
             ["*.mlir"],
         # TODO(#5897): enable these for codegen linalg on tensors/etc.
         exclude = [
+            "dynamic_compare_and_select.mlir",
             "dynamic_dot_general.mlir",
             "dynamic_linalg_matmul_on_tensors.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
