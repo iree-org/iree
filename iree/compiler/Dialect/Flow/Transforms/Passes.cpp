@@ -13,6 +13,7 @@
 #include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
+#include "mlir/Dialect/Tosa/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
 #include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
@@ -129,6 +130,7 @@ void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
 
+  passManager.addNestedPass<FuncOp>(tosa::createTosaMakeBroadcastablePass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(Flow::createPromoteI1ToI8Pass());
