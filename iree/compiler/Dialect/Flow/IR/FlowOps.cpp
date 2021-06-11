@@ -498,6 +498,11 @@ static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
   return success();
 }
 
+VariableOp VariableLoadOp::getLoadedVariable() {
+  return SymbolTable::lookupNearestSymbolFrom<IREE::Flow::VariableOp>(
+      getOperation()->getParentOp(), variable());
+}
+
 //===----------------------------------------------------------------------===//
 // flow.variable.load.indirect
 //===----------------------------------------------------------------------===//
