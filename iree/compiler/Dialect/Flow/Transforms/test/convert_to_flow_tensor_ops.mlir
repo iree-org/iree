@@ -230,7 +230,7 @@ func @turn_fill_into_splat_if_no_linalg_users(%arg0: tensor<?x?xf32>, %arg1: ten
 //   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP]]()[%[[ARG2]], %[[ARG4]], %[[D0]]]
 //   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP]]()[%[[ARG3]], %[[ARG5]], %[[D1]]]
-// 	     CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[VAL]] : tensor<?x?xf32>{%[[RD0]], %[[RD1]]}
+//       CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[VAL]] : tensor<?x?xf32>{%[[RD0]], %[[RD1]]}
 //       CHECK:   flow.tensor.update %[[ARG0]], %[[SPLAT]]
 
 // -----
@@ -249,4 +249,4 @@ func @keep_fill_if_with_linalg_users(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>)
 }
 
 // CHECK-LABEL: func @keep_fill_if_with_linalg_users
-// 		   CHECK:   linalg.fill
+//       CHECK:   linalg.fill
