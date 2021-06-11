@@ -11,6 +11,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_loader.h"
+#include "iree/hal/local/loaders/embedded_library_loader.h"
 #include "iree/hal/local/loaders/legacy_library_loader.h"
 #include "iree/hal/local/sync_device.h"
 
@@ -19,11 +20,15 @@ iree_status_t create_sample_device(iree_hal_device_t** device) {
   iree_hal_sync_device_params_t params;
   iree_hal_sync_device_params_initialize(&params);
 
-  iree_hal_executable_loader_t* dylib_loader = NULL;
-  // TODO(marbre): Use embedded instead of legacy loader.
+  iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
+  iree_host_size_t loader_count = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_embedded_library_loader_create(
+      iree_hal_executable_import_provider_null(), iree_allocator_system(),
+      &loaders[loader_count++]));
+  // TODO(hcindyl): drop the use of the legacy library loader.
   IREE_RETURN_IF_ERROR(iree_hal_legacy_library_loader_create(
-      iree_allocator_system(), &dylib_loader));
-  iree_hal_executable_loader_t* loaders[1] = {dylib_loader};
+      iree_hal_executable_import_provider_null(), iree_allocator_system(),
+      &loaders[loader_count++]));
 
   iree_string_view_t identifier = iree_make_cstring_view("dylib");
 
@@ -31,6 +36,8 @@ iree_status_t create_sample_device(iree_hal_device_t** device) {
   IREE_RETURN_IF_ERROR(
       iree_hal_sync_device_create(identifier, &params, IREE_ARRAYSIZE(loaders),
                                   loaders, iree_allocator_system(), device));
-  iree_hal_executable_loader_release(dylib_loader);
+  for (iree_host_size_t i = 0; i < loader_count; ++i) {
+    iree_hal_executable_loader_release(loaders[i]);
+  }
   return iree_ok_status();
 }

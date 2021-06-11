@@ -154,8 +154,8 @@ static iree_status_t iree_hal_sync_device_create_command_buffer(
   // TODO(#4680): implement a non-inline command buffer that stores its commands
   // and can be submitted later on/multiple-times.
   return iree_hal_inline_command_buffer_create(
-      base_device, mode, command_categories, queue_affinity,
-      out_command_buffer);
+      mode, command_categories, queue_affinity,
+      iree_hal_device_host_allocator(base_device), out_command_buffer);
 }
 
 static iree_status_t iree_hal_sync_device_create_descriptor_set(

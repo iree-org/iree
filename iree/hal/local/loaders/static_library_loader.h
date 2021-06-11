@@ -36,6 +36,7 @@ extern "C" {
 iree_status_t iree_hal_static_library_loader_create(
     iree_host_size_t library_count,
     const iree_hal_executable_library_header_t** const* libraries,
+    iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader);
 

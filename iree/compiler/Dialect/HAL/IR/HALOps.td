@@ -2047,7 +2047,8 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     StrAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
     FlatSymbolRefAttr:$interface,
-    OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size
+    OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
+    OptionalAttr<IndexAttr>:$workgroup_local_memory
   );
 
   let regions = (region VariadicRegion<SizedRegion<1>>:$workgroup_count_region);
@@ -2057,19 +2058,21 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::llvm::StringRef":$sym_name,
       "::llvm::APInt":$ordinal,
       "::llvm::StringRef":$interface,
-      "::mlir::ArrayAttr":$workgroup_size
+      "::mlir::ArrayAttr":$workgroup_size,
+      "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
       build($_builder, $_state, sym_name, ordinal, interface,
-            workgroup_size, 0);
+            workgroup_size, workgroup_local_memory, 0);
     }]>,
     OpBuilder<(ins
       "::mlir::StringAttr":$sym_name,
       "::mlir::IntegerAttr":$ordinal,
       "::mlir::FlatSymbolRefAttr":$interface,
-      "::mlir::ArrayAttr":$workgroup_size
+      "::mlir::ArrayAttr":$workgroup_size,
+      "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
       build($_builder, $_state, sym_name, ordinal, interface,
-            workgroup_size, 0);
+            workgroup_size, workgroup_local_memory, 0);
     }]>
   ];
 

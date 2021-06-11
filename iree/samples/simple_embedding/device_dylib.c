@@ -24,9 +24,11 @@ iree_status_t create_sample_device(iree_hal_device_t** device) {
   iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
   iree_host_size_t loader_count = 0;
   IREE_RETURN_IF_ERROR(iree_hal_embedded_library_loader_create(
-      iree_allocator_system(), &loaders[loader_count++]));
+      iree_hal_executable_import_provider_null(), iree_allocator_system(),
+      &loaders[loader_count++]));
   IREE_RETURN_IF_ERROR(iree_hal_legacy_library_loader_create(
-      iree_allocator_system(), &loaders[loader_count++]));
+      iree_hal_executable_import_provider_null(), iree_allocator_system(),
+      &loaders[loader_count++]));
 
   iree_task_executor_t* executor = NULL;
   IREE_RETURN_IF_ERROR(

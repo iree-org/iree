@@ -100,6 +100,7 @@ cc_binary(
         "//iree/hal",
         "//iree/hal/local",
         "//iree/hal/local:sync_driver",
+        "//iree/hal/local/loaders:embedded_library_loader",
         "//iree/hal/local/loaders:legacy_library_loader",
         "//iree/modules/hal",
         "//iree/vm",

@@ -163,6 +163,49 @@ static iree_status_t iree_hal_legacy_executable_query_library(
 
   executable->identifier = iree_make_cstring_view(header->name);
 
+  executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
+
+  return iree_ok_status();
+}
+
+static int iree_hal_legacy_executable_import_thunk_v0(
+    iree_hal_executable_import_v0_t fn_ptr, void* import_params) {
+  return fn_ptr(import_params);
+}
+
+// Resolves all of the imports declared by the executable using the given
+// |import_provider|.
+static iree_status_t iree_hal_legacy_executable_resolve_imports(
+    iree_hal_legacy_executable_t* executable,
+    const iree_hal_executable_import_provider_t import_provider) {
+  const iree_hal_executable_import_table_v0_t* import_table =
+      &executable->library.v0->imports;
+  if (!import_table->count) return iree_ok_status();
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Pass all imports right through.
+  executable->base.import_thunk = iree_hal_legacy_executable_import_thunk_v0;
+
+  // Allocate storage for the imports.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(
+              executable->base.host_allocator,
+              import_table->count * sizeof(*executable->base.imports),
+              (void**)&executable->base.imports));
+
+  // Try to resolve each import.
+  // NOTE: imports are sorted alphabetically and if we cared we could use this
+  // information to more efficiently resolve the symbols from providers (O(n)
+  // walk vs potential O(nlogn)/O(n^2)).
+  for (uint32_t i = 0; i < import_table->count; ++i) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_hal_executable_import_provider_resolve(
+            import_provider, iree_make_cstring_view(import_table->symbols[i]),
+            (void**)&executable->base.imports[i]));
+  }
+
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -170,6 +213,7 @@ static iree_status_t iree_hal_legacy_executable_create(
     iree_DyLibExecutableDef_table_t executable_def,
     iree_host_size_t executable_layout_count,
     iree_hal_executable_layout_t* const* executable_layouts,
+    const iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_def);
   IREE_ASSERT_ARGUMENT(!executable_layout_count || executable_layouts);
@@ -206,14 +250,19 @@ static iree_status_t iree_hal_legacy_executable_create(
     status = iree_hal_legacy_executable_query_library(executable);
   }
   if (iree_status_is_ok(status)) {
+    // Resolve imports, if any.
+    status =
+        iree_hal_legacy_executable_resolve_imports(executable, import_provider);
+  }
+  if (iree_status_is_ok(status)) {
     // Check to make sure that the entry point count matches the layouts
     // provided.
-    if (executable->library.v0->entry_point_count != executable_layout_count) {
-      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                              "executable provides %u entry points but caller "
-                              "provided %zu; must match",
-                              executable->library.v0->entry_point_count,
-                              executable_layout_count);
+    if (executable->library.v0->exports.count != executable_layout_count) {
+      status = iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "executable provides %u entry points but caller "
+          "provided %zu; must match",
+          executable->library.v0->exports.count, executable_layout_count);
     }
   }
 
@@ -245,21 +294,20 @@ static void iree_hal_legacy_executable_destroy(
 static iree_status_t iree_hal_legacy_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id) {
+    const iree_hal_vec3_t* workgroup_id, iree_byte_span_t local_memory) {
   iree_hal_legacy_executable_t* executable =
       (iree_hal_legacy_executable_t*)base_executable;
   const iree_hal_executable_library_v0_t* library = executable->library.v0;
 
-  if (IREE_UNLIKELY(ordinal >= library->entry_point_count)) {
+  if (IREE_UNLIKELY(ordinal >= library->exports.count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "entry point ordinal out of bounds");
   }
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   iree_string_view_t entry_point_name = iree_string_view_empty();
-  if (library->entry_point_names != NULL) {
-    entry_point_name =
-        iree_make_cstring_view(library->entry_point_names[ordinal]);
+  if (library->exports.names != NULL) {
+    entry_point_name = iree_make_cstring_view(library->exports.names[ordinal]);
   }
   if (iree_string_view_is_empty(entry_point_name)) {
     entry_point_name = iree_make_cstring_view("unknown_dylib_call");
@@ -267,13 +315,24 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
   IREE_TRACE_ZONE_BEGIN_EXTERNAL(
       z0, executable->identifier.data, executable->identifier.size, ordinal,
       entry_point_name.data, entry_point_name.size, NULL, 0);
+  if (library->exports.tags != NULL) {
+    const char* tag = library->exports.tags[ordinal];
+    if (tag) {
+      IREE_TRACE_ZONE_APPEND_TEXT(tag);
+    }
+  }
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-  library->entry_points[ordinal](dispatch_state, workgroup_id);
+  int ret = library->exports.ptrs[ordinal](dispatch_state, workgroup_id,
+                                           local_memory.data);
 
   IREE_TRACE_ZONE_END(z0);
 
-  return iree_ok_status();
+  return ret == 0 ? iree_ok_status()
+                  : iree_make_status(
+                        IREE_STATUS_INTERNAL,
+                        "executable entry point returned catastrophic error %d",
+                        ret);
 }
 
 const iree_hal_local_executable_vtable_t iree_hal_legacy_executable_vtable = {
@@ -297,6 +356,7 @@ extern const iree_hal_executable_loader_vtable_t
     iree_hal_legacy_library_loader_vtable;
 
 iree_status_t iree_hal_legacy_library_loader_create(
+    iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
   IREE_ASSERT_ARGUMENT(out_executable_loader);
@@ -308,7 +368,8 @@ iree_status_t iree_hal_legacy_library_loader_create(
       host_allocator, sizeof(*executable_loader), (void**)&executable_loader);
   if (iree_status_is_ok(status)) {
     iree_hal_executable_loader_initialize(
-        &iree_hal_legacy_library_loader_vtable, &executable_loader->base);
+        &iree_hal_legacy_library_loader_vtable, import_provider,
+        &executable_loader->base);
     executable_loader->host_allocator = host_allocator;
     *out_executable_loader = (iree_hal_executable_loader_t*)executable_loader;
   }
@@ -357,6 +418,7 @@ static iree_status_t iree_hal_legacy_library_loader_try_load(
       z0, iree_hal_legacy_executable_create(
               executable_def, executable_spec->executable_layout_count,
               executable_spec->executable_layouts,
+              base_executable_loader->import_provider,
               executable_loader->host_allocator, out_executable));
 
   IREE_TRACE_ZONE_END(z0);
