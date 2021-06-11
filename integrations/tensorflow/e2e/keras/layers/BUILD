@@ -423,6 +423,7 @@ FAILING_DYNAMIC = [
             "Add",
             "Attention",
             "Average",
+            "Embedding",
             "GlobalAveragePooling1D",
             "GlobalAveragePooling2D",
             "GlobalAveragePooling3D",
@@ -443,7 +444,6 @@ FAILING_DYNAMIC = [
     {
         # Failing on Vulkan
         "layer": [
-            "Embedding",
             "GlobalMaxPool1D",
             "GlobalMaxPool2D",
             "GlobalMaxPool3D",
