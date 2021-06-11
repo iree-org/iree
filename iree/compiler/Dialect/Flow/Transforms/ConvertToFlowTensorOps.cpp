@@ -250,6 +250,32 @@ struct SubTensorToTensorSlice : public OpRewritePattern<SubTensorOp> {
   }
 };
 
+/// Converts linalg.fill ops that are not used by other Linalg ops into
+/// flow.tensor.splat ops.
+///
+/// This is expected to improve performance because we can use DMA
+/// functionalities for the fill, instead of dispatching kernels.
+///
+/// It assumes linalg.fill ops that has linalg op users can be fused with
+/// its users so those cases aren't supported here.
+struct LinalgFillToFlowTensorSplat final
+    : public OpRewritePattern<linalg::FillOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
+                                PatternRewriter &rewriter) const override {
+    for (Operation *userOp : fillOp->getUsers()) {
+      if (isa<linalg::LinalgOp>(userOp)) return failure();
+    }
+
+    SmallVector<Value, 4> dynamicDims =
+        getDynamicDimValues(rewriter, fillOp.getLoc(), fillOp.output());
+    rewriter.replaceOpWithNewOp<TensorSplatOp>(
+        fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);
+    return success();
+  }
+};
+
 /// Converts operations that can map to flow.tensor.* operations.
 struct ConvertToFlowTensorOpsPass
     : public ConvertToFlowTensorOpsBase<ConvertToFlowTensorOpsPass> {
@@ -265,6 +291,7 @@ struct ConvertToFlowTensorOpsPass
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
     patterns.insert<
+        LinalgFillToFlowTensorSplat,
         LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
         LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>,
         SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(context);
