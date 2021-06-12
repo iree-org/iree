@@ -1,4 +1,4 @@
-func @if_true_test() attributes { iree.module.export } {
+func @if_true_test() {
   %0 = iree.unfoldable_constant dense<true> : tensor<i1>
   %1 = iree.unfoldable_constant dense<10> : tensor<i32>
   %path = iree.unfoldable_constant 1 : i32
@@ -17,7 +17,7 @@ func @if_true_test() attributes { iree.module.export } {
   return
 }
 
-func @if_false_test() attributes { iree.module.export } {
+func @if_false_test() {
   %0 = iree.unfoldable_constant dense<false> : tensor<i1>
   %1 = iree.unfoldable_constant dense<10> : tensor<i32>
   %path = iree.unfoldable_constant 0 : i32

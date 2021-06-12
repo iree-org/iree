@@ -4,7 +4,7 @@
 
 // BENCHMARK-LABEL: BM_multi_input
 // CHECK-LABEL: EXEC @multi_input
-func @multi_input(%arg0 : tensor<2xi32>, %arg1 : tensor<2xi32>) -> (tensor<2xi32>, tensor<2xi32>) attributes { iree.module.export } {
+func @multi_input(%arg0 : tensor<2xi32>, %arg1 : tensor<2xi32>) -> (tensor<2xi32>, tensor<2xi32>) {
   return %arg0, %arg1 : tensor<2xi32>, tensor<2xi32>
 }
 // CHECK: 2xi32=1 2

@@ -53,14 +53,10 @@ class WrapEntryPointsPass
 
     // Create a wrapper function for the entry point.
     auto entryFuncOp = entryFuncOps.front();
-    auto wrapperFuncOp = createWrapperFunc(entryFuncOp);
-    moduleOp.insert(Block::iterator(entryFuncOp), wrapperFuncOp);
-
-    // TODO(#3968): the story around what we export is pretty messy. We really
-    // need to switch this to being an op (iree.entry_point or iree.export)
-    // instead of being based on visibility or iree.module.export.
-    entryFuncOp->removeAttr("iree.module.export");
     entryFuncOp.setPrivate();
+    auto wrapperFuncOp = createWrapperFunc(entryFuncOp);
+    wrapperFuncOp.setPublic();
+    moduleOp.insert(Block::iterator(entryFuncOp), wrapperFuncOp);
   }
 
  private:
@@ -85,8 +81,6 @@ class WrapEntryPointsPass
     auto wrapperFuncOp =
         FuncOp::create(entryFuncOp.getLoc(), "_tflite_main", wrapperFuncType);
     wrapperFuncOp.setPublic();
-    wrapperFuncOp.getOperation()->setAttr("iree.module.export",
-                                          UnitAttr::get(&getContext()));
     wrapperFuncOp.getOperation()->setAttr("iree.abi.stub",
                                           UnitAttr::get(&getContext()));
 

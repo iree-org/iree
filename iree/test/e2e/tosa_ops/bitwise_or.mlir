@@ -1,4 +1,4 @@
-func @tensor() attributes { iree.module.export } {
+func @tensor() {
   %0 = iree.unfoldable_constant dense<[0x0, 0x11, 0x1101, 0x111]> : tensor<4xi32>
   %1 = iree.unfoldable_constant dense<[0x0, 0x10, 0x0111, 0x111]> : tensor<4xi32>
   %result = "tosa.bitwise_or"(%0, %1) : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>

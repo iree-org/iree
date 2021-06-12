@@ -1,4 +1,4 @@
-func @pad_1D_test() attributes { iree.module.export } {
+func @pad_1D_test() {
     %0 = iree.unfoldable_constant dense<42> : tensor<2xi32>
     %1 = "tosa.const"() { value = dense<[[3, 2]]> : tensor<1x2xi32> } : ()  -> (tensor<1x2xi32>)
     %result = "tosa.pad"(%0, %1)  : (tensor<2xi32>, tensor<1x2xi32>)  -> (tensor<7xi32>)
@@ -6,7 +6,7 @@ func @pad_1D_test() attributes { iree.module.export } {
     return
 }
 
-func @pad_2D_test() attributes { iree.module.export } {
+func @pad_2D_test() {
     %0 = iree.unfoldable_constant dense<42> : tensor<2x2xi32>
     %1 = "tosa.const"() { value = dense<[[1, 1], [1, 1]]> : tensor<2x2xi32> } : ()  -> (tensor<2x2xi32>)
     %result = "tosa.pad"(%0, %1)  : (tensor<2x2xi32>, tensor<2x2xi32>)  -> (tensor<4x4xi32>)
@@ -14,7 +14,7 @@ func @pad_2D_test() attributes { iree.module.export } {
     return
 }
 
-func @pad_3D_test() attributes { iree.module.export } {
+func @pad_3D_test() {
     %0 = iree.unfoldable_constant dense<42> : tensor<1x1x2xi32>
     %1 = "tosa.const"() { value = dense<[[0, 1], [1, 0], [0, 0]]> : tensor<3x2xi32> } : ()  -> (tensor<3x2xi32>)
     %result = "tosa.pad"(%0, %1)  : (tensor<1x1x2xi32>, tensor<3x2xi32>)  -> (tensor<2x2x2xi32>)

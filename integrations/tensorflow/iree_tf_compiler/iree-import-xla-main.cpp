@@ -229,13 +229,13 @@ int main(int argc, char **argv) {
   // function.
   std::string entryName = "main";
   SymbolTable symbolTable(module.get());
-  Operation *mainFunc = symbolTable.lookup(entryName);
+  auto mainFunc = symbolTable.lookup<FuncOp>(entryName);
   if (!mainFunc) {
     llvm::errs() << "Unable to find main function '" << entryName
                  << "' in converted module.\n";
     return 3;
   }
-  mainFunc->setAttr("iree.module.export", UnitAttr::get(&context));
+  mainFunc.setPublic();
 
   // Save.
   auto saveToFile = [&](llvm::StringRef savePath) -> LogicalResult {

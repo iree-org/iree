@@ -27,8 +27,7 @@ For example, to package a module compiled from the following `mhlo-dot.mlir` as
 an Android app:
 
 ```mlir
-func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32>
-  attributes { iree.module.export } {
+func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32> {
   %0 = "mhlo.dot"(%lhs, %rhs) : (tensor<2x4xf32>, tensor<4x2xf32>) -> tensor<2x2xf32>
   return %0 : tensor<2x2xf32>
 }

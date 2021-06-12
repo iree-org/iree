@@ -1,7 +1,7 @@
 // RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot -function-input="2x2x2xi32=[[100, 101] [110, 111]] [[200, 201] [210, 211]]" -function-input="2x2x2xi32=[[0, 1] [1, 0]] [[0, 0] [1, 1]]" | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @torch_index_select1
-func @torch_index_select1(%arg0: tensor<?x?x?xi32>, %arg1: tensor<?x?x?xi32>) -> tensor<?x?x?xi32> attributes {iree.module.export} {
+func @torch_index_select1(%arg0: tensor<?x?x?xi32>, %arg1: tensor<?x?x?xi32>) -> tensor<?x?x?xi32> {
   %0 = "mhlo.torch_index_select"(%arg0, %arg1) {batch_dims = -1 : i64, dim = -1 : i64} : (tensor<?x?x?xi32>, tensor<?x?x?xi32>) -> tensor<?x?x?xi32>
   return %0 : tensor<?x?x?xi32>
 }

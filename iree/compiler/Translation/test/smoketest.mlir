@@ -7,7 +7,7 @@ module @simple_module {
 
 // CHECK: "internal_functions":
 // CHECK: "local_name": "func"
-func @func(%arg0 : i32) -> i32 attributes { iree.module.export } {
+func @func(%arg0 : i32) -> i32 {
   return %arg0 : i32
 }
 
@@ -31,7 +31,7 @@ func @func(%arg0 : i32) -> i32 attributes { iree.module.export } {
 module @do_not_optimize_module {
 // CHECK: "exported_functions":
 // CHECK: "local_name": "add"
-func @add() -> i32 attributes { iree.module.export } {
+func @add() -> i32 {
   %c1 = constant 1 : i32
   %unf_c1 = iree.do_not_optimize(%c1) : i32
   %unf_c2 = iree.unfoldable_constant 2 : i32
@@ -48,7 +48,7 @@ module @hal_usage {
 // CHECK: "full_name": "hal.command_buffer.dispatch"
 // CHECK: "exported_functions":
 // CHECK: "local_name": "hloElementwiseOps"
-func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes {iree.module.export} {
+func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   %1 = mhlo.subtract %0, %arg0 : tensor<4xf32>
   %2 = mhlo.multiply %1, %arg0 : tensor<4xf32>

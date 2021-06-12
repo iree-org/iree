@@ -1,4 +1,4 @@
-func @multi_result() attributes {iree.module.export} {
+func @multi_result() {
   %input1 = iree.unfoldable_constant dense<[
       [1, 2, 3, 4],
       [5, 6, 7, 8],

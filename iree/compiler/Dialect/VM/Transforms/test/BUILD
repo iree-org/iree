@@ -19,7 +19,6 @@ iree_lit_test_suite(
         [
             "global_initialization.mlir",
             "hoist_inlined_rodata.mlir",
-            "mark_public_symbols_exported.mlir",
             "ordinal_allocation.mlir",
             "sink_defining_ops.mlir",
         ],

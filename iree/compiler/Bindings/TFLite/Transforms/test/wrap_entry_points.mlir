@@ -8,7 +8,6 @@
 //  CHECK-SAME:   tensor<?x8x8x3xf32> {iree.identifier = "output1"}
 //  CHECK-SAME: ) attributes {
 //  CHECK-SAME:   iree.abi.stub,
-//  CHECK-SAME:   iree.module.export,
 //  CHECK-SAME:   iree.reflection = {
 //  CHECK-SAME:     tfl.io.names = "input0;input1;output0;output1"
 //  CHECK-SAME:   }

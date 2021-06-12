@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-flow-form-streams -canonicalize -cse %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @outsideTieShape
-func @outsideTieShape(%arg0: tensor<?xi32> {iree.reflection = {}}, %arg1: !shapex.ranked_shape<[?]> {iree.reflection = {}}) -> (tensor<?xi32> {iree.reflection = {}}) attributes {iree.module.export} {
+func @outsideTieShape(%arg0: tensor<?xi32> {iree.reflection = {}}, %arg1: !shapex.ranked_shape<[?]> {iree.reflection = {}}) -> (tensor<?xi32> {iree.reflection = {}}) {
   %c0 = constant 0 : index
   // CHECK-DAG: %[[DIM:.+]] = shapex.ranked_dim %arg1[0]
   %dim = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?]> -> index

@@ -1,39 +1,39 @@
-func @narrow_int_i32_i8() attributes { iree.module.export } {
+func @narrow_int_i32_i8() {
   %input = iree.unfoldable_constant dense<[-42, 0, 42]> : tensor<3xi32>
   %res = "mhlo.convert"(%input) : (tensor<3xi32>) -> tensor<3xi8>
   check.expect_eq_const(%res, dense<[-42, 0, 42]> : tensor<3xi8>) : tensor<3xi8>
   return
 }
 
-func @widen_int_i8_i32() attributes { iree.module.export } {
+func @widen_int_i8_i32() {
   %input = iree.unfoldable_constant dense<[-42, 0, 42]> : tensor<3xi8>
   %res = "mhlo.convert"(%input) : (tensor<3xi8>) -> tensor<3xi32>
   check.expect_eq_const(%res, dense<[-42, 0, 42]> : tensor<3xi32>) : tensor<3xi32>
   return
 }
 
-func @narrow_int_i32_i16() attributes { iree.module.export } {
+func @narrow_int_i32_i16() {
   %input = iree.unfoldable_constant dense<[-42, 0, 42]> : tensor<3xi32>
   %res = "mhlo.convert"(%input) : (tensor<3xi32>) -> tensor<3xi16>
   check.expect_eq_const(%res, dense<[-42, 0, 42]> : tensor<3xi16>) : tensor<3xi16>
   return
 }
 
-func @widen_int_i16_i32() attributes { iree.module.export } {
+func @widen_int_i16_i32() {
   %input = iree.unfoldable_constant dense<[-42, 0, 42]> : tensor<3xi16>
   %res = "mhlo.convert"(%input) : (tensor<3xi16>) -> tensor<3xi32>
   check.expect_eq_const(%res, dense<[-42, 0, 42]> : tensor<3xi32>) : tensor<3xi32>
   return
 }
 
-func @narrow_int_i64_i32() attributes { iree.module.export } {
+func @narrow_int_i64_i32() {
   %input = iree.unfoldable_constant dense<[-42, 0, 42]> : tensor<3xi64>
   %res = "mhlo.convert"(%input) : (tensor<3xi64>) -> tensor<3xi32>
   check.expect_eq_const(%res, dense<[-42, 0, 42]> : tensor<3xi32>) : tensor<3xi32>
   return
 }
 
-func @widen_int_i32_i64() attributes { iree.module.export } {
+func @widen_int_i32_i64() {
   %input = iree.unfoldable_constant dense<[-42, 0, 42]> : tensor<3xi32>
   %res = "mhlo.convert"(%input) : (tensor<3xi32>) -> tensor<3xi64>
   check.expect_eq_const(%res, dense<[-42, 0, 42]> : tensor<3xi64>) : tensor<3xi64>

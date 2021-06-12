@@ -1,4 +1,4 @@
-func @conv2d_nopadding() attributes { iree.module.export } {
+func @conv2d_nopadding() {
   %inputs = iree.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
@@ -30,7 +30,7 @@ func @conv2d_nopadding() attributes { iree.module.export } {
   return
 }
 
-func @conv2d_nopadding_batch_feature() attributes { iree.module.export } {
+func @conv2d_nopadding_batch_feature() {
   %inputs = iree.unfoldable_constant dense<[
     [[[ 1.0], [ 3.0], [ 5.0], [ 7.0]],
      [[11.0], [13.0], [15.0], [17.0]],
@@ -67,7 +67,7 @@ func @conv2d_nopadding_batch_feature() attributes { iree.module.export } {
   return
 }
 
-func @conv2d_reorder_input_spatial() attributes { iree.module.export } {
+func @conv2d_reorder_input_spatial() {
   %inputs = iree.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [11.0, 12.0], [21.0, 22.0], [31.0, 32.0]],
       [[ 3.0,  4.0], [13.0, 14.0], [23.0, 24.0], [33.0, 34.0]],
@@ -99,7 +99,7 @@ func @conv2d_reorder_input_spatial() attributes { iree.module.export } {
   return
 }
 
-func @conv2d_reorder_kernel() attributes { iree.module.export } {
+func @conv2d_reorder_kernel() {
   %inputs = iree.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
@@ -131,7 +131,7 @@ func @conv2d_reorder_kernel() attributes { iree.module.export } {
   return
 }
 
-func @conv2d_reorder_output() attributes { iree.module.export } {
+func @conv2d_reorder_output() {
   %inputs = iree.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
@@ -164,7 +164,7 @@ func @conv2d_reorder_output() attributes { iree.module.export } {
   return
 }
 
-func @conv2d_1452x3221_same() attributes { iree.module.export } {
+func @conv2d_1452x3221_same() {
   %inputs = iree.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0], [ 9.0, 10.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0], [19.0, 20.0]],
@@ -199,7 +199,7 @@ func @conv2d_1452x3221_same() attributes { iree.module.export } {
   return
 }
 
-func @conv2d_2451x2311_same() attributes { iree.module.export } {
+func @conv2d_2451x2311_same() {
   %inputs = iree.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0]],
        [[ 6.0], [ 7.0], [ 8.0], [ 9.0], [10.0]],
@@ -241,7 +241,7 @@ func @conv2d_2451x2311_same() attributes { iree.module.export } {
   return
 }
 
-func @conv2d_no_padding2() attributes { iree.module.export } {
+func @conv2d_no_padding2() {
   %inputs = iree.unfoldable_constant dense<[
        [[[  1.0,   2.0,   3.0],
          [  4.0,   5.0,   6.0],
