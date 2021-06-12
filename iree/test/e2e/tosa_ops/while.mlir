@@ -7,7 +7,7 @@
 // }
 
 // i = 4, n = 2
-func @while_test_iter0() attributes { iree.module.export } {
+func @while_test_iter0() {
   %0 = iree.unfoldable_constant dense<4> : tensor<i32>
   %1 = "tosa.while_loop"(%0) ( {
   ^bb0(%arg0: tensor<i32>):
@@ -25,7 +25,7 @@ func @while_test_iter0() attributes { iree.module.export } {
 }
 
 // // i = 2, n = 2
-// func @while_test_iter1() attributes { iree.module.export } {
+// func @while_test_iter1() {
 //   %0 = iree.unfoldable_constant dense<2> : tensor<i32>
 //   %1 = "tosa.while_loop"(%0) ( {
 //   ^bb0(%arg0: tensor<i32>):
@@ -43,7 +43,7 @@ func @while_test_iter0() attributes { iree.module.export } {
 // }
 
 // // i = 0, n = 2
-// func @while_test_iter2() attributes { iree.module.export } {
+// func @while_test_iter2() {
 //   %0 = iree.unfoldable_constant dense<0> : tensor<i32>
 //   %1 = "tosa.while_loop"(%0) ( {
 //   ^bb0(%arg0: tensor<i32>):
@@ -61,7 +61,7 @@ func @while_test_iter0() attributes { iree.module.export } {
 // }
 
 // // i = 0, n = 1
-// func @while_test_iter4() attributes { iree.module.export } {
+// func @while_test_iter4() {
 //   %0 = iree.unfoldable_constant dense<0> : tensor<i32>
 //   %1 = "tosa.while_loop"(%0) ( {
 //   ^bb0(%arg0: tensor<i32>):

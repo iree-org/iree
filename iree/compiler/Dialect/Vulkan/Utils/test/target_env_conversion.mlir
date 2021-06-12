@@ -38,7 +38,7 @@ module  {
       }
     }
   }
-  func @simpleMath(%arg0: tensor<4xf32>) -> tensor<4xf32> attributes {iree.module.export, iree.reflection = {f = "I6!B3!d4R6!B3!d4", fv = "1"}} {
+  func @simpleMath(%arg0: tensor<4xf32>) -> tensor<4xf32> attributes {iree.reflection = {f = "I6!B3!d4R6!B3!d4", fv = "1"}} {
     %0 = flow.ex.stream.fragment(%arg0) : (tensor<4xf32>) -> tensor<4xf32> =
         (%arg1: tensor<4xf32>) -> tensor<4xf32> {
       %c4 = constant 4 : index

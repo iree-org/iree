@@ -1,4 +1,4 @@
-func @conv() attributes { iree.module.export } {
+func @conv() {
   %input = iree.unfoldable_constant dense<
      [[[[6.0, 7.5, 0.0, 1.5],
         [1.5, 3.5, 4.5, 2.0],
@@ -68,7 +68,7 @@ func @conv() attributes { iree.module.export } {
    return
 }
 
-func @depthwise_conv() attributes { iree.module.export } {
+func @depthwise_conv() {
   %input = iree.unfoldable_constant dense<
     [[[[6.0, 7.5, 0.0, 1.5, 1.5, 3.5, 4.5, 2.0, 3.0, 6.0, 0.5, 3.0, 3.5, 7.0, 2.5, 6.5],
        [4.0, 4.5, 8.0, 2.5, 7.5, 7.5, 0.0, 1.5, 7.0, 3.5, 0.0, 0.5, 4.5, 0.0, 5.0, 1.5],

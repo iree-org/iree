@@ -119,14 +119,8 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Also add an export for the "raw" form of this function, which operates
     // on low level VM types and does no verification. A later pass will
     // materialize high level API-friendly wrappers.
-    if (auto exportAttr = srcOp->getAttr("iree.module.export")) {
+    if (srcOp.isPublic()) {
       StringRef exportName = newFuncOp.getName();
-      if (auto exportStrAttr = exportAttr.dyn_cast<StringAttr>()) {
-        exportName = exportStrAttr.getValue();
-      } else {
-        assert(exportAttr.isa<UnitAttr>());
-      }
-
       rewriter.create<IREE::VM::ExportOp>(srcOp.getLoc(), newFuncOp,
                                           exportName);
     }

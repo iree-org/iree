@@ -49,7 +49,7 @@ class MaterializeShapeSupportPass
     auto moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
     for (auto funcOp : llvm::to_vector<4>(moduleOp.getOps<FuncOp>())) {
-      if (!funcOp->getAttr("iree.module.export")) {
+      if (!funcOp.isPublic()) {
         continue;
       }
       if (failed(materializeShapeSupport(funcOp, moduleBuilder))) {
@@ -176,7 +176,6 @@ class MaterializeShapeSupportPass
     calcFuncOp.setName(namePrefix.str() + "_calculate_shapes");
     calcFuncOp.setPrivate();
     // TODO(benvanik): find a better way to strip these attributes.
-    calcFuncOp->removeAttr("iree.module.export");
     calcFuncOp->removeAttr("iree.abi.stub");
     calcFuncOp->removeAttr("iree.reflection");
     auto &entryBlock = calcFuncOp.front();
@@ -334,7 +333,6 @@ class MaterializeShapeSupportPass
                                               moduleBuilder.getIndexType()),
                                       },
                                       /*outputs=*/TypeRange{}));
-    queryFuncOp->setAttr("iree.module.export", moduleBuilder.getUnitAttr());
     queryFuncOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
     auto *entryBlock = queryFuncOp.addEntryBlock();
     auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
@@ -372,7 +370,6 @@ class MaterializeShapeSupportPass
                                               moduleBuilder.getIndexType()),
                                       },
                                       /*outputs=*/TypeRange{}));
-    resizeFuncOp->setAttr("iree.module.export", moduleBuilder.getUnitAttr());
     resizeFuncOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
     auto *entryBlock = resizeFuncOp.addEntryBlock();
     auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
@@ -413,7 +410,6 @@ class MaterializeShapeSupportPass
                                               moduleBuilder.getIndexType()),
                                       },
                                       /*outputs=*/TypeRange{}));
-    queryFuncOp->setAttr("iree.module.export", moduleBuilder.getUnitAttr());
     queryFuncOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
     auto *entryBlock = queryFuncOp.addEntryBlock();
     auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);

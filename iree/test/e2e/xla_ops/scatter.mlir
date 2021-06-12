@@ -1,4 +1,4 @@
-func @scatter_scalar() attributes { iree.module.export } {
+func @scatter_scalar() {
   %arg0 = iree.unfoldable_constant dense<0> : tensor<8xi32>
   %arg1 = iree.unfoldable_constant dense<[[1], [3], [4], [7]]> : tensor<4x1xi32>
   %arg2 = iree.unfoldable_constant dense<[9, 10, 11, 12]> : tensor<4xi32>
@@ -19,7 +19,7 @@ func @scatter_scalar() attributes { iree.module.export } {
   return
 }
 
-func @scatter_slice() attributes { iree.module.export } {
+func @scatter_slice() {
   %arg0 = iree.unfoldable_constant dense<0> : tensor<6x3xi32>
   %arg1 = iree.unfoldable_constant dense<[[2], [4]]> : tensor<2x1xi32>
   %arg2 = iree.unfoldable_constant dense<[[1, 2, 3],

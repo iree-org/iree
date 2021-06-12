@@ -1,4 +1,4 @@
-func @select() attributes { iree.module.export } {
+func @select() {
   // TODO(b/132205704) support i1 in constants and function signatures.
   %input = iree.unfoldable_constant dense<[1, 0, 1, 0]> : tensor<4xi32>
   %zeros = iree.unfoldable_constant dense<0> : tensor<4xi32>

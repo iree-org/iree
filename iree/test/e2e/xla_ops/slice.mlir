@@ -1,4 +1,4 @@
-func @slice_whole_buffer() attributes { iree.module.export } {
+func @slice_whole_buffer() {
   %input = iree.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
@@ -15,7 +15,7 @@ func @slice_whole_buffer() attributes { iree.module.export } {
   return
 }
 
-func @slice_whole_stride() attributes { iree.module.export } {
+func @slice_whole_stride() {
   %input = iree.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
@@ -29,7 +29,7 @@ func @slice_whole_stride() attributes { iree.module.export } {
   return
 }
 
-func @slice_stride_part() attributes { iree.module.export } {
+func @slice_stride_part() {
   %input = iree.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
@@ -43,7 +43,7 @@ func @slice_stride_part() attributes { iree.module.export } {
   return
 }
 
-func @slice_multi_stride() attributes { iree.module.export } {
+func @slice_multi_stride() {
   %input = iree.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],

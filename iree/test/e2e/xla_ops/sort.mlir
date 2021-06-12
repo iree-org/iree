@@ -1,4 +1,4 @@
-func @sort1D() attributes { iree.module.export } {
+func @sort1D() {
   %input = iree.unfoldable_constant dense<[3, 2, 1, 4]> : tensor<4xi32>
 
   %sort = "mhlo.sort"(%input) ( {
@@ -11,7 +11,7 @@ func @sort1D() attributes { iree.module.export } {
   return
 }
 
-func @sort2D() attributes { iree.module.export } {
+func @sort2D() {
   %input = iree.unfoldable_constant dense<[[1, 2, 3, 4],
                                            [4, 3, 2, 1]]> : tensor<2x4xi32>
 
@@ -25,7 +25,7 @@ func @sort2D() attributes { iree.module.export } {
   return
 }
 
-func @sort3D() attributes { iree.module.export } {
+func @sort3D() {
   %input = iree.unfoldable_constant dense<[[[1, 2, 3, 4],
                                             [4, 3, 2, 1]]]> : tensor<1x2x4xi32>
 

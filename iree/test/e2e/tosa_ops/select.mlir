@@ -1,4 +1,4 @@
-func @tensor_float() attributes { iree.module.export } {
+func @tensor_float() {
   %0 = iree.unfoldable_constant dense<[0, 0, 1, 1]> : tensor<4xi1>
   %1 = iree.unfoldable_constant dense<[1.0, 5.0, 3.0, 4.0]> : tensor<4xf32>
   %2 = iree.unfoldable_constant dense<[5.0, 1.0, 3.0, 1.5]> : tensor<4xf32>
@@ -7,7 +7,7 @@ func @tensor_float() attributes { iree.module.export } {
   return
 }
 
-func @tensor_int() attributes { iree.module.export } {
+func @tensor_int() {
   %0 = iree.unfoldable_constant dense<[0, 0, 1, 1]> : tensor<4xi1>
   %1 = iree.unfoldable_constant dense<[1, 5, 3, 4]> : tensor<4xi32>
   %2 = iree.unfoldable_constant dense<[5, 1, 3, 1]> : tensor<4xi32>

@@ -125,7 +125,7 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
 ^bb3(%108: tensor<i64>, %109: tensor<i64>, %110: tensor<1x10xf32>, %111: tensor<1x10xf32>, %112: tensor<5xi64>, %113: tensor<5x1x10xf32>, %114: tensor<5x1x10xf32>):  // pred: ^bb1
   return %108, %112, %113, %114, %109, %110, %111 : tensor<i64>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>
 }
-func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x2x2xf32>) -> tensor<5x1x10xf32> attributes {iree.module.export} {
+func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x2x2xf32>) -> tensor<5x1x10xf32> {
   %0 = mhlo.constant dense<0.000000e+00> : tensor<1x10xf32>
   %cst = constant dense<0.000000e+00> : tensor<f32>
   %1 = mhlo.constant dense<0.000000e+00> : tensor<5x1x1xf32>

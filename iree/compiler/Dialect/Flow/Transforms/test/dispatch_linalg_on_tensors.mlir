@@ -374,8 +374,7 @@ func @pass_constant_through() -> tensor<2x2x3xi32> {
 
 // CHECK-LABEL: func @fuse_matmul_with_generic_op
 func @fuse_matmul_with_generic_op(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
-  -> tensor<?x?xf32> attributes {iree.module.export}
-{
+  -> tensor<?x?xf32> {
   %f12 = constant 12.0 : f32
 
   // linalg.generic is fused inside the dispatch region and becomes dead.
@@ -406,8 +405,7 @@ func @fuse_matmul_with_generic_op(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: 
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
-  -> (tensor<?x?xf32>, tensor<?x?xf32>) attributes {iree.module.export}
-{
+  -> (tensor<?x?xf32>, tensor<?x?xf32>) {
   %f12 = constant 12.0 : f32
   //  CHECK-DAG: %[[C0:.+]] = constant 0 : index
   //  CHECK-DAG: %[[C1:.+]] = constant 1 : index

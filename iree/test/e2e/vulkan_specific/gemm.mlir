@@ -1,4 +1,4 @@
-func @gemm() attributes { iree.module.export } {
+func @gemm() {
   %0 = iree.unfoldable_constant dense<
       [[0.        , 0.00515464, 0.01030928, 0.01546392, 0.02061856,
         0.0257732 , 0.03092784, 0.03608247, 0.04123711, 0.04639175,

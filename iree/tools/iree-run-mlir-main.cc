@@ -19,7 +19,7 @@
 // // RUN: iree-run-mlir %s | IreeFileCheck %s
 // // CHECK-LABEL: @foo
 // // CHECK: 1xf32: 2
-// func @foo() -> tensor<f32> attributes {iree.module.export} {
+// func @foo() -> tensor<f32> {
 //   %0 = constant dense<2.0> : tensor<f32>
 //   return %0 : tensor<f32>
 // }
@@ -102,12 +102,6 @@ static llvm::cl::opt<bool> verifyPasses(
     "verify-each",
     llvm::cl::desc("Run the verifier after each transformation pass"),
     llvm::cl::init(true));
-
-static llvm::cl::opt<bool> export_all_flag{
-    "export-all",
-    llvm::cl::desc("Adds iree.module.export to all functions"),
-    llvm::cl::init(false),
-};
 
 static llvm::cl::opt<bool> print_mlir_flag{
     "print-mlir",
@@ -199,12 +193,6 @@ Status PrepareModule(std::string target_backend,
   if (!mlir_module) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "could not parse MLIR file");
-  }
-
-  if (export_all_flag) {
-    for (auto function : mlir_module->getOps<mlir::FuncOp>()) {
-      function->setAttr("iree.module.export", mlir::UnitAttr::get(&context));
-    }
   }
 
   // Translate from MLIR to IREE bytecode.

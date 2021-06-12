@@ -53,6 +53,8 @@ class ConvertFunctionMetadataPass
   // names to match up with those for readability so we extract them here.
   // Is this ugly? Yeah - but such is what we have to deal with here.
   void setupEntryPointAttrs(FuncOp funcOp, DictionaryAttr entryFunctionAttr) {
+    funcOp.setPublic();
+
     auto inputsAttr =
         entryFunctionAttr.get("inputs").template dyn_cast_or_null<StringAttr>();
     auto outputsAttr = entryFunctionAttr.get("outputs")
@@ -63,8 +65,6 @@ class ConvertFunctionMetadataPass
       signalPassFailure();
       return;
     }
-
-    funcOp->setAttr("iree.module.export", UnitAttr::get(&getContext()));
 
     SmallVector<std::string, 4> inputNames;
     SmallVector<std::string, 4> outputNames;

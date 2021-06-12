@@ -34,7 +34,7 @@ class ExportBenchmarkFuncsPass
     // the wrapping for only the inputs.
     SmallVector<FuncOp, 4> entryFuncOps;
     for (auto entryFuncOp : moduleOp.getOps<FuncOp>()) {
-      if (entryFuncOp->getAttr("iree.module.export")) {
+      if (entryFuncOp.isPublic()) {
         entryFuncOps.push_back(entryFuncOp);
       }
     }
@@ -76,7 +76,6 @@ class ExportBenchmarkFuncsPass
     auto funcOp = moduleBuilder.create<FuncOp>(
         loc, funcName, moduleBuilder.getFunctionType({}, {}));
     funcOp.setPublic();
-    funcOp->setAttr("iree.module.export", moduleBuilder.getUnitAttr());
     funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
     SmallVector<NamedAttribute> reflectionAttrs = {
         moduleBuilder.getNamedAttr("benchmark",
@@ -104,7 +103,6 @@ class ExportBenchmarkFuncsPass
 
     // Ensure the original function is not exported and not inlined.
     entryFuncOp->setAttr("noinline", moduleBuilder.getUnitAttr());
-    entryFuncOp->removeAttr("iree.module.export");
     entryFuncOp->removeAttr("iree.reflection");
     entryFuncOp.setPrivate();
   }
