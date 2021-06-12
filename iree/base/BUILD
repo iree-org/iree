@@ -77,27 +77,6 @@ cc_library(
 )
 
 cc_library(
-    name = "signature_parser",
-    srcs = ["signature_parser.cc"],
-    hdrs = ["signature_parser.h"],
-    deps = [
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "signature_parser_test",
-    srcs = ["signature_parser_test.cc"],
-    deps = [
-        ":signature_parser",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
     name = "status",
     hdrs = ["status.h"],
     deps = [

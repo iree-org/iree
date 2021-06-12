@@ -21,7 +21,6 @@ iree_pyext_module(
     "unix_version.lds"
   DEPS
     iree::base
-    iree::base::signature_parser
     iree::base::status
     iree::hal
     iree::hal::drivers
