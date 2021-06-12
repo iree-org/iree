@@ -49,9 +49,11 @@ class ExportBenchmarkFuncsPass
                                                     OpBuilder& moduleBuilder) {
     std::string baseName = "_benchmark_input_";
     std::string name = baseName + std::to_string(uniqueId++);
-    auto variableOp = moduleBuilder.create<VariableOp>(
-        loc, name,
-        /*isMutable=*/false, inputType, moduleBuilder.getZeroAttr(inputType));
+    auto initialValue = moduleBuilder.getZeroAttr(inputType);
+    assert(initialValue && "failed to get zero attr for type");
+    auto variableOp = moduleBuilder.create<VariableOp>(loc, name,
+                                                       /*isMutable=*/false,
+                                                       inputType, initialValue);
     variableOp.setPrivate();
     variableOp->setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
     return variableOp;

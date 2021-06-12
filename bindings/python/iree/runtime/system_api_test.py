@@ -64,10 +64,7 @@ class SystemApiTest(absltest.TestCase):
     f = ctx.modules.arithmetic["simple_mul"]
     f_repr = repr(f)
     logging.info("f_repr: %s", f_repr)
-    self.assertRegex(
-        f_repr,
-        re.escape(
-            "(Buffer<float32[4]>, Buffer<float32[4]>) -> (Buffer<float32[4]>)"))
+    self.assertEqual(f_repr, "<VmFunction simple_mul(0rr_r), reflection = {}>")
 
   def test_duplicate_module(self):
     ctx = iree.runtime.SystemContext()
@@ -87,18 +84,19 @@ class SystemApiTest(absltest.TestCase):
     results = f(arg0, arg1)
     np.testing.assert_allclose(results, [4., 10., 18., 28.])
 
-  def test_serialize_values(self):
-    ctx = iree.runtime.SystemContext()
-    self.assertTrue(ctx.is_dynamic)
-    ctx.add_vm_module(create_simple_mul_module())
-    self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
-    f = ctx.modules.arithmetic["simple_mul"]
-    arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
-    arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
-    results = f(arg0, arg1)
-    inputs, outputs = f.get_serialized_values()
-    self.assertEqual(inputs, ("4xf32=1 2 3 4", "4xf32=4 5 6 7"))
-    self.assertEqual(outputs, ("4xf32=4 10 18 28",))
+  # TODO: Re-implement tracing in a more sustainable fashion.
+  # def test_serialize_values(self):
+  #   ctx = iree.runtime.SystemContext()
+  #   self.assertTrue(ctx.is_dynamic)
+  #   ctx.add_vm_module(create_simple_mul_module())
+  #   self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
+  #   f = ctx.modules.arithmetic["simple_mul"]
+  #   arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
+  #   arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
+  #   results = f(arg0, arg1)
+  #   inputs, outputs = f.get_serialized_values()
+  #   self.assertEqual(inputs, ("4xf32=1 2 3 4", "4xf32=4 5 6 7"))
+  #   self.assertEqual(outputs, ("4xf32=4 10 18 28",))
 
   def test_load_vm_module(self):
     arithmetic = iree.runtime.load_vm_module(create_simple_mul_module())

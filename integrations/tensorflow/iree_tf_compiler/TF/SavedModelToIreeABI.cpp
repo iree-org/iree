@@ -18,6 +18,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
@@ -37,6 +39,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
 
 namespace json = llvm::json;
+namespace IREE = mlir::iree_compiler::IREE;
 
 namespace mlir {
 namespace iree_integrations {
@@ -130,14 +133,16 @@ struct StructureLevel {
   }
 
   Type getIrType(Builder builder) {
-    auto variantType =
-        iree_compiler::IREE::VariantType::get(builder.getContext());
+    auto variantType = IREE::VariantType::get(builder.getContext());
     if (type == LevelType::Value) {
+      if (valueType.isa<TensorType>()) {
+        return IREE::HAL::BufferViewType::get(builder.getContext());
+      }
       return valueType;
     } else if (type == LevelType::List || type == LevelType::Tuple) {
-      return iree_compiler::IREE::ListType::get(variantType);
+      return IREE::ListType::get(variantType);
     } else if (type == LevelType::Dict) {
-      return iree_compiler::IREE::ListType::get(variantType);
+      return IREE::ListType::get(variantType);
     }
 
     llvm_unreachable("Unknown LevelType");
@@ -206,7 +211,12 @@ struct StructureLevel {
     if (type == LevelType::Value) {
       assert(valueIndex < callArgs.size() && "mismatched number of call args");
       assert(!callArgs[valueIndex] && "duplicate argument bindings");
-      callArgs[valueIndex] = thisValue;
+      auto value = thisValue;
+      if (value.getType().isa<IREE::HAL::BufferViewType>()) {
+        value = builder.createOrFold<IREE::HAL::TensorCastOp>(loc, valueType,
+                                                              thisValue);
+      }
+      callArgs[valueIndex] = value;
       return;
     }
 
@@ -241,23 +251,26 @@ struct StructureLevel {
     if (type == LevelType::Value) {
       assert(valueIndex < callReturns.size() &&
              "mismatched number of call returns");
-      return callReturns[valueIndex];
+      Value value = callReturns[valueIndex];
+      if (valueType.isa<TensorType>()) {
+        value = builder.createOrFold<IREE::HAL::TensorCastOp>(
+            loc, getIrType(builder), value);
+      }
+      return value;
     }
     // Recurse into sequence (index can be sparse on child ikey).
     if (type == LevelType::List || type == LevelType::Tuple) {
       Value listSizeValue =
           builder.create<ConstantOp>(loc, builder.getIndexType(),
                                      builder.getIndexAttr(getNeededListSize()));
-      Value listValue = builder.create<iree_compiler::IREE::ListCreateOp>(
+      Value listValue = builder.create<IREE::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
-      builder.create<iree_compiler::IREE::ListResizeOp>(loc, listValue,
-                                                        listSizeValue);
+      builder.create<IREE::ListResizeOp>(loc, listValue, listSizeValue);
       for (StructureLevel &child : children) {
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(child.ikey));
-        builder.create<iree_compiler::IREE::ListSetOp>(loc, listValue,
-                                                       indexValue, childValue);
+        builder.create<IREE::ListSetOp>(loc, listValue, indexValue, childValue);
       }
       return listValue;
     }
@@ -267,17 +280,15 @@ struct StructureLevel {
       Value listSizeValue =
           builder.create<ConstantOp>(loc, builder.getIndexType(),
                                      builder.getIndexAttr(getNeededListSize()));
-      Value listValue = builder.create<iree_compiler::IREE::ListCreateOp>(
+      Value listValue = builder.create<IREE::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
-      builder.create<iree_compiler::IREE::ListResizeOp>(loc, listValue,
-                                                        listSizeValue);
+      builder.create<IREE::ListResizeOp>(loc, listValue, listSizeValue);
       for (auto it : llvm::enumerate(children)) {
         StructureLevel &child = it.value();
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(it.index()));
-        builder.create<iree_compiler::IREE::ListSetOp>(loc, listValue,
-                                                       indexValue, childValue);
+        builder.create<IREE::ListSetOp>(loc, listValue, indexValue, childValue);
       }
       return listValue;
     }
@@ -290,10 +301,14 @@ struct StructureLevel {
                         int index) {
     Value indexValue = builder.create<ConstantOp>(loc, builder.getIndexType(),
                                                   builder.getIndexAttr(index));
-    Value itemValue = builder.create<iree_compiler::IREE::ListGetOp>(
-        loc, getIrType(builder), parentList, indexValue);
+    Value itemValue = builder.create<IREE::ListGetOp>(loc, getIrType(builder),
+                                                      parentList, indexValue);
     // TODO: Null check, etc. How does that work if returning a tensor? Need
     // to box somehow?
+    if (itemValue.getType().isa<IREE::HAL::BufferViewType>()) {
+      itemValue = builder.createOrFold<IREE::HAL::TensorCastOp>(loc, valueType,
+                                                                itemValue);
+    }
     return itemValue;
   }
 
@@ -548,8 +563,8 @@ class SavedModelToIREEABIPass
     : public PassWrapper<SavedModelToIREEABIPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<iree_compiler::IREE::Flow::FlowDialect,
-                    iree_compiler::IREEDialect,
+    registry.insert<IREE::Flow::FlowDialect, iree_compiler::IREEDialect,
+                    IREE::HAL::HALDialect,
                     mlir::tf_saved_model::TensorFlowSavedModelDialect>();
   }
 
