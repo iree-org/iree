@@ -222,28 +222,28 @@ returns no results and corresponds to a single test case.
 As an example, here are some tests for the XLA HLO floor operation:
 
 ```mlir
-func @tensor() attributes { iree.module.export } {
+func @tensor() {
   %input = iree.unfoldable_constant dense<[0.0, 1.1, 2.5, 4.9]> : tensor<4xf32>
   %result = "mhlo.floor"(%input) : (tensor<4xf32>) -> tensor<4xf32>
   check.expect_almost_eq_const(%result, dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf32>): tensor<4xf32>
   return
 }
 
-func @scalar() attributes { iree.module.export } {
+func @scalar() {
   %input = iree.unfoldable_constant dense<101.3> : tensor<f32>
   %result = "mhlo.floor"(%input) : (tensor<f32>) -> tensor<f32>
   check.expect_almost_eq_const(%result, dense<101.0> : tensor<f32>): tensor<f32>
   return
 }
 
-func @double() attributes { iree.module.export } {
+func @double() {
   %input = iree.unfoldable_constant dense<11.2> : tensor<f64>
   %result = "mhlo.floor"(%input) : (tensor<f64>) -> tensor<f64>
   check.expect_almost_eq_const(%result, dense<11.0> : tensor<f64>): tensor<f64>
   return
 }
 
-func @negative() attributes { iree.module.export } {
+func @negative() {
   %input = iree.unfoldable_constant dense<-1.1> : tensor<f32>
   %result = "mhlo.floor"(%input) : (tensor<f32>) -> tensor<f32>
   check.expect_almost_eq_const(%result, dense<-2.0> : tensor<f32>): tensor<f32>
@@ -251,8 +251,7 @@ func @negative() attributes { iree.module.export } {
 }
 ```
 
-The test case functions are exported using the `iree.module.export` attribute.
-Each of these exported functions will be used to create a test case in gtest.
+Test cases are created in gtest for each public function exported by the module.
 
 Note the use of `iree.unfoldable_constant` to specify test constants. If we were
 to use a regular constant, the compiler would "helpfully" fold away everything

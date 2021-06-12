@@ -1,4 +1,4 @@
-func @tanh() attributes { iree.module.export } {
+func @tanh() {
   %input = iree.unfoldable_constant dense<
       [[-100.0, -5.0, -0.5,   1.0],
        [   1.2,  2.0,  3.0, 100.0]]> : tensor<2x4xf32>

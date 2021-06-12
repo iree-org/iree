@@ -30,7 +30,6 @@ class CompilerTest(unittest.TestCase):
                                           import_only=True).decode("utf-8")
     logging.info("%s", text)
     self.assertIn("linalg.generic", text)
-    self.assertIn("iree.module.export", text)
 
   def testCompileBinaryPbFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.pb")
@@ -96,7 +95,6 @@ class CompilerTest(unittest.TestCase):
         path, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
     self.assertIn("linalg.generic", text)
-    self.assertIn("iree.module.export", text)
 
   def testImportHloTextStr(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.hlo")
@@ -106,7 +104,6 @@ class CompilerTest(unittest.TestCase):
         content, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
     self.assertIn("linalg.generic", text)
-    self.assertIn("iree.module.export", text)
 
   def testImportHloTextBytes(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.hlo")
@@ -116,7 +113,6 @@ class CompilerTest(unittest.TestCase):
         content, import_only=True, import_format="hlo_text").decode("utf-8")
     logging.info("%s", text)
     self.assertIn("linalg.generic", text)
-    self.assertIn("iree.module.export", text)
 
 
 if __name__ == "__main__":

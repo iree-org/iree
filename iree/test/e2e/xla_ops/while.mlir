@@ -1,5 +1,5 @@
 // NOTE: this has already been legalized to CFG form in the TF import tools.
-func @while() attributes {iree.module.export} {
+func @while() {
   %start = iree.unfoldable_constant dense<1> : tensor<i32>
   %bound = iree.unfoldable_constant dense<3> : tensor<i32>
   %cst_1 = constant dense<4> : tensor<i32>

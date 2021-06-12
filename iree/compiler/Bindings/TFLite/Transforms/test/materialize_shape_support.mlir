@@ -114,7 +114,6 @@
 // CHECK-LABEL: func @_tflite_dynamicEntry(
 func @_tflite_dynamicEntry(%arg0: tensor<?x8x8x3xf32> {iree.identifier = "input0"}, %arg1: tensor<?x8x8x3xf32> {iree.identifier = "input1"}) -> (tensor<?x8x8x3xf32> {iree.identifier = "output0"}, tensor<?x8x8x3xf32> {iree.identifier = "output1"}) attributes {
   iree.abi.stub,
-  iree.module.export,
   iree.reflection = {
     tfl.io.names = "input0;input1;output0;output1"
   }

@@ -1,4 +1,4 @@
-func @xla_concatenate() attributes { iree.module.export } {
+func @xla_concatenate() {
   %c0 = iree.unfoldable_constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
   %c1 = iree.unfoldable_constant dense<[[5, 6, 7], [8, 9, 10]]> : tensor<2x3xi32>
   %c2 = iree.unfoldable_constant dense<[[11, 12], [13, 14]]> : tensor<2x2xi32>
@@ -17,7 +17,7 @@ func @xla_concatenate() attributes { iree.module.export } {
   return
 }
 
-func @concatenate_cst() attributes { iree.module.export } {
+func @concatenate_cst() {
   %c0 = iree.unfoldable_constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
   %c1 = mhlo.constant dense<0> : tensor<2x3xi32>
   %0 = "mhlo.concatenate"(%c0, %c1) {dimension = 1} : (tensor<2x2xi32>, tensor<2x3xi32>) -> tensor<2x5xi32>

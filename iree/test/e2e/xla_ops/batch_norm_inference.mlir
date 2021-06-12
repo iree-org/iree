@@ -1,4 +1,4 @@
-func @batchnorm_inference_4x2() attributes { iree.module.export } {
+func @batchnorm_inference_4x2() {
   %x = iree.unfoldable_constant dense<[[1.0, 2.0, 3.0, 4.0],[5.0, 6.0, 7.0, 8.0]]> : tensor<2x4xf32>
   %mean = iree.unfoldable_constant dense<[1.0, 1.0, 1.0, 1.0]> : tensor<4xf32>
   %var = iree.unfoldable_constant dense<[2.0, 2.0, 2.0, 2.0]> : tensor<4xf32>

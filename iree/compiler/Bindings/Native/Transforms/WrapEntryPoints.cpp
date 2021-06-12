@@ -60,12 +60,6 @@ class WrapEntryPointsPass
       wrapperFuncOp.setName(publicName);
       moduleOp.insert(Block::iterator(entryFuncOp), wrapperFuncOp);
 
-      // TODO(#3968): the story around what we export is pretty messy. We really
-      // need to switch this to being an op (iree.entry_point or iree.export)
-      // instead of being based on visibility or iree.module.export.
-      entryFuncOp->removeAttr("iree.module.export");
-      wrapperFuncOp.getOperation()->setAttr("iree.module.export",
-                                            UnitAttr::get(&getContext()));
       wrapperFuncOp.getOperation()->setAttr("iree.abi.stub",
                                             UnitAttr::get(&getContext()));
     }

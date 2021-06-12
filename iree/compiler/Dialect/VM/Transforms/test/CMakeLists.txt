@@ -16,7 +16,6 @@ iree_lit_test_suite(
   SRCS
     "global_initialization.mlir"
     "hoist_inlined_rodata.mlir"
-    "mark_public_symbols_exported.mlir"
     "ordinal_allocation.mlir"
     "sink_defining_ops.mlir"
   DATA

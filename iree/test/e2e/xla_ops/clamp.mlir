@@ -1,4 +1,4 @@
-func @i8() attributes { iree.module.export } {
+func @i8() {
   %min = iree.unfoldable_constant dense<[0, 0, 0, 0]> : tensor<4xi8>
   %val = iree.unfoldable_constant dense<[-2, 4, 8, 12]> : tensor<4xi8>
   %max = iree.unfoldable_constant dense<[10, 10, 10, 10]> : tensor<4xi8>
@@ -7,7 +7,7 @@ func @i8() attributes { iree.module.export } {
   return
 }
 
-func @i16() attributes { iree.module.export } {
+func @i16() {
   %min = iree.unfoldable_constant dense<[0, 0, 0, 0]> : tensor<4xi16>
   %val = iree.unfoldable_constant dense<[-2, 4, 8, 12]> : tensor<4xi16>
   %max = iree.unfoldable_constant dense<[10, 10, 10, 10]> : tensor<4xi16>
@@ -16,7 +16,7 @@ func @i16() attributes { iree.module.export } {
   return
 }
 
-func @i32() attributes { iree.module.export } {
+func @i32() {
   %min = iree.unfoldable_constant dense<[0, 0, 0, 0]> : tensor<4xi32>
   %val = iree.unfoldable_constant dense<[-2, 4, 8, 12]> : tensor<4xi32>
   %max = iree.unfoldable_constant dense<[10, 10, 10, 10]> : tensor<4xi32>
@@ -25,7 +25,7 @@ func @i32() attributes { iree.module.export } {
   return
 }
 
-func @f32() attributes { iree.module.export } {
+func @f32() {
   %min = iree.unfoldable_constant dense<[0.0, 0.0, 0.0, 0.0]> : tensor<4xf32>
   %val = iree.unfoldable_constant dense<[-2.0, 4.0, 8.0, 12.0]> : tensor<4xf32>
   %max = iree.unfoldable_constant dense<[10.0, 10.0, 10.0, 10.0]> : tensor<4xf32>

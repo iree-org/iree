@@ -1,4 +1,4 @@
-func @foo() attributes { iree.module.export } {
+func @foo() {
   %input = iree.unfoldable_constant dense<[
     [[01, 02, 03, 04, 05]],
     [[06, 07, 08, 09, 10]],
