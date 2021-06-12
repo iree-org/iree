@@ -14,7 +14,6 @@ cc_library(
     name = "TF",
     srcs = [
         "ConvertToMHLO.cpp",
-        "LowerExportedFunctions.cpp",
         "LowerGlobalTensors.cpp",
         "Passes.cpp",
         "PrettifyDebugInfo.cpp",
@@ -38,7 +37,6 @@ cc_library(
         "//iree_tf_compiler/dialect/tf_tensorlist/conversion:convert_tf_tensorlist_to_tensorlist",
         "//iree_tf_compiler/dialect/tf_tensorlist/conversion:convert_tf_to_tf_tensorlist",
         "//iree_tf_compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
-        "@iree//iree/compiler/Bindings/SIP/Utils",
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/Flow/Transforms",
         "@iree//iree/compiler/Dialect/HAL/IR",

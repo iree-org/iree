@@ -11,13 +11,9 @@ iree_pyext_module(
   SRCS
     "initialize_module.cc"
     "binding.h"
-    "function_abi.h"
     "hal.h"
-    "host_types.h"
     "vm.h"
-    "function_abi.cc"
     "hal.cc"
-    "host_types.cc"
     "status_utils.cc"
     "status_utils.h"
     "vm.cc"
@@ -49,15 +45,6 @@ iree_py_library(
     "system_api.py"
   PYEXT_DEPS
     ::PyExtRt
-)
-
-iree_py_test(
-  NAME
-    function_abi_test
-  SRCS
-    "function_abi_test.py"
-  LABELS
-    "nokokoro"
 )
 
 iree_py_test(

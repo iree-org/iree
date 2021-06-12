@@ -74,7 +74,6 @@ class VmTest(absltest.TestCase):
         iree.compiler.core.DEFAULT_TESTING_DRIVER)
     cls.device = cls.driver.create_default_device()
     cls.hal_module = iree.runtime.create_hal_module(cls.device)
-    cls.htf = iree.runtime.HostTypeFactory.get_numpy()
 
   def test_variant_list(self):
     l = iree.runtime.VmVariantList(5)
