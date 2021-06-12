@@ -25,7 +25,6 @@ iree_lit_test_suite(
     "pack_allocations.mlir"
     "pack_constant_pool_storage.mlir"
     "propagate_constant_workgroup_info.mlir"
-    "public_abi_generation.mlir"
     "resolve_entry_point_ordinals.mlir"
   DATA
     iree::tools::IreeFileCheck

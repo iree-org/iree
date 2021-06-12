@@ -9,7 +9,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
-#include "bindings/python/iree/runtime/function_abi.h"
 #include "bindings/python/iree/runtime/status_utils.h"
 #include "iree/base/api.h"
 #include "iree/base/status.h"
@@ -128,36 +127,6 @@ void VmContext::RegisterModules(std::vector<VmModule*> modules) {
   auto status = iree_vm_context_register_modules(raw_ptr(), &module_handles[0],
                                                  module_handles.size());
   CheckApiStatus(status, "Error registering modules");
-}
-
-std::unique_ptr<FunctionAbi> VmContext::CreateFunctionAbi(
-    HalDevice& device, std::shared_ptr<HostTypeFactory> host_type_factory,
-    iree_vm_function_t f) {
-  // Resolve attrs.
-  absl::InlinedVector<std::pair<iree_string_view_t, iree_string_view_t>, 4>
-      attrs;
-  for (int i = 0;; ++i) {
-    attrs.push_back({});
-    auto status = iree_vm_get_function_reflection_attr(
-        f, i, &attrs.back().first, &attrs.back().second);
-    if (iree_status_is_not_found(status)) {
-      iree_status_ignore(status);
-      attrs.pop_back();
-      break;
-    }
-    CheckApiStatus(status, "Error getting reflection attr");
-  }
-  auto attr_lookup =
-      [&attrs](absl::string_view key) -> absl::optional<absl::string_view> {
-    for (const auto& attr : attrs) {
-      absl::string_view found_key(attr.first.data, attr.first.size);
-      absl::string_view found_value(attr.second.data, attr.second.size);
-      if (found_key == key) return found_value;
-    }
-    return absl::nullopt;
-  };
-
-  return FunctionAbi::Create(device, std::move(host_type_factory), attr_lookup);
 }
 
 void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
@@ -565,8 +534,6 @@ void SetupVmBindings(pybind11::module m) {
            py::arg("modules") = absl::optional<std::vector<VmModule*>>())
       .def("register_modules", &VmContext::RegisterModules)
       .def_property_readonly("context_id", &VmContext::context_id)
-      .def("create_function_abi", &VmContext::CreateFunctionAbi,
-           py::arg("device"), py::arg("host_type_factory"), py::arg("f"))
       .def("invoke", &VmContext::Invoke);
 
   py::class_<VmModule>(m, "VmModule")

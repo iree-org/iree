@@ -40,11 +40,6 @@ std::unique_ptr<FunctionPass> createConvertToMHLOPass();
 // a module that does not have `tf_saved_model.semantics`.
 std::unique_ptr<OperationPass<ModuleOp>> createLowerGlobalTensorsPass();
 
-// In a module tagged with `tf_saved_model.semantics`, lowers any tf_saved_model
-// exported functions to IREE exported functions with appropriate reflection
-// metadata.
-std::unique_ptr<OperationPass<ModuleOp>> createLowerExportedFunctionsPass();
-
 // In a module tagged with `tf_saved_model.semantics`, creates IREE ABI
 // functions for any saved model exported functions.
 std::unique_ptr<OperationPass<ModuleOp>> createSavedModelToIREEABIPass();
@@ -77,7 +72,6 @@ inline void registerAllPasses() {
 
   createConvertToMHLOPass();
   createLowerGlobalTensorsPass();
-  createLowerExportedFunctionsPass();
   createPrettifyDebugInfoPass();
   createPropagateResourceCastsPass();
   createSavedModelToIREEABIPass();

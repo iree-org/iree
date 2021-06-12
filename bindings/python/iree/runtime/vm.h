@@ -9,7 +9,7 @@
 
 #include "absl/types/optional.h"
 #include "bindings/python/iree/runtime/binding.h"
-#include "bindings/python/iree/runtime/host_types.h"
+#include "bindings/python/iree/runtime/hal.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -144,11 +144,6 @@ class VmContext : public ApiRefCounted<VmContext, iree_vm_context_t> {
   // Synchronously invokes the given function.
   void Invoke(iree_vm_function_t f, VmVariantList& inputs,
               VmVariantList& outputs);
-
-  // Creates a function ABI suitable for marshalling function inputs/results.
-  std::unique_ptr<FunctionAbi> CreateFunctionAbi(
-      HalDevice& device, std::shared_ptr<HostTypeFactory> host_type_factory,
-      iree_vm_function_t f);
 };
 
 class VmInvocation : public ApiRefCounted<VmInvocation, iree_vm_invocation_t> {
