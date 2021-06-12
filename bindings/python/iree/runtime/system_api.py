@@ -214,7 +214,7 @@ class BoundModule:
     # layering and will need to be fixed in some fashion if/when doing
     # heterogenous dispatch.
     return FunctionInvoker(self._context.vm_context,
-                            self._context.config.device, vm_function)
+                           self._context.config.device, vm_function)
 
   def __repr__(self):
     return f"<BoundModule {repr(self._vm_module)}>"
