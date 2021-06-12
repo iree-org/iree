@@ -30,7 +30,6 @@ iree_cc_library(
     "PackConstantPoolStorage.cpp"
     "Passes.cpp"
     "PropagateConstantWorkgroupInfo.cpp"
-    "PublicAbiGeneration.cpp"
     "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
     "TranslateExecutables.cpp"
@@ -42,7 +41,6 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTransforms
-    iree::compiler::Bindings::SIP::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL

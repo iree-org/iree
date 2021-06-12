@@ -88,12 +88,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // sizes are as much as possible available as constants.
   passManager.addNestedPass<FuncOp>(createPackAllocationsPass(targetOptions));
 
-  // For each exported function, processes the reflection metadata and
-  // generates public ABI wrappers for various calling conventions.
-  // Phase ordering note: This operates on functions whose signatures have
-  // been expanded to primitives.
-  passManager.addPass(createPublicABIGenerationPass());
-
   // After all executables are translated and before resolving entry point
   // ordinals, we allow the backends to link executables together. For example,
   // the LLVM AOT backend may combine all executable targets for the same

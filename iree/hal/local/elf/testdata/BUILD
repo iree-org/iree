@@ -14,7 +14,6 @@ package(
 
 c_embed_data(
     name = "simple_mul_dispatch",
-    testonly = True,
     srcs = glob(["simple_mul_dispatch_*.so"]),
     c_file_output = "simple_mul_dispatch.c",
     flatten = True,

@@ -5,9 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "bindings/python/iree/runtime/binding.h"
-#include "bindings/python/iree/runtime/function_abi.h"
 #include "bindings/python/iree/runtime/hal.h"
-#include "bindings/python/iree/runtime/host_types.h"
 #include "bindings/python/iree/runtime/status_utils.h"
 #include "bindings/python/iree/runtime/vm.h"
 #include "iree/base/status.h"
@@ -21,8 +19,6 @@ PYBIND11_MODULE(binding, m) {
       iree_hal_driver_registry_default()));
 
   m.doc() = "IREE Binding Backend Helpers";
-  SetupFunctionAbiBindings(m);
-  SetupHostTypesBindings(m);
   SetupHalBindings(m);
   SetupVmBindings(m);
 }

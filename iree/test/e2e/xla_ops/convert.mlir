@@ -47,11 +47,15 @@ func @int_to_float() {
   return
 }
 
+// TODO(#6160): XLA does not specify the rounding behavior, meaning that we
+// can't test something like -10.5 as that could be -11 (roundf) or -10 (rint
+// with round-to-even mode).
+//
 // For casting rules, see
 // https://www.tensorflow.org/xla/operation_semantics#convertelementtype
-func @float_to_int() {
-  %input = iree.unfoldable_constant dense<[-10.5, -4.4, 4.4, 10.5]> : tensor<4xf32>
-  %res = "mhlo.convert"(%input) : (tensor<4xf32>) -> tensor<4xi32>
-  check.expect_eq_const(%res, dense<[-10, -4, 4, 10]> : tensor<4xi32>) : tensor<4xi32>
-  return
-}
+// func @float_to_int() {
+//   %input = iree.unfoldable_constant dense<[-10.5, -4.4, 4.4, 10.5]> : tensor<4xf32>
+//   %res = "mhlo.convert"(%input) : (tensor<4xf32>) -> tensor<4xi32>
+//   check.expect_eq_const(%res, dense<[-10, -4, 4, 10]> : tensor<4xi32>) : tensor<4xi32>
+//   return
+// }

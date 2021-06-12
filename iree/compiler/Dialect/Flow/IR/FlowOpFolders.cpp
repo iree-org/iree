@@ -228,7 +228,8 @@ void ExStreamFragmentOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ClosureOptimizationPattern<ExStreamFragmentOp>>(context);
   results.insert<InsertImmutabilityPreservingStreamClones>(context);
-  results.insert<TieStreamResults>(context);
+  // TODO(#6185): fix stream ties when types/shapes change.
+  // results.insert<TieStreamResults>(context);
 }
 
 //===----------------------------------------------------------------------===//

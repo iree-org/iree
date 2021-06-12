@@ -13,12 +13,8 @@
 from . import binding
 
 # Pull some of the native symbols into the public API.
-# FunctionAbi imports
-from .binding import FunctionAbi
 # Hal imports
 from .binding import BufferUsage, HalBuffer, HalDevice, HalDriver, HalElementType, MemoryAccess, MemoryType, Shape
-# HostTypeFactory imports
-from .binding import HostTypeFactory
 # Vm imports
 from .binding import create_hal_module, Linkage, VmVariantList, VmFunction, VmInstance, VmContext, VmModule
 # SystemApi
