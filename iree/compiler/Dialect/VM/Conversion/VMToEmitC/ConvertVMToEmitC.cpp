@@ -296,8 +296,8 @@ class ConstOpConversion : public OpRewritePattern<ConstOpTy> {
 
   LogicalResult matchAndRewrite(ConstOpTy constOp,
                                 PatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<emitc::ConstOp>(constOp, constOp.getType(),
-                                                constOp.value());
+    rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constOp, constOp.getType(),
+                                                   constOp.value());
     return success();
   }
 };
@@ -320,7 +320,7 @@ class ConstZeroOpConversion : public OpRewritePattern<ConstZeroOpTy> {
       return failure();
     }
 
-    rewriter.replaceOpWithNewOp<emitc::ConstOp>(constZeroOp, type, value);
+    rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constZeroOp, type, value);
     return success();
   }
 };
@@ -692,7 +692,7 @@ class ListAllocOpConversion
       return failure();
     }
 
-    auto listOp = rewriter.create<emitc::ConstOp>(
+    auto listOp = rewriter.create<emitc::ConstantOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
         /*value=*/emitc::OpaqueAttr::get(ctx, "NULL"));
@@ -794,7 +794,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
       return getOp.emitOpError() << "element type not handled";
     }
 
-    auto valueOp = rewriter.create<emitc::ConstOp>(
+    auto valueOp = rewriter.create<emitc::ConstantOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t"),
         /*value=*/emitc::OpaqueAttr::get(ctx, ""));
