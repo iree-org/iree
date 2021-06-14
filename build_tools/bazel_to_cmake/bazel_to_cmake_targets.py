@@ -58,7 +58,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
-    "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
     "@cpuinfo": ["cpuinfo"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
