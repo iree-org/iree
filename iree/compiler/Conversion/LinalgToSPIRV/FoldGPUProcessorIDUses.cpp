@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -254,11 +255,12 @@ struct FoldAffineMinOverProcessorID : OpRewritePattern<AffineMinOp> {
 };
 
 /// Tests processor ID use folding patterns.
-struct FoldGPUProcessIDUsesPass
-    : public PassWrapper<FoldGPUProcessIDUsesPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
-  FoldGPUProcessIDUsesPass() = default;
-  FoldGPUProcessIDUsesPass(const FoldGPUProcessIDUsesPass &pass) {}
+struct LinalgToSPIRVFoldProcessorIDUsesPass
+    : public LinalgToSPIRVFoldProcessorIDUsesBase<
+          LinalgToSPIRVFoldProcessorIDUsesPass> {
+  LinalgToSPIRVFoldProcessorIDUsesPass() = default;
+  LinalgToSPIRVFoldProcessorIDUsesPass(
+      const LinalgToSPIRVFoldProcessorIDUsesPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect>();
@@ -282,14 +284,9 @@ void populateFoldGPUProcessorIDUsesPatterns(
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createFoldProcessorIDUsesPass() {
-  return std::make_unique<FoldGPUProcessIDUsesPass>();
+createLinalgToSPIRVFoldProcessorIDUsesPass() {
+  return std::make_unique<LinalgToSPIRVFoldProcessorIDUsesPass>();
 }
-
-static PassRegistration<FoldGPUProcessIDUsesPass> pass(
-    "iree-codegen-fold-gpu-procid-uses",
-    "Fold GPU processor ID uses where possible",
-    [] { return std::make_unique<FoldGPUProcessIDUsesPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

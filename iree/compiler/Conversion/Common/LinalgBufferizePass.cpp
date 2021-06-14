@@ -38,8 +38,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -56,6 +57,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
@@ -1343,24 +1346,23 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
 
 namespace {
 /// Pass to convert from tensor based ops to memref based ops.
-class LinalgBufferizePass
-    : public PassWrapper<LinalgBufferizePass, FunctionPass> {
+class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
  public:
   LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREEDialect, linalg::LinalgDialect, memref::MemRefDialect,
                     scf::SCFDialect, StandardOpsDialect>();
   }
-  void runOnFunction() override;
+  void runOnOperation() override;
 
  private:
   WorkgroupMemoryAllocationFn allocationFn;
 };
 }  // namespace
 
-void LinalgBufferizePass::runOnFunction() {
+void LinalgBufferizePass::runOnOperation() {
   BufferizationPlan plan;
-  FuncOp funcOp = getFunction();
+  FuncOp funcOp = getOperation();
   if (failed(analyseOperations(funcOp, plan))) {
     return signalPassFailure();
   }
@@ -1531,9 +1533,17 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
       allocationFn ? allocationFn : defaultAllocationFn);
 }
 
-static PassRegistration<LinalgBufferizePass> pass(
-    "iree-codegen-linalg-bufferize",
-    "Convert from to Linalg ops on tensors to buffers",
-    [] { return std::make_unique<LinalgBufferizePass>(defaultAllocationFn); });
+void addLinalgBufferizePasses(OpPassManager &passManager,
+                              WorkgroupMemoryAllocationFn allocationFn) {
+  passManager.addNestedPass<FuncOp>(createLinalgBufferizePass(allocationFn));
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
+  // passManager.addPass(createBufferHoistingPass());
+  // TODO(nicolasvasilache): bug in buffer loop hoisting with
+  // dynamic_linalg_matmul_on_tensors_fuse_0.mlir
+  // passManager.addPass(createBufferLoopHoistingPass());
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

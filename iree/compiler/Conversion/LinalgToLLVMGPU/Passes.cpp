@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 
-#include "iree/compiler/Conversion/Common/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -39,15 +39,16 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<ModuleOp>(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addPass(createTileAndDistributeToThreads());
+  pm.addPass(createLinalgToLLVMGPUTileAndDistributeToThreads());
   pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
   pm.addNestedPass<ModuleOp>(createCSEPass());
 
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-      createRemoveSingleIterationLoopPass());
+      createLinalgToLLVMGPURemoveSingleIterationLoopPass());
 
   // Linalg -> vector
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorizationPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+      createLinalgToLLVMGPUVectorizationPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
 }
@@ -63,12 +64,12 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   pm.addNestedPass<ModuleOp>(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addPass(createTileAndDistributeToThreads());
+  pm.addPass(createLinalgToLLVMGPUTileAndDistributeToThreads());
   pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
   pm.addNestedPass<ModuleOp>(createCSEPass());
 
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-      createRemoveSingleIterationLoopPass());
+      createLinalgToLLVMGPURemoveSingleIterationLoopPass());
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
@@ -97,15 +98,15 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<ModuleOp>(createStripDebugInfoPass());
   if (useROCM) {
     // convert to ROCDL.
-    pm.addNestedPass<ModuleOp>(createConvertToROCDLPass());
+    pm.addNestedPass<ModuleOp>(createLinalgToLLVMGPUConvertToROCDLPass());
   } else {
     // convert to NVVM.
-    pm.addNestedPass<ModuleOp>(createConvertToNVVMPass());
+    pm.addNestedPass<ModuleOp>(createLinalgToLLVMGPUConvertToNVVMPass());
   }
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
-  pm.addPass(createLowerExecutableTargetGPUPass());
+  pm.addPass(createLinalgToLLVMGPULowerExecutableTargetPass());
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to LLVM+NVVM/ROCDL ops.
   //
@@ -115,20 +116,6 @@ void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   //===--------------------------------------------------------------------===//
   addLowerToLLVMGPUPasses(pm, useROCM);
 }
-
-static PassPipelineRegistration<> LinalgNVVMPipeline(
-    "iree-codegen-linalg-to-nvvm-pipeline",
-    "Runs the progressive lowering pipeline from Linalg to NVVM",
-    [](OpPassManager &passManager) {
-      buildLLVMGPUTransformPassPipeline(passManager, false);
-    });
-
-static PassPipelineRegistration<> LinalgROCDLPipeline(
-    "iree-codegen-linalg-to-rocdl-pipeline",
-    "Runs the progressive lowering pipeline from Linalg to ROCDL",
-    [](OpPassManager &passManager) {
-      buildLLVMGPUTransformPassPipeline(passManager, true);
-    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -8,7 +8,8 @@
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/KernelConfig.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
@@ -317,9 +318,9 @@ class ConcretizeWorkgroupSizeOp final
   ArrayRef<int64_t> tileSize;
 };
 
-struct TileAndDistributeToThreads
-    : public PassWrapper<TileAndDistributeToThreads,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+struct LinalgToLLVMGPUTileAndDistributePass
+    : public LinalgToLLVMGPUTileAndDistributeBase<
+          LinalgToLLVMGPUTileAndDistributePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect>();
   }
@@ -424,13 +425,9 @@ struct TileAndDistributeToThreads
 }  // namespace
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createTileAndDistributeToThreads() {
-  return std::make_unique<TileAndDistributeToThreads>();
+createLinalgToLLVMGPUTileAndDistributeToThreads() {
+  return std::make_unique<LinalgToLLVMGPUTileAndDistributePass>();
 }
-
-static PassRegistration<TileAndDistributeToThreads> pass(
-    "iree-codegen-llvmgpu-tile-and-distribute",
-    "Pass to tile and distribute linalg ops within a workgroup.");
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -10,7 +10,7 @@
 #include <functional>
 #include <string>
 
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {

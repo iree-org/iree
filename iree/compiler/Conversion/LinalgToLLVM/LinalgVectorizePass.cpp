@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -112,13 +114,9 @@ void LinalgVectorizationPass::runOnFunction() {
   }
 }
 
-std::unique_ptr<FunctionPass> createLinalgVectorizePass() {
+std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorizePass() {
   return std::make_unique<LinalgVectorizationPass>();
 }
-
-static PassRegistration<LinalgVectorizationPass> pass(
-    "iree-codegen-linalg-vectorization-pass", "Vectorize linalg ops",
-    [] { return std::make_unique<LinalgVectorizationPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

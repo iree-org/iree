@@ -18,8 +18,9 @@
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -440,9 +441,8 @@ static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
 
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
-struct ConvertToGPUPass
-    : public PassWrapper<ConvertToGPUPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+struct LinalgToSPIRVConvertToGPUPass
+    : public LinalgToSPIRVConvertToGPUBase<LinalgToSPIRVConvertToGPUPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect,
                     ShapeDialect>();
@@ -644,7 +644,7 @@ void populateTileAndDistributeLinalgCopyPatterns(
   patterns.insert<TileAndDistributeCopyOp>(context);
 }
 
-void ConvertToGPUPass::runOnOperation() {
+void LinalgToSPIRVConvertToGPUPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ConversionTarget target(*context);
   // After this pass Linalg and scf.parallel ops should be gone.
@@ -679,13 +679,9 @@ void ConvertToGPUPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createConvertToGPUPass() {
-  return std::make_unique<ConvertToGPUPass>();
+createLinalgToSPIRVConvertToGPUPass() {
+  return std::make_unique<LinalgToSPIRVConvertToGPUPass>();
 }
-
-static PassRegistration<ConvertToGPUPass> pass(
-    "iree-codegen-convert-to-gpu", "Map tiled linalg and loop ops to GPU",
-    [] { return std::make_unique<ConvertToGPUPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Conversion/Common/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 
-#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -41,7 +41,7 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
   if (clUseTensorPadTileAndVectorize) {
     // Tile and vectorize linalg ops on tensors.
     passManager.addNestedPass<FuncOp>(
-        createTilePadAndVectorizeWorkgroupsPass());
+        createLinalgToLLVMTilePadAndVectorizeWorkgroupsPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   }
@@ -54,21 +54,21 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
   if (!clUseTensorPadTileAndVectorize) {
     // Tile and vectorize linalg ops on buffers.
     passManager.addNestedPass<FuncOp>(
-        createLinalgTileAndVectorizeWorkgroupsPass(lowerToVectors));
+        createLinalgToLLVMWorkgroupsVectorizationPass(lowerToVectors));
     passManager.addNestedPass<FuncOp>(createCSEPass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   }
 
   passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
-  passManager.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
+  passManager.addNestedPass<FuncOp>(createLinalgToLLVMPlanConvLoopOrderPass());
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   // Use stack allocation on CPU side.
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
-  passManager.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
+  passManager.addNestedPass<FuncOp>(createLinalgToLLVMPlanConvLoopOrderPass());
 }
 
 static void addLowerToLLVMPasses(
@@ -101,15 +101,6 @@ void buildLLVMTransformPassPipeline(
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM, options);
 }
-
-static PassPipelineRegistration<LLVMTransformPassPipelineOptions>
-    linalgLLVMVPipeline(
-        "iree-codegen-linalg-to-llvm-pipeline",
-        "Runs the progressive lowering pipeline from Linalg to LLVM",
-        [](OpPassManager &passManager,
-           const LLVMTransformPassPipelineOptions &options) {
-          buildLLVMTransformPassPipeline(passManager, options);
-        });
 
 }  // namespace iree_compiler
 }  // namespace mlir

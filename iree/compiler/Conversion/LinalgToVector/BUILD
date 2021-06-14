@@ -15,10 +15,8 @@ cc_library(
     srcs = [
         "VectorizeConv.cpp",
     ],
-    hdrs = [
-        "Passes.h",
-    ],
     deps = [
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",

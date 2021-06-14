@@ -15,10 +15,8 @@ cc_library(
     srcs = [
         "VectorContractToAArch64InlineAsmOp.cpp",
     ],
-    hdrs = [
-        "Passes.h",
-    ],
     deps = [
+        "//iree/compiler/Conversion:PassHeaders",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMDialect",

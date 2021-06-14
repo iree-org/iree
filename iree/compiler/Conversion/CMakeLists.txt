@@ -28,8 +28,10 @@ iree_cc_library(
     "Passes.h.inc"
     "Rewriters.h"
   DEPS
+    MLIRLinalgTransforms
     MLIRPass
     MLIRTransforms
+    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 
@@ -42,16 +44,6 @@ iree_cc_library(
     ::PassHeaders
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToLinalg
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    init_conversions
-  HDRS
-    "init_conversions.h"
-  DEPS
-    ::PassHeaders
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Conversion::LinalgToLLVMGPU
     iree::compiler::Conversion::LinalgToLinalg

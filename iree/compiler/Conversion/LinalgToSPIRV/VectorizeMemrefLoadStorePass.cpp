@@ -13,7 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -407,9 +408,9 @@ struct ScalarizeVectorTransferWrite final
   }
 };
 
-class VectorizeMemRefLoadStorePass final
-    : public PassWrapper<VectorizeMemRefLoadStorePass,
-                         OperationPass<ModuleOp>> {
+class LinalgToSPIRVVectorizeMemRefLoadStorePass final
+    : public LinalgToSPIRVVectorizeMemRefLoadStoreBase<
+          LinalgToSPIRVVectorizeMemRefLoadStorePass> {
   void runOnOperation() override;
 
  private:
@@ -445,7 +446,7 @@ LogicalResult ProcessFuncArg::matchAndRewrite(
   return success();
 }
 
-void VectorizeMemRefLoadStorePass::runOnOperation() {
+void LinalgToSPIRVVectorizeMemRefLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
   ModuleOp module = getOperation();
@@ -491,13 +492,10 @@ void VectorizeMemRefLoadStorePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemrefLoadStorePass() {
-  return std::make_unique<VectorizeMemRefLoadStorePass>();
+std::unique_ptr<OperationPass<ModuleOp>>
+createLinalgToSPIRVVectorizeMemRefLoadStore() {
+  return std::make_unique<LinalgToSPIRVVectorizeMemRefLoadStorePass>();
 }
 
-static PassRegistration<VectorizeMemRefLoadStorePass> pass(
-    "iree-spirv-vectorize-memref-load-store",
-    "Vectorize interface memrefs and their load/store for better memory "
-    "access");
 }  // namespace iree_compiler
 }  // namespace mlir

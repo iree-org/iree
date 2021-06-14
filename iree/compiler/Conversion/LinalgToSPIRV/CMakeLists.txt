@@ -12,25 +12,13 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    CodeGenOptionUtils
-  HDRS
-    "CodeGenOptionUtils.h"
-  SRCS
-    "CodeGenOptionUtils.cpp"
-  DEPS
-    LLVMSupport
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     LinalgToSPIRV
   HDRS
     "KernelDispatchUtils.h"
     "MemorySpace.h"
-    "Passes.h"
     "Utils.h"
   SRCS
+    "CodeGenOptionUtils.cpp"
     "ConcretizeTileAmongWorkgroupsPass.cpp"
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
@@ -43,7 +31,6 @@ iree_cc_library(
     "VectorToGPUPass.cpp"
     "VectorizeMemrefLoadStorePass.cpp"
   DEPS
-    ::CodeGenOptionUtils
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard

@@ -8,8 +8,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Conversion/Common/Passes.h"
-#include "iree/compiler/Conversion/LinalgToLinalg/Passes.h"
 #include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
@@ -184,7 +182,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Special case peephole optimizations.
   if (clEnable1x1ConvToMatmul) {
     passManager.addNestedPass<FuncOp>(
-        mlir::iree_compiler::createConvert1x1ConvToMatmulPass());
+        mlir::iree_compiler::createConvertConv2D1x1ToMatmulPass());
   }
   if (clEnableConvToImg2Col) {
     passManager.addNestedPass<FuncOp>(

@@ -15,11 +15,10 @@ iree_cc_library(
     LinalgToLLVM
   HDRS
     "KernelDispatch.h"
-    "Passes.h"
   SRCS
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
-    "LinalgTileAndVectorizePass.cpp"
+    "LinalgToLLVMWorkgroupsVectorizationPass.cpp"
     "LinalgVectorizePass.cpp"
     "LowerExecutableTargetPass.cpp"
     "PadLinalgWorkgroupTiles.cpp"
@@ -55,6 +54,7 @@ iree_cc_library(
     MLIRVectorToSCF
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Conversion::VectorToLLVM
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

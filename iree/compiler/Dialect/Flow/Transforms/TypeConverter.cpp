@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
+#include "iree/compiler/Dialect/Flow/Transforms/TypeConverter.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/IR/BuiltinTypes.h"

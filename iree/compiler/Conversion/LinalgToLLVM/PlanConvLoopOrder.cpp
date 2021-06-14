@@ -4,7 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
@@ -15,17 +16,17 @@ namespace iree_compiler {
 
 namespace {
 
-struct PlanConvLoopOrderPass
-    : PassWrapper<PlanConvLoopOrderPass, FunctionPass> {
+struct LinalgToLLVMPlanConvLoopOrderPass
+    : LinalgToLLVMPlanConvLoopOrderBase<LinalgToLLVMPlanConvLoopOrderPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
-  void runOnFunction() override;
+  void runOnOperation() override;
 };
 
 }  // namespace
 
-void PlanConvLoopOrderPass::runOnFunction() {
+void LinalgToLLVMPlanConvLoopOrderPass::runOnOperation() {
   auto funcOp = getOperation();
   auto context = funcOp.getContext();
 
@@ -55,14 +56,10 @@ void PlanConvLoopOrderPass::runOnFunction() {
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
-std::unique_ptr<FunctionPass> createPlanConvLoopOrderPass() {
-  return std::make_unique<PlanConvLoopOrderPass>();
+std::unique_ptr<OperationPass<FuncOp>>
+createLinalgToLLVMPlanConvLoopOrderPass() {
+  return std::make_unique<LinalgToLLVMPlanConvLoopOrderPass>();
 }
-
-static PassRegistration<PlanConvLoopOrderPass> pass(
-    "iree-codegen-linalg-to-llvm-plan-conv-loop-order",
-    "Convert linalg.conv to linalg.generic with a CPU-friendly iterator order",
-    [] { return std::make_unique<PlanConvLoopOrderPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir
