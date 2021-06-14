@@ -104,6 +104,7 @@ getInputOutputTypes(linalg::LinalgOp op) {
       outputTypes(op.getNumOutputs());
   auto inputOperands = op.getInputOperands();
   for (auto operand : enumerate(inputOperands)) {
+    assert(!op.isScalar(operand.value()));
     inputTypes[operand.index()] =
         getUntiledType(operand.value()->get()).dyn_cast<ShapedType>();
   }

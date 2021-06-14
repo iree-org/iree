@@ -16,6 +16,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
@@ -67,7 +68,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());
   nestedModulePM.addPass(createNormalizeMemRefsPass());
-  nestedModulePM.addNestedPass<FuncOp>(createMemRefDataFlowOptPass());
+  nestedModulePM.addNestedPass<FuncOp>(createAffineScalarReplacementPass());
 }
 
 static void buildLoopOptimizationVMVXTransformPassPipeline(

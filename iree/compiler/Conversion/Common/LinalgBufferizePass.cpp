@@ -1052,6 +1052,10 @@ static LogicalResult convertAnyLinalgOp(
   SmallVector<Value, 2> newInputBuffers;
   newInputBuffers.reserve(op.getNumInputs());
   for (OpOperand *opOperand : op.getInputOperands()) {
+    if (op.isScalar(opOperand)) {
+      newInputBuffers.push_back(opOperand->get());
+      continue;
+    }
     // For `linalg.poolin_*` ops, the input might be from a
     // `linalg.init_tensor`. In such cases, the `BlockAndValueMapping` wont have
     // a mapping for the buffer. Allocate a buffer for these.
