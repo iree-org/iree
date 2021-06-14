@@ -16,7 +16,10 @@ iree_cc_library(
   HDRS
   DEPS
     iree::base
+    iree::base::logging
     bindings::tflite::shim
   LINKOPTS
     "-landroid"
+    "-llog"
+  SHARED
 )

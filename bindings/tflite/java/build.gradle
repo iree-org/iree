@@ -41,6 +41,8 @@ android {
                         "-DIREE_BUILD_SAMPLES=OFF",
                         "-DIREE_BUILD_PYTHON_BINDINGS=OFF",
                         "-DIREE_HOST_BINARY_ROOT=${hostInstallDir}"
+
+                targets "bindings_tflite_java_org_tensorflow_lite_native_native_deps"
             }
         }
     }
