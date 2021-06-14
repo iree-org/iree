@@ -6,24 +6,6 @@
 
 iree_add_all_subdirs()
 
-# iree_cc_library(
-#   NAME
-#     native_deps
-#   SRCS
-#     "interpreter_jni.cc"
-#     "tensor_jni.cc"
-#     "tensorflow_lite_jni.cc"
-#   HDRS
-#   DEPS
-#     iree::base
-#     iree::base::logging
-#     bindings::tflite::shim
-#   LINKOPTS
-#     "-landroid"
-#     "-llog"
-#   SHARED
-# )
-
 set(_NAME "iree-tflite-bindings")
 add_library(${_NAME} SHARED "")
 
