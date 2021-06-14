@@ -30,7 +30,7 @@ iree_lit_test_suite(
     # TODO: These tests have never passed
     tags = [
         "manual",
-        "notap",
         "nokokoro",
+        "notap",
     ],
 )
