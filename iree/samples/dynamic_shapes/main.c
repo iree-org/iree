@@ -8,11 +8,11 @@
 
 #include "iree/runtime/api.h"
 
-iree_status_t reduce_sum(iree_runtime_session_t* session, const int* values,
-                         int values_length, int* out_result) {
+iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
+                            int values_length, int* out_result) {
   iree_runtime_call_t call;
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
-      session, iree_make_cstring_view("module.reduce_sum"), &call));
+      session, iree_make_cstring_view("module.reduce_sum_1d"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
   const iree_hal_dim_t arg0_shape[1] = {values_length};
@@ -58,15 +58,15 @@ iree_status_t reduce_sum(iree_runtime_session_t* session, const int* values,
   return status;
 }
 
-iree_status_t iota(iree_runtime_session_t* session, int limit,
-                   iree_hal_buffer_view_t** out_buffer_view) {
+iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
+                            size_t values_length,
+                            iree_hal_buffer_view_t** out_buffer_view) {
   iree_runtime_call_t call;
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
-      session, iree_make_cstring_view("module.iota"), &call));
+      session, iree_make_cstring_view("module.reduce_sum_2d"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
-  static const iree_hal_dim_t arg0_shape[1] = {1};
-  int arg0_data[1] = {limit};
+  const iree_hal_dim_t arg0_shape[2] = {values_length / 3, 3};
 
   // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
   //   * debugging some apparent memory corruption with the stack-local value
@@ -77,7 +77,8 @@ iree_status_t iota(iree_runtime_session_t* session, int limit,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,
-        iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);
+        iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
+        &arg0);
   }
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_inputs_push_back_buffer_view(&call, arg0);
@@ -185,42 +186,40 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   // Call the exported sample functions with some test inputs
   fprintf(stdout, "Calling functions\n\n");
 
-  // reduce_sum(1, 10, 100])
+  // reduce_sum_1d([1, 10, 100])
   if (iree_status_is_ok(status)) {
     const int input[3] = {1, 10, 100};
     int result = -1;
-    reduce_sum(session, input, 3, &result);
-    fprintf(stdout, "reduce_sum([1, 10, 100]): %d\n", result);
+    status = reduce_sum_1d(session, input, 3, &result);
+    fprintf(stdout, "reduce_sum_1d([1, 10, 100]): %d\n", result);
   }
 
-  // iota(10)
+  // reduce_sum_2d([[1, 2, 3], [10, 20, 30]])
   if (iree_status_is_ok(status)) {
+    const int input[6] = {1, 2, 3, 10, 20, 30};
     iree_hal_buffer_view_t* result_buffer_view = NULL;
-    iota(session, 10, &result_buffer_view);
-
-    // Map the result buffer and print its elements.
-    // We could also use iree_hal_buffer_view_fprint, but this should be easier
-    // to fork into code that uses the results beyond printing.
-    iree_hal_buffer_mapping_t buffer_mapping;
+    status = reduce_sum_2d(session, input, 6, &result_buffer_view);
     if (iree_status_is_ok(status)) {
-      status = iree_hal_buffer_map_range(
-          iree_hal_buffer_view_buffer(result_buffer_view),
-          IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &buffer_mapping);
-    }
-    if (iree_status_is_ok(status)) {
-      fprintf(stdout, "iota(10): [");
-      int result_count = iree_hal_buffer_view_element_count(result_buffer_view);
-      for (int i = 0; i < result_count - 1; ++i) {
-        fprintf(stdout, "%d, ", ((int*)(buffer_mapping.contents.data))[i]);
-      }
-      if (result_count > 1) {
-        fprintf(stdout, "%d]",
-                ((int*)(buffer_mapping.contents.data))[result_count - 1]);
-      }
+      fprintf(stdout, "reduce_sum_2d([[1, 2, 3], [10, 20, 30]]): ");
+      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
+                                           /*max_element_count=*/4096);
       fprintf(stdout, "\n");
     }
-    iree_hal_buffer_unmap_range(&buffer_mapping);
+    iree_hal_buffer_view_release(result_buffer_view);
+  }
 
+  // reduce_sum_2d([[1, 2, 3], [10, 20, 30], [100, 200, 300]])
+  if (iree_status_is_ok(status)) {
+    const int input[9] = {1, 2, 3, 10, 20, 30, 100, 200, 300};
+    iree_hal_buffer_view_t* result_buffer_view = NULL;
+    status = reduce_sum_2d(session, input, 9, &result_buffer_view);
+    if (iree_status_is_ok(status)) {
+      fprintf(stdout,
+              "reduce_sum_2d([[1, 2, 3], [10, 20, 30], [100, 200, 300]]): ");
+      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
+                                           /*max_element_count=*/4096);
+      fprintf(stdout, "\n");
+    }
     iree_hal_buffer_view_release(result_buffer_view);
   }
 
@@ -228,31 +227,13 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   if (iree_status_is_ok(status)) {
     const int input[3] = {1, 10, 100};
     iree_hal_buffer_view_t* result_buffer_view = NULL;
-    add_one(session, input, 3, &result_buffer_view);
-
-    // Map the result buffer and print its elements.
-    // We could also use iree_hal_buffer_view_fprint, but this should be easier
-    // to fork into code that uses the results beyond printing.
-    iree_hal_buffer_mapping_t buffer_mapping;
+    status = add_one(session, input, 3, &result_buffer_view);
     if (iree_status_is_ok(status)) {
-      status = iree_hal_buffer_map_range(
-          iree_hal_buffer_view_buffer(result_buffer_view),
-          IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &buffer_mapping);
-    }
-    if (iree_status_is_ok(status)) {
-      fprintf(stdout, "add_one([1, 10, 100]): [");
-      int result_count = iree_hal_buffer_view_element_count(result_buffer_view);
-      for (int i = 0; i < result_count - 1; ++i) {
-        fprintf(stdout, "%d, ", ((int*)(buffer_mapping.contents.data))[i]);
-      }
-      if (result_count > 1) {
-        fprintf(stdout, "%d]",
-                ((int*)(buffer_mapping.contents.data))[result_count - 1]);
-      }
+      fprintf(stdout, "add_one([1, 10, 100]): ");
+      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
+                                           /*max_element_count=*/64);
       fprintf(stdout, "\n");
     }
-    iree_hal_buffer_unmap_range(&buffer_mapping);
-
     iree_hal_buffer_view_release(result_buffer_view);
   }
   //===-------------------------------------------------------------------===//

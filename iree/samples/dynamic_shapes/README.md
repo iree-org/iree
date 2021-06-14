@@ -24,17 +24,17 @@ dynamic shapes:
 
 ```python
 class DynamicShapesModule(tf.Module):
-  # reduce_sum (dynamic input size, static output size)
+  # reduce_sum_1d (dynamic input size, static output size)
   #   e.g. [1, 2, 3] -> 6
   @tf.function(input_signature=[tf.TensorSpec([None], tf.int32)])
-  def reduce_sum(self, values):
+  def reduce_sum_1d(self, values):
     return tf.math.reduce_sum(values)
 
-  # iota (static input size, dynamic output size)
-  #   e.g. 3 -> [0, 1, 2]
-  @tf.function(input_signature=[tf.TensorSpec([], tf.int32)])
-  def iota(self, limit):
-    return tf.range(0, limit, 1)
+  # reduce_sum_2d (partially dynamic input size, static output size)
+  #   e.g. [[1, 2, 3], [10, 20, 30]] -> [11, 22, 33]
+  @tf.function(input_signature=[tf.TensorSpec([None, 3], tf.int32)])
+  def reduce_sum_2d(self, values):
+    return tf.math.reduce_sum(values, 0)
 
   # add_one (dynamic input size, dynamic output size)
   #   e.g. [1, 2, 3] -> [2, 3, 4]
