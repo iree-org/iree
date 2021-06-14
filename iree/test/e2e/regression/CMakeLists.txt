@@ -16,7 +16,6 @@ iree_lit_test_suite(
   SRCS
     "dynamic_abs.mlir"
     "dynamic_add.mlir"
-    "dynamic_compare_and_select.mlir"
     "dynamic_dot.mlir"
     "dynamic_torch_index_select_high_rank.mlir"
     "dynamic_torch_index_select_negative.mlir"

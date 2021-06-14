@@ -49,9 +49,6 @@ class VMVXTargetBackend final : public TargetBackend {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
 
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-    // TODO(#614): remove this when the std->vm conversion isn't looking for
-    // iree.module.export.
-    nestedModulePM.addPass(IREE::VM::createMarkPublicSymbolsExportedPass());
 
     // TODO(benvanik): derive these from a vm target triple.
     auto vmOptions = IREE::VM::getTargetOptionsFromFlags();

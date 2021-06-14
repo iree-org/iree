@@ -68,8 +68,7 @@ Once we get into LinalgToNNVM passes we first do bufferize to generate Linalg on
 
 Save the following mlir in /tmp/add.mlir
 ```mlir
-func @add(%lhs: tensor<4xf32>, %rhs: tensor<4xf32>) -> tensor<4xf32>
- attributes { iree.module.export } {
+func @add(%lhs: tensor<4xf32>, %rhs: tensor<4xf32>) -> tensor<4xf32> {
  %0 = "mhlo.add"(%lhs, %rhs) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
  return %0 : tensor<4xf32>
 }

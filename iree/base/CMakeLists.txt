@@ -61,31 +61,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    signature_parser
-  HDRS
-    "signature_parser.h"
-  SRCS
-    "signature_parser.cc"
-  DEPS
-    absl::optional
-    absl::span
-    absl::strings
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    signature_parser_test
-  SRCS
-    "signature_parser_test.cc"
-  DEPS
-    ::signature_parser
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     status
   HDRS
     "status.h"

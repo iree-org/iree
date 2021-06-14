@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-func @print_example_func(%arg0 : i32) attributes { iree.module.export } {
+func @print_example_func(%arg0 : i32) {
   %0 = "strings.i32_to_string"(%arg0) : (i32) -> !strings.string
   "strings.print"(%0) : (!strings.string) -> ()
   return

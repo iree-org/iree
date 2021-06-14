@@ -24,29 +24,64 @@ class TensorCastPattern : public OpConversionPattern<IREE::HAL::TensorCastOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::HAL::TensorCastOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::TensorCastOp op, llvm::ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
+    IREE::HAL::TensorCastOpAdaptor newOperands(
+        rawOperands, op.getOperation()->getAttrDictionary());
     Value newValue = {};
     auto targetType = op.target().getType();
     if (targetType.isa<TensorType>()) {
       // HAL type -> tensor<...>
-      newValue = operands.front();
+      newValue = newOperands.source();
     } else if (targetType.isa<IREE::HAL::BufferType>()) {
       // tensor<...> -> !hal.buffer
       auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
-          op.getLoc(), op.source(), operands.front(), rewriter);
+          op.getLoc(), op.source(), newOperands.source(), rewriter);
       newValue = adaptor.getBuffer();
     } else if (targetType.isa<IREE::HAL::BufferViewType>()) {
       // tensor<...> -> !hal.buffer_view
       auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
-          op.getLoc(), op.source(), operands.front(), rewriter);
-      newValue = adaptor.getBufferView();
+          op.getLoc(), op.source(), newOperands.source(), rewriter);
+
+      // Note that the buffer view cannot just be returned here: it's backing
+      // buffer will be correct, but the cast may be doing a metadata change,
+      // which must be reflected in the returned buffer view. For now, we
+      // just create a new view unconditionally when converting from a tensor
+      // since that is conservative. But this can be optimized with additional
+      // heuristics regarding when it is safe to alias the original.
+      Value originalValue = op.source();
+      if (auto sourceType =
+              originalValue.getType().dyn_cast<RankedTensorType>()) {
+        auto shapeDims = getShapeDims(rewriter, op.getLoc(), sourceType,
+                                      newOperands.source_dims());
+        newValue = rewriter.create<IREE::HAL::BufferViewCreateOp>(
+            op.getLoc(), adaptor.getBuffer(), adaptor.getElementType(),
+            shapeDims);
+      } else {
+        newValue = adaptor.getBufferView();
+      }
     }
     if (!newValue) {
       return rewriter.notifyMatchFailure(op, "bad source/target type pair");
     }
     rewriter.replaceOp(op, {newValue});
     return success();
+  }
+
+  SmallVector<Value> getShapeDims(OpBuilder &builder, Location loc,
+                                  RankedTensorType sourceType,
+                                  ValueRange sourceDims) const {
+    SmallVector<Value> shapeDims(sourceType.getRank());
+    int sourceDimsIndex = 0;
+    for (int i = 0, e = shapeDims.size(); i < e; ++i) {
+      if (sourceType.isDynamicDim(i)) {
+        shapeDims[i] = sourceDims[sourceDimsIndex++];
+      } else {
+        shapeDims[i] =
+            builder.create<ConstantIndexOp>(loc, sourceType.getDimSize(i));
+      }
+    }
+    return shapeDims;
   }
 };
 

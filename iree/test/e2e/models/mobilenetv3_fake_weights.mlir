@@ -209,7 +209,7 @@ module  {
   flow.variable @"__iree_flow___sm_node1291__m.layer-240.bias" dense<0.00480769249> : tensor<1024xf32> attributes {noinline, sym_visibility = "private"}
   flow.variable @"__iree_flow___sm_node1310__m.layer-246.kernel" dense<0.00478468882> : tensor<1x1x1024x1000xf32> attributes {noinline, sym_visibility = "private"}
   flow.variable @"__iree_flow___sm_node1311__m.layer-246.bias" dense<0.00476190494> : tensor<1000xf32> attributes {noinline, sym_visibility = "private"}
-  func @call() attributes {iree.module.export} {
+  func @call() {
     %arg0 = iree.unfoldable_constant dense<1.5> : tensor<1x224x224x3xf32>
     %0 = flow.variable.address @"__iree_flow___sm_node260__m.layer-2.kernel" : !iree.ptr<tensor<3x3x3x16xf32>>
     %1 = flow.variable.address @"__iree_flow___sm_node266__m.layer-3.gamma" : !iree.ptr<tensor<16xf32>>

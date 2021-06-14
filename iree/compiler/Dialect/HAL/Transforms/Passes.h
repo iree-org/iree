@@ -89,11 +89,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createResolveEntryPointOrdinalsPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createSerializeExecutablesPass(TargetOptions targetOptions);
 
-// For functions that contain reflection metadata in an
-// iree.generateabi.reflection attribute, generate public ABI functions for
-// typical clients to use.
-std::unique_ptr<OperationPass<ModuleOp>> createPublicABIGenerationPass();
-
 //===----------------------------------------------------------------------===//
 // Resource initialization, caching, and optimization
 //===----------------------------------------------------------------------===//
@@ -146,7 +141,6 @@ inline void registerHALPasses() {
   createLinkExecutablesPass(targetOptions);
   createResolveEntryPointOrdinalsPass();
   createSerializeExecutablesPass(targetOptions);
-  createPublicABIGenerationPass();
   createIdentifyConstantPoolsPass(targetOptions);
   createPackConstantPoolStoragePass();
   createMaterializeConstantPoolBuffersPass();

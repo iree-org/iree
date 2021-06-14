@@ -849,7 +849,9 @@ static LogicalResult recordTensorClone(Value device, Value commandBuffer,
   auto zeroOffset = schedulingState.lookupOrCreateIndex(0, rewriter);
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
       cloneOp.getLoc(), commandBuffer, operandBuffer.buffer, zeroOffset,
-      resultBuffer.buffer, zeroOffset, operandBuffer.length);
+      // Note: we use the result buffer's length here deliberately to handle the
+      // case where the source buffer can be the constant pool buffer.
+      resultBuffer.buffer, zeroOffset, resultBuffer.length);
 
   // Full barriers for now as we aren't scheduling things.
   recordFullExecutionBarrier(commandBuffer, cloneOp.getLoc(), rewriter);
@@ -1018,8 +1020,7 @@ class ExStreamFragmentOpConversion
                   streamOp.getLoc(),
                   IREE::HAL::BufferType::get(rewriter.getContext()),
                   bufferValue),
-              rewriter.createOrFold<IREE::HAL::BufferViewByteLengthOp>(
-                  streamOp.getLoc(), bufferValue)};
+              schedulingState.lookupOrComputeSize(streamValue, rewriter)};
         } else {
           bufferRange = BufferRange{
               bufferValue,

@@ -1,5 +1,5 @@
 // TODO(GH-5444): Delete the test and enable fft.mlir test in e2e/xla_ops
-func @rfft_2d() attributes { iree.module.export } {
+func @rfft_2d() {
   %input = iree.unfoldable_constant dense<[[
     9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5, -0.777, 2.0, 1.7,
     3.5, -4.5, 0.0, 9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5,

@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir --iree-input-type=mhlo -export-all -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
+// RUN: iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @collatz
 func @collatz() -> tensor<f32> {

@@ -1,4 +1,4 @@
-func @tensor_float() attributes { iree.module.export } {
+func @tensor_float() {
   %0 = iree.unfoldable_constant dense<[1.0, 0.0, 3.0, 4.0]> : tensor<4xf32>
   %1 = iree.unfoldable_constant dense<[5.0, 6.0, -3.0, 8.0]> : tensor<4xf32>
   %result = "tosa.mul"(%0, %1) {shift = 0 : i32} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
@@ -6,7 +6,7 @@ func @tensor_float() attributes { iree.module.export } {
   return
 }
 
-func @tensor_int() attributes { iree.module.export } {
+func @tensor_int() {
   %0 = iree.unfoldable_constant dense<[1, 0, 3, 4]> : tensor<4xi32>
   %1 = iree.unfoldable_constant dense<[5, 6, -3, 8]> : tensor<4xi32>
   %result = "tosa.mul"(%0, %1) {shift = 0 : i32} : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
@@ -14,7 +14,7 @@ func @tensor_int() attributes { iree.module.export } {
   return
 }
 
-func @tensor_int_shifted() attributes { iree.module.export } {
+func @tensor_int_shifted() {
   %0 = iree.unfoldable_constant dense<[1, 0, 3, 4]> : tensor<4xi32>
   %1 = iree.unfoldable_constant dense<[5, 6, -3, 8]> : tensor<4xi32>
   %result = "tosa.mul"(%0, %1) {shift = 1 : i32} : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>

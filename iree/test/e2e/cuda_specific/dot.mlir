@@ -1,4 +1,4 @@
-func @f32() attributes { iree.module.export } {
+func @f32() {
   %lhs = iree.unfoldable_constant dense<[
     [15.0, 14.0, 13.0],
     [12.0, 11.0, 10.0],
@@ -20,7 +20,7 @@ func @f32() attributes { iree.module.export } {
 }
 
 // large aligned case that can be vectorized.
-func @large_aligned() attributes { iree.module.export } {
+func @large_aligned() {
   %lhs = iree.unfoldable_constant dense<1.0> : tensor<252x1024xf32>
   %rhs = iree.unfoldable_constant dense<0.4> : tensor<1024x500xf32>
   %res = "mhlo.dot"(%lhs, %rhs) : (tensor<252x1024xf32>, tensor<1024x500xf32>) -> tensor<252x500xf32>

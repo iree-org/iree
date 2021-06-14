@@ -34,7 +34,7 @@ class ExportBenchmarkFuncsPass
     // the wrapping for only the inputs.
     SmallVector<FuncOp, 4> entryFuncOps;
     for (auto entryFuncOp : moduleOp.getOps<FuncOp>()) {
-      if (entryFuncOp->getAttr("iree.module.export")) {
+      if (entryFuncOp.isPublic()) {
         entryFuncOps.push_back(entryFuncOp);
       }
     }
@@ -49,9 +49,11 @@ class ExportBenchmarkFuncsPass
                                                     OpBuilder& moduleBuilder) {
     std::string baseName = "_benchmark_input_";
     std::string name = baseName + std::to_string(uniqueId++);
-    auto variableOp = moduleBuilder.create<VariableOp>(
-        loc, name,
-        /*isMutable=*/false, inputType, moduleBuilder.getZeroAttr(inputType));
+    auto initialValue = moduleBuilder.getZeroAttr(inputType);
+    assert(initialValue && "failed to get zero attr for type");
+    auto variableOp = moduleBuilder.create<VariableOp>(loc, name,
+                                                       /*isMutable=*/false,
+                                                       inputType, initialValue);
     variableOp.setPrivate();
     variableOp->setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
     return variableOp;
@@ -74,7 +76,6 @@ class ExportBenchmarkFuncsPass
     auto funcOp = moduleBuilder.create<FuncOp>(
         loc, funcName, moduleBuilder.getFunctionType({}, {}));
     funcOp.setPublic();
-    funcOp->setAttr("iree.module.export", moduleBuilder.getUnitAttr());
     funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
     SmallVector<NamedAttribute> reflectionAttrs = {
         moduleBuilder.getNamedAttr("benchmark",
@@ -102,7 +103,6 @@ class ExportBenchmarkFuncsPass
 
     // Ensure the original function is not exported and not inlined.
     entryFuncOp->setAttr("noinline", moduleBuilder.getUnitAttr());
-    entryFuncOp->removeAttr("iree.module.export");
     entryFuncOp->removeAttr("iree.reflection");
     entryFuncOp.setPrivate();
   }
