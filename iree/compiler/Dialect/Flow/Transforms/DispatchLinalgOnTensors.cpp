@@ -379,8 +379,8 @@ static void pullInProducersInSameGroup(
       // producer's operands and pull them in if they are marked to be fused
       // into the current group.
       if (fusedProducer) {
-        SmallVector<Value, 4> producerOperands =
-            cast<linalg::LinalgOp>(clonedOpToFuse).getShapedOperands();
+        SmallVector<Value> producerOperands =
+            cast<linalg::LinalgOp>(clonedOpToFuse).getInputAndOutputOperands();
         pullInProducersInSameGroup(rewriter, dispatchOp, fusedProducer,
                                    producerOperands, tiledLoops, groupNum);
       }
@@ -785,11 +785,12 @@ struct TileAndDistributeOnTensorsPattern
       return failure();
     }
     // Keep track of the tiledOpOperands for fusion.
-    SmallVector<Value, 4> shapedOperands(clonedLinalgOp.getShapedOperands());
+    SmallVector<Value> tiledOperands =
+        clonedLinalgOp.getInputAndOutputOperands();
     rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
 
     pullInProducersInSameGroup(rewriter, dispatchOp, tiledLinalgOp.op,
-                               shapedOperands, tiledLinalgOp.loops,
+                               tiledOperands, tiledLinalgOp.loops,
                                rootOpAttr.getInt());
 
     tiledLinalgOp.op.getOperation()->removeAttr(kRootOpAttr);
@@ -942,10 +943,11 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     // together with it.
     if (auto rootOpAttr = op->getAttrOfType<IntegerAttr>(kRootOpAttr)) {
       linalg::LinalgOp clonedLinalgOp = cast<linalg::LinalgOp>(en.second);
-      SmallVector<Value, 4> shapedOperands(clonedLinalgOp.getShapedOperands());
+      SmallVector<Value> tiledOperands =
+          clonedLinalgOp.getInputAndOutputOperands();
 
       pullInProducersInSameGroup(
-          rewriter, dispatchOp, clonedLinalgOp, shapedOperands,
+          rewriter, dispatchOp, clonedLinalgOp, tiledOperands,
           /*tiledLoops=*/ArrayRef<Operation *>(), rootOpAttr.getInt());
       clonedLinalgOp->removeAttr(kRootOpAttr);
     }
@@ -996,7 +998,7 @@ static unsigned makeElementwiseOpsRootOps(FuncOp funcOp, unsigned numRoots) {
       unsigned newGroup = numRoots++;
       op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(newGroup));
 
-      for (OpOperand *operand : linalgOp.getOutputTensorsOpOperands()) {
+      for (OpOperand *operand : linalgOp.getOutputTensorOperands()) {
         auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
         if (!producer) continue;
         if (producer.getNumLoops() != producer.getNumParallelLoops()) continue;
@@ -1028,7 +1030,7 @@ static unsigned decideFusableLinalgOps(FuncOp funcOp) {
       unsigned newGroup = numRootOps++;
       op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(newGroup));
 
-      for (OpOperand *operand : linalgOp.getOutputTensorsOpOperands()) {
+      for (OpOperand *operand : linalgOp.getOutputTensorOperands()) {
         auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
         if (!producer) continue;
         if (producer.getNumLoops() != producer.getNumParallelLoops()) continue;
