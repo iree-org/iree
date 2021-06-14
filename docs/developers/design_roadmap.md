@@ -135,7 +135,7 @@ comparison and increment on the device and insert a host readback to see if the
 loop should continue:
 
 ```mlir
-func @main() -> tensor<i32> attributes {iree.module.export, iree.reflection = {f = "I1!R6!B3!t6", fv = "1"}} {
+func @main() -> tensor<i32> attributes {iree.reflection = {f = "I1!R6!B3!t6", fv = "1"}} {
   %cst = constant dense<1> : tensor<i32>
   %cst_0 = constant dense<3> : tensor<i32>
   %cst_1 = constant dense<1> : vector<3xi32>

@@ -7,16 +7,13 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOLLVMGPU_KERNELCONFIG_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOLLVMGPU_KERNELCONFIG_H_
 
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
-#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-Optional<LaunchConfig> getLLVMGPULaunchConfig(
-    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    ArrayRef<linalg::LinalgOp> linalgOps);
+LogicalResult initGPULaunchConfig(ModuleOp moduleOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir

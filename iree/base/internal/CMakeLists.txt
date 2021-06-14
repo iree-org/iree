@@ -52,6 +52,22 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    arena
+  HDRS
+    "arena.h"
+  SRCS
+    "arena.c"
+  DEPS
+    ::atomic_slist
+    ::synchronization
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     atomic_slist
   HDRS
     "atomic_slist.h"

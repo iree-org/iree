@@ -17,6 +17,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -24,6 +25,28 @@ namespace IREE {
 namespace TensorList {
 
 namespace {
+
+struct TensorListInlinerInterface : public DialectInlinerInterface {
+  using DialectInlinerInterface::DialectInlinerInterface;
+
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    // Sure!
+    return true;
+  }
+
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+};
 
 class TensorListToHALConversionInterface
     : public HALConversionDialectInterface {
@@ -64,6 +87,7 @@ TensorListDialect::TensorListDialect(MLIRContext *context)
               TypeID::get<TensorListDialect>()) {
   addInterfaces<TensorListToHALConversionInterface>();
   addInterfaces<TensorListToVMConversionInterface>();
+  addInterfaces<TensorListInlinerInterface>();
 
   addTypes<TensorListType>();
 

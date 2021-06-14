@@ -5,8 +5,7 @@
 //  CHECK-SAME: -> (
 //  CHECK-SAME:   !hal.buffer_view, !hal.buffer_view
 //  CHECK-SAME: ) attributes {
-//  CHECK-SAME:   iree.abi.stub,
-//  CHECK-SAME:   iree.module.export
+//  CHECK-SAME:   iree.abi.stub
 //  CHECK-SAME: } {
 //  CHECK-NEXT:   %[[ARG0_DIM0:.+]] = hal.buffer_view.dim %[[ARG0]], 0 : index
 //  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.cast %[[ARG0]] : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG0_DIM0]]}

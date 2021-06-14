@@ -28,6 +28,17 @@ createTileAndDistributeToThreads();
 
 std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
 
+/// Create pass calling the dynamic pipeline for LLVMGPU.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createLowerExecutableTargetGPUPass();
+
+/// Lowering calling vectorization patterns.
+void addGPUVectorizationPassPipeline(OpPassManager &passManager);
+
+/// Simple lowering only distributute linalg ops on blocks and threads. This
+/// will result in scalar operations.
+void addGPUSimpleDistributePassPipeline(OpPassManager &passManager);
+
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.

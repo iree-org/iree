@@ -90,10 +90,15 @@ LogicalResult LinkWithBitcodeVector(
   return success();
 }
 
-static std::vector<std::string> GetROCDLPaths() {
-  // AMDGPU version-neutral bitcodes.
+static std::vector<std::string> GetROCDLPaths(std::string targetChip) {
+  // AMDGPU bitcodes.
+  int lenOfChipPrefix = 3;
+  std::string chipId = targetChip.substr(lenOfChipPrefix);
+  std::string chip_isa_bc = "oclc_isa_version_" + chipId + ".bc";
   static std::vector<std::string> *rocdl_filenames =
-      new std::vector<std::string>({"ocml.bc", "ockl.bc"});
+      new std::vector<std::string>({"ocml.bc", "ockl.bc",
+                                    "oclc_unsafe_math_off.bc",
+                                    "oclc_daz_opt_off.bc", chip_isa_bc});
 
   // Construct full path to ROCDL bitcode libraries.
   std::string rocdl_dir_path = "/opt/rocm/amdgcn/bitcode";
@@ -106,11 +111,12 @@ static std::vector<std::string> GetROCDLPaths() {
 }
 
 // Links ROCm-Device-Libs into the given module if the module needs it.
-void LinkROCDLIfNecessary(llvm::Module *module) {
+void LinkROCDLIfNecessary(llvm::Module *module, std::string targetChip) {
   if (!HAL::CouldNeedDeviceBitcode(*module)) {
     return;
   }
-  if (!succeeded(HAL::LinkWithBitcodeVector(module, GetROCDLPaths()))) {
+  if (!succeeded(
+          HAL::LinkWithBitcodeVector(module, GetROCDLPaths(targetChip)))) {
     llvm::WithColor::error(llvm::errs()) << "Fail to Link ROCDL.\n";
   };
 }

@@ -16,7 +16,6 @@ cc_library(
         "Conversion.cpp",
         "GlobalInitialization.cpp",
         "HoistInlinedRodata.cpp",
-        "MarkPublicSymbolsExported.cpp",
         "OrdinalAllocation.cpp",
         "Passes.cpp",
         "SinkDefiningOps.cpp",

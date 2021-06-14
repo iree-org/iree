@@ -17,6 +17,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+static llvm::cl::opt<bool> clUseTensorPadTileAndVectorize(
+    "iree-codegen-linalg-to-llvm-use-tensor-to-vectors",
+    llvm::cl::desc("If enabled will use tensor -> vector transformation pass"),
+    llvm::cl::init(false));
+
 static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
                                    ArrayRef<int64_t> staticShape,
                                    Type elementType,
@@ -33,14 +38,27 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
   // re-enable.
   // passManager.addNestedPass<FuncOp>(createPadLinalgWorkgroupTilesPass());
 
+  if (clUseTensorPadTileAndVectorize) {
+    // Tile and vectorize linalg ops on tensors.
+    passManager.addNestedPass<FuncOp>(
+        createTilePadAndVectorizeWorkgroupsPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  }
+
   // Use stack allocation on CPU side.
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
-  // Tile and vectorize linalg ops.
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(
-      createLinalgTileAndVectorizeWorkgroupsPass(lowerToVectors));
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  if (!clUseTensorPadTileAndVectorize) {
+    // Tile and vectorize linalg ops on buffers.
+    passManager.addNestedPass<FuncOp>(
+        createLinalgTileAndVectorizeWorkgroupsPass(lowerToVectors));
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  }
+
   passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
   passManager.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());

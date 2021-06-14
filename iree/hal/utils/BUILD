@@ -9,3 +9,16 @@ package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
+
+cc_library(
+    name = "deferred_command_buffer",
+    srcs = ["deferred_command_buffer.c"],
+    hdrs = ["deferred_command_buffer.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/base/internal:arena",
+        "//iree/hal",
+    ],
+)

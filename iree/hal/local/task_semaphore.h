@@ -10,8 +10,8 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
-#include "iree/hal/local/arena.h"
 #include "iree/hal/local/event_pool.h"
 #include "iree/task/submission.h"
 #include "iree/task/task.h"

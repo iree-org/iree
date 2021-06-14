@@ -1340,7 +1340,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool rhs_is_move;
       iree_vm_ref_t* rhs = VM_DecOperandRegRef("rhs", &rhs_is_move);
       int32_t* result = VM_DecResultRegI32("result");
-      *result = iree_vm_ref_equal(lhs, rhs);
+      *result = vm_cmp_eq_ref(lhs, rhs);
       if (lhs_is_move) iree_vm_ref_release(lhs);
       if (rhs_is_move) iree_vm_ref_release(rhs);
     });
@@ -1350,7 +1350,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool rhs_is_move;
       iree_vm_ref_t* rhs = VM_DecOperandRegRef("rhs", &rhs_is_move);
       int32_t* result = VM_DecResultRegI32("result");
-      *result = !iree_vm_ref_equal(lhs, rhs);
+      *result = vm_cmp_ne_ref(lhs, rhs);
       if (lhs_is_move) iree_vm_ref_release(lhs);
       if (rhs_is_move) iree_vm_ref_release(rhs);
     });
@@ -1358,7 +1358,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool operand_is_move;
       iree_vm_ref_t* operand = VM_DecOperandRegRef("operand", &operand_is_move);
       int32_t* result = VM_DecResultRegI32("result");
-      *result = operand->ptr != NULL ? 1 : 0;
+      *result = vm_cmp_nz_ref(operand);
       if (operand_is_move) iree_vm_ref_release(operand);
     });
 

@@ -116,7 +116,7 @@ iree/tools/iree-run-module \
     --driver=dylib \
     --module_file=mobilenet-dylib.vmfb \
     --entry_function=predict \
-    --function_inputs="1x224x224x3xf32=0"
+    --function_input="1x224x224x3xf32=0"
 ```
 
 The above assumes the exported function in the model is named as `predict` and

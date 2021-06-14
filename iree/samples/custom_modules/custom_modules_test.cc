@@ -129,22 +129,26 @@ TEST_F(CustomModulesTest, ReverseAndPrint) {
 
 TEST_F(CustomModulesTest, PrintTensor) {
   // Allocate the buffer we'll be printing.
+  static iree_hal_dim_t kShape[] = {2, 4};
   static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
                                          4.0f, 5.0f, 6.0f, 7.0f};
-  iree_hal_buffer_t* buffer = nullptr;
-  IREE_ASSERT_OK(iree_hal_allocator_wrap_buffer(
-      hal_allocator_, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+  iree_hal_buffer_view_t* buffer_view = nullptr;
+  IREE_ASSERT_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+      hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
+      IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       IREE_HAL_MEMORY_ACCESS_ALL, IREE_HAL_BUFFER_USAGE_ALL,
-      iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
-                       sizeof(kBufferContents)},
-      iree_allocator_null(), &buffer));
+      iree_make_byte_span((void*)kBufferContents, sizeof(kBufferContents)),
+      iree_allocator_null(), &buffer_view));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
                                      iree_allocator_system(), &inputs));
-  iree_vm_ref_t input_buffer_ref = iree_hal_buffer_move_ref(buffer);
-  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &input_buffer_ref));
+  iree_vm_ref_t input_buffer_view_ref =
+      iree_hal_buffer_view_move_ref(buffer_view);
+  IREE_ASSERT_OK(
+      iree_vm_list_push_ref_move(inputs.get(), &input_buffer_view_ref));
 
   // Prepare outputs list to accept the results from the invocation.
   iree::vm::ref<iree_vm_list_t> outputs;
@@ -169,22 +173,26 @@ TEST_F(CustomModulesTest, PrintTensor) {
 
 TEST_F(CustomModulesTest, RoundTripTensor) {
   // Allocate the buffer we'll be printing/parsing.
+  static iree_hal_dim_t kShape[] = {2, 4};
   static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
                                          4.0f, 5.0f, 6.0f, 7.0f};
-  iree_hal_buffer_t* buffer = nullptr;
-  IREE_ASSERT_OK(iree_hal_allocator_wrap_buffer(
-      hal_allocator_, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+  iree_hal_buffer_view_t* buffer_view = nullptr;
+  IREE_ASSERT_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+      hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
+      IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       IREE_HAL_MEMORY_ACCESS_ALL, IREE_HAL_BUFFER_USAGE_ALL,
-      iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
-                       sizeof(kBufferContents)},
-      iree_allocator_null(), &buffer));
+      iree_make_byte_span((void*)kBufferContents, sizeof(kBufferContents)),
+      iree_allocator_null(), &buffer_view));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
                                      iree_allocator_system(), &inputs));
-  iree_vm_ref_t input_buffer_ref = iree_hal_buffer_move_ref(buffer);
-  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &input_buffer_ref));
+  iree_vm_ref_t input_buffer_view_ref =
+      iree_hal_buffer_view_move_ref(buffer_view);
+  IREE_ASSERT_OK(
+      iree_vm_list_push_ref_move(inputs.get(), &input_buffer_view_ref));
 
   // Prepare outputs list to accept the results from the invocation.
   iree::vm::ref<iree_vm_list_t> outputs;

@@ -131,5 +131,5 @@ Run the tool:
 adb shell /data/local/tmp/iree-run-module -driver=vmvx \
   -module_file=/data/local/tmp/simple_abs_vmvx.vmfb \
   -entry_function=abs \
-  -function_inputs="f32=-5"
+  -function_input="f32=-5"
 ```

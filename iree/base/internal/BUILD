@@ -68,6 +68,19 @@ cc_test(
 #===------------------------------------------------------------------------===#
 
 cc_library(
+    name = "arena",
+    srcs = ["arena.c"],
+    hdrs = ["arena.h"],
+    deps = [
+        ":atomic_slist",
+        ":synchronization",
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_library(
     name = "atomic_slist",
     srcs = ["atomic_slist.c"],
     hdrs = ["atomic_slist.h"],

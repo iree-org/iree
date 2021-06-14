@@ -1,4 +1,4 @@
-func @reduce_window_nonoverlapping_1x4x6x1xf32() attributes { iree.module.export } {
+func @reduce_window_nonoverlapping_1x4x6x1xf32() {
   %0 = iree.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],
@@ -14,7 +14,7 @@ func @reduce_window_nonoverlapping_1x4x6x1xf32() attributes { iree.module.export
   return
 }
 
-func @reduce_window_overlapping_4x6xf32() attributes { iree.module.export } {
+func @reduce_window_overlapping_4x6xf32() {
   %0 = iree.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],
@@ -33,7 +33,7 @@ func @reduce_window_overlapping_4x6xf32() attributes { iree.module.export } {
   return
 }
 
-func @reduce_window_max_4x6xf32() attributes { iree.module.export } {
+func @reduce_window_max_4x6xf32() {
   %0 = iree.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],
@@ -49,7 +49,7 @@ func @reduce_window_max_4x6xf32() attributes { iree.module.export } {
   return
 }
 
-func @reduce_window_min_4x6xf32() attributes { iree.module.export } {
+func @reduce_window_min_4x6xf32() {
   %0 = iree.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],

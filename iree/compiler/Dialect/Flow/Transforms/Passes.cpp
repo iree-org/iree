@@ -14,11 +14,13 @@
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
 #include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Conversion/TosaToSCF/TosaToSCF.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Dialect/Tosa/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -67,6 +69,14 @@ void buildMHLOInputTransformPassPipeline(OpPassManager &passManager) {
   // and cfg compatible.
   // TODO: Currently recurses into SCF in Linalg generic - with hilarity.
   passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
+
+  // Various shape functions may have been materialized in the `shape.shape_of`
+  // style of treating shapes as tensors. We prefer to legalize these to
+  // scalar ops as early as possible to avoid having them persist as tensor
+  // computations.
+  passManager.addNestedPass<FuncOp>(createShapeToShapeLowering());
+  passManager.addPass(createConvertShapeToStandardPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
   // Now that control flow has been lowered, promote and extract_element
   // to tensor loads. This will be done again later once everything that can
@@ -120,6 +130,7 @@ void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
 
+  passManager.addNestedPass<FuncOp>(tosa::createTosaMakeBroadcastablePass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(Flow::createPromoteI1ToI8Pass());

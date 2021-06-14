@@ -482,3 +482,29 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
   }
   return %0 : tensor<3x9xi32>
 }
+
+
+// -----
+
+// Test that when we copy a subspan of a large constant pool into a buffer,
+// we use the correct size.
+
+// CHECK-LABEL: func @clone_from_large_buffer_to_small_buffer
+func @clone_from_large_buffer_to_small_buffer(%input: tensor<2xi32>) -> tensor<7xi32> {
+  %1 = flow.ex.stream.fragment(%input) : (tensor<2xi32>) -> tensor<7xi32> =
+      (%arg0: tensor<2xi32>) -> tensor<7xi32> {
+    %c3 = constant 3 : index
+    %const_span = hal.constant.subspan @_const_pool_splats[#hal.byte_range<0, 32>] : tensor<7xi32>
+    // CHECK: %[[C0:.+]] = constant 0 : index
+    // CHECK: %[[C28:.+]] = constant 28 : index
+    // CHECK: %[[DSTBUF:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[C28]]}
+    // CHECK: %[[CSTBUF:.+]] = hal.variable.load @_const_pool_splats : !hal.buffer
+    // CHECK: hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer> source(%[[CSTBUF]] : !hal.buffer)[%[[C0]]] target(%[[DSTBUF]] : !hal.buffer)[%[[C0]]] length(%[[C28]])
+    %2 = flow.tensor.clone %const_span : tensor<7xi32>
+    %3 = flow.tensor.update %arg0, %2[%c3] : tensor<2xi32> -> tensor<7xi32>
+    flow.return %3 : tensor<7xi32>
+  }
+  return %1 : tensor<7xi32>
+}
+
+hal.variable @_const_pool_splats : !hal.buffer attributes {sym_visibility = "private"}

@@ -20,7 +20,6 @@ iree_c_embed_data(
     "simple_mul_dispatch.c"
   H_FILE_OUTPUT
     "simple_mul_dispatch.h"
-  TESTONLY
   FLATTEN
   PUBLIC
 )

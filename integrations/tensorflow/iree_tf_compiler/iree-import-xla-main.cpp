@@ -229,13 +229,13 @@ int main(int argc, char **argv) {
   // function.
   std::string entryName = "main";
   SymbolTable symbolTable(module.get());
-  Operation *mainFunc = symbolTable.lookup(entryName);
+  auto mainFunc = symbolTable.lookup<FuncOp>(entryName);
   if (!mainFunc) {
     llvm::errs() << "Unable to find main function '" << entryName
                  << "' in converted module.\n";
     return 3;
   }
-  mainFunc->setAttr("iree.module.export", UnitAttr::get(&context));
+  mainFunc.setPublic();
 
   // Save.
   auto saveToFile = [&](llvm::StringRef savePath) -> LogicalResult {
@@ -260,9 +260,8 @@ int main(int argc, char **argv) {
 
   // Note that we emit the ABI last since any needed function-level
   // transformations (i.e. de-tupling, etc) should have been done.
-  // TODO: Uncomment this to enable IREE native bindings.
-  // pm.addNestedPass<FuncOp>(
-  //     iree_integrations::TF::createEmitDefaultIREEABIPass());
+  pm.addNestedPass<FuncOp>(
+      iree_integrations::MHLO::createEmitDefaultIREEABIPass());
 
   if (failed(pm.run(*module))) {
     llvm::errs()

@@ -1,4 +1,4 @@
-func @transpose_2d() attributes { iree.module.export } {
+func @transpose_2d() {
   %input = iree.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
   %0 = "mhlo.transpose"(%input) {
@@ -10,7 +10,7 @@ func @transpose_2d() attributes { iree.module.export } {
   return
 }
 
-func @transpose_3d() attributes { iree.module.export } {
+func @transpose_3d() {
   %input = iree.unfoldable_constant dense<[[[ 1,  2,  3],
                                             [ 4,  5,  6]],
                                            [[ 7,  8,  9],

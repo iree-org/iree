@@ -7,8 +7,6 @@ module attributes {tfl.schema_version = 3 : i32} {
   // CHECK-SAME: ) -> (
   // CHECK-SAME: tensor<?xf32> {iree.identifier = "output0"},
   // CHECK-SAME: tensor<?xf32> {iree.identifier = "output1"})
-  // CHECK-SAME: attributes
-  // CHECK-SAME: iree.module.export
   func @main(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> (tensor<?xf32>, tensor<?xf32>) attributes {
     tf.entry_function = {inputs = "input0,input1", outputs = "output0,output1"}
   } {

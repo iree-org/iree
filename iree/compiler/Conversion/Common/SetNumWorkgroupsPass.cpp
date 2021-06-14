@@ -30,14 +30,14 @@ class SetNumWorkgroupsPass
   }
 
   SetNumWorkgroupsPass(ArrayRef<int64_t> ws = {})
-      : workgroupSize(ws.begin(), ws.end()) {}
+      : workloadPerWorkgroup(ws.begin(), ws.end()) {}
   SetNumWorkgroupsPass(const SetNumWorkgroupsPass &pass)
-      : workgroupSize(pass.workgroupSize) {}
+      : workloadPerWorkgroup(pass.workloadPerWorkgroup) {}
 
   void runOnOperation() override;
 
  private:
-  SmallVector<int64_t> workgroupSize;
+  SmallVector<int64_t> workloadPerWorkgroup;
 };
 }  // namespace
 
@@ -46,33 +46,50 @@ void SetNumWorkgroupsPass::runOnOperation() {
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp module = targetOp.getInnerModule();
 
-  if (workgroupSize.empty()) {
-    // If no workgroup size is specified, leave the workgroup size as is, just
-    // set the number of workgroups to be 1, 1, 1 to have a single invocation.
-    WorkgroupCountRegionBuilder regionBuilder =
-        [](OpBuilder &b, Location loc,
-           std::array<Value, 3> workload) -> std::array<Value, 3> {
-      Value one = b.create<ConstantIndexOp>(loc, 1);
-      return {one, one, one};
-    };
-    OpBuilder builder(context);
-    for (auto funcOp : module.getOps<FuncOp>()) {
-      if (failed(defineWorkgroupCountRegion(builder, funcOp, regionBuilder))) {
+  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
+      getAllEntryPoints(module);
+  for (auto funcOp : module.getOps<FuncOp>()) {
+    auto entryPointOp = entryPoints.lookup(funcOp.getName());
+    if (!entryPointOp) continue;
+    SmallVector<int64_t, 4> currWorkloadPerWorkgroup;
+
+    // First check if there is a workload provided.
+    if (!workloadPerWorkgroup.empty()) {
+      currWorkloadPerWorkgroup.assign(workloadPerWorkgroup.begin(),
+                                      workloadPerWorkgroup.end());
+    } else if (IREE::HAL::TranslationInfo translationInfo =
+                   getTranslationInfo(entryPointOp)) {
+      if (ArrayAttr workloadPerWorkgroupAttr =
+              translationInfo.workloadPerWorkgroup()) {
+        currWorkloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
+            workloadPerWorkgroupAttr,
+            [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+      }
+    }
+
+    if (currWorkloadPerWorkgroup.empty()) {
+      // If no workgroup size is specified, leave the workgroup size as is, just
+      // set the number of workgroups to be 1, 1, 1 to have a single invocation.
+      WorkgroupCountRegionBuilder regionBuilder =
+          [](OpBuilder &b, Location loc,
+             std::array<Value, 3> workload) -> std::array<Value, 3> {
+        Value one = b.create<ConstantIndexOp>(loc, 1);
+        return {one, one, one};
+      };
+      OpBuilder builder(context);
+      for (auto funcOp : module.getOps<FuncOp>()) {
+        if (failed(
+                defineWorkgroupCountRegion(builder, funcOp, regionBuilder))) {
+          return signalPassFailure();
+        }
+      }
+    } else {
+      if (failed(materializeStaticLaunchInformation(
+              funcOp, currWorkloadPerWorkgroup))) {
+        funcOp.emitError("failed to materialize constant workgroup size");
         return signalPassFailure();
       }
     }
-    return;
-  }
-
-  auto entryPointFn = getSingleEntryPointFunction(module);
-  if (failed(entryPointFn)) {
-    return signalPassFailure();
-  }
-  auto funcOp = entryPointFn.getValue();
-
-  if (failed(materializeStaticLaunchInformation(funcOp, workgroupSize))) {
-    funcOp.emitError("failed to materialize constant workgroup size");
-    return signalPassFailure();
   }
 
   // Apply post distribution canonicalization passes.

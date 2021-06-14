@@ -3,7 +3,8 @@
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 func @abs_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<16xf32>
+  %c128 = constant 128 : index
+  %0 = hal.interface.binding.subspan @io::@arg0[%c128] : memref<16xf32>
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<16xi32>
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
@@ -25,6 +26,12 @@ hal.interface @io attributes {sym_visibility = "private"} {
 }
 
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%{{.*}}: !llvm.ptr<i32>, %{{.*}}: !llvm.ptr<f32>, %{{.*}}: !llvm.ptr<f32>)
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32>, %[[ARG1:.+]]: !llvm.ptr<f32>, %{{.*}}: !llvm.ptr<f32>)
+//       CHECK:   %[[C128:.+]] = llvm.mlir.constant(128 : index) : i64
+//       CHECK:   %[[PTRI8:.+]] = llvm.bitcast %[[ARG1]] : !llvm.ptr<f32> to !llvm.ptr<i8>
+//       CHECK:   %[[OFF:.+]] = llvm.getelementptr %[[PTRI8]][%[[C128]]] : (!llvm.ptr<i8>, i64) -> !llvm.ptr<i8>
+//       CHECK:   %[[PTR:.+]] = llvm.bitcast %[[OFF]] : !llvm.ptr<i8> to !llvm.ptr<f32>
+//       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
+//       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
 //      CHECK:    nvvm.read.ptx.sreg.tid.x
 //      CHECK:    llvm.fadd

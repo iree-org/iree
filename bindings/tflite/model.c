@@ -159,8 +159,13 @@ TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreateFromFile(
   iree_atomic_ref_count_init(&model->ref_count);
   model->allocator = allocator;
   model->owned_model_data = (uint8_t*)model + file_size;
-  (void)fread(model->owned_model_data, 1, file_size, file);
+  int ret = fread(model->owned_model_data, 1, file_size, file);
   fclose(file);
+  if (ret != file_size) {
+    IREE_TRACE_MESSAGE(ERROR, "failed model+data read");
+    IREE_TRACE_ZONE_END(z0);
+    return NULL;
+  }
 
   status = _TfLiteModelInitializeModule(model->owned_model_data, file_size,
                                         allocator, model);

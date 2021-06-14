@@ -1,4 +1,4 @@
-func @dynamic_slice() attributes { iree.module.export } {
+func @dynamic_slice() {
   %input = iree.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
@@ -14,7 +14,7 @@ func @dynamic_slice() attributes { iree.module.export } {
   return
 }
 
-func @dynamic_unit_slice() attributes { iree.module.export } {
+func @dynamic_unit_slice() {
   %input = iree.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
@@ -29,7 +29,7 @@ func @dynamic_unit_slice() attributes { iree.module.export } {
   return
 }
 
-func @dynamic_1d_slice() attributes { iree.module.export } {
+func @dynamic_1d_slice() {
   %input = iree.unfoldable_constant dense<[1, 2, 3, 4]> : tensor<4xi32>
   %start1 = iree.unfoldable_constant dense<1> : tensor<i64>
   %result = "mhlo.dynamic-slice"(%input, %start1) {

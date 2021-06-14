@@ -92,8 +92,7 @@ bridge can be used to convert the ops from GraphDef to XLA HLO, while a
 based in MLIR is currently being written.
 
 ```mlir
-func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
-    attributes { iree.module.export } {
+func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %0 = mhlo.multiply(%arg0, %arg1) : tensor<4xf32>
   return %0 : tensor<4xf32>
 }
@@ -127,8 +126,7 @@ semantics it's easy to use SSA use-def chains to ensure we are preserving the
 expected behavior of the program.
 
 ```mlir
-func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
-  attributes  {iree.module.export} {
+func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %cst = constant dense<[4, 1, 1]> : tensor<3xi32>
   %0 = iree.dispatch_region[%cst : tensor<3xi32>](%arg2 = %arg0 : tensor<4xf32>, %arg3 = %arg1 : tensor<4xf32>) : tensor<4xf32> {
     %1 = mulf %arg2, %arg3 : tensor<4xf32>
@@ -178,8 +176,7 @@ module {
       }
     }
   }
-  func @simple_mul(%arg0: memref<4xf32>, %arg1: memref<4xf32>) -> memref<4xf32>
-  attributes  {iree.module.export} {
+  func @simple_mul(%arg0: memref<4xf32>, %arg1: memref<4xf32>) -> memref<4xf32> {
     %0 = iree_interp.constant dense<[4, 1, 1]> : tensor<3xi32>
     %1 = "iree_hl_seq.alloc_heap"() : () -> memref<4xf32>
     iree_hl_seq.dispatch simple_mul_ex_dispatch_0::simple_mul_rgn_dispatch_0[%0 : memref<3xi32>](%arg0, %arg1, %1) : (memref<4xf32>, memref<4xf32>, memref<4xf32>) -> ()
@@ -226,7 +223,7 @@ module {
     }
   }
   func @simple_mul(%arg0: memref<4xf32>, %arg1: memref<4xf32>) -> memref<4xf32>
-  attributes  {iree.module.export, iree.ordinal = 0 : i32} {
+  attributes {iree.ordinal = 0 : i32} {
     %0 = "iree_ll_seq.alloc_heap"() : () -> memref<4xf32>
     iree_ll_seq.static_dispatch simple_mul_ex_dispatch_0::simple_mul_rgn_dispatch_0[dense<[4, 1, 1]> : tensor<3xi32>](%arg0, %arg1, %0) : (memref<4xf32>, memref<4xf32>, memref<4xf32>) -> ()
     iree_ll_seq.return %0 : memref<4xf32>
@@ -333,7 +330,7 @@ module {
     }
   }
   func @simple_mul(%arg0: memref<4xf32>, %arg1: memref<4xf32>) -> memref<4xf32>
-  attributes  {iree.module.export, iree.ordinal = 0 : i32} {
+  attributes {iree.ordinal = 0 : i32} {
     %0 = "iree_ll_seq.alloc_heap"() : () -> memref<4xf32>
     iree_ll_seq.static_dispatch simple_mul_ex_dispatch_0::simple_mul_rgn_dispatch_0[dense<[4, 1, 1]> : tensor<3xi32>](%arg0, %arg1, %0) : (memref<4xf32>, memref<4xf32>, memref<4xf32>) -> ()
     iree_ll_seq.return %0 : memref<4xf32>

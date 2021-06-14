@@ -13,7 +13,7 @@
 #include "iree/vm/test/emitc/arithmetic_ops.h"
 #include "iree/vm/test/emitc/arithmetic_ops_f32.h"
 #include "iree/vm/test/emitc/arithmetic_ops_i64.h"
-#include "iree/vm/test/emitc/assignment_ops.h"
+// #include "iree/vm/test/emitc/assignment_ops.h"
 #include "iree/vm/test/emitc/assignment_ops_i64.h"
 #include "iree/vm/test/emitc/comparison_ops.h"
 #include "iree/vm/test/emitc/comparison_ops_f32.h"
@@ -23,6 +23,8 @@
 #include "iree/vm/test/emitc/conversion_ops_i64.h"
 #include "iree/vm/test/emitc/global_ops.h"
 #include "iree/vm/test/emitc/list_ops.h"
+#include "iree/vm/test/emitc/list_variant_ops.h"
+#include "iree/vm/test/emitc/ref_ops.h"
 #include "iree/vm/test/emitc/shift_ops.h"
 #include "iree/vm/test/emitc/shift_ops_i64.h"
 
@@ -55,7 +57,7 @@ std::vector<TestParams> GetModuleTestParams() {
       {arithmetic_ops_descriptor_, arithmetic_ops_create},
       {arithmetic_ops_f32_descriptor_, arithmetic_ops_f32_create},
       {arithmetic_ops_i64_descriptor_, arithmetic_ops_i64_create},
-      {assignment_ops_descriptor_, assignment_ops_create},
+      // {assignment_ops_descriptor_, assignment_ops_create},
       {assignment_ops_i64_descriptor_, assignment_ops_i64_create},
       {comparison_ops_descriptor_, comparison_ops_create},
       {comparison_ops_f32_descriptor_, comparison_ops_f32_create},
@@ -65,6 +67,8 @@ std::vector<TestParams> GetModuleTestParams() {
       {conversion_ops_i64_descriptor_, conversion_ops_i64_create},
       {global_ops_descriptor_, global_ops_create},
       {list_ops_descriptor_, list_ops_create},
+      {list_variant_ops_descriptor_, list_variant_ops_create},
+      {ref_ops_descriptor_, ref_ops_create},
       {shift_ops_descriptor_, shift_ops_create},
       {shift_ops_i64_descriptor_, shift_ops_i64_create}};
 
@@ -97,8 +101,7 @@ class VMCModuleTest : public ::testing::Test,
 
     iree_vm_module_t* module_ = nullptr;
     IREE_CHECK_OK(
-        test_params.create_function(iree_allocator_system(), &module_))
-        << "Module failed to load";
+        test_params.create_function(iree_allocator_system(), &module_));
 
     std::vector<iree_vm_module_t*> modules = {module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
@@ -119,8 +122,7 @@ class VMCModuleTest : public ::testing::Test,
     IREE_CHECK_OK(iree_vm_context_resolve_function(
         context_,
         iree_string_view_t{qualified_name.data(), qualified_name.size()},
-        &function))
-        << "Exported function '" << local_name << "' not found";
+        &function));
 
     return iree_vm_invoke(context_, function,
                           /*policy=*/nullptr, /*inputs=*/nullptr,

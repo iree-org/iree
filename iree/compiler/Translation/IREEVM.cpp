@@ -7,7 +7,6 @@
 #include "iree/compiler/Translation/IREEVM.h"
 
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
-#include "iree/compiler/Bindings/SIP/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -34,10 +33,7 @@ namespace iree_compiler {
 // whole end-to-end with options for bindings/targets/etc.
 struct BindingOptions {
   // Whether to include runtime support functions for the IREE native ABI.
-  bool native = false;
-  // Whether to include runtime support functions and metadata required for
-  // SIP-compatible bindings (like bindings/python/iree).
-  bool sip = true;
+  bool native = true;
   // Whether to include runtime support functions required for the IREE TFLite
   // API compatibility bindings.
   bool tflite = false;
@@ -51,11 +47,6 @@ static BindingOptions getBindingOptionsFromFlags() {
       "iree-native-bindings-support",
       llvm::cl::desc(
           "Include runtime support for native IREE ABI-compatible bindings"),
-      llvm::cl::init(false), llvm::cl::cat(bindingOptionsCategory)};
-
-  static llvm::cl::opt<bool> *bindingsSIPFlag = new llvm::cl::opt<bool>{
-      "iree-sip-bindings-support",
-      llvm::cl::desc("Include runtime support for SIP-compatible bindings"),
       llvm::cl::init(true), llvm::cl::cat(bindingOptionsCategory)};
 
   static llvm::cl::opt<bool> *bindingsTFLiteFlag = new llvm::cl::opt<bool>{
@@ -66,7 +57,6 @@ static BindingOptions getBindingOptionsFromFlags() {
 
   BindingOptions bindingOptions;
   bindingOptions.native = *bindingsNativeFlag;
-  bindingOptions.sip = *bindingsSIPFlag;
   bindingOptions.tflite = *bindingsTFLiteFlag;
   return bindingOptions;
 }
@@ -172,9 +162,6 @@ static void buildIREEVMTransformPassPipeline(
   if (bindingOptions.native) {
     IREE::ABI::buildTransformPassPipeline(passManager);
   }
-  if (bindingOptions.sip) {
-    IREE::SIP::buildTransformPassPipeline(passManager);
-  }
   if (bindingOptions.tflite) {
     IREE::TFLite::buildTransformPassPipeline(passManager);
   }
@@ -263,10 +250,11 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
 // Exposed via the --iree-mlir-to-vm-c-module translation.
 static LogicalResult translateFromMLIRToVMCModule(
     ModuleOp moduleOp, BindingOptions bindingOptions,
+    InputDialectOptions inputOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions,
     IREE::VM::CTargetOptions cTargetOptions, llvm::raw_ostream &output) {
-  auto result = translateFromMLIRToVM(moduleOp, bindingOptions,
+  auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
                                       executableOptions, targetOptions);
   if (failed(result)) {
     return result;

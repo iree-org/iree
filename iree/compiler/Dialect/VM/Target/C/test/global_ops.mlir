@@ -6,6 +6,7 @@ vm.module @global_ops {
   // CHECK-NEXT: iree_allocator_t allocator;
   // CHECK-NEXT: uint8_t rwdata[8];
   // CHECK-NEXT: iree_vm_ref_t refs[0];
+  // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[0];
   // CHECK-NEXT: };
 
   vm.global.i32 @c42 42 : i32

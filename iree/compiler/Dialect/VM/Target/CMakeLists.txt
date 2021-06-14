@@ -29,6 +29,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    ConstantEncodingUtils
+  HDRS
+    "ConstantEncodingUtils.h"
+  SRCS
+    "ConstantEncodingUtils.cpp"
+  DEPS
+    MLIRIR
+    MLIRSupport
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     init_targets
   HDRS
     "init_targets.h"
