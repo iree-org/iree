@@ -22,6 +22,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
+    MLIRAffineTransforms
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
