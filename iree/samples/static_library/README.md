@@ -5,12 +5,14 @@ This sample shows how to:
 2. Compile the static library into a program using the `static_library_loader`
 3. Run the demo with the module using functions exported by the static library
 
-The model compiled into the static library exports a single function `simple_mul` that returns the multiplication of two tensors:
+The model compiled into the static library exports a single function
+`simple_mul` that returns the multiplication of two tensors:
 
 ```mlir
 func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
-    attributes { iree.module.export } {
-  %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+{
+  %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>,
+    tensor<4xf32>) -> tensor<4xf32>
   return %0 : tensor<4xf32>
 }
 ```
@@ -41,14 +43,14 @@ Note: run these commands from IREE's github root.
             -iree-input-type=mhlo \
             -iree-mlir-to-vm-bytecode-module \
             -iree-hal-target-backends=dylib-llvm-aot \
-            -o iree/samples/static_library/static_library_module.vmfb \
-            --iree-llvm-static-library-output-path=iree/samples/static_library/static_library_module.o
+            -o ../iree-build/iree/samples/static_library/static_library_module.vmfb \
+            -iree-llvm-static-library-output-path=./iree-build/iree/samples/static_library/static_library_module.o
     ```
 
 3. Compile the `static_library_demo` CMake target. Note: this assumes you've added the static library files and module in the demo directory from step 2:
 
     ```shell
-    cmake --build ../iree-build/ --target iree_samples_static-library-demo
+    cmake --build ../iree-build/ --target iree_samples_static_library_demo
     ```
 
 4. Run the sample binary

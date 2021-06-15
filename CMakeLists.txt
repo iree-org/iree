@@ -481,10 +481,6 @@ if(${IREE_BUILD_EMBEDDING_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples/simple_embedding)
 endif()
 
-if(${IREE_BUILD_STATIC_LIBRARY_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
-  add_subdirectory(iree/samples/static_library)
-endif()
-
 if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
   # NOTE: Currently liburing is only used by the experimental remoting
   # support, so keeping it scoped here. If this broadens, then include along
