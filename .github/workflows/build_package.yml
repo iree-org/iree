@@ -186,14 +186,8 @@ jobs:
         if: "matrix.build_package == 'py-pure-pkgs'"
         shell: bash
         run: |
-          # Just need to build for one examplar python3 variant.
-          export CIBW_BUILD="cp38-*"
-          package_dir="./iree-install/python_packages/iree_jax"
-          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-pure-pkgs"
-          # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( Make source packages.
-          mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir bindist $package_dir
+          python ./main_checkout/build_tools/github_actions/build_dist.py py-pure-pkgs
+          python -m pip wheel -w bindist --no-deps ./iree-install/python_packages/iree_jax
 
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
