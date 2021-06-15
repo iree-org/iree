@@ -10,12 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 
-#include "iree/compiler/Conversion/Common/Passes.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
-#include "iree/compiler/Conversion/LinalgToVector/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
 #include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
@@ -47,8 +45,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-static void addLinalgToSPIRVPasses(OpPassManager &pm,
-                                   const SPIRVCodegenOptions &options) {
+void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
+                                    const SPIRVCodegenOptions &options) {
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
@@ -78,9 +76,9 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
 
   // flow.dispatch.workgroups performed abstract tiling and distribution. Make
   // them concrete now since we know the target and settings now.
-  pm.addPass(createConcretizeTileAmongWorkgroupsPass(options));
+  pm.addPass(createLinalgToSPIRVConcretizeTileAmongWorkgroupsPass(options));
 
-  pm.addPass(createTileAndVectorizeInOneWorkgroupPass(options));
+  pm.addPass(createLinalgToSPIRVTileAndVectorizeOneWorkgroupPass(options));
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//
@@ -91,8 +89,9 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     workgroups.
   //   - Linalg ops are converted to loop.for ops and mapped to workitems.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createConvertToGPUPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorToGPUPass());
+  pm.addPass(createLinalgToSPIRVConvertToGPUPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+      createLinalgToSPIRVConvertVectorToGPU());
   pm.nest<ModuleOp>().addPass(createLowerAffinePass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
@@ -106,14 +105,13 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - Load/store on std.subview ops are converted into load/store on the
   //     original buffers.
   //===--------------------------------------------------------------------===//
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-      createVectorTransferOptimizationPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
   pm.nest<ModuleOp>().addPass(memref::createFoldSubViewOpsPass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
-  pm.nest<ModuleOp>().addPass(createVectorizeMemrefLoadStorePass());
+  pm.nest<ModuleOp>().addPass(createLinalgToSPIRVVectorizeMemRefLoadStore());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-      createConvertVectorToCooperativeMatrixPass());
+      createLinalgToSPIRVVectorToCooperativeMatrixPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createForOpCanonicalizationPass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
@@ -130,7 +128,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - All ops are converted to SPIR-V counterparts.
   //   - spv.module ops are formed to hold all SPIR-V ops.
   //===--------------------------------------------------------------------===//
-  pm.nest<ModuleOp>().addPass(createConvertToSPIRVPass());
+  pm.nest<ModuleOp>().addPass(createLinalgToSPIRVConvertToSPIRVPass());
 
   //===--------------------------------------------------------------------===//
   // SPIR-V dialect level conversions.
@@ -154,7 +152,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   // TODO(antiagainst): re-evaluate the inlining timing.
   //===--------------------------------------------------------------------===//
   pm.nest<ModuleOp>().addPass(createInlinerPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createBufferAllocViewCleanUpPass());
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
   WorkgroupMemoryAllocationFn allocationFn =
       [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
          Type elementType, ArrayRef<Value> dynamicSizes) {
@@ -171,25 +169,8 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final spv.module ready for serialization.
   //===--------------------------------------------------------------------===//
-  addLinalgToSPIRVPasses(pm, options);
+  buildLinalgToSPIRVPassPipeline(pm, options);
 }
-
-static PassPipelineRegistration<> linalgToSPIRVPipeline(
-    "iree-codegen-linalg-to-spirv-pipeline",
-    "Runs the progressive lowering pipeline from Linalg to SPIR-V",
-    [](OpPassManager &passManager) {
-      addLinalgToSPIRVPasses(passManager,
-                             getSPIRVCodegenOptionsFromClOptions());
-    });
-
-static PassPipelineRegistration<> hloToLinalgSPIRVPipeline(
-    "iree-codegen-hlo-to-spirv-pipeline",
-    "Runs the progressive lowering pipeline from XLA HLO to Linalg to "
-    "SPIR-V",
-    [](OpPassManager &passManager) {
-      buildSPIRVTransformPassPipeline(passManager,
-                                      getSPIRVCodegenOptionsFromClOptions());
-    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

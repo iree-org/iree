@@ -32,6 +32,7 @@ iree_cc_library(
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToSPIRV
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::IREE::IR

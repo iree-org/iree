@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/Common/Transforms.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
@@ -33,8 +35,9 @@ static Optional<std::pair<AffineExpr, AffineExpr>> threadIdMinMax(
 
 namespace {
 
-class RemoveSingleIterationLoopPass
-    : public PassWrapper<RemoveSingleIterationLoopPass, OperationPass<FuncOp>> {
+class LinalgToLLVMGPURemoveSingleIterationLoopPass
+    : public LinalgToLLVMGPURemoveSingleIterationLoopBase<
+          LinalgToLLVMGPURemoveSingleIterationLoopPass> {
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
     std::array<int32_t, 3> workgroupSize;
@@ -57,13 +60,10 @@ class RemoveSingleIterationLoopPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass() {
-  return std::make_unique<RemoveSingleIterationLoopPass>();
+std::unique_ptr<OperationPass<FuncOp>>
+createLinalgToLLVMGPURemoveSingleIterationLoopPass() {
+  return std::make_unique<LinalgToLLVMGPURemoveSingleIterationLoopPass>();
 }
-
-static PassRegistration<RemoveSingleIterationLoopPass> pass(
-    "iree-llvmgpu-remove-single-iteration-loop",
-    "Remove distributed loop with single iteration.");
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/KernelConfig.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -25,23 +25,24 @@ namespace {
 /// - then convert to NVVM/ROCDL dialect.
 /// This should be merged with the equivalent pass in LinalgToLLVM. Fo
 /// simplicity it is currently a separate pass.
-class LowerExecutableTargetPass
-    : public PassWrapper<LowerExecutableTargetPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+class LinalgToLLVMGPULowerExecutableTargetPass
+    : public LinalgToLLVMGPULowerExecutableTargetBase<
+          LinalgToLLVMGPULowerExecutableTargetPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect, linalg::LinalgDialect,
                     vector::VectorDialect, gpu::GPUDialect>();
   }
 
-  LowerExecutableTargetPass() = default;
-  LowerExecutableTargetPass(const LowerExecutableTargetPass &pass) = default;
+  LinalgToLLVMGPULowerExecutableTargetPass() = default;
+  LinalgToLLVMGPULowerExecutableTargetPass(
+      const LinalgToLLVMGPULowerExecutableTargetPass &pass) = default;
 
   void runOnOperation() override;
 };
 }  // namespace
 
-void LowerExecutableTargetPass::runOnOperation() {
+void LinalgToLLVMGPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp moduleOp = targetOp.getInnerModule();
 
@@ -111,15 +112,9 @@ void LowerExecutableTargetPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createLowerExecutableTargetGPUPass() {
-  return std::make_unique<LowerExecutableTargetPass>();
+createLinalgToLLVMGPULowerExecutableTargetPass() {
+  return std::make_unique<LinalgToLLVMGPULowerExecutableTargetPass>();
 }
-
-static PassRegistration<LowerExecutableTargetPass> pass(
-    "iree-lower-executable-target-gpu-pass",
-    "Perform lowering of executable target using one of the "
-    "IREE::HAL::DispatchLoweringPassPipeline",
-    [] { return std::make_unique<LowerExecutableTargetPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -20,9 +21,7 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-class SetNumWorkgroupsPass
-    : public PassWrapper<SetNumWorkgroupsPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+class SetNumWorkgroupsPass : public SetNumWorkgroupsBase<SetNumWorkgroupsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -105,11 +104,6 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize) {
   return std::make_unique<SetNumWorkgroupsPass>(workgroupSize);
 }
-
-static PassRegistration<SetNumWorkgroupsPass> pass(
-    "iree-set-num-workgroups",
-    "Set the number of workgroups to use for every entry point function in the "
-    "dispatch region");
 
 }  // namespace iree_compiler
 }  // namespace mlir

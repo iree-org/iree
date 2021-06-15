@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -103,8 +105,8 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
         ArrayRef<Value>({lhs, rhs, dstVec[0], dstVec[1], dstVec[2], dstVec[3]}),
         R"ASM(
             sdot $0.4s, $4.16b, $5.4b[0]
-            sdot $1.4s, $4.16b, $5.4b[1] 
-            sdot $2.4s, $4.16b, $5.4b[2] 
+            sdot $1.4s, $4.16b, $5.4b[1]
+            sdot $2.4s, $4.16b, $5.4b[2]
             sdot $3.4s, $4.16b, $5.4b[3]
           )ASM",
         "=w,=w,=w,=w,w,w,0,1,2,3", false, false,
@@ -136,11 +138,11 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
 
 namespace {
 struct VectorToAArch64InlineAsmPass
-    : public PassWrapper<VectorToAArch64InlineAsmPass, FunctionPass> {
+    : public VectorToAArch64InlineAsmBase<VectorToAArch64InlineAsmPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
   }
-  void runOnFunction() override;
+  void runOnOperation() override;
 };
 }  // namespace
 
@@ -150,7 +152,7 @@ void populateVectorContractToAArch64InlineAsm(
       context);
 }
 
-void VectorToAArch64InlineAsmPass::runOnFunction() {
+void VectorToAArch64InlineAsmPass::runOnOperation() {
   MLIRContext *context = &getContext();
   OwningRewritePatternList patterns(context);
   populateVectorContractToAArch64InlineAsm(patterns, context);
@@ -161,15 +163,10 @@ void VectorToAArch64InlineAsmPass::runOnFunction() {
   }
 }
 
-std::unique_ptr<FunctionPass> createVectorToAArch64InlineAssemblyPass() {
+std::unique_ptr<OperationPass<FuncOp>>
+createVectorToAArch64InlineAssemblyPass() {
   return std::make_unique<VectorToAArch64InlineAsmPass>();
 }
-
-static PassRegistration<VectorToAArch64InlineAsmPass> pass(
-    "iree-codegen-vector-to-aarch64-inline-asm",
-    "Convert vector operations to aarch64 inline asm"
-    "LLVMIR dialect",
-    [] { return std::make_unique<VectorToAArch64InlineAsmPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

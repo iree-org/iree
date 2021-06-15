@@ -6,7 +6,8 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/ConvertToLLVM.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
@@ -28,8 +29,9 @@ namespace {
 ///
 /// This pass only handles device code and is not meant to be run on GPU host
 /// code.
-struct ConvertToROCDLPass
-    : public PassWrapper<ConvertToROCDLPass, OperationPass<ModuleOp>> {
+struct LinalgToLLVMGPUConvertToROCDLPass
+    : public LinalgToLLVMGPUConvertToROCDLBase<
+          LinalgToLLVMGPUConvertToROCDLPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect, ROCDL::ROCDLDialect>();
   }
@@ -83,14 +85,10 @@ struct ConvertToROCDLPass
 
 }  // anonymous namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass() {
-  return std::make_unique<ConvertToROCDLPass>();
+std::unique_ptr<OperationPass<ModuleOp>>
+createLinalgToLLVMGPUConvertToROCDLPass() {
+  return std::make_unique<LinalgToLLVMGPUConvertToROCDLPass>();
 }
-
-static PassRegistration<ConvertToROCDLPass> pass(
-    "iree-codegen-convert-to-rocdl",
-    "Perform final conversion from builtin/GPU/HAL/standard dialect to LLVM "
-    "and ROCDL dialects");
 
 }  // namespace iree_compiler
 }  // namespace mlir

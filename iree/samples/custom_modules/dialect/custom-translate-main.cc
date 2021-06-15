@@ -10,7 +10,6 @@
 // We need this entry function because we want to register the custom
 // dialect, which is missing in IREE's translation main entry function.
 
-#include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/samples/custom_modules/dialect/init_dialect.h"
 #include "iree/tools/init_compiler_modules.h"
@@ -61,7 +60,6 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::registerVMTargets();
   mlir::registerMlirTranslations();
   mlir::iree_compiler::registerIreeTranslations();
-  mlir::iree_compiler::registerLinalgToSPIRVPasses();
   // Make sure command line options are registered.
   (void)mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
 

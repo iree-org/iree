@@ -15,7 +15,8 @@
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -41,8 +42,9 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-struct ConvertVectorToGPUPass
-    : public PassWrapper<ConvertVectorToGPUPass, OperationPass<FuncOp>> {
+struct LinalgToSPIRVConvertVectorToGPUPass
+    : public LinalgToSPIRVConvertVectorToGPUBase<
+          LinalgToSPIRVConvertVectorToGPUPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect, memref::MemRefDialect,
                     scf::SCFDialect, vector::VectorDialect>();
@@ -71,8 +73,8 @@ class VectorToGPUConversionTarget : public ConversionTarget {
   }
 };
 
-void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
-                                                        MLIRContext *context) {
+void LinalgToSPIRVConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(
+    FuncOp funcOp, MLIRContext *context) {
   // 1. Tile linalg and distribute it on invocations.
   std::unique_ptr<ConversionTarget> target =
       std::make_unique<ConversionTarget>(*context);
@@ -105,7 +107,7 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
-void ConvertVectorToGPUPass::runOnOperation() {
+void LinalgToSPIRVConvertVectorToGPUPass::runOnOperation() {
   MLIRContext *context = &getContext();
   FuncOp funcOp = getOperation();
   tileAndVectorizeLinalgCopy(funcOp, context);
@@ -115,12 +117,9 @@ void ConvertVectorToGPUPass::runOnOperation() {
 //===----------------------------------------------------------------------===//
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
-std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass() {
-  return std::make_unique<ConvertVectorToGPUPass>();
+std::unique_ptr<OperationPass<FuncOp>> createLinalgToSPIRVConvertVectorToGPU() {
+  return std::make_unique<LinalgToSPIRVConvertVectorToGPUPass>();
 }
 
-static PassRegistration<ConvertVectorToGPUPass> pass(
-    "iree-codegen-vector-to-gpu",
-    "Convert vector dialect to gpu subgroup level GPU instructions");
 }  // namespace iree_compiler
 }  // namespace mlir

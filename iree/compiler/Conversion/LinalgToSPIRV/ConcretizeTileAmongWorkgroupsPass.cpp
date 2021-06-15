@@ -35,10 +35,10 @@
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -279,14 +279,15 @@ static void removeOneTripTiledLoops(MLIRContext *context, FuncOp funcOp,
 
 /// Concretizes hal.interface.workgroup.* ops with constants from the chosen
 /// tiling sheme when possible and perform loop canonicalization afterwards.
-class ConcretizeTileAmongWorkgroupsPass
-    : public PassWrapper<ConcretizeTileAmongWorkgroupsPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+class LinalgToSPIRVConcretizeTileAmongWorkgroupsPass
+    : public LinalgToSPIRVConcretizeTileAmongWorkgroupsBase<
+          LinalgToSPIRVConcretizeTileAmongWorkgroupsPass> {
  public:
-  ConcretizeTileAmongWorkgroupsPass(const SPIRVCodegenOptions &options)
+  LinalgToSPIRVConcretizeTileAmongWorkgroupsPass(
+      const SPIRVCodegenOptions &options)
       : options(options) {}
-  ConcretizeTileAmongWorkgroupsPass(
-      const ConcretizeTileAmongWorkgroupsPass &that)
+  LinalgToSPIRVConcretizeTileAmongWorkgroupsPass(
+      const LinalgToSPIRVConcretizeTileAmongWorkgroupsPass &that)
       : options(that.options) {
     inlineTripOneLoops = that.inlineTripOneLoops;
   }
@@ -403,18 +404,11 @@ class ConcretizeTileAmongWorkgroupsPass
 }  // namespace
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createConcretizeTileAmongWorkgroupsPass(const SPIRVCodegenOptions &options) {
-  return std::make_unique<ConcretizeTileAmongWorkgroupsPass>(options);
+createLinalgToSPIRVConcretizeTileAmongWorkgroupsPass(
+    const SPIRVCodegenOptions &options) {
+  return std::make_unique<LinalgToSPIRVConcretizeTileAmongWorkgroupsPass>(
+      options);
 }
-
-static PassRegistration<ConcretizeTileAmongWorkgroupsPass> pass(
-    "iree-spirv-concretize-tile-among-workgroups",
-    "Replace hal.interface.workgroup.* ops with constant values from chosen "
-    "tiling and distribution scheme",
-    [] {
-      SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
-      return std::make_unique<ConcretizeTileAmongWorkgroupsPass>(options);
-    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

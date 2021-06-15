@@ -17,8 +17,8 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/Common/LaunchConfig.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/Support/Debug.h"
@@ -875,7 +875,7 @@ getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
   return nativeSize;
 }
 
-Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
+Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
 #define DISPATCH(opname)                            \
   if (isa<opname>(op)) {                            \
     return getOpNativeVectorSize(cast<opname>(op)); \

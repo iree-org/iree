@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -71,10 +73,10 @@ class TransposeUnitDimToShapeCast
   }
 };
 
-struct VectorTransferOptimizationPass
-    : public PassWrapper<VectorTransferOptimizationPass, FunctionPass> {
-  void runOnFunction() override {
-    FuncOp funcOp = getFunction();
+struct OptimizeVectorTransferPass
+    : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
+  void runOnOperation() override {
+    FuncOp funcOp = getOperation();
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
@@ -86,20 +88,15 @@ struct VectorTransferOptimizationPass
     vector::transferOpflowOpt(funcOp);
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
-    eraseDeadAllocAndStores(getFunction());
+    eraseDeadAllocAndStores(funcOp);
   }
 };
 
 }  // namespace
 
-std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass() {
-  return std::make_unique<VectorTransferOptimizationPass>();
+std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass() {
+  return std::make_unique<OptimizeVectorTransferPass>();
 }
-
-static PassRegistration<VectorTransferOptimizationPass> pass(
-    "iree-codegen-optimize-vector-transfer",
-    "Run optimization transformations on vector transfer operations",
-    [] { return std::make_unique<VectorTransferOptimizationPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

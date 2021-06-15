@@ -8,6 +8,8 @@
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -46,17 +48,18 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 }  // namespace
 
 namespace {
-struct TilePadAndVectorizeWorkgroupsPass
-    : public PassWrapper<TilePadAndVectorizeWorkgroupsPass, FunctionPass> {
+struct LinalgToLLVMTilePadAndVectorizeWorkgroupsPass
+    : public LinalgToLLVMTilePadAndVectorizeWorkgroupsBase<
+          LinalgToLLVMTilePadAndVectorizeWorkgroupsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
                     vector::VectorDialect>();
   }
-  void runOnFunction() override;
+  void runOnOperation() override;
 };
 }  // namespace
 
-void TilePadAndVectorizeWorkgroupsPass::runOnFunction() {
+void LinalgToLLVMTilePadAndVectorizeWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
@@ -197,14 +200,10 @@ void TilePadAndVectorizeWorkgroupsPass::runOnFunction() {
   }
 }
 
-std::unique_ptr<FunctionPass> createTilePadAndVectorizeWorkgroupsPass() {
-  return std::make_unique<TilePadAndVectorizeWorkgroupsPass>();
+std::unique_ptr<OperationPass<FuncOp>>
+createLinalgToLLVMTilePadAndVectorizeWorkgroupsPass() {
+  return std::make_unique<LinalgToLLVMTilePadAndVectorizeWorkgroupsPass>();
 }
-
-static PassRegistration<TilePadAndVectorizeWorkgroupsPass> pass(
-    "iree-codegen-linalg-to-llvm-tile-pad-and-vectorize-workgroups",
-    "Tile and pad workgroups tiles",
-    [] { return std::make_unique<TilePadAndVectorizeWorkgroupsPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

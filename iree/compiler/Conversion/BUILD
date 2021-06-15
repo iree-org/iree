@@ -37,6 +37,8 @@ cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//iree/compiler/Dialect/HAL/IR",
+        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
     ],
@@ -52,16 +54,6 @@ cc_library(
         ":PassesIncGen",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/HLOToLinalg",
-    ],
-)
-
-cc_library(
-    name = "init_conversions",
-    hdrs = [
-        "init_conversions.h",
-    ],
-    deps = [
-        ":PassHeaders",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Conversion/LinalgToLLVMGPU",
         "//iree/compiler/Conversion/LinalgToLinalg",

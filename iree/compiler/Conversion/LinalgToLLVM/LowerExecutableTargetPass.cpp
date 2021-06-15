@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
-#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -25,8 +25,7 @@ namespace {
 /// - then convert to LLVM dialect.
 /// In due course this could be used to generate code for all backends.
 class LowerExecutableTargetPass
-    : public PassWrapper<LowerExecutableTargetPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+    : public LowerExecutableTargetBase<LowerExecutableTargetPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect, linalg::LinalgDialect,
@@ -164,12 +163,6 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createLowerExecutableTargetPass(bool lowerToVectors) {
   return std::make_unique<LowerExecutableTargetPass>(lowerToVectors);
 }
-
-static PassRegistration<LowerExecutableTargetPass> pass(
-    "iree-lower-executable-target-pass",
-    "Perform lowering of executable target using one of the "
-    "IREE::HAL::DispatchLoweringPassPipeline",
-    [] { return std::make_unique<LowerExecutableTargetPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir
