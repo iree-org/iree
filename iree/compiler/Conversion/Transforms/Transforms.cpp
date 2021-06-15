@@ -10,25 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/Common/Transforms.h"
+#include "iree/compiler/Conversion/Transforms/Transforms.h"
 
-#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
+#include "iree/compiler/Conversion/Utils/MarkerUtils.h"
+#include "iree/compiler/Conversion/Utils/TransformUtils.h"
+#include "iree/compiler/Conversion/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-linalg-tile-and-fuse"
+#define DEBUG_TYPE "iree-coonversion-transforms"
 
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 

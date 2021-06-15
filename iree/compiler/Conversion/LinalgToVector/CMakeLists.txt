@@ -27,8 +27,8 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     MLIRVector
-    iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::PassHeaders
+    iree::compiler::Conversion::Utils
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms

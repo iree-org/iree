@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/ConvertToLLVM.h"
 
-#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/PassDetail.h"
 #include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Conversion/Utils/Utils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/GPU/Passes.h"

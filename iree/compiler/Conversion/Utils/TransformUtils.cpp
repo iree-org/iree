@@ -8,7 +8,7 @@
 // This code will be removed once this gets upstreamed to common mlir.
 // Please try to limit changes in this code only minor changes.
 
-#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
+#include "iree/compiler/Conversion/Utils/TransformUtils.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
