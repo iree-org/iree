@@ -38,7 +38,7 @@ function(iree_py_install_package)
   cmake_parse_arguments(ARG
     "AUGMENT_EXISTING_PACKAGE"
     "COMPONENT;PACKAGE_NAME;MODULE_PATH"
-    "DEPS"
+    "DEPS;ADDL_PACKAGE_FILES"
     ${ARGN})
   set(_install_component ${ARG_COMPONENT})
   set(_install_packages_dir "${CMAKE_INSTALL_PREFIX}/python_packages/${ARG_PACKAGE_NAME}")
@@ -50,6 +50,7 @@ function(iree_py_install_package)
     install(
       FILES
         ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+        ${ARG_ADDL_PACKAGE_FILES}
       COMPONENT ${_install_component}
       DESTINATION "${_install_packages_dir}"
     )
