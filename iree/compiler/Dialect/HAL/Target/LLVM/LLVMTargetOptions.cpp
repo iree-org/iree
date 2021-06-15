@@ -150,6 +150,15 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::init(llvmTargetOptions.keepLinkerArtifacts));
   llvmTargetOptions.keepLinkerArtifacts = clKeepLinkerArtifacts;
 
+  static llvm::cl::opt<std::string> clStaticLibraryOutputPath(
+      "iree-llvm-static-library-output-path",
+      llvm::cl::desc(
+          "Path to output static object (EX: '/path/to/static-library.o'). "
+          "This will produce the static library at the specified path along "
+          "with a similarly named '.h' file for static linking."),
+      llvm::cl::init(llvmTargetOptions.staticLibraryOutput));
+  llvmTargetOptions.staticLibraryOutput = clStaticLibraryOutputPath;
+
   return llvmTargetOptions;
 }
 

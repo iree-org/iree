@@ -27,6 +27,7 @@ iree_cc_library(
     ::LLVMIRPasses
     ::LLVMTargetOptions
     ::LinkerTool
+    ::StaticLibraryGenerator
     LLVMAArch64AsmParser
     LLVMAArch64CodeGen
     LLVMARMAsmParser
@@ -110,6 +111,18 @@ iree_cc_library(
     LLVMCore
     LLVMSupport
     MLIRSupport
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    StaticLibraryGenerator
+  HDRS
+    "StaticLibraryGenerator.h"
+  SRCS
+    "StaticLibraryGenerator.cpp"
+  DEPS
+    LLVMSupport
   PUBLIC
 )
 
