@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "fold_tensor_extract_op.mlir",
             "forop_canonicalization.mlir",
             "linalg_bufferize.mlir",
+            "pad_linalg_ops.mlir",
             "remove_dead_allocs.mlir",
             "transpose_canonicalization.mlir",
         ],

@@ -34,6 +34,7 @@ iree_cc_library(
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
+    "PadLinalgOps.cpp"
     "SetNumWorkgroupsPass.cpp"
     "Transforms.cpp"
   DEPS

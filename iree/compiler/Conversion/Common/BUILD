@@ -42,6 +42,7 @@ cc_library(
         "OptimizeVectorTransferPass.cpp",
         "SetNumWorkgroupsPass.cpp",
         "Transforms.cpp",
+        "PadLinalgOps.cpp"
     ],
     hdrs = [
         "LaunchConfig.h",
