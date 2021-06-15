@@ -12,7 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/Common/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -101,9 +102,9 @@ struct RemoveDeadMemAllocs : RewritePattern {
 };
 
 /// Runs canonicalization patterns on interface load/store ops.
-struct BufferAllocViewCleanUpPass
-    : public PassWrapper<BufferAllocViewCleanUpPass, FunctionPass> {
-  void runOnFunction() override {
+struct CleanupBufferAllocViewPass
+    : public CleanupBufferAllocViewBase<CleanupBufferAllocViewPass> {
+  void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<
         FoldReshapeIntoInterfaceTensorLoad<linalg::TensorCollapseShapeOp>,
@@ -115,14 +116,9 @@ struct BufferAllocViewCleanUpPass
 
 }  // namespace
 
-std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass() {
-  return std::make_unique<BufferAllocViewCleanUpPass>();
+std::unique_ptr<OperationPass<FuncOp>> createCleanupBufferAllocViewPass() {
+  return std::make_unique<CleanupBufferAllocViewPass>();
 }
-
-static PassRegistration<BufferAllocViewCleanUpPass> pass(
-    "iree-codegen-cleanup-buffer-alloc-view",
-    "Performs cleanups over HAL interface/buffer allocation/view operations",
-    [] { return std::make_unique<BufferAllocViewCleanUpPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

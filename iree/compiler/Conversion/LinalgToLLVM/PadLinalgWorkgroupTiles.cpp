@@ -6,7 +6,8 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
-#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -79,9 +80,9 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     if (!hasLoweringConfig(matmulOp)) return failure();
     auto loc = matmulOp.getLoc();
-    auto lhs = matmulOp.getInput(0);
-    auto rhs = matmulOp.getInput(1);
-    auto result = matmulOp.getOutput(0);
+    auto lhs = matmulOp.getInputOperand(0)->get();
+    auto rhs = matmulOp.getInputOperand(1)->get();
+    auto result = matmulOp.getOutputOperand(0)->get();
 
     if (lhs.getDefiningOp<linalg::PadTensorOp>() ||
         rhs.getDefiningOp<linalg::PadTensorOp>())
@@ -223,12 +224,12 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
   }
 };
 
-struct PadLinalgWorkgroupTilesPass
-    : PassWrapper<PadLinalgWorkgroupTilesPass, FunctionPass> {
+struct LLVMPadLinalgWorkgroupTilesPass
+    : LLVMPadLinalgWorkgroupTilesBase<LLVMPadLinalgWorkgroupTilesPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
-  void runOnFunction() override {
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<MatmulWorkgroupTilesPadding>(context);
@@ -237,14 +238,9 @@ struct PadLinalgWorkgroupTilesPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createPadLinalgWorkgroupTilesPass() {
-  return std::make_unique<PadLinalgWorkgroupTilesPass>();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMPadLinalgWorkgroupTilesPass() {
+  return std::make_unique<LLVMPadLinalgWorkgroupTilesPass>();
 }
-
-static PassRegistration<PadLinalgWorkgroupTilesPass> pass(
-    "iree-codegen-llvm-pad-linalg-workgroup-tiles",
-    "Padding linalg workgroup tiles into an integer multiple of tiling "
-    "parameters.");
 
 }  // namespace iree_compiler
 }  // namespace mlir

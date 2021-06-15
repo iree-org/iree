@@ -31,6 +31,7 @@ cc_library(
     ],
     deps = [
         "//iree/base/internal:flatcc",
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/LinalgToLLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",

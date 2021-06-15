@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
@@ -160,12 +162,12 @@ class Conv2DImg2ColMatmulConversion
   }
 };
 
-struct Conv2DImg2ColMatmulConversionPass
-    : PassWrapper<Conv2DImg2ColMatmulConversionPass, FunctionPass> {
+struct ConvertConv2DToImg2ColPass
+    : ConvertConv2DToImg2ColBase<ConvertConv2DToImg2ColPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
-  void runOnFunction() override {
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<Conv2DImg2ColMatmulConversion>(context);
@@ -176,12 +178,8 @@ struct Conv2DImg2ColMatmulConversionPass
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createConvertConv2DToImg2ColPass() {
-  return std::make_unique<Conv2DImg2ColMatmulConversionPass>();
+  return std::make_unique<ConvertConv2DToImg2ColPass>();
 }
-
-static PassRegistration<Conv2DImg2ColMatmulConversionPass> pass(
-    "iree-codegen-convert-conv-to-img2col",
-    "Convert linalg convolution ops to matmul img2col based implementation");
 
 }  // namespace iree_compiler
 }  // namespace mlir

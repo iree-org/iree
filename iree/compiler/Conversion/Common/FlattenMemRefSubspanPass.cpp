@@ -33,6 +33,8 @@
 
 #include <memory>
 
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -431,7 +433,7 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
 //===----------------------------------------------------------------------===//
 
 struct FlattenMemRefSubspanPass
-    : public PassWrapper<FlattenMemRefSubspanPass, OperationPass<ModuleOp>> {
+    : public FlattenMemRefSubspanBase<FlattenMemRefSubspanPass> {
   FlattenMemRefSubspanPass() {}
   FlattenMemRefSubspanPass(const FlattenMemRefSubspanPass &pass) {}
 
@@ -510,11 +512,6 @@ struct FlattenMemRefSubspanPass
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass() {
   return std::make_unique<FlattenMemRefSubspanPass>();
 }
-
-static PassRegistration<FlattenMemRefSubspanPass> pass(
-    "iree-codegen-flatten-memref-subspan",
-    "Flatten n-D MemRef subspan ops to 1-D ones and fold byte offsets on "
-    "subspan ops to the consumer load/store ops");
 
 }  // namespace iree_compiler
 }  // namespace mlir

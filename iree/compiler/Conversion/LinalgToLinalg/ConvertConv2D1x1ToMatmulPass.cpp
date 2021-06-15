@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -86,13 +88,14 @@ class Convert1x1ConvolutionMatmulOp
   }
 };
 
-struct Convert1x1ConvToMatmulPass
-    : public PassWrapper<Convert1x1ConvToMatmulPass, FunctionPass> {
+struct ConvertConv2D1x1ConvToMatmulPass
+    : public ConvertConv2D1x1ConvToMatmulBase<
+          ConvertConv2D1x1ConvToMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<Convert1x1ConvolutionMatmulOp>(context);
@@ -101,14 +104,9 @@ struct Convert1x1ConvToMatmulPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvert1x1ConvToMatmulPass() {
-  return std::make_unique<Convert1x1ConvToMatmulPass>();
+std::unique_ptr<OperationPass<FuncOp>> createConvertConv2D1x1ToMatmulPass() {
+  return std::make_unique<ConvertConv2D1x1ConvToMatmulPass>();
 }
-
-static PassRegistration<Convert1x1ConvToMatmulPass> pass(
-    "iree-codegen-convert-1x1-conv-to-matmul",
-    "Convert linalg convolution ops with 1x1 kernels into linalg matrix "
-    "multiplication ops.");
 
 }  // namespace iree_compiler
 }  // namespace mlir

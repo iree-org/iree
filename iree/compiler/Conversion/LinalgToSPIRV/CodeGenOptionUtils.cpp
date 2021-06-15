@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
-
+#include "iree/compiler/Conversion/Passes.h"
 #include "llvm/Support/CommandLine.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
+SPIRVCodegenOptions SPIRVCodegenOptions::getFromCLOptions() {
   static llvm::cl::list<unsigned> clWorkgroupTileSizes(
       "iree-spirv-workgroup-tile-size",
       llvm::cl::desc("Set tile sizes to use for each workgroup when tiling "

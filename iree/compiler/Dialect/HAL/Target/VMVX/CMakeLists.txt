@@ -26,6 +26,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect

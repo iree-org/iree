@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"

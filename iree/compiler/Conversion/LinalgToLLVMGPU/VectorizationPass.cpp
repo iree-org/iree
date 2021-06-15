@@ -8,7 +8,8 @@
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -42,7 +43,7 @@ static void populateVectorizationPatterns(OwningRewritePatternList &patterns) {
           Identifier::get(getVectorizeMarker(), patterns.getContext())));
 }
 
-static Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
+static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       // Map elementwise ops to vec4.
@@ -70,12 +71,13 @@ static Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
 static void populateVectorUnrollPatterns(OwningRewritePatternList &patterns) {
   patterns.add<vector::UnrollVectorPattern>(
       patterns.getContext(),
-      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
+      vector::UnrollVectorOptions().setNativeShapeFn(getGPUNativeVectorSize));
 }
 
 namespace {
-struct VectorizationPass
-    : public PassWrapper<VectorizationPass, OperationPass<FuncOp>> {
+struct LinalgToLLVMGPUVectorizationPass
+    : public LinalgToLLVMGPUVectorizationBase<
+          LinalgToLLVMGPUVectorizationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -147,13 +149,10 @@ struct VectorizationPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createVectorizationPass() {
-  return std::make_unique<VectorizationPass>();
+std::unique_ptr<OperationPass<FuncOp>>
+createLinalgToLLVMGPUVectorizationPass() {
+  return std::make_unique<LinalgToLLVMGPUVectorizationPass>();
 }
-
-static PassRegistration<VectorizationPass> pass(
-    "iree-codegen-llvmgpu-vectorization",
-    "Pass to convert linalg into Vector.");
 
 }  // namespace iree_compiler
 }  // namespace mlir

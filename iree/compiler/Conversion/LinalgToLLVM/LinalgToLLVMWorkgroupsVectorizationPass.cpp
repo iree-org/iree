@@ -8,7 +8,8 @@
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
-#include "iree/compiler/Conversion/VectorToLLVM/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
@@ -53,18 +54,20 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 }  // namespace
 
 namespace {
-struct TileAndVectorizeWorkgroups
-    : public PassWrapper<TileAndVectorizeWorkgroups, FunctionPass> {
-  TileAndVectorizeWorkgroups(bool vectorize = true)
+struct LinalgToLLVMWorkgroupsVectorizationPass
+    : public LinalgToLLVMWorkgroupsVectorizationBase<
+          LinalgToLLVMWorkgroupsVectorizationPass> {
+  LinalgToLLVMWorkgroupsVectorizationPass(bool vectorize = true)
       : lowerToVectors(vectorize) {}
-  TileAndVectorizeWorkgroups(const TileAndVectorizeWorkgroups &pass) {
+  LinalgToLLVMWorkgroupsVectorizationPass(
+      const LinalgToLLVMWorkgroupsVectorizationPass &pass) {
     lowerToVectors = pass.lowerToVectors;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, AffineDialect, scf::SCFDialect,
                     vector::VectorDialect>();
   }
-  void runOnFunction() override;
+  void runOnOperation() override;
 
  private:
   /// TODO(ravishankarm): Option to not generate any `vector.` instructions. The
@@ -143,7 +146,7 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 
 }  // namespace
 
-void TileAndVectorizeWorkgroups::runOnFunction() {
+void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
   // Promotes workgroups subviews to a full-tile allocated on the stack.
@@ -297,15 +300,11 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   }
 }
 
-std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass(
-    bool lowerToVectors) {
-  return std::make_unique<TileAndVectorizeWorkgroups>(lowerToVectors);
+std::unique_ptr<OperationPass<FuncOp>>
+createLinalgToLLVMWorkgroupsVectorizationPass(bool lowerToVectors) {
+  return std::make_unique<LinalgToLLVMWorkgroupsVectorizationPass>(
+      lowerToVectors);
 }
-
-static PassRegistration<TileAndVectorizeWorkgroups> pass(
-    "iree-codegen-linalg-to-llvm-workgroups-vectorization-pass",
-    "Tile and vectorize llvm workgroups",
-    [] { return std::make_unique<TileAndVectorizeWorkgroups>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

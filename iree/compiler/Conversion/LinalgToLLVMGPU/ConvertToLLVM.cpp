@@ -7,6 +7,8 @@
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/ConvertToLLVM.h"
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/GPU/Passes.h"
@@ -59,8 +61,9 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
 };
 
 /// Pass to test scalarization pattern.
-class ScalarizationTestPass
-    : public PassWrapper<ScalarizationTestPass, OperationPass<FuncOp>> {
+class TestLinalgToLLVMGPUScalarizeMathOpPass
+    : public TestLinalgToLLVMGPUScalarizeMathOpBase<
+          TestLinalgToLLVMGPUScalarizeMathOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -286,8 +289,10 @@ void populateScalarizeMathOps(RewritePatternSet &patterns) {
       patterns.getContext());
 }
 
-static PassRegistration<ScalarizationTestPass> scalarization_test_pass(
-    "iree-llvmgpu-scalarize-math-op", "Test pass for scalarization patterns.");
+std::unique_ptr<OperationPass<FuncOp>>
+createTestLinalgToLLVMGPUScalarizeMathOpPass() {
+  return std::make_unique<TestLinalgToLLVMGPUScalarizeMathOpPass>();
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -3,7 +3,8 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#include "iree/compiler/Conversion/Common/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -48,7 +49,7 @@ namespace {
 /// about the validity of `tensor_to_memref` usage/canonicalizations, keeping
 /// this pattern here.
 class FoldTensorExtractOpPass
-    : public PassWrapper<FoldTensorExtractOpPass, OperationPass<>> {
+    : public FoldTensorExtractOpBase<FoldTensorExtractOpPass> {
   void runOnOperation() override;
 };
 }  // namespace
@@ -63,11 +64,6 @@ void FoldTensorExtractOpPass::runOnOperation() {
 std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass() {
   return std::make_unique<FoldTensorExtractOpPass>();
 }
-
-static PassRegistration<FoldTensorExtractOpPass> pass(
-    "iree-codegen-fold-tensor-extract-op",
-    "Fold `tensor.extract` operations prior to lowering to LLVM",
-    [] { return std::make_unique<FoldTensorExtractOpPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

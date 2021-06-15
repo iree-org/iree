@@ -4,7 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Conversion/Common/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -215,13 +216,13 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
 };
 
 struct ForOpCanonicalizationPass
-    : PassWrapper<ForOpCanonicalizationPass, FunctionPass> {
+    : public ForOpCanonicalizationBase<ForOpCanonicalizationPass> {
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
   }
 
-  void runOnFunction() override {
-    FuncOp fn = getFunction();
+  void runOnOperation() override {
+    FuncOp fn = getOperation();
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<CanonicalizeForOpInductionVarShape,
                     PackForOpInductionVarVector>(fn.getContext());
@@ -231,15 +232,9 @@ struct ForOpCanonicalizationPass
 
 }  // namespace
 
-std::unique_ptr<FunctionPass> createForOpCanonicalizationPass() {
+std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass() {
   return std::make_unique<ForOpCanonicalizationPass>();
 }
-
-static PassRegistration<ForOpCanonicalizationPass> pass(
-    "iree-codegen-canonicalize-scf-for",
-    "An ad-hoc pass to canonicalize selected loop-carried values and "
-    "dependencies around scf.for",
-    [] { return std::make_unique<ForOpCanonicalizationPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

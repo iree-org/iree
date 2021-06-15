@@ -13,14 +13,12 @@ package(
 cc_library(
     name = "LinalgToLinalg",
     srcs = [
-        "Conv2D1x1ToMatmul.cpp",
-        "Conv2DToImg2Col.cpp",
+        "ConvertConv2D1x1ToMatmulPass.cpp",
+        "ConvertConv2DToImg2ColPass.cpp",
         "PadTensorToSubTensorInsert.cpp",
     ],
-    hdrs = [
-        "Passes.h",
-    ],
     deps = [
+        "//iree/compiler/Conversion:PassHeaders",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",

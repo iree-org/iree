@@ -15,7 +15,7 @@ cc_library(
     srcs = [
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
-        "LinalgTileAndVectorizePass.cpp",
+        "LinalgToLLVMWorkgroupsVectorizationPass.cpp",
         "LinalgVectorizePass.cpp",
         "LowerExecutableTargetPass.cpp",
         "PadLinalgWorkgroupTiles.cpp",
@@ -26,9 +26,9 @@ cc_library(
     ],
     hdrs = [
         "KernelDispatch.h",
-        "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/VectorToLLVM",

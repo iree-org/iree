@@ -26,9 +26,9 @@ cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
-        "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Dialect/HAL/IR",

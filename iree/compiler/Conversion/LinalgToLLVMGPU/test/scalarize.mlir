@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmgpu-scalarize-math-op %s | IreeFileCheck %s
+// RUN: iree-opt -iree-test-llvmgpu-scalarize-math-op %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @scalarize
 func @scalarize(
