@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
@@ -590,8 +591,7 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
   }
 };
 
-class ConvertToLLVMPass
-    : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
+class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
  public:
   ConvertToLLVMPass(bool unfuseFMA = false) { unfuseFMAOps = unfuseFMA; }
   ConvertToLLVMPass(const ConvertToLLVMPass &pass) {
@@ -725,12 +725,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool unfuseFMAOps) {
   return std::make_unique<ConvertToLLVMPass>(unfuseFMAOps);
 }
-
-static PassRegistration<ConvertToLLVMPass> pass(
-    "iree-codegen-convert-to-llvm",
-    "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to "
-    "LLVMIR dialect",
-    [] { return std::make_unique<ConvertToLLVMPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

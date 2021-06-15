@@ -32,21 +32,19 @@ gentbl_cc_library(
 cc_library(
     name = "Common",
     srcs = [
-        "BufferAllocViewCleanUpPass.cpp",
+        "CleanupBufferAllocViewPass.cpp",
         "DemoteF32ToF16.cpp",
         "FlattenMemRefSubspanPass.cpp",
         "FoldTensorExtractOpPass.cpp",
         "ForOpCanonicalizationPass.cpp",
         "LaunchConfig.cpp",
         "LinalgBufferizePass.cpp",
-        "Passes.cpp",
+        "OptimizeVectorTransferPass.cpp",
         "SetNumWorkgroupsPass.cpp",
         "Transforms.cpp",
-        "VectorTransferOptimization.cpp",
     ],
     hdrs = [
         "LaunchConfig.h",
-        "Passes.h",
         "Transforms.h",
     ],
     deps = [

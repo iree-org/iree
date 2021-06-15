@@ -15,12 +15,11 @@
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
-#include "iree/compiler/Conversion/LinalgToVector/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
@@ -77,14 +76,15 @@ static unsigned dimToIndex(StringRef dim) {
 
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
-class TileAndVectorizeInOneWorkgroupPass
-    : public PassWrapper<TileAndVectorizeInOneWorkgroupPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+class LinalgToSPIRVTileAndVectorizeOneWorkgroupPass
+    : public LinalgToSPIRVTileAndVectorizeOneWorkgroupBase<
+          LinalgToSPIRVTileAndVectorizeOneWorkgroupPass> {
  public:
-  TileAndVectorizeInOneWorkgroupPass(const SPIRVCodegenOptions &passOptions)
+  LinalgToSPIRVTileAndVectorizeOneWorkgroupPass(
+      const SPIRVCodegenOptions &passOptions)
       : options(passOptions) {}
-  TileAndVectorizeInOneWorkgroupPass(
-      const TileAndVectorizeInOneWorkgroupPass &pass)
+  LinalgToSPIRVTileAndVectorizeOneWorkgroupPass(
+      const LinalgToSPIRVTileAndVectorizeOneWorkgroupPass &pass)
       : options(pass.options) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -349,7 +349,7 @@ static void populateVectorUnrollPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns) {
   patterns.insert<vector::UnrollVectorPattern>(
       context,
-      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
+      vector::UnrollVectorOptions().setNativeShapeFn(getSPIRVNativeVectorSize));
 }
 
 namespace {
@@ -539,7 +539,7 @@ struct LowerToLoops final : public OpRewritePattern<OpTy> {
 // Main pass implementation
 //====---------------------------------------------------------------------===//
 
-void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
+void LinalgToSPIRVTileAndVectorizeOneWorkgroupPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp module = targetOp.getInnerModule();
@@ -676,7 +676,8 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
         OwningRewritePatternList vectorizationPatterns(&getContext());
         populateVectorizationPatterns(context, launchConfig,
                                       vectorizationPatterns);
-        populateVectorizeLinalgConvPatterns(context, vectorizationPatterns);
+        populateLinalgToVectorVectorizeConvPatterns(context,
+                                                    vectorizationPatterns);
         (void)applyPatternsAndFoldGreedily(funcOp,
                                            std::move(vectorizationPatterns));
         LLVM_DEBUG({
@@ -729,16 +730,11 @@ void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createTileAndVectorizeInOneWorkgroupPass(const SPIRVCodegenOptions &options) {
-  return std::make_unique<TileAndVectorizeInOneWorkgroupPass>(options);
+createLinalgToSPIRVTileAndVectorizeOneWorkgroupPass(
+    const SPIRVCodegenOptions &options) {
+  return std::make_unique<LinalgToSPIRVTileAndVectorizeOneWorkgroupPass>(
+      options);
 }
-
-static PassRegistration<TileAndVectorizeInOneWorkgroupPass> pass(
-    "iree-spirv-tile-and-vectorize-in-one-workgroup",
-    "Tile and vectorize Linalg operations on buffers in one workgroup", [] {
-      SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
-      return std::make_unique<TileAndVectorizeInOneWorkgroupPass>(options);
-    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

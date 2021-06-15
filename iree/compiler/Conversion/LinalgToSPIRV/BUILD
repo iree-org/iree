@@ -11,21 +11,9 @@ package(
 )
 
 cc_library(
-    name = "CodeGenOptionUtils",
-    srcs = [
-        "CodeGenOptionUtils.cpp",
-    ],
-    hdrs = [
-        "CodeGenOptionUtils.h",
-    ],
-    deps = [
-        "@llvm-project//llvm:Support",
-    ],
-)
-
-cc_library(
     name = "LinalgToSPIRV",
     srcs = [
+        "CodeGenOptionUtils.cpp",
         "ConcretizeTileAmongWorkgroupsPass.cpp",
         "ConvertToGPUPass.cpp",
         "ConvertToSPIRVPass.cpp",
@@ -41,11 +29,9 @@ cc_library(
     hdrs = [
         "KernelDispatchUtils.h",
         "MemorySpace.h",
-        "Passes.h",
         "Utils.h",
     ],
     deps = [
-        ":CodeGenOptionUtils",
         "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",

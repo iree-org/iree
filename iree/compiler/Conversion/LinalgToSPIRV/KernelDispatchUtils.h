@@ -18,7 +18,7 @@
 #include <array>
 
 #include "iree/compiler/Conversion/Common/LaunchConfig.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -41,7 +41,7 @@ Optional<LaunchConfig> initGPULaunchConfig(
 
 /// Returns the size of instruction in `vector` dialect that maps directly to
 /// the hardware.
-Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op);
+Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op);
 
 }  // namespace iree_compiler
 }  // namespace mlir

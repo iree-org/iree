@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 
-#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -51,7 +50,7 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(""));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.codegenOptions = getSPIRVCodegenOptionsFromClOptions();
+  targetOptions.codegenOptions = SPIRVCodegenOptions::getFromCLOptions();
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
 

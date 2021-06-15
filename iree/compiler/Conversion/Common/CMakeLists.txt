@@ -24,20 +24,18 @@ iree_cc_library(
     Common
   HDRS
     "LaunchConfig.h"
-    "Passes.h"
     "Transforms.h"
   SRCS
-    "BufferAllocViewCleanUpPass.cpp"
+    "CleanupBufferAllocViewPass.cpp"
     "DemoteF32ToF16.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
-    "Passes.cpp"
+    "OptimizeVectorTransferPass.cpp"
     "SetNumWorkgroupsPass.cpp"
     "Transforms.cpp"
-    "VectorTransferOptimization.cpp"
   DEPS
     LLVMSupport
     MLIRAffine

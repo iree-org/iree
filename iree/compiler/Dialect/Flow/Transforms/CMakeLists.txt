@@ -26,6 +26,7 @@ iree_cc_library(
     "DestructiveUpdateUtils.h"
     "Passes.h"
     "Passes.h.inc"
+    "TypeConverter.h"
   SRCS
     "ConvertToFlowTensorOps.cpp"
     "DeduplicateExecutables.cpp"
@@ -45,6 +46,7 @@ iree_cc_library(
     "PromoteI1ToI8Pass.cpp"
     "PromoteTensorLoads.cpp"
     "StripAndSplatConstantVariables.cpp"
+    "TypeConverter.cpp"
     "VerifyCompilerInputLegality.cpp"
   DEPS
     LLVMSupport
@@ -71,9 +73,6 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLinalg
     iree::compiler::Conversion::PassHeaders
-    iree::compiler::Dialect::Flow::Conversion
-    iree::compiler::Dialect::Flow::Conversion::HLOToFlow
-    iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR

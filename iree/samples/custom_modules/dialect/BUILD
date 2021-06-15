@@ -109,7 +109,6 @@ cc_binary(
     srcs = ["custom-translate-main.cc"],
     deps = [
         ":init_dialect",
-        "//iree/compiler/Conversion:init_conversions",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",

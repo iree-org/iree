@@ -13,8 +13,6 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     LinalgToVector
-  HDRS
-    "Passes.h"
   SRCS
     "VectorizeConv.cpp"
   DEPS
@@ -30,6 +28,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms

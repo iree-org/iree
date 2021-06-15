@@ -13,10 +13,10 @@
 //===----------------------------------------------------------------------===//
 #include <memory>
 
+#include "iree/compiler/Conversion/HLOToLinalg/ConvertHLOToFlow.h"
 #include "iree/compiler/Conversion/PassDetail.h"
 #include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Conversion/Rewriters.h"
-#include "iree/compiler/Dialect/Flow/Conversion/HLOToFlow/ConvertHLOToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"

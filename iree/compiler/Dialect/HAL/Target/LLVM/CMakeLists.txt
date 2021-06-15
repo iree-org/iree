@@ -46,6 +46,7 @@ iree_cc_library(
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToLLVM
+    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Utils
     iree::schemas::dylib_executable_def_c_fbs

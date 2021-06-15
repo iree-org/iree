@@ -30,9 +30,9 @@ cc_library(
     ],
     deps = [
         "//iree/base/internal:flatcc",
+        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToSPIRV",
-        "//iree/compiler/Conversion/LinalgToSPIRV:CodeGenOptionUtils",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Target/SPIRVCommon",

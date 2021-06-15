@@ -6,7 +6,8 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/ConvertToLLVM.h"
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
@@ -28,8 +29,9 @@ namespace {
 ///
 /// This pass only handles device code and is not meant to be run on GPU host
 /// code.
-struct ConvertToNVVMPass
-    : public PassWrapper<ConvertToNVVMPass, OperationPass<ModuleOp>> {
+struct LinalgToLLVMGPUConvertToNVVMPass
+    : public LinalgToLLVMGPUConvertToNVVMBase<
+          LinalgToLLVMGPUConvertToNVVMPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect, NVVM::NVVMDialect>();
   }
@@ -83,14 +85,10 @@ struct ConvertToNVVMPass
 
 }  // anonymous namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass() {
-  return std::make_unique<ConvertToNVVMPass>();
+std::unique_ptr<OperationPass<ModuleOp>>
+createLinalgToLLVMGPUConvertToNVVMPass() {
+  return std::make_unique<LinalgToLLVMGPUConvertToNVVMPass>();
 }
-
-static PassRegistration<ConvertToNVVMPass> pass(
-    "iree-codegen-convert-to-nvvm",
-    "Perform final conversion from builtin/GPU/HAL/standard dialect to LLVM "
-    "and NVVM dialects");
 
 }  // namespace iree_compiler
 }  // namespace mlir

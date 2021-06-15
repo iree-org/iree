@@ -4,7 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/PassDetail.h"
+#include "iree/compiler/Conversion/Passes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -249,10 +250,11 @@ class VectorContractToCoopMatmul final
   const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis;
 };
 
-struct VectorToCooperativeMatrixPass final
-    : public PassWrapper<VectorToCooperativeMatrixPass, FunctionPass> {
-  void runOnFunction() override {
-    FuncOp funcOp = getFunction();
+struct LinalgToSPIRVVectorToCooperativeMatrixPass final
+    : public LinalgToSPIRVVectorToCooperativeMatrixBase<
+          LinalgToSPIRVVectorToCooperativeMatrixPass> {
+  void runOnOperation() override {
+    FuncOp funcOp = getOperation();
     auto targetAttr = spirv::lookupTargetEnv(funcOp);
     SPIRVTypeConverter typeConverter(targetAttr);
 
@@ -298,15 +300,10 @@ struct VectorToCooperativeMatrixPass final
 
 }  // namespace
 
-std::unique_ptr<FunctionPass> createConvertVectorToCooperativeMatrixPass() {
-  return std::make_unique<VectorToCooperativeMatrixPass>();
+std::unique_ptr<OperationPass<FuncOp>>
+createLinalgToSPIRVVectorToCooperativeMatrixPass() {
+  return std::make_unique<LinalgToSPIRVVectorToCooperativeMatrixPass>();
 }
-
-static PassRegistration<VectorToCooperativeMatrixPass> pass(
-    "iree-spirv-vector-to-cooperative-matrix",
-    "Convert vector load/store/arithmetic ops to cooperative matrix ops when "
-    "possible",
-    [] { return std::make_unique<VectorToCooperativeMatrixPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir
