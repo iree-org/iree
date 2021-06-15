@@ -22,7 +22,7 @@ setup(
     author="The IREE Team",
     author_email="iree-discuss@googlegroups.com",
     license="Apache",
-    description="IREE Python Compiler API",
+    description="IREE JAX API",
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/google/iree",
