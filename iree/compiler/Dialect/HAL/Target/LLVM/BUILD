@@ -34,6 +34,7 @@ cc_library(
         ":LLVMIRPasses",
         ":LLVMTargetOptions",
         ":LinkerTool",
+        ":StaticLibraryGenerator",
         "//iree/base/internal:flatcc",
         "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/CodegenUtils",
@@ -113,5 +114,18 @@ cc_library(
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
+    ],
+)
+
+cc_library(
+    name = "StaticLibraryGenerator",
+    srcs = [
+        "StaticLibraryGenerator.cpp",
+    ],
+    hdrs = [
+        "StaticLibraryGenerator.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
     ],
 )

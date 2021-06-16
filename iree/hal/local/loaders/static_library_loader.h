@@ -35,7 +35,7 @@ extern "C" {
 // within and across loaders will result in undefined behavior.
 iree_status_t iree_hal_static_library_loader_create(
     iree_host_size_t library_count,
-    const iree_hal_executable_library_header_t* const* libraries,
+    const iree_hal_executable_library_header_t** const* libraries,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader);
 

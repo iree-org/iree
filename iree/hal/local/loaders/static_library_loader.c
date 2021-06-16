@@ -27,7 +27,7 @@ typedef struct iree_hal_static_executable_t {
   iree_string_view_t identifier;
 
   union {
-    const iree_hal_executable_library_header_t* header;
+    const iree_hal_executable_library_header_t** header;
     const iree_hal_executable_library_v0_t* v0;
   } library;
 } iree_hal_static_executable_t;
@@ -36,7 +36,7 @@ static const iree_hal_local_executable_vtable_t
     iree_hal_static_executable_vtable;
 
 static iree_status_t iree_hal_static_executable_create(
-    const iree_hal_executable_library_header_t* library_header,
+    const iree_hal_executable_library_header_t** library_header,
     iree_host_size_t executable_layout_count,
     iree_hal_executable_layout_t* const* executable_layouts,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
@@ -61,7 +61,7 @@ static iree_status_t iree_hal_static_executable_create(
         executable_layouts, executable_layouts_ptr, host_allocator,
         &executable->base);
     executable->library.header = library_header;
-    executable->identifier = iree_make_cstring_view(library_header->name);
+    executable->identifier = iree_make_cstring_view((*library_header)->name);
     *out_executable = (iree_hal_executable_t*)executable;
   }
 
@@ -138,7 +138,7 @@ typedef struct iree_hal_static_library_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
   iree_host_size_t library_count;
-  iree_hal_executable_library_header_t* const libraries[];
+  const iree_hal_executable_library_header_t** const libraries[];
 } iree_hal_static_library_loader_t;
 
 static const iree_hal_executable_loader_vtable_t
@@ -146,7 +146,7 @@ static const iree_hal_executable_loader_vtable_t
 
 iree_status_t iree_hal_static_library_loader_create(
     iree_host_size_t library_count,
-    const iree_hal_executable_library_header_t* const* libraries,
+    const iree_hal_executable_library_header_t** const* libraries,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
   IREE_ASSERT_ARGUMENT(out_executable_loader);
@@ -158,12 +158,13 @@ iree_status_t iree_hal_static_library_loader_create(
   // version of the IREE compiler that are then linked with an older version of
   // the runtime are difficult to spot otherwise.
   for (iree_host_size_t i = 0; i < library_count; ++i) {
-    if (libraries[i]->version > IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION) {
+    const iree_hal_executable_library_header_t* header = *libraries[i];
+    if (header->version > IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION) {
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "executable does not support this version of the "
                               "runtime (executable: %d, runtime: %d)",
-                              libraries[i]->version,
+                              header->version,
                               IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
     }
   }
@@ -226,9 +227,10 @@ static iree_status_t iree_hal_static_library_loader_try_load(
   // creation to perform a binary-search fairly easily, though, at the cost of
   // the additional code size.
   for (iree_host_size_t i = 0; i < executable_loader->library_count; ++i) {
-    if (iree_string_view_equal(
-            library_name,
-            iree_make_cstring_view(executable_loader->libraries[i]->name))) {
+    const iree_hal_executable_library_header_t* header =
+        *executable_loader->libraries[i];
+    if (iree_string_view_equal(library_name,
+                               iree_make_cstring_view(header->name))) {
       return iree_hal_static_executable_create(
           executable_loader->libraries[i],
           executable_spec->executable_layout_count,
