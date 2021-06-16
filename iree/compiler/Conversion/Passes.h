@@ -95,10 +95,6 @@ createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 /// of the created memref object that holds the constant values.
 std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 
-/// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
-std::unique_ptr<FunctionPass> createPadLinalgOpsToIntegerMultiplePass(
-    int paddingSize = 4);
-
 //------------------------------------------------------------------------------
 // LinalgToLinalg
 //------------------------------------------------------------------------------

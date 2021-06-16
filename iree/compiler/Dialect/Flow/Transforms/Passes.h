@@ -101,6 +101,14 @@ std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass();
 std::unique_ptr<OperationPass<ModuleOp>> createExportBenchmarkFuncsPass();
 
 //===----------------------------------------------------------------------===//
+// Linalg transforms
+//===----------------------------------------------------------------------===//
+
+/// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
+std::unique_ptr<FunctionPass> createPadLinalgOpsToIntegerMultiplePass(
+    int paddingSize = 4);
+
+//===----------------------------------------------------------------------===//
 // Optimizations
 //===----------------------------------------------------------------------===//
 

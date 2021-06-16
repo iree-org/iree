@@ -106,4 +106,9 @@ def VerifyCompilerInputLegality :
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyCompilerInputLegality()";
 }
 
+def PadLinalgOps :
+    Pass<"iree-flow-pad-linalg-ops", "FuncOp"> {
+  let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
+}
 #endif  // IREE_DIALECT_FLOW_PASSES

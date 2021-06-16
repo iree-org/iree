@@ -68,13 +68,6 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
-def PadLinalgOps :
-    Pass<"iree-codegen-pad-linalg-ops", "FuncOp"> {
-  let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
-  let constructor = "mlir::iree_compiler::createPadLinalgOpsToIntegerMultiplePass()";
-
-}
-
 def ResolveShapeOps :
     Pass<"iree-codegen-resolve-shape", "FuncOp"> {
   let summary = "resolve shapes";

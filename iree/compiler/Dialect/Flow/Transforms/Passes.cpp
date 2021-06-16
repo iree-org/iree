@@ -204,8 +204,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Pad linalg op
   if (clEnablePaddingLinalgOps) {
     passManager.addNestedPass<FuncOp>(
-        iree_compiler::createPadLinalgOpsToIntegerMultiplePass(
-            clLinalgOpsPaddingSize));
+        createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
   }
 
   passManager.addPass(
