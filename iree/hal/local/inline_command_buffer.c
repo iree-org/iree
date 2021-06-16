@@ -26,7 +26,7 @@
 typedef struct iree_hal_inline_command_buffer_t {
   iree_hal_resource_t resource;
 
-  iree_hal_device_t* device;
+  iree_allocator_t host_allocator;
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
   iree_hal_queue_affinity_t queue_affinity;
@@ -85,11 +85,10 @@ static void iree_hal_inline_command_buffer_reset(
 }
 
 iree_status_t iree_hal_inline_command_buffer_create(
-    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
-  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
   if (!iree_all_bits_set(
@@ -106,13 +105,12 @@ iree_status_t iree_hal_inline_command_buffer_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_inline_command_buffer_t* command_buffer = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(iree_hal_device_host_allocator(device),
-                            sizeof(*command_buffer), (void**)&command_buffer);
+  iree_status_t status = iree_allocator_malloc(
+      host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_inline_command_buffer_vtable,
                                  &command_buffer->resource);
-    command_buffer->device = device;
+    command_buffer->host_allocator = host_allocator;
     command_buffer->mode = mode;
     command_buffer->allowed_categories = command_categories;
     command_buffer->queue_affinity = queue_affinity;
@@ -129,8 +127,7 @@ static void iree_hal_inline_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_inline_command_buffer_t* command_buffer =
       iree_hal_inline_command_buffer_cast(base_command_buffer);
-  iree_allocator_t host_allocator =
-      iree_hal_device_host_allocator(command_buffer->device);
+  iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_inline_command_buffer_reset(command_buffer);
@@ -383,12 +380,16 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
       iree_hal_local_executable_cast(executable);
   iree_hal_local_executable_layout_t* local_layout =
       local_executable->executable_layouts[entry_point];
+  iree_host_size_t local_memory_size =
+      local_executable->dispatch_attrs
+          ? local_executable->dispatch_attrs[entry_point].local_memory_pages *
+                IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
+          : 0;
 
   iree_hal_executable_dispatch_state_v0_t* dispatch_state =
       &command_buffer->state.dispatch_state;
-
-  // TODO(benvanik): pull imports from layout.
-  dispatch_state->imports = NULL;
+  dispatch_state->import_thunk = local_executable->import_thunk;
+  dispatch_state->imports = local_executable->imports;
 
   // TODO(benvanik): expose on API or keep fixed on executable.
   dispatch_state->workgroup_size.x = 1;
@@ -432,8 +433,27 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
         command_buffer->state.full_binding_lengths[binding_ordinal];
   }
 
-  return iree_hal_local_executable_issue_dispatch_inline(
-      local_executable, entry_point, dispatch_state);
+  // TODO(benvanik): plumb through an arena or fixed-size reservation to use.
+  // For now when deploying to devices where you want something like the
+  // inline command buffer you probably don't want 256KB of transient memory
+  // getting allocated and retained implicitly - this should be a compiler
+  // option. For now we just malloc here to make things work and strongly
+  // encourage the kind of user who wants synchronous inline execution to not
+  // also want tons of scratch memory.
+  iree_byte_span_t local_memory = iree_make_byte_span(NULL, local_memory_size);
+  if (local_memory_size > 0) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(command_buffer->host_allocator,
+                                               local_memory_size,
+                                               (void**)&local_memory.data));
+  }
+
+  iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
+      local_executable, entry_point, dispatch_state, local_memory);
+
+  if (local_memory.data) {
+    iree_allocator_free(command_buffer->host_allocator, local_memory.data);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(

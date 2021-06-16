@@ -122,6 +122,29 @@ LogicalResult FuncOp::verifyType() {
   return success();
 }
 
+void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
+  // TODO(benvanik): remove reflection attrs as a concept and use something more
+  // MLIRish like an attribute interface/dialect interface.
+  // DictionaryAttr is not very friendly for modification :/
+  auto existingAttr =
+      getOperation()->getAttrOfType<DictionaryAttr>("iree.reflection");
+  SmallVector<NamedAttribute> attrs(existingAttr.begin(), existingAttr.end());
+  bool didFind = false;
+  for (size_t i = 0; i < attrs.size(); ++i) {
+    if (attrs[i].first == name) {
+      attrs[i].second = value;
+      didFind = true;
+      break;
+    }
+  }
+  if (!didFind) {
+    attrs.push_back(NamedAttribute(Identifier::get(name, getContext()), value));
+    DictionaryAttr::sortInPlace(attrs);
+  }
+  getOperation()->setAttr("iree.reflection",
+                          DictionaryAttr::getWithSorted(getContext(), attrs));
+}
+
 static ParseResult parseExportOp(OpAsmParser &parser, OperationState *result) {
   FlatSymbolRefAttr functionRefAttr;
   if (failed(parser.parseAttribute(functionRefAttr, "function_ref",

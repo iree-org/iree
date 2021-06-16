@@ -221,10 +221,21 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
     for (auto entryPointOp :
          targetOp.getBlock().getOps<ExecutableEntryPointOp>()) {
+      // Find the matching function in the LLVM module.
       auto *llvmFunc = llvmModule->getFunction(entryPointOp.getName());
       llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
       llvmFunc->setDSOLocal(true);
-      libraryBuilder.addEntryPoint(entryPointOp.getName(), "", llvmFunc);
+
+      // Optionally entry points may specify that they require workgroup local
+      // memory. We fetch that value here and plumb it through so the runtime
+      // knows how much memory to reserve and pass in.
+      int64_t localMemorySize = entryPointOp.workgroup_local_memory()
+                                    .getValueOr(APInt(64, 0))
+                                    .getSExtValue();
+
+      libraryBuilder.addExport(entryPointOp.getName(), "",
+                               LibraryBuilder::DispatchAttrs{localMemorySize},
+                               llvmFunc);
     }
 
     auto queryFunctionName = std::string(kQueryFunctionName);

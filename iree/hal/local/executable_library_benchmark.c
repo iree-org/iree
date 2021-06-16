@@ -136,8 +136,9 @@ static iree_status_t iree_hal_executable_library_create_loader(
     iree_hal_executable_loader_t** out_executable_loader) {
 #if defined(IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER)
   if (strcmp(FLAG_executable_format, "EX_ELF") == 0) {
-    return iree_hal_embedded_library_loader_create(host_allocator,
-                                                   out_executable_loader);
+    return iree_hal_embedded_library_loader_create(
+        iree_hal_executable_import_provider_null(), host_allocator,
+        out_executable_loader);
   }
 #endif  // IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER
   return iree_make_status(
@@ -239,6 +240,22 @@ static iree_status_t iree_hal_executable_library_run(
   iree_hal_executable_t* executable = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_executable_loader_try_load(
       executable_loader, &executable_spec, &executable));
+  iree_hal_local_executable_t* local_executable =
+      iree_hal_local_executable_cast(executable);
+
+  // Allocate workgroup-local memory that each invocation can use.
+  iree_byte_span_t local_memory = iree_make_byte_span(NULL, 0);
+  iree_host_size_t local_memory_size =
+      local_executable->dispatch_attrs
+          ? local_executable->dispatch_attrs[FLAG_entry_point]
+                    .local_memory_pages *
+                IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
+          : 0;
+  if (local_memory_size > 0) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+        host_allocator, local_memory_size, (void**)&local_memory.data));
+    local_memory.data_length = local_memory_size;
+  }
 
   // Allocate storage for buffers and populate them.
   // They only need to remain valid for the duration of the invocation and all
@@ -279,7 +296,8 @@ static iree_status_t iree_hal_executable_library_run(
       .binding_count = dispatch_params.binding_count,
       .binding_ptrs = binding_ptrs,
       .binding_lengths = binding_lengths,
-      .imports = NULL,  // not yet implemented
+      .import_thunk = NULL,  // not yet implemented
+      .imports = NULL,       // not yet implemented
   };
 
   // Execute benchmark the workgroup invocation.
@@ -287,16 +305,12 @@ static iree_status_t iree_hal_executable_library_run(
   // we are testing the memory access patterns: if we just ran the same single
   // tile processing the same exact region of memory over and over we are not
   // testing cache effects.
-  IREE_TRACE_ZONE_BEGIN(z1);
   int64_t dispatch_count = 0;
   while (iree_benchmark_keep_running(benchmark_state, /*batch_count=*/1)) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z1, iree_hal_local_executable_issue_dispatch_inline(
-                iree_hal_local_executable_cast(executable), FLAG_entry_point,
-                &dispatch_state));
+    IREE_RETURN_IF_ERROR(iree_hal_local_executable_issue_dispatch_inline(
+        local_executable, FLAG_entry_point, &dispatch_state, local_memory));
     ++dispatch_count;
   }
-  IREE_TRACE_ZONE_END(z1);
 
   // To get a total time per invocation we set the item count to the total
   // invocations dispatched. That gives us both total dispatch and single

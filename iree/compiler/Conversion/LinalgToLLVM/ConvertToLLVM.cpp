@@ -101,6 +101,8 @@ class HALDispatchABI {
         LLVM::LLVMPointerType::get(LLVM::LLVMPointerType::get(int8Type)));
     fieldTypes.push_back(LLVM::LLVMPointerType::get(indexType));
 
+    // TODO(benvanik): import_thunk/import and a callImport() helper function.
+
     LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
     assert(succeeded(bodySet) &&
            "could not set the body of an identified struct");
@@ -121,6 +123,8 @@ class HALDispatchABI {
             getDispatchStateType(context, typeConverter)),
         // const iree_hal_vec3_t* IREE_RESTRICT workgroup_id
         LLVM::LLVMPointerType::get(getVec3Type(context)),
+        // void* IREE_RESTRICT local_memory
+        LLVM::LLVMPointerType::get(IntegerType::get(context, 8)),
     };
   }
 
@@ -163,6 +167,12 @@ class HALDispatchABI {
         loc, builder.getIntegerType(32), workgroupSizeValue,
         builder.getI64ArrayAttr(dim));
     return castValueToType(loc, dimValue, resultType, builder);
+  }
+
+  // Loads the base pointer of the workgroup local memory.
+  // Note that this may be NULL if no workgroup local memory was requested.
+  Value loadWorkgroupLocalMemoryPtr(Location loc, OpBuilder &builder) {
+    return funcOp.getArgument(2);
   }
 
   // Returns the total push constant count as an index-converted type.

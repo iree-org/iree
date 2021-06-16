@@ -27,7 +27,7 @@ namespace HAL {
 //
 // Usage:
 //  LibraryBuilder builder(&module);
-//  builder.addEntryPoint("hello", "", &helloFunc);
+//  builder.addExport("hello", "", DispatchAttrs{}, &helloFunc);
 //  ...
 //  auto *queryFunc = builder.build("_query_library_foo");
 //  // call queryFunc, export it, etc
@@ -67,6 +67,18 @@ class LibraryBuilder {
     UNDEFINED = 4u,
   };
 
+  // IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
+  static const int64_t kWorkgroupLocalMemoryPageSize = 4096;
+
+  // iree_hal_executable_dispatch_attrs_v0_t
+  struct DispatchAttrs {
+    // Required workgroup local memory size, in bytes.
+    int64_t localMemorySize = 0;
+
+    // True if all values are default and the attributes may be omitted.
+    constexpr bool isDefault() const { return localMemorySize == 0; }
+  };
+
   LibraryBuilder(llvm::Module *module, Mode mode,
                  Version version = Version::V_0)
       : module(module), mode(mode), version(version) {}
@@ -87,8 +99,9 @@ class LibraryBuilder {
   // Defines a new entry point on the library implemented by |func|.
   // |name| will be used as the library export and an optional |tag| will be
   // attached.
-  void addEntryPoint(StringRef name, StringRef tag, llvm::Function *func) {
-    entryPoints.push_back({name.str(), tag.str(), func});
+  void addExport(StringRef name, StringRef tag, DispatchAttrs attrs,
+                 llvm::Function *func) {
+    exports.push_back({name.str(), tag.str(), attrs, func});
   }
 
   // Builds a `iree_hal_executable_library_query_fn_t` with the given
@@ -104,6 +117,8 @@ class LibraryBuilder {
  private:
   // Builds and returns an iree_hal_executable_library_v0_t global constant.
   llvm::Constant *buildLibraryV0(std::string libraryName);
+  llvm::Constant *buildLibraryV0ImportTable(std::string libraryName);
+  llvm::Constant *buildLibraryV0ExportTable(std::string libraryName);
 
   llvm::Module *module = nullptr;
   Mode mode = Mode::INCLUDE_REFLECTION_ATTRS;
@@ -111,12 +126,13 @@ class LibraryBuilder {
   Features features = Features::NONE;
   SanitizerKind sanitizerKind = SanitizerKind::NONE;
 
-  struct EntryPoint {
+  struct Dispatch {
     std::string name;
     std::string tag;
+    DispatchAttrs attrs;
     llvm::Function *func;
   };
-  std::vector<EntryPoint> entryPoints;
+  std::vector<Dispatch> exports;
 };
 
 }  // namespace HAL

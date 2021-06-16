@@ -61,12 +61,14 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
   iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
   iree_host_size_t loader_count = 0;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_embedded_library_loader_create(allocator,
-                                                     &loaders[loader_count++]);
+    status = iree_hal_embedded_library_loader_create(
+        iree_hal_executable_import_provider_null(), allocator,
+        &loaders[loader_count++]);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_legacy_library_loader_create(allocator,
-                                                   &loaders[loader_count++]);
+    status = iree_hal_legacy_library_loader_create(
+        iree_hal_executable_import_provider_null(), allocator,
+        &loaders[loader_count++]);
   }
 
   iree_task_executor_t* executor = NULL;
