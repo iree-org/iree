@@ -71,7 +71,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
     auto createPadding = [&](ArrayRef<int64_t> padding) {
       SmallVector<OpFoldResult> result;
       for (auto pad : padding) {
-        result.push_back(rewriter.createOrFold<ConstantIndexOp>(loc, pad));
+        result.push_back(rewriter.getI64IntegerAttr(pad));
       }
       return result;
     };
