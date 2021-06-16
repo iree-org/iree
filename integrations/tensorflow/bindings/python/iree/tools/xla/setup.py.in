@@ -78,5 +78,10 @@ setup(
         'bdist_wheel': bdist_wheel,
         'install': platlib_install,
     },
+    entry_points={
+        "console_scripts": [
+            "iree-import-xla = iree.tools.xla.scripts.iree_import_xla.__main__:main",
+        ],
+    },
     zip_safe=False,  # This package is fine but not zipping is more versatile.
 )

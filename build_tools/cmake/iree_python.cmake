@@ -34,16 +34,32 @@ include(iree_installed_test)
 #
 # Also adds a *-stripped target which strips any binaries that are
 # present.
+#
+# Arguments:
+#   AUGMENT_EXISTING_PACKAGE: Whether to add install artifacts to an existing
+#     package.
+#   COMPONENT: Install component
+#   PACKAGE_NAME: Name of the Python package in the install directory tree.
+#   MODULE_PATH: Relative path within the package to the module being installed.
+#   FILES_MATCHING: Explicit arguments to the install FILES_MATCHING directive.
+#     (Defaults to "PATTERN *.py")
+#   DEPS: Dependencies.
 function(iree_py_install_package)
   cmake_parse_arguments(ARG
     "AUGMENT_EXISTING_PACKAGE"
     "COMPONENT;PACKAGE_NAME;MODULE_PATH"
-    "DEPS;ADDL_PACKAGE_FILES"
+    "DEPS;ADDL_PACKAGE_FILES;FILES_MATCHING"
     ${ARGN})
   set(_install_component ${ARG_COMPONENT})
   set(_install_packages_dir "${CMAKE_INSTALL_PREFIX}/python_packages/${ARG_PACKAGE_NAME}")
   set(_install_module_dir "${_install_packages_dir}/${ARG_MODULE_PATH}")
   set(_target_name install-${_install_component})
+
+  if(NOT FILES_MATCHING)
+    set(_files_matching PATTERN "*.py")
+  else()
+    set(_files_matching ${ARG_FILES_MATCHING})
+  endif()
 
   if(NOT ARG_AUGMENT_EXISTING_PACKAGE)
     configure_file(setup.py.in setup.py)
@@ -87,8 +103,7 @@ function(iree_py_install_package)
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
     COMPONENT ${_install_component}
     DESTINATION "${_install_module_dir}"
-    FILES_MATCHING
-      PATTERN "*.py"
+    FILES_MATCHING ${_files_matching}
   )
 
   set(PY_INSTALL_COMPONENT ${_install_component} PARENT_SCOPE)
