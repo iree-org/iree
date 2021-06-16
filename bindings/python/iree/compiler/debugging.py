@@ -32,7 +32,7 @@ def _interpolate_path_pattern(path_pattern: str, *, invocation_id: str):
   # path_pattern. Instead, handle a fixed set of replacements.
   path_pattern = path_pattern.replace("{id}", str(invocation_id))
   path_pattern = path_pattern.replace("{pid}", str(os.getpid()))
-  path_pattern = path_pattern.replace("{main}", sys.argv[0])
+  path_pattern = path_pattern.replace("{main}", os.path.basename(sys.argv[0]))
   return path_pattern
 
 
