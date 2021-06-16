@@ -1672,7 +1672,7 @@ func @multi_result() {
           %23 = mulf %arg2, %arg3 : f32
           %24 = addf %arg2, %arg3 : f32
           linalg.yield %23, %24 : f32, f32
-        } -> tensor<?x?xf32>, tensor<?x?xf32>
+        } -> (tensor<?x?xf32>, tensor<?x?xf32>)
       flow.dispatch.tensor.store %22#0, %2, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
       flow.dispatch.tensor.store %22#1, %3, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
     }
@@ -1958,7 +1958,7 @@ func @multi_result_reduce() {
       %24 = select %19, %arg2, %arg4 : i32
       %25 = select %21, %23, %24 : i32
       linalg.yield %20, %25 : i32, i32
-    } -> tensor<?xi32>, tensor<?xi32>
+    } -> (tensor<?xi32>, tensor<?xi32>)
     flow.dispatch.tensor.store %18#0, %2, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>
     flow.dispatch.tensor.store %18#1, %3, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>
   }

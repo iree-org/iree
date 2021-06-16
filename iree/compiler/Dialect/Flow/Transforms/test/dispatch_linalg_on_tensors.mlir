@@ -781,7 +781,7 @@ func @multi_result(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?xi32>) -> (tensor<?x
     %10 = select %5, %arg3, %arg5 : i32
     %11 = select %7, %9, %10 : i32
     linalg.yield %6, %11 : i32, i32
-  } -> tensor<?xi32>, tensor<?xi32>
+  } -> (tensor<?xi32>, tensor<?xi32>)
   return %4#0, %4#1 : tensor<?xi32>, tensor<?xi32>
 }
 // CHECK-LABEL: func @multi_result
@@ -812,7 +812,7 @@ func @multi_result_fallback(%arg0: tensor<?x10xi32>, %arg1: tensor<?x10xi32>)
       outs(%1, %1 : tensor<?x10xi32>, tensor<?x10xi32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):
         linalg.yield %arg2, %arg3 : i32, i32
-      } -> tensor<?x10xi32>, tensor<?x10xi32>
+      } -> (tensor<?x10xi32>, tensor<?x10xi32>)
   return %2#0, %2#1 : tensor<?x10xi32>, tensor<?x10xi32>
 }
 // CHECK-LABEL: func @multi_result_fallback
