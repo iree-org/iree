@@ -109,11 +109,22 @@ def _incrementally_compile_tf_module(
       backend_info.backend_id,
       needs_temp_saved_model_dir=True,
   ) if artifacts_dir else {})
-  immediate_result = iree.compiler.tf.compile_module(
-      module,
-      target_backends=backend_info.compiler_targets,
-      exported_names=exported_names,
-      **output_kwargs)
+
+  # TODO: Revisit how artifacts_dir is plummed through and figure out how to
+  # get a meaningful invocation name directly. This isn't really load
+  # bearing - just adds a bit of usability so long as we have multiple
+  # methods of saving temp files.
+  if artifacts_dir:
+    invocation_id = (
+        f"{os.path.basename(artifacts_dir)}__{backend_info.backend_id}")
+  else:
+    invocation_id = None
+  with iree.compiler.TempFileSaver(invocation_id=invocation_id):
+    immediate_result = iree.compiler.tf.compile_module(
+        module,
+        target_backends=backend_info.compiler_targets,
+        exported_names=exported_names,
+        **output_kwargs)
 
   output_file = output_kwargs.get("output_file")
   if output_file:
