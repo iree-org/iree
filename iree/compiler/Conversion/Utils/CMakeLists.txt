@@ -15,31 +15,18 @@ iree_cc_library(
     Utils
   HDRS
     "MarkerUtils.h"
-    "TransformUtils.h"
     "Utils.h"
   SRCS
     "MarkerUtils.cpp"
-    "TransformUtils.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport
-    MLIRAffine
-    MLIRAnalysis
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
-    MLIRPass
-    MLIRSCF
-    MLIRStandard
     MLIRSupport
-    MLIRTransforms
-    MLIRVector
-    MLIRVectorToSCF
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )
 

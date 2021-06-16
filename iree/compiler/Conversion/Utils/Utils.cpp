@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Conversion/Utils/Utils.h"
 
+#include "iree/compiler/Conversion/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -82,6 +83,44 @@ ArrayRef<int64_t> getUntiledShape(Value tiledView) {
       .Case<ShapedType, IREE::Flow::DispatchTensorType>(
           [&](auto shapedType) { return shapedType.getShape(); })
       .Default([&](Type type) { return ArrayRef<int64_t>{}; });
+}
+
+LogicalResult getLinalgOps(FuncOp funcOp,
+                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
+                           SmallVectorImpl<Operation *> &tiledLoops) {
+  Region &region = funcOp.body();
+  if (!llvm::hasSingleElement(region)) {
+    return funcOp.emitError("unable dispatch function with multiple blocks");
+  }
+  Block *body = &region.front();
+  auto forOps = body->getOps<scf::ForOp>();
+  while (!forOps.empty()) {
+    if (!llvm::hasSingleElement(forOps)) return failure();
+    scf::ForOp forOp = *(forOps.begin());
+    tiledLoops.push_back(forOp.getOperation());
+    body = forOp.getBody();
+    forOps = body->getOps<scf::ForOp>();
+  }
+  linalgOps = llvm::to_vector<4>(body->getOps<linalg::LinalgOp>());
+
+  // Propagate markers to all ops. If one of the ops has a marker all ops in
+  // this loop need to have marker since body of the loop maps to a workgroup.
+  // TODO(ravishankarm): Temporary WAR till a better story w.r.t markers is
+  // figured out.
+  Optional<StringRef> marker = llvm::None;
+  for (auto op : linalgOps) {
+    if (hasMarker(op)) {
+      assert(!marker || marker.getValue() == getMarkerOrNull(op) &&
+                            "expected all markers within op to be the same");
+      marker = getMarkerOrNull(op);
+    }
+  }
+  if (marker.hasValue()) {
+    for (auto op : linalgOps) {
+      setMarker(op, marker.getValue());
+    }
+  }
+  return success();
 }
 
 }  // namespace iree_compiler

@@ -13,6 +13,9 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "AffineMinCanonicalization.cpp",
+        "AffineMinDistributedSCFCanonicalization.cpp",
+        "RemoveSingleIterationLoop.cpp",
         "Transforms.cpp",
     ],
     hdrs = [
@@ -22,13 +25,16 @@ cc_library(
         "//iree/compiler/Conversion/Utils",
         "//iree/compiler/Dialect/HAL/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
     ],
 )
