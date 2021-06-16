@@ -10,6 +10,7 @@ iree_py_library(
   SRCS
     "__init__.py"
     "core.py"
+    "debugging.py"
     "tf.py"
     "tflite.py"
     "tools.py"

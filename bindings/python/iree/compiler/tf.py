@@ -14,8 +14,9 @@ import logging
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
 
-from .tools import find_tool, invoke_immediate, invoke_pipeline
 from .core import CompilerOptions, DEFAULT_TESTING_BACKENDS, build_compile_command_line
+from .debugging import TempFileSaver
+from .tools import find_tool, invoke_immediate, invoke_pipeline
 
 __all__ = [
     "compile_saved_model",
@@ -113,12 +114,13 @@ class ImportOptions(CompilerOptions):
     self.save_temp_iree_input = save_temp_iree_input
 
 
-def build_import_command_line(input_path: str,
+def build_import_command_line(input_path: str, tfs: TempFileSaver,
                               options: ImportOptions) -> List[str]:
   """Builds a command line for invoking the import stage.
 
   Args:
     input_path: The input path.
+    tfs: TempFileSaver.
     options: Import options.
   Returns:
     List of strings of command line.
@@ -134,7 +136,9 @@ def build_import_command_line(input_path: str,
 
   if options.import_only and options.output_file:
     # Import stage directly outputs.
-    cl.append(f"-o={options.output_file}")
+    output_file = tfs.alloc_optional("tf-output.mlir",
+                                     export_as=options.output_file)
+    cl.append(f"-o={output_file}")
 
   # MLIR flags.
   if options.output_mlir_debuginfo:
@@ -143,16 +147,24 @@ def build_import_command_line(input_path: str,
     cl.append("--mlir-print-op-generic")
 
   # Save temps flags.
-  if options.save_temp_tf_input:
-    cl.append(f"--save-temp-tf-input={options.save_temp_tf_input}")
-  if options.save_temp_iree_input:
-    cl.append(f"--save-temp-iree-input={options.save_temp_iree_input}")
+  save_tf_input = tfs.alloc_optional("tf-input.mlir",
+                                     export_as=options.save_temp_tf_input)
+  if save_tf_input:
+    cl.append(f"--save-temp-tf-input={save_tf_input}")
+  save_iree_input = tfs.alloc_optional("tf-iree-input.mlir",
+                                       export_as=options.save_temp_iree_input)
+  if save_iree_input:
+    cl.append(f"--save-temp-iree-input={save_iree_input}")
 
   # Crash reproducer (locally qualified).
-  if options.crash_reproducer_path:
-    cl.append(
-        f"--pass-pipeline-crash-reproducer={options.crash_reproducer_path}"
-        f".import-tf")
+  requested_crash_reproducer_path = options.crash_reproducer_path
+  if requested_crash_reproducer_path:
+    requested_crash_reproducer_path = (requested_crash_reproducer_path +
+                                       ".import-tf")
+  crash_reproducer_path = tfs.alloc_optional(
+      "tf-reproducer.mlir", export_as=requested_crash_reproducer_path)
+  if crash_reproducer_path:
+    cl.append(f"--pass-pipeline-crash-reproducer={crash_reproducer_path}")
 
   # Extra args.
   cl.extend(options.import_extra_args)
@@ -169,21 +181,22 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
-  options = ImportOptions(**kwargs)
-  import_cl = build_import_command_line(saved_model_dir, options)
-  if options.import_only:
-    # One stage tool pipeline.
-    result = invoke_immediate(import_cl)
+  with TempFileSaver.implicit() as tfs:
+    options = ImportOptions(**kwargs)
+    import_cl = build_import_command_line(saved_model_dir, tfs, options)
+    if options.import_only:
+      # One stage tool pipeline.
+      result = invoke_immediate(import_cl)
+      if options.output_file:
+        return None
+      return result
+
+    # Full compilation pipeline.
+    compile_cl = build_compile_command_line("-", tfs, options)
+    result = invoke_pipeline([import_cl, compile_cl])
     if options.output_file:
       return None
     return result
-
-  # Full compilation pipeline.
-  compile_cl = build_compile_command_line("-", options)
-  result = invoke_pipeline([import_cl, compile_cl])
-  if options.output_file:
-    return None
-  return result
 
 
 def compile_module(module, saved_model_dir: Optional[str] = None, **kwargs):
@@ -197,15 +210,16 @@ def compile_module(module, saved_model_dir: Optional[str] = None, **kwargs):
   Returns:
     Same as compile_saved_model().
   """
+  with TempFileSaver.implicit() as tfs:
 
-  def do_it(saved_model_dir):
-    import tensorflow as tf
-    options = tf.saved_model.SaveOptions(save_debug_info=True)
-    tf.saved_model.save(module, saved_model_dir, options=options)
-    return compile_saved_model(saved_model_dir, **kwargs)
+    def do_it(saved_model_dir):
+      import tensorflow as tf
+      options = tf.saved_model.SaveOptions(save_debug_info=True)
+      tf.saved_model.save(module, saved_model_dir, options=options)
+      return compile_saved_model(saved_model_dir, **kwargs)
 
-  if saved_model_dir:
-    return do_it(saved_model_dir)
-  else:
-    with tempfile.TemporaryDirectory(suffix=".sm") as td:
-      return do_it(td)
+    if saved_model_dir:
+      return do_it(saved_model_dir)
+    else:
+      with tempfile.TemporaryDirectory(suffix=".sm") as td:
+        return do_it(td)
