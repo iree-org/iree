@@ -41,7 +41,16 @@ class EmbeddedLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getToolPath() const override {
-    // First check for setting the linker explicitly.
+    // Always try to use the tool specified for this exact configuration first.
+    // Hopefully some day soon we'll be able to statically link LLD in and call
+    // a C function to do the linking instead of needing a separate tool.
+    if (!targetOptions.embeddedLinkerPath.empty()) {
+      return targetOptions.embeddedLinkerPath;
+    }
+
+    // Fall back to check for setting the linker explicitly via environment
+    // variables or flags. Users may do this to use their own lld with custom
+    // architectures built in.
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
 
@@ -50,7 +59,8 @@ class EmbeddedLinkerTool : public LinkerTool {
     if (!toolPath.empty()) return toolPath;
 
     llvm::errs() << "LLD (ld.lld) not found on path; specify with the "
-                    "IREE_LLVMAOT_LINKER_PATH environment variable\n";
+                    "IREE_LLVMAOT_LINKER_PATH environment variable or "
+                    "-iree-llvm-linker-path=\n";
     return "";
   }
 
