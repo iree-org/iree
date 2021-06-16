@@ -21,10 +21,12 @@
 #include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"
 #include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "llvm/Support/InitLLVM.h"
+#include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
+#include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
@@ -49,6 +51,19 @@ int main(int argc, char **argv) {
   mlir::registerCanonicalizerPass();
   mlir::registerCSEPass();
   mlir::registerInlinerPass();
+  mlir::registerRemoveShapeConstraintsPass();
+  mlir::registerSymbolDCEPass();
+
+  // Select TF passes.
+  mlir::registerExecutorGraphPruningPassPass();
+  mlir::registerTensorFlowShapeInferencePassPass();
+  mlir::registerTensorFlowOptimizePassPass();
+  mlir::TFDevice::registerDecomposeResourceOpsPassPass();
+
+  // Old style static registration based TF passes.
+  mlir::TF::CreateDeviceIndexSelectorPass();
+  mlir::TF::CreateGuaranteeAllFuncsOneUsePass();
+  mlir::TF::CreateTFFunctionalControlFlowToCFG();
 
   if (failed(MlirOptMain(argc, argv, "IREE-TF modular optimizer driver\n",
                          registry,
