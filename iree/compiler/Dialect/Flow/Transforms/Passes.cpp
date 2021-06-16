@@ -23,7 +23,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-// TODO(benvanik): change to a pipeline option.
+// TODO(ravishankarm): Change to a pipeline option.
 static llvm::cl::opt<bool> clExportBenchmarkFuncs(
     "iree-flow-export-benchmark-funcs",
     llvm::cl::desc(
@@ -31,7 +31,7 @@ static llvm::cl::opt<bool> clExportBenchmarkFuncs(
         "unique flow.executable that dispatches with dummy arguments."),
     llvm::cl::init(false));
 
-// TODO(benvanik): change to a pipeline option.
+// TODO(ravishankarm): Change to a pipeline option.
 static llvm::cl::opt<bool> clTraceDispatchTensors(
     "iree-flow-trace-dispatch-tensors2",
     llvm::cl::desc(
