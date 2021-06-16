@@ -88,7 +88,6 @@ class TempFileSaver:
     self.retained = True
     self._retained_file_names = set()
     self._copy_on_finalize = list()  # Of (source_path, target_path)
-    self._created_dir = False
 
   def __enter__(self):
     _get_temp_file_saver_stack().append(self)
@@ -104,7 +103,7 @@ class TempFileSaver:
   @staticmethod
   def current():
     try:
-      return _get_temp_file_saver_stack()[0]
+      return _get_temp_file_saver_stack()[-1]
     except KeyError:
       raise RuntimeError("No current TempFileSaver")
 
@@ -125,6 +124,13 @@ class TempFileSaver:
 
     Returns None if neither a user-specified 'export_as' is specified nor in
     retained mode.
+
+    The distinction between retained temporaries and exports is to help in
+    cases for when the caller has requested that an artifact be written to
+    a specific place (i.e. an output file) but for debuggability, we also
+    want to save it as a temporary. In this case, we save it to the temporary
+    location and then conclude by moving artifacts to their final location
+    once the saver goes out of scope.
     """
     if not self.retained:
       return export_as
@@ -141,9 +147,7 @@ class TempFileSaver:
       if file_name not in self._retained_file_names:
         # First use of this name.
         self._retained_file_names.add(file_name)
-        if not self._created_dir:
-          os.makedirs(self.retained_path, exist_ok=True)
-          self._created_dir = True
+        os.makedirs(self.retained_path, exist_ok=True)
         return os.path.join(self.retained_path, file_name)
       index += 1
       stem, ext = os.path.splitext(original_file_name)
