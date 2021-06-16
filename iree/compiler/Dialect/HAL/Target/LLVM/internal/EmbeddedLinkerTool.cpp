@@ -46,7 +46,7 @@ class EmbeddedLinkerTool : public LinkerTool {
     if (!toolPath.empty()) return toolPath;
 
     // No explicit linker specified, search the environment for common tools.
-    toolPath = findToolInEnvironment({"ld.lld"});
+    toolPath = findToolInEnvironment({"ld.lld", "lld", "lld-11", "lld-10"});
     if (!toolPath.empty()) return toolPath;
 
     llvm::errs() << "LLD (ld.lld) not found on path; specify with the "
