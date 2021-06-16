@@ -117,6 +117,8 @@ def _incrementally_compile_tf_module(
   if artifacts_dir:
     invocation_id = (
         f"{os.path.basename(artifacts_dir)}__{backend_info.backend_id}")
+  else:
+    invocation_id = None
   with iree.compiler.TempFileSaver(invocation_id=invocation_id):
     immediate_result = iree.compiler.tf.compile_module(
         module,
