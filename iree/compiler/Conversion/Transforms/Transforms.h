@@ -12,7 +12,6 @@
 #ifndef IREE_COMPILER_CONVERSION_COMMON_TRANSFORMS_H_
 #define IREE_COMPILER_CONVERSION_COMMON_TRANSFORMS_H_
 
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"

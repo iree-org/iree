@@ -13,16 +13,16 @@ package(
 )
 
 cc_library(
-    name = "CodegenUtils",
+    name = "Utils",
     srcs = [
-        "FunctionUtils.cpp",
         "MarkerUtils.cpp",
         "TransformUtils.cpp",
+        "Utils.cpp",
     ],
     hdrs = [
-        "FunctionUtils.h",
         "MarkerUtils.h",
         "TransformUtils.h",
+        "Utils.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/IR",

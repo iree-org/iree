@@ -1,4 +1,4 @@
-# Copyright 2020 The IREE Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -11,27 +11,24 @@ package(
 )
 
 cc_library(
-    name = "LinalgToVector",
+    name = "Transforms",
     srcs = [
-        "VectorizeConv.cpp",
+        "Transforms.cpp",
+    ],
+    hdrs = [
+        "Transforms.h",
     ],
     deps = [
-        "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/Utils",
-        "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Shape/Transforms",
+        "//iree/compiler/Dialect/HAL/IR",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
-        "@llvm-project//mlir:LinalgTransforms",
-        "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:VectorOps",
     ],
 )

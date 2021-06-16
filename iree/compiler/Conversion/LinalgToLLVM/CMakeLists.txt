@@ -52,9 +52,10 @@ iree_cc_library(
     MLIRVector
     MLIRVectorToLLVM
     MLIRVectorToSCF
-    iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::PassHeaders
+    iree::compiler::Conversion::Transforms
+    iree::compiler::Conversion::Utils
     iree::compiler::Conversion::VectorToLLVM
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
-#define IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
+#ifndef IREE_COMPILER_CONVERSION_UTILS_UTILS_H_
+#define IREE_COMPILER_CONVERSION_UTILS_UTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
@@ -41,4 +41,4 @@ ArrayRef<int64_t> getUntiledShape(Value tiledView);
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
+#endif  // IREE_COMPILER_CONVERSION_UTILS_UTILS_H_
