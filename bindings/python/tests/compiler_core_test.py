@@ -28,7 +28,6 @@ class CompilerTest(unittest.TestCase):
     if "IREE_SAVE_TEMPS" in os.environ:
       del os.environ["IREE_SAVE_TEMPS"]
 
-
   def testNoTargetBackends(self):
     with self.assertRaisesRegex(
         ValueError, "Expected a non-empty list for 'target_backends'"):
@@ -197,7 +196,6 @@ class CompilerTest(unittest.TestCase):
       temp_contents = f.read()
     self.assertEqual(temp_contents, output_contents)
     temp_dir.cleanup()
-
 
   def testEnvTempFileSaver(self):
     temp_dir = tempfile.TemporaryDirectory()
