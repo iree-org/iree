@@ -16,17 +16,14 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
-// Compiled module embedded here to avoid file IO:
-#if IREE_ARCH_RISCV_64
-#include "iree/samples/simple_embedding/simple_embedding_test_llvm_aot_rv64.h"
-#else
-#include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_c.h"
-#endif
-
 // A function to create the HAL device from the different backend targets.
 // The HAL device is returned based on the implementation, and it must be
 // released by the caller.
 extern iree_status_t create_sample_device(iree_hal_device_t** device);
+
+// A function to load the vm bytecode module from the different backend targets.
+// The bytecode module is generated for the specific backend and platform.
+extern const iree_const_byte_span_t load_bytecode_module_data();
 
 iree_status_t Run() {
   // TODO(benvanik): move to instance-based registration.
@@ -43,20 +40,9 @@ iree_status_t Run() {
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));
 
   // Load bytecode module from the embedded data.
-#if IREE_ARCH_RISCV_64
-  const struct iree_file_toc_t* module_file_toc =
-      iree_samples_simple_embedding_rv64_test_module_create();
-#else
-  // Note the setup here only supports native build. The bytecode is not built
-  // for the cross-compile execution. The code can be compiled but it will
-  // hit runtime error in a cross-compile environment.
-  const struct iree_file_toc_t* module_file_toc =
-      iree_samples_simple_embedding_test_module_create();
-#endif
+  const iree_const_byte_span_t module_data = load_bytecode_module_data();
 
   iree_vm_module_t* bytecode_module = NULL;
-  iree_const_byte_span_t module_data =
-      iree_make_const_byte_span(module_file_toc->data, module_file_toc->size);
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
       module_data, iree_allocator_null(), iree_allocator_system(),
       &bytecode_module));
@@ -173,14 +159,11 @@ iree_status_t Run() {
 
 int main() {
   const iree_status_t result = Run();
+  int ret = (int)iree_status_code(result);
   if (!iree_status_is_ok(result)) {
-    char* message;
-    size_t message_length;
-    iree_status_to_string(result, &message, &message_length);
-    fprintf(stderr, "simple_embedding_run failed: %s\n", message);
-    iree_allocator_free(iree_allocator_system(), message);
-    return -1;
+    iree_status_fprint(stderr, result);
+    iree_status_free(result);
   }
-  printf("simple_embedding_run passed\n");
-  return 0;
+  fprintf(stdout, "simple_embedding passed\n");
+  return ret;
 }
