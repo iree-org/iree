@@ -15,13 +15,13 @@
 #include "iree/hal/local/loaders/static_library_loader.h"
 #include "iree/hal/local/task_device.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/samples/static_library/static_library_module.h"
+#include "iree/samples/static_library/simple_mul_c.h"
 #include "iree/task/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
 // Compiled static library module here to avoid IO:
-#include "iree/samples/static_library/static_module.h"
+#include "iree/samples/static_library/simple_mul.h"
 
 // A function to create the HAL device from the different backend targets.
 // The HAL device is returned based on the implementation, and it must be
@@ -76,7 +76,7 @@ iree_status_t Run() {
 
   // Load bytecode module from the embedded data.
   const struct iree_file_toc_t* module_file_toc =
-      iree_samples_static_library_module_create();
+      iree_samples_static_library_simple_mul_create();
 
   iree_vm_module_t* bytecode_module = NULL;
   iree_const_byte_span_t module_data =
