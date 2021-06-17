@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Conversion/PassDetail.h"
 #include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Conversion/Transforms/Transforms.h"
 #include "iree/compiler/Conversion/Utils/MarkerUtils.h"
-#include "iree/compiler/Conversion/Utils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
