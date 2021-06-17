@@ -22,6 +22,16 @@ namespace iree_compiler {
 
 namespace {
 
+// TODO(simon-camp): This is duplicated in the CModuleTarget.
+static std::string buildFunctionName(IREE::VM::ModuleOp &moduleOp,
+                                     IREE::VM::FuncOp &funcOp,
+                                     bool implSuffix) {
+  std::string functionName =
+      std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
+
+  return implSuffix ? functionName + "_impl" : functionName;
+}
+
 template <typename SrcOpTy>
 Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
                                             SrcOpTy srcOp, Type elementType) {
@@ -79,7 +89,8 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
 
 /// Generate two calls which resemble the IREE_RETURN_IF_ERROR macro. We need
 /// to split it here becasue we cannot produce a macro invocation with a
-/// function call as argument in emitc.
+/// function call as argument in emitc. Locally allocated refs will be released
+/// before the return.
 emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
                            StringAttr callee, ArrayAttr args,
                            ArrayAttr templateArgs, ArrayRef<Value> operands) {
@@ -103,6 +114,33 @@ emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{callOp.getResult(0)});
   return callOp;
+}
+
+// TODO(simon-camp/marbre): Use this function throughout the conversions.
+Optional<std::string> getCType(Type type) {
+  if (auto iType = type.dyn_cast<IntegerType>()) {
+    switch (iType.getWidth()) {
+      case 32:
+      case 64:
+        return std::string("int") + std::to_string(iType.getWidth()) +
+               std::string("_t");
+    }
+  }
+
+  if (auto fType = type.dyn_cast<FloatType>()) {
+    switch (fType.getWidth()) {
+      case 32:
+        return std::string("float");
+      case 64:
+        return std::string("double");
+    }
+  }
+
+  if (auto oType = type.dyn_cast<emitc::OpaqueType>()) {
+    return std::string(oType.getValue());
+  }
+
+  return None;
 }
 
 SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
@@ -171,6 +209,102 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
+class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
+  using OpConversionPattern<IREE::VM::CallOp>::OpConversionPattern;
+
+ private:
+  LogicalResult matchAndRewrite(
+      IREE::VM::CallOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto ctx = op.getContext();
+    auto loc = op.getLoc();
+
+    auto funcOp =
+        lookupSymbolRef<IREE::VM::CallOp, IREE::VM::FuncOp>(op, "callee");
+
+    if (!funcOp) {
+      return op.emitError() << "only calls to internal functions are supported";
+    }
+
+    if (op.getNumResults() > 1) {
+      return op.emitError()
+             << "only internal calls with exactly one result supported for now";
+    }
+
+    auto moduleOp =
+        funcOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
+
+    std::string internalFuncName =
+        buildFunctionName(moduleOp, funcOp, /*implSuffix=*/true);
+
+    SmallVector<Value, 4> updatedOperands(operands.begin(), operands.end());
+
+    if (op.getNumResults() == 0) {
+      SmallVector<Attribute, 4> args_ =
+          indexSequence(updatedOperands.size(), ctx);
+
+      args_.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+
+      ArrayAttr args = rewriter.getArrayAttr(args_);
+
+      auto callOp = failableCall(
+          /*rewriter=*/rewriter,
+          /*location=*/loc,
+          /*callee=*/StringAttr::get(ctx, internalFuncName),
+          /*args=*/args,
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/updatedOperands);
+
+      rewriter.eraseOp(op);
+
+      return success();
+    }
+
+    Type resultType = op.getType(0);
+    Optional<std::string> cType = getCType(resultType);
+
+    if (!cType.hasValue()) {
+      return op.emitError() << "unable to emit C type";
+    }
+
+    if (op.getNumResults() == 1) {
+      std::string cPtrType = cType.getValue() + std::string("*");
+
+      auto constantOp = rewriter.replaceOpWithNewOp<emitc::ConstantOp>(
+          /*op=*/op,
+          /*resultType=*/resultType,
+          /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+
+      auto ptrOp = rewriter.create<emitc::ApplyOp>(
+          /*location=*/loc,
+          /*result=*/emitc::OpaqueType::get(ctx, cPtrType),
+          /*applicableOperator=*/StringAttr::get(ctx, "&"),
+          /*operand=*/constantOp.getResult());
+
+      updatedOperands.push_back(ptrOp.getResult());
+
+      SmallVector<Attribute, 4> args_ =
+          indexSequence(updatedOperands.size(), ctx);
+
+      args_.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+
+      ArrayAttr args = rewriter.getArrayAttr(args_);
+
+      auto callOp = failableCall(
+          /*rewriter=*/rewriter,
+          /*location=*/loc,
+          /*callee=*/StringAttr::get(ctx, internalFuncName),
+          /*args=*/args,
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/updatedOperands);
+
+      return success();
+    }
+
+    return failure();
+  }
+};
+
 template <typename CmpOpTy>
 class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
  public:
@@ -212,7 +346,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
 
     if (moveLhs) {
       rewriter.create<emitc::CallOp>(
-          /*loc=*/loc,
+          /*location=*/loc,
           /*type=*/TypeRange{},
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
@@ -223,7 +357,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
     // NOTE: If lhs and rhs alias we call release twice on the same argument.
     if (moveRhs) {
       rewriter.create<emitc::CallOp>(
-          /*loc=*/loc,
+          /*location=*/loc,
           /*type=*/TypeRange{},
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
@@ -275,7 +409,7 @@ class CompareRefNotZeroOpConversion
 
     if (move) {
       rewriter.create<emitc::CallOp>(
-          /*loc=*/loc,
+          /*location=*/loc,
           /*type=*/TypeRange{},
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
@@ -363,7 +497,7 @@ class ConstRefZeroOpConversion
         /*operands=*/ArrayRef<Value>{});
 
     rewriter.create<emitc::CallOp>(
-        /*loc=*/loc,
+        /*location=*/loc,
         /*type=*/TypeRange{},
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
         /*args=*/ArrayAttr{},
@@ -449,7 +583,7 @@ class ConstRefRodataOpConversion
 
     failableCall(
         /*rewriter=*/rewriter,
-        /*loc=*/loc,
+        /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_wrap_retain"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -613,7 +747,7 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
     if (failable) {
       auto callOp = failableCall(
           /*rewriter=*/rewriter,
-          /*loc=*/loc,
+          /*location=*/loc,
           /*callee=*/StringAttr::get(ctx, funcName),
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
@@ -918,7 +1052,7 @@ class ListGetRefOpConversion
 
     failableCall(
         /*rewriter=*/rewriter,
-        /*loc=*/loc,
+        /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_get_ref_retain"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -1014,7 +1148,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
 
     auto callOp = failableCall(
         /*rewriter=*/rewriter,
-        /*loc=*/loc,
+        /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_set_value"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -1080,7 +1214,7 @@ class ListSetRefOpConversion
 
     auto callOp = failableCall(
         /*rewriter=*/rewriter,
-        /*loc=*/loc,
+        /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_set_ref_retain"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -1101,6 +1235,8 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns,
                                VMAnalysisCache &vmAnalysisCache) {
   populatePreserveCompilerHintsPatterns(context, patterns);
+  // Calls
+  patterns.insert<VMCallOpConversion>(context);
 
   // Globals
   patterns.insert<
@@ -1359,11 +1495,10 @@ class ConvertVMToEmitCPass
 
     // Control flow ops
     target.addLegalOp<IREE::VM::BranchOp>();
-    target.addLegalOp<IREE::VM::CallOp>();
     target.addLegalOp<IREE::VM::CondBranchOp>();
     // Note: We translate the fail op to two function calls in the
     // end, but we can't simply convert it here because it is a
-    // terminator.
+    // terminator and an EmitC call is not.
     target.addLegalOp<IREE::VM::FailOp>();
     target.addLegalOp<IREE::VM::ReturnOp>();
 

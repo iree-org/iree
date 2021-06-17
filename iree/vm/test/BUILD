@@ -33,6 +33,7 @@ c_embed_data(
         ":assignment_ops_f32.vmfb",
         ":assignment_ops_i64.vmfb",
         ":buffer_ops.vmfb",
+        ":call_ops.vmfb",
         ":comparison_ops.vmfb",
         ":comparison_ops_f32.vmfb",
         ":comparison_ops_i64.vmfb",
@@ -93,6 +94,12 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "buffer_ops",
     src = "buffer_ops.mlir",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
+    name = "call_ops",
+    src = "call_ops.mlir",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
