@@ -1071,7 +1071,8 @@ static LogicalResult declareEntryPointOps(
           dispatchEntryOp.getLoc(),
           targetBuilder.getStringAttr(dispatchEntryOp.function_ref()),
           targetBuilder.getIndexAttr(ordinal),
-          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{});
+          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{},
+          IntegerAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();

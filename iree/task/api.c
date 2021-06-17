@@ -33,6 +33,15 @@ IREE_FLAG(
     "threads that would otherwise need to perform the syscalls during\n"
     "coordination.");
 
+IREE_FLAG(
+    int32_t, task_worker_local_memory, 64 * 1024,
+    "Specifies the bytes of per-worker local memory allocated for use by\n"
+    "dispatched tiles. Tiles may use less than this but will fail to dispatch\n"
+    "if they require more. Conceptually it is like a stack reservation and\n"
+    "should be treated the same way: the source programs must be built to\n"
+    "only use a specific maximum amount of local memory and the runtime must\n"
+    "be configured to make at least that amount of local memory available.");
+
 //===----------------------------------------------------------------------===//
 // Topology configuration
 //===----------------------------------------------------------------------===//
@@ -86,6 +95,9 @@ iree_status_t iree_task_executor_create_from_flags(
     scheduling_mode |= IREE_TASK_SCHEDULING_MODE_DEDICATED_WAIT_THREAD;
   }
 
+  iree_host_size_t worker_local_memory =
+      (iree_host_size_t)FLAG_task_worker_local_memory;
+
   iree_status_t status = iree_ok_status();
 
   iree_task_topology_t topology;
@@ -110,7 +122,8 @@ iree_status_t iree_task_executor_create_from_flags(
 
   if (iree_status_is_ok(status)) {
     status = iree_task_executor_create(scheduling_mode, &topology,
-                                       host_allocator, out_executor);
+                                       worker_local_memory, host_allocator,
+                                       out_executor);
   }
 
   iree_task_topology_deinitialize(&topology);

@@ -28,7 +28,7 @@ namespace iree_compiler {
 // Ordered indices of arguments to the entry point function.
 // This is what the VM will receive at runtime from the HAL.
 enum EntryArgOrdinals {
-  kEntryArgScratchpad,
+  kEntryArgLocalMemory,
   kEntryArgConstants,
   kEntryArgBindings,
   kEntryArgWorkgroupX,
@@ -42,7 +42,7 @@ enum EntryArgOrdinals {
   kEntryArgWorkgroupCountZ,
 };
 
-/// Rewrites entry functions to have a vmvx.interface, scratchpad, and an XYZ
+/// Rewrites entry functions to have a vmvx.interface, local memory, and an XYZ
 /// workgroup ID. The runtime will provide these values during invocation.
 ///
 /// Source:
@@ -50,7 +50,7 @@ enum EntryArgOrdinals {
 ///
 /// Target:
 ///   func @entry(
-///       %scratchpad: !vmvx.buffer,
+///       %local_memory: !vmvx.buffer,
 ///       %constants: !vmvx.buffer,
 ///       %bindings: !iree.list<!vmvx.buffer>,
 ///       %workgroup_x: index,
@@ -78,7 +78,7 @@ LogicalResult updateHALToVMVXEntryFuncOp(FuncOp funcOp,
   auto indexType = IndexType::get(funcOp.getContext());
   auto newType = FunctionType::get(funcOp.getContext(),
                                    {
-                                       /*scratchpad=*/memRefI8Type,
+                                       /*local_memory=*/memRefI8Type,
                                        /*constants=*/memRefI32Type,
                                        /*bindings=*/bindingsType,
                                        /*workgroup_x=*/indexType,

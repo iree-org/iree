@@ -129,6 +129,9 @@ def VM_FuncOp : VM_Op<"func", [
       assert(!isExternal() && "invalid callable");
       return getType().getResults();
     }
+
+    /// Adds or overrides a reflection attribute.
+    void setReflectionAttr(StringRef name, Attribute value);
   }];
 }
 

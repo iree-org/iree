@@ -261,7 +261,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
                 builder.getSymbolRefAttr(linkedInterfaceOp.getName()),
-                ArrayAttr{});
+                ArrayAttr{}, IntegerAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.

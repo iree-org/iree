@@ -15,6 +15,7 @@ iree_cc_library(
     LinalgToSPIRV
   HDRS
     "KernelDispatchUtils.h"
+    "LaunchConfig.h"
     "MemorySpace.h"
     "Utils.h"
   SRCS
@@ -24,6 +25,7 @@ iree_cc_library(
     "ConvertToSPIRVPass.cpp"
     "FoldGPUProcessorIDUses.cpp"
     "KernelDispatchUtils.cpp"
+    "LaunchConfig.cpp"
     "Passes.cpp"
     "TileAndVectorizeInOneWorkgroupPass.cpp"
     "Utils.cpp"
@@ -58,11 +60,12 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorToSPIRV
-    iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToVector
     iree::compiler::Conversion::PassHeaders
+    iree::compiler::Conversion::Transforms
+    iree::compiler::Conversion::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect

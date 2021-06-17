@@ -6,8 +6,7 @@
 
 #include "iree/compiler/Conversion/LinalgToLLVMGPU/KernelConfig.h"
 
-#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
+#include "iree/compiler/Conversion/Utils/Utils.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 

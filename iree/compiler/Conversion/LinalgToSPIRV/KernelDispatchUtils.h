@@ -17,7 +17,7 @@
 
 #include <array>
 
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/LaunchConfig.h"
 #include "iree/compiler/Conversion/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"

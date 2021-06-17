@@ -4,19 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
-#include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 #include "iree/compiler/Conversion/PassDetail.h"
 #include "iree/compiler/Conversion/Passes.h"
-#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
+#include "iree/compiler/Conversion/Transforms/Transforms.h"
+#include "iree/compiler/Conversion/Utils/MarkerUtils.h"
+#include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -151,7 +151,7 @@ void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   // Promotes workgroups subviews to a full-tile allocated on the stack.
   if (enablePromoteWorkgroupToFullTiles) {
-    OwningRewritePatternList promotionPatterns(&getContext());
+    RewritePatternSet promotionPatterns(context);
     promotionPatterns.insert<PromoteMatmulSubviewsPattern>(
         context,
         linalg::LinalgPromotionOptions().setAllocationDeallocationFns(
@@ -166,7 +166,7 @@ void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
   // Workgroup first level of tiling.
   {
     // First level of tiling patterns. (workgroups memory)
-    OwningRewritePatternList l1patterns(&getContext());
+    RewritePatternSet l1patterns(context);
     l1patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
@@ -190,7 +190,7 @@ void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
 
   // Second level of tiling. (workgroups memory -> vectors)
   {
-    OwningRewritePatternList l2patterns(&getContext());
+    RewritePatternSet l2patterns(context);
     l2patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
@@ -211,13 +211,9 @@ void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
 
   // Apply canonicalization.
   {
-    OwningRewritePatternList canonicalizationPatterns(&getContext());
-    canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
-    AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                               context);
-    AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-    memref::SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                                   context);
+    RewritePatternSet canonicalizationPatterns =
+        linalg::getLinalgTilingCanonicalizationPatterns(context);
+    populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
       return signalPassFailure();
@@ -230,7 +226,7 @@ void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
 
   // Apply vectorization patterns.
   {
-    OwningRewritePatternList vectorizationPatterns(&getContext());
+    RewritePatternSet vectorizationPatterns(context);
     linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
                                         linalg::CopyOp, linalg::FillOp>(
         vectorizationPatterns, linalg::LinalgVectorizationOptions(),
@@ -251,7 +247,7 @@ void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
   });
 
   if (enableVectorContractToAarch64Asm) {
-    OwningRewritePatternList vectorToAArch64AsmPatterns(context);
+    RewritePatternSet vectorToAArch64AsmPatterns(context);
     populateVectorContractToAArch64InlineAsm(vectorToAArch64AsmPatterns,
                                              context);
     if (failed(applyPatternsAndFoldGreedily(
@@ -265,7 +261,7 @@ void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
     vector::VectorTransformsOptions vectorTransformsOptions =
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
-    OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
+    RewritePatternSet vectorContractLoweringPatterns(context);
     vectorContractLoweringPatterns
         .insert<ContractionOpToOuterProductOpLowering,
                 ContractionOpToMatmulOpLowering, ContractionOpLowering>(
@@ -285,7 +281,7 @@ void LinalgToLLVMWorkgroupsVectorizationPass::runOnOperation() {
   {
     VectorTransferToSCFOptions vectorToSCFOptions =
         VectorTransferToSCFOptions().setUnroll(true);
-    OwningRewritePatternList vectorToLoopsPatterns(&getContext());
+    RewritePatternSet vectorToLoopsPatterns(context);
     populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);
     // Hosit hierarchical tiling indexing and other loop invariant transfer

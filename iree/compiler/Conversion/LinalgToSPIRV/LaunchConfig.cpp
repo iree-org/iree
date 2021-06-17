@@ -13,9 +13,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/Common/LaunchConfig.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/LaunchConfig.h"
 
-#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/Utils/Utils.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"

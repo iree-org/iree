@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "legalize_input_types.mlir"
     "outline_dispatch_regions.mlir"
     "outline_large_constants.mlir"
+    "pad_linalg_ops.mlir"
     "promote_i1_to_i8.mlir"
     "promote_tensor_loads.mlir"
     "strip_and_splat_constant_variables.mlir"

@@ -1,55 +1,31 @@
-// Copyright 2020 The IREE Authors
+// Copyright 2021 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// -----------------------------------------------------------------------------
-// This code will be removed once this gets upstreamed to common mlir.
-// Please try to limit changes in this code only minor changes.
+//===- AffineMinCanonicalization.cpp --------------------------------------===//
+//
+// Fold chains of AffineMinOp
+//
+//===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
-
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
-#include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
+#include "iree/compiler/Conversion/Transforms/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/SCF/Utils.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
-#include "mlir/IR/AffineExpr.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dominance.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/Value.h"
-#include "mlir/IR/Visitors.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/LogicalResult.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/LoopUtils.h"
-#include "mlir/Transforms/Passes.h"
+#include "mlir/IR/BuiltinOps.h"
 
-using namespace mlir;          // NOLINT
-using namespace mlir::linalg;  // NOLINT
+#define DEBUG_TYPE "iree-codegen-affine-min-canonicalize"
 
-#define DEBUG_TYPE "linalg-transform-utils"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 //===----------------------------------------------------------------------===//
 // TODO: Cleanup and upstream these to go into core. Please ignore for now !
 //===----------------------------------------------------------------------===//
+
+namespace mlir {
+namespace iree_compiler {
 /// Substitute scf.for = %lb to %ub step %step by an AffineExpr expressing:
 ///   `%lb + %step * new_dim` where
 /// 1. the AffineExpr for %lb is either an AffineConstantExpr or an
@@ -104,6 +80,17 @@ static bool substitute(AffineMinOp minOp, SmallVectorImpl<AffineExpr> &exprs,
   return true;
 }
 
+namespace {
+/// Perform folding of chains of AffineMinOp.
+struct AffineMinCanonicalizationPattern
+    : public mlir::OpRewritePattern<mlir::AffineMinOp> {
+  using OpRewritePattern<mlir::AffineMinOp>::OpRewritePattern;
+
+  mlir::LogicalResult matchAndRewrite(
+      mlir::AffineMinOp minOp, mlir::PatternRewriter &rewriter) const override;
+};
+}  // namespace
+
 LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
     AffineMinOp minOp, PatternRewriter &rewriter) const {
   LLVM_DEBUG(llvm::dbgs() << "\nCanonicalize AffineMin: "
@@ -153,50 +140,9 @@ LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
   return success();
 }
 
-/// Return a fused vector::ContractionOp which represents a patterns such as:
-///
-/// ```mlir
-///    %c0 = vector.constant 0: ...
-///    %c = vector.contract %a, %b, %c0: ...
-///    %e = add %c, %d: ...
-/// ```
-///
-/// by:
-///
-/// ```mlir
-///    %e = vector.contract %a, %b, %d: ...
-/// ```
-///
-/// Return null if the canonicalization does not apply.
-// TODO: This should be a folding of Add into Contract in core but while they
-// live in different dialects, it is not possible without unnatural
-// dependencies.
-vector::ContractionOp mlir::canonicalizeContractionAdd(Operation *op) {
-  if (!isa<AddIOp, AddFOp>(op)) return nullptr;
-
-  OpBuilder builder(op);
-  auto canonicalize = [](OpBuilder &b, Value maybeContraction,
-                         Value otherOperand) -> vector::ContractionOp {
-    vector::ContractionOp contractionOp =
-        dyn_cast_or_null<vector::ContractionOp>(
-            maybeContraction.getDefiningOp());
-    if (!contractionOp) return nullptr;
-    if (auto maybeZero =
-            dyn_cast_or_null<ConstantOp>(contractionOp.acc().getDefiningOp())) {
-      if (maybeZero.value() == b.getZeroAttr(contractionOp.acc().getType())) {
-        BlockAndValueMapping bvm;
-        bvm.map(contractionOp.acc(), otherOperand);
-        return cast<vector::ContractionOp>(b.clone(*contractionOp, bvm));
-      }
-    }
-    return nullptr;
-  };
-
-  Value a = op->getOperand(0), b = op->getOperand(1);
-  vector::ContractionOp contract = canonicalize(builder, a, b);
-  contract = contract ? contract : canonicalize(builder, b, a);
-  return contract;
+void populateAffineMinCanonicalizationPattern(RewritePatternSet &patterns) {
+  patterns.add<AffineMinCanonicalizationPattern>(patterns.getContext());
 }
-//===----------------------------------------------------------------------===//
-// END TODO
-//===----------------------------------------------------------------------===//
+
+}  // namespace iree_compiler
+}  // namespace mlir
