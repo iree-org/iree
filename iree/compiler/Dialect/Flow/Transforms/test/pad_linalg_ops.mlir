@@ -1,0 +1,35 @@
+// RUN: iree-opt -split-input-file -iree-flow-pad-linalg-ops %s | IreeFileCheck %s
+
+func @matmul_f32_11x13x17(%lhs: tensor<11x17xf32>, %rhs: tensor<17x13xf32>, %init: tensor<11x13xf32>) -> tensor<11x13xf32> {
+    %result = linalg.matmul ins(%lhs, %rhs : tensor<11x17xf32>, tensor<17x13xf32>) outs(%init : tensor<11x13xf32>) -> tensor<11x13xf32>
+    return %result : tensor<11x13xf32>
+}
+// CHECK-LABEL: @matmul_f32_11x13x17
+//  CHECK-SAME:   %[[LHS:.+]]: tensor<11x17xf32>
+//  CHECK-SAME:   %[[RHS:.+]]: tensor<17x13xf32>
+//  CHECK-SAME:   %[[DST:.+]]: tensor<11x13xf32>
+//   CHECK-DAG:      %[[PADDED_LHS:.+]] = linalg.pad_tensor %[[LHS]]
+//   CHECK-DAG:      %[[PADDED_RHS:.+]] = linalg.pad_tensor %[[RHS]]
+//   CHECK-DAG:      %[[PADDED_DST:.+]] = linalg.pad_tensor %[[DST]]
+//       CHECK:      %[[PADDED_RESULT:.+]] = linalg.matmul
+//  CHECK-SAME:         ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<12x20xf32>, tensor<20x16xf32>)
+//  CHECK-SAME:         outs(%[[PADDED_DST]] : tensor<12x16xf32>)
+//       CHECK:      %[[RESULT:.+]] = subtensor %[[PADDED_RESULT]][0, 0] [11, 13] [1, 1] : tensor<12x16xf32> to tensor<11x13xf32>
+//       CHECK:      return %[[RESULT]] : tensor<11x13xf32>
+
+// -----
+
+func @matmul_f32_12x12x17(%lhs: tensor<12x17xf32>, %rhs: tensor<17x12xf32>, %init: tensor<12x12xf32>) -> tensor<12x12xf32> {
+    %result = linalg.matmul ins(%lhs, %rhs : tensor<12x17xf32>, tensor<17x12xf32>) outs(%init : tensor<12x12xf32>) -> tensor<12x12xf32>
+    return %result : tensor<12x12xf32>
+}
+// CHECK-LABEL: @matmul_f32_12x12x17
+//  CHECK-SAME:   %[[LHS:.+]]: tensor<12x17xf32>
+//  CHECK-SAME:   %[[RHS:.+]]: tensor<17x12xf32>
+//  CHECK-SAME:   %[[DST:.+]]: tensor<12x12xf32>
+//   CHECK-DAG:      %[[PADDED_LHS:.+]] = linalg.pad_tensor %[[LHS]]
+//   CHECK-DAG:      %[[PADDED_RHS:.+]] = linalg.pad_tensor %[[RHS]]
+//       CHECK:      %[[RESULT:.+]] = linalg.matmul
+//  CHECK-SAME:         ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<12x20xf32>, tensor<20x12xf32>)
+//  CHECK-SAME:         outs(%[[DST]] : tensor<12x12xf32>)
+//       CHECK:      return %[[RESULT]] : tensor<12x12xf32>

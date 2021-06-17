@@ -44,6 +44,7 @@ cc_library(
         "LegalizeInputTypes.cpp",
         "OutlineDispatchRegions.cpp",
         "OutlineLargeConstants.cpp",
+        "PadLinalgOps.cpp",
         "PassDetail.h",
         "Passes.cpp",
         "PromoteI1ToI8Pass.cpp",
