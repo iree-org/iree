@@ -321,8 +321,11 @@ func @always_fuse_reshape
 
 // -----
 
-func @fuse_tensor_update_with_fill(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index,
-               %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
+// A subsequent pass is expected to convert linalg.fill and flow.tensor.update into DMA ops.
+func @dont_fuse_tensor_update_with_fill(
+    %arg0: tensor<?x?xf32>, %arg1: tensor<f32>,
+    %arg2: index, %arg3: index, %arg4: index, %arg5: index)
+-> tensor<?x?xf32> {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %0 = tensor.extract %arg1[] : tensor<f32>
@@ -336,29 +339,9 @@ func @fuse_tensor_update_with_fill(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %
   return %7 : tensor<?x?xf32>
 }
 
-//       CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 + s2)>
-//       CHECK: func @fuse_tensor_update_with_fill
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<f32>
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9]+]]: index
-//  CHECK-SAME:   %[[ARG3:[a-zA-Z0-9]+]]: index
-//  CHECK-SAME:   %[[ARG4:[a-zA-Z0-9]+]]: index
-//  CHECK-SAME:   %[[ARG5:[a-zA-Z0-9]+]]: index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP]]()[%[[ARG2]], %[[ARG4]], %[[D0]]]
-//   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP]]()[%[[ARG3]], %[[ARG5]], %[[D1]]]
-//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
-//  CHECK-SAME:    [%[[RD1]], %[[RD0]], %[[C1]]]
-//  CHECK-SAME:    (%[[ARG1]], %[[RD0]], %[[RD1]])
-//   CHECK-DAG:      %[[VAL:.+]] = tensor.extract
-//   CHECK-DAG:      %[[INIT:.+]] = linalg.init_tensor
-//       CHECK:      %[[RETURN:.+]] = linalg.fill(%[[VAL]], %[[INIT]])
-//       CHECK:      flow.dispatch.tensor.store %[[RETURN]], {{.*}}
-//  CHECK-NEXT:      flow.return
-//       CHECK:   flow.tensor.update %[[ARG0]], %[[RESULT]]
+// CHECK: func @dont_fuse_tensor_update_with_fill
+// CHECK:   linalg.fill
+// CHECK:   flow.tensor.update
 
 // -----
 
@@ -479,6 +462,7 @@ func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96x
 
 // -----
 
+// A subsequent pass is expected to convert linalg.fill into DMA ops.
 func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32> {
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 225, 225, 3] : tensor<1x225x225x3xf32>
@@ -490,12 +474,8 @@ func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32
 //      CHECK: func @subtensor_insert
 // CHECK-SAME: (%[[INPUT:.+]]: tensor<1x224x224x3xf32>)
 //
-//      CHECK:   %[[FILL:.+]] = flow.dispatch.workgroups[{{.+}}]() : () -> tensor<1x225x225x3xf32> =
-// CHECK-NEXT:       (%[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x225x225x3xf32>) {
-//      CHECK:     linalg.init_tensor
-// CHECK-NEXT:     %[[TENSOR:.+]] = linalg.fill
-// CHECK-NEXT:     flow.dispatch.tensor.store %[[TENSOR]], %[[OUTPUT]], {{.*}}
-// CHECK-NEXT:     flow.return
+//  CHECK-NOT:   flow.dispatch.workgroups
+//      CHECK:   %[[FILL:.+]] =  linalg.fill
 //
 //      CHECK:   %[[PAD:.+]] = flow.dispatch.workgroups[{{.+}}](%[[INPUT]], %[[FILL]]) : (tensor<1x224x224x3xf32>, tensor<1x225x225x3xf32>) -> %[[FILL]] =
 // CHECK-NEXT:       (%[[SRC:.+]]: !flow.dispatch.tensor<readonly:1x224x224x3xf32>, %[[DST:.+]]: !flow.dispatch.tensor<readwrite:1x225x225x3xf32>) {

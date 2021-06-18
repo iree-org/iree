@@ -251,22 +251,19 @@ struct SubTensorToTensorSlice
   }
 };
 
-/// Converts linalg.fill ops that are not used by other Linalg ops into
-/// flow.tensor.splat ops.
+/// Converts linalg.fill ops into flow.tensor.splat ops.
 ///
 /// This is expected to improve performance because we can use DMA
 /// functionalities for the fill, instead of dispatching kernels.
-///
-/// It assumes linalg.fill ops that has linalg op users can be fused with
-/// its users so those cases aren't supported here.
 struct LinalgFillToFlowTensorSplat final
     : public OpRewritePattern<linalg::FillOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
                                 PatternRewriter &rewriter) const override {
-    for (Operation *userOp : fillOp->getUsers()) {
-      if (isa<linalg::LinalgOp>(userOp)) return failure();
+    if (fillOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      // Don't convert linalg.fill ops that were fused together with other ops.
+      return failure();
     }
 
     SmallVector<Value, 4> dynamicDims =
@@ -280,22 +277,30 @@ struct LinalgFillToFlowTensorSplat final
 /// Converts operations that can map to flow.tensor.* operations.
 struct ConvertToFlowTensorOpsPass
     : public ConvertToFlowTensorOpsBase<ConvertToFlowTensorOpsPass> {
+  ConvertToFlowTensorOpsPass(bool runBefore) {
+    runBeforeDispatchRegionFormation = runBefore;
+  }
+  ConvertToFlowTensorOpsPass(const ConvertToFlowTensorOpsPass &that) {
+    runBeforeDispatchRegionFormation = that.runBeforeDispatchRegionFormation;
+  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, memref::MemRefDialect,
                     mlir::StandardOpsDialect>();
   }
-  ConvertToFlowTensorOpsPass() = default;
-  ConvertToFlowTensorOpsPass(const ConvertToFlowTensorOpsPass &pass) {}
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
-    patterns.insert<
-        LinalgFillToFlowTensorSplat,
-        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
-        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>,
-        SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(context);
+    if (runBeforeDispatchRegionFormation) {
+      patterns.insert<
+          LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
+          LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>,
+          SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(context);
+    } else {
+      patterns.insert<LinalgFillToFlowTensorSplat>(context);
+    }
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
@@ -304,8 +309,10 @@ struct ConvertToFlowTensorOpsPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass() {
-  return std::make_unique<ConvertToFlowTensorOpsPass>();
+std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass(
+    bool runBeforeDispatchRegionFormation) {
+  return std::make_unique<ConvertToFlowTensorOpsPass>(
+      runBeforeDispatchRegionFormation);
 }
 
 }  // namespace Flow
