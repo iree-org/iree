@@ -18,9 +18,9 @@ set -e
 
 # Run under a virtual environment to isolate Python packages.
 # TODO(scotttodd): clean the venv first? `rm -rf`?
-python3 -m venv .venv
-source .venv/bin/activate
-trap deactivate EXIT
+# python3 -m venv .venv
+# source .venv/bin/activate
+# trap deactivate EXIT
 
 # Install general Jupyter notebook requirements.
 python3 -m pip install --upgrade pip
