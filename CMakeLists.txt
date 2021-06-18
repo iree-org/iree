@@ -212,7 +212,12 @@ endif()
 # does it and not diverge, since all implementations and all header users must
 # have the same definition of NDEBUG.
 #
-# LLVM defaults this to ON for Debug builds only. If set ON manually, then
+# LLVM defaults LLVM_ENABLE_ASSERTIONS to ON for Debug builds only but then
+# conditions itself to only update flags if not building Debug. We just let
+# IREE_ENABLE_ASSERTIONS be not conditioned on anything and only update the
+# flags in appropriate build types.
+#
+# If IREE_ENABLE_ASSERTIONS is set ON manually, then
 #   - NDEBUG must be undefined
 #   - LLVM_ENABLE_ASSERTIONS is forced off in order to keep multiple parties
 #     from mucking with globals.
@@ -223,8 +228,8 @@ endif()
 
 option(IREE_ENABLE_ASSERTIONS "Force unset of NDEBUG compile option" OFF)
 
-# Filter -DNDEBUG from CMAKE_CXX_FLAGS_* and CMAKE_C_FLAGS_* for non the
-# current CMAKE_BUILD_TYPE (unless if Debug).
+# Filter -DNDEBUG from CMAKE_CXX_FLAGS_* and CMAKE_C_FLAGS_* (if
+# CMAKE_BUILD_TYPE is not Debug).
 function(iree_fix_ndebug)
   string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
   if(IREE_ENABLE_ASSERTIONS AND NOT "${uppercase_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
