@@ -36,8 +36,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 // Registration
 //===----------------------------------------------------------------------===//
 
-void registerAllDialects(mlir::DialectRegistry &registry);
-
 inline void registerAllPasses() {
   registerMHLOImportPassPipeline();
 

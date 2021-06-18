@@ -75,8 +75,6 @@ ALL_SRCS = [
     "simple_stateful_test.py",
     "sliding_window_test.py",
     "space_to_batch_nd_test.py",
-    "strings_test.py",
-    "tensorlist_test.py",
 ]
 
 # keep sorted

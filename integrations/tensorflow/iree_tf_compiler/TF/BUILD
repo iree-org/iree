@@ -31,12 +31,6 @@ cc_library(
     ],
     deps = [
         "//iree_tf_compiler/MHLO",
-        "//iree_tf_compiler/dialect/tf_strings/conversion:convert_tf_strings_to_strings",
-        "//iree_tf_compiler/dialect/tf_strings/conversion:convert_tf_to_tf_strings",
-        "//iree_tf_compiler/dialect/tf_strings/ir:dialect",
-        "//iree_tf_compiler/dialect/tf_tensorlist/conversion:convert_tf_tensorlist_to_tensorlist",
-        "//iree_tf_compiler/dialect/tf_tensorlist/conversion:convert_tf_to_tf_tensorlist",
-        "//iree_tf_compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/Flow/Transforms",
         "@iree//iree/compiler/Dialect/HAL/IR",
