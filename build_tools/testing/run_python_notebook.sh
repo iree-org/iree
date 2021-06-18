@@ -24,11 +24,11 @@ set -e
 
 # Install general Jupyter notebook requirements.
 # python3 -m pip install --upgrade pip
-python3 -m pip install --quiet jupyter_core nbconvert ipykernel
+python3 -m pip install --user --quiet jupyter_core nbconvert ipykernel
 
 # Install common notebook requirements.
 # TODO(scotttodd): refactor so not all deps are always installed
-python3 -m pip install --quiet \
+python3 -m pip install --user --quiet \
   numpy \
   matplotlib \
   tensorflow \
