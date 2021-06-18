@@ -107,6 +107,7 @@ iree_cc_library(
     ::synchronization
     iree::base::core_headers
     iree::base::tracing
+    ${CMAKE_DL_LIBS}
   PUBLIC
 )
 
@@ -374,6 +375,7 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
+    ${CMAKE_DL_LIBS}
   PUBLIC
 )
 
