@@ -61,8 +61,6 @@ iree_cc_library(
     MLIRVector
     MLIRVectorToSPIRV
     iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToVector
     iree::compiler::Conversion::PassHeaders
     iree::compiler::Conversion::Transforms
     iree::compiler::Conversion::Utils

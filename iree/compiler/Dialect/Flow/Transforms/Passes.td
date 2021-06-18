@@ -9,6 +9,19 @@
 
 include "mlir/Pass/PassBase.td"
 
+
+def ConvertConv2D1x1ConvToMatmul :
+    Pass<"iree-flow-convert-conv2d-1x1-to-matmul", "FuncOp"> {
+  let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2D1x1ToMatmulPass()";
+}
+
+def ConvertConv2DToImg2Col :
+    Pass<"iree-flow-convert-conv2d-to-img2col", "FuncOp"> {
+  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
+}
+
 def ConvertToFlowTensorOps :
     Pass<"iree-flow-convert-to-flow-tensor-ops-pass", "FuncOp"> {
   let summary = "Convert operations to equivalent flow.tensor.* operations";
@@ -45,16 +58,16 @@ def FormStreams :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormStreamsPass()";
 }
 
+def FusionOfTensorOps :
+    Pass<"iree-flow-fusion-of-tensor-ops", ""> {
+  let summary = "Fuse operations on tensors";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFusionOfTensorOpsPass()";
+}
+
 def HoistUnstreamableOps :
     Pass<"iree-flow-hoist-unstreamable-ops", "FuncOp"> {
   let summary = "Hoist ops that cannot be captured in streams to the top of their block.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createHoistUnstreamableOpsPass()";
-}
-
-def HLOToHLOPreprocessing :
-    Pass<"iree-flow-hlo-to-hlo-preprocessing", "FuncOp"> {
-  let summary = "Apply hlo to hlo transformations for some hlo ops";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createHLOToHLOPreprocessingPass()";
 }
 
 def InjectDispatchTracing :
@@ -63,16 +76,22 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def PadLinalgOps :
+    Pass<"iree-flow-pad-linalg-ops", "FuncOp"> {
+  let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
+}
+
+def PadTensorToSubTensorInsert :
+    Pass<"iree-flow-pad-tensor-to-subtensor-insert", ""> {
+  let summary = "Convert linalg.pad_tensor into linalg.fill + subtensor_insert";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
+}
+
 def PromoteI1ToI8 :
     Pass<"iree-flow-promote-i1-to-i8", "FuncOp"> {
   let summary = "Legalizes i1 tensor constants to i8s";
   let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
-}
-
-def LegalizeInputTypes :
-    Pass<"iree-flow-legalize-input-types", "ModuleOp"> {
-  let summary = "Legalizes input types to ones supported by the IREE flow dialect";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createLegalizeInputTypesPass()";
 }
 
 def OutlineDispatchRegions :
@@ -100,15 +119,4 @@ def StripAndSplatConstantVariables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
 }
 
-def VerifyCompilerInputLegality :
-    Pass<"iree-verify-compiler-input-legality", "ModuleOp"> {
-  let summary = "Verifies that only supported IR constructs are passed to the compiler.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyCompilerInputLegality()";
-}
-
-def PadLinalgOps :
-    Pass<"iree-flow-pad-linalg-ops", "FuncOp"> {
-  let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
-}
 #endif  // IREE_DIALECT_FLOW_PASSES

@@ -22,20 +22,6 @@ namespace iree_compiler {
 void registerConversionPasses();
 
 //------------------------------------------------------------------------------
-// Conversions into Linalg
-//------------------------------------------------------------------------------
-
-/// Creates a pass to fuse Linalg operations on tensors.
-std::unique_ptr<Pass> createFusionOfTensorOpsPass();
-
-/// Creates XLA-HLO to Linalg on tensors transformation pass.
-std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass();
-
-/// Resolves shape related ops (std.dim, shapex.tie_shape, etc.) by tracing
-/// them back to the original HAL interface bindings.
-std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();
-
-//------------------------------------------------------------------------------
 // Misc/common conversions
 //------------------------------------------------------------------------------
 
@@ -98,16 +84,6 @@ std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 //------------------------------------------------------------------------------
 // LinalgToLinalg
 //------------------------------------------------------------------------------
-
-/// Creates a pass to convert linalg convolution ops with 1x1 kernels into
-/// linalg.matmul
-std::unique_ptr<OperationPass<FuncOp>> createConvertConv2D1x1ToMatmulPass();
-
-std::unique_ptr<OperationPass<FuncOp>> createConvertConv2DToImg2ColPass();
-
-/// Pass to convert a linalg.pad_tensor operation into a linalg.fill +
-/// subtensor_insert. This allows lowering the operation into a single kernel.
-std::unique_ptr<OperationPass<>> createPadTensorToSubTensorInsertPass();
 
 //------------------------------------------------------------------------------
 // LinalgToLLVM
@@ -347,7 +323,6 @@ void populateVectorContractToAArch64InlineAsm(
 // Test passes
 //------------------------------------------------------------------------------
 
-std::unique_ptr<OperationPass<FuncOp>> createTestMHLOConvertComplexToRealPass();
 std::unique_ptr<OperationPass<FuncOp>>
 createTestLinalgToLLVMGPUScalarizeMathOpPass();
 

@@ -96,8 +96,6 @@ void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
 
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createResolveShapeOpsPass());
-
   //===--------------------------------------------------------------------===//
   // Prepare stdandard ops for SPIR-V conversion.
   //

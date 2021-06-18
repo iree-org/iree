@@ -40,6 +40,7 @@ cc_library(
         "LinalgBufferizePass.cpp",
         "OptimizeVectorTransferPass.cpp",
         "SetNumWorkgroupsPass.cpp",
+        "VectorizeConv.cpp",
     ],
     deps = [
         "//iree/compiler/Conversion:PassHeaders",

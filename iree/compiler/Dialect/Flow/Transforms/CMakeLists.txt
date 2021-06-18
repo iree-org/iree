@@ -28,6 +28,8 @@ iree_cc_library(
     "Passes.h.inc"
     "TypeConverter.h"
   SRCS
+    "ConvertConv2D1x1ToMatmulPass.cpp"
+    "ConvertConv2DToImg2ColPass.cpp"
     "ConvertToFlowTensorOps.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
@@ -35,45 +37,33 @@ iree_cc_library(
     "ExpandVariableDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FormStreams.cpp"
-    "HLOToHLOPreprocessing.cpp"
+    "FusionOfTensorOps.cpp"
     "HoistUnstreamableOps.cpp"
     "InjectDispatchTracing.cpp"
-    "LegalizeInputTypes.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineLargeConstants.cpp"
     "PadLinalgOps.cpp"
+    "PadTensorToSubTensorInsert.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "PromoteI1ToI8Pass.cpp"
     "PromoteTensorLoads.cpp"
     "StripAndSplatConstantVariables.cpp"
     "TypeConverter.cpp"
-    "VerifyCompilerInputLegality.cpp"
   DEPS
     LLVMSupport
+    MLIRAffine
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRMemRef
     MLIRPass
     MLIRSCF
-    MLIRSCFToStandard
-    MLIRShape
-    MLIRShapeOpsTransforms
-    MLIRShapeToStandard
     MLIRStandard
     MLIRSupport
     MLIRTensor
-    MLIRTosa
-    MLIRTosaToLinalg
-    MLIRTosaToSCF
-    MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToLinalg
-    iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
@@ -81,7 +71,6 @@ iree_cc_library(
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
     iree::compiler::Utils
-    tensorflow::mlir_hlo
   PUBLIC
 )
 

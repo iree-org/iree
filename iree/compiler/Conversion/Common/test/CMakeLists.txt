@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "linalg_bufferize.mlir"
     "remove_dead_allocs.mlir"
     "transpose_canonicalization.mlir"
+    "vectorize_linalg_conv.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

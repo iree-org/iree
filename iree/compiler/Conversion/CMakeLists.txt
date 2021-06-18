@@ -26,7 +26,6 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
-    "Rewriters.h"
   DEPS
     MLIRLinalgTransforms
     MLIRPass
@@ -43,13 +42,9 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Conversion::LinalgToLLVMGPU
-    iree::compiler::Conversion::LinalgToLinalg
     iree::compiler::Conversion::LinalgToSPIRV
-    iree::compiler::Conversion::LinalgToVector
-    iree::compiler::Conversion::VectorToLLVM
   PUBLIC
 )
 
