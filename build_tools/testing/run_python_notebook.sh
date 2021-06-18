@@ -23,7 +23,7 @@ set -e
 # trap deactivate EXIT
 
 # Install general Jupyter notebook requirements.
-python3 -m pip install --upgrade pip
+# python3 -m pip install --upgrade pip
 python3 -m pip install --quiet jupyter_core nbconvert ipykernel
 
 # Install common notebook requirements.
