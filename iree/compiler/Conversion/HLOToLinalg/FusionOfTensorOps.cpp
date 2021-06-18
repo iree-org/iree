@@ -47,9 +47,9 @@ struct FusionOfTensorOpsPass
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
 
-    // Only fuse operations where all uses of the producer are generic or
-    // indexed generic operations. If an operation is used in a named op, it
-    // will be computed anyway, so the consumers can just use that value.
+    // Only fuse operations where all uses of the producer are generic
+    // operations. If an operation is used in a named op, it will be computed
+    // anyway, so the consumers can just use that value.
     linalg::ControlElementwiseOpsFusionFn controlFn =
         [](const OpResult &producer, const OpOperand &consumer) {
           // TODO(GH-5611): Enable fusion with reduction consumer for all
@@ -58,7 +58,7 @@ struct FusionOfTensorOpsPass
           // producer pointwise ops to avoid performance regressions on CPU.
           if (!clEnableFusionWithReductionOps) {
             auto consumerOp = consumer.getOwner();
-            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(consumerOp) &&
+            if (isa<linalg::GenericOp>(consumerOp) &&
                 dyn_cast<LinalgOp>(consumerOp).getNumReductionLoops()) {
               return false;
             }
@@ -66,8 +66,7 @@ struct FusionOfTensorOpsPass
 
           llvm::SmallDenseSet<Operation *, 4> numUsers;
           for (Operation *user : producer.getUsers()) {
-            if (isa<linalg::GenericOp, linalg::IndexedGenericOp>(user))
-              continue;
+            if (isa<linalg::GenericOp>(user)) continue;
             numUsers.insert(user);
           }
           return numUsers.empty();

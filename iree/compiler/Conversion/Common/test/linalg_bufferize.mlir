@@ -1121,10 +1121,11 @@ func @gather() {
   %d0 = memref.dim %5, %c0 : tensor<?xi32>
   %d1 = memref.dim %4, %c1 : tensor<?x?xf32>
   %3 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
-  %7 = linalg.indexed_generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<?xi32>) outs(%3 : tensor<?x?xf32>) {
-  ^bb0(%arg0: index, %arg1: index, %arg2: i32, %arg3: f32):  // no predecessors
+  %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<?xi32>) outs(%3 : tensor<?x?xf32>) {
+  ^bb0( %arg2: i32, %arg3: f32):  // no predecessors
+    %iv1 = linalg.index 1 : index
     %8 = index_cast %arg2 : i32 to index
-    %9 = tensor.extract %4[%8, %arg1] : tensor<?x?xf32>
+    %9 = tensor.extract %4[%8, %iv1] : tensor<?x?xf32>
     linalg.yield %9 : f32
   } -> tensor<?x?xf32>
   flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>

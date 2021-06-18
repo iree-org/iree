@@ -662,7 +662,6 @@ void LinalgToSPIRVConvertToGPUPass::runOnOperation() {
   patterns.insert<MapLinalgOpToGlobalInvocationId<linalg::CopyOp>,
                   MapLinalgOpToGlobalInvocationId<linalg::FillOp>,
                   MapLinalgOpToGlobalInvocationId<linalg::GenericOp>,
-                  MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
                   SerializeAndDistributeCopy>(context);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 

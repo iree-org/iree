@@ -17,6 +17,7 @@
 #include "mlir/Conversion/TosaToSCF/TosaToSCF.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Dialect/Tosa/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -220,8 +221,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createConvertToFlowTensorOpsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   // NOTE: required because the current dispatch-linalg-on-tensors pass
   // creates a lot of dead IR that needs to be cleaned up.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());

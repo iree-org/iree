@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -resolve-shaped-type-result-dims -canonicalize -cse %s | IreeFileCheck %s
 
 func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -867,3 +867,32 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
 //       CHECK:     subtensor
 //       CHECK:     flow.return
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func @dynamic_dot() -> !hal.buffer_view attributes {iree.abi.stub} {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %cst = constant 0.000000e+00 : f32
+  %0 = iree.dynamic_shape_constant dense<[[1.500000e+01, 1.400000e+01, 1.300000e+01], [1.200000e+01, 1.100000e+01, 1.000000e+01], [9.000000e+00, 8.000000e+00, 7.000000e+00], [6.000000e+00, 5.000000e+00, 4.000000e+00], [3.000000e+00, 2.000000e+00, 1.000000e+00]]> : tensor<5x3xf32> -> tensor<?x?xf32>
+  %1 = iree.dynamic_shape_constant dense<[[1.500000e+01, 1.400000e+01, 1.300000e+01, 1.200000e+01, 1.100000e+01], [1.000000e+01, 9.000000e+00, 8.000000e+00, 7.000000e+00, 6.000000e+00], [5.000000e+00, 4.000000e+00, 3.000000e+00, 2.000000e+00, 1.000000e+00]]> : tensor<3x5xf32> -> tensor<?x?xf32>
+  %2 = memref.dim %0, %c0 : tensor<?x?xf32>
+  %3 = memref.dim %1, %c1 : tensor<?x?xf32>
+  %4 = linalg.init_tensor [%2, %3] : tensor<?x?xf32>
+  %5 = linalg.fill(%4, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %6 = linalg.matmul ins(%0, %1 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%5 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %7 = memref.dim %6, %c0 : tensor<?x?xf32>
+  %8 = memref.dim %6, %c1 : tensor<?x?xf32>
+  %9 = hal.tensor.cast %6 : tensor<?x?xf32>{%7, %8} -> !hal.buffer_view
+  return %9 : !hal.buffer_view
+}
+// CHECK-LABEL: func @dynamic_dot()
+//   CHECK-NOT:    linalg.fill
+//   CHECK-NOT:    linalg.matmul
+//       CHECK:    scf.for
+//       CHECK:      scf.for
+//       CHECK:        linalg.fill
+//       CHECK:        linalg.matmul
+//   CHECK-NOT:    linalg.fill
+//   CHECK-NOT:    linalg.matmul
+//       CHECK:    return
