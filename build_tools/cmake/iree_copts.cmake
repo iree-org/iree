@@ -306,15 +306,6 @@ if(ANDROID)
   )
 endif()
 
-if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Generic")
-# If building for a known OS, link against libdl for dynamic library support.
-# Generic systems may not support dynamic libraries.
-  iree_select_compiler_opts(_IREE_DL_LINKOPTS
-  CLANG_OR_GCC
-    "-ldl"
-  )
-endif()
-
 # TODO(benvanik): remove the ABSL usage here; we aren't abseil.
 If(${IREE_ENABLE_THREADING})
   iree_select_compiler_opts(_IREE_ABSL_LINKOPTS
@@ -330,7 +321,6 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-lm"
-    ${_IREE_DL_LINKOPTS}
     ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
