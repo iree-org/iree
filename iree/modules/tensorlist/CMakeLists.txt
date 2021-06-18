@@ -10,6 +10,12 @@
 
 iree_add_all_subdirs()
 
+# absl has thread dependency.
+# TODO(#3848): Remove this condition.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 iree_cc_library(
   NAME
     native_module

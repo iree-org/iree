@@ -6,6 +6,11 @@
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
 
+# Tools has thread dependency from iree::hal::drivers and absl
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 add_subdirectory(android)
 add_subdirectory(test)
 add_subdirectory(utils)
