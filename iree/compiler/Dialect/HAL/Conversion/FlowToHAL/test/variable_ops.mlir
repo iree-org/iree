@@ -61,3 +61,41 @@ func @fn() {
   flow.variable.store %0, @var_with_initializer : tensor<f32>
   return
 }
+
+// -----
+// Checks that the implicit cast allowing a buffer_view to store into a variable
+// that maps to a buffer is permitted.
+// CHECK-LABEL: hal.variable @var_with_buffer_view_store
+// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
+// CHECK: hal.variable.store %[[buffer]], @var_with_buffer_view_store : !hal.buffer
+flow.variable @var_with_buffer_view_store mutable dense<0.000000e+00> : tensor<f32>
+func @fn(%arg0: !hal.buffer_view) {
+  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<f32>
+  flow.variable.store %0, @var_with_buffer_view_store : tensor<f32>
+  return
+}
+
+// -----
+// Checks that stores are only permitted on variables that dominate.
+func @fn(%arg0: !hal.buffer_view) {
+  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<f32>
+  // expected-error @+1 {{failed to legalize operation 'flow.variable.store'}}
+  flow.variable.store %0, @var_with_buffer_view_store : tensor<f32>
+  return
+}
+flow.variable @var_with_buffer_view_store mutable dense<0.000000e+00> : tensor<f32>
+
+// -----
+// Checks that the implicit cast allowing a buffer_view to indirect store into
+// a variable that maps to a buffer is permitted.
+// CHECK-LABEL: hal.variable @var_indirect_with_buffer_view_store
+// CHECK: %[[ptr:.*]] = hal.variable.address @var_indirect_with_buffer_view_store : !iree.ptr<!hal.buffer>
+// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
+// CHECK: hal.variable.store.indirect %[[buffer]], %[[ptr]] : !hal.buffer -> !iree.ptr<!hal.buffer>
+flow.variable @var_indirect_with_buffer_view_store mutable : tensor<i32>
+func @fn(%arg0: !hal.buffer_view) {
+  %0 = flow.variable.address @var_indirect_with_buffer_view_store : !iree.ptr<tensor<i32>>
+  %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<i32>
+  flow.variable.store.indirect %1, %0 : tensor<i32> -> !iree.ptr<tensor<i32>>
+  return
+}
