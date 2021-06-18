@@ -205,6 +205,55 @@ if(${IREE_ENABLE_CCACHE})
   endif()
 endif()
 
+
+#-------------------------------------------------------------------------------
+# IREE assertions
+# We don't love the way this is done, but we have to line it up with how LLVM
+# does it and not diverge, since all implementations and all header users must
+# have the same definition of NDEBUG.
+#
+# LLVM defaults LLVM_ENABLE_ASSERTIONS to ON for Debug builds only but then
+# conditions itself to only update flags if not building Debug. We just let
+# IREE_ENABLE_ASSERTIONS be not conditioned on anything and only update the
+# flags in appropriate build types.
+#
+# If IREE_ENABLE_ASSERTIONS is set ON manually, then
+#   - NDEBUG must be undefined
+#   - LLVM_ENABLE_ASSERTIONS is forced off in order to keep multiple parties
+#     from mucking with globals.
+#
+# Since CMake forces NDEBUG for !Debug builds, some surgery needs to be done
+# at the top level to avoid divergence.
+#-------------------------------------------------------------------------------
+
+option(IREE_ENABLE_ASSERTIONS "Force unset of NDEBUG compile option" OFF)
+
+# Filter -DNDEBUG from CMAKE_CXX_FLAGS_* and CMAKE_C_FLAGS_* (if
+# CMAKE_BUILD_TYPE is not Debug).
+function(iree_fix_ndebug)
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
+  if(IREE_ENABLE_ASSERTIONS AND NOT "${uppercase_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+      # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
+      foreach (flags_var_to_scrub
+              CMAKE_CXX_FLAGS_${uppercase_CMAKE_BUILD_TYPE}
+              CMAKE_C_FLAGS_${uppercase_CMAKE_BUILD_TYPE})
+          set(original_flags "${${flags_var_to_scrub}}")
+          string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
+                  altered_flags "${original_flags}")
+          if(NOT "${original_flags}" STREQUAL "${altered_flags}")
+            message(STATUS
+              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${flags_var_to_scrub}: '${original_flags}' -> '${altered_flags}'")
+            set(${flags_var_to_scrub} "${altered_flags}" PARENT_SCOPE)
+          endif()
+      endforeach()
+
+      # Make sure that LLVM doesn't add its own logic for assertion disabling.
+      # We'd like to make sure that we are not dueling over globals.
+      set(LLVM_ENABLE_ASSERTIONS OFF PARENT_SCOPE)
+  endif()
+endfunction()
+iree_fix_ndebug()
+
 #-------------------------------------------------------------------------------
 # IREE utility definitions
 #-------------------------------------------------------------------------------
@@ -278,7 +327,6 @@ endif()
 #-------------------------------------------------------------------------------
 
 # Disable LLVM's warnings.
-set(LLVM_ENABLE_ASSERTIONS OFF CACHE BOOL "don't use global flags /facepalm")
 set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
 
 # Adds bundled projects that must be included after the LLVM directory has
