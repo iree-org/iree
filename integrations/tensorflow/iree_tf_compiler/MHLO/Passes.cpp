@@ -41,7 +41,7 @@ void buildMHLOImportPassPipeline(OpPassManager &pm) {
 
   // Mostly delicate to the IREE side MHLO legalization pipeline, now that
   // we have handled the weird that comes from legacy HLO clients.
-  mlir::iree_compiler::IREE::Flow::buildMHLOInputTransformPassPipeline(pm);
+  mlir::iree_compiler::buildMHLOInputTransformPassPipeline(pm);
 
   // Import pipelines should end with canonicalization because they may have
   // access to dialects and patterns that the core compiler does not.
