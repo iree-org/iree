@@ -148,18 +148,41 @@ class VariableStoreOpConversion
     : public OpConversionPattern<IREE::Flow::VariableStoreOp> {
  public:
   VariableStoreOpConversion(MLIRContext *ctx, TypeConverter &converter)
-      : OpConversionPattern(ctx) {}
+      : OpConversionPattern(ctx), converter(converter) {}
 
   LogicalResult matchAndRewrite(
       IREE::Flow::VariableStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::VariableStoreOp::Adaptor operands(newOperands);
+    auto *symbolOp =
+        SymbolTable::lookupNearestSymbolFrom(storeOp, storeOp.variable());
+    if (!symbolOp) return failure();
+    auto variableOp = cast<IREE::HAL::VariableOp>(symbolOp);
+    Type variableType = converter.convertType(variableOp.type());
+    if (!variableType) return failure();
+    Value storeValue = operands.value();
+    Type storeType = storeValue.getType();
+
+    // A limited number of implicit conversions on store are allowed.
+    if (variableType != storeType) {
+      if (storeType.isa<IREE::HAL::BufferViewType>() &&
+          variableType.isa<IREE::HAL::BufferType>()) {
+        storeValue = rewriter.create<IREE::HAL::BufferViewBufferOp>(
+            storeOp.getLoc(), variableType, storeValue);
+      } else {
+        return rewriter.notifyMatchFailure(
+            storeOp, "mismatched store and variable type");
+      }
+    }
+
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableStoreOp>(
-        storeOp, operands.value(),
+        storeOp, storeValue,
         rewriter.getSymbolRefAttr(storeOp.variable()));
     return success();
   }
+
+  TypeConverter &converter;
 };
 
 class VariableStoreIndirectOpConversion
