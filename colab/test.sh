@@ -7,7 +7,7 @@
 
 # Test each notebook in this directory.
 
-# set -x
+set -x
 set -e
 
 SCRIPT_DIR=$(dirname "$0")
@@ -20,11 +20,11 @@ FAILING_NOTEBOOKS=(
 
   # MNIST training notebook fails to import/compile:
   # https://github.com/google/iree/issues/6163
-  mnist_training.ipynb \  
+  mnist_training.ipynb \
 
   # Text classification notebook has a dep with non-standard install steps:
   # https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
-  tflite_text_classification.ipynb  \  
+  tflite_text_classification.ipynb  \
 )
 
 # TODO(scotttodd): improve script ergonomics:
