@@ -413,10 +413,10 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
   }
 
   // TODO(simon-camp): We sometimes get a to high number of refs used. This may
-  // be because the IR is in a mixed state of VM and EmitC dialect and the
-  // RegisterAllocation pass doesn't handle the 'emitc.opaque' type correctly.
+  // be because the IR is in a mixed state of VM and EmitC dialects and the
+  // register allocation pass doesn't handle the 'emitc.opaque' type correctly.
   // We could either
-  //  - annotate the function with correct number of refs in the
+  //  - annotate the function with the correct number of refs in the
   //    conversion or
   //  - define the array in the conversion (which would need to be
   //    done through a macro at the moment because array types are not handled
