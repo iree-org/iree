@@ -30,8 +30,8 @@ vm.module @call_ops {
   }
 
   vm.func @_v_i() -> i32 attributes {noinline} {
-      %c1 = vm.const.i32 1 : i32
-      vm.return %c1 : i32
+    %c1 = vm.const.i32 1 : i32
+    vm.return %c1 : i32
   }
 
 }
