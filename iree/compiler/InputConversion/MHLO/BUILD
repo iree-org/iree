@@ -56,7 +56,7 @@ cc_library(
         "VerifyCompilerMHLOInputLegality.cpp",
     ],
     hdrs = [
-        "Passes.h"
+        "Passes.h",
     ],
     deps = [
         ":PassHeaders",
