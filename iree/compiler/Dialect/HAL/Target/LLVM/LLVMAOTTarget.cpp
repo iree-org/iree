@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/dylib_executable_def_builder.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -292,6 +293,17 @@ class LLVMAOTTargetBackend final : public TargetBackend {
              << options_.targetTriple << "'";
     }
 
+    // If we are keeping artifacts then let's also add the bitcode for easier
+    // debugging (vs just the binary object file).
+    if (options_.keepLinkerArtifacts) {
+      auto bitcodeFile = Artifact::createTemporary(libraryName, "bc");
+      auto &os = bitcodeFile.outputFile->os();
+      llvm::WriteBitcodeToFile(*llvmModule, os);
+      os.flush();
+      os.close();
+      bitcodeFile.outputFile->keep();
+    }
+
     // Emit object files.
     SmallVector<Artifact, 4> objectFiles;
     {
@@ -346,6 +358,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           << "linker artifacts for " << targetOp.getName() << " preserved:\n"
           << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
+      for (auto &objectFile : objectFiles) {
+        objectFile.outputFile->keep();
+      }
     }
 
     if (options_.linkEmbedded) {
