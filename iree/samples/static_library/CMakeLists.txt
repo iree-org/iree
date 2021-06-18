@@ -29,7 +29,46 @@ iree_bytecode_module(
     "-iree-llvm-static-library-output-path=${CMAKE_CURRENT_BINARY_DIR}/simple_mul.o"
   PUBLIC
   TESTONLY
-)
+  GENERATED
+    ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.o
+  )
+
+  if(DEFINED _RULE_TRANSLATE_TOOL)
+    set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
+  else()
+    set(_TRANSLATE_TOOL "iree-translate")
+  endif()
+
+  iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
+
+  set(_ARGS)
+  list(APPEND _ARGS "-iree-input-type=mhlo"  )
+  list(APPEND _ARGS "-iree-mlir-to-vm-bytecode-module")
+  list(APPEND _ARGS "-iree-hal-target-backends=dylib-llvm-aot")
+  list(APPEND _ARGS "-iree-llvm-static-library-output-path=simple_mul.o")
+  list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
+  list(APPEND _ARGS "-o")
+  list(APPEND _ARGS "simple_mul.vmfb")
+
+  # Depending on the binary instead of the target here given we might not have
+  # a target in this CMake invocation when cross-compiling.
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.o
+    COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
+    # Changes to either the translation tool or the input source should
+    # trigger rebuilding.
+    DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} "simple_mul.mlir"
+  )
+
+  add_library(simple_mul
+        STATIC
+        ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.o)
+
+  SET_TARGET_PROPERTIES(
+    simple_mul
+    PROPERTIES
+    LINKER_LANGUAGE C
+    )
 
 iree_cc_binary(
   NAME
@@ -48,7 +87,7 @@ iree_cc_binary(
     iree::task::api
     iree::vm
     iree::vm::bytecode_module
-    ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.o
+    simple_mul
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
