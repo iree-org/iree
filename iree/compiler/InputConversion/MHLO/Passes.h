@@ -39,10 +39,6 @@ std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass();
 /// backends.
 std::unique_ptr<OperationPass<FuncOp>> createMHLOToMHLOPreprocessingPass();
 
-/// Resolves shape related ops (std.dim, shapex.tie_shape, etc.) by tracing
-/// them back to the original HAL interface bindings.
-std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();
-
 // Verifies a module being input to the core compiler pipeline only contains
 // IR structures that are supported at that level.
 std::unique_ptr<OperationPass<ModuleOp>>

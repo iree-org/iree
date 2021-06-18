@@ -33,12 +33,6 @@ def MHLOToMHLOPreprocessing :
   ];
 }
 
-def ResolveShapeOps :
-    Pass<"iree-mhlo-resolve-shape", "FuncOp"> {
-  let summary = "resolve shapes";
-  let constructor = "mlir::iree_compiler::createResolveShapeOpsPass()";
-}
-
 def VerifyCompilerMHLOInputLegality :
     Pass<"iree-mhlo-verify-compiler-input-legality", "ModuleOp"> {
   let summary = "Verifies that only supported IR constructs are passed to the compiler.";

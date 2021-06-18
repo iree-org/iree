@@ -44,9 +44,6 @@ cc_library(
 
 cc_library(
     name = "MHLO",
-    hdrs = [
-        "Passes.h"
-    ],
     srcs = [
         "BroadcastingToLinalgPatterns.cpp",
         "ConvertComplexToReal.cpp",
@@ -56,8 +53,10 @@ cc_library(
         "MHLOToLinalgOnTensors.cpp",
         "MHLOToMHLOPreprocessing.cpp",
         "Passes.cpp",
-        "ResolveShapeOps.cpp",
         "VerifyCompilerMHLOInputLegality.cpp",
+    ],
+    hdrs = [
+        "Passes.h"
     ],
     deps = [
         ":PassHeaders",

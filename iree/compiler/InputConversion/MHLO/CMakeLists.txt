@@ -47,7 +47,6 @@ iree_cc_library(
     "MHLOToLinalgOnTensors.cpp"
     "MHLOToMHLOPreprocessing.cpp"
     "Passes.cpp"
-    "ResolveShapeOps.cpp"
     "VerifyCompilerMHLOInputLegality.cpp"
   DEPS
     ::PassHeaders

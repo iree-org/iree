@@ -45,7 +45,7 @@ cc_library(
     name = "TOSA",
     srcs = [
         "Passes.cpp",
-        "VerifyCompilerTOSAInputLegality.cpp"
+        "VerifyCompilerTOSAInputLegality.cpp",
     ],
     hdrs = [
         "Passes.h",
