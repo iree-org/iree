@@ -19,44 +19,54 @@ func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
 
 ## Background
 
-IREE's `static_library_loader` allows applications to inject a set of static libraries that can be resolved at runtime by name. This can be particularly useful on "bare metal" or embedded systems running IREE that lack operating systems or the ability to load shared libraries in binaries.
+IREE's `static_library_loader` allows applications to inject a set of static
+libraries that can be resolved at runtime by name. This can be particularly
+useful on "bare metal" or embedded systems running IREE that lack operating
+systems or the ability to load shared libraries in binaries.
 
-When static library output is enabled, `iree-translate` produces a separate static library to compile into the target program. At runtime bytecode module instructs the VM which static libraries to load exported functions from the model.
+When static library output is enabled, `iree-translate` produces a separate
+static library to compile into the target program. At runtime bytecode module
+instructs the VM which static libraries to load exported functions from the
+model.
 
 ## Instructions
-Note: run these commands from IREE's github root.
+_Note: run the following commands from IREE's github repo root._
 
-1. Configure CMake with the `IREE_BUILD_STATIC_LIBRARY_SAMPLES` then build the `iree_translate` CMake target (see
-   [here](https://google.github.io/iree/building-from-source/getting-started/)
-   for general instructions on building using CMake):
+1. Configure CMake for building the static library then demo. You'll need to set
+the flags building samples, the compiler, and the `dylib-llvm-aot`
+driver/backend. See
+[here](https://google.github.io/iree/building-from-source/getting-started/)
+for general instructions on building using CMake):
 
-   ```shell
-   cmake -B ../iree-build/ -IREE_BUILD_STATIC_LIBRARY_SAMPLES=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo .
-   cmake --build ../iree-build/ --target iree_tools_iree-translate
-   ```
+  ```shell
+  cmake -B ../iree-build/
+    -DIREE_BUILD_SAMPLES=ON \
+    -DIREE_TARGET_BACKENDS_TO_BUILD=DYLIB-LLVM-AOT \
+    -DIREE_HAL_DRIVERS_TO_BUILD=DYLIB \
+    -DIREE_BUILD_COMPILER=ON \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo .
+  ```
 
-2. Run `iree-translate` on  `simple_mul.mlir` (located in this directory) to produce the static library, header file, and bytecode module:
+2. Build the `simple_mul` CMake target. This will run  `iree-translate` on
+`simple_mul.mlir` (located in this directory) to produce a static library,
+header file, and bytecode module:
 
-    ```shell
-    ../iree-build/tools/iree-translate \
-            iree/samples/static_library/simple_mul.mlir \
-            -iree-input-type=mhlo \
-            -iree-mlir-to-vm-bytecode-module \
-            -iree-hal-target-backends=dylib-llvm-aot \
-            -o ../iree-build/iree/samples/static_library/static_library_module.vmfb \
-            -iree-llvm-static-library-output-path=./iree-build/iree/samples/static_library/static_library_module.o
-    ```
+  ```shell
+  cmake --build ../iree-build/ --target iree_samples_static_library_simple_mul_c
+  ```
 
-3. Compile the `static_library_demo` CMake target. Note: this assumes you've added the static library files and module in the demo directory from step 2:
+3. Build the `static_library_demo` CMake target. Note: this assumes you've
+generated the static library files and module in the build directory from step
+2:
 
-    ```shell
-    cmake --build ../iree-build/ --target iree_samples_static_library_demo
-    ```
+  ```shell
+  cmake --build ../iree-build/ --target iree_samples_static_library_demo
+  ```
 
-4. Run the sample binary
+4. Run the sample binary:
 
-   ```shell
-   ../iree-build/iree/samples/static_library/static_library_demo
+  ```shell
+  ../iree-build/iree/samples/static_library/static_library_demo
 
-   # Output: static_library_run passed
-   ```
+  # Output: static_library_run passed
+  ```

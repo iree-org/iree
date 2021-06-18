@@ -38,6 +38,7 @@ iree_cc_binary(
     "static_library_demo.c"
   DEPS
     ::simple_mul_c
+    iree::runtime
     iree::base
     iree::hal
     iree::hal::local
