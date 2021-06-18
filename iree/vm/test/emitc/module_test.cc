@@ -15,6 +15,7 @@
 #include "iree/vm/test/emitc/arithmetic_ops_i64.h"
 // #include "iree/vm/test/emitc/assignment_ops.h"
 #include "iree/vm/test/emitc/assignment_ops_i64.h"
+#include "iree/vm/test/emitc/call_ops.h"
 #include "iree/vm/test/emitc/comparison_ops.h"
 #include "iree/vm/test/emitc/comparison_ops_f32.h"
 #include "iree/vm/test/emitc/comparison_ops_i64.h"
@@ -59,6 +60,7 @@ std::vector<TestParams> GetModuleTestParams() {
       {arithmetic_ops_i64_descriptor_, arithmetic_ops_i64_create},
       // {assignment_ops_descriptor_, assignment_ops_create},
       {assignment_ops_i64_descriptor_, assignment_ops_i64_create},
+      {call_ops_descriptor_, call_ops_create},
       {comparison_ops_descriptor_, comparison_ops_create},
       {comparison_ops_f32_descriptor_, comparison_ops_f32_create},
       {comparison_ops_i64_descriptor_, comparison_ops_i64_create},
