@@ -34,6 +34,16 @@ python3 -m pip install --quiet \
   tensorflow \
   tensorflow_hub
 
+# Install IREE packages outside of the notebook
+# TODO(scotttodd): installs inside notebooks should be sufficient
+python3 -m pip install \
+  iree-compiler-snapshot \
+  iree-runtime-snapshot \
+  iree-tools-tf-snapshot \
+  iree-tools-tflite-snapshot \
+  iree-tools-xla-snapshot \
+  --find-links https://github.com/google/iree/releases
+
 # Run the notebook, discarding output (still fails if an exception is thrown).
 jupyter nbconvert --to notebook --execute $1 --stdout > /dev/null
 printf "Notebook exit code: %d\n" $?
