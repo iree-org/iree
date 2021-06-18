@@ -158,8 +158,6 @@ cc_library(
     hdrs = ["init_compiler_modules.h"],
     deps = [
         "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
-        "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-        "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
     ],
 )
 
