@@ -23,12 +23,12 @@ set -e
 # trap deactivate EXIT
 
 # Install general Jupyter notebook requirements.
-sudo python3 -m pip install --upgrade pip
-sudo python3 -m pip install --quiet jupyter_core nbconvert ipykernel
+python3 -m pip install --upgrade pip
+python3 -m pip install --quiet jupyter_core nbconvert ipykernel
 
 # Install common notebook requirements.
 # TODO(scotttodd): refactor so not all deps are always installed
-sudo python3 -m pip install --quiet \
+python3 -m pip install --quiet \
   numpy \
   matplotlib \
   tensorflow \
