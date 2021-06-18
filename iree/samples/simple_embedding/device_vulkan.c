@@ -12,6 +12,9 @@
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/registration/driver_module.h"
 
+// Compiled module embedded here to avoid file IO:
+#include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_vulkan_c.h"
+
 iree_status_t create_sample_device(iree_hal_device_t** device) {
   // Only register the vulkan HAL driver.
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_driver_module_register(
@@ -26,4 +29,11 @@ iree_status_t create_sample_device(iree_hal_device_t** device) {
       driver, iree_allocator_system(), device));
   iree_hal_driver_release(driver);
   return iree_ok_status();
+}
+
+const iree_const_byte_span_t load_bytecode_module_data() {
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_simple_embedding_test_module_vulkan_create();
+  return iree_make_const_byte_span(module_file_toc->data,
+                                   module_file_toc->size);
 }
