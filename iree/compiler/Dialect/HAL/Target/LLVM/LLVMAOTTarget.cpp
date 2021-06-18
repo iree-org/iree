@@ -200,13 +200,19 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
       // -ffreestanding-like behavior.
       func.addFnAttr("no-builtins");
+
+      // Our dispatches are all hot - that's kind of the point.
+      // This may favor more aggressive optimizations.
+      func.addFnAttr("hot");
     }
 
     // Build the IREE HAL executable library metadata. The runtime uses this to
     // find the entry point functions and their information.
-    LibraryBuilder libraryBuilder(
-        llvmModule.get(), LibraryBuilder::Mode::INCLUDE_REFLECTION_ATTRS,
-        LibraryBuilder::Version::V_0);
+    // TODO(benvanik): add a flag for this (adds a few KB/binary).
+    LibraryBuilder::Mode libraryBuilderMode =
+        LibraryBuilder::Mode::INCLUDE_REFLECTION_ATTRS;
+    LibraryBuilder libraryBuilder(llvmModule.get(), libraryBuilderMode,
+                                  LibraryBuilder::Version::V_0);
     switch (options_.sanitizerKind) {
       case SanitizerKind::kNone: {
         libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
@@ -300,7 +306,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         return targetOp.emitError()
                << "failed to compile LLVM-IR module to an object file";
       }
-      auto objectFile = Artifact::createTemporary(libraryName, "obj");
+      auto objectFile = Artifact::createTemporary(libraryName, "o");
       auto &os = objectFile.outputFile->os();
       os << objectData;
       os.flush();
@@ -337,7 +343,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto &linkArtifacts = linkArtifactsOr.getValue();
     if (options_.keepLinkerArtifacts) {
       mlir::emitRemark(targetOp.getLoc())
-          << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
+          << "linker artifacts for " << targetOp.getName() << " preserved:\n"
           << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
     }

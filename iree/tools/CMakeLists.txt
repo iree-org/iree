@@ -321,6 +321,7 @@ if(${IREE_BUILD_COMPILER})
       iree-translate
     DEPS
       ::iree_translate_main
+      lld
     HOSTONLY
   )
 
@@ -329,6 +330,7 @@ if(${IREE_BUILD_COMPILER})
       iree-opt
     DEPS
       ::iree_opt_main
+      lld
     HOSTONLY
   )
 
@@ -354,6 +356,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       ::init_passes_and_dialects
       ::init_targets
+      lld
       LLVMSupport
       MLIRIR
       MLIRParser
@@ -421,6 +424,13 @@ if(${IREE_BUILD_COMPILER})
       DEPENDS FileCheck
     )
   endif()
+
+  # lld install - required by the compiler to link codegen executables.
+  install(
+    TARGETS lld
+    COMPONENT Compiler
+    RUNTIME DESTINATION bin
+  )
 
   # General test dependency binary/scripts installed.
   install(
