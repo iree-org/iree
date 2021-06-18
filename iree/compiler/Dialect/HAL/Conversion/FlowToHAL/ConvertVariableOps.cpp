@@ -170,25 +170,22 @@ class VariableStoreOpConversion
     : public OpConversionPattern<IREE::Flow::VariableStoreOp> {
  public:
   VariableStoreOpConversion(MLIRContext *ctx, TypeConverter &converter)
-      : OpConversionPattern(ctx) {}
+      : OpConversionPattern(ctx), converter(converter) {}
 
   LogicalResult matchAndRewrite(
       IREE::Flow::VariableStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::VariableStoreOp::Adaptor operands(newOperands);
-    auto *symbolOp =
+    auto *variableOp =
         SymbolTable::lookupNearestSymbolFrom(storeOp, storeOp.variable());
-    if (!symbolOp) return failure();
-    auto variableOp = dyn_cast<IREE::HAL::VariableOp>(symbolOp);
-    if (!variableOp) {
-      // Will happen if the variable op does not dominate the containing
-      // function.
-      return rewriter.notifyMatchFailure(storeOp,
-                                         "does not reference a HAL VariableOp");
-    }
+    if (!variableOp) return failure();
 
+    Type variableType = getVariableType(variableOp);
+    if (!variableType) {
+      return rewriter.notifyMatchFailure(storeOp, "illegal variable op type");
+    }
     Value storeValue = implicitCastVariableStore(
-        storeOp.getLoc(), operands.value(), variableOp.type(), rewriter);
+        storeOp.getLoc(), operands.value(), variableType, rewriter);
     if (!storeValue) {
       return rewriter.notifyMatchFailure(storeOp,
                                          "mismatched store and variable type");
@@ -198,6 +195,22 @@ class VariableStoreOpConversion
         storeOp, storeValue, rewriter.getSymbolRefAttr(storeOp.variable()));
     return success();
   }
+
+  Type getVariableType(Operation *variableOp) const {
+    if (auto halVariableOp = dyn_cast<IREE::HAL::VariableOp>(variableOp)) {
+      return halVariableOp.type();
+    } else if (auto flowVariableOp =
+                   dyn_cast<IREE::Flow::VariableOp>(variableOp)) {
+      // If the variable referent is not in dominance order at the module level,
+      // it may not have been converted yet. So get the unconverted op and
+      // convert its type to allow variables and uses in any order.
+      return converter.convertType(flowVariableOp.type());
+    }
+
+    return nullptr;
+  }
+
+  TypeConverter &converter;
 };
 
 class VariableStoreIndirectOpConversion

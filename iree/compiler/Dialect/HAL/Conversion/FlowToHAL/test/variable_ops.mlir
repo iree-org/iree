@@ -76,14 +76,17 @@ func @fn(%arg0: !hal.buffer_view) {
 }
 
 // -----
-// Checks that stores are only permitted on variables that dominate.
-func @fn(%arg0: !hal.buffer_view) {
+// Checks that stores are permitted for variables that do not dominate the
+// function containing a store.
+// CHECK-LABEL: func @store_var_out_of_order
+// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
+// CHECK: hal.variable.store %[[buffer]], @var_out_of_order : !hal.buffer
+func @store_var_out_of_order(%arg0: !hal.buffer_view) {
   %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<f32>
-  // expected-error @+1 {{failed to legalize operation 'flow.variable.store'}}
-  flow.variable.store %0, @var_with_buffer_view_store : tensor<f32>
+  flow.variable.store %0, @var_out_of_order : tensor<f32>
   return
 }
-flow.variable @var_with_buffer_view_store mutable dense<0.000000e+00> : tensor<f32>
+flow.variable @var_out_of_order mutable dense<0.000000e+00> : tensor<f32>
 
 // -----
 // Checks that the implicit cast allowing a buffer_view to indirect store into
