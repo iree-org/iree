@@ -164,6 +164,10 @@ set(IREE_ALL_TARGET_BACKENDS
 
 if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
   set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
+  # For Apple platforms we need to use Metal instead of Vulkan.
+  if(APPLE)
+    list(REMOVE_ITEM IREE_TARGET_BACKENDS_TO_BUILD Vulkan-SPIRV)
+  endif()
 endif()
 message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
 
