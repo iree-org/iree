@@ -37,11 +37,6 @@ iree_cc_library(
   PUBLIC
 )
 
-# TODO(#3848): gtest library has implicit thread dependency from absl.
-if(NOT ${IREE_ENABLE_THREADING})
-  return()
-endif()
-
 iree_cc_library(
   NAME
     gtest
@@ -49,8 +44,6 @@ iree_cc_library(
     "gtest.h"
     "status_matchers.h"
   DEPS
-    absl::optional
-    absl::strings
     gmock
     gtest
     iree::base::status

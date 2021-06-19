@@ -12,15 +12,23 @@
 #include <utility>
 #include <vector>
 
-#include "absl/types/optional.h"
-#include "absl/types/span.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/span.h"
 #include "iree/base/status.h"
 #include "iree/vm/builtin_types.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/ref_cc.h"
 #include "iree/vm/stack.h"
+
+// std::string_view is available starting in C++17.
+// Prior to that only IREE's C iree_string_view_t is available.
+#if defined(__has_include)
+#if __has_include(<string_view>) && __cplusplus >= 201703L
+#define IREE_HAVE_STD_STRING_VIEW 1
+#include <string_view>
+#endif  // __has_include(<string_view>)
+#endif  // __has_include
 
 namespace iree {
 namespace vm {
@@ -192,9 +200,15 @@ struct cconv_map<ref<T>> {
   static constexpr const auto conv_chars = literal("r");
 };
 template <>
-struct cconv_map<absl::string_view> {
+struct cconv_map<iree_string_view_t> {
   static constexpr const auto conv_chars = literal("r");
 };
+#if defined(IREE_HAVE_STD_STRING_VIEW)
+template <>
+struct cconv_map<std::string_view> {
+  static constexpr const auto conv_chars = literal("r");
+};
+#endif  // IREE_HAVE_STD_STRING_VIEW
 
 template <typename U, size_t S>
 struct cconv_map<std::array<U, S>> {
@@ -209,7 +223,7 @@ struct cconv_map<std::tuple<Ts...>> {
 };
 
 template <typename U>
-struct cconv_map<absl::Span<U>> {
+struct cconv_map<iree::span<U>> {
   static constexpr const auto conv_chars = concat_literals(
       literal("C"), cconv_map<typename impl::remove_cvref<U>::type>::conv_chars,
       literal("D"));
@@ -292,15 +306,19 @@ struct ParamUnpack<ref<T>>;
 template <typename T>
 struct ParamUnpack<const ref<T>>;
 template <>
-struct ParamUnpack<absl::string_view>;
+struct ParamUnpack<iree_string_view_t>;
+#if defined(IREE_HAVE_STD_STRING_VIEW)
+template <>
+struct ParamUnpack<std::string_view>;
+#endif  // IREE_HAVE_STD_STRING_VIEW
 template <typename U, size_t S>
 struct ParamUnpack<std::array<U, S>>;
 template <typename... Ts>
 struct ParamUnpack<std::tuple<Ts...>>;
 template <typename U>
-struct ParamUnpack<absl::Span<U>, enable_if_not_primitive<U>>;
+struct ParamUnpack<iree::span<U>, enable_if_not_primitive<U>>;
 template <typename U>
-struct ParamUnpack<absl::Span<U>, enable_if_primitive<U>>;
+struct ParamUnpack<iree::span<U>, enable_if_primitive<U>>;
 
 struct Unpacker {
   template <typename... Ts>
@@ -413,14 +431,40 @@ struct ParamUnpack<const ref<T>> {
 // An `iree.byte_buffer` containing a string.
 // The string view is aliased directly into the underlying byte buffer.
 template <>
-struct ParamUnpack<absl::string_view> {
-  using storage_type = absl::string_view;
+struct ParamUnpack<iree_string_view_t> {
+  using storage_type = iree_string_view_t;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::get()->type) {
       auto byte_span = reinterpret_cast<iree_vm_buffer_t*>(reg_ptr->ptr)->data;
-      out_param = absl::string_view{
+      out_param = iree_make_string_view(
+          reinterpret_cast<const char*>(byte_span.data), byte_span.data_length);
+    } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "parameter contains a reference to the wrong type; "
+          "have %.*s but expected %.*s",
+          (int)iree_vm_ref_type_name(reg_ptr->type).size,
+          iree_vm_ref_type_name(reg_ptr->type).data,
+          (int)ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.size,
+          ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.data);
+    } else {
+      // NOTE: empty string is allowed here!
+      out_param = iree_string_view_empty();
+    }
+  }
+};
+#if defined(IREE_HAVE_STD_STRING_VIEW)
+template <>
+struct ParamUnpack<std::string_view> {
+  using storage_type = std::string_view;
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
+    ptr += sizeof(iree_vm_ref_t);
+    if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::get()->type) {
+      auto byte_span = reinterpret_cast<iree_vm_buffer_t*>(reg_ptr->ptr)->data;
+      out_param = std::string_view{
           reinterpret_cast<const char*>(byte_span.data), byte_span.data_length};
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
       status = iree_make_status(
@@ -437,6 +481,7 @@ struct ParamUnpack<absl::string_view> {
     }
   }
 };
+#endif  // IREE_HAVE_STD_STRING_VIEW
 
 // Arrays are C++ ABI only representing a fixed repeated field (`i32, i32`).
 template <typename U, size_t S>
@@ -473,7 +518,7 @@ struct ParamUnpack<std::tuple<Ts...>> {
 // In the future we could check that all subelements are primitives and alias if
 // the host machine endianness is the same.
 template <typename U>
-struct ParamUnpack<absl::Span<U>, enable_if_not_primitive<U>> {
+struct ParamUnpack<iree::span<U>, enable_if_not_primitive<U>> {
   using element_type = typename impl::remove_cvref<U>::type;
   using storage_type = std::vector<element_type>;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
@@ -489,14 +534,14 @@ struct ParamUnpack<absl::Span<U>, enable_if_not_primitive<U>> {
 // Simple primitive variadic span (like `i32...`). We can alias directly into
 // the argument buffer so long as endianness matches.
 template <typename U>
-struct ParamUnpack<absl::Span<U>, enable_if_primitive<U>> {
+struct ParamUnpack<iree::span<U>, enable_if_primitive<U>> {
   using element_type = U;
-  using storage_type = absl::Span<const element_type>;
+  using storage_type = iree::span<const element_type>;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     iree_host_size_t count = *reinterpret_cast<const int32_t*>(ptr);
     ptr += sizeof(int32_t);
     out_param =
-        absl::MakeConstSpan(reinterpret_cast<const element_type*>(ptr), count);
+        iree::span<U>(reinterpret_cast<const element_type*>(ptr), count);
     ptr += sizeof(element_type) * count;
   }
 };
@@ -638,22 +683,20 @@ struct NativeFunction {
 
 template <typename Owner, typename Result, typename... Params>
 constexpr NativeFunction<Owner> MakeNativeFunction(
-    absl::string_view name, StatusOr<Result> (Owner::*fn)(Params...)) {
+    const char* name, StatusOr<Result> (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctor<Owner, Result, Params...>;
-  return {{name.data(), name.size()},
+  return {iree_make_cstring_view(name),
           packing::cconv_storage<Result, sizeof...(Params), Params...>::value(),
-          (void (Owner::*)())fn,
-          &dispatch_functor_t::Call};
+          (void (Owner::*)())fn, &dispatch_functor_t::Call};
 }
 
 template <typename Owner, typename... Params>
 constexpr NativeFunction<Owner> MakeNativeFunction(
-    absl::string_view name, Status (Owner::*fn)(Params...)) {
+    const char* name, Status (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctorVoid<Owner, Params...>;
-  return {{name.data(), name.size()},
+  return {iree_make_cstring_view(name),
           packing::cconv_storage_void<sizeof...(Params), Params...>::value(),
-          (void (Owner::*)())fn,
-          &dispatch_functor_t::Call};
+          (void (Owner::*)())fn, &dispatch_functor_t::Call};
 }
 
 }  // namespace vm

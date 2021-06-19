@@ -27,10 +27,7 @@ iree_pyext_module(
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
-    absl::inlined_vector
-    absl::strings
     absl::optional
-    absl::span
 )
 
 iree_py_library(

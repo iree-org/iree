@@ -14,7 +14,6 @@ iree_cc_test(
   SRCS
     "module_test.cc"
   DEPS
-    absl::strings
     iree::base::logging
     iree::base::status
     iree::testing::gtest

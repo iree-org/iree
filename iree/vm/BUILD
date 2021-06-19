@@ -33,8 +33,8 @@ cc_library(
 cc_library(
     name = "cc",
     hdrs = [
-        "module_abi_packing.h",
         "native_module_cc.h",
+        "native_module_packing.h",
         "ref_cc.h",
     ],
     deps = [
@@ -42,9 +42,7 @@ cc_library(
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:status",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
+        "//iree/base/internal:span",
     ],
 )
 
@@ -248,8 +246,6 @@ cc_test(
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "//iree/vm/test:all_bytecode_modules_c",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
     ],
 )
 

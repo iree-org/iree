@@ -25,16 +25,14 @@ iree_cc_library(
   NAME
     cc
   HDRS
-    "module_abi_packing.h"
     "native_module_cc.h"
+    "native_module_packing.h"
     "ref_cc.h"
   DEPS
     ::vm
-    absl::optional
-    absl::span
-    absl::strings
     iree::base
     iree::base::core_headers
+    iree::base::internal::span
     iree::base::status
   PUBLIC
 )
@@ -201,8 +199,6 @@ iree_cc_test(
   DEPS
     ::bytecode_module
     ::vm
-    absl::span
-    absl::strings
     iree::base::logging
     iree::base::status
     iree::testing::gtest

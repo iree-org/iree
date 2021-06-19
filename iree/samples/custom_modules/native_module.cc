@@ -15,7 +15,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
@@ -285,7 +284,9 @@ extern "C" iree_status_t iree_custom_native_module_create(
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CustomModule>(
-      "custom", allocator, absl::MakeConstSpan(kCustomModuleFunctions));
+      "custom", allocator,
+      iree::span<const vm::NativeFunction<CustomModuleState>>(
+          kCustomModuleFunctions));
   IREE_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
   return iree_ok_status();

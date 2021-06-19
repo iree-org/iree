@@ -78,9 +78,8 @@ cc_test(
         ":hal",
         "//iree/base",
         "//iree/base:status",
+        "//iree/base/internal:span",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
     ],
 )

@@ -249,8 +249,8 @@ typedef struct iree_hal_buffer_mapping_t {
 // be unmapped before any command may use it.
 //
 // Buffers may map (roughly) 1:1 with an allocation either from the host heap or
-// a device. iree_hal_buffer_Subspan can be used to reference subspans of
-// buffers like absl::Span - though unlike absl::Span the returned Buffer holds
+// a device. iree_hal_buffer_subspan can be used to reference subspans of
+// buffers like std::span - though unlike std::span the returned buffer holds
 // a reference to the parent buffer.
 typedef struct iree_hal_buffer_t iree_hal_buffer_t;
 
