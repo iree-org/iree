@@ -149,7 +149,7 @@ cc_library(
         ":init_iree_passes_and_dialects",
         ":init_mlir_passes_and_dialects",
         ":init_xla_dialects",
-        "//iree/compiler/Conversion",
+        "//iree/compiler/Codegen",
         "//iree/compiler/Dialect/HAL/Conversion:Passes",
     ],
 )
@@ -319,7 +319,7 @@ cc_library(
         ":init_targets",
         ":init_translations",
         ":init_xla_dialects",
-        "//iree/compiler/Conversion",
+        "//iree/compiler/Codegen",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
