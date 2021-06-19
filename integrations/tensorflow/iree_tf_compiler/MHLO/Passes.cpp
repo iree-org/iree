@@ -9,6 +9,7 @@
 #include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/SCF/Passes.h"
@@ -41,7 +42,7 @@ void buildMHLOImportPassPipeline(OpPassManager &pm) {
 
   // Mostly delicate to the IREE side MHLO legalization pipeline, now that
   // we have handled the weird that comes from legacy HLO clients.
-  mlir::iree_compiler::IREE::Flow::buildMHLOInputTransformPassPipeline(pm);
+  mlir::iree_compiler::buildMHLOInputConversionPassPipeline(pm);
 
   // Import pipelines should end with canonicalization because they may have
   // access to dialects and patterns that the core compiler does not.

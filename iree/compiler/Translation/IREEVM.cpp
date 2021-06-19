@@ -13,6 +13,8 @@
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
@@ -170,10 +172,10 @@ static void buildIREEVMTransformPassPipeline(
     case InputDialectOptions::Type::none:
       break;
     case InputDialectOptions::Type::tosa:
-      IREE::Flow::buildTOSAInputTransformPassPipeline(passManager);
+      buildTOSAInputConversionPassPipeline(passManager);
       break;
     case InputDialectOptions::Type::mhlo:
-      IREE::Flow::buildMHLOInputTransformPassPipeline(passManager);
+      buildMHLOInputConversionPassPipeline(passManager);
       break;
   }
 

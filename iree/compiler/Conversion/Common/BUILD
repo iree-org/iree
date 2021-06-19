@@ -40,6 +40,7 @@ cc_library(
         "LinalgBufferizePass.cpp",
         "OptimizeVectorTransferPass.cpp",
         "SetNumWorkgroupsPass.cpp",
+        "VectorizeConv.cpp",
     ],
     deps = [
         "//iree/compiler/Conversion:PassHeaders",
@@ -54,6 +55,7 @@ cc_library(
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:CFGTransforms",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgInterfaces",

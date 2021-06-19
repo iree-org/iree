@@ -36,8 +36,6 @@ cc_library(
     deps = [
         "//iree/compiler/Conversion:PassHeaders",
         "//iree/compiler/Conversion/Common",
-        "//iree/compiler/Conversion/HLOToLinalg",
-        "//iree/compiler/Conversion/LinalgToVector",
         "//iree/compiler/Conversion/Transforms",
         "//iree/compiler/Conversion/Utils",
         "//iree/compiler/Dialect/Flow/IR",

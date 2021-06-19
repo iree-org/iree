@@ -1,4 +1,3 @@
-
 // Copyright 2021 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -9,12 +8,6 @@
 #define IREE_CONVERSION_PASSES
 
 include "mlir/Pass/PassBase.td"
-
-def ConvertHLOToLinalgOnTensors :
-    Pass<"iree-codegen-hlo-to-linalg-on-tensors", "FuncOp"> {
-  let summary = "Convert from XLA-HLO ops to Linalg ops on tensors";
-  let constructor = "mlir::iree_compiler::createHLOToLinalgOnTensorsPass()";
-}
 
 //------------------------------------------------------------------------------
 // Common/misc passes
@@ -50,12 +43,6 @@ def ForOpCanonicalization :
   let constructor = "mlir::iree_compiler::createForOpCanonicalizationPass()";
 }
 
-def FusionOfTensorOps :
-    Pass<"iree-codegen-fusion-of-tensor-ops", ""> {
-  let summary = "Fuse operations on tensors";
-  let constructor = "mlir::iree_compiler::createFusionOfTensorOpsPass()";
-}
-
 def LinalgBufferize :
     Pass<"iree-codegen-linalg-bufferize", "FuncOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
@@ -66,12 +53,6 @@ def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "FuncOp"> {
   let summary = "Run optimization transformations on vector transfer operations";
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
-}
-
-def ResolveShapeOps :
-    Pass<"iree-codegen-resolve-shape", "FuncOp"> {
-  let summary = "resolve shapes";
-  let constructor = "mlir::iree_compiler::createResolveShapeOpsPass()";
 }
 
 // TODO: Consider removing or moving to HAL/Transforms in order to avoid
@@ -85,18 +66,6 @@ def SetNumWorkgroups :
 //------------------------------------------------------------------------------
 // LinalgToLinalg
 //------------------------------------------------------------------------------
-
-def ConvertConv2D1x1ConvToMatmul :
-    Pass<"iree-codegen-convert-conv2d-1x1-to-matmul", "FuncOp"> {
-  let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
-  let constructor = "mlir::iree_compiler::createConvertConv2D1x1ToMatmulPass()";
-}
-
-def ConvertConv2DToImg2Col :
-    Pass<"iree-codegen-convert-conv2d-to-img2col", "FuncOp"> {
-  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
-  let constructor = "mlir::iree_compiler::createConvertConv2DToImg2ColPass()";
-}
 
 //------------------------------------------------------------------------------
 // LinalgToLLVM
@@ -279,12 +248,6 @@ def VectorToAArch64InlineAsm :
 //------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------
-
-def TestMHLOConvertComplexToReal :
-    Pass<"iree-test-mhlo-convert-complex-to-real", "FuncOp"> {
-  let summary = "Test pass that does an MHLO->MHLO conversion of just complex arithmetic ops.";
-  let constructor = "mlir::iree_compiler::createTestMHLOConvertComplexToRealPass()";
-}
 
 def TestLinalgToLLVMGPUScalarizeMathOp :
     Pass<"iree-test-llvmgpu-scalarize-math-op", "FuncOp"> {

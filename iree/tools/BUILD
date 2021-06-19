@@ -95,6 +95,8 @@ cc_library(
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/compiler/Dialect/Vulkan/IR",
+        "//iree/compiler/InputConversion/MHLO",
+        "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//mlir:IR",
     ],
@@ -148,7 +150,6 @@ cc_library(
         ":init_mlir_passes_and_dialects",
         ":init_xla_dialects",
         "//iree/compiler/Conversion",
-        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Dialect/HAL/Conversion:Passes",
     ],
 )
