@@ -300,6 +300,7 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         "//build_tools:default_linkopts",
+        "//build_tools:threads",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",

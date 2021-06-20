@@ -114,8 +114,8 @@ cc_library(
         ":file_path",
         ":internal",
         ":synchronization",
-        "//build_tools:default_linkopts",
         "//build_tools:dl",
+        "//build_tools:threads",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -298,6 +298,7 @@ cc_library(
     ],
     deps = [
         ":internal",
+        "//build_tools:threads",
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
@@ -357,8 +358,8 @@ cc_library(
     deps = [
         ":internal",
         ":synchronization",
-        "//build_tools:default_linkopts",
         "//build_tools:dl",
+        "//build_tools:threads",
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",

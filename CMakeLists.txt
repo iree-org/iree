@@ -311,6 +311,13 @@ mark_as_advanced(
 include(iree_setup_toolchain)
 
 #-------------------------------------------------------------------------------
+# Threads
+#-------------------------------------------------------------------------------
+if(${IREE_ENABLE_THREADING})
+  find_package(Threads REQUIRED)
+endif()
+
+#-------------------------------------------------------------------------------
 # Configure python early if there are any features that need it.
 # Note that doing this early ensures that dependencies that make incidental
 # use of Python (such as LLVM) resolve the same version.

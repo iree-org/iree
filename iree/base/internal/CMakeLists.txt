@@ -105,6 +105,7 @@ iree_cc_library(
     ::file_path
     ::internal
     ::synchronization
+    Threads::Threads
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
@@ -314,6 +315,7 @@ iree_cc_library(
     "synchronization.c"
   DEPS
     ::internal
+    Threads::Threads
     iree::base
     iree::base::core_headers
     iree::base::tracing
@@ -371,6 +373,7 @@ iree_cc_library(
     ${CMAKE_DL_LIBS}
     ::internal
     ::synchronization
+    Threads::Threads
     iree::base
     iree::base::core_headers
     iree::base::tracing
