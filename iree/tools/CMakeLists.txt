@@ -6,7 +6,7 @@
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
 
-# Tools has thread dependency from iree::hal::drivers and absl
+# Tools has thread dependency from iree::hal::drivers
 if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
@@ -84,8 +84,6 @@ iree_cc_binary(
   SRCS
     "iree-check-module-main.cc"
   DEPS
-    iree::modules::check::native_module
-    absl::strings
     iree::base
     iree::base::core_headers
     iree::base::internal::file_io
@@ -95,6 +93,7 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal
     iree::hal::drivers
+    iree::modules::check::native_module
     iree::modules::hal
     iree::testing::gtest
     iree::tools::utils::vm_util
@@ -369,7 +368,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRSupport
       MLIRTargetLLVMIRExport
-      absl::span
       iree::base
       iree::base::internal::flags
       iree::base::logging

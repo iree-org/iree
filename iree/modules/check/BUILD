@@ -19,6 +19,7 @@ cc_test(
         "//iree/base:logging",
         "//iree/base:status",
         "//iree/base/internal",
+        "//iree/base/internal:span",
         "//iree/hal",
         "//iree/hal/vmvx/registration",
         "//iree/modules/hal",
@@ -27,7 +28,6 @@ cc_test(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -45,6 +45,5 @@ cc_library(
         "//iree/testing:gtest",
         "//iree/vm",
         "//iree/vm:cc",
-        "@com_google_absl//absl/types:span",
     ],
 )

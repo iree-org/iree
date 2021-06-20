@@ -38,7 +38,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/logging.h"
@@ -56,6 +55,7 @@
 #include "iree/tools/init_targets.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
+#include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -270,7 +270,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
 
   // Parse input values from the flags.
   vm::ref<iree_vm_list_t> inputs;
-  auto function_inputs_list = absl::MakeConstSpan(
+  auto function_inputs_list = iree::span<std::string>(
       function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
       function_inputs_flag.size());
   IREE_RETURN_IF_ERROR(
@@ -305,7 +305,10 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   // We do this first so that if we fail validation we know prior to dealing
   // with devices.
   iree_vm_module_t* bytecode_module = nullptr;
-  IREE_RETURN_IF_ERROR(LoadBytecodeModule(flatbuffer_data, &bytecode_module));
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
+      iree_make_const_byte_span((void*)flatbuffer_data.data(),
+                                flatbuffer_data.size()),
+      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
 
   if (!run_flag) {
     // Just wanted verification; return without running.
@@ -316,7 +319,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(CreateDevice(driver_name.c_str(), &device));
   iree_vm_module_t* hal_module = nullptr;
-  IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
@@ -467,14 +471,14 @@ extern "C" int main(int argc, char** argv) {
 
   int argc_llvm = argc;
   char** argv_llvm = argv;
-  int argc_absl = 1;
-  std::vector<char*> argv_absl = {argv[0]};
+  int argc_iree = 1;
+  std::vector<char*> argv_iree = {argv[0]};
   for (int i = 0; i < argc; ++i) {
     if (std::strcmp(argv[i], "--") == 0) {
       argc_llvm = i;
-      argc_absl = argc - i;
+      argc_iree = argc - i;
       for (int j = i + 1; j < argc; ++j) {
-        argv_absl.push_back(argv[i + 1]);
+        argv_iree.push_back(argv[i + 1]);
       }
       break;
     }
@@ -502,12 +506,12 @@ extern "C" int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc_llvm, argv_llvm);
 
   for (auto& run_arg : run_args_flag) {
-    argv_absl.push_back(const_cast<char*>(run_arg.c_str()));
+    argv_iree.push_back(const_cast<char*>(run_arg.c_str()));
   }
-  argc_absl += run_args_flag.size();
-  char** argv_absl_ptr = argv_absl.data();
-  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc_absl,
-                           &argv_absl_ptr);
+  argc_iree += run_args_flag.size();
+  char** argv_iree_ptr = argv_iree.data();
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc_iree,
+                           &argv_iree_ptr);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
 

@@ -281,6 +281,28 @@ cc_test(
 )
 
 cc_library(
+    name = "span",
+    hdrs = ["span.h"],
+)
+
+cc_library(
+    name = "status_internal",
+    srcs = [
+        "status.cc",
+        "statusor.cc",
+    ],
+    hdrs = [
+        "status.h",
+        "statusor.h",
+    ],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:logging",
+    ],
+)
+
+cc_library(
     name = "synchronization",
     srcs = [
         "synchronization.c",
@@ -330,32 +352,11 @@ cc_test(
 
 iree_cmake_extra_content(
     content = """
-# TODO(#3848): absl has a thread dependency, move this condition after statusor
-# is fixed.
 if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
 """,
     inline = True,
-)
-
-# TODO(#3848): statusor has the abseil dependency.
-cc_library(
-    name = "status_internal",
-    srcs = [
-        "status.cc",
-        "statusor.cc",
-    ],
-    hdrs = [
-        "status.h",
-        "statusor.h",
-    ],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:logging",
-        "@com_google_absl//absl/utility",
-    ],
 )
 
 cc_library(

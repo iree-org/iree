@@ -58,7 +58,6 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
-    absl::span
     iree::base
     iree::base::status
     iree::hal

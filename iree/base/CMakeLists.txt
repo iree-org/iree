@@ -58,28 +58,28 @@ iree_cc_library(
     iree::base::internal::flags
   PUBLIC
 )
-if(${IREE_ENABLE_THREADING})
-  iree_cc_library(
-    NAME
-      status
-    HDRS
-      "status.h"
-    DEPS
-      iree::base::internal::status_internal
-    PUBLIC
-  )
 
-  iree_cc_test(
-    NAME
-      status_test
-    SRCS
-      "status_test.cc"
-    DEPS
-      ::status
-      iree::testing::gtest
-      iree::testing::gtest_main
-  )
-endif()
+iree_cc_library(
+  NAME
+    status
+  HDRS
+    "status.h"
+  DEPS
+    iree::base::internal::status_internal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    status_test
+  SRCS
+    "status_test.cc"
+  DEPS
+    ::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_test(
   NAME
     string_view_test

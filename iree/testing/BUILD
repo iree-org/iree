@@ -6,8 +6,6 @@
 
 # Testing utilities for IREE.
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -40,16 +38,6 @@ cc_library(
     ],
 )
 
-iree_cmake_extra_content(
-    content = """
-# TODO(#3848): gtest library has implicit thread dependency from absl.
-if(NOT ${IREE_ENABLE_THREADING})
-  return()
-endif()
-""",
-    inline = True,
-)
-
 cc_library(
     name = "gtest",
     testonly = True,
@@ -59,8 +47,6 @@ cc_library(
     ],
     deps = [
         "//iree/base:status",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest",
     ],
 )
