@@ -7,24 +7,12 @@
 #ifndef IREE_BINDINGS_PYTHON_IREE_BINDING_H_
 #define IREE_BINDINGS_PYTHON_IREE_BINDING_H_
 
+#include <optional>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "iree/base/api.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
-
-namespace pybind11 {
-namespace detail {
-#if !defined(ABSL_HAVE_STD_OPTIONAL)
-// Make absl::optional act like the future C++17 optional for pybind11.
-// If ABSL_HAVE_STD_OPTIONAL is defined then absl::optional == std::optional
-// and the default type caster is sufficient.
-template <typename T>
-struct type_caster<absl::optional<T>> : optional_caster<absl::optional<T>> {};
-#endif
-}  // namespace detail
-}  // namespace pybind11
 
 namespace iree {
 namespace python {

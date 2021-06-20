@@ -6,7 +6,6 @@
 
 #include "bindings/python/iree/runtime/vm.h"
 
-#include "absl/types/optional.h"
 #include "bindings/python/iree/runtime/status_utils.h"
 #include "iree/base/api.h"
 #include "iree/base/status.h"
@@ -75,7 +74,7 @@ VmInstance VmInstance::Create() {
 //------------------------------------------------------------------------------
 
 VmContext VmContext::Create(VmInstance* instance,
-                            absl::optional<std::vector<VmModule*>> modules) {
+                            std::optional<std::vector<VmModule*>> modules) {
   iree_vm_context_t* context;
   if (!modules) {
     // Simple create with open allowed modules.
@@ -147,14 +146,14 @@ VmModule VmModule::FromFlatbufferBlob(py::buffer flatbuffer_blob) {
   return VmModule::CreateRetained(module);
 }
 
-absl::optional<iree_vm_function_t> VmModule::LookupFunction(
+std::optional<iree_vm_function_t> VmModule::LookupFunction(
     const std::string& name, iree_vm_function_linkage_t linkage) {
   iree_vm_function_t f;
   auto status = iree_vm_module_lookup_function_by_name(
       raw_ptr(), linkage, {name.data(), name.size()}, &f);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
-    return absl::nullopt;
+    return std::nullopt;
   }
   CheckApiStatus(status, "Error looking up function");
   return f;
@@ -525,7 +524,7 @@ void SetupVmBindings(pybind11::module m) {
 
   py::class_<VmContext>(m, "VmContext")
       .def(py::init(&VmContext::Create), py::arg("instance"),
-           py::arg("modules") = absl::optional<std::vector<VmModule*>>())
+           py::arg("modules") = std::optional<std::vector<VmModule*>>())
       .def("register_modules", &VmContext::RegisterModules)
       .def_property_readonly("context_id", &VmContext::context_id)
       .def("invoke", &VmContext::Invoke);

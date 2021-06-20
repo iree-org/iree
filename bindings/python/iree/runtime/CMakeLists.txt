@@ -27,7 +27,6 @@ iree_pyext_module(
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
-    absl::optional
 )
 
 iree_py_library(
