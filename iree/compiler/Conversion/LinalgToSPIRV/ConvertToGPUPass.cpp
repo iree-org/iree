@@ -444,8 +444,8 @@ namespace {
 struct LinalgToSPIRVConvertToGPUPass
     : public LinalgToSPIRVConvertToGPUBase<LinalgToSPIRVConvertToGPUPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect,
-                    ShapeDialect>();
+    registry.insert<AffineDialect, gpu::GPUDialect, memref::MemRefDialect,
+                    scf::SCFDialect, ShapeDialect>();
   }
   void runOnOperation() override;
 };
