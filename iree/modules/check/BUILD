@@ -17,7 +17,7 @@ cc_library(
     hdrs = ["module.h"],
     deps = [
         "//iree/base",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/base/internal",
         "//iree/hal",
         "//iree/modules/hal",
@@ -33,8 +33,7 @@ cc_test(
     deps = [
         ":check",
         "//iree/base",
-        "//iree/base:logging",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/base/internal",
         "//iree/base/internal:span",
         "//iree/hal",

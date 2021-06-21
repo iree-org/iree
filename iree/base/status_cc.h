@@ -4,24 +4,251 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_BASE_INTERNAL_STATUSOR_H_
-#define IREE_BASE_INTERNAL_STATUSOR_H_
+#ifndef IREE_BASE_STATUS_CC_H_
+#define IREE_BASE_STATUS_CC_H_
 
 #ifndef __cplusplus
-#error iree::StatusOr<T> is only usable in C++ code.
+#error iree::Status is only usable in C++ code.
 #endif  // !__cplusplus
 
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <string>
 #include <type_traits>
 #include <utility>
 
 #include "iree/base/api.h"
 #include "iree/base/attributes.h"
-#include "iree/base/internal/status.h"
+#include "iree/base/logging.h"
+#include "iree/base/target_platform.h"
 
 namespace iree {
 
+namespace status_impl {
+
+template <class T, class U = T>
+constexpr T exchange(T& obj, U&& new_value) {
+  T old_value = std::move(obj);
+  obj = std::forward<U>(new_value);
+  return old_value;
+}
+
+}  // namespace status_impl
+
+//===----------------------------------------------------------------------===//
+// Status codes and source location utilities
+//===----------------------------------------------------------------------===//
+
+// Class representing a specific location in the source code of a program.
+class SourceLocation {
+ public:
+  // Avoid this constructor; it populates the object with dummy values.
+  constexpr SourceLocation() : line_(0), file_name_(nullptr) {}
+
+  // `file_name` must outlive all copies of the `iree::SourceLocation` object,
+  // so in practice it should be a string literal.
+  constexpr SourceLocation(std::uint_least32_t line, const char* file_name)
+      : line_(line), file_name_(file_name) {}
+
+  // The line number of the captured source location.
+  constexpr std::uint_least32_t line() const { return line_; }
+
+  // The file name of the captured source location.
+  constexpr const char* file_name() const { return file_name_; }
+
+ private:
+  std::uint_least32_t line_;
+  const char* file_name_;
+};
+
+// If a function takes an `iree::SourceLocation` parameter, pass this as the
+// argument.
+#if IREE_STATUS_FEATURES == 0
+#define IREE_LOC ::iree::SourceLocation(0, NULL)
+#else
+#define IREE_LOC ::iree::SourceLocation(__LINE__, __FILE__)
+#endif  // IREE_STATUS_FEATURES == 0
+
+enum class StatusCode : uint32_t {
+  kOk = IREE_STATUS_OK,
+  kCancelled = IREE_STATUS_CANCELLED,
+  kUnknown = IREE_STATUS_UNKNOWN,
+  kInvalidArgument = IREE_STATUS_INVALID_ARGUMENT,
+  kDeadlineExceeded = IREE_STATUS_DEADLINE_EXCEEDED,
+  kNotFound = IREE_STATUS_NOT_FOUND,
+  kAlreadyExists = IREE_STATUS_ALREADY_EXISTS,
+  kPermissionDenied = IREE_STATUS_PERMISSION_DENIED,
+  kResourceExhausted = IREE_STATUS_RESOURCE_EXHAUSTED,
+  kFailedPrecondition = IREE_STATUS_FAILED_PRECONDITION,
+  kAborted = IREE_STATUS_ABORTED,
+  kOutOfRange = IREE_STATUS_OUT_OF_RANGE,
+  kUnimplemented = IREE_STATUS_UNIMPLEMENTED,
+  kInternal = IREE_STATUS_INTERNAL,
+  kUnavailable = IREE_STATUS_UNAVAILABLE,
+  kDataLoss = IREE_STATUS_DATA_LOSS,
+  kUnauthenticated = IREE_STATUS_UNAUTHENTICATED,
+};
+
+static inline const char* StatusCodeToString(StatusCode code) {
+  return iree_status_code_string(static_cast<iree_status_code_t>(code));
+}
+
+// Prints a human-readable representation of `x` to `os`.
+std::ostream& operator<<(std::ostream& os, const StatusCode& x);
+
+//===----------------------------------------------------------------------===//
+// Status
+//===----------------------------------------------------------------------===//
+
+class IREE_MUST_USE_RESULT Status;
+
+// A Status value can be either OK or not-OK
+//   * OK indicates that the operation succeeded.
+//   * A not-OK value indicates that the operation failed and contains
+//   status_impls
+//     about the error.
+class Status final {
+ public:
+  // Return a combination of the error code name and message.
+  static IREE_MUST_USE_RESULT std::string ToString(iree_status_t status);
+
+  // Creates an OK status with no message.
+  Status() = default;
+
+  // Takes ownership of a C API status instance.
+  Status(iree_status_t&& status) noexcept
+      : value_(status_impl::exchange(
+            status, iree_status_from_code(iree_status_code(status)))) {}
+
+  // Takes ownership of a C API status instance wrapped in a Status.
+  Status(Status& other) noexcept
+      : value_(status_impl::exchange(other.value_,
+                                     iree_status_from_code(other.code()))) {}
+  Status(Status&& other) noexcept
+      : value_(status_impl::exchange(other.value_,
+                                     iree_status_from_code(other.code()))) {}
+  Status& operator=(Status&& other) {
+    if (this != &other) {
+      if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
+      value_ = status_impl::exchange(other.value_,
+                                     iree_status_from_code(other.code()));
+    }
+    return *this;
+  }
+
+  Status(iree_status_code_t code) : value_(iree_status_from_code(code)) {}
+  Status& operator=(const iree_status_code_t& code) {
+    if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
+    value_ = iree_status_from_code(code);
+    return *this;
+  }
+
+  Status(StatusCode code) : value_(iree_status_from_code(code)) {}
+  Status& operator=(const StatusCode& code) {
+    if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
+    value_ = iree_status_from_code(code);
+    return *this;
+  }
+
+  // Creates a status with the specified code and error message.
+  // If `code` is kOk, `message` is ignored.
+  Status(StatusCode code, const char* message) {
+    if (IREE_UNLIKELY(code != StatusCode::kOk)) {
+      value_ = (!message || !strlen(message))
+                   ? iree_status_from_code(code)
+                   : iree_status_allocate(static_cast<iree_status_code_t>(code),
+                                          /*file=*/nullptr, /*line=*/0,
+                                          iree_make_cstring_view(message));
+    }
+  }
+  Status(StatusCode code, SourceLocation location, const char* message) {
+    if (IREE_UNLIKELY(code != StatusCode::kOk)) {
+      value_ = iree_status_allocate(static_cast<iree_status_code_t>(code),
+                                    location.file_name(), location.line(),
+                                    iree_make_cstring_view(message));
+    }
+  }
+
+  ~Status() {
+    if (IREE_UNLIKELY((uintptr_t)(value_) & ~IREE_STATUS_CODE_MASK)) {
+      iree_status_free(value_);
+    }
+  }
+
+  // Returns true if the Status is OK.
+  IREE_MUST_USE_RESULT bool ok() const { return iree_status_is_ok(value_); }
+
+  // Returns the error code.
+  IREE_MUST_USE_RESULT StatusCode code() const {
+    return static_cast<StatusCode>(iree_status_code(value_));
+  }
+
+  // Return a combination of the error code name and message.
+  IREE_MUST_USE_RESULT std::string ToString() const {
+    return Status::ToString(value_);
+  }
+
+  // Ignores any errors, potentially suppressing complaints from any tools.
+  void IgnoreError() { value_ = iree_status_ignore(value_); }
+
+  // Converts to a C API status instance and transfers ownership.
+  IREE_MUST_USE_RESULT operator iree_status_t() && {
+    return status_impl::exchange(
+        value_, iree_status_from_code(iree_status_code(value_)));
+  }
+
+  IREE_MUST_USE_RESULT iree_status_t release() {
+    return status_impl::exchange(value_, iree_ok_status());
+  }
+
+  friend bool operator==(const Status& lhs, const Status& rhs) {
+    return lhs.code() == rhs.code();
+  }
+  friend bool operator!=(const Status& lhs, const Status& rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend bool operator==(const Status& lhs, const StatusCode& rhs) {
+    return lhs.code() == rhs;
+  }
+  friend bool operator!=(const Status& lhs, const StatusCode& rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend bool operator==(const StatusCode& lhs, const Status& rhs) {
+    return lhs == rhs.code();
+  }
+  friend bool operator!=(const StatusCode& lhs, const Status& rhs) {
+    return !(lhs == rhs);
+  }
+
+ private:
+  iree_status_t value_ = iree_ok_status();
+};
+
+// Returns an OK status, equivalent to a default constructed instance.
+IREE_MUST_USE_RESULT static inline Status OkStatus() { return Status(); }
+
+// Prints a human-readable representation of `x` to `os`.
+std::ostream& operator<<(std::ostream& os, const Status& x);
+
+IREE_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
+  return status.code() == StatusCode::kOk;
+}
+
+IREE_MUST_USE_RESULT static inline bool IsOk(const iree_status_t& status) {
+  return iree_status_is_ok(status);
+}
+
+//===----------------------------------------------------------------------===//
+// StatusOr<T>
+//===----------------------------------------------------------------------===//
+
 template <typename T>
 class IREE_MUST_USE_RESULT StatusOr;
+
+namespace status_impl {
 
 // https://en.cppreference.com/w/cpp/types/conjunction
 template <typename... Ts>
@@ -41,36 +268,34 @@ struct disjunction<T, Ts...>
 template <typename T>
 struct disjunction<T> : T {};
 
-// https://en.cppreference.com/w/cpp/types/negation
-template <typename T>
-struct negation : std::integral_constant<bool, !T::value> {};
-
 // https://en.cppreference.com/w/cpp/utility/in_place
 struct in_place_t {
   explicit in_place_t() = default;
 };
 /*inline*/ constexpr in_place_t in_place{};
 
-namespace internal_statusor {
+// https://en.cppreference.com/w/cpp/types/negation
+template <typename T>
+struct negation : std::integral_constant<bool, !T::value> {};
 
 template <typename T, typename U>
 using IsStatusOrConversionAmbiguous =
-    iree::disjunction<std::is_constructible<T, StatusOr<U>&>,
-                      std::is_constructible<T, const StatusOr<U>&>,
-                      std::is_constructible<T, StatusOr<U>&&>,
-                      std::is_constructible<T, const StatusOr<U>&&>,
-                      std::is_convertible<StatusOr<U>&, T>,
-                      std::is_convertible<const StatusOr<U>&, T>,
-                      std::is_convertible<StatusOr<U>&&, T>,
-                      std::is_convertible<const StatusOr<U>&&, T>>;
+    status_impl::disjunction<std::is_constructible<T, StatusOr<U>&>,
+                             std::is_constructible<T, const StatusOr<U>&>,
+                             std::is_constructible<T, StatusOr<U>&&>,
+                             std::is_constructible<T, const StatusOr<U>&&>,
+                             std::is_convertible<StatusOr<U>&, T>,
+                             std::is_convertible<const StatusOr<U>&, T>,
+                             std::is_convertible<StatusOr<U>&&, T>,
+                             std::is_convertible<const StatusOr<U>&&, T>>;
 
 template <typename T, typename U>
 using IsStatusOrConversionAssigmentAmbiguous =
-    iree::disjunction<IsStatusOrConversionAmbiguous<T, U>,
-                      std::is_assignable<T&, StatusOr<U>&>,
-                      std::is_assignable<T&, const StatusOr<U>&>,
-                      std::is_assignable<T&, StatusOr<U>&&>,
-                      std::is_assignable<T&, const StatusOr<U>&&>>;
+    status_impl::disjunction<IsStatusOrConversionAmbiguous<T, U>,
+                             std::is_assignable<T&, StatusOr<U>&>,
+                             std::is_assignable<T&, const StatusOr<U>&>,
+                             std::is_assignable<T&, StatusOr<U>&&>,
+                             std::is_assignable<T&, const StatusOr<U>&&>>;
 
 template <typename T, typename U>
 struct IsAmbiguousStatusOrForInitialization
@@ -86,18 +311,18 @@ struct IsAmbiguousStatusOrForInitialization<T, StatusOr<U>>
     : public IsStatusOrConversionAmbiguous<T, U> {};
 
 template <typename T, typename U>
-using IsStatusOrDirectInitializationAmbiguous = iree::disjunction<
+using IsStatusOrDirectInitializationAmbiguous = status_impl::disjunction<
     std::is_same<StatusOr<T>, std::remove_cv_t<std::remove_reference_t<U>>>,
     std::is_same<Status, std::remove_cv_t<std::remove_reference_t<U>>>,
-    std::is_same<iree::in_place_t,
+    std::is_same<status_impl::in_place_t,
                  std::remove_cv_t<std::remove_reference_t<U>>>,
     IsAmbiguousStatusOrForInitialization<T, U>>;
 
 template <typename T, typename U>
-using IsStatusOrDirectInitializationValid = iree::disjunction<
+using IsStatusOrDirectInitializationValid = status_impl::disjunction<
     // The is_same allows nested status ors to ignore this check iff same type.
     std::is_same<T, std::remove_cv_t<std::remove_reference_t<U>>>,
-    iree::negation<IsStatusOrDirectInitializationAmbiguous<T, U>>>;
+    status_impl::negation<IsStatusOrDirectInitializationAmbiguous<T, U>>>;
 
 class Helper {
  public:
@@ -142,7 +367,7 @@ class StatusOrData {
       MakeValue(std::move(other.data_));
       MakeStatus();
     } else {
-      MakeStatus(exchange(other.status_, other.status_.code()));
+      MakeStatus(status_impl::exchange(other.status_, other.status_.code()));
     }
   }
 
@@ -162,12 +387,12 @@ class StatusOrData {
       MakeValue(std::move(other.data_));
       MakeStatus();
     } else {
-      MakeStatus(exchange(other.status_, other.status_.code()));
+      MakeStatus(status_impl::exchange(other.status_, other.status_.code()));
     }
   }
 
   template <typename... Args>
-  explicit StatusOrData(iree::in_place_t, Args&&... args)
+  explicit StatusOrData(status_impl::in_place_t, Args&&... args)
       : data_(std::forward<Args>(args)...) {
     MakeStatus();
   }
@@ -176,7 +401,7 @@ class StatusOrData {
   explicit StatusOrData(T&& value) : data_(std::move(value)) { MakeStatus(); }
 
   explicit StatusOrData(Status&& status)
-      : status_(exchange(status, status.code())) {
+      : status_(status_impl::exchange(status, status.code())) {
     EnsureNotOk();
   }
 
@@ -195,7 +420,7 @@ class StatusOrData {
     if (other.ok()) {
       Assign(std::move(other.data_));
     } else {
-      Assign(exchange(other.status_, other.status_.code()));
+      Assign(status_impl::exchange(other.status_, other.status_.code()));
     }
     return *this;
   }
@@ -231,7 +456,7 @@ class StatusOrData {
 
   void Assign(Status&& status) {
     Clear();
-    status_ = exchange(status, status.code());
+    status_ = status_impl::exchange(status, status.code());
     EnsureNotOk();
   }
 
@@ -270,14 +495,13 @@ class StatusOrData {
   // Construct the value (data_) through placement new with the passed arg.
   template <typename Arg>
   void MakeValue(Arg&& arg) {
-    internal_statusor::PlacementNew<T>(&dummy_, std::forward<Arg>(arg));
+    status_impl::PlacementNew<T>(&dummy_, std::forward<Arg>(arg));
   }
 
   // Construct the status (status_) through placement new with the passed arg.
   template <typename... Args>
   void MakeStatus(Args&&... args) {
-    internal_statusor::PlacementNew<Status>(&status_,
-                                            std::forward<Args>(args)...);
+    status_impl::PlacementNew<Status>(&status_, std::forward<Args>(args)...);
   }
 };
 
@@ -312,21 +536,21 @@ struct TraitsBase<false, false> {
   TraitsBase& operator=(TraitsBase&&) = delete;
 };
 
-}  // namespace internal_statusor
+}  // namespace status_impl
 
 // StatusOr<T> is the union of a Status object and a T object.
 //
 // A StatusOr object either holds a usable value, or an error Status explaining
 // why such a value is not present.
 template <typename T>
-class StatusOr : private internal_statusor::StatusOrData<T>,
-                 private internal_statusor::TraitsBase<
-                     std::is_copy_constructible<T>::value,
-                     std::is_move_constructible<T>::value> {
+class StatusOr
+    : private status_impl::StatusOrData<T>,
+      private status_impl::TraitsBase<std::is_copy_constructible<T>::value,
+                                      std::is_move_constructible<T>::value> {
   template <typename U>
   friend class StatusOr;
 
-  typedef internal_statusor::StatusOrData<T> Base;
+  typedef status_impl::StatusOrData<T> Base;
 
  public:
   typedef T element_type;
@@ -349,24 +573,24 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U,
       std::enable_if_t<
-          iree::conjunction<
-              iree::negation<std::is_same<T, U>>,
+          status_impl::conjunction<
+              status_impl::negation<std::is_same<T, U>>,
               std::is_constructible<T, const U&>,
               std::is_convertible<const U&, T>,
-              iree::negation<internal_statusor::IsStatusOrConversionAmbiguous<
-                  T, U>>>::value,
+              status_impl::negation<
+                  status_impl::IsStatusOrConversionAmbiguous<T, U>>>::value,
           int> = 0>
   StatusOr(const StatusOr<U>& other)  // NOLINT
       : Base(static_cast<const typename StatusOr<U>::Base&>(other)) {}
   template <
       typename U,
       std::enable_if_t<
-          iree::conjunction<
-              iree::negation<std::is_same<T, U>>,
+          status_impl::conjunction<
+              status_impl::negation<std::is_same<T, U>>,
               std::is_constructible<T, const U&>,
-              iree::negation<std::is_convertible<const U&, T>>,
-              iree::negation<internal_statusor::IsStatusOrConversionAmbiguous<
-                  T, U>>>::value,
+              status_impl::negation<std::is_convertible<const U&, T>>,
+              status_impl::negation<
+                  status_impl::IsStatusOrConversionAmbiguous<T, U>>>::value,
           int> = 0>
   explicit StatusOr(const StatusOr<U>& other)
       : Base(static_cast<const typename StatusOr<U>::Base&>(other)) {}
@@ -374,22 +598,23 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U,
       std::enable_if_t<
-          iree::conjunction<
-              iree::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
-              std::is_convertible<U&&, T>,
-              iree::negation<internal_statusor::IsStatusOrConversionAmbiguous<
-                  T, U>>>::value,
+          status_impl::conjunction<
+              status_impl::negation<std::is_same<T, U>>,
+              std::is_constructible<T, U&&>, std::is_convertible<U&&, T>,
+              status_impl::negation<
+                  status_impl::IsStatusOrConversionAmbiguous<T, U>>>::value,
           int> = 0>
   StatusOr(StatusOr<U>&& other)  // NOLINT
       : Base(static_cast<typename StatusOr<U>::Base&&>(other)) {}
   template <
       typename U,
       std::enable_if_t<
-          iree::conjunction<
-              iree::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
-              iree::negation<std::is_convertible<U&&, T>>,
-              iree::negation<internal_statusor::IsStatusOrConversionAmbiguous<
-                  T, U>>>::value,
+          status_impl::conjunction<
+              status_impl::negation<std::is_same<T, U>>,
+              std::is_constructible<T, U&&>,
+              status_impl::negation<std::is_convertible<U&&, T>>,
+              status_impl::negation<
+                  status_impl::IsStatusOrConversionAmbiguous<T, U>>>::value,
           int> = 0>
   explicit StatusOr(StatusOr<U>&& other)
       : Base(static_cast<typename StatusOr<U>::Base&&>(other)) {}
@@ -397,31 +622,29 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // Conversion copy/move assignment operator, T must be constructible and
   // assignable from U. Only enable if T cannot be directly assigned from
   // StatusOr<U>.
-  template <
-      typename U,
-      std::enable_if_t<
-          iree::conjunction<
-              iree::negation<std::is_same<T, U>>,
-              std::is_constructible<T, const U&>,
-              std::is_assignable<T, const U&>,
-              iree::negation<
-                  internal_statusor::IsStatusOrConversionAssigmentAmbiguous<
-                      T, U>>>::value,
-          int> = 0>
+  template <typename U,
+            std::enable_if_t<
+                status_impl::conjunction<
+                    status_impl::negation<std::is_same<T, U>>,
+                    std::is_constructible<T, const U&>,
+                    std::is_assignable<T, const U&>,
+                    status_impl::negation<
+                        status_impl::IsStatusOrConversionAssigmentAmbiguous<
+                            T, U>>>::value,
+                int> = 0>
   StatusOr& operator=(const StatusOr<U>& other) {
     this->Assign(other);
     return *this;
   }
-  template <
-      typename U,
-      std::enable_if_t<
-          iree::conjunction<
-              iree::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
-              std::is_assignable<T, U&&>,
-              iree::negation<
-                  internal_statusor::IsStatusOrConversionAssigmentAmbiguous<
-                      T, U>>>::value,
-          int> = 0>
+  template <typename U,
+            std::enable_if_t<
+                status_impl::conjunction<
+                    status_impl::negation<std::is_same<T, U>>,
+                    std::is_constructible<T, U&&>, std::is_assignable<T, U&&>,
+                    status_impl::negation<
+                        status_impl::IsStatusOrConversionAssigmentAmbiguous<
+                            T, U>>>::value,
+                int> = 0>
   StatusOr& operator=(StatusOr<U>&& other) {
     this->Assign(std::move(other));
     return *this;
@@ -434,8 +657,8 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
 
   // Takes ownership of a C API status instance.
   StatusOr(iree_status_t&& status) noexcept
-      : Base(exchange(status,
-                      iree_status_from_code(iree_status_code(status)))) {}
+      : Base(status_impl::exchange(
+            status, iree_status_from_code(iree_status_code(status)))) {}
 
   // Constructs a new StatusOr with the given non-ok status. After calling this
   // constructor, this->ok() will be false and calls to value() will
@@ -455,9 +678,9 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // Constructs the inner value T in-place using the provided args, using the
   // T(args...) constructor.
   template <typename... Args>
-  explicit StatusOr(iree::in_place_t, Args&&... args);
+  explicit StatusOr(status_impl::in_place_t, Args&&... args);
   template <typename U, typename... Args>
-  explicit StatusOr(iree::in_place_t, std::initializer_list<U> ilist,
+  explicit StatusOr(status_impl::in_place_t, std::initializer_list<U> ilist,
                     Args&&... args);
 
   // Constructs the inner value T in-place using the provided args, using the
@@ -465,27 +688,25 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // constructed from a U. Can accept move or copy constructors. Explicit it
   // U is not convertible to T. To avoid ambiguity, this is disabled if U is
   // a StatusOr<J>, where J is convertible to T.
-  template <
-      typename U = T,
-      std::enable_if_t<
-          iree::conjunction<
-              internal_statusor::IsStatusOrDirectInitializationValid<T, U&&>,
-              std::is_constructible<T, U&&>,
-              std::is_convertible<U&&, T>>::value,
-          int> = 0>
+  template <typename U = T,
+            std::enable_if_t<
+                status_impl::conjunction<
+                    status_impl::IsStatusOrDirectInitializationValid<T, U&&>,
+                    std::is_constructible<T, U&&>,
+                    std::is_convertible<U&&, T>>::value,
+                int> = 0>
   StatusOr(U&& u)  // NOLINT
-      : StatusOr(iree::in_place, std::forward<U>(u)) {}
+      : StatusOr(status_impl::in_place, std::forward<U>(u)) {}
 
-  template <
-      typename U = T,
-      std::enable_if_t<
-          iree::conjunction<
-              internal_statusor::IsStatusOrDirectInitializationValid<T, U&&>,
-              std::is_constructible<T, U&&>,
-              iree::negation<std::is_convertible<U&&, T>>>::value,
-          int> = 0>
+  template <typename U = T,
+            std::enable_if_t<
+                status_impl::conjunction<
+                    status_impl::IsStatusOrDirectInitializationValid<T, U&&>,
+                    std::is_constructible<T, U&&>,
+                    status_impl::negation<std::is_convertible<U&&, T>>>::value,
+                int> = 0>
   explicit StatusOr(U&& u)  // NOLINT
-      : StatusOr(iree::in_place, std::forward<U>(u)) {}
+      : StatusOr(status_impl::in_place, std::forward<U>(u)) {}
 
   // Returns this->ok()
   explicit operator bool() const { return ok(); }
@@ -534,7 +755,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   void IgnoreError() const;
 
  private:
-  using internal_statusor::StatusOrData<T>::Assign;
+  using status_impl::StatusOrData<T>::Assign;
   template <typename U>
   void Assign(const StatusOr<U>& other);
   template <typename U>
@@ -542,7 +763,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Implementation details for StatusOr<T>
+// Implementation status_impls for StatusOr<T>
 
 template <typename T>
 StatusOr<T>::StatusOr() : Base(Status(StatusCode::kUnknown, "")) {}
@@ -592,14 +813,14 @@ inline void StatusOr<T>::Assign(StatusOr<U>&& other) {
 }
 template <typename T>
 template <typename... Args>
-StatusOr<T>::StatusOr(iree::in_place_t, Args&&... args)
-    : Base(iree::in_place, std::forward<Args>(args)...) {}
+StatusOr<T>::StatusOr(status_impl::in_place_t, Args&&... args)
+    : Base(status_impl::in_place, std::forward<Args>(args)...) {}
 
 template <typename T>
 template <typename U, typename... Args>
-StatusOr<T>::StatusOr(iree::in_place_t, std::initializer_list<U> ilist,
+StatusOr<T>::StatusOr(status_impl::in_place_t, std::initializer_list<U> ilist,
                       Args&&... args)
-    : Base(iree::in_place, ilist, std::forward<Args>(args)...) {}
+    : Base(status_impl::in_place, ilist, std::forward<Args>(args)...) {}
 
 template <typename T>
 const Status& StatusOr<T>::status() const& {
@@ -611,7 +832,7 @@ Status StatusOr<T>::status() && {
   if (ok()) {
     return OkStatus();
   } else {
-    return exchange(this->status_, this->status_.code());
+    return status_impl::exchange(this->status_, this->status_.code());
   }
 }
 
@@ -719,4 +940,4 @@ IREE_MUST_USE_RESULT static inline bool IsOk(const StatusOr<T>& status_or) {
   }                                                                       \
   lhs = std::move(statusor).value()
 
-#endif  // IREE_BASE_INTERNAL_STATUSOR_H_
+#endif  // IREE_BASE_STATUS_CC_H_

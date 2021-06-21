@@ -129,8 +129,8 @@ iree_cc_test(
     "file_io_test.cc"
   DEPS
     ::file_io
+    iree::base::cc
     iree::base::logging
-    iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -304,22 +304,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    status_internal
-  HDRS
-    "status.h"
-    "statusor.h"
-  SRCS
-    "status.cc"
-    "statusor.cc"
-  DEPS
-    iree::base
-    iree::base::core_headers
-    iree::base::logging
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     synchronization
   HDRS
     "call_once.h"
@@ -400,7 +384,7 @@ iree_cc_test(
     ::internal
     ::synchronization
     ::threading
-    iree::base::status
+    iree::base::cc
     iree::testing::gtest
     iree::testing::gtest_main
 )

@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "iree/base/internal/span.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"

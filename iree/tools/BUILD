@@ -23,7 +23,7 @@ cc_binary(
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
         "//iree/base",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
         "//iree/base/internal:flags",
@@ -44,9 +44,9 @@ cc_binary(
     srcs = ["iree-check-module-main.cc"],
     deps = [
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:core_headers",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
         "//iree/base/internal:flags",
@@ -247,8 +247,8 @@ cc_binary(
         ":init_passes_and_dialects",
         ":init_targets",
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:flags",
         "//iree/compiler/Dialect/HAL/Target",
@@ -277,7 +277,7 @@ cc_binary(
     srcs = ["iree-run-module-main.cc"],
     deps = [
         "//iree/base",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
         "//iree/base/internal:flags",

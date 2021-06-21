@@ -13,7 +13,7 @@
 #include "iree/base/internal/inline_array.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/logging.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

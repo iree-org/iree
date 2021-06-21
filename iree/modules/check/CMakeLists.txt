@@ -15,8 +15,8 @@ iree_cc_library(
     "module.cc"
   DEPS
     iree::base
+    iree::base::cc
     iree::base::internal
-    iree::base::status
     iree::hal
     iree::modules::hal
     iree::testing::gtest
@@ -36,10 +36,9 @@ if(${IREE_HAL_DRIVER_VMVX})
     DEPS
       ::check
       iree::base
+      iree::base::cc
       iree::base::internal
       iree::base::internal::span
-      iree::base::logging
-      iree::base::status
       iree::hal
       iree::hal::vmvx::registration
       iree::modules::hal

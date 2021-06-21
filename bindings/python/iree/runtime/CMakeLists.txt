@@ -21,7 +21,7 @@ iree_pyext_module(
     "unix_version.lds"
   DEPS
     iree::base
-    iree::base::status
+    iree::base::cc
     iree::hal
     iree::hal::drivers
     iree::modules::hal

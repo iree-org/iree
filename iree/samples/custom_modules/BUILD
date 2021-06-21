@@ -19,7 +19,7 @@ cc_library(
     hdrs = ["module.h"],
     deps = [
         "//iree/base",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",

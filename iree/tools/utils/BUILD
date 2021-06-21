@@ -17,8 +17,8 @@ cc_library(
     hdrs = ["vm_util.h"],
     deps = [
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
         "//iree/base/internal:span",

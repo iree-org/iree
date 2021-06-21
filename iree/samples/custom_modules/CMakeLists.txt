@@ -24,7 +24,7 @@ iree_cc_library(
     "module.cc"
   DEPS
     iree::base
-    iree::base::status
+    iree::base::cc
     iree::hal
     iree::modules::hal
     iree::vm

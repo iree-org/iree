@@ -8,7 +8,7 @@
 
 #include "bindings/python/iree/runtime/status_utils.h"
 #include "iree/base/api.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"

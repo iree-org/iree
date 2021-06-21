@@ -40,8 +40,8 @@ cc_library(
     deps = [
         ":vm",
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:core_headers",
-        "//iree/base:status",
         "//iree/base/internal:span",
     ],
 )
@@ -120,7 +120,7 @@ cc_test(
         ":impl",
         ":native_module_test_hdrs",
         "//iree/base",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -241,8 +241,8 @@ cc_test(
     deps = [
         ":bytecode_module",
         ":vm",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "//iree/vm/test:all_bytecode_modules_c",
