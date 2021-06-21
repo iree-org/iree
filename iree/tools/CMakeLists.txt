@@ -6,6 +6,11 @@
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
 
+# Tools has thread dependency from iree::hal::drivers
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 add_subdirectory(android)
 add_subdirectory(test)
 add_subdirectory(utils)
@@ -79,8 +84,6 @@ iree_cc_binary(
   SRCS
     "iree-check-module-main.cc"
   DEPS
-    iree::modules::check::native_module
-    absl::strings
     iree::base
     iree::base::core_headers
     iree::base::internal::file_io
@@ -90,6 +93,7 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal
     iree::hal::drivers
+    iree::modules::check::native_module
     iree::modules::hal
     iree::testing::gtest
     iree::tools::utils::vm_util
@@ -169,6 +173,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Transforms
       iree::compiler::Dialect::Vulkan::IR
+      iree::compiler::InputConversion::MHLO
+      iree::compiler::InputConversion::TOSA
       iree::compiler::Translation::IREEVM
     PUBLIC
   )
@@ -232,8 +238,6 @@ if(${IREE_BUILD_COMPILER})
       "init_compiler_modules.h"
     DEPS
       iree::compiler::Dialect::Modules::Check::IR::CheckDialect
-      iree::compiler::Dialect::Modules::Strings::IR::Dialect
-      iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect
   )
 
   iree_cc_library(
@@ -321,6 +325,8 @@ if(${IREE_BUILD_COMPILER})
       iree-translate
     DEPS
       ::iree_translate_main
+    DATA
+      lld
     HOSTONLY
   )
 
@@ -329,6 +335,8 @@ if(${IREE_BUILD_COMPILER})
       iree-opt
     DEPS
       ::iree_opt_main
+    DATA
+      lld
     HOSTONLY
   )
 
@@ -360,7 +368,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRSupport
       MLIRTargetLLVMIRExport
-      absl::span
       iree::base
       iree::base::internal::flags
       iree::base::logging
@@ -377,6 +384,8 @@ if(${IREE_BUILD_COMPILER})
       iree::vm
       iree::vm::bytecode_module
       iree::vm::cc
+    DATA
+      lld
     HOSTONLY
   )
 
@@ -421,6 +430,13 @@ if(${IREE_BUILD_COMPILER})
       DEPENDS FileCheck
     )
   endif()
+
+  # lld install - required by the compiler to link codegen executables.
+  install(
+    TARGETS lld
+    COMPONENT Compiler
+    RUNTIME DESTINATION bin
+  )
 
   # General test dependency binary/scripts installed.
   install(

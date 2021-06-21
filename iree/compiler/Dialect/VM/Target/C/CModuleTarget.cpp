@@ -137,7 +137,7 @@ static LogicalResult printFuncOpArguments(IREE::VM::FuncOp &funcOp,
       });
 }
 
-// Function results get propagated through pointer arguments
+/// Function results get propagated through pointer arguments
 static LogicalResult printFuncOpResults(
     IREE::VM::FuncOp &funcOp, mlir::emitc::CppEmitter &emitter,
     SmallVector<std::string, 4> &resultNames) {
@@ -212,11 +212,6 @@ static LogicalResult translateBranchOp(IREE::VM::BranchOp branchOp,
     return branchOp.emitOpError() << "Unable to find label for successor block";
   }
   output << emitter.getOrCreateName(successor) << ";\n";
-  return success();
-}
-
-static LogicalResult translateCallOpToC(IREE::VM::CallOp callOp,
-                                        mlir::emitc::CppEmitter &emitter) {
   return success();
 }
 
@@ -309,8 +304,6 @@ static LogicalResult translateOpToC(Operation &op,
                                     bool hasRefs) {
   if (auto branchOp = dyn_cast<IREE::VM::BranchOp>(op))
     return translateBranchOp(branchOp, emitter);
-  if (auto callOp = dyn_cast<IREE::VM::CallOp>(op))
-    return translateCallOpToC(callOp, emitter);
   if (auto condBranchOp = dyn_cast<IREE::VM::CondBranchOp>(op))
     return translateCondBranchOp(condBranchOp, emitter);
   if (auto failOp = dyn_cast<IREE::VM::FailOp>(op))
@@ -327,7 +320,8 @@ static LogicalResult translateOpToC(Operation &op,
 
 static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
                                           IREE::VM::FuncOp &funcOp,
-                                          mlir::emitc::CppEmitter &emitter) {
+                                          mlir::emitc::CppEmitter &emitter,
+                                          bool declareOnly) {
   std::string moduleName = moduleOp.getName().str();
   emitc::CppEmitter::Scope scope(emitter);
   llvm::raw_ostream &output = emitter.ostream();
@@ -336,7 +330,7 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
   std::string functionName =
       buildFunctionName(moduleOp, funcOp, /*implSuffix=*/true);
 
-  output << "iree_status_t " << functionName << "(";
+  output << "static iree_status_t " << functionName << "(";
 
   if (failed(printFuncOpArguments(funcOp, emitter))) {
     return failure();
@@ -362,7 +356,13 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
 
   // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
   // struct argument name here must not be changed.
-  output << moduleName << "_state_t* state) {\n";
+  output << moduleName << "_state_t* state)";
+
+  if (declareOnly) {
+    output << ";\n";
+    return success();
+  }
+  output << " {\n";
 
   // We forward declare all result variables except for the ones with RefType.
   output << "// VARIABLE DECLARATIONS\n";
@@ -406,11 +406,21 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
   // We reuse the register allocation pass and emit an array for all Values with
   // ref type instead of generating one variable per Value. This makes the
   // deallocation process easier for us.
+
   RegisterAllocation registerAllocation;
   if (failed(registerAllocation.recalculate(funcOp))) {
     return funcOp.emitOpError() << "unable to perform register allocation";
   }
 
+  // TODO(simon-camp): We sometimes get a to high number of refs used. This may
+  // be because the IR is in a mixed state of VM and EmitC dialects and the
+  // register allocation pass doesn't handle the 'emitc.opaque' type correctly.
+  // We could either
+  //  - annotate the function with the correct number of refs in the
+  //    conversion or
+  //  - define the array in the conversion (which would need to be
+  //    done through a macro at the moment because array types are not handled
+  //    by EmitC).
   const size_t numRefs = registerAllocation.getMaxRefRegisterOrdinal() + 1;
   const bool hasRefs = numRefs > 0;
 
@@ -463,7 +473,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
       return failure();
     }
 
-    if (funcOp.getNumArguments() > 0) {
+    if (funcOp.getNumResults() > 0) {
       output << ", ";
     }
 
@@ -488,18 +498,14 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
       argNames.push_back(argName);
     }
 
+    for (std::string &resultName : resultNames) {
+      argNames.push_back(resultName);
+    }
+
+    argNames.push_back("state");
+
     output << llvm::join(argNames, ", ");
-
-    if (funcOp.getNumResults() > 0) {
-      output << ", ";
-    }
-
-    output << llvm::join(resultNames, ", ");
-
-    if (funcOp.getNumArguments() + funcOp.getNumResults() > 0) {
-      output << ", ";
-    }
-    output << "state);\n}\n";
+    output << ");\n}\n";
   }
 
   auto printCStringView = [](std::string s) -> std::string {
@@ -559,16 +565,13 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "static const iree_vm_native_function_ptr_t " << functionName
          << "[] = {\n";
 
-  // sort func ops
-  SmallVector<IREE::VM::FuncOp, 4> funcOps(moduleOp.getOps<IREE::VM::FuncOp>());
-  llvm::sort(funcOps, [&moduleOp](auto &lhs, auto &rhs) {
-    std::string lhsStr =
-        buildFunctionName(moduleOp, lhs, /*implSufffix=*/false);
-    std::string rhsStr =
-        buildFunctionName(moduleOp, rhs, /*implSufffix=*/false);
-    return lhsStr.compare(rhsStr) < 0;
-  });
-  for (auto funcOp : funcOps) {
+  // We only add exported functions to the table, as calls to internal functions
+  // are directly mapped to C function calls of the generated implementation.
+  for (auto exportOp : exportOps) {
+    auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
+    if (!funcOp) {
+      return exportOp.emitError("Couldn't find referenced FuncOp");
+    }
     output << "{"
            << "(iree_vm_native_function_shim_t)";
 
@@ -653,7 +656,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   return success();
 }
 
-// Adapted from BytecodeModuleTarget and extended by C specific passes
+/// Adapted from BytecodeModuleTarget and extended by C specific passes
 static LogicalResult canonicalizeModule(
     IREE::VM::ModuleOp moduleOp, IREE::VM::CTargetOptions targetOptions) {
   OwningRewritePatternList patterns(moduleOp.getContext());
@@ -763,9 +766,24 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     return failure();
   }
 
+  output << "// DECLARE FUNCTIONS\n";
+
+  // forward declare functions
+  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
+    if (failed(translateFunctionToC(moduleOp, funcOp, emitter,
+                                    /*declareOnly=*/true))) {
+      return failure();
+    }
+
+    output << "\n";
+  }
+
+  output << "// DEFINE FUNCTIONS\n";
+
   // translate functions
   for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
-    if (failed(translateFunctionToC(moduleOp, funcOp, emitter))) {
+    if (failed(translateFunctionToC(moduleOp, funcOp, emitter,
+                                    /*declareOnly=*/false))) {
       return failure();
     }
 

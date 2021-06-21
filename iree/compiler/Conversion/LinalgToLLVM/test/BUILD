@@ -29,6 +29,7 @@ iree_lit_test_suite(
             "plan_conv_loop_order.mlir",
             "tile_pad_and_vectorize_workgroups.mlir",
             "unfused_fma.mlir",
+            "vector_contract_to_aarch64_asm.mlir",
         ],
         include = ["*.mlir"],
     ),

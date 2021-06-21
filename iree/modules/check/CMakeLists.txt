@@ -15,9 +15,9 @@ if(${IREE_HAL_DRIVER_VMVX})
       "check_test.cc"
     DEPS
       ::native_module
-      absl::span
       iree::base
       iree::base::internal
+      iree::base::internal::span
       iree::base::logging
       iree::base::status
       iree::hal

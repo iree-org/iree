@@ -68,9 +68,8 @@ iree_cc_test(
     "string_util_test.cc"
   DEPS
     ::hal
-    absl::span
-    absl::strings
     iree::base
+    iree::base::internal::span
     iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main

@@ -4,11 +4,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(_srcs
+  "__init__.py"
+  "scripts/iree_translate/__main__.py"
+)
+
 iree_py_library(
   NAME
     core
-  SRCS
-    "__init__.py"
+  SRCS ${_srcs}
 )
 
 if(${IREE_BUILD_COMPILER})
@@ -24,6 +28,7 @@ iree_py_install_package(
   COMPONENT IreePythonPackage-compiler
   PACKAGE_NAME iree_compiler
   MODULE_PATH iree/tools/core
+  FILES_MATCHING ${_srcs}
   DEPS
     iree_tools_iree-translate
 )

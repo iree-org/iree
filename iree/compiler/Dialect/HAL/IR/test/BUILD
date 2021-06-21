@@ -33,6 +33,7 @@ iree_lit_test_suite(
             "executable_ops.mlir",
             "experimental_ops.mlir",
             "interface_ops.mlir",
+            "invalid.mlir",
             "semaphore_ops.mlir",
             "variable_folding.mlir",
             "variable_ops.mlir",

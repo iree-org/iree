@@ -17,7 +17,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/status.h"
@@ -38,9 +37,9 @@ using ::testing::Each;
 using ::testing::Not;
 
 template <typename T>
-absl::Span<const T> AbslSpan(iree_byte_span_t bytes) {
-  return absl::Span<T>(reinterpret_cast<T*>(bytes.data),
-                       bytes.data_length / sizeof(T));
+iree::span<const T> ToSpan(iree_byte_span_t bytes) {
+  return iree::span<const T>(reinterpret_cast<T*>(bytes.data),
+                             bytes.data_length / sizeof(T));
 }
 
 StatusOr<std::string> BufferViewToString(iree_hal_buffer_view_t* buffer_view) {
@@ -59,21 +58,21 @@ StatusOr<std::string> BufferViewToString(iree_hal_buffer_view_t* buffer_view) {
 
 template <typename T>
 Status ExpectAllTrue(iree_byte_span_t bytes) {
-  EXPECT_THAT(AbslSpan<T>(bytes), Each(Not(T(0))));
+  EXPECT_THAT(ToSpan<T>(bytes), Each(Not(T(0))));
   return OkStatus();
 }
 
-// TODO(b/146898896): Put this somewhere common. Operator overload?
 bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
-  return AbslSpan<uint8_t>(lhs_bytes) == AbslSpan<uint8_t>(rhs_bytes);
+  return lhs_bytes.data_length == rhs_bytes.data_length &&
+         memcmp(lhs_bytes.data, rhs_bytes.data, lhs_bytes.data_length) == 0;
 }
 
 static constexpr float kF32PrecisionThreshold = 0.0001f;
 
 template <typename T>
 bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
-  auto lhs_span = AbslSpan<T>(lhs_bytes);
-  auto rhs_span = AbslSpan<T>(rhs_bytes);
+  auto lhs_span = ToSpan<T>(lhs_bytes);
+  auto rhs_span = ToSpan<T>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
     if (fabs(lhs_span[i] - rhs_span[i]) > kF32PrecisionThreshold) {
@@ -87,8 +86,8 @@ static constexpr float kF16PrecisionThreshold = 0.001f;
 
 bool AlmostEqByteSpanF16(iree_byte_span_t lhs_bytes,
                          iree_byte_span_t rhs_bytes) {
-  auto lhs_span = AbslSpan<uint16_t>(lhs_bytes);
-  auto rhs_span = AbslSpan<uint16_t>(rhs_bytes);
+  auto lhs_span = ToSpan<uint16_t>(lhs_bytes);
+  auto rhs_span = ToSpan<uint16_t>(rhs_bytes);
   assert(lhs_span.size() == rhs_span.size());
   for (int i = 0; i < lhs_span.size(); ++i) {
     if (fabs(iree_math_f16_to_f32(lhs_span[i]) -
@@ -414,7 +413,9 @@ extern "C" iree_status_t check_native_module_create(
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CheckModule>(
-      "check", allocator, absl::MakeConstSpan(kCheckModuleFunctions));
+      "check", allocator,
+      iree::span<const vm::NativeFunction<CheckModuleState>>(
+          kCheckModuleFunctions));
   *out_module = module.release()->interface();
   return iree_ok_status();
 }

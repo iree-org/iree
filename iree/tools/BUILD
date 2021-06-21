@@ -95,6 +95,8 @@ cc_library(
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/compiler/Dialect/Vulkan/IR",
+        "//iree/compiler/InputConversion/MHLO",
+        "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//mlir:IR",
     ],
@@ -148,7 +150,6 @@ cc_library(
         ":init_mlir_passes_and_dialects",
         ":init_xla_dialects",
         "//iree/compiler/Conversion",
-        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Dialect/HAL/Conversion:Passes",
     ],
 )
@@ -158,8 +159,6 @@ cc_library(
     hdrs = ["init_compiler_modules.h"],
     deps = [
         "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
-        "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-        "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
     ],
 )
 
@@ -263,7 +262,6 @@ cc_binary(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
@@ -290,7 +288,6 @@ cc_binary(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
     ],
 )
 

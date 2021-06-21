@@ -23,6 +23,7 @@ cc_library(
         "PlanConvLoopOrder.cpp",
         "TilePadAndVectorizeWorkgroups.cpp",
         "UnfuseFMAOps.cpp",
+        "VectorContractToAArch64InlineAsmOp.cpp",
     ],
     hdrs = [
         "KernelDispatch.h",
@@ -32,7 +33,6 @@ cc_library(
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/Transforms",
         "//iree/compiler/Conversion/Utils",
-        "//iree/compiler/Conversion/VectorToLLVM",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
@@ -58,7 +58,6 @@ cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardOpsTransforms",
-        "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToStandard",

@@ -31,7 +31,6 @@ iree_cc_library(
     ${NATIVE_APP_GLUE_DIR}
   DEPS
     ::android_native_app_glue
-    absl::strings
     iree::base::status
     iree::hal::drivers
     iree::modules::hal

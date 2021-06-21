@@ -4,37 +4,81 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cctype>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <string>
+#include <vector>
 
-#include "absl/flags/flag.h"
-#include "absl/flags/parse.h"
-#include "absl/strings/escaping.h"
-#include "absl/strings/str_split.h"
-#include "absl/strings/strip.h"
+#include "iree/base/internal/flags.h"
 
-ABSL_FLAG(std::string, identifier, "resources",
-          "name of the resources function");
-ABSL_FLAG(std::string, output_header, "", "output header file");
-ABSL_FLAG(std::string, output_impl, "", "output impl file");
-ABSL_FLAG(std::string, strip_prefix, "", "strip prefix from filenames");
-ABSL_FLAG(bool, flatten, false,
+IREE_FLAG(string, identifier, "resources", "name of the resources function");
+IREE_FLAG(string, output_header, "", "output header file");
+IREE_FLAG(string, output_impl, "", "output impl file");
+IREE_FLAG(string, strip_prefix, "", "strip prefix from filenames");
+IREE_FLAG(bool, flatten, false,
           "whether to flatten the directory structure (only include basename)");
 
-void GenerateExternCOpen(std::ofstream& f) {
+static std::string CEscape(const std::string& src) {
+  static const char kHexChar[] = "0123456789ABCDEF";
+  std::string dest;
+  bool last_hex_escape = false;  // true if last output char was \xNN.
+  for (unsigned char c : src) {
+    bool is_hex_escape = false;
+    switch (c) {
+      case '\n':
+        dest.append("\\n");
+        break;
+      case '\r':
+        dest.append("\\r");
+        break;
+      case '\t':
+        dest.append("\\t");
+        break;
+      case '\"':
+        dest.append("\\\"");
+        break;
+      case '\'':
+        dest.append("\\'");
+        break;
+      case '\\':
+        dest.append("\\\\");
+        break;
+      default:
+        // Note that if we emit \xNN and the src character after that is a hex
+        // digit then that digit must be escaped too to prevent it being
+        // interpreted as part of the character code by C.
+        if ((!isprint(c) || (last_hex_escape && isxdigit(c)))) {
+          dest.append(
+              "\\"
+              "x");
+          dest.push_back(kHexChar[c / 16]);
+          dest.push_back(kHexChar[c % 16]);
+          is_hex_escape = true;
+        } else {
+          dest.push_back(c);
+          break;
+        }
+    }
+    last_hex_escape = is_hex_escape;
+  }
+  return dest;
+}
+
+static void GenerateExternCOpen(std::ofstream& f) {
   f << "\n#if __cplusplus\n";
   f << "extern \"C\" {\n";
   f << "#endif // __cplusplus\n";
 }
 
-void GenerateExternCClose(std::ofstream& f) {
+static void GenerateExternCClose(std::ofstream& f) {
   f << "#if __cplusplus\n";
   f << "}\n";
   f << "#endif // __cplusplus\n\n";
 }
 
-void GenerateTocStruct(std::ofstream& f) {
+static void GenerateTocStruct(std::ofstream& f) {
   f << "#ifndef IREE_FILE_TOC\n";
   f << "#define IREE_FILE_TOC\n";
   GenerateExternCOpen(f);
@@ -47,17 +91,15 @@ void GenerateTocStruct(std::ofstream& f) {
   f << "#endif  // IREE_FILE_TOC\n";
 }
 
-bool GenerateHeader(const std::string& header_file,
-                    const std::vector<std::string>& toc_files) {
+static bool GenerateHeader(const std::string& header_file,
+                           const std::vector<std::string>& toc_files) {
   std::ofstream f(header_file, std::ios::out | std::ios::trunc);
   f << "#pragma once\n";  // Pragma once isn't great but is the best we can do.
   f << "#include <stddef.h>\n";
   GenerateTocStruct(f);
   GenerateExternCOpen(f);
-  f << "const iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
-    << "_create();\n";
-  f << "static inline size_t " << absl::GetFlag(FLAGS_identifier)
-    << "_size() {\n";
+  f << "const iree_file_toc_t* " << FLAG_identifier << "_create();\n";
+  f << "static inline size_t " << FLAG_identifier << "_size() {\n";
   f << "  return " << toc_files.size() << ";\n";
   f << "}\n";
   GenerateExternCClose(f);
@@ -65,7 +107,7 @@ bool GenerateHeader(const std::string& header_file,
   return f.good();
 }
 
-bool SlurpFile(const std::string& file_name, std::string* contents) {
+static bool SlurpFile(const std::string& file_name, std::string* contents) {
   constexpr std::streamoff kMaxSize = 100000000;
   std::ifstream f(file_name, std::ios::in | std::ios::binary);
   // get length of file:
@@ -86,9 +128,9 @@ bool SlurpFile(const std::string& file_name, std::string* contents) {
   return f.good();
 }
 
-bool GenerateImpl(const std::string& impl_file,
-                  const std::vector<std::string>& input_files,
-                  const std::vector<std::string>& toc_files) {
+static bool GenerateImpl(const std::string& impl_file,
+                         const std::vector<std::string>& input_files,
+                         const std::vector<std::string>& toc_files) {
   std::ofstream f(impl_file, std::ios::out | std::ios::trunc);
   f << "#include <stddef.h>\n";
   f << "#include <stdint.h>\n";
@@ -110,15 +152,18 @@ bool GenerateImpl(const std::string& impl_file,
       std::cerr << "Error reading file " << input_files[i] << "\n";
       return false;
     }
-    absl::string_view remaining_contents = contents;
-    constexpr int kMaxBytesPerLine = 1024;
-    while (!remaining_contents.empty()) {
-      auto line = remaining_contents.substr(0, kMaxBytesPerLine);
-      for (char c : line) {
+    size_t remaining_offset = 0;
+    size_t remaining_length = contents.size();
+    constexpr size_t kMaxBytesPerLine = 1024;
+    while (remaining_length > 0) {
+      size_t line_length = std::min(remaining_length, kMaxBytesPerLine);
+      for (size_t j = 0; j < line_length; ++j) {
+        char c = contents[remaining_offset + j];
         f << std::to_string((uint8_t)c) << ",";
       }
       f << "\n";
-      remaining_contents = remaining_contents.substr(line.size());
+      remaining_offset += line_length;
+      remaining_length -= line_length;
     }
     f << "0,\n";  // NUL termination
     f << "};\n";
@@ -127,15 +172,14 @@ bool GenerateImpl(const std::string& impl_file,
   assert(input_files.size() == toc_files.size());
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "  {\n";
-    f << "    \"" << absl::CEscape(toc_files[i]) << "\",\n";
+    f << "    \"" << CEscape(toc_files[i]) << "\",\n";
     f << "    file_" << i << ",\n";
     f << "    sizeof(file_" << i << ") - 1\n";
     f << "  },\n";
   }
   f << "  {NULL, NULL, 0},\n";
   f << "};\n";
-  f << "const struct iree_file_toc_t* " << absl::GetFlag(FLAGS_identifier)
-    << "_create() {\n";
+  f << "const struct iree_file_toc_t* " << FLAG_identifier << "_create() {\n";
   f << "  return &toc[0];\n";
   f << "}\n";
   f.close();
@@ -143,41 +187,42 @@ bool GenerateImpl(const std::string& impl_file,
 }
 
 int main(int argc, char** argv) {
-  // Parse flags.
-  std::vector<char*> raw_positional_args = absl::ParseCommandLine(argc, argv);
+  // Parse flags, updating argc/argv with position arguments.
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   std::vector<std::string> input_files;
-  input_files.reserve(raw_positional_args.size() - 1);
-  // Skip program name.
-  for (size_t i = 1, e = raw_positional_args.size(); i < e; ++i) {
-    input_files.push_back(std::string(raw_positional_args[i]));
+  input_files.reserve(argc - 1);
+  for (size_t i = 1, e = argc; i < e; ++i) {  // Skip program name.
+    input_files.push_back(std::string(argv[i]));
   }
 
   // Generate TOC files by optionally removing a prefix.
   std::vector<std::string> toc_files;
   toc_files.reserve(input_files.size());
-  const std::string& strip_prefix = absl::GetFlag(FLAGS_strip_prefix);
+  const std::string& strip_prefix = FLAG_strip_prefix;
   for (const auto& input_file : input_files) {
     std::string toc_file = input_file;
     if (!strip_prefix.empty()) {
-      toc_file = std::string(absl::StripPrefix(toc_file, strip_prefix));
+      if (toc_file.find(strip_prefix) == 0) {
+        toc_file = toc_file.substr(strip_prefix.size());
+      }
     }
-    if (absl::GetFlag(FLAGS_flatten)) {
-      std::vector<std::string> comps =
-          absl::StrSplit(toc_file, absl::ByAnyChar("/\\"));
-      toc_file = comps.back();
+    if (FLAG_flatten) {
+      size_t slash_pos = toc_file.find_last_of("/\\");
+      if (slash_pos != std::string::npos) {
+        toc_file = toc_file.substr(slash_pos + 1);
+      }
     }
     toc_files.push_back(toc_file);
   }
-  if (!absl::GetFlag(FLAGS_output_header).empty()) {
-    if (!GenerateHeader(absl::GetFlag(FLAGS_output_header), toc_files)) {
+  if (strlen(FLAG_output_header) != 0) {
+    if (!GenerateHeader(FLAG_output_header, toc_files)) {
       std::cerr << "Error generating headers.\n";
       return 1;
     }
   }
 
-  if (!absl::GetFlag(FLAGS_output_impl).empty()) {
-    if (!GenerateImpl(absl::GetFlag(FLAGS_output_impl), input_files,
-                      toc_files)) {
+  if (strlen(FLAG_output_impl) != 0) {
+    if (!GenerateImpl(FLAG_output_impl, input_files, toc_files)) {
       std::cerr << "Error generating impl.\n";
       return 2;
     }

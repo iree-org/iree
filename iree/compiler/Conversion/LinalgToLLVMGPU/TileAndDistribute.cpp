@@ -382,15 +382,15 @@ struct LinalgToLLVMGPUTileAndDistributePass
         populateTilingReductionPatterns(context, wgTilingPatterns,
                                         getTileSizes(config, 0));
         (void)applyPatternsAndFoldGreedily(funcOp, std::move(wgTilingPatterns));
-        applyCanonicalizationPatternsForTiling(context, funcOp);
       }
 
       {
-        OwningRewritePatternList patterns(context);
-        // Apply canonicalization patterns.
-        linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
-        populateAffineMinSCFCanonicalizationPattern(patterns);
-        (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+        RewritePatternSet wgTilingCanonicalizationPatterns =
+            linalg::getLinalgTilingCanonicalizationPatterns(context);
+        populateAffineMinSCFCanonicalizationPattern(
+            wgTilingCanonicalizationPatterns);
+        (void)applyPatternsAndFoldGreedily(
+            funcOp, std::move(wgTilingCanonicalizationPatterns));
       }
 
       {
@@ -398,7 +398,13 @@ struct LinalgToLLVMGPUTileAndDistributePass
         populatePromotionPatterns(context, promotionPatterns);
         (void)applyPatternsAndFoldGreedily(funcOp,
                                            std::move(promotionPatterns));
-        applyCanonicalizationPatternsForTiling(context, funcOp);
+      }
+
+      {
+        RewritePatternSet promotionCanonicalization =
+            linalg::getLinalgTilingCanonicalizationPatterns(context);
+        (void)applyPatternsAndFoldGreedily(
+            funcOp, std::move(promotionCanonicalization));
       }
 
       {
@@ -410,14 +416,15 @@ struct LinalgToLLVMGPUTileAndDistributePass
             context, threadLevelTilingPatterns, workgroupSize);
         (void)applyPatternsAndFoldGreedily(
             funcOp, std::move(threadLevelTilingPatterns));
-        applyCanonicalizationPatternsForTiling(context, funcOp);
       }
       {
-        OwningRewritePatternList patterns(context);
         // Apply canonicalization patterns.
-        linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
-        populateAffineMinSCFCanonicalizationPattern(patterns);
-        (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+        RewritePatternSet threadTilingCanonicalizationPatterns =
+            linalg::getLinalgTilingCanonicalizationPatterns(context);
+        populateAffineMinSCFCanonicalizationPattern(
+            threadTilingCanonicalizationPatterns);
+        (void)applyPatternsAndFoldGreedily(
+            funcOp, std::move(threadTilingCanonicalizationPatterns));
       }
     }
   }

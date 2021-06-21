@@ -112,15 +112,16 @@ class VMAddModuleTest : public ::testing::Test {
 
 TEST_F(VMAddModuleTest, AddTest) {
   IREE_ASSERT_OK_AND_ASSIGN(
-      int32_t v, RunFunction(iree_make_cstring_view("add_module.add"), 17, 42));
+      int32_t v,
+      RunFunction(iree_make_cstring_view("add_module.add_and_double"), 17, 42));
   ASSERT_EQ(v, 118);
 }
 
 TEST_F(VMAddModuleTest, AddCallTest) {
   IREE_ASSERT_OK_AND_ASSIGN(
       int32_t v,
-      RunFunction(iree_make_cstring_view("add_module.add_call"), 17));
-  ASSERT_EQ(v, 34);
+      RunFunction(iree_make_cstring_view("add_module.test_call"), 17));
+  ASSERT_EQ(v, 136);
 }
 
 }  // namespace

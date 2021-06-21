@@ -63,6 +63,5 @@ cc_library(
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:cc",
-        "@com_google_absl//absl/types:span",
     ],
 )

@@ -53,7 +53,6 @@ cc_library(
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardOpsTransforms",
-        "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToLLVM",

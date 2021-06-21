@@ -55,10 +55,11 @@ else
   mkdir -p "${BUILD_RISCV_DIR?}"
 fi
 
-# Configure riscv, then build.
+# Configure riscv for 64-bit linux config, then build.
 "${CMAKE_BIN?}" -G Ninja -B "${BUILD_RISCV_DIR?}" \
   -DCMAKE_TOOLCHAIN_FILE="$(realpath ${ROOT_DIR?}/build_tools/cmake/riscv.toolchain.cmake)" \
   -DIREE_HOST_BINARY_ROOT="$(realpath ${BUILD_HOST_DIR?}/install)" \
+  -DRISCV_CPU=rv64 \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_ENABLE_MLIR=OFF \
   -DIREE_BUILD_TESTS=ON \

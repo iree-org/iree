@@ -10,6 +10,7 @@
 
 load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -280,6 +281,11 @@ cc_test(
 )
 
 cc_library(
+    name = "span",
+    hdrs = ["span.h"],
+)
+
+cc_library(
     name = "status_internal",
     srcs = [
         "status.cc",
@@ -293,7 +299,6 @@ cc_library(
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:logging",
-        "@com_google_absl//absl/utility",
     ],
 )
 
@@ -339,6 +344,19 @@ cc_test(
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
+)
+
+#===------------------------------------------------------------------------===#
+# Utilities with thread dependencies
+#===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+""",
+    inline = True,
 )
 
 cc_library(

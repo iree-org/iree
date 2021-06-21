@@ -4,11 +4,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(_srcs
+  "__init__.py"
+  "scripts/iree_import_tf/__main__.py"
+)
+
 iree_py_library(
   NAME
     tf
-  SRCS
-    "__init__.py"
+  SRCS ${_srcs}
   DEPS
   iree_tf_compiler_iree-import-tf
 )
@@ -23,6 +27,7 @@ iree_py_install_package(
   COMPONENT IreePythonPackage-tools-tf
   PACKAGE_NAME iree_tools_tf
   MODULE_PATH iree/tools/tf
+  FILES_MATCHING ${_srcs}
   DEPS
     iree_tf_compiler_iree-import-tf
 )

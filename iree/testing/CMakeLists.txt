@@ -44,8 +44,6 @@ iree_cc_library(
     "gtest.h"
     "status_matchers.h"
   DEPS
-    absl::optional
-    absl::strings
     gmock
     gtest
     iree::base::status

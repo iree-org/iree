@@ -14,7 +14,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "absl/utility/utility.h"
 #include "iree/base/api.h"
 #include "iree/base/attributes.h"
 #include "iree/base/internal/status.h"
@@ -24,11 +23,39 @@ namespace iree {
 template <typename T>
 class IREE_MUST_USE_RESULT StatusOr;
 
+// https://en.cppreference.com/w/cpp/types/conjunction
+template <typename... Ts>
+struct conjunction : std::true_type {};
+template <typename T, typename... Ts>
+struct conjunction<T, Ts...>
+    : std::conditional<T::value, conjunction<Ts...>, T>::type {};
+template <typename T>
+struct conjunction<T> : T {};
+
+// https://en.cppreference.com/w/cpp/types/disjunction
+template <typename... Ts>
+struct disjunction : std::false_type {};
+template <typename T, typename... Ts>
+struct disjunction<T, Ts...>
+    : std::conditional<T::value, T, disjunction<Ts...>>::type {};
+template <typename T>
+struct disjunction<T> : T {};
+
+// https://en.cppreference.com/w/cpp/types/negation
+template <typename T>
+struct negation : std::integral_constant<bool, !T::value> {};
+
+// https://en.cppreference.com/w/cpp/utility/in_place
+struct in_place_t {
+  explicit in_place_t() = default;
+};
+/*inline*/ constexpr in_place_t in_place{};
+
 namespace internal_statusor {
 
 template <typename T, typename U>
 using IsStatusOrConversionAmbiguous =
-    absl::disjunction<std::is_constructible<T, StatusOr<U>&>,
+    iree::disjunction<std::is_constructible<T, StatusOr<U>&>,
                       std::is_constructible<T, const StatusOr<U>&>,
                       std::is_constructible<T, StatusOr<U>&&>,
                       std::is_constructible<T, const StatusOr<U>&&>,
@@ -39,7 +66,7 @@ using IsStatusOrConversionAmbiguous =
 
 template <typename T, typename U>
 using IsStatusOrConversionAssigmentAmbiguous =
-    absl::disjunction<IsStatusOrConversionAmbiguous<T, U>,
+    iree::disjunction<IsStatusOrConversionAmbiguous<T, U>,
                       std::is_assignable<T&, StatusOr<U>&>,
                       std::is_assignable<T&, const StatusOr<U>&>,
                       std::is_assignable<T&, StatusOr<U>&&>,
@@ -59,18 +86,18 @@ struct IsAmbiguousStatusOrForInitialization<T, StatusOr<U>>
     : public IsStatusOrConversionAmbiguous<T, U> {};
 
 template <typename T, typename U>
-using IsStatusOrDirectInitializationAmbiguous = absl::disjunction<
+using IsStatusOrDirectInitializationAmbiguous = iree::disjunction<
     std::is_same<StatusOr<T>, std::remove_cv_t<std::remove_reference_t<U>>>,
     std::is_same<Status, std::remove_cv_t<std::remove_reference_t<U>>>,
-    std::is_same<absl::in_place_t,
+    std::is_same<iree::in_place_t,
                  std::remove_cv_t<std::remove_reference_t<U>>>,
     IsAmbiguousStatusOrForInitialization<T, U>>;
 
 template <typename T, typename U>
-using IsStatusOrDirectInitializationValid = absl::disjunction<
+using IsStatusOrDirectInitializationValid = iree::disjunction<
     // The is_same allows nested status ors to ignore this check iff same type.
     std::is_same<T, std::remove_cv_t<std::remove_reference_t<U>>>,
-    absl::negation<IsStatusOrDirectInitializationAmbiguous<T, U>>>;
+    iree::negation<IsStatusOrDirectInitializationAmbiguous<T, U>>>;
 
 class Helper {
  public:
@@ -140,7 +167,7 @@ class StatusOrData {
   }
 
   template <typename... Args>
-  explicit StatusOrData(absl::in_place_t, Args&&... args)
+  explicit StatusOrData(iree::in_place_t, Args&&... args)
       : data_(std::forward<Args>(args)...) {
     MakeStatus();
   }
@@ -322,11 +349,11 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U,
       std::enable_if_t<
-          absl::conjunction<
-              absl::negation<std::is_same<T, U>>,
+          iree::conjunction<
+              iree::negation<std::is_same<T, U>>,
               std::is_constructible<T, const U&>,
               std::is_convertible<const U&, T>,
-              absl::negation<internal_statusor::IsStatusOrConversionAmbiguous<
+              iree::negation<internal_statusor::IsStatusOrConversionAmbiguous<
                   T, U>>>::value,
           int> = 0>
   StatusOr(const StatusOr<U>& other)  // NOLINT
@@ -334,11 +361,11 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U,
       std::enable_if_t<
-          absl::conjunction<
-              absl::negation<std::is_same<T, U>>,
+          iree::conjunction<
+              iree::negation<std::is_same<T, U>>,
               std::is_constructible<T, const U&>,
-              absl::negation<std::is_convertible<const U&, T>>,
-              absl::negation<internal_statusor::IsStatusOrConversionAmbiguous<
+              iree::negation<std::is_convertible<const U&, T>>,
+              iree::negation<internal_statusor::IsStatusOrConversionAmbiguous<
                   T, U>>>::value,
           int> = 0>
   explicit StatusOr(const StatusOr<U>& other)
@@ -347,10 +374,10 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U,
       std::enable_if_t<
-          absl::conjunction<
-              absl::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
+          iree::conjunction<
+              iree::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
               std::is_convertible<U&&, T>,
-              absl::negation<internal_statusor::IsStatusOrConversionAmbiguous<
+              iree::negation<internal_statusor::IsStatusOrConversionAmbiguous<
                   T, U>>>::value,
           int> = 0>
   StatusOr(StatusOr<U>&& other)  // NOLINT
@@ -358,10 +385,10 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U,
       std::enable_if_t<
-          absl::conjunction<
-              absl::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
-              absl::negation<std::is_convertible<U&&, T>>,
-              absl::negation<internal_statusor::IsStatusOrConversionAmbiguous<
+          iree::conjunction<
+              iree::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
+              iree::negation<std::is_convertible<U&&, T>>,
+              iree::negation<internal_statusor::IsStatusOrConversionAmbiguous<
                   T, U>>>::value,
           int> = 0>
   explicit StatusOr(StatusOr<U>&& other)
@@ -373,11 +400,11 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U,
       std::enable_if_t<
-          absl::conjunction<
-              absl::negation<std::is_same<T, U>>,
+          iree::conjunction<
+              iree::negation<std::is_same<T, U>>,
               std::is_constructible<T, const U&>,
               std::is_assignable<T, const U&>,
-              absl::negation<
+              iree::negation<
                   internal_statusor::IsStatusOrConversionAssigmentAmbiguous<
                       T, U>>>::value,
           int> = 0>
@@ -388,10 +415,10 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U,
       std::enable_if_t<
-          absl::conjunction<
-              absl::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
+          iree::conjunction<
+              iree::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
               std::is_assignable<T, U&&>,
-              absl::negation<
+              iree::negation<
                   internal_statusor::IsStatusOrConversionAssigmentAmbiguous<
                       T, U>>>::value,
           int> = 0>
@@ -428,9 +455,9 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // Constructs the inner value T in-place using the provided args, using the
   // T(args...) constructor.
   template <typename... Args>
-  explicit StatusOr(absl::in_place_t, Args&&... args);
+  explicit StatusOr(iree::in_place_t, Args&&... args);
   template <typename U, typename... Args>
-  explicit StatusOr(absl::in_place_t, std::initializer_list<U> ilist,
+  explicit StatusOr(iree::in_place_t, std::initializer_list<U> ilist,
                     Args&&... args);
 
   // Constructs the inner value T in-place using the provided args, using the
@@ -441,24 +468,24 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   template <
       typename U = T,
       std::enable_if_t<
-          absl::conjunction<
+          iree::conjunction<
               internal_statusor::IsStatusOrDirectInitializationValid<T, U&&>,
               std::is_constructible<T, U&&>,
               std::is_convertible<U&&, T>>::value,
           int> = 0>
   StatusOr(U&& u)  // NOLINT
-      : StatusOr(absl::in_place, std::forward<U>(u)) {}
+      : StatusOr(iree::in_place, std::forward<U>(u)) {}
 
   template <
       typename U = T,
       std::enable_if_t<
-          absl::conjunction<
+          iree::conjunction<
               internal_statusor::IsStatusOrDirectInitializationValid<T, U&&>,
               std::is_constructible<T, U&&>,
-              absl::negation<std::is_convertible<U&&, T>>>::value,
+              iree::negation<std::is_convertible<U&&, T>>>::value,
           int> = 0>
   explicit StatusOr(U&& u)  // NOLINT
-      : StatusOr(absl::in_place, std::forward<U>(u)) {}
+      : StatusOr(iree::in_place, std::forward<U>(u)) {}
 
   // Returns this->ok()
   explicit operator bool() const { return ok(); }
@@ -565,14 +592,14 @@ inline void StatusOr<T>::Assign(StatusOr<U>&& other) {
 }
 template <typename T>
 template <typename... Args>
-StatusOr<T>::StatusOr(absl::in_place_t, Args&&... args)
-    : Base(absl::in_place, std::forward<Args>(args)...) {}
+StatusOr<T>::StatusOr(iree::in_place_t, Args&&... args)
+    : Base(iree::in_place, std::forward<Args>(args)...) {}
 
 template <typename T>
 template <typename U, typename... Args>
-StatusOr<T>::StatusOr(absl::in_place_t, std::initializer_list<U> ilist,
+StatusOr<T>::StatusOr(iree::in_place_t, std::initializer_list<U> ilist,
                       Args&&... args)
-    : Base(absl::in_place, ilist, std::forward<Args>(args)...) {}
+    : Base(iree::in_place, ilist, std::forward<Args>(args)...) {}
 
 template <typename T>
 const Status& StatusOr<T>::status() const& {

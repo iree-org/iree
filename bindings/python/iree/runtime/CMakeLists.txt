@@ -25,14 +25,8 @@ iree_pyext_module(
     iree::hal
     iree::hal::drivers
     iree::modules::hal
-    iree::modules::strings::strings_module
-    iree::modules::tensorlist::native_module
     iree::vm
     iree::vm::bytecode_module
-    absl::inlined_vector
-    absl::strings
-    absl::optional
-    absl::span
 )
 
 iree_py_library(

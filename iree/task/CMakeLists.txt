@@ -10,6 +10,11 @@
 
 iree_add_all_subdirs()
 
+# Task-based executor requires threading support.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 iree_cc_library(
   NAME
     api

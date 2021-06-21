@@ -12,23 +12,23 @@
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/embedded_library_loader.h"
-#include "iree/hal/local/loaders/legacy_library_loader.h"
 #include "iree/hal/local/task_device.h"
 #include "iree/task/api.h"
+
+// Compiled module embedded here to avoid file IO:
+#include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_arm_64_c.h"
+#include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_riscv_64_c.h"
+#include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_x86_64_c.h"
 
 iree_status_t create_sample_device(iree_hal_device_t** device) {
   // Set paramters for the device created in the next step.
   iree_hal_task_device_params_t params;
   iree_hal_task_device_params_initialize(&params);
 
-  iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
-  iree_host_size_t loader_count = 0;
+  iree_hal_executable_loader_t* loader = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_embedded_library_loader_create(
       iree_hal_executable_import_provider_null(), iree_allocator_system(),
-      &loaders[loader_count++]));
-  IREE_RETURN_IF_ERROR(iree_hal_legacy_library_loader_create(
-      iree_hal_executable_import_provider_null(), iree_allocator_system(),
-      &loaders[loader_count++]));
+      &loader));
 
   iree_task_executor_t* executor = NULL;
   IREE_RETURN_IF_ERROR(
@@ -38,11 +38,26 @@ iree_status_t create_sample_device(iree_hal_device_t** device) {
 
   // Create the device and release the executor and loader afterwards.
   IREE_RETURN_IF_ERROR(iree_hal_task_device_create(
-      identifier, &params, executor, IREE_ARRAYSIZE(loaders), loaders,
+      identifier, &params, executor, /*loader_count=*/1, &loader,
       iree_allocator_system(), device));
   iree_task_executor_release(executor);
-  for (iree_host_size_t i = 0; i < loader_count; ++i) {
-    iree_hal_executable_loader_release(loaders[i]);
-  }
+  iree_hal_executable_loader_release(loader);
   return iree_ok_status();
+}
+
+const iree_const_byte_span_t load_bytecode_module_data() {
+#if IREE_ARCH_X86_64
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_simple_embedding_test_module_dylib_x86_64_create();
+#elif IREE_ARCH_RISCV_64
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_simple_embedding_test_module_dylib_riscv_64_create();
+#elif IREE_ARCH_ARM_64
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_simple_embedding_test_module_dylib_arm_64_create();
+#else
+#error "Unsupported platform."
+#endif
+  return iree_make_const_byte_span(module_file_toc->data,
+                                   module_file_toc->size);
 }
