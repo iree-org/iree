@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_MODULES_CHECK_NATIVE_MODULE_H_
-#define IREE_MODULES_CHECK_NATIVE_MODULE_H_
+#ifndef IREE_MODULES_CHECK_MODULE_H_
+#define IREE_MODULES_CHECK_MODULE_H_
 
 #include <stdint.h>
 
@@ -24,4 +24,4 @@ iree_status_t check_native_module_create(iree_allocator_t allocator,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_MODULES_CHECK_NATIVE_MODULE_H_
+#endif  // IREE_MODULES_CHECK_MODULE_H_

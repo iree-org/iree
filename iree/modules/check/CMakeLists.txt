@@ -6,6 +6,26 @@
 
 iree_add_all_subdirs()
 
+iree_cc_library(
+  NAME
+    check
+  HDRS
+    "module.h"
+  SRCS
+    "module.cc"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::base::status
+    iree::hal
+    iree::modules::hal
+    iree::testing::gtest
+    iree::vm
+    iree::vm::cc
+  TESTONLY
+  PUBLIC
+)
+
 # Doesn't use bazel_to_cmake because IREE_HAL_DRIVER_VMVX filtering is custom logic
 if(${IREE_HAL_DRIVER_VMVX})
   iree_cc_test(
@@ -14,7 +34,7 @@ if(${IREE_HAL_DRIVER_VMVX})
     SRCS
       "check_test.cc"
     DEPS
-      ::native_module
+      ::check
       iree::base
       iree::base::internal
       iree::base::internal::span
@@ -30,24 +50,3 @@ if(${IREE_HAL_DRIVER_VMVX})
       iree::vm::cc
   )
 endif()
-
-
-iree_cc_library(
-  NAME
-    native_module
-  HDRS
-    "native_module.h"
-  SRCS
-    "native_module.cc"
-  DEPS
-    iree::base
-    iree::base::internal
-    iree::base::status
-    iree::hal
-    iree::modules::hal
-    iree::testing::gtest
-    iree::vm
-    iree::vm::cc
-  TESTONLY
-  PUBLIC
-)

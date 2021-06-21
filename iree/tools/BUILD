@@ -52,7 +52,7 @@ cc_binary(
         "//iree/base/internal:flags",
         "//iree/hal",
         "//iree/hal/drivers",
-        "//iree/modules/check:native_module",
+        "//iree/modules/check",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/tools/utils:vm_util",
