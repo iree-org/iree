@@ -20,6 +20,7 @@ iree_cc_library(
     "math.h"
   SRCS
     "atomics_clang.h"
+    "atomics_disabled.h"
     "atomics_gcc.h"
     "atomics_msvc.h"
   DEPS
