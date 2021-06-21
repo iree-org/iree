@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_MODULES_HAL_HAL_MODULE_H_
-#define IREE_MODULES_HAL_HAL_MODULE_H_
+#ifndef IREE_MODULES_HAL_MODULE_H_
+#define IREE_MODULES_HAL_MODULE_H_
 
 #include <stdint.h>
 
@@ -66,4 +66,4 @@ IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_view_retain(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_MODULES_HAL_HAL_MODULE_H_
+#endif  // IREE_MODULES_HAL_MODULE_H_

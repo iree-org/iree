@@ -10,7 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "pybind11/numpy.h"
 

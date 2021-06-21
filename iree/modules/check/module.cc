@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/modules/check/native_module.h"
+#include "iree/modules/check/module.h"
 
 #include <cassert>
 #include <cmath>
@@ -21,7 +21,7 @@
 #include "iree/base/internal/math.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/native_module_cc.h"
 #include "iree/vm/ref_cc.h"
@@ -408,7 +408,7 @@ class CheckModule final : public vm::NativeModule<CheckModuleState> {
 
 // Note that while we are using C++ bindings internally we still expose the
 // module as a C instance. This hides the details of our implementation.
-extern "C" iree_status_t check_native_module_create(
+extern "C" iree_status_t iree_check_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;

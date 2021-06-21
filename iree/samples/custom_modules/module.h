@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_SAMPLES_CUSTOM_MODULES_NATIVE_MODULE_H_
-#define IREE_SAMPLES_CUSTOM_MODULES_NATIVE_MODULE_H_
+#ifndef IREE_SAMPLES_CUSTOM_MODULES_MODULE_H_
+#define IREE_SAMPLES_CUSTOM_MODULES_MODULE_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -51,4 +51,4 @@ iree_status_t iree_custom_native_module_create(iree_allocator_t allocator,
 
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_custom_message, iree_custom_message_t);
 
-#endif  // IREE_SAMPLES_CUSTOM_MODULES_NATIVE_MODULE_H_
+#endif  // IREE_SAMPLES_CUSTOM_MODULES_MODULE_H_

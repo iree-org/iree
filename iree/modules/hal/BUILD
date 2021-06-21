@@ -13,10 +13,10 @@ package(
 cc_library(
     name = "hal",
     srcs = [
-        "hal_module.c",
+        "module.c",
     ],
     hdrs = [
-        "hal_module.h",
+        "module.h",
     ],
     textual_hdrs = [
         "exports.inl",
