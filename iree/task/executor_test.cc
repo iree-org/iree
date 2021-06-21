@@ -10,6 +10,7 @@
 
 #include "iree/base/internal/prng.h"
 #include "iree/base/tracing.h"
+#include "iree/task/topology_cpuinfo.h"
 #include "iree/testing/gtest.h"
 
 namespace {
