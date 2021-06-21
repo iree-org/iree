@@ -15,6 +15,7 @@ iree_cc_library(
     "allocator.c"
     "allocator.h"
     "api.c"
+    "assert.h"
     "status.c"
     "status.h"
     "string_view.c"
