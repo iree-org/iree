@@ -16,7 +16,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
+if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 """,
     inline = True,
 )
@@ -124,7 +124,7 @@ iree_cmake_extra_content(
     content = """
 endif()
 
-if(${IREE_TARGET_BACKEND_VULKAN-SPIRV})
+if(${IREE_TARGET_BACKEND_VULKAN-SPIRV} AND ${IREE_HAL_DRIVER_VULKAN})
 """,
     inline = True,
 )
