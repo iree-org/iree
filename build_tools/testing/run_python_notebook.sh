@@ -45,6 +45,8 @@ python3 -m pip install \
   iree-tools-xla-snapshot \
   --find-links https://github.com/google/iree/releases
 
+# Tone down TensorFlow's logging by default.
+export TF_CPP_MIN_LOG_LEVEL=${TF_CPP_MIN_LOG_LEVEL:-1}
+
 # Run the notebook, discarding output (still fails if an exception is thrown).
 jupyter nbconvert --to notebook --execute $1 --stdout > /dev/null
-printf "Notebook exit code: %d\n" $?
