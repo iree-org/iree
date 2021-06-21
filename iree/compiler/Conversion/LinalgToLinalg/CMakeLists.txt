@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRPass
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRTransformUtils
     iree::compiler::Conversion::PassHeaders
   PUBLIC
