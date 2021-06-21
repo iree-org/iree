@@ -29,6 +29,7 @@ cc_library(
     name = "internal",
     srcs = [
         "atomics_clang.h",
+        "atomics_disabled.h",
         "atomics_gcc.h",
         "atomics_msvc.h",
     ],
