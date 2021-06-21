@@ -42,6 +42,7 @@ iree_cc_library(
     "submission.h"
     "task.h"
     "topology.h"
+    "topology_cpuinfo.h"
     "tuning.h"
   SRCS
     "executor.c"
@@ -56,6 +57,7 @@ iree_cc_library(
     "task.c"
     "task_impl.h"
     "topology.c"
+    "topology_cpuinfo.c"
     "worker.c"
     "worker.h"
   DEPS
@@ -165,7 +167,18 @@ iree_cc_test(
     "topology_test.cc"
   DEPS
     ::task
-    cpuinfo
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    topology_cpuinfo_test
+  SRCS
+    "topology_cpuinfo_test.cc"
+  DEPS
+    ::task
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
