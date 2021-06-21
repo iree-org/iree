@@ -184,13 +184,15 @@ function(iree_pyext_module)
       "/GR"
   )
 
+  set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD 17)
+  set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+
   target_compile_options(
     ${_NAME} PRIVATE
     ${ARG_COPTS}
     ${IREE_DEFAULT_COPTS}
     ${_RTTI_AND_EXCEPTION_COPTS}
   )
-
 
   # Link flags.
   if(UNIX AND NOT APPLE)  # Apple does not support linker scripts.

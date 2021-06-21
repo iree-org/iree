@@ -5,20 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #-------------------------------------------------------------------------------
-# Abseil configuration
-#-------------------------------------------------------------------------------
-
-include(AbseilConfigureCopts)
-
-# By default Abseil strips string literals on mobile platforms, which means
-# we cannot run IREE binaries via command-line with proper options. Turn off
-# the stripping.
-# TODO(#3814): remove ABSL flags.
-if(ANDROID)
-  add_definitions(-DABSL_FLAGS_STRIP_NAMES=0)
-endif()
-
-#-------------------------------------------------------------------------------
 # C/C++ options as used within IREE
 #-------------------------------------------------------------------------------
 #
@@ -315,18 +301,7 @@ if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Generic")
   )
 endif()
 
-# TODO(benvanik): remove the ABSL usage here; we aren't abseil.
-If(${IREE_ENABLE_THREADING})
-  iree_select_compiler_opts(_IREE_ABSL_LINKOPTS
-    ALL
-      "${ABSL_DEFAULT_LINKOPTS}"
-  )
-endif()
-
 iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
-  ALL
-    # TODO(benvanik): remove the ABSL usage here; we aren't abseil.
-    ${_IREE_ABSL_LINKOPTS}
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-lm"
@@ -344,9 +319,6 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 else()
   set(IREE_TARGET_GUI_LINKOPTS "")
 endif()
-
-# TODO(benvanik): remove the ABSL usage here; we aren't abseil.
-set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
 #-------------------------------------------------------------------------------
 # Size-optimized build flags

@@ -18,9 +18,7 @@ cc_binary(
     name = "generate_embed_data",
     srcs = ["generate_embed_data_main.cc"],
     deps = [
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/strings",
+        "//iree/base/internal:flags",
     ],
 )
 
