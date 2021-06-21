@@ -13,6 +13,20 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+cc_library(
+    name = "module",
+    srcs = ["module.cc"],
+    hdrs = ["module.h"],
+    deps = [
+        "//iree/base",
+        "//iree/base:status",
+        "//iree/hal",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:cc",
+    ],
+)
+
 iree_cmake_extra_content(
     content = """
 if(NOT "${IREE_TARGET_BACKEND_VMVX}" OR
@@ -28,7 +42,7 @@ iree_bytecode_module(
     c_identifier = "iree_samples_custom_modules_test_module",
     flags = [
         "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=dylib-llvm-aot",
+        "-iree-hal-target-backends=vmvx",
     ],
     translate_tool = "//iree/samples/custom_modules/dialect:custom-translate",
 )
@@ -38,7 +52,7 @@ cc_test(
     srcs = ["custom_modules_test.cc"],
     deps = [
         ":custom_modules_test_module_c",
-        ":native_module",
+        ":module",
         "//iree/base",
         "//iree/base:logging",
         "//iree/hal",
@@ -48,20 +62,6 @@ cc_test(
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "//iree/vm:cc",
-    ],
-)
-
-cc_library(
-    name = "native_module",
-    srcs = ["native_module.cc"],
-    hdrs = ["native_module.h"],
-    deps = [
-        "//iree/base",
-        "//iree/base:status",
-        "//iree/hal",
-        "//iree/modules/hal",
-        "//iree/vm",
         "//iree/vm:cc",
     ],
 )
