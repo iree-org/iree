@@ -6,12 +6,12 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
-#include "emitc/Dialect/EmitC/IR/EmitC.h"
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
