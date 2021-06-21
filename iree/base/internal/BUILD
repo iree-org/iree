@@ -135,8 +135,8 @@ cc_test(
     srcs = ["file_io_test.cc"],
     deps = [
         ":file_io",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -286,21 +286,6 @@ cc_library(
 )
 
 cc_library(
-    name = "status_internal",
-    srcs = [
-        "status.cc",
-    ],
-    hdrs = [
-        "status.h",
-    ],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:logging",
-    ],
-)
-
-cc_library(
     name = "synchronization",
     srcs = [
         "synchronization.c",
@@ -387,7 +372,7 @@ cc_test(
         ":internal",
         ":synchronization",
         ":threading",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

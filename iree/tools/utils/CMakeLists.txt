@@ -19,10 +19,10 @@ iree_cc_library(
     "vm_util.cc"
   DEPS
     iree::base
+    iree::base::cc
     iree::base::internal::file_io
     iree::base::internal::span
     iree::base::logging
-    iree::base::status
     iree::base::tracing
     iree::hal
     iree::modules::hal

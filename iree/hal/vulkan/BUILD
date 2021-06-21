@@ -84,9 +84,9 @@ cc_library(
     deps = [
         ":dynamic_symbols",
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:core_headers",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/base/internal:flatcc",
@@ -115,8 +115,8 @@ cc_library(
     ],
     deps = [
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:core_headers",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:dynamic_library",
         "//iree/hal/vulkan/util:ref_ptr",

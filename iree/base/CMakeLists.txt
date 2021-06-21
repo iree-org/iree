@@ -28,6 +28,43 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    cc
+  HDRS
+    "status_cc.h"
+  SRCS
+    "status_cc.cc"
+  DEPS
+    ::base
+    ::core_headers
+    ::logging
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    status_test
+  SRCS
+    "status_test.cc"
+  DEPS
+    ::base
+    ::cc
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    string_view_test
+  SRCS
+    "string_view_test.cc"
+  DEPS
+    ::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     core_headers
   HDRS
     "alignment.h"
@@ -57,38 +94,6 @@ iree_cc_library(
     ::tracing
     iree::base::internal::flags
   PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    status
-  HDRS
-    "status.h"
-  DEPS
-    iree::base::internal::status_internal
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    status_test
-  SRCS
-    "status_test.cc"
-  DEPS
-    ::status
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    string_view_test
-  SRCS
-    "string_view_test.cc"
-  DEPS
-    ::base
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 # TODO(benvanik): evaluate if we want this as part of the API. Could restrict it

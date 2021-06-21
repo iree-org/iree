@@ -77,7 +77,7 @@ cc_test(
     deps = [
         ":hal",
         "//iree/base",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/base/internal:span",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",

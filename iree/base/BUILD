@@ -36,6 +36,43 @@ cc_library(
     ],
 )
 
+# TODO(benvanik): make these srcs and only expose an api_cc.h.
+cc_library(
+    name = "cc",
+    srcs = [
+        "status_cc.cc",
+    ],
+    hdrs = [
+        "status_cc.h",
+    ],
+    deps = [
+        ":base",
+        ":core_headers",
+        ":logging",
+    ],
+)
+
+cc_test(
+    name = "status_test",
+    srcs = ["status_test.cc"],
+    deps = [
+        ":base",
+        ":cc",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "string_view_test",
+    srcs = ["string_view_test.cc"],
+    deps = [
+        ":base",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
 #===------------------------------------------------------------------------===#
 # Core headers (platform detection, compiler compat, etc)
 #===------------------------------------------------------------------------===#
@@ -73,35 +110,6 @@ cc_library(
         ":core_headers",
         ":tracing",
         "//iree/base/internal:flags",
-    ],
-)
-
-cc_library(
-    name = "status",
-    hdrs = ["status.h"],
-    deps = [
-        "//iree/base/internal:status_internal",
-    ],
-)
-
-cc_test(
-    name = "status_test",
-    srcs = ["status_test.cc"],
-    deps = [
-        ":base",
-        ":status",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "string_view_test",
-    srcs = ["string_view_test.cc"],
-    deps = [
-        ":base",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
     ],
 )
 

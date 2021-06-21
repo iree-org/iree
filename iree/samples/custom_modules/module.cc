@@ -16,7 +16,7 @@
 #include <utility>
 
 #include "iree/base/api.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/native_module_cc.h"

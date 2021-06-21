@@ -13,7 +13,7 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/main.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tools/utils/vm_util.h"

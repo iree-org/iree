@@ -46,7 +46,7 @@ cc_library(
         "status_matchers.h",
     ],
     deps = [
-        "//iree/base:status",
+        "//iree/base:cc",
         "@com_google_googletest//:gtest",
     ],
 )

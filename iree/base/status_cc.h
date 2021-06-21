@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_BASE_INTERNAL_STATUS_H_
-#define IREE_BASE_INTERNAL_STATUS_H_
+#ifndef IREE_BASE_STATUS_CC_H_
+#define IREE_BASE_STATUS_CC_H_
 
 #ifndef __cplusplus
 #error iree::Status is only usable in C++ code.
@@ -940,4 +940,4 @@ IREE_MUST_USE_RESULT static inline bool IsOk(const StatusOr<T>& status_or) {
   }                                                                       \
   lhs = std::move(statusor).value()
 
-#endif  // IREE_BASE_INTERNAL_STATUS_H_
+#endif  // IREE_BASE_STATUS_CC_H_
