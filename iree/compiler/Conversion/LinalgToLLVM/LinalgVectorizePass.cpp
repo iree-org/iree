@@ -39,15 +39,15 @@ static Optional<SmallVector<int64_t, 4>> getShape(mlir::Operation *op) {
 
 namespace {
 struct LinalgVectorizationPass
-    : public PassWrapper<LinalgVectorizationPass, FunctionPass> {
+    : public LinalgVectorizationBase<LinalgVectorizationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, AffineDialect>();
   }
-  void runOnFunction() override;
+  void runOnOperation() override;
 };
 }  // namespace
 
-void LinalgVectorizationPass::runOnFunction() {
+void LinalgVectorizationPass::runOnOperation() {
   FuncOp funcOp = getOperation();
   MLIRContext *context = &getContext();
   // Apply vectorization patterns.

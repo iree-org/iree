@@ -20,6 +20,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -197,9 +198,8 @@ static bool isInFusionGroup(Operation *op, unsigned targetGroup) {
 ///   across workgroups.
 /// - Dispatchable ops : These are ops that are not root operations, but still
 ///   perform some "meaningful" computation. Typically, fused element-wise
-///   operations, represented as linalg.generic/linalg.indexed_generic. These
-///   could be fused with root operations using tile + fuse, or could be in
-///   their own dispatch regions.
+///   operations, represented as linalg.generic. These could be fused with root
+///   operations using tile + fuse, or could be in their own dispatch regions.
 /// - Always fused dispatchable ops : These are ops that are chosen to always be
 ///   fused into dispatch regions that use their values, since when bufferized
 ///   they can be converted into being no-copy/aliasing operations. Examples of
@@ -254,7 +254,7 @@ static bool isDispatchableOp(Operation *op) {
   // Linalg ops are marked dispatchable.
   if ((op->getDialect() !=
        op->getContext()->getLoadedDialect<linalg::LinalgDialect>()) &&
-      !isa<SubTensorOp, SubTensorInsertOp>(op)) {
+      !isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(op)) {
     return false;
   }
   return !isAlwaysClonedIntoDispatchOp(op);
@@ -262,8 +262,8 @@ static bool isDispatchableOp(Operation *op) {
 
 static bool isAlwaysFusedIntoDispatchOp(Operation *op) {
   return isDispatchableOp(op) &&
-         (isa<linalg::TensorCollapseShapeOp, SubTensorOp>(op) ||
-          isa<linalg::TensorExpandShapeOp, SubTensorOp>(op));
+         (isa<linalg::TensorCollapseShapeOp, tensor::ExtractSliceOp>(op) ||
+          isa<linalg::TensorExpandShapeOp, tensor::ExtractSliceOp>(op));
 }
 
 //===----------------------------------------------------------------------===//
@@ -536,7 +536,7 @@ static void tryToTieOperandsAndResults(
 
     // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
     // when it's available in MLIR core in some form.
-    if (auto insertOp = dyn_cast_or_null<SubTensorInsertOp>(tieOp)) {
+    if (auto insertOp = dyn_cast_or_null<tensor::InsertSliceOp>(tieOp)) {
       auto loadOp =
           insertOp.dest().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
       if (!loadOp) return nullptr;
@@ -713,6 +713,12 @@ static Optional<SmallVector<SmallVector<Value, 4>, 1>> computeOutputShape(
   return outputShapes;
 }
 
+static bool hasOnlyDimUses(Operation *op) {
+  return llvm::all_of(op->getUsers(), [&](Operation *user) {
+    return isa<memref::DimOp>(user);
+  });
+}
+
 //===----------------------------------------------------------------------===//
 // Patterns that create the dispatch region.
 //===----------------------------------------------------------------------===//
@@ -734,6 +740,11 @@ struct TileAndDistributeOnTensorsPattern
     if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
     IntegerAttr rootOpAttr = op->getAttrOfType<IntegerAttr>(kRootOpAttr);
     if (!rootOpAttr) return failure();
+
+    // TODO(ravishankarm): It is getting strange to track when to apply this
+    // pattern and when not to. Need to revisit this, with dynamic shape cases
+    // in mind.
+    if (hasOnlyDimUses(linalgOp)) return failure();
 
     // Compute workgroup count to use for the dispatch op. These are the ranges
     // of the outermost parallel loops that can be distributed.
@@ -878,7 +889,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!isDispatchableOp(op)) return failure();
+    if (!isDispatchableOp(op) || hasOnlyDimUses(op)) return failure();
 
     // If this is a dispatchable op that is to be fused into dispatch ops, and
     // all its uses are dispatchable ops, don't do anything.
@@ -1169,7 +1180,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   // If elementwise operations are not tiled and distributed, the wont be marked
   // as root ops previously. Mark them so here to allow fusion of `fill` etc.
   numRoots = makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
-  makeElementwiseOpsRootOps<linalg::IndexedGenericOp>(funcOp, numRoots);
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs()
@@ -1215,7 +1225,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     // to guarantee type match during transformation. Later in destructive
     // update subtensor_insert ops will be turned into flow dispatch output
     // store ops.
-    SubTensorInsertOp::getCanonicalizationPatterns(patterns, context);
+    tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 

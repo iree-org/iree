@@ -93,8 +93,8 @@ struct ConcatenateOpConversion
     for (auto arg : args) {
       offsets[dim] = accBound;
       sizes[dim] = rewriter.create<memref::DimOp>(loc, arg, dim);
-      result = rewriter.create<SubTensorInsertOp>(loc, arg, result, offsets,
-                                                  sizes, strides);
+      result = rewriter.create<tensor::InsertSliceOp>(loc, arg, result, offsets,
+                                                      sizes, strides);
       accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);
