@@ -12,7 +12,7 @@
         <link rel="canonical" href="https://google.github.io/iree/bindings/c-api/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.1, mkdocs-material-7.1.7">
+      <meta name="generator" content="mkdocs-1.2.1, mkdocs-material-7.1.8">
     
     
       
@@ -42,6 +42,8 @@
     
     
       
+
+
     
     
   </head>
@@ -833,7 +835,7 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
 <span class="c1">// The VM bytecode and HAL modules will typically be included, along</span>
 <span class="c1">// with those for the specific HAL drivers your application uses.</span>
 <span class="c1">// Functionality extensions can be used via custom modules.</span>
-<span class="cp">#include</span> <span class="cpf">&quot;iree/modules/hal/hal_module.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&quot;iree/modules/hal/module.h&quot;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&quot;iree/hal/dylib/registration/driver_module.h&quot;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&quot;iree/vm/bytecode_module.h&quot;</span><span class="cp"></span>
 </code></pre></div>
