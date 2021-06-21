@@ -14,7 +14,7 @@
 
 #include "iree/base/status.h"
 #include "iree/hal/drivers/init.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"

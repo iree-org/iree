@@ -19,7 +19,7 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/vm/ref_cc.h"
 
 namespace iree {

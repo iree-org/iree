@@ -18,7 +18,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/check/native_module.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"

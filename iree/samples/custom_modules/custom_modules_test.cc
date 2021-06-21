@@ -9,7 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vmvx/registration/driver_module.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/samples/custom_modules/custom_modules_test_module_c.h"
 #include "iree/samples/custom_modules/native_module.h"
 #include "iree/testing/gtest.h"
