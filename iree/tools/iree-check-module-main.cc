@@ -110,7 +110,8 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));
   iree_vm_module_t* check_module = nullptr;
-  check_native_module_create(iree_allocator_system(), &check_module);
+  IREE_RETURN_IF_ERROR(
+      iree_check_module_create(iree_allocator_system(), &check_module));
 
   std::array<iree_vm_module_t*, 3> modules = {hal_module, check_module,
                                               input_module};
