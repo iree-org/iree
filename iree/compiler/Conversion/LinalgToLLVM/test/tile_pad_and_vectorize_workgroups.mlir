@@ -33,7 +33,7 @@ module  {
         %11 = affine.min #map3(%arg0)
         %12 = affine.min #map4(%arg1)
         %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf32>
-        %14 = linalg.fill(%13, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+        %14 = linalg.fill(%13, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
         %15 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config1} ins(%8, %10 : tensor<?x383xf32>, tensor<383x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:383x513xf32>
       }
@@ -58,23 +58,23 @@ module  {
 //     CHECK: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>
 //     CHECK: %[[LHS_WG_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]]
 //     CHECK: %[[RHS_WG_TILE:.+]] = flow.dispatch.tensor.load %[[RHS]]
-//     CHECK: %[[DST_WG_TILE_INIT:.+]] = linalg.init_tensor 
+//     CHECK: %[[DST_WG_TILE_INIT:.+]] = linalg.init_tensor
 //     CHECK: %[[DST_WG_TILE_INIT_C0:.+]] = linalg.fill(%[[DST_WG_TILE_INIT]], %[[CST]])
 //     CHECK: {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C383]] step %[[C32]] iter_args(%[[DST_WG_TILE_0:.+]] = %[[DST_WG_TILE_INIT_C0]])
 //     CHECK:    {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C513]] step %[[C32]] iter_args(%[[DST_WG_TILE_1:.+]] = %[[DST_WG_TILE_0]])
 //     CHECK:       {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C383]] step %[[C32]] iter_args(%[[DST_WG_TILE_2:.+]] = %[[DST_WG_TILE_1]])
-//     CHECK:           %[[LHS_L1_TILE:.+]] = subtensor %[[LHS_WG_TILE]]
-//     CHECK:           %[[RHS_L1_TILE:.+]] = subtensor %[[RHS_WG_TILE]]
-//     CHECK:           %[[DST_L1_TILE:.+]] = subtensor %[[DST_WG_TILE_2]]
+//     CHECK:           %[[LHS_L1_TILE:.+]] = tensor.extract_slice %[[LHS_WG_TILE]]
+//     CHECK:           %[[RHS_L1_TILE:.+]] = tensor.extract_slice %[[RHS_WG_TILE]]
+//     CHECK:           %[[DST_L1_TILE:.+]] = tensor.extract_slice %[[DST_WG_TILE_2]]
 //     CHECK:           %[[LHS_L1_TILE_PADDED:.+]] = linalg.pad_tensor %[[LHS_L1_TILE]]
 //     CHECK:           %[[RHS_L1_TILE_PADDED:.+]] = linalg.pad_tensor %[[RHS_L1_TILE]]
 //     CHECK:           %[[DST_L1_TILE_PADDED:.+]] = linalg.pad_tensor %[[DST_L1_TILE]]
 //     CHECK:           {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C32]] step %[[C4]] iter_args(%[[DST_VEC_TILE_0:.+]] = %[[DST_L1_TILE_PADDED]])
 //     CHECK:              {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C32]] step %[[C4]] iter_args(%[[DST_VEC_TILE_1:.+]] = %[[DST_VEC_TILE_0]])
 //     CHECK:                {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C32]] step %[[C4]] iter_args(%[[DST_VEC_TILE_2:.+]] = %[[DST_VEC_TILE_1]])
-//     CHECK:                    %[[LHS_VEC_TILE:.+]] = subtensor %[[LHS_L1_TILE_PADDED]]
-//     CHECK:                    %[[RHS_VEC_TILE:.+]] = subtensor %[[RHS_L1_TILE_PADDED]]
-//     CHECK:                    %[[DST_VEC_TILE:.+]] = subtensor %[[DST_VEC_TILE_2]]
+//     CHECK:                    %[[LHS_VEC_TILE:.+]] = tensor.extract_slice %[[LHS_L1_TILE_PADDED]]
+//     CHECK:                    %[[RHS_VEC_TILE:.+]] = tensor.extract_slice %[[RHS_L1_TILE_PADDED]]
+//     CHECK:                    %[[DST_VEC_TILE:.+]] = tensor.extract_slice %[[DST_VEC_TILE_2]]
 //     CHECK:                    %[[LHS_VEC:.+]] = vector.transfer_read %[[LHS_VEC_TILE]]
 //     CHECK:                    %[[RHS_VEC:.+]] = vector.transfer_read %[[RHS_VEC_TILE]]
 //     CHECK:                    %[[DST_VEC:.+]] = vector.transfer_read %[[DST_VEC_TILE]]

@@ -58,7 +58,7 @@ static Value getViewSource(Value view) {
       view = viewOp.getViewSource();
       continue;
     }
-    if (auto subTensorOp = view.getDefiningOp<SubTensorOp>()) {
+    if (auto subTensorOp = view.getDefiningOp<tensor::ExtractSliceOp>()) {
       view = subTensorOp.source();
       continue;
     }

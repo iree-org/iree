@@ -118,7 +118,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
       SmallVector<OpFoldResult> strides(2, rewriter.getI64IntegerAttr(1));
       SmallVector<OpFoldResult> sizes = {rewriter.getIndexAttr(M),
                                          rewriter.getIndexAttr(N)};
-      rewriter.replaceOpWithNewOp<SubTensorOp>(
+      rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
           matmulOp, paddedMatmulOp->getResults()[0], offsets, sizes, strides);
     }
 
