@@ -23,35 +23,15 @@ if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 
 # TODO(llvm-bazel/#228): re-enable bazel.
 #cc_binary(
-#    name = "simple_embedding_dylib",
-#    srcs = [
-#        "device_dylib.c",
-#        "simple_embedding.c",
-#    ],
-#    deps = [
-#        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
-#        ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
-#        ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
-#        "//iree/base",
-#        "//iree/hal",
-#        "//iree/hal/local",
-#        "//iree/hal/local:task_driver",
-#        "//iree/hal/local/loaders:embedded_library_loader",
-#        "//iree/modules/hal",
-#        "//iree/task:api",
-#        "//iree/vm",
-#        "//iree/vm:bytecode_module",
-#    ],
-#)
-#
-#cc_binary(
 #    name = "simple_embedding_local_sync",
 #    srcs = [
 #        "device_local_sync.c",
 #        "simple_embedding.c",
 #    ],
 #    deps = [
+#        ":simple_embedding_test_bytecode_module_dylib_arm_32_c",
 #        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
+#        ":simple_embedding_test_bytecode_module_dylib_riscv_32_c",
 #        ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
 #        ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
 #        "//iree/base",
@@ -79,6 +59,24 @@ if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 #    ],
 #)
 #
+# TODO(#6121): Adjust the flags to resolve segfault if necessary.
+#iree_bytecode_module(
+#    name = "simple_embedding_test_bytecode_module_dylib_riscv_32",
+#    src = "simple_embedding_test.mlir",
+#    c_identifier = "iree_samples_simple_embedding_test_module_dylib_riscv_32",
+#    flags = [
+#        "-iree-input-type=mhlo",
+#        "-iree-mlir-to-vm-bytecode-module",
+#        "-iree-hal-target-backends=dylib-llvm-aot",
+#        "-iree-llvm-target-triple=riscv32-pc-linux-elf",
+#        "-iree-llvm-target-cpu=generic-rv32",
+#        "-iree-llvm-target-cpu-features=+m",
+#        "-iree-llvm-target-abi=ilp32",
+#        "-iree-llvm-link-embedded=true",
+#        "-iree-llvm-debug-symbols=false",
+#    ],
+#)
+#
 #iree_bytecode_module(
 #    name = "simple_embedding_test_bytecode_module_dylib_riscv_64",
 #    src = "simple_embedding_test.mlir",
@@ -91,6 +89,21 @@ if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 #        "-iree-llvm-target-cpu=generic-rv64",
 #        "-iree-llvm-target-cpu-features=+m,+a,+f,+d,+c",
 #        "-iree-llvm-target-abi=lp64d",
+#        "-iree-llvm-link-embedded=true",
+#        "-iree-llvm-debug-symbols=false",
+#    ],
+#)
+#
+#iree_bytecode_module(
+#    name = "simple_embedding_test_bytecode_module_dylib_arm_32",
+#    src = "simple_embedding_test.mlir",
+#    c_identifier = "iree_samples_simple_embedding_test_module_dylib_arm_32",
+#    flags = [
+#        "-iree-input-type=mhlo",
+#        "-iree-mlir-to-vm-bytecode-module",
+#        "-iree-hal-target-backends=dylib-llvm-aot",
+#        "-iree-llvm-target-triple=armv7a-pc-linux-elf",
+#        "-iree-llvm-target-float-abi=hard",
 #        "-iree-llvm-link-embedded=true",
 #        "-iree-llvm-debug-symbols=false",
 #    ],
@@ -111,14 +124,51 @@ if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 #)
 #
 #run_binary_test(
-#    name = "simple_embedding_dylib_test",
-#    test_binary = ":simple_embedding_dylib",
-#)
-#
-#run_binary_test(
 #    name = "simple_embedding_local_sync_test",
 #    test_binary = ":simple_embedding_local_sync",
 #)
+
+iree_cmake_extra_content(
+    content = """
+if(${IREE_ENABLE_THREADING})
+""",
+    inline = True,
+)
+
+#cc_binary(
+#    name = "simple_embedding_dylib",
+#    srcs = [
+#        "device_dylib.c",
+#        "simple_embedding.c",
+#    ],
+#    deps = [
+#        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
+#        ":simple_embedding_test_bytecode_module_dylib_riscv_32_c",
+#        ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
+#        ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
+#        "//iree/base",
+#        "//iree/hal",
+#        "//iree/hal/local",
+#        "//iree/hal/local:task_driver",
+#        "//iree/hal/local/loaders:embedded_library_loader",
+#        "//iree/modules/hal",
+#        "//iree/task:api",
+#        "//iree/vm",
+#        "//iree/vm:bytecode_module",
+#    ],
+#)
+#
+#run_binary_test(
+#    name = "simple_embedding_dylib_test",
+#    test_binary = ":simple_embedding_dylib",
+#)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
+)
 
 iree_cmake_extra_content(
     content = """

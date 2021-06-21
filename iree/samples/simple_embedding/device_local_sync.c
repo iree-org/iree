@@ -15,7 +15,9 @@
 #include "iree/hal/local/sync_device.h"
 
 // Compiled module embedded here to avoid file IO:
+#include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_arm_32_c.h"
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_arm_64_c.h"
+#include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_riscv_32_c.h"
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_riscv_64_c.h"
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_x86_64_c.h"
 
@@ -43,9 +45,15 @@ const iree_const_byte_span_t load_bytecode_module_data() {
 #if IREE_ARCH_X86_64
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_simple_embedding_test_module_dylib_x86_64_create();
+#elif IREE_ARCH_RISCV_32
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_simple_embedding_test_module_dylib_riscv_32_create();
 #elif IREE_ARCH_RISCV_64
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_simple_embedding_test_module_dylib_riscv_64_create();
+#elif IREE_ARCH_ARM_32
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_simple_embedding_test_module_dylib_arm_32_create();
 #elif IREE_ARCH_ARM_64
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_simple_embedding_test_module_dylib_arm_64_create();

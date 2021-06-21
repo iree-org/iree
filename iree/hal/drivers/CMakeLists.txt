@@ -7,6 +7,8 @@
 # Doesn't use bazel_to_cmake because of custom configuration vars
 
 # Driver registration has implicit thread dependency from task executor.
+
+# TODO(#4298): Separate HAL driver registration from threading.
 if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
