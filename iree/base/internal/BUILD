@@ -289,11 +289,9 @@ cc_library(
     name = "status_internal",
     srcs = [
         "status.cc",
-        "statusor.cc",
     ],
     hdrs = [
         "status.h",
-        "statusor.h",
     ],
     deps = [
         "//iree/base",

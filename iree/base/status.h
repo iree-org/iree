@@ -30,7 +30,6 @@
 
 #ifdef __cplusplus
 #include "iree/base/internal/status.h"
-#include "iree/base/internal/statusor.h"
 #endif  // __cplusplus
 
 #endif  // IREE_BASE_STATUS_H_

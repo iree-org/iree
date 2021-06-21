@@ -307,10 +307,8 @@ iree_cc_library(
     status_internal
   HDRS
     "status.h"
-    "statusor.h"
   SRCS
     "status.cc"
-    "statusor.cc"
   DEPS
     iree::base
     iree::base::core_headers
