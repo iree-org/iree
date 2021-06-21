@@ -32,7 +32,8 @@ python3 -m pip install --quiet \
   numpy \
   matplotlib \
   tensorflow \
-  tensorflow_hub
+  tensorflow_hub \
+  bottleneck
 
 # Install IREE packages outside of the notebook
 # TODO(scotttodd): installs inside notebooks should be sufficient
