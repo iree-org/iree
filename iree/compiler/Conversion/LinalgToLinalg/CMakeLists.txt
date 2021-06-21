@@ -21,6 +21,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRLinalg
+    MLIRMemRef
     MLIRPass
     MLIRStandard
     MLIRSupport
