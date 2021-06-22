@@ -10,6 +10,7 @@
 EXPLICIT_TARGET_MAPPING = {
     # Internal utilities to emulate various binary/library options.
     "//build_tools:default_linkopts": [],
+    "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # LLVM
     "@llvm-project//llvm:IPO": ["LLVMipo"],
