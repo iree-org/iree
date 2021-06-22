@@ -43,7 +43,7 @@ static llvm::StructType *makeImportTableType(llvm::LLVMContext &context) {
           context, "iree_hal_executable_import_table_v0_t")) {
     return existingType;
   }
-  auto *i32Type = llvm::IntegerType::getInt64Ty(context);
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
   auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
   auto *type = llvm::StructType::create(context,
                                         {
@@ -51,7 +51,7 @@ static llvm::StructType *makeImportTableType(llvm::LLVMContext &context) {
                                             i8PtrType->getPointerTo(),
                                         },
                                         "iree_hal_executable_import_table_v0_t",
-                                        /*isPacked=*/false);
+                                        /*isPacked=*/true);
   return type;
 }
 
@@ -70,7 +70,7 @@ static llvm::StructType *makeVec3Type(llvm::LLVMContext &context) {
                                             i32Type,
                                         },
                                         "iree_hal_vec3_t",
-                                        /*isPacked=*/false);
+                                        /*isPacked=*/true);
   return type;
 }
 
@@ -156,7 +156,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
           i8PtrType->getPointerTo(),
       },
       "iree_hal_executable_export_table_v0_t",
-      /*isPacked=*/false);
+      /*isPacked=*/true);
   return type;
 }
 
@@ -181,7 +181,7 @@ static llvm::StructType *makeLibraryHeaderType(llvm::LLVMContext &context) {
                                             i32Type,
                                         },
                                         "iree_hal_executable_library_header_t",
-                                        /*isPacked=*/false);
+                                        /*isPacked=*/true);
   return type;
 }
 
@@ -205,7 +205,7 @@ static llvm::StructType *makeLibraryType(llvm::StructType *libraryHeaderType) {
                                             exportTableType,
                                         },
                                         "iree_hal_executable_library_v0_t",
-                                        /*isPacked=*/false);
+                                        /*isPacked=*/true);
   return type;
 }
 
