@@ -51,6 +51,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -1536,6 +1537,7 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
 void addLinalgBufferizePasses(OpPassManager &passManager,
                               WorkgroupMemoryAllocationFn allocationFn) {
   passManager.addNestedPass<FuncOp>(createLinalgBufferizePass(allocationFn));
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());

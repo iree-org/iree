@@ -587,6 +587,7 @@ LLVM_FAILING_DYNAMIC = [
     "segment_prod",
     "segment_sum",
     "sigmoid",
+    "sign",
     "sinh",
     "sobol_sample",
     "softmax",

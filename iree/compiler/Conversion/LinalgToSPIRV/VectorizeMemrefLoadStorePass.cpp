@@ -411,6 +411,9 @@ struct ScalarizeVectorTransferWrite final
 class LinalgToSPIRVVectorizeMemRefLoadStorePass final
     : public LinalgToSPIRVVectorizeMemRefLoadStoreBase<
           LinalgToSPIRVVectorizeMemRefLoadStorePass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<memref::MemRefDialect>();
+  }
   void runOnOperation() override;
 
  private:

@@ -197,9 +197,8 @@ static bool isInFusionGroup(Operation *op, unsigned targetGroup) {
 ///   across workgroups.
 /// - Dispatchable ops : These are ops that are not root operations, but still
 ///   perform some "meaningful" computation. Typically, fused element-wise
-///   operations, represented as linalg.generic/linalg.indexed_generic. These
-///   could be fused with root operations using tile + fuse, or could be in
-///   their own dispatch regions.
+///   operations, represented as linalg.generic. These could be fused with root
+///   operations using tile + fuse, or could be in their own dispatch regions.
 /// - Always fused dispatchable ops : These are ops that are chosen to always be
 ///   fused into dispatch regions that use their values, since when bufferized
 ///   they can be converted into being no-copy/aliasing operations. Examples of
@@ -713,6 +712,12 @@ static Optional<SmallVector<SmallVector<Value, 4>, 1>> computeOutputShape(
   return outputShapes;
 }
 
+static bool hasOnlyDimUses(Operation *op) {
+  return llvm::all_of(op->getUsers(), [&](Operation *user) {
+    return isa<memref::DimOp>(user);
+  });
+}
+
 //===----------------------------------------------------------------------===//
 // Patterns that create the dispatch region.
 //===----------------------------------------------------------------------===//
@@ -734,6 +739,11 @@ struct TileAndDistributeOnTensorsPattern
     if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
     IntegerAttr rootOpAttr = op->getAttrOfType<IntegerAttr>(kRootOpAttr);
     if (!rootOpAttr) return failure();
+
+    // TODO(ravishankarm): It is getting strange to track when to apply this
+    // pattern and when not to. Need to revisit this, with dynamic shape cases
+    // in mind.
+    if (hasOnlyDimUses(linalgOp)) return failure();
 
     // Compute workgroup count to use for the dispatch op. These are the ranges
     // of the outermost parallel loops that can be distributed.
@@ -878,7 +888,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!isDispatchableOp(op)) return failure();
+    if (!isDispatchableOp(op) || hasOnlyDimUses(op)) return failure();
 
     // If this is a dispatchable op that is to be fused into dispatch ops, and
     // all its uses are dispatchable ops, don't do anything.
@@ -1169,7 +1179,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   // If elementwise operations are not tiled and distributed, the wont be marked
   // as root ops previously. Mark them so here to allow fusion of `fill` etc.
   numRoots = makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
-  makeElementwiseOpsRootOps<linalg::IndexedGenericOp>(funcOp, numRoots);
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs()

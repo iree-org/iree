@@ -4,9 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -127,13 +129,13 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
   int paddingSize;
 };
 
-class PadLinalgOpsPass : public PassWrapper<PadLinalgOpsPass, FunctionPass> {
+class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
  public:
   PadLinalgOpsPass(int size) : paddingSize(size) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
-  void runOnFunction() override {
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(context);
     patterns.insert<PadMatmulOp>(context, paddingSize);
@@ -145,7 +147,7 @@ class PadLinalgOpsPass : public PassWrapper<PadLinalgOpsPass, FunctionPass> {
 };
 }  // namespace
 
-std::unique_ptr<FunctionPass> createPadLinalgOpsToIntegerMultiplePass(
+std::unique_ptr<OperationPass<FuncOp>> createPadLinalgOpsToIntegerMultiplePass(
     int paddingSize) {
   return std::make_unique<PadLinalgOpsPass>(paddingSize);
 }

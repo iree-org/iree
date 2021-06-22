@@ -444,8 +444,8 @@ namespace {
 struct LinalgToSPIRVConvertToGPUPass
     : public LinalgToSPIRVConvertToGPUBase<LinalgToSPIRVConvertToGPUPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect,
-                    ShapeDialect>();
+    registry.insert<AffineDialect, gpu::GPUDialect, memref::MemRefDialect,
+                    scf::SCFDialect, ShapeDialect>();
   }
   void runOnOperation() override;
 };
@@ -662,7 +662,6 @@ void LinalgToSPIRVConvertToGPUPass::runOnOperation() {
   patterns.insert<MapLinalgOpToGlobalInvocationId<linalg::CopyOp>,
                   MapLinalgOpToGlobalInvocationId<linalg::FillOp>,
                   MapLinalgOpToGlobalInvocationId<linalg::GenericOp>,
-                  MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
                   SerializeAndDistributeCopy>(context);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
