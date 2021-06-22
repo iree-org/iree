@@ -47,23 +47,16 @@ for general instructions on building using CMake):
     -DCMAKE_BUILD_TYPE=RelWithDebInfo .
   ```
 
-2. Build the `simple_mul` CMake target. This will run  `iree-translate` on
-`simple_mul.mlir` (located in this directory) to produce a static library,
-header file, and bytecode module:
-
-  ```shell
-  cmake --build ../iree-build/ --target iree_samples_static_library_simple_mul_c
-  ```
-
-3. Build the `static_library_demo` CMake target. Note: this assumes you've
-generated the static library files and module in the build directory from step
-2:
+2. Build the `static_library_demo` CMake target to create the static demo. This
+target has several dependencies that will translate `simple_mul.mlir` into a
+static library (`simple_mul.h` & `simple_mul.c`) as well as a bytecode module
+(`simple_mul.vmfb`) which are finally built into the demo binary:
 
   ```shell
   cmake --build ../iree-build/ --target iree_samples_static_library_demo
   ```
 
-4. Run the sample binary:
+3. Run the sample binary:
 
   ```shell
   ../iree-build/iree/samples/static_library/static_library_demo
