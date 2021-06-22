@@ -180,7 +180,7 @@ class BufferizationPlan {
 static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
   auto definingOp = v.getDefiningOp();
   if (!definingOp) {
-    BlockArgument arg = v.cast<BlockArgument>();
+    auto arg = v.cast<BlockArgument>();
     return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           Value initOperand = forOp.getOpOperandForRegionIterArg(arg).get();
@@ -517,28 +517,21 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
 static LogicalResult hasDestructiveUpdateLoopPattern(scf::ForOp forOp,
                                                      BufferizationPlan &plan) {
   for (BlockArgument arg : forOp.getRegionIterArgs()) {
-    bool allArgUsesCompatible = true;
-    for (OpOperand &use : arg.getUses()) {
+    auto isDestructiveUpdateUses = [&](OpOperand &use) -> bool {
       Operation *user = use.getOwner();
-      bool isDestructiveUpdateCompatibleUse =
-          TypeSwitch<Operation *, bool>(user)
-              .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
-                return subTensorOp.source() == arg;
-              })
-              .Case<SubTensorInsertOp>(
-                  [&](SubTensorInsertOp subTensorInsertOp) {
-                    return subTensorInsertOp.dest() == arg;
-                  })
-              .Case<memref::DimOp, scf::YieldOp>([&](auto op) { return true; })
-              .Default([&](Operation *op) { return false; });
-      if (!isDestructiveUpdateCompatibleUse) {
-        allArgUsesCompatible = false;
-        break;
-      }
-    }
-    if (allArgUsesCompatible) {
+      TypeSwitch<Operation *, bool>(user)
+          .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
+            return subTensorOp.source() == arg;
+          })
+          .Case<SubTensorInsertOp>([&](SubTensorInsertOp subTensorInsertOp) {
+            return subTensorInsertOp.dest() == arg;
+          })
+          .Case<memref::DimOp, scf::YieldOp>([&](auto op) { return true; })
+          .Default([&](Operation *op) { return false; });
+    };
+    if (llvm::all_of(arg.getUses(), isDestructiveUpdateUses)) {
       for (Operation *user : arg.getUsers()) {
-        TypeSwitch<Operation *>(user)
+        3 TypeSwitch<Operation *>(user)
             .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
               plan.unionSets(subTensorOp.source(), subTensorOp.result());
             })
@@ -602,8 +595,9 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
                                               plan);
         })
         .Case<tensor::InsertOp>([&](tensor::InsertOp insertOp) {
-          return analyseDestructiveUpdateOp(insertOp, nullptr, insertOp.dest(),
-                                            insertOp.result(), plan);
+          return analyseDestructiveUpdateOp(insertOp, /*source =*/nullptr,
+                                            insertOp.dest(), insertOp.result(),
+                                            plan);
         })
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
@@ -872,7 +866,6 @@ static Value walkUseToGetResultBuffer(
   while (value.hasOneUse()) {
     OpOperand &use = *value.use_begin();
     user = use.getOwner();
-    // Check if this is a `flow.dispatch.tensor.store` op.
     if (isa<IREE::Flow::DispatchTensorStoreOp>(user)) {
       return getSubviewOpForTensorStoreOp(b, user, bvm);
     }
