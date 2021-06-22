@@ -31,18 +31,19 @@ iree_status_t create_sample_device(iree_hal_device_t** device) {
       &loader));
 
   iree_task_executor_t* executor = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_task_executor_create_from_flags(iree_allocator_system(), &executor));
+  iree_status_t status =
+      iree_task_executor_create_from_flags(iree_allocator_system(), &executor);
 
   iree_string_view_t identifier = iree_make_cstring_view("dylib");
-
-  // Create the device and release the executor and loader afterwards.
-  IREE_RETURN_IF_ERROR(iree_hal_task_device_create(
-      identifier, &params, executor, /*loader_count=*/1, &loader,
-      iree_allocator_system(), device));
+  if (iree_status_is_ok(status)) {
+    // Create the device.
+    status = iree_hal_task_device_create(identifier, &params, executor,
+                                         /*loader_count=*/1, &loader,
+                                         iree_allocator_system(), device);
+  }
   iree_task_executor_release(executor);
   iree_hal_executable_loader_release(loader);
-  return iree_ok_status();
+  return status;
 }
 
 const iree_const_byte_span_t load_bytecode_module_data() {

@@ -16,6 +16,55 @@ package(
 
 iree_cmake_extra_content(
     content = """
+if(${IREE_TARGET_BACKEND_VMVX} AND ${IREE_HAL_DRIVER_VMVX})
+""",
+    inline = True,
+)
+
+cc_binary(
+    name = "simple_embedding_vmvx_sync",
+    srcs = [
+        "device_vmvx_sync.c",
+        "simple_embedding.c",
+    ],
+    deps = [
+        ":simple_embedding_test_bytecode_module_vmvx_c",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/hal/local:sync_driver",
+        "//iree/hal/local/loaders:vmvx_module_loader",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+    ],
+)
+
+iree_bytecode_module(
+    name = "simple_embedding_test_bytecode_module_vmvx",
+    src = "simple_embedding_test.mlir",
+    c_identifier = "iree_samples_simple_embedding_test_module_vmvx",
+    flags = [
+        "-iree-input-type=mhlo",
+        "-iree-mlir-to-vm-bytecode-module",
+        "-iree-hal-target-backends=vmvx",
+    ],
+)
+
+run_binary_test(
+    name = "simple_embedding_vmvx_sync_test",
+    test_binary = ":simple_embedding_vmvx_sync",
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
+)
+
+iree_cmake_extra_content(
+    content = """
 if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 """,
     inline = True,
@@ -23,9 +72,9 @@ if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 
 # TODO(llvm-bazel/#228): re-enable bazel.
 #cc_binary(
-#    name = "simple_embedding_local_sync",
+#    name = "simple_embedding_embedded_sync",
 #    srcs = [
-#        "device_local_sync.c",
+#        "device_embedded_sync.c",
 #        "simple_embedding.c",
 #    ],
 #    deps = [
@@ -124,8 +173,8 @@ if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 #)
 #
 #run_binary_test(
-#    name = "simple_embedding_local_sync_test",
-#    test_binary = ":simple_embedding_local_sync",
+#    name = "simple_embedding_embedded_sync_test",
+#    test_binary = ":simple_embedding_embedded_sync",
 #)
 
 iree_cmake_extra_content(

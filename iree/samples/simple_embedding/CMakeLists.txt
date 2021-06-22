@@ -3,13 +3,56 @@
 
 iree_add_all_subdirs()
 
+if(${IREE_TARGET_BACKEND_VMVX} AND ${IREE_HAL_DRIVER_VMVX})
+
+iree_cc_binary(
+  NAME
+    simple_embedding_vmvx_sync
+  SRCS
+    "device_vmvx_sync.c"
+    "simple_embedding.c"
+  DEPS
+    ::simple_embedding_test_bytecode_module_vmvx_c
+    iree::base
+    iree::hal
+    iree::hal::local
+    iree::hal::local::loaders::vmvx_module_loader
+    iree::hal::local::sync_driver
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+)
+
+iree_bytecode_module(
+  NAME
+    simple_embedding_test_bytecode_module_vmvx
+  SRC
+    "simple_embedding_test.mlir"
+  C_IDENTIFIER
+    "iree_samples_simple_embedding_test_module_vmvx"
+  FLAGS
+    "-iree-input-type=mhlo"
+    "-iree-mlir-to-vm-bytecode-module"
+    "-iree-hal-target-backends=vmvx"
+  PUBLIC
+)
+
+iree_run_binary_test(
+  NAME
+    "simple_embedding_vmvx_sync_test"
+  TEST_BINARY
+    ::simple_embedding_vmvx_sync
+)
+
+endif()
+
 if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 
 iree_cc_binary(
   NAME
-    simple_embedding_local_sync
+    simple_embedding_embedded_sync
   SRCS
-    "device_local_sync.c"
+    "device_embedded_sync.c"
     "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_dylib_arm_32_c
@@ -122,9 +165,9 @@ iree_bytecode_module(
 
 iree_run_binary_test(
   NAME
-    "simple_embedding_local_sync_test"
+    "simple_embedding_embedded_sync_test"
   TEST_BINARY
-    ::simple_embedding_local_sync
+    ::simple_embedding_embedded_sync
 )
 
 if(${IREE_ENABLE_THREADING})
