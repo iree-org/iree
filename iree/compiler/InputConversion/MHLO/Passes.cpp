@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -68,9 +69,21 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       mlir::iree_compiler::createMHLOToLinalgOnTensorsPass());
 
+  // NOTE: Now that mostly in linalg form, propagate shapes in preparation
+  // for resolving final things that need analysis.
+  passManager.addNestedPass<FuncOp>(
+      mlir::memref::createResolveShapedTypeResultDimsPass());
+
+  // Shape ops may have been created as part of lowering. Convert them again.
+  // TODO: See if we can not do the lowerings at the top and only do them here.
+  passManager.addNestedPass<FuncOp>(createShapeToShapeLowering());
+  passManager.addPass(createConvertShapeToStandardPass());
+
   // Note that some MHLO ops are left by the above and must resolve via
   // canonicalization. See comments in the above pass and find a better way.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   //----------------------------------------------------------------------------
   // Entry dialect cleanup

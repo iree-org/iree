@@ -14,6 +14,7 @@ cc_library(
     name = "TF",
     srcs = [
         "ConvertToMHLO.cpp",
+        "DirectLoweringPatterns.cpp",
         "LowerGlobalTensors.cpp",
         "Passes.cpp",
         "PrettifyDebugInfo.cpp",

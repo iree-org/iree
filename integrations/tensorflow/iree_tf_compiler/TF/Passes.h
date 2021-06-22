@@ -58,6 +58,15 @@ std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass();
 std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass();
 
 //===----------------------------------------------------------------------===//
+// Patterns
+//===----------------------------------------------------------------------===//
+
+// Populates patterns for direct lowering TensorFlow ops that IREE manages
+// (augmenting the standard MHLO lowerings).
+void populateDirectLoweringPatterns(MLIRContext *context,
+                                    RewritePatternSet &patterns);
+
+//===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
 

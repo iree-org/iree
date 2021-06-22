@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
@@ -694,6 +695,39 @@ struct ConvertSelectOp : public OpConversionPattern<chlo::BroadcastSelectOp> {
   }
 };
 
+struct ConvertDynamicReshapeOp
+    : public OpConversionPattern<mhlo::DynamicReshapeOp> {
+  using OpConversionPattern<mhlo::DynamicReshapeOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::DynamicReshapeOp op, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    mhlo::DynamicReshapeOpAdaptor operands(rawOperands);
+    Value input = operands.operand();
+    Value outputShape = operands.output_shape();
+    auto outputShapeType = outputShape.getType().dyn_cast<RankedTensorType>();
+    auto resultType = op.getType().dyn_cast<RankedTensorType>();
+    if (!outputShapeType || !resultType) {
+      return rewriter.notifyMatchFailure(op, "not ranked");
+    }
+    SmallVector<Value> targetDims;
+    assert(resultType.getRank() == outputShapeType.getNumElements() &&
+           "mismatched rank");
+    for (int i = 0, e = resultType.getRank(); i < e; ++i) {
+      if (resultType.isDynamicDim(i)) {
+        Value index = rewriter.create<ConstantIndexOp>(loc, i);
+        targetDims.push_back(
+            rewriter.create<tensor::ExtractOp>(loc, outputShape, index));
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(op, resultType,
+                                                             input, targetDims);
+    return success();
+  }
+};
+
 }  // namespace
 
 }  // namespace iree_compiler
@@ -743,6 +777,7 @@ void mlir::iree_compiler::populateMHLOBroadcastingToLinalgPatterns(
   // TODO: Remove the benefit after it is removed upstream.
   patterns.insert<ConvertSelectOp>(typeConverter, context, 1000);
   patterns.insert<ConvertConstantLikeOp>(typeConverter, context);
+  patterns.insert<ConvertDynamicReshapeOp>(typeConverter, context);
 
   // Make mixed scalar broadcasting of Clamp explicit.
   // NOTE: Because we are doing a full conversion out of HLO, we do not use
