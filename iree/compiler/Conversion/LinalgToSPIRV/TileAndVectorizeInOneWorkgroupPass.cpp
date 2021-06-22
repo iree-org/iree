@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -88,8 +89,8 @@ class LinalgToSPIRVTileAndVectorizeOneWorkgroupPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, IREE::HAL::HALDialect, gpu::GPUDialect,
-                    linalg::LinalgDialect, scf::SCFDialect, ShapeDialect,
-                    vector::VectorDialect>();
+                    linalg::LinalgDialect, memref::MemRefDialect,
+                    scf::SCFDialect, ShapeDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -287,7 +288,6 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
       linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
       linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
       linalg::LinalgTilingPattern<linalg::GenericOp>,
-      linalg::LinalgTilingPattern<linalg::IndexedGenericOp>,
       linalg::LinalgTilingPattern<linalg::PoolingNHWCMaxFOp>,
       linalg::LinalgTilingPattern<linalg::PoolingNHWCMinFOp>,
       linalg::LinalgTilingPattern<linalg::PoolingNHWCSumFOp>>(
@@ -735,7 +735,6 @@ void LinalgToSPIRVTileAndVectorizeOneWorkgroupPass::runOnOperation() {
                LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
                LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
                LowerToLoops<linalg::FillOp>, LowerToLoops<linalg::GenericOp>,
-               LowerToLoops<linalg::IndexedGenericOp>,
                LowerToLoops<linalg::MatmulOp>,
                LowerToLoops<linalg::PoolingNHWCMaxFOp>,
                LowerToLoops<linalg::PoolingNHWCMinFOp>,

@@ -3,12 +3,13 @@ func @table() {
 
   // This generates [0, ... 512] for a constant value to avoid an excessively large constant.
   %init = linalg.init_tensor [513] : tensor<513xi16>
-  %cst = linalg.indexed_generic {
+  %cst = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
     outs(%init: tensor<513xi16>) {
-    ^bb0(%arg0 : index, %arg1: i16):
-      %0 = index_cast %arg0 : index to i16
+    ^bb0(%arg1: i16):
+      %i = linalg.index 0 : index
+      %0 = index_cast %i : index to i16
       linalg.yield %0 : i16
     } -> tensor<513xi16>
 
