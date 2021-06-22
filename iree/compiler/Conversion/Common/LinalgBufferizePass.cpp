@@ -519,7 +519,7 @@ static LogicalResult hasDestructiveUpdateLoopPattern(scf::ForOp forOp,
   for (BlockArgument arg : forOp.getRegionIterArgs()) {
     auto isDestructiveUpdateUses = [&](OpOperand &use) -> bool {
       Operation *user = use.getOwner();
-      TypeSwitch<Operation *, bool>(user)
+      return TypeSwitch<Operation *, bool>(user)
           .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
             return subTensorOp.source() == arg;
           })
@@ -531,7 +531,7 @@ static LogicalResult hasDestructiveUpdateLoopPattern(scf::ForOp forOp,
     };
     if (llvm::all_of(arg.getUses(), isDestructiveUpdateUses)) {
       for (Operation *user : arg.getUsers()) {
-        3 TypeSwitch<Operation *>(user)
+        TypeSwitch<Operation *>(user)
             .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
               plan.unionSets(subTensorOp.source(), subTensorOp.result());
             })
