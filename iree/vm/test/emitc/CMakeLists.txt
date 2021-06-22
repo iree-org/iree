@@ -24,16 +24,21 @@ iree_cc_test(
     ::arithmetic_ops
     ::arithmetic_ops_f32
     ::arithmetic_ops_i64
-    # ::assignment_ops
+    ::assignment_ops
+    ::assignment_ops_f32
     ::assignment_ops_i64
+    ::buffer_ops
     ::call_ops
     ::comparison_ops
     ::comparison_ops_f32
     ::comparison_ops_i64
     ::control_flow_ops
     ::conversion_ops
+    ::conversion_ops_f32
     ::conversion_ops_i64
     ::global_ops
+    ::global_ops_f32
+    ::global_ops_i64
     ::list_ops
     ::list_variant_ops
     ::ref_ops
@@ -68,15 +73,23 @@ iree_c_module(
     "arithmetic_ops_i64.h"
 )
 
-# TODO(simon-camp): Reenable this test once the 'vm.select.ref' op is supported.
-# iree_c_module(
-#   NAME
-#     assignment_ops
-#   SRC
-#     "../assignment_ops.mlir"
-#   H_FILE_OUTPUT
-#     "assignment_ops.h"
-# )
+iree_c_module(
+  NAME
+    assignment_ops
+  SRC
+    "../assignment_ops.mlir"
+  H_FILE_OUTPUT
+    "assignment_ops.h"
+)
+
+iree_c_module(
+  NAME
+    assignment_ops_f32
+  SRC
+    "../assignment_ops_f32.mlir"
+  H_FILE_OUTPUT
+    "assignment_ops_f32.h"
+)
 
 iree_c_module(
   NAME
@@ -85,6 +98,15 @@ iree_c_module(
     "../assignment_ops_i64.mlir"
   H_FILE_OUTPUT
     "assignment_ops_i64.h"
+)
+
+iree_c_module(
+  NAME
+    buffer_ops
+  SRC
+    "../buffer_ops.mlir"
+  H_FILE_OUTPUT
+    "buffer_ops.h"
 )
 
 iree_c_module(
@@ -143,6 +165,15 @@ iree_c_module(
 
 iree_c_module(
   NAME
+    conversion_ops_f32
+  SRC
+    "../conversion_ops_f32.mlir"
+  H_FILE_OUTPUT
+    "conversion_ops_f32.h"
+)
+
+iree_c_module(
+  NAME
     conversion_ops_i64
   SRC
     "../conversion_ops_i64.mlir"
@@ -157,6 +188,24 @@ iree_c_module(
     "../global_ops.mlir"
   H_FILE_OUTPUT
     "global_ops.h"
+)
+
+iree_c_module(
+  NAME
+    global_ops_f32
+  SRC
+    "../global_ops_f32.mlir"
+  H_FILE_OUTPUT
+    "global_ops_f32.h"
+)
+
+iree_c_module(
+  NAME
+    global_ops_i64
+  SRC
+    "../global_ops_i64.mlir"
+  H_FILE_OUTPUT
+    "global_ops_i64.h"
 )
 
 iree_c_module(

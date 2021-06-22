@@ -1,11 +1,11 @@
-vm.module @conversion_ops {
+vm.module @conversion_ops_f32 {
 
   //===----------------------------------------------------------------------===//
   // Casting and type conversion/emulation
   //===----------------------------------------------------------------------===//
 
-  vm.export @test_cast_si32_f32_int_max
-  vm.func @test_cast_si32_f32_int_max() {
+  vm.export @test_cast_si32_f32_int_max attributes {emitc.exclude}
+  vm.func private @test_cast_si32_f32_int_max() {
     %c1 = vm.const.i32 2147483647 : i32
     %c1dno = iree.do_not_optimize(%c1) : i32
     %v = vm.cast.si32.f32 %c1dno : i32 -> f32
@@ -14,8 +14,8 @@ vm.module @conversion_ops {
     vm.return
   }
 
-  vm.export @test_cast_si32_f32_int_min
-  vm.func @test_cast_si32_f32_int_min() {
+  vm.export @test_cast_si32_f32_int_min attributes {emitc.exclude}
+  vm.func private @test_cast_si32_f32_int_min() {
     %c1 = vm.const.i32 -2147483648 : i32
     %c1dno = iree.do_not_optimize(%c1) : i32
     %v = vm.cast.si32.f32 %c1dno : i32 -> f32
@@ -24,8 +24,8 @@ vm.module @conversion_ops {
     vm.return
   }
 
-  vm.export @test_cast_ui32_f32_int_max
-  vm.func @test_cast_ui32_f32_int_max() {
+  vm.export @test_cast_ui32_f32_int_max attributes {emitc.exclude}
+  vm.func private @test_cast_ui32_f32_int_max() {
     %c1 = vm.const.i32 4294967295 : i32
     %c1dno = iree.do_not_optimize(%c1) : i32
     %v = vm.cast.ui32.f32 %c1dno : i32 -> f32
@@ -34,8 +34,8 @@ vm.module @conversion_ops {
     vm.return
   }
 
-  vm.export @test_cast_f32_si32_int_max
-  vm.func @test_cast_f32_si32_int_max() {
+  vm.export @test_cast_f32_si32_int_max attributes {emitc.exclude}
+  vm.func private @test_cast_f32_si32_int_max() {
     %c1 = vm.const.f32 2147483647.0 : f32
     %c1dno = iree.do_not_optimize(%c1) : f32
     %v = vm.cast.f32.si32 %c1dno : f32 -> i32
@@ -44,8 +44,8 @@ vm.module @conversion_ops {
     vm.return
   }
 
-  vm.export @test_cast_f32_si32_int_min
-  vm.func @test_cast_f32_si32_int_min() {
+  vm.export @test_cast_f32_si32_int_min attributes {emitc.exclude}
+  vm.func private @test_cast_f32_si32_int_min() {
     %c1 = vm.const.f32 -2147483648.0 : f32
     %c1dno = iree.do_not_optimize(%c1) : f32
     %v = vm.cast.f32.si32 %c1dno : f32 -> i32
@@ -54,8 +54,8 @@ vm.module @conversion_ops {
     vm.return
   }
 
-  vm.export @test_cast_f32_ui32_int_max
-  vm.func @test_cast_f32_ui32_int_max() {
+  vm.export @test_cast_f32_ui32_int_max attributes {emitc.exclude}
+  vm.func private @test_cast_f32_ui32_int_max() {
     %c1 = vm.const.f32 4294967295.0 : f32
     %c1dno = iree.do_not_optimize(%c1) : f32
     %v = vm.cast.f32.ui32 %c1dno : f32 -> i32

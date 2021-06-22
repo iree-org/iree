@@ -13,8 +13,10 @@ if(${IREE_ENABLE_EMITC})
     HDRS
       "ConvertVMToEmitC.h"
       "EmitCTypeConverter.h"
+      "DropExcludedExports.h"
     SRCS
       "ConvertVMToEmitC.cpp"
+      "DropExcludedExports.cpp"
     DEPS
       MLIRIR
       MLIRPass

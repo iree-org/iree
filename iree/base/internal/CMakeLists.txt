@@ -101,6 +101,7 @@ iree_cc_library(
     "dynamic_library_posix.c"
     "dynamic_library_win32.c"
   DEPS
+    ${CMAKE_DL_LIBS}
     ::file_path
     ::internal
     ::synchronization
@@ -367,6 +368,7 @@ iree_cc_library(
     "threading_pthreads.c"
     "threading_win32.c"
   DEPS
+    ${CMAKE_DL_LIBS}
     ::internal
     ::synchronization
     iree::base
