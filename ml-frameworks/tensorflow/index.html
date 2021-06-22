@@ -802,7 +802,8 @@ them by yourself by following
 <a href="#missing-serving-signature-in-savedmodel">"Missing serving signature in SavedModel"</a>.</p>
 </div>
 <p>Then you can import the model with <code>iree-import-tf</code>. You can read the options
-supported via <code>iree-import-tf -help</code>. Using <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>
+supported via <code>iree-import-tf -help</code>. Using
+<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>
 as an example and assuming the serving signature is <code>predict</code>:</p>
 <div class="highlight"><pre><span></span><code>iree-import-tf
   -tf-import-type<span class="o">=</span>savedmodel_v1 <span class="se">\</span>
@@ -811,14 +812,16 @@ as an example and assuming the serving signature is <code>predict</code>:</p>
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p><code>iree-import-tf</code> is installed as <code>/path/to/python/site-packages/iree/tools/tf/iree-import-tf</code>.
+<p><code>iree-import-tf</code> is installed as
+<code>/path/to/python/site-packages/iree/tools/tf/iree-import-tf</code>.
 You can find out the full path to the <code>site-packages</code> directory via the
 <code>python -m site</code> command.</p>
 <p><code>-tf-import-type</code> needs to match the SavedModel version. You can try both v1
 and v2 if you see one of them gives an empty dump.</p>
 </div>
 <p>Afterwards you can further compile the model in <code>iree_input.mlir</code> for
-<a href="/backends/cpu-dylib/">CPU</a> or <a href="/backends/gpu-vulkan/">GPU</a>.</p>
+<a href="/deployment-configurations/cpu-dylib/">CPU</a> or
+<a href="/deployment-configurations/gpu-vulkan/">GPU</a>.</p>
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
 
 <h2 id="training">Training<a class="headerlink" href="#training" title="Permanent link">&para;</a></h2>
@@ -858,11 +861,13 @@ and v2 if you see one of them gives an empty dump.</p>
 directory.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="missing-serving-signature-in-savedmodel">Missing serving signature in SavedModel<a class="headerlink" href="#missing-serving-signature-in-savedmodel" title="Permanent link">&para;</a></h3>
-<p>Sometimes SavedModels are exported without explicit <a href="https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export">serving signatures</a>.
+<p>Sometimes SavedModels are exported without explicit
+<a href="https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export">serving signatures</a>.
 This happens by default for TensorFlow Hub SavedModels. However, serving
 signatures are required as entry points for IREE compilation flow. You
 can use Python to load and re-export the SavedModel to give it serving
-signatures. For example, for <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>,
+signatures. For example, for
+<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>,
 assuming we want the serving signature to be <code>predict</code> and operating on a
 224x224 RGB image:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">tensorflow.compat.v2</span> <span class="k">as</span> <span class="nn">tf</span>
