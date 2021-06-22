@@ -98,40 +98,29 @@ iree_status_t Run() {
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
       session, iree_make_cstring_view(kMainFunctionName), &call));
 
-  // Allocate buffers that can be mapped on the CPU and that can also be used
-  // on the device. Not all devices support this, but the ones we have now do.
-  const int kElementCount = 4;
-  iree_hal_buffer_t* arg0_buffer = NULL;
-  iree_hal_buffer_t* arg1_buffer = NULL;
-  iree_hal_memory_type_t input_memory_type =
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(device), input_memory_type,
-      IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount, &arg0_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(device), input_memory_type,
-      IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount, &arg1_buffer));
 
   // Populate initial values for 4 * 2 = 8.
-  const float kFloat4 = 4.0f;
-  const float kFloat2 = 2.0f;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_fill(arg0_buffer, 0, IREE_WHOLE_BUFFER,
-                                            &kFloat4, sizeof(float)));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_fill(arg1_buffer, 0, IREE_WHOLE_BUFFER,
-                                            &kFloat2, sizeof(float)));
-
-  // Wrap buffers in shaped buffer views.
+  const int kElementCount = 4;
   iree_hal_dim_t shape[1] = {kElementCount};
   iree_hal_buffer_view_t* arg0_buffer_view = NULL;
   iree_hal_buffer_view_t* arg1_buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      arg0_buffer, shape, IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-      &arg0_buffer_view));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      arg1_buffer, shape, IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-      &arg1_buffer_view));
-  iree_hal_buffer_release(arg0_buffer);
-  iree_hal_buffer_release(arg1_buffer);
+  float kFloat4[] = {4.0f};
+  float kFloat2[] = {2.0f};
+
+  iree_hal_memory_type_t input_memory_type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_clone_heap_buffer(
+    iree_hal_device_allocator(device), shape,
+    IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+    input_memory_type,
+    IREE_HAL_BUFFER_USAGE_ALL,
+    iree_make_const_byte_span((void*)kFloat4, sizeof(kFloat4)), &arg0_buffer_view));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_clone_heap_buffer(
+    iree_hal_device_allocator(device), shape,
+    IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+    input_memory_type,
+    IREE_HAL_BUFFER_USAGE_ALL,
+    iree_make_const_byte_span((void*)kFloat2, sizeof(kFloat2)), &arg1_buffer_view));
 
   // Queue buffer views for input.
   IREE_RETURN_IF_ERROR(

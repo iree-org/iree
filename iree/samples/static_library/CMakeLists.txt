@@ -10,14 +10,8 @@ if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}
   return()
 endif()
 
-# Find iree-translate binary
-if(DEFINED _RULE_TRANSLATE_TOOL)
-  set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
-else()
-  set(_TRANSLATE_TOOL "iree-translate")
-endif()
-
-iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
+# Set iree-translate binary
+set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-translate>)
 
 # Setup args for iree-transalte
 set(_TRANSLATE_ARGS)
