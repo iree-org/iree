@@ -3,7 +3,7 @@
 
 iree_add_all_subdirs()
 
-if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
+if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 
 iree_cc_binary(
   NAME
@@ -116,7 +116,7 @@ iree_run_binary_test(
 
 endif()
 
-if(${IREE_TARGET_BACKEND_VULKAN-SPIRV})
+if(${IREE_TARGET_BACKEND_VULKAN-SPIRV} AND ${IREE_HAL_DRIVER_VULKAN})
 
 iree_cc_binary(
   NAME

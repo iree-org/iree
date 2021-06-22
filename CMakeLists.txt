@@ -5,11 +5,18 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.13.4)
+
 # Do not set MSVC warning flags like /W3 by default (since 3.15):
 #   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
 if(POLICY CMP0092)
   cmake_policy(SET CMP0092 NEW)
 endif()
+
+# LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
+# CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
+# New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
+set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(iree ASM C CXX)
@@ -183,7 +190,6 @@ endforeach()
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
-  ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
 
 #-------------------------------------------------------------------------------
@@ -437,7 +443,6 @@ add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 if(${IREE_ENABLE_THREADING})
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
   add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
-  add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 endif()
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)

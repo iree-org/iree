@@ -23,7 +23,7 @@ if(${IREE_ENABLE_EMITC})
     DEPS
       ::add_module
       iree::base
-      iree::base::status
+      iree::base::cc
       iree::testing::gtest
       iree::testing::gtest_main
       iree::vm

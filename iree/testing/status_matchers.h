@@ -8,10 +8,9 @@
 #define IREE_TESTING_STATUS_MATCHERS_H_
 
 #include <memory>
+#include <string>
 
-#include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
-#include "iree/base/status.h"  // IWYU pragma: export
+#include "iree/base/status_cc.h"  // IWYU pragma: export
 #include "iree/testing/gtest.h"
 
 namespace iree {
@@ -93,16 +92,16 @@ class IsOkAndHoldsGenerator {
 template <typename Enum, typename Matchee>
 class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
  public:
-  StatusMatcher(Enum code, absl::optional<absl::string_view> message)
-      : code_(code), message_(message) {}
+  StatusMatcher(Enum code, std::string message)
+      : code_(code), message_(std::move(message)) {}
 
   // From testing::MatcherInterface.
   //
   // Describes the expected error code.
   void DescribeTo(std::ostream *os) const override {
     *os << "error code " << StatusCodeToString(code_);
-    if (message_.has_value()) {
-      *os << "::'" << message_.value() << "'";
+    if (!message_.empty()) {
+      *os << "::'" << message_ << "'";
     }
   }
 
@@ -121,7 +120,7 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
                 << GetMessage(matchee);
       return false;
     }
-    if (message_.has_value() && GetMessage(matchee) != message_.value()) {
+    if (!message_.empty() && GetMessage(matchee) != message_) {
       *listener << "whose error message is '" << GetMessage(matchee) << "'";
       return false;
     }
@@ -161,7 +160,7 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
   const Enum code_;
 
   // Expected error message (empty if none expected and verified).
-  const absl::optional<std::string> message_;
+  const std::string message_;
 };
 
 // StatusMatcherGenerator is an intermediate object returned by
@@ -173,8 +172,8 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
 template <typename Enum>
 class StatusIsMatcherGenerator {
  public:
-  StatusIsMatcherGenerator(Enum code, absl::optional<absl::string_view> message)
-      : code_(code), message_(message) {}
+  StatusIsMatcherGenerator(Enum code, std::string message)
+      : code_(code), message_(std::move(message)) {}
 
   operator ::testing::Matcher<const StatusCode &>() const {
     return ::testing::MakeMatcher(
@@ -204,7 +203,7 @@ class StatusIsMatcherGenerator {
   const Enum code_;
 
   // Expected error message (empty if none expected and verified).
-  const absl::optional<std::string> message_;
+  const std::string message_;
 };
 
 // Implements a gMock matcher that checks whether a status container (e.g.
@@ -296,15 +295,15 @@ internal::IsOkAndHoldsGenerator<ValueMatcherT> IsOkAndHolds(
 // given |code|.
 template <typename Enum>
 internal::StatusIsMatcherGenerator<Enum> StatusIs(Enum code) {
-  return internal::StatusIsMatcherGenerator<Enum>(code, absl::nullopt);
+  return internal::StatusIsMatcherGenerator<Enum>(code, "");
 }
 
 // Returns a gMock matcher that expects an iree::Status object to have the
 // given |code| and |message|.
 template <typename Enum>
 internal::StatusIsMatcherGenerator<Enum> StatusIs(Enum code,
-                                                  absl::string_view message) {
-  return internal::StatusIsMatcherGenerator<Enum>(code, message);
+                                                  std::string message) {
+  return internal::StatusIsMatcherGenerator<Enum>(code, std::move(message));
 }
 
 // Returns an internal::IsOkMatcherGenerator, which may be typecast to a

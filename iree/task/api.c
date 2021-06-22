@@ -12,6 +12,7 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/task/topology.h"
+#include "iree/task/topology_cpuinfo.h"
 
 //===----------------------------------------------------------------------===//
 // Executor configuration

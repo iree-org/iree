@@ -31,6 +31,7 @@ iree_cc_library(
     "LinalgBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
     "SetNumWorkgroupsPass.cpp"
+    "VectorizeConv.cpp"
   DEPS
     LLVMSupport
     MLIRAffine
@@ -40,6 +41,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRMemRef
+    MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
     MLIRSCFToStandard

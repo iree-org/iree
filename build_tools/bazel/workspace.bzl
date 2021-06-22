@@ -24,12 +24,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.local_repository,
-        name = "com_google_absl",
-        path = paths.join(iree_path, "third_party/abseil-cpp"),
-    )
-
-    maybe(
-        native.local_repository,
         name = "com_google_googletest",
         path = paths.join(iree_path, "third_party/googletest"),
     )

@@ -11,10 +11,9 @@
 #include <utility>
 #include <vector>
 
-#include "absl/strings/string_view.h"
-#include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/status.h"
+#include "iree/base/internal/span.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -33,7 +32,7 @@ using Shape = std::vector<iree_hal_dim_t>;
 
 // Parses a serialized set of shape dimensions using the canonical shape format
 // (the same as produced by FormatShape).
-StatusOr<Shape> ParseShape(absl::string_view value) {
+StatusOr<Shape> ParseShape(const std::string& value) {
   Shape shape(6);
   iree_host_size_t actual_rank = 0;
   iree_status_t status;
@@ -48,7 +47,7 @@ StatusOr<Shape> ParseShape(absl::string_view value) {
 }
 
 // Converts shape dimensions into a `4x5x6` format.
-StatusOr<std::string> FormatShape(absl::Span<const iree_hal_dim_t> value) {
+StatusOr<std::string> FormatShape(iree::span<const iree_hal_dim_t> value) {
   std::string buffer(16, '\0');
   iree_host_size_t actual_length = 0;
   iree_status_t status;
@@ -64,7 +63,7 @@ StatusOr<std::string> FormatShape(absl::Span<const iree_hal_dim_t> value) {
 
 // Parses a serialized iree_hal_element_type_t. The format is the same as
 // produced by FormatElementType.
-StatusOr<iree_hal_element_type_t> ParseElementType(absl::string_view value) {
+StatusOr<iree_hal_element_type_t> ParseElementType(const std::string& value) {
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   iree_status_t status = iree_hal_parse_element_type(
       iree_string_view_t{value.data(), value.size()}, &element_type);
@@ -93,9 +92,9 @@ StatusOr<std::string> FormatElementType(iree_hal_element_type_t value) {
 // For example, "1.2" of type IREE_HAL_ELEMENT_TYPE_FLOAT32 will write the 4
 // byte float value of 1.2 to |buffer|.
 template <typename T>
-Status ParseElement(absl::string_view value,
+Status ParseElement(const std::string& value,
                     iree_hal_element_type_t element_type,
-                    absl::Span<T> buffer) {
+                    iree::span<T> buffer) {
   return iree_hal_parse_element(
       iree_string_view_t{value.data(), value.size()}, element_type,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
@@ -126,9 +125,9 @@ StatusOr<std::string> FormatElement(T value,
 // produced by FormatBufferElements. Supports additional inputs of
 // empty to denote a 0 fill and a single element to denote a splat.
 template <typename T>
-Status ParseBufferElements(absl::string_view value,
+Status ParseBufferElements(const std::string& value,
                            iree_hal_element_type_t element_type,
-                           absl::Span<T> buffer) {
+                           iree::span<T> buffer) {
   IREE_RETURN_IF_ERROR(
       iree_hal_parse_buffer_elements(
           iree_string_view_t{value.data(), value.size()}, element_type,
@@ -146,7 +145,7 @@ Status ParseBufferElements(absl::string_view value,
 // |max_element_count| can be used to limit the total number of elements printed
 // when the count may be large. Elided elements will be replaced with `...`.
 template <typename T>
-StatusOr<std::string> FormatBufferElements(absl::Span<const T> data,
+StatusOr<std::string> FormatBufferElements(iree::span<const T> data,
                                            const Shape& shape,
                                            iree_hal_element_type_t element_type,
                                            size_t max_element_count) {
@@ -222,10 +221,10 @@ struct ElementTypeFromCType<double> {
 // For example, "1.2" of type float (IREE_HAL_ELEMENT_TYPE_FLOAT32) will return
 // 1.2f.
 template <typename T>
-inline StatusOr<T> ParseElement(absl::string_view value) {
+inline StatusOr<T> ParseElement(const std::string& value) {
   T result = T();
   IREE_RETURN_IF_ERROR(ParseElement(value, ElementTypeFromCType<T>::value,
-                                    absl::MakeSpan(&result, 1)));
+                                    iree::span<T>(&result, 1)));
   return result;
 }
 
@@ -241,8 +240,8 @@ inline StatusOr<std::string> FormatElement(T value) {
 // produced by FormatBufferElements. Supports additional inputs of
 // empty to denote a 0 fill and a single element to denote a splat.
 template <typename T>
-inline Status ParseBufferElements(absl::string_view value,
-                                  absl::Span<T> buffer) {
+inline Status ParseBufferElements(const std::string& value,
+                                  iree::span<T> buffer) {
   return ParseBufferElements(value, ElementTypeFromCType<T>::value, buffer);
 }
 
@@ -251,14 +250,14 @@ inline Status ParseBufferElements(absl::string_view value,
 // additional inputs of empty to denote a 0 fill and a single element to denote
 // a splat.
 template <typename T>
-inline StatusOr<std::vector<T>> ParseBufferElements(absl::string_view value,
+inline StatusOr<std::vector<T>> ParseBufferElements(const std::string& value,
                                                     const Shape& shape) {
   iree_host_size_t element_count = 1;
   for (size_t i = 0; i < shape.size(); ++i) {
     element_count *= shape[i];
   }
   std::vector<T> result(element_count);
-  IREE_RETURN_IF_ERROR(ParseBufferElements(value, absl::MakeSpan(result)));
+  IREE_RETURN_IF_ERROR(ParseBufferElements(value, iree::span<T>(result)));
   return std::move(result);
 }
 
@@ -270,7 +269,7 @@ inline StatusOr<std::vector<T>> ParseBufferElements(absl::string_view value,
 // when the count may be large. Elided elements will be replaced with `...`.
 template <typename T>
 StatusOr<std::string> FormatBufferElements(
-    absl::Span<const T> data, const Shape& shape,
+    iree::span<const T> data, const Shape& shape,
     size_t max_element_count = SIZE_MAX) {
   return FormatBufferElements(data, shape, ElementTypeFromCType<T>::value,
                               max_element_count);
@@ -426,7 +425,7 @@ struct BufferView final
 
   // Creates a buffer view with a reference to the given |buffer|.
   static StatusOr<BufferView> Create(Buffer buffer,
-                                     absl::Span<const iree_hal_dim_t> shape,
+                                     iree::span<const iree_hal_dim_t> shape,
                                      iree_hal_element_type_t element_type) {
     BufferView buffer_view;
     iree_status_t status = iree_hal_buffer_view_create(
@@ -476,7 +475,7 @@ struct BufferView final
 
   // Parses a serialized set of buffer elements in the canonical tensor format
   // (the same as produced by Format).
-  static StatusOr<BufferView> Parse(absl::string_view value,
+  static StatusOr<BufferView> Parse(const std::string& value,
                                     Allocator allocator) {
     BufferView buffer_view;
     iree_status_t status = iree_hal_buffer_view_parse(
@@ -678,44 +677,44 @@ TEST(ElementStringUtilTest, ParseElementInvalid) {
 TEST(ElementStringUtilTest, ParseOpaqueElement) {
   std::vector<uint8_t> buffer1(1);
   IREE_EXPECT_OK(ParseElement("FF", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
-                              absl::MakeSpan(buffer1)));
+                              iree::span<uint8_t>(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<uint8_t>{0xFF}));
 
   std::vector<uint16_t> buffer2(1);
   IREE_EXPECT_OK(ParseElement("FFCD", IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
-                              absl::MakeSpan(buffer2)));
+                              iree::span<uint16_t>(buffer2)));
   EXPECT_THAT(buffer2, Eq(std::vector<uint16_t>{0xCDFFu}));
 
   std::vector<uint32_t> buffer4(1);
   IREE_EXPECT_OK(ParseElement("FFCDAABB", IREE_HAL_ELEMENT_TYPE_OPAQUE_32,
-                              absl::MakeSpan(buffer4)));
+                              iree::span<uint32_t>(buffer4)));
   EXPECT_THAT(buffer4, Eq(std::vector<uint32_t>{0xBBAACDFFu}));
 
   std::vector<uint64_t> buffer8(1);
   IREE_EXPECT_OK(ParseElement("FFCDAABBCCDDEEFF",
                               IREE_HAL_ELEMENT_TYPE_OPAQUE_64,
-                              absl::MakeSpan(buffer8)));
+                              iree::span<uint64_t>(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<uint64_t>{0xFFEEDDCCBBAACDFFull}));
 }
 
 TEST(ElementStringUtilTest, ParseOpaqueElementInvalid) {
   std::vector<uint8_t> buffer0(0);
-  EXPECT_THAT(
-      ParseElement("", IREE_HAL_ELEMENT_TYPE_OPAQUE_8, absl::MakeSpan(buffer0)),
-      StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseElement("", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
+                           iree::span<uint8_t>(buffer0)),
+              StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(ParseElement("FF", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
-                           absl::MakeSpan(buffer0)),
+                           iree::span<uint8_t>(buffer0)),
               StatusIs(StatusCode::kInvalidArgument));
 
   std::vector<uint8_t> buffer1(1);
-  EXPECT_THAT(
-      ParseElement("", IREE_HAL_ELEMENT_TYPE_OPAQUE_8, absl::MakeSpan(buffer1)),
-      StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseElement("", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
+                           iree::span<uint8_t>(buffer1)),
+              StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(ParseElement("F", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
-                           absl::MakeSpan(buffer1)),
+                           iree::span<uint8_t>(buffer1)),
               StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(ParseElement("FFC", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
-                           absl::MakeSpan(buffer1)),
+                           iree::span<uint8_t>(buffer1)),
               StatusIs(StatusCode::kInvalidArgument));
 }
 
@@ -759,28 +758,28 @@ TEST(ElementStringUtilTest, FormatOpaqueElement) {
 TEST(BufferElementsStringUtilTest, ParseBufferElements) {
   // Empty:
   std::vector<int8_t> buffer0(0);
-  IREE_EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer0)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("", iree::span<int8_t>(buffer0)));
   EXPECT_THAT(buffer0, Eq(std::vector<int8_t>{}));
   std::vector<int8_t> buffer8(8, 123);
-  IREE_EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer8)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("", iree::span<int8_t>(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<int8_t>{0, 0, 0, 0, 0, 0, 0, 0}));
   // Scalar:
   std::vector<int8_t> buffer1(1);
-  IREE_EXPECT_OK(ParseBufferElements<int8_t>("1", absl::MakeSpan(buffer1)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("1", iree::span<int8_t>(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<int8_t>{1}));
   // Splat:
-  IREE_EXPECT_OK(ParseBufferElements<int8_t>("3", absl::MakeSpan(buffer8)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("3", iree::span<int8_t>(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<int8_t>{3, 3, 3, 3, 3, 3, 3, 3}));
   // 1:1:
-  IREE_EXPECT_OK(ParseBufferElements<int8_t>("2", absl::MakeSpan(buffer1)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("2", iree::span<int8_t>(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<int8_t>{2}));
   std::vector<int16_t> buffer8i16(8);
   IREE_EXPECT_OK(ParseBufferElements<int16_t>("0 1 2 3 4 5 6 7",
-                                              absl::MakeSpan(buffer8i16)));
+                                              iree::span<int16_t>(buffer8i16)));
   EXPECT_THAT(buffer8i16, Eq(std::vector<int16_t>{0, 1, 2, 3, 4, 5, 6, 7}));
   std::vector<int32_t> buffer8i32(8);
   IREE_EXPECT_OK(ParseBufferElements<int32_t>("[0 1 2 3] [4 5 6 7]",
-                                              absl::MakeSpan(buffer8i32)));
+                                              iree::span<int32_t>(buffer8i32)));
   EXPECT_THAT(buffer8i32, Eq(std::vector<int32_t>{0, 1, 2, 3, 4, 5, 6, 7}));
 }
 
@@ -788,22 +787,22 @@ TEST(BufferElementsStringUtilTest, ParseBufferElementsOpaque) {
   std::vector<uint16_t> buffer3i16(3);
   IREE_EXPECT_OK(ParseBufferElements("0011 2233 4455",
                                      IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
-                                     absl::MakeSpan(buffer3i16)));
+                                     iree::span<uint16_t>(buffer3i16)));
   EXPECT_THAT(buffer3i16, Eq(std::vector<uint16_t>{0x1100, 0x3322, 0x5544}));
 }
 
 TEST(BufferElementsStringUtilTest, ParseBufferElementsInvalid) {
   std::vector<int8_t> buffer0(0);
-  EXPECT_THAT(ParseBufferElements("abc", absl::MakeSpan(buffer0)),
+  EXPECT_THAT(ParseBufferElements("abc", iree::span<int8_t>(buffer0)),
               StatusIs(StatusCode::kOutOfRange));
   std::vector<int8_t> buffer1(1);
-  EXPECT_THAT(ParseBufferElements("abc", absl::MakeSpan(buffer1)),
+  EXPECT_THAT(ParseBufferElements("abc", iree::span<int8_t>(buffer1)),
               StatusIs(StatusCode::kInvalidArgument));
   std::vector<int8_t> buffer8(8);
-  EXPECT_THAT(ParseBufferElements("1 2 3", absl::MakeSpan(buffer8)),
+  EXPECT_THAT(ParseBufferElements("1 2 3", iree::span<int8_t>(buffer8)),
               StatusIs(StatusCode::kOutOfRange));
   std::vector<int8_t> buffer4(4);
-  EXPECT_THAT(ParseBufferElements("1 2 3 4 5", absl::MakeSpan(buffer4)),
+  EXPECT_THAT(ParseBufferElements("1 2 3 4 5", iree::span<int8_t>(buffer4)),
               StatusIs(StatusCode::kOutOfRange));
 }
 

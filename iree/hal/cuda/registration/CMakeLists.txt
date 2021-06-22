@@ -21,8 +21,8 @@ iree_cc_library(
     "driver_module.c"
   DEPS
     iree::base
+    iree::base::cc
     iree::base::core_headers
-    iree::base::status
     iree::base::tracing
     iree::hal
     iree::hal::cuda

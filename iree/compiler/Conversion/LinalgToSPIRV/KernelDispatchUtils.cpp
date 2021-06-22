@@ -436,7 +436,6 @@ LogicalResult getGenericOpLaunchConfig(linalg::LinalgOp linalgOp,
   }
 
 GET_GENERIC_OP_LAUNCH_CONFIG(linalg::GenericOp)
-GET_GENERIC_OP_LAUNCH_CONFIG(linalg::IndexedGenericOp)
 
 #undef GET_GENERIC_OP_LAUNCH_CONFIG
 
@@ -749,8 +748,7 @@ Optional<LaunchConfig> initGPULaunchConfig(
     DISPATCH(linalg::PoolingNHWCSumFOp)
   }
 
-  // Any generic/indexed_generic operations found are made the root if no other
-  // op is the root
+  // Any generic operations found are made the root if no other op is the root
   if (!rootOperation) {
     for (linalg::LinalgOp linalgOp : reverse(linalgOps)) {
       size_t numLoops = getNumOuterParallelLoops(linalgOp);
@@ -762,7 +760,6 @@ Optional<LaunchConfig> initGPULaunchConfig(
       }
 
       DISPATCH(linalg::GenericOp)
-      DISPATCH(linalg::IndexedGenericOp)
     }
   }
 

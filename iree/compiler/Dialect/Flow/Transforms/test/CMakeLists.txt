@@ -14,6 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "conv1x1_to_matmul.mlir"
+    "conv2d_to_img2col.mlir"
     "convert_to_flow_tensor_ops.mlir"
     "deduplicate_executables.mlir"
     "dispatch_linalg_on_tensors.mlir"
@@ -22,20 +24,16 @@ iree_lit_test_suite(
     "expand_variable_dynamic_dims.mlir"
     "export_benchmark_funcs.mlir"
     "form_streams.mlir"
-    "hlo_to_hlo_preprocessing.mlir"
-    "hlo_to_hlo_preprocessing_canoncalize_dot_general.mlir"
-    "hlo_to_hlo_preprocessing_extract_pad_from_conv.mlir"
     "hoist_unstreamable_ops.mlir"
     "inject_dispatch_tracing.mlir"
-    "legalize_input_types.mlir"
     "outline_dispatch_regions.mlir"
     "outline_large_constants.mlir"
     "pad_linalg_ops.mlir"
+    "pad_tensor_to_tensor.mlir"
     "promote_i1_to_i8.mlir"
     "promote_tensor_loads.mlir"
     "strip_and_splat_constant_variables.mlir"
     "transformation.mlir"
-    "verify_compiler_input_legality.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

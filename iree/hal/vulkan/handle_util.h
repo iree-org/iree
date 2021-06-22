@@ -30,6 +30,13 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
+template <class T, class U = T>
+constexpr T exchange(T& obj, U&& new_value) {
+  T old_value = std::move(obj);
+  obj = std::forward<U>(new_value);
+  return old_value;
+}
+
 class VkDeviceHandle : public RefObject<VkDeviceHandle> {
  public:
   VkDeviceHandle(DynamicSymbols* syms,
@@ -46,8 +53,7 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
   VkDeviceHandle(const VkDeviceHandle&) = delete;
   VkDeviceHandle& operator=(const VkDeviceHandle&) = delete;
   VkDeviceHandle(VkDeviceHandle&& other) noexcept
-      : value_(iree::exchange(other.value_,
-                              static_cast<VkDevice>(VK_NULL_HANDLE))),
+      : value_(exchange(other.value_, static_cast<VkDevice>(VK_NULL_HANDLE))),
         syms_(std::move(other.syms_)),
         enabled_extensions_(other.enabled_extensions_),
         owns_device_(other.owns_device_),
@@ -98,8 +104,8 @@ class VkCommandPoolHandle {
   VkCommandPoolHandle& operator=(const VkCommandPoolHandle&) = delete;
   VkCommandPoolHandle(VkCommandPoolHandle&& other) noexcept
       : logical_device_(std::move(other.logical_device_)),
-        value_(iree::exchange(other.value_,
-                              static_cast<VkCommandPool>(VK_NULL_HANDLE))) {}
+        value_(exchange(other.value_,
+                        static_cast<VkCommandPool>(VK_NULL_HANDLE))) {}
   VkCommandPoolHandle& operator=(VkCommandPoolHandle&& other) {
     std::swap(logical_device_, other.logical_device_);
     std::swap(value_, other.value_);

@@ -1121,10 +1121,11 @@ func @gather() {
   %d0 = memref.dim %5, %c0 : tensor<?xi32>
   %d1 = memref.dim %4, %c1 : tensor<?x?xf32>
   %3 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
-  %7 = linalg.indexed_generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<?xi32>) outs(%3 : tensor<?x?xf32>) {
-  ^bb0(%arg0: index, %arg1: index, %arg2: i32, %arg3: f32):  // no predecessors
+  %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<?xi32>) outs(%3 : tensor<?x?xf32>) {
+  ^bb0( %arg2: i32, %arg3: f32):  // no predecessors
+    %iv1 = linalg.index 1 : index
     %8 = index_cast %arg2 : i32 to index
-    %9 = tensor.extract %4[%8, %arg1] : tensor<?x?xf32>
+    %9 = tensor.extract %4[%8, %iv1] : tensor<?x?xf32>
     linalg.yield %9 : f32
   } -> tensor<?x?xf32>
   flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
@@ -1672,7 +1673,7 @@ func @multi_result() {
           %23 = mulf %arg2, %arg3 : f32
           %24 = addf %arg2, %arg3 : f32
           linalg.yield %23, %24 : f32, f32
-        } -> tensor<?x?xf32>, tensor<?x?xf32>
+        } -> (tensor<?x?xf32>, tensor<?x?xf32>)
       flow.dispatch.tensor.store %22#0, %2, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
       flow.dispatch.tensor.store %22#1, %3, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
     }
@@ -1958,7 +1959,7 @@ func @multi_result_reduce() {
       %24 = select %19, %arg2, %arg4 : i32
       %25 = select %21, %23, %24 : i32
       linalg.yield %20, %25 : i32, i32
-    } -> tensor<?xi32>, tensor<?xi32>
+    } -> (tensor<?xi32>, tensor<?xi32>)
     flow.dispatch.tensor.store %18#0, %2, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>
     flow.dispatch.tensor.store %18#1, %3, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>
   }

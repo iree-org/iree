@@ -25,17 +25,15 @@ iree_cc_library(
   NAME
     cc
   HDRS
-    "module_abi_packing.h"
     "native_module_cc.h"
+    "native_module_packing.h"
     "ref_cc.h"
   DEPS
     ::vm
-    absl::optional
-    absl::span
-    absl::strings
     iree::base
+    iree::base::cc
     iree::base::core_headers
-    iree::base::status
+    iree::base::internal::span
   PUBLIC
 )
 
@@ -112,7 +110,7 @@ iree_cc_test(
     ::impl
     ::native_module_test_hdrs
     iree::base
-    iree::base::status
+    iree::base::cc
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -201,10 +199,8 @@ iree_cc_test(
   DEPS
     ::bytecode_module
     ::vm
-    absl::span
-    absl::strings
+    iree::base::cc
     iree::base::logging
-    iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_c
