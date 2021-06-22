@@ -2311,8 +2311,8 @@ func @sort1D() {
       %7 = tensor.extract %arg3[%5] : tensor<4xi32>
       %8 = cmpi sgt, %6, %7 : i32
       %11 = scf.if %8 -> (tensor<4xi32>) {
-        %12 = tensor.insert %6 into %arg3[%5] : i32 into tensor<4xi32>
-        %13 = tensor.insert %7 into %12[%arg2] : i32 into tensor<4xi32>
+        %12 = tensor.insert %6 into %arg3[%5] : tensor<4xi32>
+        %13 = tensor.insert %7 into %12[%arg2] : tensor<4xi32>
         scf.yield %13 : tensor<4xi32>
       } else {
         scf.yield %arg3 : tensor<4xi32>
@@ -2358,8 +2358,8 @@ func @sort1D_inplace() {
       %7 = tensor.extract %arg3[%5] : tensor<4xi32>
       %8 = cmpi sgt, %6, %7 : i32
       %11 = scf.if %8 -> (tensor<4xi32>) {
-        %12 = tensor.insert %6 into %arg3[%5] : i32 into tensor<4xi32>
-        %13 = tensor.insert %7 into %12[%arg2] : i32 into tensor<4xi32>
+        %12 = tensor.insert %6 into %arg3[%5] : tensor<4xi32>
+        %13 = tensor.insert %7 into %12[%arg2] : tensor<4xi32>
         scf.yield %13 : tensor<4xi32>
       } else {
         scf.yield %arg3 : tensor<4xi32>

@@ -694,7 +694,7 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
   } else if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
     dynamicDims = getDynamicDims(b, loc, transferWriteOp.source());
   } else {
-    return nullptr;
+    dynamicDims = getDynamicDims(b, loc, op->getResult(resultNum));
   }
 
   // If its a static allocation hoist it all the way up at begining of the
