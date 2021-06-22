@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -109,8 +110,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createConvertToFlowTensorOpsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   // NOTE: required because the current dispatch-linalg-on-tensors pass
   // creates a lot of dead IR that needs to be cleaned up.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());

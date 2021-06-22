@@ -399,6 +399,7 @@ iree_e2e_cartesian_product_test_suite(
     ",,segment_prod,,,iree_llvmaot"
     ",,segment_sum,,,iree_llvmaot"
     ",,sigmoid,,,iree_llvmaot"
+    ",,sign,,,iree_llvmaot"
     ",,sinh,,,iree_llvmaot"
     ",,sobol_sample,,,iree_llvmaot"
     ",,softmax,,,iree_llvmaot"
