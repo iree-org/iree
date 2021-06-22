@@ -11,6 +11,7 @@ EXPLICIT_TARGET_MAPPING = {
     # Internal utilities to emulate various binary/library options.
     "//build_tools:default_linkopts": [],
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
+    "//build_tools:runtimethreads": ['$<$<STREQUAL:${IREE_ENABLE_THREADING},"ON">:Threads::Threads>'],
     "//build_tools:threads": ["Threads::Threads"],
 
     # LLVM

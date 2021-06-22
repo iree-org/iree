@@ -101,11 +101,11 @@ iree_cc_library(
     "dynamic_library_posix.c"
     "dynamic_library_win32.c"
   DEPS
+    $<$<STREQUAL:${IREE_ENABLE_THREADING},"ON">:Threads::Threads>
     ${CMAKE_DL_LIBS}
     ::file_path
     ::internal
     ::synchronization
-    Threads::Threads
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
@@ -314,8 +314,8 @@ iree_cc_library(
   SRCS
     "synchronization.c"
   DEPS
+    $<$<STREQUAL:${IREE_ENABLE_THREADING},"ON">:Threads::Threads>
     ::internal
-    Threads::Threads
     iree::base
     iree::base::core_headers
     iree::base::tracing
@@ -370,10 +370,10 @@ iree_cc_library(
     "threading_pthreads.c"
     "threading_win32.c"
   DEPS
+    $<$<STREQUAL:${IREE_ENABLE_THREADING},"ON">:Threads::Threads>
     ${CMAKE_DL_LIBS}
     ::internal
     ::synchronization
-    Threads::Threads
     iree::base
     iree::base::core_headers
     iree::base::tracing

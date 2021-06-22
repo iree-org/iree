@@ -300,6 +300,7 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         "//build_tools:default_linkopts",
+        # TODO: Temporarily linking with threads since llvm:Support fails to do so
         "//build_tools:threads",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
