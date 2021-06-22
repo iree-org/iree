@@ -10,6 +10,11 @@
 
 iree_add_all_subdirs()
 
+# TODO(#4298): Separate HAL driver registration from threading.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 if(${IREE_HAL_DRIVER_VMVX})
 
 iree_cc_library(
