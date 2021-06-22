@@ -212,6 +212,15 @@ IREE_API_EXPORT intptr_t iree_string_view_split(iree_string_view_t value,
   return offset;
 }
 
+IREE_API_EXPORT void iree_string_view_replace_char(iree_string_view_t value,
+                                                   char old_char,
+                                                   char new_char) {
+  char* p = (char*)value.data;
+  for (iree_host_size_t i = 0; i < value.size; ++i) {
+    if (p[i] == old_char) p[i] = new_char;
+  }
+}
+
 static bool iree_string_view_match_pattern_impl(iree_string_view_t value,
                                                 iree_string_view_t pattern) {
   iree_host_size_t next_char_index = iree_string_view_find_first_of(

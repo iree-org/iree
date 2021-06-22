@@ -9,8 +9,6 @@
 # matching.
 #
 #  "@absl_py//absl/"
-#  "@com_google_absl//absl/"
-#  "@com_google_absl//absl/"
 #  "@bazel_skylib//"
 #  "@com_google_benchmark//"
 #  "@cpuinfo//"

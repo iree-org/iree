@@ -32,6 +32,7 @@ iree_cc_library(
     LLVMAArch64CodeGen
     LLVMARMAsmParser
     LLVMARMCodeGen
+    LLVMBitWriter
     LLVMCore
     LLVMRISCVAsmParser
     LLVMRISCVCodeGen

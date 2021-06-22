@@ -9,8 +9,6 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree_tf_compiler/MHLO/Passes.h"
-#include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"
-#include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -22,11 +20,6 @@
 namespace mlir {
 namespace iree_integrations {
 namespace TF {
-
-void registerAllDialects(mlir::DialectRegistry &registry) {
-  registry.insert<tf_strings::TFStringsDialect>();
-  registry.insert<tf_tensorlist::TFTensorListDialect>();
-}
 
 // All IREE-specific passes that lower TF representations before reaching the
 // IREE core should go here.
@@ -67,12 +60,6 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
-  // Lowering module specific TF behavior to intermediate dialects.
-  //----------------------------------------------------------------------------
-  pm.addPass(tf_strings::createConvertTFToTFStringsPass());
-  pm.addPass(tf_tensorlist::createConvertTFToTFTensorListPass());
-
-  //----------------------------------------------------------------------------
   // Legalize to XLA
   //----------------------------------------------------------------------------
   pm.addPass(createConvertToMHLOPass());
@@ -92,12 +79,6 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   // pm.addPass(iree_compiler::Shape::createConvertShapeToShapexPass());
   // pm.addPass(createCanonicalizerPass());
-
-  //----------------------------------------------------------------------------
-  // Lowering intermediate dialects to module specific dialects.
-  //----------------------------------------------------------------------------
-  pm.addPass(tf_strings::createConvertTFStringsToStringsPass());
-  pm.addPass(tf_tensorlist::createConvertTFTensorListToTensorListPass());
 
   //----------------------------------------------------------------------------
   // Lowering tf_saved_model dialect to IREE dialects

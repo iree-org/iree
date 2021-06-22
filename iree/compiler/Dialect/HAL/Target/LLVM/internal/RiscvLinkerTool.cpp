@@ -42,19 +42,6 @@ class RiscvLinkerTool : public LinkerTool {
     return llvm::Twine(riscvToolchainRoot).concat("/bin/clang").str();
   }
 
-  LogicalResult configureModule(
-      llvm::Module *llvmModule,
-      ArrayRef<llvm::Function *> exportedFuncs) override {
-    for (auto &func : *llvmModule) {
-      // Enable frame pointers to ensure that stack unwinding works.
-      func.addFnAttr("frame-pointer", "all");
-
-      // -ffreestanding-like behavior.
-      func.addFnAttr("no-builtins");
-    }
-    return success();
-  }
-
   Optional<Artifacts> linkDynamicLibrary(
       StringRef libraryName, ArrayRef<Artifact> objectFiles) override {
     Artifacts artifacts;

@@ -116,9 +116,7 @@ class Config:
         driver_name.split(",") if driver_name is not None else None)
     self.device = self.driver.create_default_device()
     hal_module = _binding.create_hal_module(self.device)
-    strings_module = _binding.create_strings_module()
-    tensorlist_module = _binding.create_tensorlist_module()
-    self.default_vm_modules = (hal_module, strings_module, tensorlist_module)
+    self.default_vm_modules = (hal_module,)
 
 
 _global_config = None

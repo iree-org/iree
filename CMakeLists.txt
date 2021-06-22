@@ -5,11 +5,18 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.13.4)
+
 # Do not set MSVC warning flags like /W3 by default (since 3.15):
 #   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
 if(POLICY CMP0092)
   cmake_policy(SET CMP0092 NEW)
 endif()
+
+# LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
+# CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
+# New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
+set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(iree ASM C CXX)
@@ -43,6 +50,7 @@ option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
+option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
@@ -182,7 +190,6 @@ endforeach()
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
-  ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
 
 #-------------------------------------------------------------------------------
@@ -203,6 +210,55 @@ if(${IREE_ENABLE_CCACHE})
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
   endif()
 endif()
+
+
+#-------------------------------------------------------------------------------
+# IREE assertions
+# We don't love the way this is done, but we have to line it up with how LLVM
+# does it and not diverge, since all implementations and all header users must
+# have the same definition of NDEBUG.
+#
+# LLVM defaults LLVM_ENABLE_ASSERTIONS to ON for Debug builds only but then
+# conditions itself to only update flags if not building Debug. We just let
+# IREE_ENABLE_ASSERTIONS be not conditioned on anything and only update the
+# flags in appropriate build types.
+#
+# If IREE_ENABLE_ASSERTIONS is set ON manually, then
+#   - NDEBUG must be undefined
+#   - LLVM_ENABLE_ASSERTIONS is forced off in order to keep multiple parties
+#     from mucking with globals.
+#
+# Since CMake forces NDEBUG for !Debug builds, some surgery needs to be done
+# at the top level to avoid divergence.
+#-------------------------------------------------------------------------------
+
+option(IREE_ENABLE_ASSERTIONS "Force unset of NDEBUG compile option" OFF)
+
+# Filter -DNDEBUG from CMAKE_CXX_FLAGS_* and CMAKE_C_FLAGS_* (if
+# CMAKE_BUILD_TYPE is not Debug).
+function(iree_fix_ndebug)
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
+  if(IREE_ENABLE_ASSERTIONS AND NOT "${uppercase_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+      # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
+      foreach (flags_var_to_scrub
+              CMAKE_CXX_FLAGS_${uppercase_CMAKE_BUILD_TYPE}
+              CMAKE_C_FLAGS_${uppercase_CMAKE_BUILD_TYPE})
+          set(original_flags "${${flags_var_to_scrub}}")
+          string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
+                  altered_flags "${original_flags}")
+          if(NOT "${original_flags}" STREQUAL "${altered_flags}")
+            message(STATUS
+              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${flags_var_to_scrub}: '${original_flags}' -> '${altered_flags}'")
+            set(${flags_var_to_scrub} "${altered_flags}" PARENT_SCOPE)
+          endif()
+      endforeach()
+
+      # Make sure that LLVM doesn't add its own logic for assertion disabling.
+      # We'd like to make sure that we are not dueling over globals.
+      set(LLVM_ENABLE_ASSERTIONS OFF PARENT_SCOPE)
+  endif()
+endfunction()
+iree_fix_ndebug()
 
 #-------------------------------------------------------------------------------
 # IREE utility definitions
@@ -277,7 +333,6 @@ endif()
 #-------------------------------------------------------------------------------
 
 # Disable LLVM's warnings.
-set(LLVM_ENABLE_ASSERTIONS OFF CACHE BOOL "don't use global flags /facepalm")
 set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
 
 # Adds bundled projects that must be included after the LLVM directory has
@@ -379,15 +434,16 @@ endif()
 include(external_cc_library)
 include(flatbuffer_c_library)
 
-add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 
-add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
+if(${IREE_ENABLE_THREADING})
+  add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+  add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+endif()
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 

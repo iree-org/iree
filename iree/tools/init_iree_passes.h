@@ -23,6 +23,8 @@
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 
 namespace mlir {
@@ -35,6 +37,9 @@ inline void registerAllIreePasses() {
 
   IREE::TFLite::registerPasses();
   IREE::TFLite::registerTransformPassPipeline();
+
+  registerMHLOConversionPasses();
+  registerTOSAConversionPasses();
 
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();

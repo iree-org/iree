@@ -209,7 +209,7 @@ def HAL_VariableLoadOp : HAL_Op<"variable.load", [
   let verifier = [{ return verifyVariableLoadOp(*this); }];
 }
 
-def FLOW_VariableLoadIndirectOp : HAL_Op<"variable.load.indirect"> {
+def HAL_VariableLoadIndirectOp : HAL_Op<"variable.load.indirect"> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the variable value.

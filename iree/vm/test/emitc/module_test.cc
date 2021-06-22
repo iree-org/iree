@@ -4,10 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "absl/strings/match.h"
-#include "absl/strings/str_replace.h"
 #include "iree/base/logging.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/test/emitc/arithmetic_ops.h"
@@ -15,6 +13,7 @@
 #include "iree/vm/test/emitc/arithmetic_ops_i64.h"
 // #include "iree/vm/test/emitc/assignment_ops.h"
 #include "iree/vm/test/emitc/assignment_ops_i64.h"
+#include "iree/vm/test/emitc/call_ops.h"
 #include "iree/vm/test/emitc/comparison_ops.h"
 #include "iree/vm/test/emitc/comparison_ops_f32.h"
 #include "iree/vm/test/emitc/comparison_ops_i64.h"
@@ -46,7 +45,11 @@ struct ModuleDescription {
 
 std::ostream& operator<<(std::ostream& os, const TestParams& params) {
   std::string qualified_name = params.module_name + "." + params.local_name;
-  return os << absl::StrReplaceAll(qualified_name, {{":", "_"}, {".", "_"}});
+  auto name_sv =
+      iree_make_string_view(qualified_name.data(), qualified_name.size());
+  iree_string_view_replace_char(name_sv, ':', '_');
+  iree_string_view_replace_char(name_sv, '.', '_');
+  return os << qualified_name;
 }
 
 std::vector<TestParams> GetModuleTestParams() {
@@ -59,6 +62,7 @@ std::vector<TestParams> GetModuleTestParams() {
       {arithmetic_ops_i64_descriptor_, arithmetic_ops_i64_create},
       // {assignment_ops_descriptor_, assignment_ops_create},
       {assignment_ops_i64_descriptor_, assignment_ops_i64_create},
+      {call_ops_descriptor_, call_ops_create},
       {comparison_ops_descriptor_, comparison_ops_create},
       {comparison_ops_f32_descriptor_, comparison_ops_f32_create},
       {comparison_ops_i64_descriptor_, comparison_ops_i64_create},
@@ -135,7 +139,7 @@ class VMCModuleTest : public ::testing::Test,
 
 TEST_P(VMCModuleTest, Check) {
   const auto& test_params = GetParam();
-  bool expect_failure = absl::StartsWith(test_params.local_name, "fail_");
+  bool expect_failure = test_params.local_name.find("fail_") == 0;
 
   iree::Status result =
       RunFunction(test_params.module_name, test_params.local_name);

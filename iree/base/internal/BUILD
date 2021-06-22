@@ -10,6 +10,7 @@
 
 load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -28,6 +29,7 @@ cc_library(
     name = "internal",
     srcs = [
         "atomics_clang.h",
+        "atomics_disabled.h",
         "atomics_gcc.h",
         "atomics_msvc.h",
     ],
@@ -134,8 +136,8 @@ cc_test(
     srcs = ["file_io_test.cc"],
     deps = [
         ":file_io",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -280,21 +282,8 @@ cc_test(
 )
 
 cc_library(
-    name = "status_internal",
-    srcs = [
-        "status.cc",
-        "statusor.cc",
-    ],
-    hdrs = [
-        "status.h",
-        "statusor.h",
-    ],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:logging",
-        "@com_google_absl//absl/utility",
-    ],
+    name = "span",
+    hdrs = ["span.h"],
 )
 
 cc_library(
@@ -341,6 +330,19 @@ cc_test(
     ],
 )
 
+#===------------------------------------------------------------------------===#
+# Utilities with thread dependencies
+#===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+""",
+    inline = True,
+)
+
 cc_library(
     name = "threading",
     srcs = [
@@ -371,7 +373,7 @@ cc_test(
         ":internal",
         ":synchronization",
         ":threading",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

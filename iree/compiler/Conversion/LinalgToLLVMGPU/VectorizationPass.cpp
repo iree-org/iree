@@ -9,7 +9,6 @@
 #include "iree/compiler/Conversion/Transforms/Transforms.h"
 #include "iree/compiler/Conversion/Utils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Utils/Utils.h"
-#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"

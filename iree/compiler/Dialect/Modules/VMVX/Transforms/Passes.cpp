@@ -38,7 +38,6 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Linalg -> Vectors
   // ---------------------------------------------------------------------------
 
-  nestedModulePM.addNestedPass<FuncOp>(createResolveShapeOpsPass());
   nestedModulePM.addNestedPass<FuncOp>(
       Shape::createCleanupShapePlaceholdersPass());
 

@@ -8,18 +8,9 @@
 
 #include <memory>
 
-#include "iree/compiler/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
-#include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
-#include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
-#include "mlir/Conversion/TosaToSCF/TosaToSCF.h"
-#include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
-#include "mlir/Dialect/Shape/Transforms/Passes.h"
-#include "mlir/Dialect/Tosa/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -73,103 +64,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// Prepare HLO for use as an input to the Flow dialect.
-void buildMHLOInputTransformPassPipeline(OpPassManager &passManager) {
-  // Currently we don't handle SCF ops well and have to convert them all to CFG.
-  // In the future it would be nice if we could have all of flow be both scf
-  // and cfg compatible.
-  // TODO: Currently recurses into SCF in Linalg generic - with hilarity.
-  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
-
-  // Various shape functions may have been materialized in the `shape.shape_of`
-  // style of treating shapes as tensors. We prefer to legalize these to
-  // scalar ops as early as possible to avoid having them persist as tensor
-  // computations.
-  passManager.addNestedPass<FuncOp>(createShapeToShapeLowering());
-  passManager.addPass(createConvertShapeToStandardPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-
-  // Now that control flow has been lowered, promote and extract_element
-  // to tensor loads. This will be done again later once everything that can
-  // be is lowered to device.
-  passManager.addNestedPass<FuncOp>(createPromoteTensorLoadsPass());
-
-  // We also don't handle calls well on the old codepath; until we remove the
-  // use of the CFG we can continue inlining.
-  passManager.addPass(mlir::createInlinerPass());
-
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createHLOToHLOPreprocessingPass());
-
-  // Perform initial cleanup.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
-
-  // Legalize input types. We do this after flattening tuples so that we don't
-  // have to deal with them.
-  // TODO(nicolasvasilache): createLegalizeInputTypesPass is old and does not
-  // handle region conversion properly (parent cloned before children). Revisit
-  // when using ops with regions such as scf.for and linalg.generic.
-  passManager.addPass(
-      mlir::iree_compiler::IREE::Flow::createLegalizeInputTypesPass());
-
-  // Convert to Linalg. After this point, HLO will be eliminated.
-  passManager.addNestedPass<FuncOp>(
-      mlir::iree_compiler::createHLOToLinalgOnTensorsPass());
-
-  // Note that some MHLO ops are left by the above and must resolve via
-  // canonicalization. See comments in the above pass and find a better way.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-}
-
-// Prepare TOSA for use as an input to the Flow dialect.
-void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
-
-  // Currently we don't handle SCF ops well and have to convert them all to CFG.
-  // In the future it would be nice if we could have all of flow be both scf
-  // and cfg compatible.
-  // TODO: Currently recurses into SCF in Linalg generic - with hilarity.
-  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
-
-  // Now that control flow has been lowered, promote and extract_element
-  // to tensor loads. This will be done again later once everything that can
-  // be is lowered to device.
-  passManager.addNestedPass<FuncOp>(createPromoteTensorLoadsPass());
-
-  // We also don't handle calls well on the old codepath; until we remove the
-  // use of the CFG we can continue inlining.
-  passManager.addPass(mlir::createInlinerPass());
-
-  passManager.addNestedPass<FuncOp>(tosa::createTosaMakeBroadcastablePass());
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(Flow::createPromoteI1ToI8Pass());
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-}
-
-void registerInputTransformPassPipeline() {
-  PassPipelineRegistration<> tosa(
-      "iree-tosa-input-transformation-pipeline",
-      "Runs the TOSA IREE flow dialect transformation pipeline",
-      [](OpPassManager &passManager) {
-        buildTOSAInputTransformPassPipeline(passManager);
-      });
-  PassPipelineRegistration<> mhlo(
-      "iree-mhlo-input-transformation-pipeline",
-      "Runs the MHLO IREE flow dialect transformation pipeline",
-      [](OpPassManager &passManager) {
-        buildMHLOInputTransformPassPipeline(passManager);
-      });
-}
-
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
-  //----------------------------------------------------------------------------
-  // Entry dialect cleanup
-  //----------------------------------------------------------------------------
-  passManager.addPass(createVerifyCompilerInputLegality());
-
   // Perform initial cleanup.
   // NOTE: There is no principled reason to be doing this here. But also ensures
   // some consistency at the tool boundary.
@@ -194,30 +89,24 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Special case peephole optimizations.
   if (clEnable1x1ConvToMatmul) {
-    passManager.addNestedPass<FuncOp>(
-        mlir::iree_compiler::createConvertConv2D1x1ToMatmulPass());
+    passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
   }
   if (clEnableConvToImg2Col) {
-    passManager.addNestedPass<FuncOp>(
-        mlir::iree_compiler::createConvertConv2DToImg2ColPass());
+    passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
   }
-
   // Pad linalg op
   if (clEnablePaddingLinalgOps) {
     passManager.addNestedPass<FuncOp>(
         createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
   }
-
-  passManager.addPass(
-      mlir::iree_compiler::createPadTensorToSubTensorInsertPass());
+  passManager.addPass(createPadTensorToSubTensorInsertPass());
 
   // Elementwise, fusion, tiling and distribution.
   passManager.addNestedPass<FuncOp>(
       mlir::createConvertElementwiseToLinalgPass());
   passManager.addNestedPass<FuncOp>(mlir::createLinalgFoldUnitExtentDimsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(
-      mlir::iree_compiler::createFusionOfTensorOpsPass());
+  passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createConvertToFlowTensorOpsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
@@ -314,7 +203,6 @@ void registerFlowPasses() {
   registerPasses();
 
   // Pipelines.
-  registerInputTransformPassPipeline();
   registerFlowTransformPassPipeline();
 }
 

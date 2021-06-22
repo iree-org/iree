@@ -23,12 +23,6 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-// Performs input legalization for specific combination of input dialects.
-void buildMHLOInputTransformPassPipeline(OpPassManager &passManager);
-void buildTOSAInputTransformPassPipeline(OpPassManager &passManager);
-
-void registerInputTransformPassPipeline();
-
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
 //
@@ -38,8 +32,6 @@ void registerInputTransformPassPipeline();
 // The expected usage is:
 //   Input legalization by one of:
 //     - Directly passing supported flow plus core ops
-//     - buildTOSAInputTransformPassPipeline()
-//     - buildMHLOInputTransformPassPipeline
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
 void buildFlowTransformPassPipeline(OpPassManager &passManager);
@@ -50,9 +42,20 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
-// Verifies a module being input to the core compiler pipeline only contains
-// IR structures that are supported at that level.
-std::unique_ptr<OperationPass<ModuleOp>> createVerifyCompilerInputLegality();
+/// Creates a pass to convert linalg convolution ops with 1x1 kernels into
+/// linalg.matmul
+std::unique_ptr<OperationPass<FuncOp>> createConvertConv2D1x1ToMatmulPass();
+
+/// Creates a pass to convert linalg convolution ops into linalg.matmul ops
+/// using im2col tranformation.
+std::unique_ptr<OperationPass<FuncOp>> createConvertConv2DToImg2ColPass();
+
+/// Pass to convert a linalg.pad_tensor operation into a linalg.fill +
+/// subtensor_insert. This allows lowering the operation into a single kernel.
+std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass();
+
+/// Creates a pass to fuse Linalg operations on tensors.
+std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
 // Convert operations to equivalent flow.tensor.* ops. This is run after
 // dispatch region creation to catch operations that were left outside of
@@ -61,17 +64,6 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass();
 
 // Promote I1 tensor constants to I8 tensors to match later operations.
 std::unique_ptr<OperationPass<FuncOp>> createPromoteI1ToI8Pass();
-
-// Legalizes the input types to those supported by the flow dialect.
-// This will fail if types that cannot be supported at all are present, however
-// conditionally supported types (based on availability, etc) may still be
-// allowed to pass through successfully.
-std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
-
-/// Creates XLA-HLO preprocessing transformation pass. In this pass we should
-/// have all mhlo -> mhlo transformations that are shared between all
-/// backends.
-std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPreprocessingPass();
 
 // Converts standard ops which match to flow.tensor.load (typically causing a
 // read-back).

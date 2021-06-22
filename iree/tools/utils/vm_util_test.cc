@@ -6,11 +6,10 @@
 
 #include "iree/tools/utils/vm_util.h"
 
-#include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vmvx/registration/driver_module.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
@@ -39,45 +38,49 @@ class VmUtilTest : public ::testing::Test {
 };
 
 TEST_F(VmUtilTest, ParsePrintBuffer) {
-  absl::string_view buf_string = "2x2xi32=[42 43][44 45]";
+  std::string buf_string = "2x2xi32=[42 43][44 45]";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList(allocator_, {buf_string}, &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(
+      allocator_, std::vector<std::string>{buf_string}, &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
   EXPECT_EQ(os.str(),
-            absl::StrCat("result[0]: hal.buffer_view\n", buf_string, "\n"));
+            std::string("result[0]: hal.buffer_view\n") + buf_string + "\n");
 }
 
 TEST_F(VmUtilTest, ParsePrintScalar) {
-  absl::string_view input_string = "42";
+  std::string input_string = "42";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList(allocator_, {input_string}, &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(
+      allocator_, std::vector<std::string>{input_string}, &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
-  EXPECT_EQ(os.str(), absl::StrCat("result[0]: i32=", input_string, "\n"));
+  EXPECT_EQ(os.str(), std::string("result[0]: i32=") + input_string + "\n");
 }
 
 TEST_F(VmUtilTest, ParsePrintRank0Buffer) {
-  absl::string_view buf_string = "i32=42";
+  std::string buf_string = "i32=42";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList(allocator_, {buf_string}, &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(
+      allocator_, std::vector<std::string>{buf_string}, &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
   EXPECT_EQ(os.str(),
-            absl::StrCat("result[0]: hal.buffer_view\n", buf_string, "\n"));
+            std::string("result[0]: hal.buffer_view\n") + buf_string + "\n");
 }
 
 TEST_F(VmUtilTest, ParsePrintMultipleBuffers) {
-  absl::string_view buf_string1 = "2x2xi32=[42 43][44 45]";
-  absl::string_view buf_string2 = "2x3xf64=[1 2 3][4 5 6]";
+  std::string buf_string1 = "2x2xi32=[42 43][44 45]";
+  std::string buf_string2 = "2x3xf64=[1 2 3][4 5 6]";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList(allocator_, {buf_string1, buf_string2},
-                                    &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(
+      allocator_, std::vector<std::string>{buf_string1, buf_string2},
+      &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
-  EXPECT_EQ(os.str(),
-            absl::StrCat("result[0]: hal.buffer_view\n", buf_string1,
-                         "\nresult[1]: hal.buffer_view\n", buf_string2, "\n"));
+  EXPECT_EQ(os.str(), std::string("result[0]: hal.buffer_view\n") +
+                          buf_string1 + "\nresult[1]: hal.buffer_view\n" +
+                          buf_string2 + "\n");
 }
 
 }  // namespace

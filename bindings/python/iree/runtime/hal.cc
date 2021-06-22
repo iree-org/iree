@@ -6,7 +6,6 @@
 
 #include "bindings/python/iree/runtime/hal.h"
 
-#include "absl/container/inlined_vector.h"
 #include "iree/hal/api.h"
 
 namespace iree {

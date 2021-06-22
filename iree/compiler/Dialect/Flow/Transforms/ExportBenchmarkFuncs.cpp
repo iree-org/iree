@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -26,6 +27,10 @@ namespace Flow {
 class ExportBenchmarkFuncsPass
     : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
  public:
+  void getDependentDialects(DialectRegistry& registry) const override {
+    registry.insert<IREEDialect>();
+  }
+
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
 

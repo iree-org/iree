@@ -16,7 +16,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/registration/driver_module.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"

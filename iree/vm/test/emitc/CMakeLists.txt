@@ -14,9 +14,8 @@ iree_cc_test(
   SRCS
     "module_test.cc"
   DEPS
-    absl::strings
+    iree::base::cc
     iree::base::logging
-    iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::cc
@@ -27,6 +26,7 @@ iree_cc_test(
     ::arithmetic_ops_i64
     # ::assignment_ops
     ::assignment_ops_i64
+    ::call_ops
     ::comparison_ops
     ::comparison_ops_f32
     ::comparison_ops_i64
@@ -85,6 +85,15 @@ iree_c_module(
     "../assignment_ops_i64.mlir"
   H_FILE_OUTPUT
     "assignment_ops_i64.h"
+)
+
+iree_c_module(
+  NAME
+    call_ops
+  SRC
+    "../call_ops.mlir"
+  H_FILE_OUTPUT
+    "call_ops.h"
 )
 
 iree_c_module(

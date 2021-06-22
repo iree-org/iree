@@ -320,10 +320,6 @@ build:_msvc_base --define=iree_is_msvc=true
 # Bazel gets confused and sometimes loses track of Bash.
 build:_msvc_base --action_env BAZEL_SH='bash'
 
-# Disable warnings for dependencies. We don't control these.
-# absl forces /W3 in their copts, so we exclude them to avoid D9025
-build:_msvc_base --per_file_copt=+external,-com_google_absl@/w
-
 # Find the source of truth for these in iree_copts.cmake.
 build:_msvc_base --copt=/DWIN32_LEAN_AND_MEAN
 build:_msvc_base --copt=/DNOMINMAX

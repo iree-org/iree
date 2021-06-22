@@ -33,7 +33,6 @@ cc_library(
         "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
-        "Rewriters.h",
     ],
     deps = [
         ":PassesIncGen",
@@ -53,12 +52,8 @@ cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//iree/compiler/Conversion/Common",
-        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Conversion/LinalgToLLVMGPU",
-        "//iree/compiler/Conversion/LinalgToLinalg",
         "//iree/compiler/Conversion/LinalgToSPIRV",
-        "//iree/compiler/Conversion/LinalgToVector",
-        "//iree/compiler/Conversion/VectorToLLVM",
     ],
 )

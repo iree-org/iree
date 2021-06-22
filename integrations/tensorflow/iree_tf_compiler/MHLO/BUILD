@@ -25,11 +25,11 @@ cc_library(
     ],
     deps = [
         "@iree//iree/compiler/Conversion:PassHeaders",
-        "@iree//iree/compiler/Conversion/HLOToLinalg",
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/Flow/Transforms",
         "@iree//iree/compiler/Dialect/IREE/IR",
         "@iree//iree/compiler/Dialect/Shape/Transforms",
+        "@iree//iree/compiler/InputConversion/MHLO",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

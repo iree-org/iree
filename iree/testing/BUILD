@@ -46,9 +46,7 @@ cc_library(
         "status_matchers.h",
     ],
     deps = [
-        "//iree/base:status",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "//iree/base:cc",
         "@com_google_googletest//:gtest",
     ],
 )

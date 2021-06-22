@@ -21,18 +21,12 @@ iree_pyext_module(
     "unix_version.lds"
   DEPS
     iree::base
-    iree::base::status
+    iree::base::cc
     iree::hal
     iree::hal::drivers
     iree::modules::hal
-    iree::modules::strings::strings_module
-    iree::modules::tensorlist::native_module
     iree::vm
     iree::vm::bytecode_module
-    absl::inlined_vector
-    absl::strings
-    absl::optional
-    absl::span
 )
 
 iree_py_library(

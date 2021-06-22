@@ -23,7 +23,7 @@ cc_binary(
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
         "//iree/base",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
         "//iree/base/internal:flags",
@@ -44,15 +44,15 @@ cc_binary(
     srcs = ["iree-check-module-main.cc"],
     deps = [
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:core_headers",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
         "//iree/base/internal:flags",
         "//iree/hal",
         "//iree/hal/drivers",
-        "//iree/modules/check:native_module",
+        "//iree/modules/check",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/tools/utils:vm_util",
@@ -95,6 +95,8 @@ cc_library(
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/compiler/Dialect/Vulkan/IR",
+        "//iree/compiler/InputConversion/MHLO",
+        "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//mlir:IR",
     ],
@@ -148,7 +150,6 @@ cc_library(
         ":init_mlir_passes_and_dialects",
         ":init_xla_dialects",
         "//iree/compiler/Conversion",
-        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Dialect/HAL/Conversion:Passes",
     ],
 )
@@ -158,8 +159,6 @@ cc_library(
     hdrs = ["init_compiler_modules.h"],
     deps = [
         "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
-        "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-        "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
     ],
 )
 
@@ -248,8 +247,8 @@ cc_binary(
         ":init_passes_and_dialects",
         ":init_targets",
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:flags",
         "//iree/compiler/Dialect/HAL/Target",
@@ -263,7 +262,6 @@ cc_binary(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
@@ -279,7 +277,7 @@ cc_binary(
     srcs = ["iree-run-module-main.cc"],
     deps = [
         "//iree/base",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
         "//iree/base/internal:flags",
@@ -290,7 +288,6 @@ cc_binary(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
     ],
 )
 

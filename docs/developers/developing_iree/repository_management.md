@@ -101,7 +101,6 @@ overwrite the submodule version updates from the `SUBMODULE_VERSIONS.txt` file i
 the repository root. Here is an example:
 
 ```text
-6ec136281086b71da32b5fb068bd6e46b78a5c79 third_party/abseil-cpp
 309de5988eb949a27e077a24a1d83c0687d10d57 third_party/benchmark
 97f3aa91746a7d207513a73725e92cee7c35bb87 third_party/flatbuffers
 f2fb48c3b3d79a75a88a99fba6576b25d42ec528 third_party/googletest

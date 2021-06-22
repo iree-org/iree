@@ -13,6 +13,7 @@
 
 #include "iree/base/attributes.h"
 #include "iree/base/config.h"
+#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 
 #ifdef __cplusplus

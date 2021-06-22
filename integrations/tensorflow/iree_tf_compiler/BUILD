@@ -33,13 +33,9 @@ cc_binary(
     deps = [
         "//iree_tf_compiler/MHLO",
         "//iree_tf_compiler/TF",
-        "//iree_tf_compiler/dialect/tf_strings/ir:dialect",
-        "//iree_tf_compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/HAL/IR",
         "@iree//iree/compiler/Dialect/IREE/IR",
-        "@iree//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-        "@iree//iree/compiler/Dialect/Modules/TensorList/IR",
         "@iree//iree/tools:init_xla_dialects",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",

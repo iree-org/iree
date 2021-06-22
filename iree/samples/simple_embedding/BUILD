@@ -7,7 +7,6 @@
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
-load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,58 +14,119 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# The prebuilt simple_embedding_test-llvm-aot_rv64 bytecode module is build with
-# RISC-V 64-bit cross-compile toolchain (with RISCV_TOOLCHAIN_ROOT defined):
-# iree-translate \
-#     -iree-mlir-to-vm-bytecode-module \
-#     -iree-hal-target-backends=dylib-llvm-aot \
-#     -iree-llvm-target-triple=riscv64 \
-#     -iree-llvm-target-cpu=generic-rv64 \
-#     -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c" \
-#     -iree-llvm-target-abi=lp64d \
-#     iree/samples/simple_embedding/simple_embedding_test.mlir \
-#     -o /tmp/simple_embedding_test-llvm-aot_rv64.vmfb
-c_embed_data(
-    name = "simple_embedding_test_llvm_aot_rv64",
-    srcs = [
-        "data/simple_embedding_test-llvm-aot_rv64.vmfb",
-    ],
-    c_file_output = "simple_embedding_test_llvm_aot_rv64.c",
-    flatten = True,
-    h_file_output = "simple_embedding_test_llvm_aot_rv64.h",
-    identifier = "iree_samples_simple_embedding_rv64_test_module",
-)
-
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
-   OR NOT ${IREE_HAL_DRIVER_DYLIB} OR NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
+if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 """,
     inline = True,
 )
 
-cc_binary(
-    name = "simple_embedding_dylib",
-    srcs = [
-        "device_dylib.c",
-        "simple_embedding.c",
-    ],
-    deps = [
-        ":simple_embedding_test_bytecode_module_c",
-        ":simple_embedding_test_llvm_aot_rv64",
-        "//iree/base",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:task_driver",
-        "//iree/hal/local/loaders:embedded_library_loader",
-        "//iree/hal/local/loaders:legacy_library_loader",
-        "//iree/modules/hal",
-        "//iree/task:api",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-    ],
+# TODO(llvm-bazel/#228): re-enable bazel.
+#cc_binary(
+#    name = "simple_embedding_dylib",
+#    srcs = [
+#        "device_dylib.c",
+#        "simple_embedding.c",
+#    ],
+#    deps = [
+#        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
+#        ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
+#        ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
+#        "//iree/base",
+#        "//iree/hal",
+#        "//iree/hal/local",
+#        "//iree/hal/local:task_driver",
+#        "//iree/hal/local/loaders:embedded_library_loader",
+#        "//iree/modules/hal",
+#        "//iree/task:api",
+#        "//iree/vm",
+#        "//iree/vm:bytecode_module",
+#    ],
+#)
+#
+#cc_binary(
+#    name = "simple_embedding_local_sync",
+#    srcs = [
+#        "device_local_sync.c",
+#        "simple_embedding.c",
+#    ],
+#    deps = [
+#        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
+#        ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
+#        ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
+#        "//iree/base",
+#        "//iree/hal",
+#        "//iree/hal/local",
+#        "//iree/hal/local:sync_driver",
+#        "//iree/hal/local/loaders:embedded_library_loader",
+#        "//iree/modules/hal",
+#        "//iree/vm",
+#        "//iree/vm:bytecode_module",
+#    ],
+#)
+#
+#iree_bytecode_module(
+#    name = "simple_embedding_test_bytecode_module_dylib_x86_64",
+#    src = "simple_embedding_test.mlir",
+#    c_identifier = "iree_samples_simple_embedding_test_module_dylib_x86_64",
+#    flags = [
+#        "-iree-input-type=mhlo",
+#        "-iree-mlir-to-vm-bytecode-module",
+#        "-iree-hal-target-backends=dylib-llvm-aot",
+#        "-iree-llvm-target-triple=x86_64-pc-linux-elf",
+#        "-iree-llvm-link-embedded=true",
+#        "-iree-llvm-debug-symbols=false",
+#    ],
+#)
+#
+#iree_bytecode_module(
+#    name = "simple_embedding_test_bytecode_module_dylib_riscv_64",
+#    src = "simple_embedding_test.mlir",
+#    c_identifier = "iree_samples_simple_embedding_test_module_dylib_riscv_64",
+#    flags = [
+#        "-iree-input-type=mhlo",
+#        "-iree-mlir-to-vm-bytecode-module",
+#        "-iree-hal-target-backends=dylib-llvm-aot",
+#        "-iree-llvm-target-triple=riscv64-pc-linux-elf",
+#        "-iree-llvm-target-cpu=generic-rv64",
+#        "-iree-llvm-target-cpu-features=+m,+a,+f,+d,+c",
+#        "-iree-llvm-target-abi=lp64d",
+#        "-iree-llvm-link-embedded=true",
+#        "-iree-llvm-debug-symbols=false",
+#    ],
+#)
+#
+#iree_bytecode_module(
+#    name = "simple_embedding_test_bytecode_module_dylib_arm_64",
+#    src = "simple_embedding_test.mlir",
+#    c_identifier = "iree_samples_simple_embedding_test_module_dylib_arm_64",
+#    flags = [
+#        "-iree-input-type=mhlo",
+#        "-iree-mlir-to-vm-bytecode-module",
+#        "-iree-hal-target-backends=dylib-llvm-aot",
+#        "-iree-llvm-target-triple=aarch64-pc-linux-elf",
+#        "-iree-llvm-link-embedded=true",
+#        "-iree-llvm-debug-symbols=false",
+#    ],
+#)
+#
+#run_binary_test(
+#    name = "simple_embedding_dylib_test",
+#    test_binary = ":simple_embedding_dylib",
+#)
+#
+#run_binary_test(
+#    name = "simple_embedding_local_sync_test",
+#    test_binary = ":simple_embedding_local_sync",
+#)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+
+if(${IREE_TARGET_BACKEND_VULKAN-SPIRV} AND ${IREE_HAL_DRIVER_VULKAN})
+""",
+    inline = True,
 )
 
 cc_binary(
@@ -76,8 +136,7 @@ cc_binary(
         "simple_embedding.c",
     ],
     deps = [
-        ":simple_embedding_test_bytecode_module_c",
-        ":simple_embedding_test_llvm_aot_rv64",
+        ":simple_embedding_test_bytecode_module_vulkan_c",
         "//iree/base",
         "//iree/hal",
         "//iree/hal/vulkan/registration",
@@ -87,66 +146,26 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "simple_embedding_local_sync",
-    srcs = [
-        "device_local_sync.c",
-        "simple_embedding.c",
-    ],
-    deps = [
-        ":simple_embedding_test_bytecode_module_c",
-        ":simple_embedding_test_llvm_aot_rv64",
-        "//iree/base",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:sync_driver",
-        "//iree/hal/local/loaders:embedded_library_loader",
-        "//iree/hal/local/loaders:legacy_library_loader",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-    ],
-)
-
 iree_bytecode_module(
-    name = "simple_embedding_test_bytecode_module",
+    name = "simple_embedding_test_bytecode_module_vulkan",
     src = "simple_embedding_test.mlir",
-    c_identifier = "iree_samples_simple_embedding_test_module",
+    c_identifier = "iree_samples_simple_embedding_test_module_vulkan",
     flags = [
         "-iree-input-type=mhlo",
         "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=dylib-llvm-aot",
         "-iree-hal-target-backends=vulkan-spirv",
         "-iree-llvm-debug-symbols=false",
     ],
 )
 
-# Bytecode module is built without cross-compilation. Bypass the following test if it
-# is not built for the host machine.
-
-iree_cmake_extra_content(
-    content = """
-# Bytecode is built without cross-compilation. Bypass the following test if it
-# is not built for the host machine.
-
-if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|x86_64|AMD64")
-  return()
-endif()
-""",
-    inline = True,
-)
-
-run_binary_test(
-    name = "simple_embedding_dylib_test",
-    test_binary = ":simple_embedding_dylib",
-)
-
-run_binary_test(
-    name = "simple_embedding_local_sync_test",
-    test_binary = ":simple_embedding_local_sync",
-)
-
 run_binary_test(
     name = "simple_embedding_vulkan_test",
     test_binary = ":simple_embedding_vulkan",
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

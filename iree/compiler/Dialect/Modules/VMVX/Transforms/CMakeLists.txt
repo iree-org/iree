@@ -42,7 +42,6 @@ iree_cc_library(
     MLIRVector
     MLIRVectorToSCF
     iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Conversion::PassHeaders
     iree::compiler::Dialect::HAL::IR::HALDialect
