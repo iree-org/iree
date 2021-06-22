@@ -11,16 +11,21 @@
 #include "iree/vm/test/emitc/arithmetic_ops.h"
 #include "iree/vm/test/emitc/arithmetic_ops_f32.h"
 #include "iree/vm/test/emitc/arithmetic_ops_i64.h"
-// #include "iree/vm/test/emitc/assignment_ops.h"
+#include "iree/vm/test/emitc/assignment_ops.h"
+#include "iree/vm/test/emitc/assignment_ops_f32.h"
 #include "iree/vm/test/emitc/assignment_ops_i64.h"
+#include "iree/vm/test/emitc/buffer_ops.h"
 #include "iree/vm/test/emitc/call_ops.h"
 #include "iree/vm/test/emitc/comparison_ops.h"
 #include "iree/vm/test/emitc/comparison_ops_f32.h"
 #include "iree/vm/test/emitc/comparison_ops_i64.h"
 #include "iree/vm/test/emitc/control_flow_ops.h"
 #include "iree/vm/test/emitc/conversion_ops.h"
+#include "iree/vm/test/emitc/conversion_ops_f32.h"
 #include "iree/vm/test/emitc/conversion_ops_i64.h"
 #include "iree/vm/test/emitc/global_ops.h"
+#include "iree/vm/test/emitc/global_ops_f32.h"
+#include "iree/vm/test/emitc/global_ops_i64.h"
 #include "iree/vm/test/emitc/list_ops.h"
 #include "iree/vm/test/emitc/list_variant_ops.h"
 #include "iree/vm/test/emitc/ref_ops.h"
@@ -60,16 +65,21 @@ std::vector<TestParams> GetModuleTestParams() {
       {arithmetic_ops_descriptor_, arithmetic_ops_create},
       {arithmetic_ops_f32_descriptor_, arithmetic_ops_f32_create},
       {arithmetic_ops_i64_descriptor_, arithmetic_ops_i64_create},
-      // {assignment_ops_descriptor_, assignment_ops_create},
+      {assignment_ops_descriptor_, assignment_ops_create},
+      {assignment_ops_f32_descriptor_, assignment_ops_f32_create},
       {assignment_ops_i64_descriptor_, assignment_ops_i64_create},
+      {buffer_ops_descriptor_, buffer_ops_create},
       {call_ops_descriptor_, call_ops_create},
       {comparison_ops_descriptor_, comparison_ops_create},
       {comparison_ops_f32_descriptor_, comparison_ops_f32_create},
       {comparison_ops_i64_descriptor_, comparison_ops_i64_create},
       {control_flow_ops_descriptor_, control_flow_ops_create},
       {conversion_ops_descriptor_, conversion_ops_create},
+      {conversion_ops_f32_descriptor_, conversion_ops_f32_create},
       {conversion_ops_i64_descriptor_, conversion_ops_i64_create},
       {global_ops_descriptor_, global_ops_create},
+      {global_ops_f32_descriptor_, global_ops_f32_create},
+      {global_ops_i64_descriptor_, global_ops_i64_create},
       {list_ops_descriptor_, list_ops_create},
       {list_variant_ops_descriptor_, list_variant_ops_create},
       {ref_ops_descriptor_, ref_ops_create},
