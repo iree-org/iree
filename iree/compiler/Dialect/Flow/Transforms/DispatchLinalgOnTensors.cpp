@@ -37,22 +37,6 @@
 
 #define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors"
 
-// TODO(ravishankarm): Prune this list. These flags should go away ASAP!!
-
-static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
-    "iree-flow-dispatch-linalg-on-tensors-tile-sizes",
-    llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
-    llvm::cl::CommaSeparated);
-
-// TODO(#5040): This works for the most part but the downstream bufferization
-// needs to be sorted out before this can be made the default. Remove after
-// making this default.
-static llvm::cl::opt<bool> clEnableOperandFusion(
-    "iree-flow-dispatch-formation-enable-operand-fusion",
-    llvm::cl::desc(
-        "Enable fusing operand producers during dispatch region formation"),
-    llvm::cl::init(false));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -105,11 +89,25 @@ struct DispatchLinalgOnTensorsPass
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
                 memref::MemRefDialect, scf::SCFDialect, ShapeDialect>();
   }
-  DispatchLinalgOnTensorsPass() = default;
-  DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
+  DispatchLinalgOnTensorsPass(bool operandFusion = false) {
+    enableOperandFusion = operandFusion;
+  }
+  DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {
+    enableOperandFusion = pass.enableOperandFusion;
+  }
+
   void runOnOperation() override;
 
  private:
+  // TODO(#5040): This works for the most part but the downstream bufferization
+  // needs to be sorted out before this can be made the default. Remove after
+  // making this default.
+  Option<bool> enableOperandFusion{
+      *this, "enable-operand-fusion",
+      llvm::cl::desc(
+          "Enabling fusing operand producers during dispatch region formation"),
+      llvm::cl::init(false)};
+
   Statistic numDispatches{this, "number of dispatches",
                           "Number of Flow dispatches created"};
 };
@@ -1023,7 +1021,8 @@ static unsigned makeElementwiseOpsRootOps(FuncOp funcOp, unsigned numRoots) {
 /// groups. All analysis of what to fuse happens here. For now this is just
 /// hard-wiring from basic heuristic but this could be adapted to have 1) better
 /// heuristics and 2) use a search approach to decide what all should be fused.
-static unsigned decideFusableLinalgOps(FuncOp funcOp) {
+static unsigned decideFusableLinalgOps(FuncOp funcOp,
+                                       bool enableOperandFusion) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp.getContext();
   OpBuilder builder(context);
@@ -1048,7 +1047,7 @@ static unsigned decideFusableLinalgOps(FuncOp funcOp) {
       }
     }
 
-    if (clEnableOperandFusion) {
+    if (enableOperandFusion) {
       // To fuse root operations with their consumers, for all root ops chosen.
       // If, 1) The root op has a single use 2) The consumer is an elementwise
       // operation 3) The indexing map in the producer and consumer are identity
@@ -1092,7 +1091,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   MLIRContext *context = funcOp->getContext();
   context->allowUnregisteredDialects(true);
 
-  unsigned numRoots = decideFusableLinalgOps(funcOp);
+  unsigned numRoots = decideFusableLinalgOps(funcOp, enableOperandFusion);
   makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
@@ -1130,18 +1129,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     // Default to zero to skip tiling.
     auto zero = builder.create<ConstantIndexOp>(op->getLoc(), 0);
     SmallVector<Value, 4> useTileSizes(numParallelDims, zero);
-
-    if (!clLinalgOnTensorsTileSizes.empty()) {
-      SmallVector<int64_t, 2> tileSizes(clLinalgOnTensorsTileSizes.begin(),
-                                        clLinalgOnTensorsTileSizes.end());
-      useTileSizes.resize(std::min<size_t>(tileSizes.size(), numParallelDims));
-      return llvm::to_vector<4>(llvm::map_range(
-          ArrayRef<int64_t>(tileSizes).take_front(
-              std::min<size_t>(tileSizes.size(), numParallelDims)),
-          [&](int64_t t) -> Value {
-            return builder.create<ConstantIndexOp>(op->getLoc(), t);
-          }));
-    }
 
     // For ops with more than 3 parallel dimensions, we want to ignore the
     // higher dimension and tile along last three dimensions.
@@ -1244,8 +1231,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass() {
-  return std::make_unique<DispatchLinalgOnTensorsPass>();
+std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass(
+    bool enableOperandFusion) {
+  return std::make_unique<DispatchLinalgOnTensorsPass>(enableOperandFusion);
 }
 
 }  // namespace Flow

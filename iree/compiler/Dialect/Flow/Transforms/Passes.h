@@ -12,6 +12,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassOptions.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
@@ -23,18 +24,71 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-// Adds a set of passes to the given pass manager that run the required flow
-// transforms in the canonical order.
-//
-// Most translation code should prefer to use this instead of manually adding
-// the passes themselves to ensure that expected pass ordering is observed.
-//
-// The expected usage is:
-//   Input legalization by one of:
-//     - Directly passing supported flow plus core ops
-//   buildFlowTransformPassPipeline
-//   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager);
+/// Options that control flow transformation pipeline.
+struct FlowTransformationPassPipelineOptions
+    : public PassPipelineOptions<FlowTransformationPassPipelineOptions> {
+  Option<bool> demoteF32ToF16{
+      *this, "demote-f32-to-f16",
+      llvm::cl::desc("Convert all f32 ops and values into f16 counterparts "
+                     "unconditionally before main flow conversions"),
+      llvm::cl::init(false)};
+
+  Option<bool> enable1x1ConvToMatmul{
+      *this, "enable-1x1-conv-to-matmul",
+      llvm::cl::desc("Enable converting 1x1 linalg convolution ops to linalg "
+                     "matmul ops pass."),
+      llvm::cl::init(true)};
+
+  Option<bool> enableConvToImg2Col{
+      *this, "enable-conv-img2col-transform",
+      llvm::cl::desc("Enable converting convolution ops to img2col form."),
+      llvm::cl::init(false)};
+
+  Option<bool> enableFusionWithReductionOps{
+      *this, "enable-fusion-with-reduction-ops",
+      llvm::cl::desc("Allow fusing generic ops with reductions"),
+      llvm::cl::init(false)};
+
+  Option<bool> enableOperandFusion{
+      *this, "enable-operand-fusion",
+      llvm::cl::desc(
+          "Enable fusion operand producers during dispatch region formation"),
+      llvm::cl::init(false)};
+
+  Option<bool> enablePaddingLinalgOps{
+      *this, "iree-flow-enable-padding-linalg-ops",
+      llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
+                     "flow-padding-size"),
+      llvm::cl::init(false)};
+
+  Option<bool> exportBenchmarkFuncs{
+      *this, "export-benchmark-funcs",
+      llvm::cl::desc(
+          "Exports one function per original module entry point and "
+          "unique flow.executable that dispatches with dummy arguments."),
+      llvm::cl::init(false)};
+
+  Option<int> linalgOpsPaddingSize{
+      *this, "iree-flow-linalg-ops-padding-size",
+      llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
+                     "flow-padding-size"),
+      llvm::cl::init(4)};
+};
+
+/// Adds a set of passes to the given pass manager that run the required flow
+/// transforms in the canonical order.
+///
+/// Most translation code should prefer to use this instead of manually adding
+/// the passes themselves to ensure that expected pass ordering is observed.
+///
+/// The expected usage is:
+///   Input legalization by one of:
+///     - Directly passing supported flow plus core ops
+///   buildFlowTransformPassPipeline
+///   <run conversion from flow to sequencer/hal/vm/etc>
+void buildFlowTransformPassPipeline(
+    OpPassManager &passManager,
+    const FlowTransformationPassPipelineOptions &options);
 
 void registerFlowTransformPassPipeline();
 
@@ -55,7 +109,8 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertConv2DToImg2ColPass();
 std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass();
 
 /// Creates a pass to fuse Linalg operations on tensors.
-std::unique_ptr<Pass> createFusionOfTensorOpsPass();
+std::unique_ptr<Pass> createFusionOfTensorOpsPass(
+    bool enableFusionWithReductionOps = false);
 
 // Convert operations to equivalent flow.tensor.* ops. This is run after
 // dispatch region creation to catch operations that were left outside of
@@ -81,7 +136,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
 
 /// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
 /// A dispatch region is created for each tiled loop nest.
-std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass();
+std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass(
+    bool enableOperandFusion = false);
 
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();

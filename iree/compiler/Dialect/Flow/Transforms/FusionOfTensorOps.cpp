@@ -19,11 +19,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-static llvm::cl::opt<bool> clEnableFusionWithReductionOps(
-    "iree-enable-fusion-with-reduction-ops",
-    llvm::cl::desc("Allow fusing generic ops with reductions"),
-    llvm::cl::init(false));
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -41,6 +36,13 @@ struct FusionOfTensorOpsPass
     registry.insert<AffineDialect, linalg::LinalgDialect>();
   }
 
+  FusionOfTensorOpsPass(bool fuseWithReduction = false) {
+    enableFusionWithReductionOps = fuseWithReduction;
+  }
+  FusionOfTensorOpsPass(const FusionOfTensorOpsPass &pass) {
+    enableFusionWithReductionOps = pass.enableFusionWithReductionOps;
+  }
+
   void runOnOperation() override {
     OwningRewritePatternList fusionPatterns(&getContext());
     OwningRewritePatternList interfacePatterns(&getContext());
@@ -51,12 +53,12 @@ struct FusionOfTensorOpsPass
     // operations. If an operation is used in a named op, it will be computed
     // anyway, so the consumers can just use that value.
     linalg::ControlElementwiseOpsFusionFn controlFn =
-        [](const OpResult &producer, const OpOperand &consumer) {
+        [&](const OpResult &producer, const OpOperand &consumer) {
           // TODO(GH-5611): Enable fusion with reduction consumer for all
           // targets. Currently vectorization doesn't handle generic ops with
           // reduction iterators we will disable for now to allow vectorizing
           // producer pointwise ops to avoid performance regressions on CPU.
-          if (!clEnableFusionWithReductionOps) {
+          if (!enableFusionWithReductionOps) {
             auto consumerOp = consumer.getOwner();
             if (isa<linalg::GenericOp>(consumerOp) &&
                 dyn_cast<LinalgOp>(consumerOp).getNumReductionLoops()) {
@@ -115,12 +117,19 @@ struct FusionOfTensorOpsPass
     (void)applyPatternsAndFoldGreedily(op->getRegions(),
                                        std::move(pushReshapePatterns));
   }
+
+ private:
+  Option<bool> enableFusionWithReductionOps{
+      *this, "enable-fusion-with-reduction-ops",
+      llvm::cl::desc("Allow fusing generic ops with reductions"),
+      llvm::cl::init(false)};
 };
 
 }  // namespace
 
-std::unique_ptr<Pass> createFusionOfTensorOpsPass() {
-  return std::make_unique<FusionOfTensorOpsPass>();
+std::unique_ptr<Pass> createFusionOfTensorOpsPass(
+    bool enableFusionWithReductionOps) {
+  return std::make_unique<FusionOfTensorOpsPass>(enableFusionWithReductionOps);
 }
 
 }  // namespace Flow

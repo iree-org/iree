@@ -28,7 +28,6 @@ def main() -> None:
         print(f"Generating {module_name} ...")
         subprocess.run(args=[
             IREE_TRANSLATE_PATH, model_benchmark.model_path,
-            "--iree-mlir-to-vm-bytecode-module",
             f"--iree-hal-target-backends={target.hal_target_backend}", "-o",
             module_name
         ] + target.compilation_flags,

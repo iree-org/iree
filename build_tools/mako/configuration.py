@@ -6,6 +6,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 
+def pipeline_options_to_string(pipeline, options=None):
+  if options is not None:
+    options_str = ",".join(options);
+    return f"--{pipeline}={{{options_str}}}";
+  else:
+    return f"--{pipeline}";
+
 class TargetInfo:
   """Information of a target backend.
 
@@ -26,6 +33,7 @@ class TargetInfo:
                hal_target_backend,
                taskset,
                mako_tag,
+               flow_transformation_flags=None,
                compilation_flags=None,
                runtime_flags=None):
     if compilation_flags is None:
@@ -38,7 +46,13 @@ class TargetInfo:
     self.mako_tag = mako_tag
     # This setup is going to be deprecated. Now we only test mhlo inputs for
     # Mako setup, hardcoded would make it eaiser.
-    self.compilation_flags = compilation_flags + ['--iree-input-type=mhlo']
+    self.compilation_flags = \
+      pipeline_options_to_string("iree-flow-transformation-pipeline",
+                                 flow_transformation_flags) + \
+                                 ["--iree-hal-transformation-pipeline"] + \
+                                 ["--iree-vm-transformation-pipeline"] + \
+                                 compilation_flags + \
+                                 ['--iree-input-type=mhlo']
     self.runtime_flags = runtime_flags
 
   def add_batch_flag(self, size):
@@ -131,11 +145,13 @@ def get_pixel4_default_target_list(skipped_target=None,
                  hal_target_backend="vulkan-spirv",
                  taskset="80",
                  mako_tag="vlk",
+                 flow_transformation_flags=[
+                     "enable-operand-fusion",
+                     "enable-fusion-with-reduction-ops"
+                 ],
                  compilation_flags=[
                      "--iree-vulkan-target-triple=adreno-a640-android11",
                      "--iree-flow-inline-constants-max-byte-length=2048",
-                     "--iree-flow-dispatch-formation-enable-operand-fusion",
-                     "--iree-enable-fusion-with-reduction-ops",
                  ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -191,11 +207,11 @@ def get_s20_default_target_list(skipped_target=None,
           hal_target_backend="vulkan-spirv",
           taskset="80",
           mako_tag="vlk",
+          flow_transformation_flags=["enable-operand-fusion"],
           compilation_flags=[
               "--iree-vulkan-target-triple=valhall-g77-android11",
               # TODO(GH-5330): Revisit the number or delete the flag.
               "--iree-flow-inline-constants-max-byte-length=16",
-              "--iree-flow-dispatch-formation-enable-operand-fusion"
           ])
   ]
   targets = [elem for elem in targets if elem.mako_tag not in skipped_target]
@@ -240,15 +256,15 @@ MODEL_BENCHMARKS = [
                 benchmark_key="6338759231537152",
                 targets=get_pixel4_default_target_list(
                     skipped_target=["vlk2"],
+                    # TODO(GH-5857): Enable this after fixing segfault.
+                    # flow_transformation_flags=[
+                    #     "enable-operand-fusion",
+                    # ],
                     compilation_flags={
                         'cpu': [
-                            # TODO(GH-5857): Enable this after fixing segfault.
-                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ],
                         'cpu3t': [
-                            # TODO(GH-5857): Enable this after fixing segfault.
-                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ]
                     })),
@@ -256,15 +272,15 @@ MODEL_BENCHMARKS = [
                 name="S20",
                 benchmark_key="5618403088793600",
                 targets=get_s20_default_target_list(
+                    # TODO(GH-5857): Enable this after fixing segfault.
+                    # flow_transformation_flags=[
+                    #     "enable-operand-fusion",
+                    # ],
                     compilation_flags={
                         'cpu': [
-                            # TODO(GH-5857): Enable this after fixing segfault.
-                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ],
                         'cpu3t': [
-                            # TODO(GH-5857): Enable this after fixing segfault.
-                            #"--iree-flow-dispatch-formation-enable-operand-fusion",
                             "-iree-llvm-loop-unrolling=true"
                         ]
                     })),

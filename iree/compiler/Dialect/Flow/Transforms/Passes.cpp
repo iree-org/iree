@@ -15,56 +15,20 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-// TODO(ravishankarm): Change to a pipeline option.
-static llvm::cl::opt<bool> clExportBenchmarkFuncs(
-    "iree-flow-export-benchmark-funcs",
-    llvm::cl::desc(
-        "Exports one function per original module entry point and "
-        "unique flow.executable that dispatches with dummy arguments."),
-    llvm::cl::init(false));
-
-// TODO(ravishankarm): Change to a pipeline option.
 static llvm::cl::opt<bool> clTraceDispatchTensors(
-    "iree-flow-trace-dispatch-tensors2",
+    "iree-flow-trace-dispatch-tensors",
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clDemoteF32ToF16(
-    "iree-flow-demote-f32-to-f16",
-    llvm::cl::desc("Convert all f32 ops and values into f16 counterparts "
-                   "unconditionally before main flow conversions"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
-    "iree-flow-enable-1x1-conv-to-matmul",
-    llvm::cl::desc("Enable converting 1x1 linalg convolution ops to linalg "
-                   "matmul ops pass."),
-    llvm::cl::init(true));
-
-static llvm::cl::opt<bool> clEnableConvToImg2Col(
-    "iree-flow-enable-conv-img2col-transform",
-    llvm::cl::desc("Enable converting convolution ops to img2col form."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
-    "iree-flow-enable-padding-linalg-ops",
-    llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
-                   "flow-padding-size"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<int> clLinalgOpsPaddingSize(
-    "iree-flow-linalg-ops-padding-size",
-    llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
-                   "flow-padding-size"),
-    llvm::cl::init(4));
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+void buildFlowTransformPassPipeline(
+    OpPassManager &passManager,
+    const FlowTransformationPassPipelineOptions &options) {
   // Perform initial cleanup.
   // NOTE: There is no principled reason to be doing this here. But also ensures
   // some consistency at the tool boundary.
@@ -88,16 +52,16 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       Shape::createExpandFunctionDynamicDimsPass());
 
   // Special case peephole optimizations.
-  if (clEnable1x1ConvToMatmul) {
+  if (options.enable1x1ConvToMatmul) {
     passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
   }
-  if (clEnableConvToImg2Col) {
+  if (options.enableConvToImg2Col) {
     passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
   }
   // Pad linalg op
-  if (clEnablePaddingLinalgOps) {
+  if (options.enablePaddingLinalgOps) {
     passManager.addNestedPass<FuncOp>(
-        createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
+        createPadLinalgOpsToIntegerMultiplePass(options.linalgOpsPaddingSize));
   }
   passManager.addPass(createPadTensorToSubTensorInsertPass());
 
@@ -106,13 +70,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       mlir::createConvertElementwiseToLinalgPass());
   passManager.addNestedPass<FuncOp>(mlir::createLinalgFoldUnitExtentDimsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
+  passManager.addNestedPass<FuncOp>(
+      createFusionOfTensorOpsPass(options.enableFusionWithReductionOps));
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createConvertToFlowTensorOpsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createDispatchLinalgOnTensorsPass());
+      IREE::Flow::createDispatchLinalgOnTensorsPass(
+          options.enableOperandFusion));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   // NOTE: required because the current dispatch-linalg-on-tensors pass
   // creates a lot of dead IR that needs to be cleaned up.
@@ -139,7 +105,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as
   // exporting all original model entry points.
-  if (clExportBenchmarkFuncs) {
+  if (options.exportBenchmarkFuncs) {
     passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
   }
 
@@ -185,12 +151,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 }
 
 void registerFlowTransformPassPipeline() {
-  PassPipelineRegistration<> transformPassPipeline(
-      "iree-flow-transformation-pipeline",
-      "Runs the full IREE flow dialect transformation pipeline",
-      [](OpPassManager &passManager) {
-        buildFlowTransformPassPipeline(passManager);
-      });
+  PassPipelineRegistration<FlowTransformationPassPipelineOptions>
+      transformPassPipeline(
+          "iree-flow-transformation-pipeline",
+          "Runs the full IREE flow dialect transformation pipeline",
+          [](OpPassManager &passManager,
+             const FlowTransformationPassPipelineOptions &options) {
+            buildFlowTransformPassPipeline(passManager, options);
+          });
 }
 
 namespace {
