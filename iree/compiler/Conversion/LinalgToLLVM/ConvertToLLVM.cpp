@@ -103,7 +103,7 @@ class HALDispatchABI {
 
     // TODO(benvanik): import_thunk/import and a callImport() helper function.
 
-    LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
+    LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/true);
     assert(succeeded(bodySet) &&
            "could not set the body of an identified struct");
     (void)bodySet;

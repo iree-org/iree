@@ -4,7 +4,7 @@
 func @binding_ptrs() {
   // CHECK-DAG: %[[C72:.+]] = llvm.mlir.constant(72 : index) : i64
   %c72 = constant 72 : index
-  // CHECK: %[[STATE:.+]] =  llvm.load %arg0 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>
+  // CHECK: %[[STATE:.+]] =  llvm.load %arg0 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", packed (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>
   // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE]][5]
   // CHECK: %[[C1:.+]] = llvm.mlir.constant(1 : index) : i64
   // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][%[[C1]]] : (!llvm.ptr<ptr<i8>>, i64) -> !llvm.ptr<ptr<i8>>
