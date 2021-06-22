@@ -217,7 +217,7 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
                                      filledStaticResult.result()});
       SmallVector<OpFoldResult> offsets(2, rewriter.getI64IntegerAttr(0));
       SmallVector<OpFoldResult> strides(2, rewriter.getI64IntegerAttr(1));
-      rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+      rewriter.replaceOpWithNewOp<SubTensorOp>(
           matmulOp, paddedMatmulOp->getResults()[0], offsets, sizes, strides);
     }
     return success();

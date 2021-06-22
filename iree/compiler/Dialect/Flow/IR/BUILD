@@ -86,7 +86,6 @@ gentbl_cc_library(
         "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
-        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
         "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
     ],
 )
@@ -111,7 +110,6 @@ gentbl_cc_library(
         "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
-        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
         "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
     ],
 )
@@ -137,7 +135,6 @@ gentbl_cc_library(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
-        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
         "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
     ],
 )
@@ -159,7 +156,6 @@ iree_tablegen_doc(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
-        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
         "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
     ],
 )

@@ -20,7 +20,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -57,15 +56,14 @@ struct SpecialTerminatorOpCapture {
 // TODO(nicolasvasilache): Use some interface instead of op names directly.
 static bool hasDestructiveUpdateSubTensorUses(
     Value v, SpecialTerminatorOpCapture &capture) {
-  SmallVector<tensor::ExtractSliceOp, 4> reads;
-  SmallVector<tensor::InsertSliceOp, 4> writes;
+  SmallVector<SubTensorOp, 4> reads;
+  SmallVector<SubTensorInsertOp, 4> writes;
   for (auto &u : v.getUses()) {
-    if (auto subTensorOp = dyn_cast<tensor::ExtractSliceOp>(u.getOwner())) {
+    if (auto subTensorOp = dyn_cast<SubTensorOp>(u.getOwner())) {
       reads.push_back(subTensorOp);
       continue;
     }
-    if (auto subTensorInsertOp =
-            dyn_cast<tensor::InsertSliceOp>(u.getOwner())) {
+    if (auto subTensorInsertOp = dyn_cast<SubTensorInsertOp>(u.getOwner())) {
       writes.push_back(subTensorInsertOp);
       continue;
     }
@@ -197,8 +195,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
 
 /// Convert `subtensor %t [offsets][sizes][strides] -> %st` to a
 /// flow.dispatch.tensor.load.
-static LogicalResult propagateSubTensorOp(OpBuilder &b,
-                                          tensor::ExtractSliceOp op) {
+static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   auto loadOp = op.source().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
@@ -227,7 +224,7 @@ static LogicalResult propagateSubTensorOp(OpBuilder &b,
 }
 
 static LogicalResult rewriteSubTensorInsertInPlace(OpBuilder &b,
-                                                   tensor::InsertSliceOp op,
+                                                   SubTensorInsertOp op,
                                                    Value target) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteSubTensorInsertInPlace: "
                           << *(op.getOperation()) << "\n");
@@ -377,14 +374,12 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
 
   // Try to rewrite inplace.
   if (failed(rewriteSubTensorInsertInPlace(
-          b, cast<tensor::InsertSliceOp>(capture.rootDestructiveUpdate),
-          target))) {
+          b, cast<SubTensorInsertOp>(capture.rootDestructiveUpdate), target))) {
     return failure();
   }
 
   if (scf::ForOp loopOp = dyn_cast<scf::ForOp>(outermostProducingOp))
-    loopOp.walk(
-        [&](tensor::ExtractSliceOp op) { (void)propagateSubTensorOp(b, op); });
+    loopOp.walk([&](SubTensorOp op) { (void)propagateSubTensorOp(b, op); });
 
   return success();
 }
@@ -425,7 +420,7 @@ LogicalResult rewriteLinalgDestructiveUpdates(
                     capture.initValue = op.value();
                     Value sourceValue =
                         isADestructiveUpdatePattern(capture.initValue, capture);
-                    if (!sourceValue || !isa_and_nonnull<tensor::InsertSliceOp>(
+                    if (!sourceValue || !isa_and_nonnull<SubTensorInsertOp>(
                                             capture.rootDestructiveUpdate))
                       return WalkResult::advance();
                     if (failed(rewriteDestructiveUpdateInPlace(b, capture,

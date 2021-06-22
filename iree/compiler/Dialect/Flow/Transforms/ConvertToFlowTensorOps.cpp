@@ -12,7 +12,6 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -161,10 +160,10 @@ struct LinalgTensorReshapeToFlowTensorReshape
 
 /// Convert subtensor insert operation flow.tensor.update where possible.
 struct SubTensorInsertToTensorUpdate
-    : public OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+    : public OpRewritePattern<SubTensorInsertOp> {
+  using OpRewritePattern<SubTensorInsertOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
+  LogicalResult matchAndRewrite(SubTensorInsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
     if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
@@ -204,27 +203,26 @@ struct SubTensorInsertToTensorUpdate
 };
 
 /// Convert subtensor operation to flow.tensor.slice where possible.
-struct SubTensorToTensorSlice
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+struct SubTensorToTensorSlice : public OpRewritePattern<SubTensorOp> {
+  using OpRewritePattern<SubTensorOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+  LogicalResult matchAndRewrite(SubTensorOp subTensorOp,
                                 PatternRewriter &rewriter) const override {
-    if (sliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (subTensorOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
-    SmallVector<OpFoldResult, 4> offsets = sliceOp.getMixedOffsets();
-    SmallVector<OpFoldResult, 4> sizes = sliceOp.getMixedSizes();
-    SmallVector<OpFoldResult, 4> strides = sliceOp.getMixedStrides();
-    ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
+    SmallVector<OpFoldResult, 4> offsets = subTensorOp.getMixedOffsets();
+    SmallVector<OpFoldResult, 4> sizes = subTensorOp.getMixedSizes();
+    SmallVector<OpFoldResult, 4> strides = subTensorOp.getMixedStrides();
+    ArrayRef<int64_t> srcShape = subTensorOp.getSourceType().getShape();
     if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
                                              srcShape)) {
       return failure();
     }
-    Location loc = sliceOp.getLoc();
+    Location loc = subTensorOp.getLoc();
 
-    ShapedType sourceType = sliceOp.getSourceType();
-    ShapedType resultType = sliceOp.getType();
+    ShapedType sourceType = subTensorOp.getSourceType();
+    ShapedType resultType = subTensorOp.getType();
 
     // Handle rank reduced version.
     if (resultType.getRank() < sourceType.getRank()) {
@@ -237,17 +235,17 @@ struct SubTensorToTensorSlice
     auto offsetVals = getAsValues(rewriter, loc, offsets);
     auto sizeVals = getAsValues(rewriter, loc, sizes);
     auto sourceDynamicDims =
-        getDynamicDimValues(rewriter, loc, sliceOp.source());
+        getDynamicDimValues(rewriter, loc, subTensorOp.source());
     auto resultDynamicDims = getDynamicValues(sizes);
     Value replacement = rewriter.create<TensorSliceOp>(
-        loc, resultType, sliceOp.source(), sourceDynamicDims, offsetVals,
+        loc, resultType, subTensorOp.source(), sourceDynamicDims, offsetVals,
         sizeVals, resultDynamicDims);
-    if (resultType.getRank() > sliceOp.getType().getRank()) {
+    if (resultType.getRank() > subTensorOp.getType().getRank()) {
       replacement = rewriter.create<IREE::Flow::TensorReshapeOp>(
-          loc, sliceOp.getType(), replacement, resultDynamicDims,
+          loc, subTensorOp.getType(), replacement, resultDynamicDims,
           resultDynamicDims);
     }
-    rewriter.replaceOp(sliceOp, replacement);
+    rewriter.replaceOp(subTensorOp, replacement);
     return success();
   }
 };

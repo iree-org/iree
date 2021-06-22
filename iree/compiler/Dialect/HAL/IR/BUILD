@@ -132,7 +132,6 @@ gentbl_cc_library(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
-        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],
 )
 
@@ -157,7 +156,6 @@ gentbl_cc_library(
         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
-        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],
 )
 
@@ -220,7 +218,6 @@ iree_tablegen_doc(
         "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:StdOpsTdFiles",
-        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],
 )
 

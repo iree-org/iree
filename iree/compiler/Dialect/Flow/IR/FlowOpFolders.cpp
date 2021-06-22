@@ -446,7 +446,7 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
         loadOp.strides().empty()) {
       return failure();
     }
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+    rewriter.replaceOpWithNewOp<SubTensorOp>(
         loadOp, loadOp.source(), loadOp.getMixedOffsets(),
         loadOp.getMixedSizes(), loadOp.getMixedStrides());
     return success();

@@ -483,7 +483,7 @@ func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 225, 225, 3] : tensor<1x225x225x3xf32>
   %1 = linalg.fill(%0, %cst) : tensor<1x225x225x3xf32>, f32 -> tensor<1x225x225x3xf32>
-  %2 = tensor.insert_slice %arg0 into %1[0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1] : tensor<1x224x224x3xf32> into tensor<1x225x225x3xf32>
+  %2 = subtensor_insert %arg0 into %1[0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1] : tensor<1x224x224x3xf32> into tensor<1x225x225x3xf32>
   return %2 : tensor<1x225x225x3xf32>
 }
 
@@ -501,7 +501,7 @@ func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32
 // CHECK-NEXT:       (%[[SRC:.+]]: !flow.dispatch.tensor<readonly:1x224x224x3xf32>, %[[DST:.+]]: !flow.dispatch.tensor<readwrite:1x225x225x3xf32>) {
 // CHECK-NEXT:     %[[SRC_TENSOR:.+]] = flow.dispatch.tensor.load %[[SRC]], {{.*}} : !flow.dispatch.tensor<readonly:1x224x224x3xf32> -> tensor<1x224x224x3xf32>
 // CHECK-NEXT:     %[[DST_TENSOR:.+]] = flow.dispatch.tensor.load %[[DST]], {{.*}} : !flow.dispatch.tensor<readwrite:1x225x225x3xf32> -> tensor<1x225x225x3xf32>
-// CHECK-NEXT:     %[[INSERT:.+]] = tensor.insert_slice %[[SRC_TENSOR]] into %[[DST_TENSOR]][0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1]
+// CHECK-NEXT:     %[[INSERT:.+]] = subtensor_insert %[[SRC_TENSOR]] into %[[DST_TENSOR]][0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1]
 // CHECK-NEXT:     flow.dispatch.tensor.store %[[INSERT]], %[[DST]], {{.*}} : tensor<1x225x225x3xf32> -> !flow.dispatch.tensor<readwrite:1x225x225x3xf32>
 // CHECK-NEXT:     flow.return
 //
@@ -553,12 +553,12 @@ func @inline_dag_1(
     %arg0: tensor<?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
     %arg3 : index) -> tensor<?xf32> {
   %0 = linalg.tensor_expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
-  %1 = tensor.extract_slice %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
+  %1 = subtensor %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
   %2 = linalg.tensor_collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %3 = linalg.tensor_collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  %4 = tensor.extract_slice %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
+  %4 = subtensor %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
   %5 = linalg.tensor_collapse_shape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  %6 = tensor.extract_slice %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
+  %6 = subtensor %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
   %7 = linalg.tensor_collapse_shape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %8 = linalg.init_tensor [%arg3] : tensor<?xf32>
   %9 = linalg.generic {
@@ -579,7 +579,7 @@ func @inline_dag_1(
 }
 // CHECK-LABEL: func @inline_dag_1
 //   CHECK-NOT:   linalg.
-//   CHECK-NOT:   tensor.extract_slice
+//   CHECK-NOT:   subtensor
 //       CHECK:   flow.dispatch.workgroups
 //  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
 //  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
@@ -591,9 +591,9 @@ func @inline_dag_1(
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
 //       CHECK:     %[[OP1:.+]] = linalg.tensor_expand_shape %[[LEAF2]]
 //       CHECK:     %[[OP2:.+]] = linalg.tensor_collapse_shape %[[LEAF1]]
-//       CHECK:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
-//       CHECK:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
-//       CHECK:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
+//       CHECK:     %[[OP3:.+]] = subtensor %[[OP1]][0, 0]
+//       CHECK:     %[[OP4:.+]] = subtensor %[[OP1]][0, 10]
+//       CHECK:     %[[OP5:.+]] = subtensor %[[OP1]][0, 20]
 //       CHECK:     %[[OP6:.+]] = linalg.tensor_collapse_shape %[[OP3]]
 //       CHECK:     %[[OP7:.+]] = linalg.tensor_collapse_shape %[[OP4]]
 //       CHECK:     %[[OP8:.+]] = linalg.tensor_collapse_shape %[[OP5]]
@@ -606,14 +606,14 @@ func @inline_dag_2(
     %arg0: tensor<?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
     %arg3 : index) -> tensor<?xf32> {
   %0 = linalg.tensor_expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
-  %1 = tensor.extract_slice %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
+  %1 = subtensor %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
   %2 = linalg.tensor_collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   br ^bb1
 ^bb1:
   %3 = linalg.tensor_collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  %4 = tensor.extract_slice %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
+  %4 = subtensor %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
   %5 = linalg.tensor_collapse_shape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  %6 = tensor.extract_slice %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
+  %6 = subtensor %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
   %7 = linalg.tensor_collapse_shape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %8 = linalg.init_tensor [%arg3] : tensor<?xf32>
   %9 = linalg.generic {
@@ -646,9 +646,9 @@ func @inline_dag_2(
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
 //       CHECK:     %[[OP1:.+]] = linalg.tensor_expand_shape %[[LEAF2]]
 //       CHECK:     %[[OP2:.+]] = linalg.tensor_collapse_shape %[[LEAF1]]
-//       CHECK:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
-//       CHECK:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
-//       CHECK:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
+//       CHECK:     %[[OP3:.+]] = subtensor %[[OP1]][0, 0]
+//       CHECK:     %[[OP4:.+]] = subtensor %[[OP1]][0, 10]
+//       CHECK:     %[[OP5:.+]] = subtensor %[[OP1]][0, 20]
 //       CHECK:     %[[OP6:.+]] = linalg.tensor_collapse_shape %[[OP3]]
 //       CHECK:     %[[OP7:.+]] = linalg.tensor_collapse_shape %[[OP4]]
 //       CHECK:     %[[OP8:.+]] = linalg.tensor_collapse_shape %[[OP5]]
@@ -667,7 +667,7 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
   %251 = cmpi sgt, %250, %c0_i32 : i32
   %252 = select %251, %250, %c0_i32 : i32
   %253 = index_cast %252 : i32 to index
-  %254 = tensor.extract_slice %245[%253] [9] [1] : tensor<18xi32> to tensor<9xi32>
+  %254 = subtensor %245[%253] [9] [1] : tensor<18xi32> to tensor<9xi32>
   %255 = linalg.init_tensor [9] : tensor<9xi1>
   %256 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
@@ -699,7 +699,7 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
 //   CHECK-DAG:     %[[CMP2:.+]] = cmpi sgt, %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[SELECT2:.+]] = select %[[CMP2]], %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[INDEX_CAST:.+]] = index_cast %[[SELECT2]]
-//   CHECK-DAG:     tensor.extract_slice %[[ARG3V]][%[[INDEX_CAST]]]
+//   CHECK-DAG:     subtensor %[[ARG3V]][%[[INDEX_CAST]]]
 //       CHECK:     flow.return
 
 // -----
@@ -714,7 +714,7 @@ func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16> {
   %3 = cmpi sgt, %2, %c0_i32 : i32
   %4 = select %3, %2, %c0_i32 : i32
   %5 = index_cast %4 : i32 to index
-  %6 = tensor.extract_slice %arg0[%5] [1] [1] : tensor<4xi32> to tensor<i32>
+  %6 = subtensor %arg0[%5] [1] [1] : tensor<4xi32> to tensor<i32>
   br ^bb1
 ^bb1:  // pred: ^bb0
   %7 = linalg.init_tensor [] : tensor<i16>
@@ -744,7 +744,7 @@ func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16> {
 //       CHECK:     %[[OP4:.+]] = cmpi sgt, %[[OP3]], %[[C0]] : i32
 //       CHECK:     %[[OP5:.+]] = select %[[OP4]], %[[OP3]], %[[C0]] : i32
 //       CHECK:     %[[OP6:.+]] = index_cast %[[OP5]] : i32 to index
-//       CHECK:     %[[OP7:.+]] = tensor.extract_slice %[[LEAF1]][%[[OP6]]] [1] [1] : tensor<4xi32> to tensor<i32>
+//       CHECK:     %[[OP7:.+]] = subtensor %[[LEAF1]][%[[OP6]]] [1] [1] : tensor<4xi32> to tensor<i32>
 //       CHECK:     %[[RES:.+]] = linalg.generi
 //  CHECK-SAME:       ins(%[[OP7]] : tensor<i32>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<i16>) {
@@ -842,7 +842,7 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
   %9 = cmpi sgt, %8, %c0_i32 : i32
   %10 = select %9, %8, %c0_i32 : i32
   %11 = index_cast %10 : i32 to index
-  %12 = tensor.extract_slice %arg0[%5, %11] [1, %arg3] [1, 1] : tensor<?x?xi32> to tensor<1x?xi32>
+  %12 = subtensor %arg0[%5, %11] [1, %arg3] [1, 1] : tensor<?x?xi32> to tensor<1x?xi32>
   return %12 : tensor<1x?xi32>
 }
 // CHECK-LABEL: func @dynamic_slice(
@@ -864,7 +864,7 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
 //   CHECK-DAG:     select
 //   CHECK-DAG:     index_cast
 //   CHECK-DAG:     index_cast
-//       CHECK:     tensor.extract_slice
+//       CHECK:     subtensor
 //       CHECK:     flow.return
 //       CHECK:   return %[[RESULT]]
 
