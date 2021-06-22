@@ -14,6 +14,8 @@ vm.module @constant_ops {
   // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[2];
   // CHECK-NEXT: };
 
+  // We mark the rodata ops public in this test to explicitly prevent DCE from
+  // deleting them.
   vm.rodata public @buffer_1 dense<[1, 2, 3]> : tensor<3xi8>
   vm.rodata public @buffer_2 dense<[1, 2, 3]> : tensor<3xi32>
 
