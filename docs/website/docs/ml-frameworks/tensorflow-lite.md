@@ -1,20 +1,20 @@
 # TensorFlow Lite Integration
 
 IREE supports compiling and running pre-trained TensorFlow Lite (TFLite)
-models.  It converts a model to [TOSA MLIR](https://mlir.llvm.org/docs/Dialects/
-TOSA/), then compiles it into a VM module.
+models.  It converts a model to
+[TOSA MLIR](https://mlir.llvm.org/docs/Dialects/TOSA/), then compiles it into a
+VM module.
 
 ## Prerequisites
 
-Download a pre-trained TFLite model from the list of [hosted models](
-https://www.tensorflow.org/lite/guide/hosted_models), or use the [TensorFlow
-Lite converter](https://www.tensorflow.org/lite/convert) to convert a
-TensorFlow model to a .tflite flatbuffer.
+Download a pre-trained TFLite model from the list of
+[hosted models](https://www.tensorflow.org/lite/guide/hosted_models), or use the
+[TensorFlow Lite converter](https://www.tensorflow.org/lite/convert) to convert
+a TensorFlow model to a .tflite flatbuffer.
 
 
 Install IREE pip packages, either from pip or by
-[building from source](../building-from-source/
-optional-features.md#building-python-bindings):
+[building from source](../building-from-source/optional-features.md#building-python-bindings):
 
 ```shell
 python -m pip install \
@@ -72,14 +72,15 @@ The flatbuffer can then be loaded to a VM module and run through IREE's runtime.
 | -- | -- |
 Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb)
 
-An example smoke test of the [TensorFlow Lite C API](https://github.com/google/
-iree/tree/main/bindings/tflite) is available [here](https://github.com/google/
-iree/blob/main/bindings/tflite/smoke_test.cc).
+An example smoke test of the
+[TensorFlow Lite C API](https://github.com/google/iree/tree/main/bindings/tflite)
+is available
+[here](https://github.com/google/iree/blob/main/bindings/tflite/smoke_test.cc).
 
 !!! todo
 
     [Issue#3954](https://github.com/google/iree/issues/3954): Add documentation
-    for an Android demo using the [Java TFLite bindings](https://github.com/
-    google/iree/tree/main/bindings/tflite/java), once it is complete at
-    [not-jenni/iree-android-tflite-demo](https://github.com/not-jenni/
-    iree-android-tflite-demo).
+    for an Android demo using the
+    [Java TFLite bindings](https://github.com/google/iree/tree/main/bindings/tflite/java),
+    once it is complete at
+    [not-jenni/iree-android-tflite-demo](https://github.com/not-jenni/iree-android-tflite-demo).
