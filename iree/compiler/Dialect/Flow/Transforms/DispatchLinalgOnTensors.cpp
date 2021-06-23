@@ -20,6 +20,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -253,7 +254,7 @@ static bool isDispatchableOp(Operation *op) {
   // Linalg ops are marked dispatchable.
   if ((op->getDialect() !=
        op->getContext()->getLoadedDialect<linalg::LinalgDialect>()) &&
-      !isa<SubTensorOp, SubTensorInsertOp>(op)) {
+      !isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(op)) {
     return false;
   }
   return !isAlwaysClonedIntoDispatchOp(op);
@@ -261,8 +262,8 @@ static bool isDispatchableOp(Operation *op) {
 
 static bool isAlwaysFusedIntoDispatchOp(Operation *op) {
   return isDispatchableOp(op) &&
-         (isa<linalg::TensorCollapseShapeOp, SubTensorOp>(op) ||
-          isa<linalg::TensorExpandShapeOp, SubTensorOp>(op));
+         (isa<linalg::TensorCollapseShapeOp, tensor::ExtractSliceOp>(op) ||
+          isa<linalg::TensorExpandShapeOp, tensor::ExtractSliceOp>(op));
 }
 
 //===----------------------------------------------------------------------===//
@@ -535,7 +536,7 @@ static void tryToTieOperandsAndResults(
 
     // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
     // when it's available in MLIR core in some form.
-    if (auto insertOp = dyn_cast_or_null<SubTensorInsertOp>(tieOp)) {
+    if (auto insertOp = dyn_cast_or_null<tensor::InsertSliceOp>(tieOp)) {
       auto loadOp =
           insertOp.dest().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
       if (!loadOp) return nullptr;
@@ -1224,7 +1225,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     // to guarantee type match during transformation. Later in destructive
     // update subtensor_insert ops will be turned into flow dispatch output
     // store ops.
-    SubTensorInsertOp::getCanonicalizationPatterns(patterns, context);
+    tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 

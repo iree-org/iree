@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -89,7 +90,7 @@ struct PadTensorOpConversion : public OpRewritePattern<linalg::PadTensorOp> {
     Value fill =
         rewriter.create<linalg::FillOp>(loc, initTensor, yieldVal).getResult(0);
     SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
-    rewriter.replaceOpWithNewOp<SubTensorInsertOp>(
+    rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
         padTensorOp, source, fill, lowPad, sourceShape, strides);
     return success();
   }
@@ -98,7 +99,8 @@ struct PadTensorOpConversion : public OpRewritePattern<linalg::PadTensorOp> {
 struct PadTensorToSubTensorInsertPass
     : public PadTensorToSubTensorInsertBase<PadTensorToSubTensorInsertPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, StandardOpsDialect>();
+    registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
+                    StandardOpsDialect>();
   }
 
   void runOnOperation() override {

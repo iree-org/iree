@@ -14,7 +14,7 @@ func @matmul_f32_11x13x17(%lhs: tensor<11x17xf32>, %rhs: tensor<17x13xf32>, %ini
 //       CHECK:      %[[PADDED_RESULT:.+]] = linalg.matmul
 //  CHECK-SAME:         ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<12x20xf32>, tensor<20x16xf32>)
 //  CHECK-SAME:         outs(%[[PADDED_DST]] : tensor<12x16xf32>)
-//       CHECK:      %[[RESULT:.+]] = subtensor %[[PADDED_RESULT]][0, 0] [11, 13] [1, 1] : tensor<12x16xf32> to tensor<11x13xf32>
+//       CHECK:      %[[RESULT:.+]] = tensor.extract_slice %[[PADDED_RESULT]][0, 0] [11, 13] [1, 1] : tensor<12x16xf32> to tensor<11x13xf32>
 //       CHECK:      return %[[RESULT]] : tensor<11x13xf32>
 
 // -----

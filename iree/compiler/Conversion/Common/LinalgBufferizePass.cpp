@@ -53,6 +53,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -195,8 +196,8 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
       .Case<ConstantOp>([&](ConstantOp constantOp) { return true; })
       .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
           [&](auto op) { return isFromReadOnlyTensor(op.src(), plan); })
-      .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
-        return isFromReadOnlyTensor(subTensorOp.source(), plan);
+      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
+        return isFromReadOnlyTensor(sliceOp.source(), plan);
       })
       .Case<IREE::Flow::DispatchTensorLoadOp>(
           [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
@@ -425,7 +426,7 @@ static LogicalResult analyseSingleOperandResultOp(Value source, Value result,
   return success();
 }
 
-static LogicalResult analyseSubTensorOp(SubTensorOp subTensorOp,
+static LogicalResult analyseSubTensorOp(tensor::ExtractSliceOp subTensorOp,
                                         BufferizationPlan &plan) {
   if (!canUsersHandleSubviews(subTensorOp)) {
     plan.insert(subTensorOp.source());
@@ -505,7 +506,7 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
 ///   %result = scf.for %arg0 = ... iter_args(%arg1 = %init) {
 ///     %st = subtensor %arg1[...]
 ///
-///     %yieldVal = subtensor_insert %val, %arg1[...]
+///     %yieldVal = tensor.insert_slice %val, %arg1[...]
 ///     scf.yield %yieldVal
 ///   }
 ///
@@ -520,27 +521,29 @@ static LogicalResult hasDestructiveUpdateLoopPattern(scf::ForOp forOp,
     auto isDestructiveUpdateUses = [&](OpOperand &use) -> bool {
       Operation *user = use.getOwner();
       return TypeSwitch<Operation *, bool>(user)
-          .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
-            return subTensorOp.source() == arg;
+          .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
+            return sliceOp.source() == arg;
           })
-          .Case<SubTensorInsertOp>([&](SubTensorInsertOp subTensorInsertOp) {
-            return subTensorInsertOp.dest() == arg;
-          })
+          .Case<tensor::InsertSliceOp>(
+              [&](tensor::InsertSliceOp subTensorInsertOp) {
+                return subTensorInsertOp.dest() == arg;
+              })
           .Case<memref::DimOp, scf::YieldOp>([&](auto op) { return true; })
           .Default([&](Operation *op) { return false; });
     };
     if (llvm::all_of(arg.getUses(), isDestructiveUpdateUses)) {
       for (Operation *user : arg.getUsers()) {
         TypeSwitch<Operation *>(user)
-            .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
-              plan.unionSets(subTensorOp.source(), subTensorOp.result());
+            .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
+              plan.unionSets(sliceOp.source(), sliceOp.result());
             })
-            .Case<SubTensorInsertOp>([&](SubTensorInsertOp subTensorInsertOp) {
-              if (!isFromReadOnlyTensor(subTensorInsertOp.source(), plan)) {
-                plan.unionSets(subTensorInsertOp.source(),
-                               subTensorInsertOp.dest());
-              }
-            })
+            .Case<tensor::InsertSliceOp>(
+                [&](tensor::InsertSliceOp subTensorInsertOp) {
+                  if (!isFromReadOnlyTensor(subTensorInsertOp.source(), plan)) {
+                    plan.unionSets(subTensorInsertOp.source(),
+                                   subTensorInsertOp.dest());
+                  }
+                })
             .Default([&](Operation *) {});
       }
     }
@@ -582,14 +585,15 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
               return analyseSingleOperandResultOp(reshapeOp.src(),
                                                   reshapeOp.result(), plan);
             })
-        .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
-          return analyseSubTensorOp(subTensorOp, plan);
+        .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
+          return analyseSubTensorOp(sliceOp, plan);
         })
-        .Case<SubTensorInsertOp>([&](SubTensorInsertOp subTensorInsertOp) {
-          return analyseDestructiveUpdateOp(
-              subTensorInsertOp, subTensorInsertOp.source(),
-              subTensorInsertOp.dest(), subTensorInsertOp.result(), plan);
-        })
+        .Case<tensor::InsertSliceOp>(
+            [&](tensor::InsertSliceOp subTensorInsertOp) {
+              return analyseDestructiveUpdateOp(
+                  subTensorInsertOp, subTensorInsertOp.source(),
+                  subTensorInsertOp.dest(), subTensorInsertOp.result(), plan);
+            })
         .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
           return analyseSingleOperandResultOp(castOp.source(), castOp.dest(),
                                               plan);
@@ -681,9 +685,9 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
     }
   } else if (auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(op)) {
     dynamicDims = llvm::to_vector<4>(loadOp.sizes());
-  } else if (auto subTensorOp = dyn_cast<SubTensorOp>(op)) {
-    dynamicDims = llvm::to_vector<4>(subTensorOp.sizes());
-  } else if (auto subTensorInsertOp = dyn_cast<SubTensorInsertOp>(op)) {
+  } else if (auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
+    dynamicDims = llvm::to_vector<4>(sliceOp.sizes());
+  } else if (auto subTensorInsertOp = dyn_cast<tensor::InsertSliceOp>(op)) {
     dynamicDims = getDynamicDims(b, loc, subTensorInsertOp.dest());
   } else if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
     dynamicDims = getDynamicDims(b, loc, transferWriteOp.source());
@@ -791,12 +795,12 @@ static Value getSubviewOpForTensorStoreOp(OpBuilder &b, Operation *storeOp,
                                           const BlockAndValueMapping &bvm) {
   SmallVector<Value, 4> operandsOfSubviewOp;
   auto op = cast<OffsetSizeAndStrideOpInterface>(storeOp);
-  Value target =
-      TypeSwitch<Operation *, Value>(op)
-          .Case<IREE::Flow::DispatchTensorStoreOp>(
-              [&](auto storeOp) { return storeOp.target(); })
-          .Case<SubTensorInsertOp>([&](auto storeOp) { return storeOp.dest(); })
-          .Default([](Operation *) { return nullptr; });
+  Value target = TypeSwitch<Operation *, Value>(op)
+                     .Case<IREE::Flow::DispatchTensorStoreOp>(
+                         [&](auto storeOp) { return storeOp.target(); })
+                     .Case<tensor::InsertSliceOp>(
+                         [&](auto storeOp) { return storeOp.dest(); })
+                     .Default([](Operation *) { return nullptr; });
   if (!target) return nullptr;
   operandsOfSubviewOp.push_back(bvm.lookup(target));
   operandsOfSubviewOp.append(op.offsets().begin(), op.offsets().end());
@@ -905,8 +909,8 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     Operation *op = it.first->getOwner();
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
-            .Case<scf::IfOp, scf::ForOp, linalg::LinalgOp, SubTensorInsertOp,
-                  vector::TransferWriteOp>(
+            .Case<scf::IfOp, scf::ForOp, linalg::LinalgOp,
+                  tensor::InsertSliceOp, vector::TransferWriteOp>(
                 [&](auto op) { return resultBuffer; })
             .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
                 [&](auto reshapeOp) {
@@ -980,7 +984,7 @@ static Value getAliasingBufferForReshapeResult(OpBuilder &b,
 }
 
 /// Converts a `subtensor` operation to a `subview` operation.
-static Value getAliasingBufferForResult(OpBuilder &b, SubTensorOp op,
+static Value getAliasingBufferForResult(OpBuilder &b, tensor::ExtractSliceOp op,
                                         BlockAndValueMapping &bvm) {
   Location loc = op.getLoc();
   Value srcTensor = op.source();
@@ -1020,10 +1024,10 @@ static SmallVector<Value> getAliasingBuffersForResult(
 static SmallVector<Value, 4> getAliasingBuffersForResults(
     OpBuilder &b, Operation *op, BlockAndValueMapping &bvm) {
   return TypeSwitch<Operation *, SmallVector<Value, 4>>(op)
-      .Case<IREE::Flow::DispatchTensorLoadOp, SubTensorOp, tensor::CastOp>(
-          [&](auto singleResultOp) -> SmallVector<Value, 4> {
-            return {getAliasingBufferForResult(b, singleResultOp, bvm)};
-          })
+      .Case<IREE::Flow::DispatchTensorLoadOp, tensor::ExtractSliceOp,
+            tensor::CastOp>([&](auto singleResultOp) -> SmallVector<Value, 4> {
+        return {getAliasingBufferForResult(b, singleResultOp, bvm)};
+      })
       .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
           [&](auto reshapeOp) -> SmallVector<Value, 4> {
             return {getAliasingBufferForReshapeResult(b, reshapeOp, bvm)};
@@ -1238,12 +1242,12 @@ static LogicalResult convertInterfaceStoreTensorOp(
   return success();
 }
 
-/// Converts a `subtensor_insert` operation to buffers by
+/// Converts a `tensor.insert_slice` operation to buffers by
 /// - Allocating a buffer for the result (if needed), and copying the
 ///   destination value into this buffer.
 /// - Copying the source values into a subview of the result buffer.
 static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
-                                              SubTensorInsertOp op,
+                                              tensor::InsertSliceOp op,
                                               BlockAndValueMapping &bvm,
                                               BufferizationPlan &plan) {
   Location loc = op.getLoc();
@@ -1519,20 +1523,19 @@ void LinalgBufferizePass::runOnOperation() {
           return convertScfIfOp(b, ifOp, bvm, plan);
         })
         .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorCollapseShapeOp,
-              linalg::TensorExpandShapeOp, SubTensorOp, tensor::CastOp>(
-            [&](auto aliasingOp) {
-              auto aliasingBuffers =
-                  getAliasingBuffersForResults(b, aliasingOp, bvm);
-              if (failed(getOrAllocateResultBuffers(b, aliasingOp,
-                                                    aliasingBuffers, bvm, plan,
-                                                    allocationFn))) {
-                return failure();
-              }
-              copyFromAliasingBufferToResultBuffer(
-                  b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
-                  aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
-              return success();
-            })
+              linalg::TensorExpandShapeOp, tensor::ExtractSliceOp,
+              tensor::CastOp>([&](auto aliasingOp) {
+          auto aliasingBuffers =
+              getAliasingBuffersForResults(b, aliasingOp, bvm);
+          if (failed(getOrAllocateResultBuffers(b, aliasingOp, aliasingBuffers,
+                                                bvm, plan, allocationFn))) {
+            return failure();
+          }
+          copyFromAliasingBufferToResultBuffer(
+              b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
+              aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
+          return success();
+        })
         .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
           if (failed(getOrAllocateResultBuffers(b, padTensorOp, bvm, plan,
                                                 allocationFn))) {
@@ -1547,13 +1550,14 @@ void LinalgBufferizePass::runOnOperation() {
           }
           return convertAnyLinalgOp(b, linalgOp, bvm, plan, allocationFn);
         })
-        .Case<SubTensorInsertOp>([&](SubTensorInsertOp subTensorInsertOp) {
-          if (failed(getOrAllocateResultBuffers(b, subTensorInsertOp, bvm, plan,
-                                                allocationFn))) {
-            return failure();
-          }
-          return convertSubTensorInsertOp(b, subTensorInsertOp, bvm, plan);
-        })
+        .Case<tensor::InsertSliceOp>(
+            [&](tensor::InsertSliceOp subTensorInsertOp) {
+              if (failed(getOrAllocateResultBuffers(b, subTensorInsertOp, bvm,
+                                                    plan, allocationFn))) {
+                return failure();
+              }
+              return convertSubTensorInsertOp(b, subTensorInsertOp, bvm, plan);
+            })
         .Case<tensor::InsertOp>([&](tensor::InsertOp tensorInsertOp) {
           if (failed(getOrAllocateResultBuffers(b, tensorInsertOp, bvm, plan,
                                                 allocationFn))) {
