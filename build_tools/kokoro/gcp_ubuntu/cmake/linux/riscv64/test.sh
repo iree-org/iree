@@ -24,7 +24,10 @@ pushd "${BUILD_RISCV_DIR?}/iree/samples/simple_embedding" > /dev/null
 -L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_dylib
 
 /usr/src/qemu-riscv/qemu-riscv64 -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
--L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_local_sync
+-L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_embedded_sync
+
+/usr/src/qemu-riscv/qemu-riscv64 -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+-L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_vmvx_sync
 
 popd > /dev/null
 

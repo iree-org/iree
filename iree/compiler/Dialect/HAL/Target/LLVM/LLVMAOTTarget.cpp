@@ -293,17 +293,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
              << options_.targetTriple << "'";
     }
 
-    // If we are keeping artifacts then let's also add the bitcode for easier
-    // debugging (vs just the binary object file).
-    if (options_.keepLinkerArtifacts) {
-      auto bitcodeFile = Artifact::createTemporary(libraryName, "bc");
-      auto &os = bitcodeFile.outputFile->os();
-      llvm::WriteBitcodeToFile(*llvmModule, os);
-      os.flush();
-      os.close();
-      bitcodeFile.outputFile->keep();
-    }
-
     // Emit object files.
     SmallVector<Artifact, 4> objectFiles;
     {
@@ -324,6 +313,18 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       os.flush();
       os.close();
       objectFiles.push_back(std::move(objectFile));
+    }
+
+    // If we are keeping artifacts then let's also add the bitcode for easier
+    // debugging (vs just the binary object file).
+    if (options_.keepLinkerArtifacts) {
+      auto bitcodeFile =
+          Artifact::createVariant(objectFiles.front().path, "bc");
+      auto &os = bitcodeFile.outputFile->os();
+      llvm::WriteBitcodeToFile(*llvmModule, os);
+      os.flush();
+      os.close();
+      bitcodeFile.outputFile->keep();
     }
 
     if (!options_.staticLibraryOutput.empty()) {
