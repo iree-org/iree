@@ -74,7 +74,7 @@ Text classification with TFLite and IREE | [![Open in Colab](https://colab.resea
 
 An example smoke test of the [TensorFlow Lite C API](https://github.com/google/
 iree/tree/main/bindings/tflite) is available [here](https://github.com/google/
-iree/blob/main/bindings/tflite/smoke_test.cc ).
+iree/blob/main/bindings/tflite/smoke_test.cc).
 
 !!! todo
 
