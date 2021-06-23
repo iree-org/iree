@@ -37,11 +37,6 @@ static inline int32_t vm_select_i32(int32_t condition, int32_t true_value,
   return condition ? true_value : false_value;
 }
 
-static inline float vm_select_f32(int32_t condition, float true_value,
-                                  float false_value) {
-  return condition ? true_value : false_value;
-}
-
 //===------------------------------------------------------------------===//
 // Native integer arithmetic
 //===------------------------------------------------------------------===//
@@ -70,58 +65,6 @@ static inline int32_t vm_not_i32(int32_t operand) {
 static inline int32_t vm_and_i32(int32_t lhs, int32_t rhs) { return lhs & rhs; }
 static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
 static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
-
-//===------------------------------------------------------------------===//
-// Native floating-point arithmetic
-//===------------------------------------------------------------------===//
-
-static inline float vm_add_f32(float lhs, float rhs) { return lhs + rhs; }
-static inline float vm_sub_f32(float lhs, float rhs) { return lhs - rhs; }
-static inline float vm_mul_f32(float lhs, float rhs) { return lhs * rhs; }
-static inline float vm_div_f32(float lhs, float rhs) { return lhs / rhs; }
-static inline float vm_rem_f32(float lhs, float rhs) {
-  return remainderf(lhs, rhs);
-}
-static inline float vm_fma_f32(float a, float b, float c) {
-#ifdef FP_FAST_FMAF
-  return fmaf(a, b, c);
-#else
-  return a * b + c;
-#endif  // FP_FAST_FMAF
-}
-static inline float vm_abs_f32(float operand) { return fabsf(operand); }
-static inline float vm_neg_f32(float operand) { return -operand; }
-static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
-static inline float vm_floor_f32(float operand) { return floorf(operand); }
-
-static inline float vm_cast_si32f32(int32_t operand) { return (float)operand; }
-static inline float vm_cast_ui32f32(int32_t operand) {
-  return (float)(uint32_t)operand;
-}
-static inline int32_t vm_cast_f32si32(float operand) {
-  return (int32_t)lroundf(operand);
-}
-static inline int32_t vm_cast_f32ui32(float operand) {
-  return (uint32_t)lroundf(operand);
-}
-
-static inline float vm_atan_f32(float operand) { return atanf(operand); }
-static inline float vm_atan2_f32(float y, float x) { return atan2f(y, x); }
-static inline float vm_cos_f32(float operand) { return cosf(operand); }
-static inline float vm_sin_f32(float operand) { return sinf(operand); }
-static inline float vm_exp_f32(float operand) { return expf(operand); }
-static inline float vm_exp2_f32(float operand) { return exp2f(operand); }
-static inline float vm_expm1_f32(float operand) { return expm1f(operand); }
-static inline float vm_log_f32(float operand) { return logf(operand); }
-static inline float vm_log10_f32(float operand) { return log10f(operand); }
-static inline float vm_log1p_f32(float operand) { return log1pf(operand); }
-static inline float vm_log2_f32(float operand) { return log2f(operand); }
-static inline float vm_pow_f32(float b, float e) { return powf(b, e); }
-static inline float vm_rsqrt_f32(float operand) {
-  return 1.0f / sqrtf(operand);
-}
-static inline float vm_sqrt_f32(float operand) { return sqrtf(operand); }
-static inline float vm_tanh_f32(float operand) { return tanhf(operand); }
 
 //===------------------------------------------------------------------===//
 // Casting and type conversion/emulation
@@ -190,34 +133,6 @@ static inline int32_t vm_cmp_ne_ref(iree_vm_ref_t* lhs, iree_vm_ref_t* rhs) {
 }
 static inline int32_t vm_cmp_nz_ref(iree_vm_ref_t* operand) {
   return (operand->ptr != NULL) ? 1 : 0;
-}
-
-static inline int32_t vm_cmp_eq_f32o(float lhs, float rhs) {
-  return (lhs == rhs) ? 1 : 0;
-}
-static inline int32_t vm_cmp_eq_f32u(float lhs, float rhs) {
-  return (isunordered(lhs, rhs) || (lhs == rhs)) ? 1 : 0;
-}
-static inline int32_t vm_cmp_ne_f32o(float lhs, float rhs) {
-  return (lhs != rhs) ? 1 : 0;
-}
-static inline int32_t vm_cmp_ne_f32u(float lhs, float rhs) {
-  return (isunordered(lhs, rhs) || (lhs != rhs)) ? 1 : 0;
-}
-static inline int32_t vm_cmp_lt_f32o(float lhs, float rhs) {
-  return isless(lhs, rhs) ? 1 : 0;
-}
-static inline int32_t vm_cmp_lt_f32u(float lhs, float rhs) {
-  return (isunordered(lhs, rhs) || isless(lhs, rhs)) ? 1 : 0;
-}
-static inline int32_t vm_cmp_lte_f32o(float lhs, float rhs) {
-  return islessequal(lhs, rhs) ? 1 : 0;
-}
-static inline int32_t vm_cmp_lte_f32u(float lhs, float rhs) {
-  return (isunordered(lhs, rhs) || islessequal(lhs, rhs)) ? 1 : 0;
-}
-static inline int32_t vm_cmp_nan_f32(float operand) {
-  return isnan(operand) ? 1 : 0;
 }
 
 //===------------------------------------------------------------------===//
@@ -320,6 +235,103 @@ static inline int32_t vm_cmp_lt_i64u(int64_t lhs, int64_t rhs) {
 }
 static inline int32_t vm_cmp_nz_i64(int64_t operand) {
   return (operand != 0) ? 1 : 0;
+}
+
+//===------------------------------------------------------------------===//
+// ExtF32: Conditional assignment
+//===------------------------------------------------------------------===//
+
+static inline float vm_select_f32(int32_t condition, float true_value,
+                                  float false_value) {
+  return condition ? true_value : false_value;
+}
+
+//===------------------------------------------------------------------===//
+// ExtF32: Native floating-point arithmetic
+//===------------------------------------------------------------------===//
+
+static inline float vm_add_f32(float lhs, float rhs) { return lhs + rhs; }
+static inline float vm_sub_f32(float lhs, float rhs) { return lhs - rhs; }
+static inline float vm_mul_f32(float lhs, float rhs) { return lhs * rhs; }
+static inline float vm_div_f32(float lhs, float rhs) { return lhs / rhs; }
+static inline float vm_rem_f32(float lhs, float rhs) {
+  return remainderf(lhs, rhs);
+}
+static inline float vm_fma_f32(float a, float b, float c) {
+#ifdef FP_FAST_FMAF
+  return fmaf(a, b, c);
+#else
+  return a * b + c;
+#endif  // FP_FAST_FMAF
+}
+static inline float vm_abs_f32(float operand) { return fabsf(operand); }
+static inline float vm_neg_f32(float operand) { return -operand; }
+static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
+static inline float vm_floor_f32(float operand) { return floorf(operand); }
+
+static inline float vm_atan_f32(float operand) { return atanf(operand); }
+static inline float vm_atan2_f32(float y, float x) { return atan2f(y, x); }
+static inline float vm_cos_f32(float operand) { return cosf(operand); }
+static inline float vm_sin_f32(float operand) { return sinf(operand); }
+static inline float vm_exp_f32(float operand) { return expf(operand); }
+static inline float vm_exp2_f32(float operand) { return exp2f(operand); }
+static inline float vm_expm1_f32(float operand) { return expm1f(operand); }
+static inline float vm_log_f32(float operand) { return logf(operand); }
+static inline float vm_log10_f32(float operand) { return log10f(operand); }
+static inline float vm_log1p_f32(float operand) { return log1pf(operand); }
+static inline float vm_log2_f32(float operand) { return log2f(operand); }
+static inline float vm_pow_f32(float b, float e) { return powf(b, e); }
+static inline float vm_rsqrt_f32(float operand) {
+  return 1.0f / sqrtf(operand);
+}
+static inline float vm_sqrt_f32(float operand) { return sqrtf(operand); }
+static inline float vm_tanh_f32(float operand) { return tanhf(operand); }
+
+//===------------------------------------------------------------------===//
+// ExtF32: Casting and type conversion/emulation
+//===------------------------------------------------------------------===//
+
+static inline float vm_cast_si32f32(int32_t operand) { return (float)operand; }
+static inline float vm_cast_ui32f32(int32_t operand) {
+  return (float)(uint32_t)operand;
+}
+static inline int32_t vm_cast_f32si32(float operand) {
+  return (int32_t)lroundf(operand);
+}
+static inline int32_t vm_cast_f32ui32(float operand) {
+  return (uint32_t)lroundf(operand);
+}
+
+//===------------------------------------------------------------------===//
+// ExtF32: Comparison ops
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_cmp_eq_f32o(float lhs, float rhs) {
+  return (lhs == rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_eq_f32u(float lhs, float rhs) {
+  return (isunordered(lhs, rhs) || (lhs == rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_f32o(float lhs, float rhs) {
+  return (lhs != rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_f32u(float lhs, float rhs) {
+  return (isunordered(lhs, rhs) || (lhs != rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_f32o(float lhs, float rhs) {
+  return isless(lhs, rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_f32u(float lhs, float rhs) {
+  return (isunordered(lhs, rhs) || isless(lhs, rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lte_f32o(float lhs, float rhs) {
+  return islessequal(lhs, rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lte_f32u(float lhs, float rhs) {
+  return (isunordered(lhs, rhs) || islessequal(lhs, rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_nan_f32(float operand) {
+  return isnan(operand) ? 1 : 0;
 }
 
 //===------------------------------------------------------------------===//
