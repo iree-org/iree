@@ -1,14 +1,20 @@
 # TensorFlow Lite Integration
 
-IREE supports compiling and running pre-trained TFLite models.  It converts a model to [TOSA MLIR](https://mlir.llvm.org/docs/Dialects/TOSA/), then compiles it into a VM module.
+IREE supports compiling and running pre-trained TensorFlow Lite (TFLite)
+models.  It converts a model to [TOSA MLIR](https://mlir.llvm.org/docs/Dialects/
+TOSA/), then compiles it into a VM module.
 
 ## Prerequisites
 
-Download a pre-trained TFLite model from the list of [hosted models](https://www.tensorflow.org/lite/guide/hosted_models).
+Download a pre-trained TFLite model from the list of [hosted models](
+https://www.tensorflow.org/lite/guide/hosted_models), or use the [TensorFlow
+Lite converter](https://www.tensorflow.org/lite/convert) to convert a
+TensorFlow model to a .tflite flatbuffer.
 
 
 Install IREE pip packages, either from pip or by
-[building from source](../building-from-source/optional-features.md#building-python-bindings):
+[building from source](../building-from-source/
+optional-features.md#building-python-bindings):
 
 ```shell
 python -m pip install \
@@ -28,7 +34,8 @@ iree-import-tflite \
   -o sample.mlir
 ```
 
-Next, compile the TOSA MLIR to a VM flatbuffer, using either the command line tools or the [Python API](https://google.github.io/iree/bindings/python/):
+Next, compile the TOSA MLIR to a VM flatbuffer, using either the command line
+tools or the [Python API](https://google.github.io/iree/bindings/python/):
 
 #### Using the command-line tool
 
@@ -45,8 +52,17 @@ iree-translate \
 ``` python
 from iree.compiler import compile_str
 with open('sample.mlir') as sample_tosa_mlir:
-  compiled_flatbuffer = compile_str(sample_tosa_mlir.read(), target_backends=["vmvx"])
+  compiled_flatbuffer = compile_str(sample_tosa_mlir.read(),
+    input_type="tosa",
+    target_backends=["vmvx"],
+    extra_args=["--iree-native-bindings-support=false",
+      "--iree-tflite-bindings-support"])
 ```
+
+!!! todo
+
+    [Issue#5462](https://github.com/google/iree/issues/5462): Link to
+    TensorFlow Lite bindings documentation once it has been written.
 
 The flatbuffer can then be loaded to a VM module and run through IREE's runtime.
 
@@ -58,4 +74,8 @@ Text classification with TFLite and IREE | [![Open in Colab](https://colab.resea
 
 !!! todo
 
-    [Issue#3954](https://github.com/google/iree/issues/3954): Add documentation for an Android demo using the [TFLite bindings](https://google.github.io/iree/bindings/tensorflow-lite/), once it is complete at [not-jenni/iree-android-tflite-demo](https://github.com/not-jenni/iree-android-tflite-demo).
+    [Issue#3954](https://github.com/google/iree/issues/3954): Add documentation
+    for an Android demo using the [Java TFLite bindings](https://github.com/
+    google/iree/tree/main/bindings/tflite/java), once it is complete at
+    [not-jenni/iree-android-tflite-demo](https://github.com/not-jenni/
+    iree-android-tflite-demo).
