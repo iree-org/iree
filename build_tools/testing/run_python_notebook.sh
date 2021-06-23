@@ -18,32 +18,37 @@ set -e
 
 # Run under a virtual environment to isolate Python packages.
 #
-# Note: --without-pip and --system-site-packages are workarounds for Docker
-#  * https://stackoverflow.com/a/63805343
-#  * https://askubuntu.com/a/897004
+# This is informed by Docker workarounds and we're walking a thin line here.
+# --system-site-packages: leverage system packages for common notebook
+#     requirements (tensorflow, numpy, and other large packages)
+# --clear: delete existing venv contents (package installs within notebooks)
 #
-# Note: --clear deletes existing venv contents, which helps make these tests
-# more hermetic, at the cost of time spent performing redundant installs.
-# TODO(scotttodd): evaluate if we can do without --clear
-python3 -m venv .venv --without-pip --system-site-packages --clear
+# See also:
+#   * https://stackoverflow.com/a/63805343
+#   * https://askubuntu.com/a/897004
+python3 -m venv .venv --system-site-packages --clear
 source .venv/bin/activate
 trap deactivate EXIT
 
-# Install general Jupyter notebook requirements.
-python3 -m pip install --quiet jupyter_core nbconvert ipykernel
+# Update pip within the venv (you'd think this wouldn't be needed, but it is).
+python3 -m pip install --quiet --upgrade pip
 
-# Install common notebook requirements.
-# TODO(scotttodd): refactor so not all deps are always installed
+# Install general Jupyter notebook requirements, ignoring any system versions
+# This ensures that the `jupyter` command runs within the venv.
+#
+# See also:
+#   * https://stackoverflow.com/q/42449814
+#   * https://stackoverflow.com/a/19459977
+python3 -m pip install --ignore-installed --quiet \
+  jupyter_core nbconvert ipykernel
+
+# Install common notebook requirements, reusing system versions if possible.
 python3 -m pip install --quiet \
   numpy \
   matplotlib \
   tensorflow \
   tensorflow_hub \
   bottleneck
-
-# https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
-python3 -m pip install --quiet \
-  --index-url https://google-coral.github.io/py-repo/ tflite_runtime
 
 # Tone down TensorFlow's logging by default.
 export TF_CPP_MIN_LOG_LEVEL=${TF_CPP_MIN_LOG_LEVEL:-2}
