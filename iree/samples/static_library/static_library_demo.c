@@ -54,30 +54,40 @@ iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
 }
 
 iree_status_t Run() {
+  iree_status_t status = iree_ok_status();
+
   // Instance configuration (this should be shared across sessions).
   iree_runtime_instance_options_t instance_options;
   iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
                                            &instance_options);
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
-  IREE_RETURN_IF_ERROR(iree_runtime_instance_create(
-      &instance_options, iree_allocator_system(), &instance));
+
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_instance_create(&instance_options,
+                                          iree_allocator_system(), &instance);
+  }
 
   // Create dylib device with static loader.
   iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(create_device_with_static_loader(&device),
-                       "create device");
+  if (iree_status_is_ok(status)) {
+    status = create_device_with_static_loader(&device);
+  }
   iree_vm_module_t* hal_module = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hal_module_create(device, iree_allocator_system(), &hal_module);
+  }
 
   // Session configuration (one per loaded module to hold module state).
   iree_runtime_session_options_t session_options;
   iree_runtime_session_options_initialize(&session_options);
   iree_runtime_session_t* session = NULL;
-  IREE_RETURN_IF_ERROR(iree_runtime_session_create_with_device(
-      instance, &session_options, device,
-      iree_runtime_instance_host_allocator(instance), &session));
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_session_create_with_device(
+        instance, &session_options, device,
+        iree_runtime_instance_host_allocator(instance), &session);
+  }
   iree_hal_device_release(device);
 
   // Load bytecode module from the embedded data. Append to the session.
@@ -86,66 +96,87 @@ iree_status_t Run() {
   iree_const_byte_span_t module_data =
       iree_make_const_byte_span(module_file_toc->data, module_file_toc->size);
   iree_vm_module_t* bytecode_module = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-      module_data, iree_allocator_null(), iree_allocator_system(),
-      &bytecode_module));
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_session_append_module(session, bytecode_module));
+  if (iree_status_is_ok(status)) {
+    status = iree_vm_bytecode_module_create(module_data, iree_allocator_null(),
+                                            iree_allocator_system(),
+                                            &bytecode_module);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_runtime_session_append_module(session, bytecode_module);
+  }
 
   // Lookup the entry point function call.
   const char kMainFunctionName[] = "module.simple_mul";
   iree_runtime_call_t call;
-  IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
-      session, iree_make_cstring_view(kMainFunctionName), &call));
-
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_call_initialize_by_name(
+        session, iree_make_cstring_view(kMainFunctionName), &call);
+  }
 
   // Populate initial values for 4 * 2 = 8.
   const int kElementCount = 4;
   iree_hal_dim_t shape[1] = {kElementCount};
   iree_hal_buffer_view_t* arg0_buffer_view = NULL;
   iree_hal_buffer_view_t* arg1_buffer_view = NULL;
-  float kFloat4[] = {4.0f};
-  float kFloat2[] = {2.0f};
+  float kFloat4[] = {4.0f, 4.0f, 4.0f, 4.0f};
+  float kFloat2[] = {2.0f, 2.0f, 2.0f, 2.0f};
 
   iree_hal_memory_type_t input_memory_type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_clone_heap_buffer(
-    iree_hal_device_allocator(device), shape,
-    IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-    input_memory_type,
-    IREE_HAL_BUFFER_USAGE_ALL,
-    iree_make_const_byte_span((void*)kFloat4, sizeof(kFloat4)), &arg0_buffer_view));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_clone_heap_buffer(
-    iree_hal_device_allocator(device), shape,
-    IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-    input_memory_type,
-    IREE_HAL_BUFFER_USAGE_ALL,
-    iree_make_const_byte_span((void*)kFloat2, sizeof(kFloat2)), &arg1_buffer_view));
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_view_clone_heap_buffer(
+        iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, input_memory_type,
+        IREE_HAL_BUFFER_USAGE_ALL,
+        iree_make_const_byte_span((void*)kFloat4,
+                                  sizeof(float) * kElementCount),
+        &arg0_buffer_view);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_view_clone_heap_buffer(
+        iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, input_memory_type,
+        IREE_HAL_BUFFER_USAGE_ALL,
+        iree_make_const_byte_span((void*)kFloat2,
+                                  sizeof(float) * kElementCount),
+        &arg1_buffer_view);
+  }
 
   // Queue buffer views for input.
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_inputs_push_back_buffer_view(&call, arg0_buffer_view));
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_runtime_call_inputs_push_back_buffer_view(&call, arg0_buffer_view);
+  }
   iree_hal_buffer_view_release(arg0_buffer_view);
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_inputs_push_back_buffer_view(&call, arg1_buffer_view));
+
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_runtime_call_inputs_push_back_buffer_view(&call, arg1_buffer_view);
+  }
   iree_hal_buffer_view_release(arg1_buffer_view);
 
   // Invoke call.
-  IREE_RETURN_IF_ERROR(iree_runtime_call_invoke(&call, /*flags=*/0));
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_call_invoke(&call, /*flags=*/0);
+  }
 
   // Retreive output buffer view with results from the invocation.
   iree_hal_buffer_view_t* ret_buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_runtime_call_outputs_pop_front_buffer_view(&call, &ret_buffer_view));
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_call_outputs_pop_front_buffer_view(&call,
+                                                             &ret_buffer_view);
+  }
 
   // Read back the results and ensure we got the right values.
   iree_hal_buffer_mapping_t mapped_memory;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(ret_buffer_view), IREE_HAL_MEMORY_ACCESS_READ,
-      0, IREE_WHOLE_BUFFER, &mapped_memory));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_map_range(
+        iree_hal_buffer_view_buffer(ret_buffer_view),
+        IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &mapped_memory);
+  }
   for (int i = 0; i < mapped_memory.contents.data_length / sizeof(float); ++i) {
     if (((const float*)mapped_memory.contents.data)[i] != 8.0f) {
-      return iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");
+      return status;
     }
   }
 
