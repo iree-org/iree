@@ -1330,6 +1330,10 @@ void populateVMToEmitCPatterns(MLIRContext *context,
   patterns.insert<ConstOpConversion<IREE::VM::ConstF32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstF32ZeroOp>>(context);
 
+  // ExtF32: Conditional assignment
+  patterns.insert<CallOpConversion<IREE::VM::SelectF32Op>>(context,
+                                                           "vm_select_f32");
+
   // ExtF32: Native floating-point arithmetic
   patterns.insert<CallOpConversion<IREE::VM::AddF32Op>>(context, "vm_add_f32");
   patterns.insert<CallOpConversion<IREE::VM::SubF32Op>>(context, "vm_sub_f32");
@@ -1369,6 +1373,16 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                                          "vm_sqrt_f32");
   patterns.insert<CallOpConversion<IREE::VM::TanhF32Op>>(context,
                                                          "vm_tanh_f32");
+
+  // ExtF32: Casting and type conversion/emulation
+  patterns.insert<CallOpConversion<IREE::VM::CastSI32F32Op>>(context,
+                                                             "vm_cast_si32f32");
+  patterns.insert<CallOpConversion<IREE::VM::CastUI32F32Op>>(context,
+                                                             "vm_cast_ui32f32");
+  patterns.insert<CallOpConversion<IREE::VM::CastF32SI32Op>>(context,
+                                                             "vm_cast_f32si32");
+  patterns.insert<CallOpConversion<IREE::VM::CastF32UI32Op>>(context,
+                                                             "vm_cast_f32ui32");
 
   // ExtF32: Comparison ops
   patterns.insert<CallOpConversion<IREE::VM::CmpEQF32OOp>>(context,
