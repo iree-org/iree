@@ -51,7 +51,7 @@ static llvm::StructType *makeImportTableType(llvm::LLVMContext &context) {
                                             i8PtrType->getPointerTo(),
                                         },
                                         "iree_hal_executable_import_table_v0_t",
-                                        /*isPacked=*/true);
+                                        /*isPacked=*/false);
   return type;
 }
 
@@ -70,7 +70,7 @@ static llvm::StructType *makeVec3Type(llvm::LLVMContext &context) {
                                             i32Type,
                                         },
                                         "iree_hal_vec3_t",
-                                        /*isPacked=*/true);
+                                        /*isPacked=*/false);
   return type;
 }
 
@@ -126,7 +126,7 @@ static llvm::StructType *makeDispatchAttrsType(llvm::LLVMContext &context) {
                                    i16Type,
                                },
                                "iree_hal_executable_dispatch_attrs_v0_t",
-                               /*isPacked=*/true);
+                               /*isPacked=*/false);
   return type;
 }
 
@@ -156,7 +156,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
           i8PtrType->getPointerTo(),
       },
       "iree_hal_executable_export_table_v0_t",
-      /*isPacked=*/true);
+      /*isPacked=*/false);
   return type;
 }
 
@@ -181,7 +181,7 @@ static llvm::StructType *makeLibraryHeaderType(llvm::LLVMContext &context) {
                                             i32Type,
                                         },
                                         "iree_hal_executable_library_header_t",
-                                        /*isPacked=*/true);
+                                        /*isPacked=*/false);
   return type;
 }
 
@@ -205,7 +205,7 @@ static llvm::StructType *makeLibraryType(llvm::StructType *libraryHeaderType) {
                                             exportTableType,
                                         },
                                         "iree_hal_executable_library_v0_t",
-                                        /*isPacked=*/true);
+                                        /*isPacked=*/false);
   return type;
 }
 
