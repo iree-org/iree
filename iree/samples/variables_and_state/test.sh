@@ -13,7 +13,7 @@ set -x
 set -e
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
-BUILD_DIR=${ROOT_DIR}/../iree-build
+BUILD_DIR=${ROOT_DIR}/build
 ARTIFACTS_DIR=/tmp/iree/colab_artifacts
 
 # 1. Run the notebook to generate `counter.mlir` and `counter_vmvx.vmfb`

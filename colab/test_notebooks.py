@@ -34,14 +34,14 @@ class ColabNotebookTests(absltest.TestCase):
     notebooks_path = os.path.join(repo_root, "colab/")
     for notebook_path in glob.glob(notebooks_path + "*.ipynb"):
       notebook_name = os.path.basename(notebook_path)
-      
+
       def unit_test(self, notebook_path=notebook_path):
         completed_process = subprocess.run([script_path, notebook_path])
         self.assertEqual(completed_process.returncode, 0)
 
       if notebook_name in NOTEBOOKS_TO_SKIP:
         unit_test = unittest.skip(unit_test)
-      if notebook_name in NOTEBOOKS_EXPECTED_TO_FAIL:
+      elif notebook_name in NOTEBOOKS_EXPECTED_TO_FAIL:
         unit_test = unittest.expectedFailure(unit_test)
 
       # Add 'unit_test' to this class, so the test runner runs it.

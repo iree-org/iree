@@ -10,20 +10,26 @@
 #
 # Usage: run_python_notebook.sh /path/to/notebook.ipynb
 #
-# This is intended for use on continuous integration servers and as a reference
-# for users, but it can also be run manually.
+# This is intended for use on continuous integration servers within a Docker
+# container and as a reference for users, but it can also be run locally.
 
 set -x
 set -e
 
 # Run under a virtual environment to isolate Python packages.
-# TODO(scotttodd): clean the venv first? `rm -rf`?
-# python3 -m venv .venv
-# source .venv/bin/activate
-# trap deactivate EXIT
+#
+# Note: --without-pip and --system-site-packages are workarounds for Docker
+#  * https://stackoverflow.com/a/63805343
+#  * https://askubuntu.com/a/897004
+#
+# Note: --clear deletes existing venv contents, which helps make these tests
+# more hermetic, at the cost of time spent performing redundant installs.
+# TODO(scotttodd): evaluate if we can do without --clear
+python3 -m venv .venv --without-pip --system-site-packages --clear
+source .venv/bin/activate
+trap deactivate EXIT
 
 # Install general Jupyter notebook requirements.
-python3 -m pip install --upgrade pip
 python3 -m pip install --quiet jupyter_core nbconvert ipykernel
 
 # Install common notebook requirements.
@@ -35,18 +41,12 @@ python3 -m pip install --quiet \
   tensorflow_hub \
   bottleneck
 
-# Install IREE packages outside of the notebook
-# TODO(scotttodd): installs inside notebooks should be sufficient
-python3 -m pip install \
-  iree-compiler-snapshot \
-  iree-runtime-snapshot \
-  iree-tools-tf-snapshot \
-  iree-tools-tflite-snapshot \
-  iree-tools-xla-snapshot \
-  --find-links https://github.com/google/iree/releases
+# https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
+python3 -m pip install --quiet \
+  --index-url https://google-coral.github.io/py-repo/ tflite_runtime
 
 # Tone down TensorFlow's logging by default.
-export TF_CPP_MIN_LOG_LEVEL=${TF_CPP_MIN_LOG_LEVEL:-1}
+export TF_CPP_MIN_LOG_LEVEL=${TF_CPP_MIN_LOG_LEVEL:-2}
 
 # Run the notebook, discarding output (still fails if an exception is thrown).
 jupyter nbconvert --to notebook --execute $1 --stdout > /dev/null
