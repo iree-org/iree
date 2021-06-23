@@ -164,6 +164,6 @@ int main() {
     iree_status_fprint(stderr, result);
     iree_status_free(result);
   }
-  fprintf(stdout, "simple_embedding passed\n");
+  fprintf(stdout, "simple_embedding done\n");
   return ret;
 }
