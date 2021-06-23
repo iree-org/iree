@@ -288,9 +288,73 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          TensorFlow Lite
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         TensorFlow Lite
       </a>
+      
+        
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    Prerequisites
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#importing-models" class="md-nav__link">
+    Importing models
+  </a>
+  
+    <nav class="md-nav" aria-label="Importing models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-command-line-tool" class="md-nav__link">
+    Using the command-line tool
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-python-api" class="md-nav__link">
+    Using the python API
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#samples" class="md-nav__link">
+    Samples
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -569,6 +633,55 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    Prerequisites
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#importing-models" class="md-nav__link">
+    Importing models
+  </a>
+  
+    <nav class="md-nav" aria-label="Importing models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-command-line-tool" class="md-nav__link">
+    Using the command-line tool
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-python-api" class="md-nav__link">
+    Using the python API
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#samples" class="md-nav__link">
+    Samples
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -581,19 +694,80 @@
                 
                 
                 <h1 id="tensorflow-lite-integration">TensorFlow Lite Integration<a class="headerlink" href="#tensorflow-lite-integration" title="Permanent link">&para;</a></h1>
+<p>IREE supports compiling and running pre-trained TensorFlow Lite (TFLite)
+models.  It converts a model to
+<a href="https://mlir.llvm.org/docs/Dialects/TOSA/">TOSA MLIR</a>, then compiles it into a
+VM module.</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>Download a pre-trained TFLite model from the list of
+<a href="https://www.tensorflow.org/lite/guide/hosted_models">hosted models</a>, or use the
+<a href="https://www.tensorflow.org/lite/convert">TensorFlow Lite converter</a> to convert
+a TensorFlow model to a .tflite flatbuffer.</p>
+<p>Install IREE pip packages, either from pip or by
+<a href="../../building-from-source/optional-features/#building-python-bindings">building from source</a>:</p>
+<div class="highlight"><pre><span></span><code>python -m pip install <span class="se">\</span>
+  iree-compiler-snapshot <span class="se">\</span>
+  iree-runtime-snapshot <span class="se">\</span>
+  iree-tools-tflite-snapshot <span class="se">\</span>
+  -f https://github.com/google/iree/releases
+</code></pre></div>
+<h2 id="importing-models">Importing models<a class="headerlink" href="#importing-models" title="Permanent link">&para;</a></h2>
+<p>Fist, import the TFLite model to TOSA MLIR:</p>
+<div class="highlight"><pre><span></span><code>iree-import-tflite <span class="se">\</span>
+  sample.tflite <span class="se">\</span>
+  -o sample.mlir
+</code></pre></div>
+<p>Next, compile the TOSA MLIR to a VM flatbuffer, using either the command line
+tools or the <a href="https://google.github.io/iree/bindings/python/">Python API</a>:</p>
+<h4 id="using-the-command-line-tool">Using the command-line tool<a class="headerlink" href="#using-the-command-line-tool" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code>iree-translate <span class="se">\</span>
+  --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
+  --iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
+  sample.mlir <span class="se">\</span>
+  -o sample.vmfb
+</code></pre></div>
+<h4 id="using-the-python-api">Using the python API<a class="headerlink" href="#using-the-python-api" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">iree.compiler</span> <span class="kn">import</span> <span class="n">compile_str</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;sample.mlir&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sample_tosa_mlir</span><span class="p">:</span>
+  <span class="n">compiled_flatbuffer</span> <span class="o">=</span> <span class="n">compile_str</span><span class="p">(</span><span class="n">sample_tosa_mlir</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span>
+    <span class="n">input_type</span><span class="o">=</span><span class="s2">&quot;tosa&quot;</span><span class="p">,</span>
+    <span class="n">target_backends</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;vmvx&quot;</span><span class="p">],</span>
+    <span class="n">extra_args</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;--iree-native-bindings-support=false&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;--iree-tflite-bindings-support&quot;</span><span class="p">])</span>
+</code></pre></div>
 <div class="admonition todo">
 <p class="admonition-title">Todo</p>
-<p><a href="https://github.com/google/iree/issues/5455">Issue#5455</a>: write this documentation</p>
+<p><a href="https://github.com/google/iree/issues/5462">Issue#5462</a>: Link to
+TensorFlow Lite bindings documentation once it has been written.</p>
 </div>
-<!-- TODO(??): overview (mention TOSA?) -->
-
-<!-- TODO(??): pip install vs build from source -->
-
-<!-- TODO(??): python model code vs tf lite flatbuffer -->
-
-<!-- TODO(??): Colab notebooks, code samples -->
-
-<!-- TODO(??): using the tflite bindings -->
+<p>The flatbuffer can then be loaded to a VM module and run through IREE's runtime.</p>
+<h2 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Colab notebooks</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Text classification with TFLite and IREE</td>
+<td><a href="https://colab.research.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+</tr>
+</tbody>
+</table>
+<p>An example smoke test of the
+<a href="https://github.com/google/iree/tree/main/bindings/tflite">TensorFlow Lite C API</a>
+is available
+<a href="https://github.com/google/iree/blob/main/bindings/tflite/smoke_test.cc">here</a>.</p>
+<div class="admonition todo">
+<p class="admonition-title">Todo</p>
+<p><a href="https://github.com/google/iree/issues/3954">Issue#3954</a>: Add documentation
+for an Android demo using the
+<a href="https://github.com/google/iree/tree/main/bindings/tflite/java">Java TFLite bindings</a>,
+once it is complete at
+<a href="https://github.com/not-jenni/iree-android-tflite-demo">not-jenni/iree-android-tflite-demo</a>.</p>
+</div>
                 
               
               
