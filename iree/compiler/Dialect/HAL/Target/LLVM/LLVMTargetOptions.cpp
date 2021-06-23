@@ -10,6 +10,7 @@
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetOptions.h"
 
 namespace mlir {
@@ -171,6 +172,16 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
           "with a similarly named '.h' file for static linking."),
       llvm::cl::init(llvmTargetOptions.staticLibraryOutput));
   llvmTargetOptions.staticLibraryOutput = clStaticLibraryOutputPath;
+
+  static llvm::cl::opt<bool> clListTargets(
+      "iree-llvm-list-targets",
+      llvm::cl::desc("Lists all registered targets that the LLVM backend can "
+                     "generate code for."),
+      llvm::cl::init(false));
+  if (clListTargets) {
+    llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
+    exit(0);
+  }
 
   return llvmTargetOptions;
 }
