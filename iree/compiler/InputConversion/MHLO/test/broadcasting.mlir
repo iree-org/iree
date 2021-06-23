@@ -404,3 +404,24 @@ func @PolygammaWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>)
       : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
   return %0 : tensor<4xf32>
 }
+
+// -----
+// CHECK-LABEL: @fallbackDynamicReshape
+func @fallbackDynamicReshape(%arg0 : tensor<4x?x3x?xui32>, %arg1 : tensor<5xindex>) -> tensor<12x?x?x1x?xui32> {
+  // CHECK: %[[INPUT:.*]] = unrealized_conversion_cast %arg0 : tensor<4x?x3x?xui32> to tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[C1:.*]] = constant 1 : index
+  // CHECK-DAG: %[[RESULT_D1:.*]] = tensor.extract %arg1[%[[C1]]] : tensor<5xindex>
+  // CHECK-DAG: %[[C2:.*]] = constant 2 : index
+  // CHECK-DAG: %[[RESULT_D2:.*]] = tensor.extract %arg1[%[[C2]]] : tensor<5xindex>
+  // CHECK-DAG: %[[C4:.*]] = constant 4 : index
+  // CHECK-DAG: %[[RESULT_D4:.*]] = tensor.extract %arg1[%[[C4]]] : tensor<5xindex>
+  // CHECK-DAG: %[[INDEX1:.*]] = constant 1 : index
+  // CHECK-DAG: %[[ARG_D1:.*]] = memref.dim %[[INPUT]], %[[INDEX1]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[INDEX3:.*]] = constant 3 : index
+  // CHECK-DAG: %[[ARG_D3:.*]] = memref.dim %[[INPUT]], %[[INDEX3]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %[[INPUT]] : tensor<4x?x3x?xi32>{%[[ARG_D1]], %[[ARG_D3]]} -> tensor<12x?x?x1x?xi32>{%[[RESULT_D1]], %[[RESULT_D2]], %[[RESULT_D4]]}
+  %0 = "mhlo.dynamic_reshape"(%arg0, %arg1) : (tensor<4x?x3x?xui32>, tensor<5xindex>) -> tensor<12x?x?x1x?xui32>
+  // CHECK: %[[UNCONVERTED_RESULT:.*]] = unrealized_conversion_cast %[[RESULT]] : tensor<12x?x?x1x?xi32> to tensor<12x?x?x1x?xui32>
+  // CHECK: return %[[UNCONVERTED_RESULT]]
+  return %0 : tensor<12x?x?x1x?xui32>
+}
