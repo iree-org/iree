@@ -33,18 +33,6 @@
 #define IREE_RESTRICT restrict
 #endif  // _MSC_VER
 
-// Forces packing on the struct/union nested within.
-// We pack our structs both here and in the compiler's IR and they must be
-// consistent.
-#if defined(_MSC_VER)
-#define IREE_PACK(__Declaration__) \
-  __pragma(pack(push, 1)) __Declaration__ __pragma(pack(pop))
-#elif defined(__GNUC__)
-#define IREE_PACK(__Declaration__) __Declaration__ __attribute__((__packed__))
-#else
-#error "No packing macro available for this compiler"
-#endif  // _MSC_VER
-
 //===----------------------------------------------------------------------===//
 // Runtime feature support metadata
 //===----------------------------------------------------------------------===//
@@ -104,7 +92,7 @@ static_assert(sizeof(iree_hal_executable_library_version_t) == 4, "uint32_t");
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
-typedef IREE_PACK(struct iree_hal_executable_library_header_t {
+typedef struct iree_hal_executable_library_header_t {
   // Version of the API this library was built with, which was likely the value
   // of IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION.
   iree_hal_executable_library_version_t version;
@@ -119,7 +107,7 @@ typedef IREE_PACK(struct iree_hal_executable_library_header_t {
   // Libraries meant for use with a particular sanitizer will are only usable
   // with hosting code that is using the same sanitizer.
   iree_hal_executable_library_sanitizer_kind_t sanitizer;
-}) iree_hal_executable_library_header_t;
+} iree_hal_executable_library_header_t;
 
 // Exported function from dynamic libraries for querying library information.
 // The provided |max_version| is the maximum version the caller supports;
@@ -180,7 +168,7 @@ typedef int (*iree_hal_executable_import_thunk_v0_t)(
 // Represented as a struct-of-arrays for more efficient packing and more
 // locality during lookup. Each subarray - when not omitted and NULL - is
 // indexed by import ordinal and has up to |count| entries.
-typedef IREE_PACK(struct iree_hal_executable_import_table_v0_t {
+typedef struct iree_hal_executable_import_table_v0_t {
   // Total number of imports in the table.
   uint32_t count;
 
@@ -204,20 +192,19 @@ typedef IREE_PACK(struct iree_hal_executable_import_table_v0_t {
   //
   // The symbol table is sorted ascending alphabetical (by strcmp).
   const char* const* symbols;
-}) iree_hal_executable_import_table_v0_t;
+} iree_hal_executable_import_table_v0_t;
 
-typedef IREE_PACK(union iree_hal_vec3_t {
+typedef union iree_hal_vec3_t {
   struct {
     uint32_t x;
     uint32_t y;
     uint32_t z;
   };
   uint32_t value[3];
-}) iree_hal_vec3_t;
-static_assert(sizeof(iree_hal_vec3_t) == 3 * sizeof(uint32_t), "uint32_t[3]");
+} iree_hal_vec3_t;
 
 // Read-only per-dispatch state passed to each workgroup in a dispatch.
-typedef IREE_PACK(struct iree_hal_executable_dispatch_state_v0_t {
+typedef struct iree_hal_executable_dispatch_state_v0_t {
   // Total workgroup count for the dispatch. This is sourced from either the
   // original dispatch call (for iree_hal_command_buffer_dispatch) or the
   // indirection buffer (for iree_hal_command_buffer_dispatch_indirect).
@@ -246,7 +233,7 @@ typedef IREE_PACK(struct iree_hal_executable_dispatch_state_v0_t {
   // Contains one entry per imported function. If an import was marked as weak
   // then the corresponding entry may be NULL.
   const iree_hal_executable_import_v0_t* imports;
-}) iree_hal_executable_dispatch_state_v0_t;
+} iree_hal_executable_dispatch_state_v0_t;
 
 // Function signature of exported executable entry points.
 // The same |dispatch_state| is passed to all workgroups in a dispatch while
@@ -275,7 +262,7 @@ typedef int (*iree_hal_executable_dispatch_v0_t)(
 // Attributes for exported dispatch functions defining how they are to be
 // executed. 0 defaults are well-specified and the entire attributes table may
 // be omitted if no dispatch functions require these fields.
-typedef IREE_PACK(struct iree_hal_executable_dispatch_attrs_v0_t {
+typedef struct iree_hal_executable_dispatch_attrs_v0_t {
   // Number of IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE byte pages (or 0)
   // indicating how much workgroup local memory is required for the dispatch.
   // This is the size of the buffer referenced by the `local_memory` argument.
@@ -283,13 +270,13 @@ typedef IREE_PACK(struct iree_hal_executable_dispatch_attrs_v0_t {
   // Must be 0. May be used in the future for flags controlling the dispatch
   // behavior/synchronization requirements.
   uint16_t reserved;
-}) iree_hal_executable_dispatch_attrs_v0_t;
+} iree_hal_executable_dispatch_attrs_v0_t;
 static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) == 4, "uint32_t");
 
 // A table of exported functions arranged as a struct-of-arrays for more
 // efficient packing and faster lookup. Each subarray - when not omitted and
 // NULL - is indexed by export ordinal and has up to |count| entries.
-typedef IREE_PACK(struct iree_hal_executable_export_table_v0_t {
+typedef struct iree_hal_executable_export_table_v0_t {
   // Total number of exports in the table.
   uint32_t count;
 
@@ -311,7 +298,7 @@ typedef IREE_PACK(struct iree_hal_executable_export_table_v0_t {
   // verbose logging. The string values, when present, may be attached to
   // tracing/debugging events related to the entry point.
   const char* const* tags;
-}) iree_hal_executable_export_table_v0_t;
+} iree_hal_executable_export_table_v0_t;
 
 // Structure used for v0 library interfaces.
 // The entire structure is designed to be read-only and able to live embedded in
@@ -323,7 +310,7 @@ typedef IREE_PACK(struct iree_hal_executable_export_table_v0_t {
 // For example, a JIT may default all exports to JIT thunk functions and then
 // atomically swap them out for the translated function pointers as they are
 // available.
-typedef IREE_PACK(struct iree_hal_executable_library_v0_t {
+typedef struct iree_hal_executable_library_v0_t {
   // Version/metadata header.
   // Will have a version of IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0.
   const iree_hal_executable_library_header_t* header;
@@ -333,6 +320,6 @@ typedef IREE_PACK(struct iree_hal_executable_library_v0_t {
 
   // Table of exported functions from the executable.
   iree_hal_executable_export_table_v0_t exports;
-}) iree_hal_executable_library_v0_t;
+} iree_hal_executable_library_v0_t;
 
 #endif  // IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_H_
