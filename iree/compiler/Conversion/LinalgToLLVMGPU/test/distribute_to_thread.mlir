@@ -68,7 +68,7 @@ hal.executable.target @cuda, filter="cuda" {
           %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg1)[%workgroup_size_x]
           %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x1024xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
           %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<1024x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          linalg.fill(%11, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, f32
+          linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
           linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
         }
       }
@@ -132,7 +132,7 @@ hal.executable.target @cuda, filter="cuda" {
         %cst_0 = constant 0xFF800000 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<1000xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<f32>
-        linalg.fill(%1, %cst_0) : memref<f32>, f32
+        linalg.fill(%cst_0, %1) : f32, memref<f32>
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %2 = cmpf ogt, %arg0, %arg1 : f32
@@ -152,5 +152,5 @@ hal.executable.target @cuda, filter="cuda" {
 }
 
 //   CHECK-LABEL: hal.executable @reduction_dispatch
-//         CHECK: linalg.fill(%{{.*}}, %{{.*}}) : memref<f32>, f32
+//         CHECK: linalg.fill(%{{.*}}, %{{.*}}) : f32, memref<f32>
 //         CHECK: linalg.generic {{.*}} ins(%{{.*}} : memref<1000xf32>) outs(%{{.*}} : memref<f32>)

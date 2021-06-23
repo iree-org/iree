@@ -87,7 +87,7 @@ struct ConcatenateOpConversion
     auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
     Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
     Value result =
-        rewriter.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+        rewriter.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
     Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
@@ -142,7 +142,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
       loc, /*dyn_size=*/ValueRange{}, resultType.getShape(),
       resultType.getElementType());
   Value zeroTensor =
-      b.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+      b.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
   switch (lhs.getType().cast<RankedTensorType>().getRank()) {
     case 1:

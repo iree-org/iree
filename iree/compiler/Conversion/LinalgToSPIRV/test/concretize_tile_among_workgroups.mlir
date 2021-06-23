@@ -48,7 +48,7 @@ hal.executable @conv2d_static_shape attributes {sym_visibility = "private"} {
               %16 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg0)[%workgroup_size_z]
               %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg1)[%workgroup_size_y]
               %18 = memref.subview %2[0, %arg0, %arg1, %arg2] [1, %16, %17, %14] [1, 1, 1, 1] : memref<1x112x112x32xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
-              linalg.fill(%18, %cst) : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>, f32
+              linalg.fill(%cst, %18) : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
               linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : memref<1x?x?x16xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 810000 + s0 + d1 * 3600 + d2 * 16 + d3)>>, memref<3x3x16x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1536 + s0 + d1 * 512 + d2 * 32 + d3)>>) outs(%18 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>)
             }
           }
@@ -117,7 +117,7 @@ hal.executable @conv2d_static_shape attributes {sym_visibility = "private"} {
 // CHECK-SAME:   [1, %[[OUTPUT_SIZE_Z]], %[[OUTPUT_SIZE_Y]], %[[OUTPUT_SIZE_X]]]
 // CHECK-SAME:   memref<1x112x112x32xf32> to memref<1x?x?x?xf32, {{.+}}>
 
-//      CHECK: linalg.fill(%[[OUTPUT_VIEW]], %{{.+}})
+//      CHECK: linalg.fill(%{{.+}}, %[[OUTPUT_VIEW]])
 //      CHECK: linalg.conv_2d_input_nhwc_filter_hwcf
 // CHECK-SAME:   ins(%[[INPUT_VIEW]], %[[FILTER_VIEW]] : memref<1x?x?x16xf32, #map{{[0-9]+}}>, memref<3x3x16x?xf32, #map{{[0-9]+}}>)
 // CHECK-SAME:   outs(%[[OUTPUT_VIEW]] : memref<1x?x?x?xf32, #map{{[0-9]+}}>)

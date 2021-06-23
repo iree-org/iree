@@ -108,7 +108,7 @@ func @tile_4d_generic_op_alone
 func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1280] : tensor<1280xf32>
-  %1 = linalg.fill(%0, %cst) : tensor<1280xf32>, f32 -> tensor<1280xf32>
+  %1 = linalg.fill(%cst, %0) : f32, tensor<1280xf32> -> tensor<1280xf32>
   %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%arg0 : tensor<7x7x1280xf32>) outs(%1 : tensor<1280xf32>) {
   ^bb0(%arg1: f32, %arg2: f32):
     %3 = addf %arg1, %arg2 : f32
@@ -134,7 +134,7 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
 // CHECK-SAME:       sizes = [7, 7, %[[SIZE0]]]
 //      CHECK:     %[[SIZE1:.+]] = affine.min #[[SIZE_MAP1]](%[[IV]], %[[WG_SIZE0]])
 //      CHECK:     %[[INIT:.+]] = linalg.init_tensor [%[[SIZE1]]] : tensor<?xf32>
-// CHECK-NEXT:     %[[OUT:.+]] = linalg.fill(%[[INIT]]
+// CHECK-NEXT:     %[[OUT:.+]] = linalg.fill(%{{.*}}, %[[INIT]]
 //      CHECK:     %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[IN]] : tensor<7x7x?xf32>) outs(%[[OUT]] : tensor<?xf32>)
 //      CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG2]], {{.*}}

@@ -1331,7 +1331,7 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
         "value");
   }
 
-  b.create<linalg::FillOp>(loc, resultPaddedBuffer, paddingValue);
+  b.create<linalg::FillOp>(loc, paddingValue, resultPaddedBuffer);
 
   // Get the interior region.
   SmallVector<OpFoldResult> sizeMixedValues =

@@ -51,7 +51,7 @@ hal.executable @matmul_dynamic_shape attributes {sym_visibility = "private"} {
             %25 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg0)[%0, %workgroup_size_y]
             %26 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg1)[%1, %workgroup_size_x]
             %27 = memref.subview %16[%arg0, %arg1] [%25, %26] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            linalg.fill(%27, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, f32
+            linalg.fill(%cst, %27) {__internal_linalg_transform__ = "workgroup"} : f32, memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
             linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%22, %24 : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>) outs(%27 : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>)
           }
         }
@@ -112,7 +112,7 @@ hal.executable @matmul_dynamic_shape attributes {sym_visibility = "private"} {
 //      CHECK:     %[[Y_SIZE:.+]] = affine.min #[[YBOUNDMAP]](%[[IV_Y]])[%[[C_DIM0]]]
 //      CHECK:     %[[X_SIZE:.+]] = affine.min #[[XBOUNDMAP]](%[[IV_X]])[%[[C_DIM1]]]
 //      CHECK:     %[[C_TILE:.+]] = memref.subview %{{.+}}[%[[IV_Y]], %[[IV_X]]] [%[[Y_SIZE]], %[[X_SIZE]]] [1, 1] : memref<?x?xf32> to memref<?x?xf32, {{.+}}>
-//      CHECK:     linalg.fill(%[[C_TILE]], %cst)
+//      CHECK:     linalg.fill(%cst, %[[C_TILE]])
 //      CHECK:     linalg.matmul
 // CHECK-SAME:       ins(%[[A_TILE]], %[[B_TILE]]
 // CHECK-SAME:       outs(%[[C_TILE]]

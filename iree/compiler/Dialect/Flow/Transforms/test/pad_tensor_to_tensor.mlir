@@ -28,7 +28,7 @@ module  {
 //   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP0]]()[%[[ARG3]], %[[D0]]]
 //   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]], %[[D1]]]
 //       CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[RD0]], %[[RD1]]]
-//       CHECK:   %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
+//       CHECK:   %[[FILL:.+]] = linalg.fill(%[[VAL]], %[[INIT]])
 //       CHECK:   %[[RESULT:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][4, %[[ARG2]]] [%[[D0]], %[[D1]]] [1, 1]
 //       CHECK:   return %[[RESULT]]
 
@@ -53,6 +53,6 @@ module  {
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<f32>
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
 //       CHECK:   %[[INIT:.+]] = linalg.init_tensor [18, 12]
-//       CHECK:   %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
+//       CHECK:   %[[FILL:.+]] = linalg.fill(%[[VAL]], %[[INIT]])
 //       CHECK:   %[[RESULT:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][4, 5] [12, 4] [1, 1]
 //       CHECK:   return %[[RESULT]]
