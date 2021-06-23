@@ -22,14 +22,18 @@ namespace iree_compiler {
 
 namespace {
 
-// TODO(simon-camp): This is duplicated in the CModuleTarget.
+// TODO(simon-camp): This is adapted in the CModuleTarget.
 static std::string buildFunctionName(IREE::VM::ModuleOp &moduleOp,
                                      IREE::VM::FuncOp &funcOp,
-                                     bool implSuffix) {
-  std::string functionName =
-      std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
-
-  return implSuffix ? functionName + "_impl" : functionName;
+                                     bool isImported) {
+  if (isImported) {
+    // TODO(simon-camp): Build correct name from function arguments and results
+    // (reuse CallingConventionUtils from Target directory).
+    return "call_0i_i_import";
+  } else {
+    return std::string(moduleOp.getName()) + "_" +
+           std::string(funcOp.getName()) + "_impl";
+  }
 }
 
 template <typename SrcOpTy>
@@ -221,36 +225,56 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     auto funcOp =
         lookupSymbolRef<IREE::VM::CallOp, IREE::VM::FuncOp>(op, "callee");
+    auto importOp =
+        lookupSymbolRef<IREE::VM::CallOp, IREE::VM::ImportOp>(op, "callee");
 
-    if (!funcOp) {
-      return op.emitError() << "only calls to internal functions are supported";
-    }
+    assert(funcOp || importOp);
+    assert(!(funcOp && importOp));
+
+    auto moduleOp =
+        funcOp ? funcOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>()
+               : importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
+
+    const bool isImported = importOp != nullptr;
 
     if (op.getNumResults() > 1) {
       return op.emitError()
-             << "only internal calls with exactly one result supported for now";
+             << "only internal calls with at most one result supported for now";
     }
 
-    auto moduleOp =
-        funcOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
-
-    std::string internalFuncName =
-        buildFunctionName(moduleOp, funcOp, /*implSuffix=*/true);
+    std::string funcName =
+        buildFunctionName(moduleOp, funcOp, /*isImported=*/isImported);
 
     SmallVector<Value, 4> updatedOperands(operands.begin(), operands.end());
 
     if (op.getNumResults() == 0) {
-      SmallVector<Attribute, 4> args_ =
-          indexSequence(updatedOperands.size(), ctx);
+      SmallVector<Attribute, 4> args_;
+      if (!isImported) {
+        // The order is arguments, results, stack, state
+        args_ = indexSequence(updatedOperands.size(), ctx);
+        args_.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args_.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+      } else {
+        int importOrdinal = 0;
+        // TODO(simon-camp): split into multiple EmitC ops
+        std::string importArg = std::string("&state->imports[") +
+                                std::to_string(importOrdinal) +
+                                std::string("]");
+        // The order is stack, import, arguments, results
+        args_.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args_.push_back(emitc::OpaqueAttr::get(ctx, importArg));
 
-      args_.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+        for (auto operandIndex : indexSequence(updatedOperands.size(), ctx)) {
+          args_.push_back(operandIndex);
+        }
+      }
 
       ArrayAttr args = rewriter.getArrayAttr(args_);
 
       auto callOp = failableCall(
           /*rewriter=*/rewriter,
           /*location=*/loc,
-          /*callee=*/StringAttr::get(ctx, internalFuncName),
+          /*callee=*/StringAttr::get(ctx, funcName),
           /*args=*/args,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/updatedOperands);
@@ -283,17 +307,33 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
       updatedOperands.push_back(ptrOp.getResult());
 
-      SmallVector<Attribute, 4> args_ =
-          indexSequence(updatedOperands.size(), ctx);
+      SmallVector<Attribute, 4> args_;
+      if (!isImported) {
+        // The order is arguments, results, stack, state
+        args_ = indexSequence(updatedOperands.size(), ctx);
+        args_.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args_.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+      } else {
+        int importOrdinal = 0;
+        // TODO(simon-camp): split into multiple EmitC ops
+        std::string importArg = std::string("&state->imports[") +
+                                std::to_string(importOrdinal) +
+                                std::string("]");
+        // The order is stack, import, arguments, results
+        args_.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args_.push_back(emitc::OpaqueAttr::get(ctx, importArg));
 
-      args_.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+        for (auto operandIndex : indexSequence(updatedOperands.size(), ctx)) {
+          args_.push_back(operandIndex);
+        }
+      }
 
       ArrayAttr args = rewriter.getArrayAttr(args_);
 
       auto callOp = failableCall(
           /*rewriter=*/rewriter,
           /*location=*/loc,
-          /*callee=*/StringAttr::get(ctx, internalFuncName),
+          /*callee=*/StringAttr::get(ctx, funcName),
           /*args=*/args,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/updatedOperands);
@@ -1524,6 +1564,7 @@ class ConvertVMToEmitCPass
     target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
     target.addLegalOp<IREE::VM::FuncOp>();
     target.addLegalOp<IREE::VM::ExportOp>();
+    target.addLegalOp<IREE::VM::ImportOp>();
 
     // Global ops
     target.addLegalOp<IREE::VM::GlobalI32Op>();

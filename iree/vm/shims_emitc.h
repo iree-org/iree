@@ -66,6 +66,19 @@ static iree_status_t call_0i_i_shim(iree_vm_stack_t* stack,
   return target_fn(stack, module, module_state, args->arg0, &results->ret0);
 }
 
+static iree_status_t call_0i_i_import(iree_vm_stack_t* stack,
+                                      const iree_vm_function_t* import,
+                                      int32_t arg0, int32_t* out_ret0) {
+  iree_vm_function_call_t call;
+  call.function = *import;
+  call.arguments = iree_make_byte_span(&arg0, sizeof(arg0));
+  call.results = iree_make_byte_span(out_ret0, sizeof(*out_ret0));
+
+  iree_vm_execution_result_t result;
+  memset(&result, 0, sizeof(result));
+  return import->module->begin_call(import->module, stack, &call, &result);
+}
+
 // 0ii_i
 typedef iree_status_t (*call_0ii_i_t)(iree_vm_stack_t* stack, void* module_ptr,
                                       void* module_state, int32_t arg0,
