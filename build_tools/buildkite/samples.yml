@@ -1,0 +1,22 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+steps:
+  - label: "Test Colab notebooks"
+    commands:
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:eb72a4864f30ba53868cf23caf44e60aca35a36682ed1b1a5fa37cd9fda8855c colab/test.sh"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"
+
+  - label: "Test Samples"
+    commands:
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:eb72a4864f30ba53868cf23caf44e60aca35a36682ed1b1a5fa37cd9fda8855c iree/samples/variables_and_state/test.sh"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"
