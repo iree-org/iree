@@ -8,10 +8,10 @@
 
 def pipeline_options_to_string(pipeline, options=None):
   if options is not None:
-    options_str = ",".join(options);
-    return f"--{pipeline}={{{options_str}}}";
+    options_str = ",".join(options)
+    return [f"--{pipeline}={{{options_str}}}"]
   else:
-    return f"--{pipeline}";
+    return [f"--{pipeline}"]
 
 class TargetInfo:
   """Information of a target backend.
@@ -146,8 +146,7 @@ def get_pixel4_default_target_list(skipped_target=None,
                  taskset="80",
                  mako_tag="vlk",
                  flow_transformation_flags=[
-                     "enable-operand-fusion",
-                     "enable-fusion-with-reduction-ops"
+                     "enable-operand-fusion", "enable-fusion-with-reduction-ops"
                  ],
                  compilation_flags=[
                      "--iree-vulkan-target-triple=adreno-a640-android11",
@@ -261,12 +260,8 @@ MODEL_BENCHMARKS = [
                     #     "enable-operand-fusion",
                     # ],
                     compilation_flags={
-                        'cpu': [
-                            "-iree-llvm-loop-unrolling=true"
-                        ],
-                        'cpu3t': [
-                            "-iree-llvm-loop-unrolling=true"
-                        ]
+                        'cpu': ["-iree-llvm-loop-unrolling=true"],
+                        'cpu3t': ["-iree-llvm-loop-unrolling=true"]
                     })),
             PhoneBenchmarkInfo(
                 name="S20",
@@ -277,12 +272,8 @@ MODEL_BENCHMARKS = [
                     #     "enable-operand-fusion",
                     # ],
                     compilation_flags={
-                        'cpu': [
-                            "-iree-llvm-loop-unrolling=true"
-                        ],
-                        'cpu3t': [
-                            "-iree-llvm-loop-unrolling=true"
-                        ]
+                        'cpu': ["-iree-llvm-loop-unrolling=true"],
+                        'cpu3t': ["-iree-llvm-loop-unrolling=true"]
                     })),
         ]),
     ModelBenchmarkInfo(

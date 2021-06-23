@@ -164,8 +164,7 @@ function(iree_mlir_benchmark_suite)
            "${_RULE_TARGET_ARCHITECTURE}")
 
       # The full list of translation flags.
-      set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
-      list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
+      set(_TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
       list(SORT _RULE_TRANSLATION_FLAGS)
       list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
 

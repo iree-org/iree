@@ -77,6 +77,7 @@ iree_mlir_benchmark_suite(
   TRANSLATION_FLAGS
     "--iree-input-type=mhlo"
     "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-mlir-to-vm-bytecode-module"
   DRIVER
     "vmvx"
   RUNTIME_FLAGS
@@ -101,7 +102,10 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    # "--iree-flow-transformation-pipeline={enable-operand-fusion}"
+    "--iree-flow-transformation-pipeline"
+    "--iree-hal-transformation-pipeline"
+    "--iree-vm-transformation-pipeline"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib-sync"
@@ -125,7 +129,10 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    # "--iree-flow-transformation-pipeline={enable-operand-fusion}"
+    "--iree-flow-transformation-pipeline"
+    "--iree-hal-transformation-pipeline"
+    "--iree-vm-transformation-pipeline"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
@@ -151,7 +158,10 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    # "--iree-flow-transformation-pipeline={enable-operand-fusion}"
+    "--iree-flow-transformation-pipeline"
+    "--iree-hal-transformation-pipeline"
+    "--iree-vm-transformation-pipeline"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
@@ -176,8 +186,9 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=adreno-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-flow-dispatch-formation-enable-operand-fusion"
-    "--iree-enable-fusion-with-reduction-ops"
+    "--iree-flow-transformation-pipeline={enable-operand-fusion,enable-fusion-with-reduction-ops}"
+    "--iree-hal-transformation-pipeline"
+    "--iree-vm-transformation-pipeline"
   DRIVER
     "vulkan"
 )
@@ -197,9 +208,10 @@ iree_mlir_benchmark_suite(
   TRANSLATION_FLAGS
     "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=adreno-unknown-android11"
+    "--iree-flow-transformation-pipeline={enable-operand-fusion,enable-fusion-with-reduction-ops}"
+    "--iree-hal-transformation-pipeline"
+    "--iree-vm-transformation-pipeline"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-flow-dispatch-formation-enable-operand-fusion"
-    "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   DRIVER
     "vulkan"
@@ -223,9 +235,10 @@ iree_mlir_benchmark_suite(
   TRANSLATION_FLAGS
     "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-transformation-pipeline={enable-operand-fusion,enable-fusion-with-reduction-ops}"
+    "--iree-hal-transformation-pipeline"
+    "--iree-vm-transformation-pipeline"
     "--iree-flow-inline-constants-max-byte-length=16"
-    "--iree-flow-dispatch-formation-enable-operand-fusion"
-    "--iree-enable-fusion-with-reduction-ops"
   DRIVER
     "vulkan"
 )
@@ -245,9 +258,10 @@ iree_mlir_benchmark_suite(
   TRANSLATION_FLAGS
     "--iree-input-type=mhlo"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-transformation-pipeline={enable-operand-fusion,enable-fusion-with-reduction-ops}"
+    "--iree-hal-transformation-pipeline"
+    "--iree-vm-transformation-pipeline"
     "--iree-flow-inline-constants-max-byte-length=16"
-    "--iree-flow-dispatch-formation-enable-operand-fusion"
-    "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   DRIVER
     "vulkan"
@@ -270,9 +284,10 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-transformation-pipeline={enable-operand-fusion,enable-fusion-with-reduction-ops}"
+    "--iree-hal-transformation-pipeline"
+    "--iree-vm-transformation-pipeline"
     "--iree-flow-inline-constants-max-byte-length=16"
-    "--iree-flow-dispatch-formation-enable-operand-fusion"
-    "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   DRIVER
     "vulkan"
@@ -306,6 +321,7 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-mlir-to-vm-bytecode-module"
   DRIVER
     "dylib-sync"
 )
@@ -327,6 +343,7 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-mlir-to-vm-bytecode-module"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -350,6 +367,7 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-mlir-to-vm-bytecode-module"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
