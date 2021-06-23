@@ -42,6 +42,13 @@ SET_TARGET_PROPERTIES(
   PROPERTIES
   LINKER_LANGUAGE C)
 
+# Note: If you're cross compiling the simple_mul for a different backend, you'll
+# need to run iree-translate manually to produce the desired '.vmfb' and '.h/.o'
+# files. Substitute the 'simple_mul' dependency in iree_cc_binary() below with
+# your own static library and the `simple_mul.vmfb` in the iree_c_embed_data()
+# rule. You can use paths to files, i.e. 'path/to/generated/output.vmfb' in
+# place of CMake targets.
+
 # Generate the embed data with the bytecode module
 iree_c_embed_data(
   NAME

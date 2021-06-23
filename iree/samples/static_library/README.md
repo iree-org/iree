@@ -63,3 +63,17 @@ static library (`simple_mul.h` & `simple_mul.c`) as well as a bytecode module
 
   # Output: static_library_run passed
   ```
+
+### Changing compilation options
+
+The steps above build both the compiler for the host (machine doing the
+compiling) and the demo for the target using same options as the host machine.
+If you wish to target a different deployment other than the host, you'll need to
+compile the library and demo with different options.
+
+For example, see
+[documentation](https://google.github.io/iree/building-from-source/android/)
+on cross compiling on Android.
+
+Note: separating the target from the host will require modifying dependencies in
+the demos `CMakeLists.txt`. See included comments for more info.
