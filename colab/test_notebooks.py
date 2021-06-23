@@ -16,8 +16,9 @@ NOTEBOOKS_TO_SKIP = [
 ]
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-  # Text classification notebook has a dep with non-standard install steps:
-  # https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
+  # Text classification notebook
+  #   * fails to extract the vocab file on Docker
+  #   * fails to compile the imported .mlir in Colab
   "tflite_text_classification.ipynb",
 ]
 
