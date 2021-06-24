@@ -13,8 +13,8 @@
 # This is intended for use on continuous integration servers within a Docker
 # container and as a reference for users, but it can also be run locally.
 
-set -x
 set -e
+set -x
 
 # Run under a virtual environment to isolate Python packages.
 #
@@ -26,9 +26,9 @@ set -e
 # See also:
 #   * https://stackoverflow.com/a/63805343
 #   * https://askubuntu.com/a/897004
-python3 -m venv .venv --system-site-packages --clear
-source .venv/bin/activate
-trap deactivate EXIT
+python3 -m venv .notebook.venv --system-site-packages --clear
+source .notebook.venv/bin/activate 2> /dev/null
+trap "deactivate 2> /dev/null" EXIT
 
 # Update pip within the venv (you'd think this wouldn't be needed, but it is).
 python3 -m pip install --quiet --upgrade pip
