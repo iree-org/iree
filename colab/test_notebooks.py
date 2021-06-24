@@ -12,15 +12,15 @@ import unittest
 
 from absl.testing import absltest
 
-NOTEBOOKS_TO_SKIP = [
-]
+NOTEBOOKS_TO_SKIP = []
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-  # Text classification notebook
-  #   * fails to extract the vocab file on Docker
-  #   * fails to compile the imported .mlir in Colab
-  "tflite_text_classification.ipynb",
+    # Text classification notebook
+    #   * fails to extract the vocab file on Docker
+    #   * fails to compile the imported .mlir in Colab
+    "tflite_text_classification.ipynb",
 ]
+
 
 class ColabNotebookTests(absltest.TestCase):
   """Tests running all Colab notebooks in this directory."""
@@ -28,8 +28,8 @@ class ColabNotebookTests(absltest.TestCase):
   @classmethod
   def generateTests(cls):
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    script_path = os.path.join(
-      repo_root, "build_tools/testing/run_python_notebook.sh")
+    script_path = os.path.join(repo_root,
+                               "build_tools/testing/run_python_notebook.sh")
 
     # Create a test case for each notebook in this folder.
     notebooks_path = os.path.join(repo_root, "colab/")
@@ -37,17 +37,19 @@ class ColabNotebookTests(absltest.TestCase):
       notebook_name = os.path.basename(notebook_path)
 
       def unit_test(self, notebook_path=notebook_path):
+
         completed_process = subprocess.run([script_path, notebook_path])
         self.assertEqual(completed_process.returncode, 0)
 
       if notebook_name in NOTEBOOKS_TO_SKIP:
-        unit_test = unittest.skip(unit_test)
+        unit_test = unittest.skip("Skip requested")(unit_test)
       elif notebook_name in NOTEBOOKS_EXPECTED_TO_FAIL:
         unit_test = unittest.expectedFailure(unit_test)
 
       # Add 'unit_test' to this class, so the test runner runs it.
       unit_test.__name__ = f"test_{notebook_name}"
       setattr(cls, unit_test.__name__, unit_test)
+
 
 if __name__ == "__main__":
   ColabNotebookTests.generateTests()
