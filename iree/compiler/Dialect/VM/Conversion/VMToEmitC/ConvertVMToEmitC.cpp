@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -23,17 +24,19 @@ namespace iree_compiler {
 namespace {
 
 // TODO(simon-camp): This is adapted in the CModuleTarget.
-static std::string buildFunctionName(IREE::VM::ModuleOp &moduleOp,
-                                     IREE::VM::FuncOp &funcOp,
-                                     bool isImported) {
-  if (isImported) {
-    // TODO(simon-camp): Build correct name from function arguments and results
-    // (reuse CallingConventionUtils from Target directory).
-    return "call_0i_i_import";
-  } else {
-    return std::string(moduleOp.getName()) + "_" +
-           std::string(funcOp.getName()) + "_impl";
+static Optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
+                                               IREE::VM::FuncOp &funcOp) {
+  return std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName()) +
+         "_impl";
+}
+
+static Optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
+                                               IREE::VM::ImportOp &importOp) {
+  auto callingConvention = makeImportCallingConventionString(importOp);
+  if (!callingConvention.hasValue()) {
+    return None;
   }
+  return std::string("call_") + callingConvention.getValue() + "_import";
 }
 
 template <typename SrcOpTy>
@@ -237,13 +240,18 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     const bool isImported = importOp != nullptr;
 
+    Optional<std::string> funcName = isImported
+                                         ? buildFunctionName(moduleOp, importOp)
+                                         : buildFunctionName(moduleOp, funcOp);
+
     if (op.getNumResults() > 1) {
       return op.emitError()
              << "only internal calls with at most one result supported for now";
     }
 
-    std::string funcName =
-        buildFunctionName(moduleOp, funcOp, /*isImported=*/isImported);
+    if (!funcName.hasValue()) {
+      return op.emitError() << "Couldn't build function name";
+    }
 
     SmallVector<Value, 4> updatedOperands(operands.begin(), operands.end());
 
@@ -274,7 +282,7 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
       auto callOp = failableCall(
           /*rewriter=*/rewriter,
           /*location=*/loc,
-          /*callee=*/StringAttr::get(ctx, funcName),
+          /*callee=*/StringAttr::get(ctx, funcName.getValue()),
           /*args=*/args,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/updatedOperands);
@@ -333,7 +341,7 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
       auto callOp = failableCall(
           /*rewriter=*/rewriter,
           /*location=*/loc,
-          /*callee=*/StringAttr::get(ctx, funcName),
+          /*callee=*/StringAttr::get(ctx, funcName.getValue()),
           /*args=*/args,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/updatedOperands);
