@@ -53,7 +53,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     // Lower TF Patterns must be separate from canonocalization patterns as
     // they are sometimes inversions of eachother.
     OwningRewritePatternList lowerTfPatterns(&getContext());
-    mlir::TF::PopulateLoweringTFPatterns(context, &lowerTfPatterns);
+    mlir::TF::PopulateTFLoweringBeforeHLOPatterns(context, &lowerTfPatterns);
 
     OwningRewritePatternList canonicalizePatterns(&getContext());
     for (auto *op : context->getRegisteredOperations()) {
