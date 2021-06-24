@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_VM_TARGET_CONSTANTENCODINGUTILS_H_
-#define IREE_COMPILER_DIALECT_VM_TARGET_CONSTANTENCODINGUTILS_H_
+#ifndef IREE_COMPILER_DIALECT_VM_UTILS_CONSTANTENCODING_H_
+#define IREE_COMPILER_DIALECT_VM_UTILS_CONSTANTENCODING_H_
 
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Location.h"
@@ -24,4 +24,4 @@ LogicalResult serializeConstantArray(Location loc, ElementsAttr elementsAttr,
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_CONSTANTENCODINGUTILS_H_
+#endif  // IREE_COMPILER_DIALECT_VM_UTILS_CONSTANTENCODING_H_

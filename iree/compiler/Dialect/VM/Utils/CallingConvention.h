@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_VM_TARGET_CALLINGCONVENTIONUTILS_H_
-#define IREE_COMPILER_DIALECT_VM_TARGET_CALLINGCONVENTIONUTILS_H_
+#ifndef IREE_COMPILER_DIALECT_VM_UTILS_CALLINGCONVENTION_H_
+#define IREE_COMPILER_DIALECT_VM_UTILS_CALLINGCONVENTION_H_
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
@@ -32,4 +32,4 @@ Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp);
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_CALLINGCONVENTIONUTILS_H_
+#endif  // IREE_COMPILER_DIALECT_VM_UTILS_CALLINGCONVENTION_H_

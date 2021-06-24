@@ -12,9 +12,9 @@
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
-#include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
-#include "iree/compiler/Dialect/VM/Target/ConstantEncodingUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
+#include "iree/compiler/Dialect/VM/Utils/ConstantEncoding.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
