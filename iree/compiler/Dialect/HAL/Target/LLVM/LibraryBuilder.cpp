@@ -43,7 +43,7 @@ static llvm::StructType *makeImportTableType(llvm::LLVMContext &context) {
           context, "iree_hal_executable_import_table_v0_t")) {
     return existingType;
   }
-  auto *i32Type = llvm::IntegerType::getInt64Ty(context);
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
   auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
   auto *type = llvm::StructType::create(context,
                                         {
@@ -126,7 +126,7 @@ static llvm::StructType *makeDispatchAttrsType(llvm::LLVMContext &context) {
                                    i16Type,
                                },
                                "iree_hal_executable_dispatch_attrs_v0_t",
-                               /*isPacked=*/true);
+                               /*isPacked=*/false);
   return type;
 }
 

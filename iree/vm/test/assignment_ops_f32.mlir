@@ -4,8 +4,8 @@ vm.module @assignment_ops_f32 {
   // ExtF32: Conditional assignment
   //===--------------------------------------------------------------------===//
 
-  vm.export @test_select_f32 attributes {emitc.exclude}
-  vm.func private @test_select_f32() {
+  vm.export @test_select_f32
+  vm.func @test_select_f32() {
     %c0 = vm.const.i32 0 : i32
     %c0dno = iree.do_not_optimize(%c0) : i32
     %c1 = vm.const.i32 1 : i32
