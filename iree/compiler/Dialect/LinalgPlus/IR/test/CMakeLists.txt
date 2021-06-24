@@ -14,10 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "byte_buffer_ops.mlir"
-    "do_not_optimize.mlir"
-    "list_ops.mlir"
-    "parse_print.mlir"
+    "roundtrip.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
