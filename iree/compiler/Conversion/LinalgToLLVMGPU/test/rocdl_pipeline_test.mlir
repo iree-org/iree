@@ -83,7 +83,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
             %13 = affine.min #map2(%arg0)[%workgroup_size_y]
             %14 = affine.min #map2(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%15, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
             %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x1024xf32>
           }

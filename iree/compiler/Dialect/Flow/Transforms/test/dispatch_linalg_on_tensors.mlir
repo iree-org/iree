@@ -95,7 +95,7 @@ func @fuse_matmul_with_fill(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tenso
   %M = memref.dim %A, %c0 : tensor<?x?xf32>
   %N = memref.dim %B, %c1 : tensor<?x?xf32>
   %0 = linalg.init_tensor [%M, %N] : tensor<?x?xf32>
-  %1 = linalg.fill(%0, %zero) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %1 = linalg.fill(%zero, %0) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
   %2 = linalg.matmul ins(%A, %B : tensor<?x?xf32>, tensor<?x?xf32>)
     outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %2 : tensor<?x?xf32>
@@ -120,7 +120,7 @@ func @fuse_matmul_with_fill(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tenso
 //   CHECK-DAG:            %[[LHS_TILE:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
 //   CHECK-DAG:            %[[RHS_TILE:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
 //   CHECK-DAG:            %[[INIT_TILE:.+]] = linalg.init_tensor
-//       CHECK:            %[[FILL_TILE:.+]] = linalg.fill(%[[INIT_TILE]], %[[ZERO]])
+//       CHECK:            %[[FILL_TILE:.+]] = linalg.fill(%[[ZERO]], %[[INIT_TILE]])
 //       CHECK:            %[[RESULT_TILE:.+]] = linalg.matmul
 //  CHECK-SAME:              ins(%[[LHS_TILE]], %[[RHS_TILE]] : tensor<?x?xf32>, tensor<?x?xf32>)
 //  CHECK-SAME:              outs(%[[FILL_TILE]] : tensor<?x?xf32>)
@@ -139,7 +139,7 @@ func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tensor<?x
   %N = memref.dim %B, %c1 : tensor<?x?xf32>
   %K = memref.dim %A, %c1 : tensor<?x?xf32>
   %0 = linalg.init_tensor [%M, %N] : tensor<?x?xf32>
-  %1 = linalg.fill(%0, %zero) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %1 = linalg.fill(%zero, %0) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
   %2 = linalg.init_tensor [%M, %K] : tensor<?x?xf32>
   %3 = linalg.generic
     {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -182,7 +182,7 @@ func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tensor<?x
 //       CHECK:       scf.for
 //       CHECK:         scf.for
 //       CHECK:            %[[INIT_TILE:.+]] = linalg.init_tensor
-//       CHECK:            %[[FILL_TILE:.+]] = linalg.fill(%[[INIT_TILE]], %[[ZERO]])
+//       CHECK:            %[[FILL_TILE:.+]] = linalg.fill(%[[ZERO]], %[[INIT_TILE]])
 //       CHECK:            linalg.matmul
 //       CHECK:              outs(%[[FILL_TILE]] : tensor<?x?xf32>)
 
@@ -200,7 +200,7 @@ func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tensor<?x
 //   NOCHECK-DAG:              %[[LHS_TILE_2:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
 //   NOCHECK-DAG:              %[[RHS_TILE_2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
 //   NOCHECK-DAG:              %[[INIT_TILE_2:.+]] = linalg.init_tensor
-//       NOCHECK:              %[[FILL_TILE:.+]] = linalg.fill(%[[INIT_TILE]], %[[ZERO]])
+//       NOCHECK:              %[[FILL_TILE:.+]] = linalg.fill(%[[ZERO]], %[[INIT_TILE]])
 //       NOCHECK:              %[[RESULT_TILE_2:.++]]] = linalg.matmul
 //  NOCHECK-SAME:                ins(%[[LHS_TILE_2]], %[[RHS_TILE_2]] : tensor<?x?xf32>, tensor<?x?xf32>)
 //       NOCHECK:                outs(%[[FILL_TILE_2]] : tensor<?x?xf32>)
@@ -289,13 +289,13 @@ func @always_fuse_reshape
   %m = memref.dim %0, %c0 : tensor<?x4xf32>
   %n1 = memref.dim %rhs1, %c1 : tensor<4x?xf32>
   %init1 = linalg.init_tensor [%m, %n1] : tensor<?x?xf32>
-  %fill1 = linalg.fill(%init1, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %fill1 = linalg.fill(%cst, %init1) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
   %1 = linalg.matmul
     ins(%0, %rhs1 : tensor<?x4xf32>, tensor<4x?xf32>)
     outs(%fill1 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %n2 = memref.dim %rhs2, %c1 : tensor<4x?xf32>
   %init2 = linalg.init_tensor [%m, %n2] : tensor<?x?xf32>
-  %fill2 = linalg.fill(%init2, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %fill2 = linalg.fill(%cst, %init2) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
   %2= linalg.matmul
     ins(%0, %rhs2 : tensor<?x4xf32>, tensor<4x?xf32>)
     outs(%fill2 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -331,7 +331,7 @@ func @fuse_tensor_update_with_fill(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %
   %3 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%1)[%arg2, %arg4]
   %4 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%2)[%arg3, %arg5]
   %5 = linalg.init_tensor [%3, %4] : tensor<?x?xf32>
-  %6 = linalg.fill(%5, %0) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %6 = linalg.fill(%0, %5) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
   %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32>{%1, %2} -> tensor<?x?xf32>{%3, %4}
   return %7 : tensor<?x?xf32>
 }
@@ -355,7 +355,7 @@ func @fuse_tensor_update_with_fill(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %
 //  CHECK-SAME:    (%[[ARG1]], %[[RD0]], %[[RD1]])
 //   CHECK-DAG:      %[[VAL:.+]] = tensor.extract
 //   CHECK-DAG:      %[[INIT:.+]] = linalg.init_tensor
-//       CHECK:      %[[RETURN:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
+//       CHECK:      %[[RETURN:.+]] = linalg.fill(%[[VAL]], %[[INIT]])
 //       CHECK:      flow.dispatch.tensor.store %[[RETURN]], {{.*}}
 //  CHECK-NEXT:      flow.return
 //       CHECK:   flow.tensor.update %[[ARG0]], %[[RESULT]]
@@ -448,7 +448,7 @@ func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: 
 func @conv2d(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>) -> tensor<1x112x112x32xf32> {
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %cst = constant 0.000000e+00 : f32
-  %1 = linalg.fill(%0, %cst) : tensor<1x112x112x32xf32>, f32 -> tensor<1x112x112x32xf32>
+  %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
   %2 = linalg.conv_2d_input_nhwc_filter_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
@@ -467,7 +467,7 @@ func @conv2d(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>) -
 func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96xf32>) -> tensor<1x56x56x96xf32> {
   %cst = constant 0.000000e+00 : f32
   %1 = linalg.init_tensor [1, 56, 56, 96] : tensor<1x56x56x96xf32>
-  %2 = linalg.fill(%1, %cst) : tensor<1x56x56x96xf32>, f32 -> tensor<1x56x56x96xf32>
+  %2 = linalg.fill(%cst, %1) : f32, tensor<1x56x56x96xf32> -> tensor<1x56x56x96xf32>
   %4 = linalg.depthwise_conv_2d_input_nhwc_filter_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%input, %filter : tensor<1x113x113x96xf32>, tensor<3x3x96xf32>) outs(%2 : tensor<1x56x56x96xf32>) -> tensor<1x56x56x96xf32>
   return %4 : tensor<1x56x56x96xf32>
 }
@@ -482,7 +482,7 @@ func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96x
 func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32> {
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 225, 225, 3] : tensor<1x225x225x3xf32>
-  %1 = linalg.fill(%0, %cst) : tensor<1x225x225x3xf32>, f32 -> tensor<1x225x225x3xf32>
+  %1 = linalg.fill(%cst, %0) : f32, tensor<1x225x225x3xf32> -> tensor<1x225x225x3xf32>
   %2 = tensor.insert_slice %arg0 into %1[0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1] : tensor<1x224x224x3xf32> into tensor<1x225x225x3xf32>
   return %2 : tensor<1x225x225x3xf32>
 }
@@ -512,7 +512,7 @@ func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32
 func @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: tensor<1000xf32>, %offset: tensor<f32>) -> tensor<f32> {
   %zero = constant 0.0 : f32
   %init = linalg.init_tensor [] : tensor<f32>
-  %fill = linalg.fill(%init, %zero) : tensor<f32>, f32 -> tensor<f32>
+  %fill = linalg.fill(%zero, %init) : f32, tensor<f32> -> tensor<f32>
   %reduce = linalg.generic {
               indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>, affine_map<(d0) -> ()>],
               iterator_types = ["reduction"]}
@@ -762,8 +762,8 @@ func @multi_result(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?xi32>) -> (tensor<?x
   %c0 = constant 0 : index
   %0 = memref.dim %arg0, %c0 : tensor<?x?xi32>
   %1 = linalg.init_tensor [%0] : tensor<?xi32>
-  %2 = linalg.fill(%1, %cmin) : tensor<?xi32>, i32 -> tensor<?xi32>
-  %3 = linalg.fill(%1, %c0_i32) : tensor<?xi32>, i32 -> tensor<?xi32>
+  %2 = linalg.fill(%cmin, %1) : i32, tensor<?xi32> -> tensor<?xi32>
+  %3 = linalg.fill(%c0_i32, %1) : i32, tensor<?xi32> -> tensor<?xi32>
   %4:2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
                        affine_map<(d0, d1) -> (d1, d0)>,
@@ -879,7 +879,7 @@ func @dynamic_dot() -> !hal.buffer_view attributes {iree.abi.stub} {
   %2 = memref.dim %0, %c0 : tensor<?x?xf32>
   %3 = memref.dim %1, %c1 : tensor<?x?xf32>
   %4 = linalg.init_tensor [%2, %3] : tensor<?x?xf32>
-  %5 = linalg.fill(%4, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %5 = linalg.fill(%cst, %4) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
   %6 = linalg.matmul ins(%0, %1 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%5 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %7 = memref.dim %6, %c0 : tensor<?x?xf32>
   %8 = memref.dim %6, %c1 : tensor<?x?xf32>

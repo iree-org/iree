@@ -30,7 +30,7 @@ module  {
         %13 = affine.min affine_map<(d0) -> (-d0 + 5, 64)>(%arg0)
         %14 = affine.min affine_map<(d0) -> (-d0 + 5, 64)>(%arg1)
         %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-        %16 = linalg.fill(%15, %cst) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+        %16 = linalg.fill(%cst, %15) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
         %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config1} ins(%8, %10 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:5x5xf32>
       }
@@ -60,7 +60,7 @@ module  {
 //  CHECK-NEXT: linalg.yield %[[C0]] : f32
 //  CHECK-NEXT: tensor<3x?xf32> to tensor<4x8xf32>
 //       CHECK: %[[PADDED_RESULT:.+]] = linalg.init_tensor [8, 8] : tensor<8x8xf32>
-//       CHECK: %[[PADDED_RESULT_0:.+]] = linalg.fill(%[[PADDED_RESULT]], %[[C0]]) : tensor<8x8xf32>
+//       CHECK: %[[PADDED_RESULT_0:.+]] = linalg.fill(%[[C0]], %[[PADDED_RESULT]]) : f32, tensor<8x8xf32>
 //       CHECK: %[[MATMUL_RESULT:.+]] = linalg.matmul {{.*}} ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<8x4xf32>, tensor<4x8xf32>) outs(%[[PADDED_RESULT_0]] : tensor<8x8xf32>) -> tensor<8x8xf32>
 //       CHECK: %[[CLIPED_RESULT:.+]] = tensor.extract_slice %[[MATMUL_RESULT]][0, 0] [%[[LHS_TILE_SIZE]], %[[RHS_TILE_SIZE]]] [1, 1] : tensor<8x8xf32> to tensor<?x?xf32>
 //       CHECK:  flow.dispatch.tensor.store %[[CLIPED_RESULT]], %[[RESULT]], offsets = [%{{.*}}, %{{.*}}], sizes = [%[[LHS_TILE_SIZE]], %[[RHS_TILE_SIZE]]], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:5x5xf32>

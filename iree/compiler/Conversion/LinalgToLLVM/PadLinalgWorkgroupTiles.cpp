@@ -209,7 +209,7 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
       Value zero =
           rewriter.create<ConstantOp>(loc, rewriter.getZeroAttr(elementType));
       auto filledStaticResult =
-          rewriter.create<linalg::FillOp>(loc, staticResult, zero);
+          rewriter.create<linalg::FillOp>(loc, zero, staticResult);
       auto paddedMatmulOp =
           cast<linalg::LinalgOp>(matmulOp.getOperation())
               .clone(rewriter, loc, {resultType},

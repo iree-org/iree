@@ -40,7 +40,7 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
             %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg0)[%workgroup_size_y]
             %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%15, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
             %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>
           }
@@ -112,7 +112,7 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
             %18 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg0)[%workgroup_size_y]
             %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 256, s0)>(%arg1)[%workgroup_size_x]
             %20 = linalg.init_tensor [%18, %19] : tensor<?x?xf32>
-            %21 = linalg.fill(%20, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+            %21 = linalg.fill(%cst, %20) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
             %22 = linalg.matmul ins(%15, %17 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%21 : tensor<?x?xf32>) -> tensor<?x?xf32>
             %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%13 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
             ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
