@@ -114,6 +114,7 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
+    std::string targetTriple = "", std::string targetDataLayout = "",
     bool unfuseFMAOps = false);
 
 /// Pass to convert Linalg ops into vector operations.
@@ -140,12 +141,20 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createLowerExecutableTargetPass(bool lowerToVectors = true);
 
 //----------------------------------------------------------------------------//
-// LinalgToLLVM  Pass Pipelines for lowering to LLVM dialect.
+// LinalgToLLVM Pass Pipelines for lowering to LLVM dialect.
 //----------------------------------------------------------------------------//
 
 /// Options for LLVM pipeline.
 struct LLVMTransformPassPipelineOptions
     : public PassPipelineOptions<LLVMTransformPassPipelineOptions> {
+  Option<std::string> targetTriple{
+      *this, "target-triple", llvm::cl::desc("Code generation target triple."),
+      llvm::cl::init("")};
+  Option<std::string> targetDataLayout{
+      *this, "target-data-layout",
+      llvm::cl::desc("Code generation target data layout."),
+      llvm::cl::init("")};
+
   Option<bool> unfuseFMAOps{
       *this, "unfuse-fma-ops",
       llvm::cl::desc("Enable rewriting llvm.fma to its unfused version."),

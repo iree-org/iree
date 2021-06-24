@@ -30,6 +30,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineToStandard
+    MLIRAnalysis
     MLIRIR
     MLIRLLVMIR
     MLIRLinalg

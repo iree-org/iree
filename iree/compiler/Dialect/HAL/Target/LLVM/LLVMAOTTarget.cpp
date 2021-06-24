@@ -77,15 +77,27 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
+    auto targetMachine = createTargetMachine(options_);
+    if (!targetMachine) {
+      llvm::errs() << "failed to create target machine for target triple '"
+                   << options_.targetTriple << "'";
+      return;
+    }
+
     passManager.addPass(createLowerExecutableTargetPass());
+
     // Set target specific options.
+    LLVMTransformPassPipelineOptions codeGenOptions;
+    codeGenOptions.targetTriple = options_.targetTriple;
+    codeGenOptions.targetDataLayout =
+        targetMachine->createDataLayout().getStringRepresentation();
+
     // TODO(ataei): This is temporary here, should move when target specific
     // overrides options grows.
-    llvm::Triple triple(options_.targetTriple);
-    LLVMTransformPassPipelineOptions codeGenOptions;
-    if (triple.isWasm()) {
+    if (targetMachine->getTargetTriple().isWasm()) {
       codeGenOptions.unfuseFMAOps = true;
     }
+
     buildLLVMTransformPassPipeline(passManager, codeGenOptions);
   }
 
