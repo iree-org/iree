@@ -36,6 +36,7 @@ iree_py_library(
     "__init__.py"
     "function.py"
     "system_api.py"
+    "tracing.py"
   PYEXT_DEPS
     ::PyExtRt
 )

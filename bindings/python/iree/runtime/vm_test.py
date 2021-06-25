@@ -140,8 +140,6 @@ class VmTest(absltest.TestCase):
     logging.info("context: %s", context)
 
   def test_add_scalar_new_abi(self):
-    # TODO: Enable with new ABI.
-    return
     m = create_add_scalar_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
@@ -152,8 +150,6 @@ class VmTest(absltest.TestCase):
     self.assertEqual(result, 11)
 
   def test_synchronous_dynamic_shape_invoke_function_new_abi(self):
-    # TODO: Enable with new ABI.
-    return
     m = create_simple_dynamic_abs_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
@@ -165,8 +161,6 @@ class VmTest(absltest.TestCase):
     np.testing.assert_allclose(result, [[1., 2.], [3., 4.]])
 
   def test_synchronous_invoke_function_new_abi(self):
-    # TODO: Enable with new ABI.
-    return
     m = create_simple_static_mul_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])

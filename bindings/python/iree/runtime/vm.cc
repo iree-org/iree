@@ -120,7 +120,8 @@ void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
 // VmModule
 //------------------------------------------------------------------------------
 
-VmModule VmModule::FromFlatbufferBlob(py::buffer flatbuffer_blob) {
+VmModule VmModule::FromFlatbufferBlob(py::object flatbuffer_blob_object) {
+  auto flatbuffer_blob = py::cast<py::buffer>(flatbuffer_blob_object);
   auto buffer_info = flatbuffer_blob.request();
   iree_vm_module_t* module;
 
@@ -143,7 +144,9 @@ VmModule VmModule::FromFlatbufferBlob(py::buffer flatbuffer_blob) {
   }
 
   CheckApiStatus(status, "Error creating vm module from flatbuffer");
-  return VmModule::CreateRetained(module);
+  auto py_module = VmModule::CreateRetained(module);
+  py_module.stashed_flatbuffer_blob = flatbuffer_blob_object;
+  return py_module;
 }
 
 std::optional<iree_vm_function_t> VmModule::LookupFunction(
@@ -501,6 +504,10 @@ void SetupVmBindings(pybind11::module m) {
   py::class_<iree_vm_function_t>(m, "VmFunction")
       .def_readonly("linkage", &iree_vm_function_t::linkage)
       .def_readonly("ordinal", &iree_vm_function_t::ordinal)
+      .def_property_readonly("name", [](iree_vm_function_t& self) {
+        iree_string_view_t name = iree_vm_function_name(&self);
+        return py::str(name.data, name.size);
+      })
       .def_property_readonly("reflection",
                              [](iree_vm_function_t& self) {
                                return GetFunctionReflectionDict(self);
@@ -534,6 +541,9 @@ void SetupVmBindings(pybind11::module m) {
       .def_property_readonly("name", &VmModule::name)
       .def("lookup_function", &VmModule::LookupFunction, py::arg("name"),
            py::arg("linkage") = IREE_VM_FUNCTION_LINKAGE_EXPORT)
+      .def_property_readonly("stashed_flatbuffer_blob", [](VmModule &self) {
+          return self.get_stashed_flatbuffer_blob();
+      })
       .def("__repr__", [](VmModule& self) {
         std::string repr("<VmModule ");
         iree_string_view_t name = iree_vm_module_name(self.raw_ptr());
