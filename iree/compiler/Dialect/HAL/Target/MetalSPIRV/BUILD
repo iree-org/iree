@@ -26,8 +26,8 @@ cc_library(
     hdrs = ["MetalSPIRVTarget.h"],
     deps = [
         ":SPIRVToMSL",
-        "//iree/compiler/Conversion:PassHeaders",
-        "//iree/compiler/Conversion/Common",
+        "//iree/compiler/Codegen:PassHeaders",
+        "//iree/compiler/Codegen/Common",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Target/SPIRVCommon",
         "//iree/compiler/Utils",

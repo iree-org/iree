@@ -40,7 +40,7 @@ void SPIRVTargetBackend::declareTargetOpsForEnv(
 
 void SPIRVTargetBackend::buildTranslationPassPipeline(
     OpPassManager &passManager) {
-  buildSPIRVTransformPassPipeline(passManager, spvCodeGenOptions_);
+  buildSPIRVCodegenPassPipeline(passManager, spvCodeGenOptions_);
 }
 
 }  // namespace HAL

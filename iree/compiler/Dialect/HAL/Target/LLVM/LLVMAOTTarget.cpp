@@ -8,7 +8,7 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
@@ -83,11 +83,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                    << options_.targetTriple << "'";
       return;
     }
-
-    passManager.addPass(createLowerExecutableTargetPass());
-
+    passManager.addPass(createLLVMCPULowerExecutableTargetPass());
     // Set target specific options.
-    LLVMTransformPassPipelineOptions codeGenOptions;
+    LLVMCPUCodegenPassPipelineOptions codeGenOptions;
     codeGenOptions.targetTriple = options_.targetTriple;
     codeGenOptions.targetDataLayout =
         targetMachine->createDataLayout().getStringRepresentation();
@@ -98,7 +96,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       codeGenOptions.unfuseFMAOps = true;
     }
 
-    buildLLVMTransformPassPipeline(passManager, codeGenOptions);
+    buildLLVMCPUCodegenPassPipeline(passManager, codeGenOptions);
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {

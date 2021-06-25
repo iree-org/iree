@@ -122,7 +122,7 @@ struct DispatchLinalgOnTensorsPass
 
 /// Returns the number of consecutive outer loops that are "parallel". This is a
 /// copy of the function from
-/// iree/compiler/Conversion/CodegenUtils/FunctionUtils.h that is duplicated
+/// iree/compiler/Codegen/CodegenUtils/FunctionUtils.h that is duplicated
 /// here to avoid adding an build dependency.
 static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
   return op.iterator_types()
