@@ -55,6 +55,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_benchmark//:benchmark": ["benchmark"],
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
+    "@com_github_yaml_libyaml//:yaml": ["yaml"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
     "@cpuinfo": ["cpuinfo"],

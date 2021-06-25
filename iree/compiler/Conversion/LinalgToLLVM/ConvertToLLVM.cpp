@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -603,8 +604,15 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
 
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
  public:
-  ConvertToLLVMPass(bool unfuseFMA = false) { unfuseFMAOps = unfuseFMA; }
+  ConvertToLLVMPass(std::string targetTriple = "",
+                    std::string targetDataLayout = "", bool unfuseFMA = false) {
+    this->targetTriple = targetTriple;
+    this->targetDataLayout = targetDataLayout;
+    unfuseFMAOps = unfuseFMA;
+  }
   ConvertToLLVMPass(const ConvertToLLVMPass &pass) {
+    targetTriple = pass.targetTriple;
+    targetDataLayout = pass.targetDataLayout;
     unfuseFMAOps = pass.unfuseFMAOps;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -614,6 +622,13 @@ class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
   void runOnOperation() override;
 
  private:
+  Option<std::string> targetTriple{
+      *this, "target-triple", llvm::cl::desc("Code generation target triple."),
+      llvm::cl::init("")};
+  Option<std::string> targetDataLayout{
+      *this, "target-data-layout",
+      llvm::cl::desc("Code generation target data layout."),
+      llvm::cl::init("")};
   Option<bool> unfuseFMAOps{
       *this, "unfuse-fma-ops",
       llvm::cl::desc("Enable rewriting llvm.fma to its unfused version."),
@@ -623,6 +638,15 @@ class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
 }  // namespace
 
 void ConvertToLLVMPass::runOnOperation() {
+  auto module = getOperation();
+
+  // Add required attributes to the module so that the lowering knows how to
+  // handle structs and data layouts.
+  module->setAttr(LLVM::LLVMDialect::getTargetTripleAttrName(),
+                  StringAttr::get(module->getContext(), targetTriple));
+  module->setAttr(LLVM::LLVMDialect::getDataLayoutAttrName(),
+                  StringAttr::get(module->getContext(), targetDataLayout));
+
   // Run Vector -> Vector transformations ahead of conversion to LLVM.
   {
     OwningRewritePatternList patterns(&getContext());
@@ -647,9 +671,12 @@ void ConvertToLLVMPass::runOnOperation() {
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(mathPatterns));
   }
 
-  auto module = getOperation();
-
-  LLVMTypeConverter converter(&getContext());
+  const auto &dataLayoutAnalysis = getAnalysis<DataLayoutAnalysis>();
+  LowerToLLVMOptions options(&getContext(),
+                             dataLayoutAnalysis.getAtOrAbove(module));
+  options.dataLayout = llvm::DataLayout(targetDataLayout);
+  options.overrideIndexBitwidth(options.dataLayout.getPointerSizeInBits());
+  LLVMTypeConverter converter(&getContext(), options, &dataLayoutAnalysis);
   converter.addConversion([](Shape::RankedShapeType, SmallVectorImpl<Type> &) {
     return success();
   });
@@ -732,8 +759,9 @@ void ConvertToLLVMPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
-    bool unfuseFMAOps) {
-  return std::make_unique<ConvertToLLVMPass>(unfuseFMAOps);
+    std::string targetTriple, std::string targetDataLayout, bool unfuseFMAOps) {
+  return std::make_unique<ConvertToLLVMPass>(targetTriple, targetDataLayout,
+                                             unfuseFMAOps);
 }
 
 }  // namespace iree_compiler

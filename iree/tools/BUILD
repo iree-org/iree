@@ -285,6 +285,7 @@ cc_binary(
         "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
+        "//iree/tools/utils:yaml_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",

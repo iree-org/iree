@@ -1326,6 +1326,14 @@ void populateVMToEmitCPatterns(MLIRContext *context,
       context, "vm_cmp_ne_ref", vmAnalysisCache);
   patterns.insert<CompareRefNotZeroOpConversion>(context, vmAnalysisCache);
 
+  // ExtF32: Globals
+  patterns.insert<
+      GlobalLoadOpConversion<IREE::VM::GlobalLoadF32Op, IREE::VM::GlobalF32Op>>(
+      context, "vm_global_load_f32");
+  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreF32Op,
+                                          IREE::VM::GlobalF32Op>>(
+      context, "vm_global_store_f32");
+
   // ExtF32: Native floating-point constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstF32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstF32ZeroOp>>(context);
@@ -1403,6 +1411,14 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                                             "vm_cmp_lte_f32u");
   patterns.insert<CallOpConversion<IREE::VM::CmpNaNF32Op>>(context,
                                                            "vm_cmp_nan_f32");
+
+  // ExtI64: Globals
+  patterns.insert<
+      GlobalLoadOpConversion<IREE::VM::GlobalLoadI64Op, IREE::VM::GlobalI64Op>>(
+      context, "vm_global_load_i64");
+  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreI64Op,
+                                          IREE::VM::GlobalI64Op>>(
+      context, "vm_global_store_i64");
 
   // ExtI64: Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI64Op>>(context);
@@ -1505,6 +1521,8 @@ class ConvertVMToEmitCPass
 
     // Global ops
     target.addLegalOp<IREE::VM::GlobalI32Op>();
+    target.addLegalOp<IREE::VM::GlobalI64Op>();
+    target.addLegalOp<IREE::VM::GlobalF32Op>();
     target.addLegalOp<IREE::VM::RodataOp>();
 
     // Control flow ops
