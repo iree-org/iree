@@ -85,7 +85,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
     passManager.addPass(createLLVMCPULowerExecutableTargetPass());
     // Set target specific options.
-    LLVMTransformPassPipelineOptions codeGenOptions;
+    LLVMCPUCodegenPassPipelineOptions codeGenOptions;
     codeGenOptions.targetTriple = options_.targetTriple;
     codeGenOptions.targetDataLayout =
         targetMachine->createDataLayout().getStringRepresentation();
