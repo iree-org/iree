@@ -89,7 +89,8 @@ static void addLowerToLLVMPasses(
   passManager.addPass(createFoldTensorExtractOpPass());
 
   // (HAL, IREE, Linalg, STD) -> LLVM
-  passManager.addPass(createConvertToLLVMPass());
+  passManager.addPass(createConvertToLLVMPass(
+      options.targetTriple, options.targetDataLayout, options.unfuseFMAOps));
 
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());

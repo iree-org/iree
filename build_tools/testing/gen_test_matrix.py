@@ -83,6 +83,7 @@ from typing import Set, Tuple
 import argparse
 from contextlib import contextmanager
 import os
+import shutil
 
 try:
   import yaml
@@ -126,7 +127,10 @@ class Environment:
       for gen_dir, fname in obsolete_gen_files:
         obsolete_path = os.path.join(gen_dir, fname)
         log(f"Removing obsolete file {obsolete_path}")
-        os.remove(obsolete_path)
+        if os.path.isdir(obsolete_path):
+          shutil.rmtree(obsolete_path)
+        else:
+          os.remove(obsolete_path)
 
 
 class Runner:

@@ -149,6 +149,21 @@ static inline iree_status_t vm_fail_or_ok(int32_t status_code,
 }
 
 //===------------------------------------------------------------------===//
+// ExtI64: Globals
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_global_load_i64(uint8_t* base, uint32_t byte_offset) {
+  const int64_t* global_ptr = (const int64_t*)(base + byte_offset);
+  return *global_ptr;
+}
+
+static inline void vm_global_store_i64(uint8_t* base, uint32_t byte_offset,
+                                       int64_t value) {
+  int64_t* global_ptr = (int64_t*)(base + byte_offset);
+  *global_ptr = value;
+}
+
+//===------------------------------------------------------------------===//
 // ExtI64: Conditional assignment
 //===------------------------------------------------------------------===//
 
@@ -235,6 +250,21 @@ static inline int32_t vm_cmp_lt_i64u(int64_t lhs, int64_t rhs) {
 }
 static inline int32_t vm_cmp_nz_i64(int64_t operand) {
   return (operand != 0) ? 1 : 0;
+}
+
+//===------------------------------------------------------------------===//
+// ExtF32: Globals
+//===------------------------------------------------------------------===//
+
+static inline float vm_global_load_f32(uint8_t* base, uint32_t byte_offset) {
+  const float* global_ptr = (const float*)(base + byte_offset);
+  return *global_ptr;
+}
+
+static inline void vm_global_store_f32(uint8_t* base, uint32_t byte_offset,
+                                       float value) {
+  float* global_ptr = (float*)(base + byte_offset);
+  *global_ptr = value;
 }
 
 //===------------------------------------------------------------------===//

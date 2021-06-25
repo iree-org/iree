@@ -160,26 +160,6 @@ static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
                                      mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
 
-  for (auto globalOp : moduleOp.getOps<IREE::VM::GlobalI32Op>()) {
-    Optional<Attribute> initialValue = globalOp.initial_value();
-    Optional<StringRef> initializer = globalOp.initializer();
-    if (initialValue.hasValue()) {
-      // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so
-      // the struct argument name here must not be changed.
-      emitter.ostream() << "vm_global_store_i32(state->rwdata, "
-                        << globalOp.ordinal() << ", ";
-      if (failed(emitter.emitAttribute(*globalOp.getOperation(),
-                                       initialValue.getValue()))) {
-        return globalOp.emitError() << "Unable to emit initial_value";
-      }
-      emitter.ostream() << ");\n";
-    } else if (initializer.hasValue()) {
-      return globalOp.emitError()
-             << "Initializers for globals not supported yet";
-    }
-  }
-  // TODO(simon-camp): Support globals with different element type
-
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
     std::string buffer_name =
         moduleOp.getName().str() + "_" + rodataOp.getName().str();
