@@ -6,7 +6,7 @@
 
 #include "iree_tf_compiler/MHLO/Passes.h"
 
-#include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
