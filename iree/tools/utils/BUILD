@@ -45,3 +45,15 @@ cc_test(
         "//iree/vm:cc",
     ],
 )
+
+cc_library(
+    name = "yaml_util",
+    srcs = ["yaml_util.c"],
+    hdrs = ["yaml_util.h"],
+    deps = [
+        "//iree/base",
+        "//iree/hal",
+        "//iree/vm",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
