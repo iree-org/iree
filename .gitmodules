@@ -50,3 +50,6 @@
 [submodule "third_party/stblib"]
 	path = third_party/stblib
 	url = https://github.com/nothings/stb
+[submodule "third_party/libyaml"]
+	path = third_party/libyaml
+	url = https://github.com/yaml/libyaml.git

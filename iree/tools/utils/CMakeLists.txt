@@ -49,6 +49,21 @@ iree_cc_test(
     iree::vm::cc
 )
 
+iree_cc_library(
+  NAME
+    yaml_util
+  HDRS
+    "yaml_util.h"
+  SRCS
+    "yaml_util.c"
+  DEPS
+    iree::base
+    iree::hal
+    iree::vm
+    yaml
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # image utility library based on stb_image.h in https://github.com/nothings/stb
