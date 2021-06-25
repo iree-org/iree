@@ -276,6 +276,15 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
 class FlattenTuplesInCFGPass
     : public PassWrapper<FlattenTuplesInCFGPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-mhlo-flatten-tuples-in-cfg";
+  }
+
+  StringRef getDescription() const override {
+    return "Convert functions to remove tuples from method signatures and "
+           "blocks";
+  }
+
   void runOnOperation() override {
     auto module = getOperation();
     Builder builder(module.getContext());
@@ -320,9 +329,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass() {
   return std::make_unique<FlattenTuplesInCFGPass>();
 }
 
-static PassRegistration<FlattenTuplesInCFGPass> pass(
-    "iree-mhlo-flatten-tuples-in-cfg",
-    "Convert functions to remove tuples from method signatures and blocks");
+static PassRegistration<FlattenTuplesInCFGPass> pass;
 
 }  // namespace MHLO
 }  // namespace iree_integrations

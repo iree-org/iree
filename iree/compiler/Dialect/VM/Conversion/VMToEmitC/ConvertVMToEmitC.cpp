@@ -1490,6 +1490,12 @@ class ConvertVMToEmitCPass
     registry.insert<mlir::emitc::EmitCDialect, IREEDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-convert-vm-to-emitc"; }
+
+  StringRef getDescription() const override {
+    return "Convert VM Ops to the EmitC dialect";
+  }
+
   void runOnOperation() override {
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter;
@@ -1551,8 +1557,7 @@ createConvertVMToEmitCPass() {
 }  // namespace VM
 }  // namespace IREE
 
-static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass(
-    "iree-convert-vm-to-emitc", "Convert VM Ops to the EmitC dialect");
+static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass;
 
 }  // namespace iree_compiler
 }  // namespace mlir

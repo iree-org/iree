@@ -163,6 +163,15 @@ struct AffineMinDistributedSCFCanonicalizationPattern
 struct AffineMinDistributedSCFCanonicalizationPass
     : public PassWrapper<AffineMinDistributedSCFCanonicalizationPass,
                          FunctionPass> {
+  StringRef getArgument() const override {
+    return "iree-codegen-affinemin-scf-canonicalization";
+  }
+
+  StringRef getDescription() const override {
+    return "Pass to run pass cleaning up affineMinOp after tiling and "
+           "distribute.";
+  }
+
   void runOnFunction() override {
     FuncOp funcOp = getFunction();
     RewritePatternSet foldPattern(&getContext());
@@ -183,12 +192,9 @@ void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns) {
       patterns.getContext());
 }
 
-static PassRegistration<AffineMinDistributedSCFCanonicalizationPass> pass(
-    "iree-codegen-affinemin-scf-canonicalization",
-    "Pass to run pass cleaning up affineMinOp after tiling and distribute.",
-    [] {
-      return std::make_unique<AffineMinDistributedSCFCanonicalizationPass>();
-    });
+static PassRegistration<AffineMinDistributedSCFCanonicalizationPass> pass([] {
+  return std::make_unique<AffineMinDistributedSCFCanonicalizationPass>();
+});
 
 }  // namespace iree_compiler
 }  // namespace mlir

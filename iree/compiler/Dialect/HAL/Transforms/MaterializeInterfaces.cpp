@@ -1122,6 +1122,14 @@ class MaterializeInterfacesPass
     }
   }
 
+  StringRef getArgument() const override {
+    return "iree-hal-materialize-interfaces2";
+  }
+
+  StringRef getDescription() const override {
+    return "Materializes hal.executable ops from flow.executable ops";
+  }
+
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
 
@@ -1189,12 +1197,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
   return std::make_unique<MaterializeInterfacesPass>(executableOptions);
 }
 
-static PassRegistration<MaterializeInterfacesPass> pass(
-    "iree-hal-materialize-interfaces2",
-    "Materializes hal.executable ops from flow.executable ops", [] {
-      auto options = getTargetOptionsFromFlags();
-      return std::make_unique<MaterializeInterfacesPass>(options);
-    });
+static PassRegistration<MaterializeInterfacesPass> pass([] {
+  auto options = getTargetOptionsFromFlags();
+  return std::make_unique<MaterializeInterfacesPass>(options);
+});
 
 }  // namespace HAL
 }  // namespace IREE

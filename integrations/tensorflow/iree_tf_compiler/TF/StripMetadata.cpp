@@ -34,6 +34,14 @@ static bool isTFAttr(NamedAttribute &namedAttr) {
 class StripModuleMetadataPass
     : public PassWrapper<StripModuleMetadataPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-tf-strip-module-metadata";
+  }
+
+  StringRef getDescription() const override {
+    return "Remove unneeded TensorFlow attributes from module ops";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
@@ -48,6 +56,14 @@ class StripModuleMetadataPass
 class StripFunctionMetadataPass
     : public PassWrapper<StripFunctionMetadataPass, OperationPass<FuncOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-tf-strip-function-metadata";
+  }
+
+  StringRef getDescription() const override {
+    return "Remove unneeded TensorFlow attributes from func ops";
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
@@ -85,13 +101,9 @@ std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass() {
   return std::make_unique<StripFunctionMetadataPass>();
 }
 
-static PassRegistration<StripModuleMetadataPass> modulePass(
-    "iree-tf-strip-module-metadata",
-    "Remove unneeded TensorFlow attributes from module ops");
+static PassRegistration<StripModuleMetadataPass> modulePass;
 
-static PassRegistration<StripFunctionMetadataPass> funcPass(
-    "iree-tf-strip-function-metadata",
-    "Remove unneeded TensorFlow attributes from func ops");
+static PassRegistration<StripFunctionMetadataPass> funcPass;
 
 }  // namespace TF
 }  // namespace iree_integrations
