@@ -120,7 +120,8 @@ void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
 // VmModule
 //------------------------------------------------------------------------------
 
-VmModule VmModule::FromFlatbufferBlob(py::buffer flatbuffer_blob) {
+VmModule VmModule::FromFlatbufferBlob(py::object flatbuffer_blob_object) {
+  auto flatbuffer_blob = py::cast<py::buffer>(flatbuffer_blob_object);
   auto buffer_info = flatbuffer_blob.request();
   iree_vm_module_t* module;
 
@@ -143,7 +144,9 @@ VmModule VmModule::FromFlatbufferBlob(py::buffer flatbuffer_blob) {
   }
 
   CheckApiStatus(status, "Error creating vm module from flatbuffer");
-  return VmModule::CreateRetained(module);
+  auto py_module = VmModule::CreateRetained(module);
+  py_module.stashed_flatbuffer_blob = flatbuffer_blob_object;
+  return py_module;
 }
 
 std::optional<iree_vm_function_t> VmModule::LookupFunction(
@@ -288,6 +291,109 @@ py::object VmVariantList::GetVariant(int index) {
       return GetAsList(index);
     } else if (iree_hal_buffer_view_isa(v.ref)) {
       return GetAsNdarray(index);
+    }
+  }
+
+  throw RaiseValueError("Unsupported VM to Python Type Conversion");
+}
+
+py::object VmVariantList::GetAsSerializedTraceValue(int index) {
+  iree_vm_variant_t v = iree_vm_variant_empty();
+  CheckApiStatus(iree_vm_list_get_variant(raw_ptr(), index, &v),
+                 "Could not access list element");
+  if (iree_vm_type_def_is_value(&v.type)) {
+    // Convert a value type.
+    py::dict record;
+    switch (v.type.value_type) {
+      case IREE_VM_VALUE_TYPE_I8:
+        record["i8"] = py::cast(v.i8);
+        break;
+      case IREE_VM_VALUE_TYPE_I16:
+        record["i16"] = py::cast(v.i16);
+        break;
+      case IREE_VM_VALUE_TYPE_I32:
+        record["i32"] = py::cast(v.i32);
+        break;
+      case IREE_VM_VALUE_TYPE_I64:
+        record["i64"] = py::cast(v.i64);
+        break;
+      case IREE_VM_VALUE_TYPE_F32:
+        record["f32"] = py::cast(v.f32);
+        break;
+      case IREE_VM_VALUE_TYPE_F64:
+        record["f64"] = py::cast(v.f64);
+        break;
+      default:
+        throw RaiseValueError("Unsupported VM value type conversion");
+    }
+    record["type"] = py::cast("value");
+    return std::move(record);
+  } else if (v.type.ref_type == IREE_VM_REF_TYPE_NULL) {
+    py::dict record;
+    record["type"] = "null";
+    return std::move(record);
+  } else if (iree_vm_type_def_is_ref(&v.type)) {
+    // Convert reference type.
+    if (iree_vm_list_isa(v.ref)) {
+      py::dict record;
+      record["type"] = "list";
+      py::list items;
+      iree_vm_list_t* sub_list = NULL;
+      CheckApiStatus(iree_vm_list_check_deref(v.ref, &sub_list),
+                     "Could not deref list (wrong type?)");
+      iree_vm_list_retain(sub_list);
+      VmVariantList sub_list_object(sub_list);
+      for (int i = 0, e = sub_list_object.size(); i < e; ++i) {
+        items.append(sub_list_object.GetAsSerializedTraceValue(i));
+      }
+      record["items"] = std::move(items);
+      return std::move(record);
+    } else if (iree_hal_buffer_view_isa(v.ref)) {
+      py::dict record;
+      record["type"] = "buffer_view";
+      iree_hal_buffer_view_t* buffer_view = iree_hal_buffer_view_deref(v.ref);
+      if (!buffer_view) {
+        throw RaiseValueError(
+            "Could not deref result buffer view (wrong type?)");
+      }
+      iree_hal_buffer_t* raw_buffer = iree_hal_buffer_view_buffer(buffer_view);
+      if (!raw_buffer) {
+        throw RaiseValueError("Could not deref result buffer (wrong type?)");
+      }
+
+      // Extract dims from the buffer view.
+      size_t rank = 0;
+      std::vector<int32_t> dims(6);
+      iree_status_t status = iree_hal_buffer_view_shape(
+          buffer_view, dims.capacity(), dims.data(), &rank);
+      if (iree_status_is_out_of_range(status)) {
+        dims.resize(rank);
+        status = iree_hal_buffer_view_shape(buffer_view, dims.capacity(),
+                                            dims.data(), &rank);
+      }
+      CheckApiStatus(status, "Error extracting shape");
+      dims.resize(rank);
+      record["shape"] = py::cast(std::move(dims));
+
+      // Element type.
+      iree_hal_element_type_t element_type =
+          iree_hal_buffer_view_element_type(buffer_view);
+      // TODO: Would be nice to output as hex.
+      record["element_type"] = element_type;
+
+      // Map memory.
+      iree_device_size_t byte_length = iree_hal_buffer_byte_length(raw_buffer);
+      iree_hal_buffer_mapping_t mapped_memory;
+      CheckApiStatus(iree_hal_buffer_map_range(
+                         raw_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                         0 /* element_offset */, byte_length, &mapped_memory),
+                     "Could not map memory");
+      record["contents"] =
+          py::bytes(reinterpret_cast<const char*>(mapped_memory.contents.data),
+                    mapped_memory.contents.data_length);
+      iree_hal_buffer_unmap_range(&mapped_memory);
+
+      return std::move(record);
     }
   }
 
@@ -492,6 +598,8 @@ void SetupVmBindings(pybind11::module m) {
       .def("get_as_ndarray", &VmVariantList::GetAsNdarray)
       .def("get_as_list", &VmVariantList::GetAsList)
       .def("get_variant", &VmVariantList::GetVariant)
+      .def("get_serialized_trace_value",
+           &VmVariantList::GetAsSerializedTraceValue)
       .def("push_float", &VmVariantList::PushFloat)
       .def("push_int", &VmVariantList::PushInt)
       .def("push_list", &VmVariantList::PushList)
@@ -501,6 +609,18 @@ void SetupVmBindings(pybind11::module m) {
   py::class_<iree_vm_function_t>(m, "VmFunction")
       .def_readonly("linkage", &iree_vm_function_t::linkage)
       .def_readonly("ordinal", &iree_vm_function_t::ordinal)
+      .def_property_readonly("name",
+                             [](iree_vm_function_t& self) {
+                               iree_string_view_t name =
+                                   iree_vm_function_name(&self);
+                               return py::str(name.data, name.size);
+                             })
+      .def_property_readonly("module_name",
+                             [](iree_vm_function_t& self) {
+                               iree_string_view_t name =
+                                   iree_vm_module_name(self.module);
+                               return py::str(name.data, name.size);
+                             })
       .def_property_readonly("reflection",
                              [](iree_vm_function_t& self) {
                                return GetFunctionReflectionDict(self);
@@ -534,6 +654,9 @@ void SetupVmBindings(pybind11::module m) {
       .def_property_readonly("name", &VmModule::name)
       .def("lookup_function", &VmModule::LookupFunction, py::arg("name"),
            py::arg("linkage") = IREE_VM_FUNCTION_LINKAGE_EXPORT)
+      .def_property_readonly(
+          "stashed_flatbuffer_blob",
+          [](VmModule& self) { return self.get_stashed_flatbuffer_blob(); })
       .def("__repr__", [](VmModule& self) {
         std::string repr("<VmModule ");
         iree_string_view_t name = iree_vm_module_name(self.raw_ptr());
