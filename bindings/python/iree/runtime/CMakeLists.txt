@@ -68,6 +68,8 @@ iree_py_install_package(
   MODULE_PATH iree/runtime
   DEPS
     bindings_python_iree_runtime_PyExtRt
+  ADDL_PACKAGE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/README.md
 )
 
 install(
