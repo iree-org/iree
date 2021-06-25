@@ -92,7 +92,7 @@ class FunctionInvoker:
   def __call__(self, *args, **kwargs):
     call_trace = None  # type: Optional[tracing.CallTrace]
     if self._tracer:
-      call_trace = self._tracer.start_call(self._vm_function.name)
+      call_trace = self._tracer.start_call(self._vm_function)
 
     # Initialize the capacity to our total number of args, since we should
     # be below that when doing a flat invocation. May want to be more

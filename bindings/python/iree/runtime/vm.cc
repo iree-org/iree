@@ -504,10 +504,18 @@ void SetupVmBindings(pybind11::module m) {
   py::class_<iree_vm_function_t>(m, "VmFunction")
       .def_readonly("linkage", &iree_vm_function_t::linkage)
       .def_readonly("ordinal", &iree_vm_function_t::ordinal)
-      .def_property_readonly("name", [](iree_vm_function_t& self) {
-        iree_string_view_t name = iree_vm_function_name(&self);
-        return py::str(name.data, name.size);
-      })
+      .def_property_readonly("name",
+                             [](iree_vm_function_t& self) {
+                               iree_string_view_t name =
+                                   iree_vm_function_name(&self);
+                               return py::str(name.data, name.size);
+                             })
+      .def_property_readonly("module_name",
+                             [](iree_vm_function_t& self) {
+                               iree_string_view_t name =
+                                   iree_vm_module_name(self.module);
+                               return py::str(name.data, name.size);
+                             })
       .def_property_readonly("reflection",
                              [](iree_vm_function_t& self) {
                                return GetFunctionReflectionDict(self);

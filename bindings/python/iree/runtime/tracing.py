@@ -83,13 +83,14 @@ class InvocationTracer:
   def add_module(self, module: TracedModule):
     self._modules.append(module)
 
-  def start_call(self, function_name: str):
-    logging.info("Tracing call to %s", function_name)
+  def start_call(self, function: _binding.VmFunction):
+    logging.info("Tracing call to %s.%s", function.module_name, function.name)
 
     # Start assembling the call record.
     record = {
         "modules": [m.serialize() for m in self._modules],
-        "function_name": function_name,
+        "module_name": function.module_name,
+        "function_name": function.name,
     }
     return CallTrace(self, record)
 
