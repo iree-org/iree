@@ -41,6 +41,7 @@ cc_library(
         "//iree/compiler/Dialect/Shape/Transforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineToStandardTransforms",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
