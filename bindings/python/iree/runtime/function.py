@@ -71,7 +71,8 @@ class FunctionInvoker:
   ]
 
   def __init__(self, vm_context: VmContext, device: HalDevice,
-               vm_function: VmFunction, tracer: Optional[tracing.InvocationTracer]):
+               vm_function: VmFunction,
+               tracer: Optional[tracing.ContextTracer]):
     self._vm_context = vm_context
     # TODO: Needing to know the precise device to allocate on here is bad
     # layering and will need to be fixed in some fashion if/when doing
@@ -114,7 +115,11 @@ class FunctionInvoker:
     arg_list = VmVariantList(len(args))
     ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
     _merge_python_sequence_to_vm(inv, arg_list, args, self._arg_descs)
+    if call_trace:
+      call_trace.add_vm_list(arg_list, "args")
     self._vm_context.invoke(self._vm_function, arg_list, ret_list)
+    if call_trace:
+      call_trace.add_vm_list(ret_list, "results")
     returns = _extract_vm_sequence_to_python(inv, ret_list, ret_descs)
     if call_trace:
       call_trace.end_call()

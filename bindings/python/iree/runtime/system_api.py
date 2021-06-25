@@ -123,9 +123,11 @@ class Config:
     hal_module = _binding.create_hal_module(self.device)
     self.default_vm_modules = (hal_module,)
     self.tracer = tracer or tracing.get_default_tracer()
-    if self.tracer:
+    if self.tracer and self.tracer.enabled:
       logging.info("IREE runtime tracing calls to path: %s",
                    self.tracer.trace_path)
+    else:
+      self.tracer = None
 
 
 _global_config = None
@@ -228,7 +230,7 @@ class BoundModule:
     # heterogenous dispatch.
     return FunctionInvoker(self._context.vm_context,
                            self._context.config.device, vm_function,
-                           self._context._inv_tracer)
+                           self._context._tracer)
 
   def __repr__(self):
     return f"<BoundModule {repr(self._vm_module)}>"
@@ -270,11 +272,12 @@ class SystemContext:
           (m.name, BoundModule(self, m)) for m in init_vm_modules
       ])
 
-    self._inv_tracer = None  # type: Optional[tracing.InvocationTracer]
+    self._tracer = None  # type: Optional[tracing.ContextTracer]
     if self._config.tracer:
-      self._inv_tracer = self._config.tracer.create_invocation()
-      for bm in self._bound_modules.values():
-        self._inv_tracer.add_module(bm.traced_module)
+      self._tracer = tracing.ContextTracer(
+          self._config.tracer,
+          is_dynamic=self._is_dynamic,
+          modules=[bm.traced_module for bm in self._bound_modules.values()])
 
   @property
   def vm_context(self) -> _binding.VmContext:
@@ -303,8 +306,8 @@ class SystemContext:
         raise ValueError(f"Attempt to register duplicate VmModule: '{m.name}'")
       bound_module = BoundModule(self, m)
       self._bound_modules[m.name] = bound_module
-      if self._inv_tracer:
-        self._inv_tracer.add_module(bound_module.traced_module)
+      if self._tracer:
+        self._tracer.add_module(bound_module.traced_module)
     self._vm_context.register_modules(vm_modules)
 
   def add_vm_module(self, vm_module):

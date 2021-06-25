@@ -99,6 +99,7 @@ class VmVariantList {
   py::object GetAsList(int index);
   py::object GetAsNdarray(int index);
   py::object GetVariant(int index);
+  py::object GetAsSerializedTraceValue(int index);
 
  private:
   VmVariantList(iree_vm_list_t* list) : list_(list) {}
