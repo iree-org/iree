@@ -85,8 +85,12 @@ class TracedModule:
   def serialize(self):
     module_record = {"name": self._vm_module.name}
     if self._vmfb_path:
+      module_record["type"] = "bytecode"
       module_record["vmfb_path"] = os.path.relpath(self._vmfb_path,
                                                    self._parent.trace_path)
+    else:
+      module_record["type"] = "native"
+
     return module_record
 
 

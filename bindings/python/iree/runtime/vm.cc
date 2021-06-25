@@ -326,17 +326,17 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
       default:
         throw RaiseValueError("Unsupported VM value type conversion");
     }
-    record["t"] = py::cast("value");
+    record["type"] = py::cast("value");
     return std::move(record);
   } else if (v.type.ref_type == IREE_VM_REF_TYPE_NULL) {
     py::dict record;
-    record["t"] = "null";
+    record["type"] = "null";
     return std::move(record);
   } else if (iree_vm_type_def_is_ref(&v.type)) {
     // Convert reference type.
     if (iree_vm_list_isa(v.ref)) {
       py::dict record;
-      record["t"] = "list";
+      record["type"] = "list";
       py::list items;
       iree_vm_list_t* sub_list = NULL;
       CheckApiStatus(iree_vm_list_check_deref(v.ref, &sub_list),
@@ -350,7 +350,7 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
       return std::move(record);
     } else if (iree_hal_buffer_view_isa(v.ref)) {
       py::dict record;
-      record["t"] = "buffer_view";
+      record["type"] = "buffer_view";
       iree_hal_buffer_view_t* buffer_view = iree_hal_buffer_view_deref(v.ref);
       if (!buffer_view) {
         throw RaiseValueError(
