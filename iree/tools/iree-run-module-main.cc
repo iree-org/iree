@@ -160,6 +160,15 @@ iree_status_t Run() {
 
 extern "C" int main(int argc, char** argv) {
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
+  if (argc > 1) {
+    // Avoid iree-run-module spinning endlessly on stdin if the user uses single
+    // dashes for flags.
+    std::cout << "Error: More than one positional argument (single dash '-') "
+                 "given for initiating stdin input. Perhaps you meant to use "
+                 "'--' instead?"
+              << std::endl;
+    return 3;  // status IREE_STATUS_INVALID_ARGUMENT
+  }
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
   IREE_CHECK_OK(Run());
