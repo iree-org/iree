@@ -40,6 +40,13 @@ class PackAllocationsPass
     registry.insert<IREE::HAL::HALDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-hal-pack-allocations"; }
+
+  StringRef getDescription() const override {
+    return "Packs allocations and materializes runtime packing code as "
+           "required.";
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
 
@@ -346,12 +353,10 @@ std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass(
   return std::make_unique<PackAllocationsPass>(targetOptions);
 }
 
-static PassRegistration<PackAllocationsPass> pass(
-    "iree-hal-pack-allocations",
-    "Packs allocations and materializes runtime packing code as required.", [] {
-      auto options = getTargetOptionsFromFlags();
-      return std::make_unique<PackAllocationsPass>(options);
-    });
+static PassRegistration<PackAllocationsPass> pass([] {
+  auto options = getTargetOptionsFromFlags();
+  return std::make_unique<PackAllocationsPass>(options);
+});
 
 }  // namespace HAL
 }  // namespace IREE

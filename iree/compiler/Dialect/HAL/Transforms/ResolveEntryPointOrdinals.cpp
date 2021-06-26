@@ -74,6 +74,14 @@ class ResolveEntryPointOrdinalsPass
     : public PassWrapper<ResolveEntryPointOrdinalsPass,
                          OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-hal-resolve-entry-point-ordinals";
+  }
+
+  StringRef getDescription() const override {
+    return "Resolves hal.executable.entry_point references to ordinals";
+  }
+
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(&getContext());
@@ -87,9 +95,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createResolveEntryPointOrdinalsPass() {
   return std::make_unique<ResolveEntryPointOrdinalsPass>();
 }
 
-static PassRegistration<ResolveEntryPointOrdinalsPass> pass(
-    "iree-hal-resolve-entry-point-ordinals",
-    "Resolves hal.executable.entry_point references to ordinals");
+static PassRegistration<ResolveEntryPointOrdinalsPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

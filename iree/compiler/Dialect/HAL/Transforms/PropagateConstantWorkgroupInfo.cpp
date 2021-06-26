@@ -18,6 +18,14 @@ class PropagateConstantWorkgroupInfoPass
     : public PassWrapper<PropagateConstantWorkgroupInfoPass,
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-hal-propagate-constant-workgroup-info";
+  }
+
+  StringRef getDescription() const override {
+    return "Propagates constant hal.interface.workgroup.* queries when known";
+  }
+
   void runOnOperation() override {
     auto targetOp = getOperation();
 
@@ -50,9 +58,7 @@ createPropagateConstantWorkgroupInfoPass() {
   return std::make_unique<PropagateConstantWorkgroupInfoPass>();
 }
 
-static PassRegistration<PropagateConstantWorkgroupInfoPass> pass(
-    "iree-hal-propagate-constant-workgroup-info",
-    "Propagates constant hal.interface.workgroup.* queries when known");
+static PassRegistration<PropagateConstantWorkgroupInfoPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

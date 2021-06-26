@@ -14,6 +14,10 @@ namespace TF {
 class StripAssertsPass
     : public PassWrapper<StripAssertsPass, OperationPass<FuncOp>> {
  public:
+  StringRef getArgument() const override { return "iree-tf-strip-asserts"; }
+
+  StringRef getDescription() const override { return "Remove tf.Assert ops"; }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     DenseSet<Operation *> assertOps;
@@ -33,8 +37,7 @@ std::unique_ptr<OperationPass<FuncOp>> createStripAssertsPass() {
   return std::make_unique<StripAssertsPass>();
 }
 
-static PassRegistration<StripAssertsPass> funcPass("iree-tf-strip-asserts",
-                                                   "Remove tf.Assert ops");
+static PassRegistration<StripAssertsPass> funcPass;
 
 }  // namespace TF
 }  // namespace iree_integrations

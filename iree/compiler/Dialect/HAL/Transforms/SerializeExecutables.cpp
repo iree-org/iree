@@ -29,6 +29,14 @@ class SerializeExecutablesPass
   explicit SerializeExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
+  StringRef getArgument() const override {
+    return "iree-hal-serialize-executables";
+  }
+
+  StringRef getDescription() const override {
+    return "Serializes hal.executable.target ops to hal.executable.binary ops";
+  }
+
   void runOnOperation() override {
     auto executableOp = getOperation();
     auto targetOps = llvm::to_vector<4>(
@@ -60,12 +68,10 @@ createSerializeExecutablesPass(TargetOptions executableOptions) {
   return std::make_unique<SerializeExecutablesPass>(executableOptions);
 }
 
-static PassRegistration<SerializeExecutablesPass> pass(
-    "iree-hal-serialize-executables",
-    "Serializes hal.executable.target ops to hal.executable.binary ops", [] {
-      auto options = getTargetOptionsFromFlags();
-      return std::make_unique<SerializeExecutablesPass>(options);
-    });
+static PassRegistration<SerializeExecutablesPass> pass([] {
+  auto options = getTargetOptionsFromFlags();
+  return std::make_unique<SerializeExecutablesPass>(options);
+});
 
 }  // namespace HAL
 }  // namespace IREE

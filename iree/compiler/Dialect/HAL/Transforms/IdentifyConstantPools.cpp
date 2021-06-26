@@ -38,6 +38,15 @@ class IdentifyConstantPoolsPass
     registry.insert<IREE::HAL::HALDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-hal-identify-constant-pools";
+  }
+
+  StringRef getDescription() const override {
+    return "Combines constant variables into one or more hal.constant_pools "
+           "based on usage semantics.";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -297,14 +306,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass(
   return std::make_unique<IdentifyConstantPoolsPass>(targetOptions);
 }
 
-static PassRegistration<IdentifyConstantPoolsPass> pass(
-    "iree-hal-identify-constant-pools",
-    "Combines constant variables into one or more hal.constant_pools based on "
-    "usage semantics.",
-    [] {
-      auto options = getTargetOptionsFromFlags();
-      return std::make_unique<IdentifyConstantPoolsPass>(options);
-    });
+static PassRegistration<IdentifyConstantPoolsPass> pass([] {
+  auto options = getTargetOptionsFromFlags();
+  return std::make_unique<IdentifyConstantPoolsPass>(options);
+});
 
 }  // namespace HAL
 }  // namespace IREE

@@ -32,6 +32,15 @@ class HoistInlinedRodataPass
     registry.insert<IREE::VM::VMDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-vm-hoist-inlined-rodata";
+  }
+
+  StringRef getDescription() const override {
+    return "Hoists inline iree.byte_buffer values to module-level constant "
+           "storage.";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
     SymbolTable moduleSymbolTable(moduleOp);
@@ -80,9 +89,7 @@ createHoistInlinedRodataPass() {
   return std::make_unique<HoistInlinedRodataPass>();
 }
 
-static PassRegistration<HoistInlinedRodataPass> pass(
-    "iree-vm-hoist-inlined-rodata",
-    "Hoists inline iree.byte_buffer values to module-level constant storage.");
+static PassRegistration<HoistInlinedRodataPass> pass;
 
 }  // namespace VM
 }  // namespace IREE
