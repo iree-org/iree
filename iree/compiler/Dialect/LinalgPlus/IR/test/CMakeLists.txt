@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "invalid.mlir"
     "roundtrip.mlir"
   DATA
     iree::tools::IreeFileCheck

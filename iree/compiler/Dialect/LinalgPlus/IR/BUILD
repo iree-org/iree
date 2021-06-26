@@ -22,6 +22,7 @@ filegroup(
         [
             "LinalgPlusBase.td",
             "LinalgPlusOps.td",
+            "LinalgPlusInterfaces.td",
         ],
         include = ["*.td"],
     ),
@@ -31,15 +32,20 @@ cc_library(
     name = "IR",
     srcs = [
         "LinalgPlusDialect.cpp",
+        "LinalgPlusInterfaces.cpp",
+        "LinalgPlusInterfaces.cpp.inc",
         "LinalgPlusOps.cpp",
         "LinalgPlusOps.cpp.inc",
     ],
     hdrs = [
         "LinalgPlusDialect.h",
+        "LinalgPlusInterfaces.h",
+        "LinalgPlusInterfaces.h.inc",
         "LinalgPlusOps.h",
         "LinalgPlusOps.h.inc",
     ],
     deps = [
+        ":LinalgPlusInterfacesGen",
         ":LinalgPlusOpsGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
@@ -70,6 +76,27 @@ gentbl_cc_library(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "LinalgPlusInterfacesGen",
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "LinalgPlusInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "LinalgPlusInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgPlusInterfaces.td",
+    td_includes = ["third_party/iree"],
+    td_srcs = [
+        ":td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
 

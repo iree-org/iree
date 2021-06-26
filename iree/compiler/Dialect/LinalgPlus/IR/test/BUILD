@@ -17,6 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "invalid.mlir",
             "roundtrip.mlir",
         ],
         include = ["*.mlir"],

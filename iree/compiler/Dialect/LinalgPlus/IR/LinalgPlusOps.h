@@ -14,6 +14,17 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+namespace mlir {
+namespace iree_compiler {
+namespace linalg_plus {
+class LinalgPlusOp;
+
+}  // namespace linalg_plus
+}  // namespace iree_compiler
+}  // namespace mlir
+
+#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusInterfaces.h"
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusOps.h.inc"  // IWYU pragma: export
 

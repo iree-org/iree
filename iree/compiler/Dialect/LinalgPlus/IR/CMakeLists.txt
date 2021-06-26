@@ -15,10 +15,14 @@ iree_cc_library(
     IR
   HDRS
     "LinalgPlusDialect.h"
+    "LinalgPlusInterfaces.h"
+    "LinalgPlusInterfaces.h.inc"
     "LinalgPlusOps.h"
     "LinalgPlusOps.h.inc"
   SRCS
     "LinalgPlusDialect.cpp"
+    "LinalgPlusInterfaces.cpp"
+    "LinalgPlusInterfaces.cpp.inc"
     "LinalgPlusOps.cpp"
     "LinalgPlusOps.cpp.inc"
   DEPS
@@ -40,6 +44,16 @@ iree_tablegen_library(
   OUTS
     -gen-op-decls LinalgPlusOps.h.inc
     -gen-op-defs LinalgPlusOps.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    LinalgPlusInterfacesGen
+  TD_FILE
+    "LinalgPlusInterfaces.td"
+  OUTS
+    -gen-op-interface-decls LinalgPlusInterfaces.h.inc
+    -gen-op-interface-defs LinalgPlusInterfaces.cpp.inc
 )
 
 iree_tablegen_doc(
