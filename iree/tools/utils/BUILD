@@ -10,6 +10,24 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+cc_library(
+    name = "trace_replay",
+    srcs = ["trace_replay.c"],
+    hdrs = ["trace_replay.h"],
+    deps = [
+        ":yaml_util",
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/base/internal:file_io",
+        "//iree/base/internal:file_path",
+        "//iree/hal",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
+
 # TODO(benvanik): fold these into iree/runtime and use that instead.
 cc_library(
     name = "vm_util",

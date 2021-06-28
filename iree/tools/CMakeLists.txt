@@ -80,6 +80,28 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-benchmark-trace
+  SRCS
+    "iree-benchmark-trace-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::atomic_slist
+    iree::base::internal::file_path
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::hal::drivers
+    iree::modules::hal
+    iree::testing::benchmark
+    iree::tools::utils::trace_replay
+    iree::tools::utils::yaml_util
+    iree::vm
+    yaml
+  TESTONLY
+)
+
+iree_cc_binary(
+  NAME
     iree-check-module
   SRCS
     "iree-check-module-main.cc"
@@ -141,15 +163,15 @@ iree_cc_binary(
     "iree-run-trace-main.c"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::file_path
     iree::base::internal::flags
     iree::base::tracing
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
+    iree::tools::utils::trace_replay
     iree::tools::utils::yaml_util
     iree::vm
-    iree::vm::bytecode_module
     yaml
 )
 
