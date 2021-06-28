@@ -253,13 +253,12 @@ cc_test(
 cc_library(
     name = "main",
     srcs = [
-        "main_posix.cc",
-        "main_win32.cc",
+        "main_posix.c",
+        "main_win32.c",
     ],
     hdrs = ["main.h"],
     deps = [
         "//iree/base:core_headers",
-        "//iree/base:logging",
     ],
 )
 
