@@ -15,15 +15,20 @@ FROM gcr.io/iree-oss/cmake-python-swiftshader@sha256:75ad1156a486aa4bf3f93d45f9a
 RUN apt-get update && apt-get install -y python3-venv python-setuptools && \
     python3 -m pip install --upgrade setuptools
 
-# Note: we explicitly do *not* install Jupyter notebook requirements since
-# they should be installed within venvs.
-
 # Install additional packages often used in notebooks.
 # Installing these at the system level helps with caching, since venvs can
 # set --system-site-packages to use the already installed versions.
-RUN python3 -m pip install \
+#
+# Note:
+#   * Packages relating to TensorFlow are pinned to versions close to what
+#     Colab includes in its hosted runtimes. We don't need to match all of
+#     Colab's dependencies, but we should at least make an effort for the ones
+#     our notebooks use.
+#   * We explicitly do *not* install Jupyter notebook requirements since they
+#     should be installed within venvs.
+RUN python3 -m pip install --ignore-installed \
     numpy \
     matplotlib \
-    tensorflow \
-    tensorflow_hub \
-    bottleneck
+    bottleneck \
+    tensorflow==2.5.0 \
+    tensorflow_hub==0.12.0
