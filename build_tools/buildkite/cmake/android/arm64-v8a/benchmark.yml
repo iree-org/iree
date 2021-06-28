@@ -45,9 +45,7 @@ steps:
     artifact_paths: "mako-*.log"
     timeout_in_minutes: "15"
 
-  # TODO(6330): Skip as the phone is currently offline.
   - label: "benchmark on Galaxy S20 (exynos-990, mali-g77)"
-    skip: "Currently offline"
     commands:
       - "buildkite-agent artifact download --step build model-S20-artifacts.tgz ./"
       - "buildkite-agent artifact download --step build flagfiles.tgz ./"
