@@ -86,10 +86,10 @@ class TracedModule:
     module_record = {"name": self._vm_module.name}
     if self._vmfb_path:
       module_record["type"] = "bytecode"
-      module_record["vmfb_path"] = os.path.relpath(self._vmfb_path,
-                                                   self._parent.trace_path)
+      module_record["path"] = os.path.relpath(self._vmfb_path,
+                                              self._parent.trace_path)
     else:
-      module_record["type"] = "native"
+      module_record["type"] = "builtin"
 
     return module_record
 
@@ -112,15 +112,18 @@ class ContextTracer:
       os.makedirs(os.path.dirname(parent.trace_path), exist_ok=True)
     logging.info("Tracing context events to: %s", self._file_path)
     self.emit_frame({
-        "type": "init_context",
-        "is_dynamic": is_dynamic,
-        "modules": [m.serialize() for m in self._modules],
+        "type": "context_load",
     })
+    for module in self._modules:
+      self.emit_frame({
+          "type": "module_load",
+          "module": module.serialize(),
+      })
 
   def add_module(self, module: TracedModule):
     self._modules.append(module)
     self.emit_frame({
-        "type": "add_module",
+        "type": "module_load",
         "module": module.serialize(),
     })
 
@@ -130,8 +133,7 @@ class ContextTracer:
     # Start assembling the call record.
     record = {
         "type": "call",
-        "module_name": function.module_name,
-        "function_name": function.name,
+        "function": "%s.%s" % (function.module_name, function.name),
     }
     return CallTrace(self, record)
 

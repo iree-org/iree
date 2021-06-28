@@ -52,8 +52,6 @@ cc_library(
     hdrs = ["yaml_util.h"],
     deps = [
         "//iree/base",
-        "//iree/hal",
-        "//iree/vm",
         "@com_github_yaml_libyaml//:yaml",
     ],
 )

@@ -336,7 +336,7 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
     // Convert reference type.
     if (iree_vm_list_isa(v.ref)) {
       py::dict record;
-      record["type"] = "list";
+      record["type"] = "vm.list";
       py::list items;
       iree_vm_list_t* sub_list = NULL;
       CheckApiStatus(iree_vm_list_check_deref(v.ref, &sub_list),
@@ -350,7 +350,7 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
       return std::move(record);
     } else if (iree_hal_buffer_view_isa(v.ref)) {
       py::dict record;
-      record["type"] = "buffer_view";
+      record["type"] = "hal.buffer_view";
       iree_hal_buffer_view_t* buffer_view = iree_hal_buffer_view_deref(v.ref);
       if (!buffer_view) {
         throw RaiseValueError(

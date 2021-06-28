@@ -285,10 +285,28 @@ cc_binary(
         "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
-        "//iree/tools/utils:yaml_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
+    ],
+)
+
+cc_binary(
+    name = "iree-run-trace",
+    srcs = ["iree-run-trace-main.c"],
+    deps = [
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/base/internal:file_io",
+        "//iree/base/internal:file_path",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/drivers",
+        "//iree/modules/hal",
+        "//iree/tools/utils:yaml_util",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "@com_github_yaml_libyaml//:yaml",
     ],
 )
 

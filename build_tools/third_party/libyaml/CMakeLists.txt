@@ -14,7 +14,7 @@ external_cc_library(
   ROOT
     ${LIBYAML_ROOT}
   INCLUDES
-    "${FLATCC_ROOT}/include"
+    "${LIBYAML_ROOT}/include"
   SRCS
     "src/api.c"
     "src/dumper.c"

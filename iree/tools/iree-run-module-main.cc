@@ -21,7 +21,6 @@
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tools/utils/vm_util.h"
-#include "iree/tools/utils/yaml_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
