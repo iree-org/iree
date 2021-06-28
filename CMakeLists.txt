@@ -467,6 +467,11 @@ if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
 endif()
 
+if(${IREE_HAL_DRIVER_VULKAN})
+  # HWCPipe is used for profiling ARM Mali GPUs.
+  add_subdirectory(third_party/hwcpipe)
+endif()
+
 if(${IREE_TARGET_BACKEND_METAL-SPIRV})
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)

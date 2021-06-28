@@ -34,6 +34,7 @@
 #include "iree/hal/vulkan/tracing.h"
 #include "iree/hal/vulkan/util/arena.h"
 #include "iree/hal/vulkan/util/ref_ptr.h"
+#include "iree/hal/vulkan/vendor_specific_profiler.h"
 #include "iree/hal/vulkan/vma_allocator.h"
 
 using namespace iree::hal::vulkan;
@@ -355,6 +356,8 @@ typedef struct iree_hal_vulkan_device_t {
   // |queue_count| tracing contexts, if tracing is enabled.
   iree_hal_vulkan_tracing_context_t** queue_tracing_contexts;
 
+  iree_hal_vulkan_vendor_specific_profiler_context_t* vendor_profiler_context;
+
   DescriptorPoolCache* descriptor_pool_cache;
 
   VkCommandPoolHandle* dispatch_command_pool;
@@ -621,6 +624,24 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
         transfer_queue_set);
   }
 
+  if (iree_all_bits_set(enabled_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_vendor_specific_profiler_context_allocate(
+            physical_device, logical_device, host_allocator,
+            &device->vendor_profiler_context));
+    if (device->vendor_profiler_context) {
+      // Start it right now. We cannot attach it to a specific command queue,
+      // command buffer, or semaphore waits as we can have many of them. The
+      // profiler is expected to query GPU counters from this physical device.
+      // But we don't really have an abstraction for physical device in IREE.
+      // The logical device is fine here as we are unlikely to create multiple
+      // logical devices for the same physical device.
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_vendor_specific_profiler_start(
+          device->vendor_profiler_context));
+    }
+  }
+
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -633,6 +654,11 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_vulkan_vendor_specific_profiler_stop(
+      device->vendor_profiler_context);
+  iree_hal_vulkan_vendor_specific_profiler_context_free(
+      device->vendor_profiler_context);
 
   // Drop all command queues. These may wait until idle in their destructor.
   for (iree_host_size_t i = 0; i < device->queue_count; ++i) {

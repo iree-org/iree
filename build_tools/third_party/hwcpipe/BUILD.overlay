@@ -1,0 +1,31 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+exports_files(["LICENSE"])
+
+cc_library(
+    name = "hwcpipe",
+    srcs = [
+      "hwcpipe.cpp",
+      "third_party/json.hpp",
+      "vendor/arm/mali/mali_profiler.cpp",
+      "vendor/arm/pmu/pmu_counter.cpp",
+      "vendor/arm/pmu/pmu_profiler.cpp",
+    ],
+    hdrs = [
+      "cpu_profiler.h",
+      "gpu_profiler.h",
+      "hwcpipe.h",
+      "hwcpipe_log.h",
+      "value.h",
+      "vendor/arm/mali/hwc.hpp",
+      "vendor/arm/mali/hwc_names.hpp",
+      "vendor/arm/mali/mali_profiler.h",
+      "vendor/arm/pmu/pmu_counter.h",
+      "vendor/arm/pmu/pmu_profiler.h",
+    ],
+    includes = [
+      "third_party/",
+    ],
+)

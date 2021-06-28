@@ -63,6 +63,8 @@ iree_cc_library(
     "timepoint_util.h"
     "tracing.cc"
     "tracing.h"
+    "vendor_specific_profiler.cc"
+    "vendor_specific_profiler.h"
     "vma_allocator.cc"
     "vma_allocator.h"
     "vma_buffer.cc"
@@ -79,9 +81,11 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::flatcc
     iree::base::internal::synchronization
+    iree::base::internal::threading
     iree::base::logging
     iree::base::tracing
     iree::hal
+    iree::hal::vulkan::mali_profiler
     iree::hal::vulkan::util::arena
     iree::hal::vulkan::util::intrusive_list
     iree::hal::vulkan::util::ref_ptr
@@ -123,6 +127,19 @@ iree_cc_test(
     iree::testing::gtest_main
   LABELS
     "driver=vulkan"
+)
+
+iree_cc_library(
+  NAME
+    mali_profiler
+  HDRS
+    "mali_profiler.h"
+  SRCS
+    "mali_profiler.cc"
+  DEPS
+    hwcpipe
+    iree::base
+  PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

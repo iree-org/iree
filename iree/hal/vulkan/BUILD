@@ -66,6 +66,8 @@ cc_library(
         "timepoint_util.h",
         "tracing.cc",
         "tracing.h",
+        "vendor_specific_profiler.cc",
+        "vendor_specific_profiler.h",
         "vma_allocator.cc",
         "vma_allocator.h",
         "vma_buffer.cc",
@@ -91,7 +93,9 @@ cc_library(
         "//iree/base/internal",
         "//iree/base/internal:flatcc",
         "//iree/base/internal:synchronization",
+        "//iree/base/internal:threading",
         "//iree/hal",
+        "//iree/hal/vulkan:mali_profiler",
         "//iree/hal/vulkan/util:arena",
         "//iree/hal/vulkan/util:intrusive_list",
         "//iree/hal/vulkan/util:ref_ptr",
@@ -133,5 +137,19 @@ cc_test(
         "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "mali_profiler",
+    srcs = [
+        "mali_profiler.cc",
+    ],
+    hdrs = [
+        "mali_profiler.h",
+    ],
+    deps = [
+        "//iree/base",
+        "@hwcpipe//:hwcpipe",
     ],
 )
