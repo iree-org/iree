@@ -24,6 +24,7 @@
 // The HAL device is returned based on the implementation, and it must be
 // released by the caller.
 iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
+  iree_status_t status = iree_ok_status();
   // Set paramters for the device created in the next step.
   iree_hal_task_device_params_t params;
   iree_hal_task_device_params_initialize(&params);
@@ -35,18 +36,23 @@ iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
   const iree_hal_executable_library_header_t** libraries[1] = {static_library};
 
   iree_hal_executable_loader_t* library_loader = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_static_library_loader_create(
-      IREE_ARRAYSIZE(libraries), libraries, iree_allocator_system(),
-      &library_loader));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_static_library_loader_create(
+        IREE_ARRAYSIZE(libraries), libraries, iree_allocator_system(),
+        &library_loader);
+  }
 
   iree_task_executor_t* executor = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_task_executor_create_from_flags(iree_allocator_system(), &executor));
+  if (iree_status_is_ok(status)) {
+    iree_task_executor_create_from_flags(iree_allocator_system(), &executor);
+  }
 
   // Create the device and release the executor and loader afterwards.
-  IREE_RETURN_IF_ERROR(iree_hal_task_device_create(
-      iree_make_cstring_view("dylib"), &params, executor, 1, &library_loader,
-      iree_allocator_system(), device));
+  if (iree_status_is_ok(status)) {
+    iree_hal_task_device_create(iree_make_cstring_view("dylib"), &params,
+                                executor, 1, &library_loader,
+                                iree_allocator_system(), device);
+  }
   iree_task_executor_release(executor);
   iree_hal_executable_loader_release(library_loader);
 
@@ -174,9 +180,12 @@ iree_status_t Run() {
         iree_hal_buffer_view_buffer(ret_buffer_view),
         IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &mapped_memory);
   }
-  for (int i = 0; i < mapped_memory.contents.data_length / sizeof(float); ++i) {
-    if (((const float*)mapped_memory.contents.data)[i] != 8.0f) {
-      return status;
+  if (iree_status_is_ok(status)) {
+    for (int i = 0; i < mapped_memory.contents.data_length / sizeof(float);
+         ++i) {
+      if (((const float*)mapped_memory.contents.data)[i] != 8.0f) {
+        return iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");
+      }
     }
   }
 
@@ -189,7 +198,7 @@ iree_status_t Run() {
   iree_runtime_session_release(session);
   iree_runtime_instance_release(instance);
 
-  return iree_ok_status();
+  return status;
 }
 
 int main() {
