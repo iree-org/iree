@@ -13,7 +13,7 @@ set -x
 set -e
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
-BUILD_DIR=${ROOT_DIR}/build
+BUILD_DIR=${ROOT_DIR}/build-samples
 ARTIFACTS_DIR=/tmp/iree/colab_artifacts
 
 # 1. Run the notebook to generate `counter.mlir` and `counter_vmvx.vmfb`
@@ -23,8 +23,7 @@ test -f ${ARTIFACTS_DIR}/counter.mlir && echo "counter.mlir exists"
 test -f ${ARTIFACTS_DIR}/counter_vmvx.vmfb && echo "counter_vmvx.vmfb exists"
 
 # 2. Compile the `iree_samples_variables_and_state` CMake target.
-git submodule update --init
-cmake -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
+cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
 cmake --build ${BUILD_DIR} --target iree_samples_variables_and_state
 
 # 3. Run the sample binary.

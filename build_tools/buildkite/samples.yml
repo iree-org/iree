@@ -15,7 +15,7 @@ steps:
 
   - label: "Test Samples"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:be5465585706b620d6c722caa6237eafdfaa8dd11ce20db0981b979f2d3387b3 iree/samples/variables_and_state/test.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:be5465585706b620d6c722caa6237eafdfaa8dd11ce20db0981b979f2d3387b3 build_tools/testing/test_samples.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
