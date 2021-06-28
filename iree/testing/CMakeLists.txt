@@ -21,7 +21,6 @@ iree_cc_library(
     benchmark
     iree::base
     iree::base::tracing
-  TESTONLY
   PUBLIC
 )
 

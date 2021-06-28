@@ -13,7 +13,6 @@
 
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/file_path.h"
-#include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/bytecode_module.h"
