@@ -568,6 +568,14 @@ class SavedModelToIREEABIPass
                     mlir::tf_saved_model::TensorFlowSavedModelDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "tf-saved-model-to-iree-abi";
+  }
+
+  StringRef getDescription() const override {
+    return "Creates IREE ABI entrypoints for saved model exports";
+  }
+
   void runOnOperation() override {
     if (failed(run())) {
       signalPassFailure();
@@ -619,9 +627,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createSavedModelToIREEABIPass() {
   return std::make_unique<SavedModelToIREEABIPass>();
 }
 
-static PassRegistration<SavedModelToIREEABIPass> pass(
-    "tf-saved-model-to-iree-abi",
-    "Creates IREE ABI entrypoints for saved model exports");
+static PassRegistration<SavedModelToIREEABIPass> pass;
 
 }  // namespace TF
 }  // namespace iree_integrations

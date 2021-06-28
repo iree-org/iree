@@ -28,6 +28,7 @@ __all__ = [
     "TARGET_BACKEND_TO_DRIVER",
 ]
 
+import logging
 import os
 import sys
 
@@ -35,6 +36,7 @@ from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
 from . import binding as _binding
 from .function import FunctionInvoker
+from . import tracing
 
 import numpy as np
 
@@ -109,14 +111,23 @@ class Config:
   device: _binding.HalDevice
   vm_instance: _binding.VmInstance
   default_vm_modules: Tuple[_binding.VmModule, ...]
+  tracer: Optional[tracing.Tracer]
 
-  def __init__(self, driver_name: Optional[str] = None):
+  def __init__(self,
+               driver_name: Optional[str] = None,
+               tracer: Optional[tracing.Tracer] = None):
     self.vm_instance = _binding.VmInstance()
     self.driver = _create_default_iree_driver(
         driver_name.split(",") if driver_name is not None else None)
     self.device = self.driver.create_default_device()
     hal_module = _binding.create_hal_module(self.device)
     self.default_vm_modules = (hal_module,)
+    self.tracer = tracer or tracing.get_default_tracer()
+    if self.tracer and self.tracer.enabled:
+      logging.info("IREE runtime tracing calls to path: %s",
+                   self.tracer.trace_path)
+    else:
+      self.tracer = None
 
 
 _global_config = None
@@ -182,8 +193,14 @@ class BoundModule:
 
   def __init__(self, context: "SystemContext", vm_module: _binding.VmModule):
     self._context = context
+    self._tracer = self._context._config.tracer
     self._vm_module = vm_module
     self._lazy_functions = dict()
+
+    # Let the tracing infra create a traced module.
+    self.traced_module = None
+    if self._tracer:
+      self.traced_module = self._tracer.persist_vm_module(vm_module)
 
   @property
   def name(self):
@@ -212,7 +229,8 @@ class BoundModule:
     # layering and will need to be fixed in some fashion if/when doing
     # heterogenous dispatch.
     return FunctionInvoker(self._context.vm_context,
-                           self._context.config.device, vm_function)
+                           self._context.config.device, vm_function,
+                           self._context._tracer)
 
   def __repr__(self):
     return f"<BoundModule {repr(self._vm_module)}>"
@@ -254,6 +272,13 @@ class SystemContext:
           (m.name, BoundModule(self, m)) for m in init_vm_modules
       ])
 
+    self._tracer = None  # type: Optional[tracing.ContextTracer]
+    if self._config.tracer:
+      self._tracer = tracing.ContextTracer(
+          self._config.tracer,
+          is_dynamic=self._is_dynamic,
+          modules=[bm.traced_module for bm in self._bound_modules.values()])
+
   @property
   def vm_context(self) -> _binding.VmContext:
     return self._vm_context
@@ -279,7 +304,10 @@ class SystemContext:
     for m in vm_modules:
       if m.name in self._bound_modules:
         raise ValueError(f"Attempt to register duplicate VmModule: '{m.name}'")
-      self._bound_modules[m.name] = BoundModule(self, m)
+      bound_module = BoundModule(self, m)
+      self._bound_modules[m.name] = bound_module
+      if self._tracer:
+        self._tracer.add_module(bound_module.traced_module)
     self._vm_context.register_modules(vm_modules)
 
   def add_vm_module(self, vm_module):

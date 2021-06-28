@@ -17,6 +17,14 @@ class DropExcludedExportsPass
     : public PassWrapper<DropExcludedExportsPass,
                          OperationPass<IREE::VM::ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-vm-drop-excluded-exports";
+  }
+
+  StringRef getDescription() const override {
+    return "Deletes exports if annotated with emitc.exclude.";
+  }
+
   void runOnOperation() override {
     // Remove exports annotated with emitc.exclude.
     SmallVector<Operation *, 4> opsToRemove;
@@ -39,9 +47,7 @@ createDropExcludedExportsPass() {
   return std::make_unique<DropExcludedExportsPass>();
 }
 
-static PassRegistration<DropExcludedExportsPass> pass(
-    "iree-vm-drop-excluded-exports",
-    "Deletes exports if annotated with emitc.exclude.");
+static PassRegistration<DropExcludedExportsPass> pass;
 
 }  // namespace VM
 }  // namespace IREE

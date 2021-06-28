@@ -50,6 +50,14 @@ class TranslateExecutablesPass
     }
   }
 
+  StringRef getArgument() const override {
+    return "iree-hal-translate-executables";
+  }
+
+  StringRef getDescription() const override {
+    return "Translates hal.executable.target via the target backend pipelines";
+  }
+
   void runOnOperation() override {
     auto targetOp = getOperation();
     for (auto &pipeline : pipelines_) {
@@ -82,12 +90,10 @@ createTranslateExecutablesPass(TargetOptions executableOptions) {
   return std::make_unique<TranslateExecutablesPass>(executableOptions);
 }
 
-static PassRegistration<TranslateExecutablesPass> pass(
-    "iree-hal-translate-executables",
-    "Translates hal.executable.target via the target backend pipelines", [] {
-      auto options = getTargetOptionsFromFlags();
-      return std::make_unique<TranslateExecutablesPass>(options);
-    });
+static PassRegistration<TranslateExecutablesPass> pass([] {
+  auto options = getTargetOptionsFromFlags();
+  return std::make_unique<TranslateExecutablesPass>(options);
+});
 
 }  // namespace HAL
 }  // namespace IREE

@@ -10,12 +10,6 @@
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
     defined(IREE_PLATFORM_LINUX)
 
-namespace iree {
-namespace {
-
-extern "C" int main(int argc, char** argv) { return iree_main(argc, argv); }
-
-}  // namespace
-}  // namespace iree
+int main(int argc, char** argv) { return iree_main(argc, argv); }
 
 #endif  // IREE_PLATFORM_*

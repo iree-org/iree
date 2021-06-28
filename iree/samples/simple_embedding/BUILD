@@ -119,7 +119,7 @@ if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
 #        "-iree-hal-target-backends=dylib-llvm-aot",
 #        "-iree-llvm-target-triple=riscv32-pc-linux-elf",
 #        "-iree-llvm-target-cpu=generic-rv32",
-#        "-iree-llvm-target-cpu-features=+m",
+#        "-iree-llvm-target-cpu-features=+m,+f",
 #        "-iree-llvm-target-abi=ilp32",
 #        "-iree-llvm-link-embedded=true",
 #        "-iree-llvm-debug-symbols=false",

@@ -29,6 +29,14 @@ class ExpandFunctionDynamicDimsPass
     registry.insert<ShapeDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-shape-expand-function-dynamic-dims";
+  }
+
+  StringRef getDescription() const override {
+    return "Expands dynamic dimensions in function signatures.";
+  }
+
   void runOnFunction() override {
     auto funcOp = getFunction();
     auto &typeExpander = getDynamicShapeTypeExpander();
@@ -45,6 +53,14 @@ class ExpandFunctionRankedShapeDimsPass
     : public PassWrapper<ExpandFunctionRankedShapeDimsPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<ShapeDialect>();
+  }
+
+  StringRef getArgument() const override {
+    return "iree-shape-expand-function-ranked-shape-dims";
+  }
+
+  StringRef getDescription() const override {
+    return "Expands ranked_shape types at function boundaries to loose dims.";
   }
 
   void runOnFunction() override {
@@ -75,13 +91,8 @@ createExpandFunctionRankedShapeDimsPass() {
   return std::make_unique<Shape::ExpandFunctionRankedShapeDimsPass>();
 }
 
-static PassRegistration<Shape::ExpandFunctionDynamicDimsPass> pass_dynamic(
-    "iree-shape-expand-function-dynamic-dims",
-    "Expands dynamic dimensions in function signatures.");
-
-static PassRegistration<Shape::ExpandFunctionRankedShapeDimsPass> pass_rs(
-    "iree-shape-expand-function-ranked-shape-dims",
-    "Expands ranked_shape types at function boundaries to loose dims.");
+static PassRegistration<Shape::ExpandFunctionDynamicDimsPass> pass_dynamic;
+static PassRegistration<Shape::ExpandFunctionRankedShapeDimsPass> pass_rs;
 
 }  // namespace Shape
 }  // namespace iree_compiler
