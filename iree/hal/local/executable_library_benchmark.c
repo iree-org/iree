@@ -204,6 +204,7 @@ static iree_status_t iree_file_read_contents(const char* path,
 // allocations correctly and will leak. Don't use this as an example for how to
 // write robust code.
 static iree_status_t iree_hal_executable_library_run(
+    const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
   iree_allocator_t host_allocator = benchmark_state->host_allocator;
 
@@ -368,31 +369,6 @@ int main(int argc, char** argv) {
 
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   iree_benchmark_initialize(&argc, argv);
-
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  // clang-format off
-  fprintf(stderr,
-"\x1b[31m"
-"===----------------------------------------------------------------------===\n"
-"\n"
-"         ██     ██  █████  ██████  ███    ██ ██ ███    ██  ██████\n"
-"         ██     ██ ██   ██ ██   ██ ████   ██ ██ ████   ██ ██\n"
-"         ██  █  ██ ███████ ██████  ██ ██  ██ ██ ██ ██  ██ ██   ███\n"
-"         ██ ███ ██ ██   ██ ██   ██ ██  ██ ██ ██ ██  ██ ██ ██    ██\n"
-"          ███ ███  ██   ██ ██   ██ ██   ████ ██ ██   ████  ██████\n"
-"\n"
-"===----------------------------------------------------------------------===\n"
-"\n"
-"Tracing is enabled and will skew your results!\n"
-"The timings involved here can an order of magnitude off due to the tracing\n"
-"time sampling, recording, and instrumentation overhead. Disable tracing with\n"
-"IREE_ENABLE_RUNTIME_TRACING=OFF and rebuild.\n"
-"\x1b[0m"
-"\n"
-  );
-  fflush(stderr);
-  // clang-format on
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   // TODO(benvanik): override these with our own flags.
   iree_benchmark_def_t benchmark_def = {
