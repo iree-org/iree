@@ -29,6 +29,7 @@ cc_library(
     name = "internal",
     srcs = [
         "atomics_clang.h",
+        "atomics_disabled.h",
         "atomics_gcc.h",
         "atomics_msvc.h",
     ],
@@ -114,6 +115,7 @@ cc_library(
         ":internal",
         ":synchronization",
         "//build_tools:default_linkopts",
+        "//build_tools:dl",
         "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
@@ -135,8 +137,8 @@ cc_test(
     srcs = ["file_io_test.cc"],
     deps = [
         ":file_io",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -251,13 +253,12 @@ cc_test(
 cc_library(
     name = "main",
     srcs = [
-        "main_posix.cc",
-        "main_win32.cc",
+        "main_posix.c",
+        "main_win32.c",
     ],
     hdrs = ["main.h"],
     deps = [
         "//iree/base:core_headers",
-        "//iree/base:logging",
     ],
 )
 
@@ -283,23 +284,6 @@ cc_test(
 cc_library(
     name = "span",
     hdrs = ["span.h"],
-)
-
-cc_library(
-    name = "status_internal",
-    srcs = [
-        "status.cc",
-        "statusor.cc",
-    ],
-    hdrs = [
-        "status.h",
-        "statusor.h",
-    ],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:logging",
-    ],
 )
 
 cc_library(
@@ -373,6 +357,7 @@ cc_library(
         ":internal",
         ":synchronization",
         "//build_tools:default_linkopts",
+        "//build_tools:dl",
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
@@ -389,7 +374,7 @@ cc_test(
         ":internal",
         ":synchronization",
         ":threading",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

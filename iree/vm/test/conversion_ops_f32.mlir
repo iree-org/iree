@@ -1,4 +1,4 @@
-vm.module @conversion_ops {
+vm.module @conversion_ops_f32 {
 
   //===----------------------------------------------------------------------===//
   // Casting and type conversion/emulation

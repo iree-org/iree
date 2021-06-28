@@ -8,7 +8,7 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
@@ -77,16 +77,26 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    passManager.addPass(createLowerExecutableTargetPass());
+    auto targetMachine = createTargetMachine(options_);
+    if (!targetMachine) {
+      llvm::errs() << "failed to create target machine for target triple '"
+                   << options_.targetTriple << "'";
+      return;
+    }
+    passManager.addPass(createLLVMCPULowerExecutableTargetPass());
     // Set target specific options.
+    LLVMCPUCodegenPassPipelineOptions codeGenOptions;
+    codeGenOptions.targetTriple = options_.targetTriple;
+    codeGenOptions.targetDataLayout =
+        targetMachine->createDataLayout().getStringRepresentation();
+
     // TODO(ataei): This is temporary here, should move when target specific
     // overrides options grows.
-    llvm::Triple triple(options_.targetTriple);
-    LLVMTransformPassPipelineOptions codeGenOptions;
-    if (triple.isWasm()) {
+    if (targetMachine->getTargetTriple().isWasm()) {
       codeGenOptions.unfuseFMAOps = true;
     }
-    buildLLVMTransformPassPipeline(passManager, codeGenOptions);
+
+    buildLLVMCPUCodegenPassPipeline(passManager, codeGenOptions);
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
@@ -293,17 +303,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
              << options_.targetTriple << "'";
     }
 
-    // If we are keeping artifacts then let's also add the bitcode for easier
-    // debugging (vs just the binary object file).
-    if (options_.keepLinkerArtifacts) {
-      auto bitcodeFile = Artifact::createTemporary(libraryName, "bc");
-      auto &os = bitcodeFile.outputFile->os();
-      llvm::WriteBitcodeToFile(*llvmModule, os);
-      os.flush();
-      os.close();
-      bitcodeFile.outputFile->keep();
-    }
-
     // Emit object files.
     SmallVector<Artifact, 4> objectFiles;
     {
@@ -324,6 +323,18 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       os.flush();
       os.close();
       objectFiles.push_back(std::move(objectFile));
+    }
+
+    // If we are keeping artifacts then let's also add the bitcode for easier
+    // debugging (vs just the binary object file).
+    if (options_.keepLinkerArtifacts) {
+      auto bitcodeFile =
+          Artifact::createVariant(objectFiles.front().path, "bc");
+      auto &os = bitcodeFile.outputFile->os();
+      llvm::WriteBitcodeToFile(*llvmModule, os);
+      os.flush();
+      os.close();
+      bitcodeFile.outputFile->keep();
     }
 
     if (!options_.staticLibraryOutput.empty()) {

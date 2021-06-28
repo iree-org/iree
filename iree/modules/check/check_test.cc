@@ -13,12 +13,11 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/span.h"
-#include "iree/base/logging.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vmvx/registration/driver_module.h"
-#include "iree/modules/check/native_module.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/check/module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
@@ -49,7 +48,7 @@ class CheckTest : public ::testing::Test {
         iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     IREE_ASSERT_OK(
-        check_native_module_create(iree_allocator_system(), &check_module_))
+        iree_check_module_create(iree_allocator_system(), &check_module_))
         << "Native module failed to init";
   }
 

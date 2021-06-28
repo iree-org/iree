@@ -6,12 +6,12 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
-#include "emitc/Dialect/EmitC/IR/EmitC.h"
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
@@ -1326,9 +1326,21 @@ void populateVMToEmitCPatterns(MLIRContext *context,
       context, "vm_cmp_ne_ref", vmAnalysisCache);
   patterns.insert<CompareRefNotZeroOpConversion>(context, vmAnalysisCache);
 
+  // ExtF32: Globals
+  patterns.insert<
+      GlobalLoadOpConversion<IREE::VM::GlobalLoadF32Op, IREE::VM::GlobalF32Op>>(
+      context, "vm_global_load_f32");
+  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreF32Op,
+                                          IREE::VM::GlobalF32Op>>(
+      context, "vm_global_store_f32");
+
   // ExtF32: Native floating-point constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstF32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstF32ZeroOp>>(context);
+
+  // ExtF32: Conditional assignment
+  patterns.insert<CallOpConversion<IREE::VM::SelectF32Op>>(context,
+                                                           "vm_select_f32");
 
   // ExtF32: Native floating-point arithmetic
   patterns.insert<CallOpConversion<IREE::VM::AddF32Op>>(context, "vm_add_f32");
@@ -1370,6 +1382,16 @@ void populateVMToEmitCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::TanhF32Op>>(context,
                                                          "vm_tanh_f32");
 
+  // ExtF32: Casting and type conversion/emulation
+  patterns.insert<CallOpConversion<IREE::VM::CastSI32F32Op>>(context,
+                                                             "vm_cast_si32f32");
+  patterns.insert<CallOpConversion<IREE::VM::CastUI32F32Op>>(context,
+                                                             "vm_cast_ui32f32");
+  patterns.insert<CallOpConversion<IREE::VM::CastF32SI32Op>>(context,
+                                                             "vm_cast_f32si32");
+  patterns.insert<CallOpConversion<IREE::VM::CastF32UI32Op>>(context,
+                                                             "vm_cast_f32ui32");
+
   // ExtF32: Comparison ops
   patterns.insert<CallOpConversion<IREE::VM::CmpEQF32OOp>>(context,
                                                            "vm_cmp_eq_f32o");
@@ -1389,6 +1411,14 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                                             "vm_cmp_lte_f32u");
   patterns.insert<CallOpConversion<IREE::VM::CmpNaNF32Op>>(context,
                                                            "vm_cmp_nan_f32");
+
+  // ExtI64: Globals
+  patterns.insert<
+      GlobalLoadOpConversion<IREE::VM::GlobalLoadI64Op, IREE::VM::GlobalI64Op>>(
+      context, "vm_global_load_i64");
+  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreI64Op,
+                                          IREE::VM::GlobalI64Op>>(
+      context, "vm_global_store_i64");
 
   // ExtI64: Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI64Op>>(context);
@@ -1460,6 +1490,12 @@ class ConvertVMToEmitCPass
     registry.insert<mlir::emitc::EmitCDialect, IREEDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-convert-vm-to-emitc"; }
+
+  StringRef getDescription() const override {
+    return "Convert VM Ops to the EmitC dialect";
+  }
+
   void runOnOperation() override {
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter;
@@ -1491,6 +1527,8 @@ class ConvertVMToEmitCPass
 
     // Global ops
     target.addLegalOp<IREE::VM::GlobalI32Op>();
+    target.addLegalOp<IREE::VM::GlobalI64Op>();
+    target.addLegalOp<IREE::VM::GlobalF32Op>();
     target.addLegalOp<IREE::VM::RodataOp>();
 
     // Control flow ops
@@ -1519,8 +1557,7 @@ createConvertVMToEmitCPass() {
 }  // namespace VM
 }  // namespace IREE
 
-static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass(
-    "iree-convert-vm-to-emitc", "Convert VM Ops to the EmitC dialect");
+static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass;
 
 }  // namespace iree_compiler
 }  // namespace mlir

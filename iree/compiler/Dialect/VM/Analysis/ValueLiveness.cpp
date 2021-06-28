@@ -86,7 +86,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
     std::sort(
         valueNames.begin(), valueNames.end(),
         +[](const StringAttr &a, const StringAttr &b) {
-          return a.getValue().compare_lower(b.getValue()) < 0;
+          return a.getValue().compare_insensitive(b.getValue()) < 0;
         });
     SmallVector<Attribute, 8> valueNameAttrs;
     for (auto attr : valueNames) {

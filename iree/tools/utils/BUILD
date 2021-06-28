@@ -17,8 +17,8 @@ cc_library(
     hdrs = ["vm_util.h"],
     deps = [
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
         "//iree/base/internal:span",
@@ -43,5 +43,15 @@ cc_test(
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:cc",
+    ],
+)
+
+cc_library(
+    name = "yaml_util",
+    srcs = ["yaml_util.c"],
+    hdrs = ["yaml_util.h"],
+    deps = [
+        "//iree/base",
+        "@com_github_yaml_libyaml//:yaml",
     ],
 )

@@ -8,7 +8,7 @@
 
 #include <memory>
 
-#include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -30,7 +30,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // For now lower using the default CPU pass-pipeline which doesn't
   // vectorize. When VMVX can lower vector operations, this can be relaxed.
   passManager.addPass(
-      createLowerExecutableTargetPass(/*lowerToVectors=*/false));
+      createLLVMCPULowerExecutableTargetPass(/*lowerToVectors=*/false));
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 

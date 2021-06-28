@@ -165,8 +165,8 @@ func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (ten
     %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %1 = flow.dispatch.tensor.load %arg1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %2 = linalg.init_tensor [] : tensor<i32>
-    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32> 
-    %4 = linalg.fill(%2, %c0_i32) : tensor<i32>, i32 -> tensor<i32> 
+    %3 = linalg.fill(%c-2147483648_i32, %2) : i32, tensor<i32> -> tensor<i32>
+    %4 = linalg.fill(%c0_i32, %2) : i32, tensor<i32> -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.return
@@ -190,8 +190,8 @@ func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi3
     %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %1 = flow.dispatch.tensor.load %arg1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %2 = linalg.init_tensor [] : tensor<i32>
-    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32> 
-    %4 = linalg.fill(%2, %c0_i32) : tensor<i32>, i32 -> tensor<i32> 
+    %3 = linalg.fill(%c-2147483648_i32, %2) : i32, tensor<i32> -> tensor<i32>
+    %4 = linalg.fill(%c0_i32, %2) : i32, tensor<i32> -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<readwrite:i32>
     flow.return
@@ -213,8 +213,8 @@ func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) 
     %val = tensor.extract %0[] : tensor<i32>
     %1 = flow.dispatch.tensor.load %arg1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %2 = linalg.init_tensor [] : tensor<i32>
-    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32> 
-    %4 = linalg.fill(%2, %val) : tensor<i32>, i32 -> tensor<i32> 
+    %3 = linalg.fill(%c-2147483648_i32, %2) : i32, tensor<i32> -> tensor<i32>
+    %4 = linalg.fill(%val, %2) : i32, tensor<i32> -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<readwrite:i32>
     flow.return
@@ -237,8 +237,8 @@ func @inline_cst_and_remove_unused_read_write_result() -> tensor<i32> {
     %c0_i32 = constant 0 : i32
     %c-2147483648_i32 = constant -2147483648 : i32
     %2 = linalg.init_tensor [] : tensor<i32>
-    %3 = linalg.fill(%2, %c-2147483648_i32) : tensor<i32>, i32 -> tensor<i32>
-    %4 = linalg.fill(%2, %c0_i32) : tensor<i32>, i32 -> tensor<i32>
+    %3 = linalg.fill(%c-2147483648_i32, %2) : i32, tensor<i32> -> tensor<i32>
+    %4 = linalg.fill(%c0_i32, %2) : i32, tensor<i32> -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg1, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
     flow.dispatch.tensor.store %4, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<readwrite:i32>
     flow.return

@@ -42,6 +42,12 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
                     shape::ShapeDialect, StandardOpsDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-tf-convert-to-mhlo"; }
+
+  StringRef getDescription() const override {
+    return "Converts from TensorFlow to the XLA MHLO dialect";
+  }
+
  public:
   ConvertToMHLOPass() = default;
   ConvertToMHLOPass(const ConvertToMHLOPass &) {}
@@ -53,7 +59,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     // Lower TF Patterns must be separate from canonocalization patterns as
     // they are sometimes inversions of eachother.
     OwningRewritePatternList lowerTfPatterns(&getContext());
-    mlir::TF::PopulateLoweringTFPatterns(context, &lowerTfPatterns);
+    mlir::TF::PopulateTFLoweringBeforeHLOPatterns(context, &lowerTfPatterns);
 
     OwningRewritePatternList canonicalizePatterns(&getContext());
     for (auto *op : context->getRegisteredOperations()) {
@@ -146,9 +152,7 @@ std::unique_ptr<FunctionPass> createConvertToMHLOPass() {
   return std::make_unique<ConvertToMHLOPass>();
 }
 
-static PassRegistration<ConvertToMHLOPass> pass(
-    "iree-tf-convert-to-mhlo",
-    "Converts from TensorFlow to the XLA MHLO dialect");
+static PassRegistration<ConvertToMHLOPass> pass;
 
 }  // namespace TF
 }  // namespace iree_integrations

@@ -55,10 +55,10 @@ iree_cc_binary(
     "iree-run-module-vulkan-gui-main.cc"
   DEPS
     ::vulkan_gui_util
+    iree::base::cc
     iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::main
-    iree::base::status
     iree::base::tracing
     iree::hal::vulkan::registration
     iree::modules::hal

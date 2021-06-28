@@ -152,7 +152,7 @@
   <DisplayString Condition="is_infinite()">(infinite timeout)</DisplayString>
   <DisplayString Condition="is_relative()">+{rel_hours()/10}{rel_hours()%10}:{rel_minutes()/10}{rel_minutes()%10}:{rel_seconds()/10}{rel_seconds()%10} / {rel_total_ms()}ms / {rel_total_us()}us</DisplayString>
   <DisplayString Condition="is_absolute()">{abs_year()}-{abs_month()/10}{abs_month()%10}-{abs_day()/10}{abs_day()%10} {abs_hour()/10}{abs_hour()%10}:{abs_minutes()/10}{abs_minutes()%10}:{abs_seconds()/10}{abs_seconds()%10}.{abs_milliseconds()}</DisplayString>
-  
+
   <Expand>
     <!-- relative duration -->
     <Synthetic Name="[seconds]" Condition="is_relative() &amp;&amp; !is_sentinel()">

@@ -5,11 +5,18 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.13.4)
+
 # Do not set MSVC warning flags like /W3 by default (since 3.15):
 #   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
 if(POLICY CMP0092)
   cmake_policy(SET CMP0092 NEW)
 endif()
+
+# LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
+# CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
+# New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
+set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(iree ASM C CXX)
@@ -429,8 +436,9 @@ include(flatbuffer_c_library)
 
 add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 if(${IREE_ENABLE_THREADING})

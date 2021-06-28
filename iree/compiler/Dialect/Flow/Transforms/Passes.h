@@ -97,7 +97,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createExportBenchmarkFuncsPass();
 //===----------------------------------------------------------------------===//
 
 /// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
-std::unique_ptr<FunctionPass> createPadLinalgOpsToIntegerMultiplePass(
+std::unique_ptr<OperationPass<FuncOp>> createPadLinalgOpsToIntegerMultiplePass(
     int paddingSize = 4);
 
 //===----------------------------------------------------------------------===//

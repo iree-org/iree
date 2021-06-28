@@ -29,7 +29,7 @@ cc_library(
         "VMVXTarget.h",
     ],
     deps = [
-        "//iree/compiler/Conversion:PassHeaders",
+        "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",

@@ -22,6 +22,14 @@ namespace MHLO {
 class EmitDefaultIREEABIPass
     : public PassWrapper<EmitDefaultIREEABIPass, OperationPass<FuncOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-mhlo-emit-default-iree-abi";
+  }
+
+  StringRef getDescription() const override {
+    return "Emits simple default ABI metadata";
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     if (SymbolTable::getSymbolVisibility(funcOp) !=
@@ -108,8 +116,7 @@ std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass() {
   return std::make_unique<EmitDefaultIREEABIPass>();
 }
 
-static PassRegistration<EmitDefaultIREEABIPass> funcPass(
-    "iree-mhlo-emit-default-iree-abi", "Emits simple default ABI metadata");
+static PassRegistration<EmitDefaultIREEABIPass> funcPass;
 
 }  // namespace MHLO
 }  // namespace iree_integrations

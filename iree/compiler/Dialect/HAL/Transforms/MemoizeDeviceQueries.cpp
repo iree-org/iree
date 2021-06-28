@@ -26,6 +26,14 @@ namespace HAL {
 class MemoizeDeviceQueriesPass
     : public PassWrapper<MemoizeDeviceQueriesPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-hal-memoize-device-queries";
+  }
+
+  StringRef getDescription() const override {
+    return "Caches hal.device.query results for use across the entire module";
+  }
+
   void runOnOperation() override {
     // Find all match ops we want to memoize and group them together.
     // This lets us easily replace all usages of a match with a single variable.
@@ -94,9 +102,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass() {
   return std::make_unique<MemoizeDeviceQueriesPass>();
 }
 
-static PassRegistration<MemoizeDeviceQueriesPass> pass(
-    "iree-hal-memoize-device-queries",
-    "Caches hal.device.query results for use across the entire module");
+static PassRegistration<MemoizeDeviceQueriesPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

@@ -52,7 +52,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts mhlo.concatenate operation to subtensor ops + subtensor_insert ops.
+/// Converts mhlo.concatenate operation to extract_slice ops + insert_slice ops.
 struct ConcatenateOpConversion
     : public OpConversionPattern<mhlo::ConcatenateOp> {
   using OpConversionPattern<mhlo::ConcatenateOp>::OpConversionPattern;
@@ -87,14 +87,14 @@ struct ConcatenateOpConversion
     auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
     Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
     Value result =
-        rewriter.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+        rewriter.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
     Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
       offsets[dim] = accBound;
       sizes[dim] = rewriter.create<memref::DimOp>(loc, arg, dim);
-      result = rewriter.create<SubTensorInsertOp>(loc, arg, result, offsets,
-                                                  sizes, strides);
+      result = rewriter.create<tensor::InsertSliceOp>(loc, arg, result, offsets,
+                                                      sizes, strides);
       accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);
@@ -142,7 +142,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
       loc, /*dyn_size=*/ValueRange{}, resultType.getShape(),
       resultType.getElementType());
   Value zeroTensor =
-      b.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+      b.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
   switch (lhs.getType().cast<RankedTensorType>().getRank()) {
     case 1:

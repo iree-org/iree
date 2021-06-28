@@ -25,6 +25,14 @@ class ConvertStandardToVMTestPass
     registry.insert<IREE::VM::VMDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "test-iree-convert-std-to-vm";
+  }
+
+  StringRef getDescription() const override {
+    return "Convert Standard Ops to the IREE VM dialect";
+  }
+
   void runOnOperation() override {
     ConversionTarget target(getContext());
     target.addLegalDialect<IREE::VM::VMDialect>();
@@ -57,9 +65,7 @@ createConvertStandardToVMTestPass() {
 }  // namespace VM
 }  // namespace IREE
 
-static PassRegistration<ConvertStandardToVMTestPass> pass(
-    "test-iree-convert-std-to-vm",
-    "Convert Standard Ops to the IREE VM dialect");
+static PassRegistration<ConvertStandardToVMTestPass> pass;
 
 }  // namespace iree_compiler
 }  // namespace mlir

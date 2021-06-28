@@ -12,7 +12,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
@@ -164,6 +164,6 @@ int main() {
     iree_status_fprint(stderr, result);
     iree_status_free(result);
   }
-  fprintf(stdout, "simple_embedding passed\n");
+  fprintf(stdout, "simple_embedding done\n");
   return ret;
 }

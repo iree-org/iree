@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
 #include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
 #include "iree/compiler/Dialect/VM/Target/ConstantEncodingUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -158,26 +159,6 @@ static LogicalResult printFuncOpResults(
 static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
                                      mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
-
-  for (auto globalOp : moduleOp.getOps<IREE::VM::GlobalI32Op>()) {
-    Optional<Attribute> initialValue = globalOp.initial_value();
-    Optional<StringRef> initializer = globalOp.initializer();
-    if (initialValue.hasValue()) {
-      // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so
-      // the struct argument name here must not be changed.
-      emitter.ostream() << "vm_global_store_i32(state->rwdata, "
-                        << globalOp.ordinal() << ", ";
-      if (failed(emitter.emitAttribute(*globalOp.getOperation(),
-                                       initialValue.getValue()))) {
-        return globalOp.emitError() << "Unable to emit initial_value";
-      }
-      emitter.ostream() << ");\n";
-    } else if (initializer.hasValue()) {
-      return globalOp.emitError()
-             << "Initializers for globals not supported yet";
-    }
-  }
-  // TODO(simon-camp): Support globals with different element type
 
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
     std::string buffer_name =
@@ -699,12 +680,20 @@ static LogicalResult canonicalizeModule(
     modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
+  // C target specific pass
+
+  // Erase exports annotated with 'emitc.exclude'. This makes testing
+  // of partially supported ops easier. For the DCE pass to remove the
+  // referenced function it must be unused and marked private.
+  modulePasses.addPass(createDropExcludedExportsPass());
+  modulePasses.addPass(mlir::createSymbolDCEPass());
+
   // In the the Bytecode module the order is:
   // * `createDropCompilerHintsPass()`
   // * `IREE::VM::createOrdinalAllocationPass()`
-  // Here, we have to reverse the order and run `createConvertVMToEmitCPass()`
-  // inbetween to test the EmitC pass. Otherwise, the constants get folded
-  // by the canonicalizer.
+  // Here, we have to reverse the order and run
+  // `createConvertVMToEmitCPass()` inbetween to test the EmitC pass.
+  // Otherwise, the constants get folded by the canonicalizer.
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
@@ -713,7 +702,7 @@ static LogicalResult canonicalizeModule(
   // invalidate the ordinals.
   modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
 
-  // C target specific passes
+  // C target specific pass
   modulePasses.addPass(createConvertVMToEmitCPass());
 
   modulePasses.addPass(createDropCompilerHintsPass());

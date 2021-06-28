@@ -10,7 +10,7 @@
 #include <memory>
 #include <string>
 
-#include "iree/base/status.h"  // IWYU pragma: export
+#include "iree/base/status_cc.h"  // IWYU pragma: export
 #include "iree/testing/gtest.h"
 
 namespace iree {

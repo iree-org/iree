@@ -7,6 +7,14 @@
 #ifndef IREE_BASE_INTERNAL_MAIN_H_
 #define IREE_BASE_INTERNAL_MAIN_H_
 
-extern "C" int iree_main(int argc, char** argv);
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+int iree_main(int argc, char** argv);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_BASE_INTERNAL_MAIN_H_
