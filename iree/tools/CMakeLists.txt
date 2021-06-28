@@ -141,15 +141,15 @@ iree_cc_binary(
     "iree-run-trace-main.c"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::file_path
     iree::base::internal::flags
     iree::base::tracing
+    iree::hal
     iree::hal::drivers
     iree::modules::hal
+    iree::tools::utils::trace_replay
     iree::tools::utils::yaml_util
     iree::vm
-    iree::vm::bytecode_module
     yaml
 )
 

@@ -12,6 +12,27 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    trace_replay
+  HDRS
+    "trace_replay.h"
+  SRCS
+    "trace_replay.c"
+  DEPS
+    ::yaml_util
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::file_path
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+    yaml
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     vm_util
   HDRS
     "vm_util.h"
