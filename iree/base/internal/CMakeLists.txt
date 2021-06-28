@@ -266,11 +266,10 @@ iree_cc_library(
   HDRS
     "main.h"
   SRCS
-    "main_posix.cc"
-    "main_win32.cc"
+    "main_posix.c"
+    "main_win32.c"
   DEPS
     iree::base::core_headers
-    iree::base::logging
   PUBLIC
 )
 
