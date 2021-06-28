@@ -58,8 +58,6 @@ iree_cc_library(
     "yaml_util.c"
   DEPS
     iree::base
-    iree::hal
-    iree::vm
     yaml
   PUBLIC
 )

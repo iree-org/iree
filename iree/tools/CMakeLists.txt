@@ -121,6 +121,7 @@ iree_cc_binary(
   SRCS
     "iree-run-module-main.cc"
   DEPS
+    iree::base
     iree::base::cc
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -128,9 +129,28 @@ iree_cc_binary(
     iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::cc
+)
+
+iree_cc_binary(
+  NAME
+    iree-run-trace
+  SRCS
+    "iree-run-trace-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::file_path
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal::drivers
+    iree::modules::hal
     iree::tools::utils::yaml_util
     iree::vm
     iree::vm::bytecode_module
+    yaml
 )
 
 if(${IREE_BUILD_COMPILER})
