@@ -210,6 +210,14 @@ class InlineDeviceSwitchesPass
     registry.insert<IREEDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-hal-inline-device-switches";
+  }
+
+  StringRef getDescription() const override {
+    return "Inlines hal.device.switch condition regions";
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     SmallVector<IREE::HAL::DeviceSwitchOp, 4> switchOps;
@@ -228,9 +236,7 @@ std::unique_ptr<OperationPass<FuncOp>> createInlineDeviceSwitchesPass() {
   return std::make_unique<InlineDeviceSwitchesPass>();
 }
 
-static PassRegistration<InlineDeviceSwitchesPass> pass(
-    "iree-hal-inline-device-switches",
-    "Inlines hal.device.switch condition regions");
+static PassRegistration<InlineDeviceSwitchesPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

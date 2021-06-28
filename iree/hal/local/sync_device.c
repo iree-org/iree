@@ -142,7 +142,7 @@ static iree_status_t iree_hal_sync_device_query_i32(
   // iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   *out_value = 0;
   return iree_make_status(IREE_STATUS_NOT_FOUND,
-                          "unknown device configuration key value '%*.s'",
+                          "unknown device configuration key value '%.*s'",
                           (int)key.size, key.data);
 }
 

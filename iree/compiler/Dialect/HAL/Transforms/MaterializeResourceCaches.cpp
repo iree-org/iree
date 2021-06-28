@@ -32,6 +32,14 @@ class MaterializeResourceCachesPass
   explicit MaterializeResourceCachesPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
+  StringRef getArgument() const override {
+    return "iree-hal-materialize-resource-caches";
+  }
+
+  StringRef getDescription() const override {
+    return "Materializes hal.executable resource caches and rewrites lookups.";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) return;
@@ -326,12 +334,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
   return std::make_unique<MaterializeResourceCachesPass>(targetOptions);
 }
 
-static PassRegistration<MaterializeResourceCachesPass> pass(
-    "iree-hal-materialize-resource-caches",
-    "Materializes hal.executable resource caches and rewrites lookups.", [] {
-      auto options = getTargetOptionsFromFlags();
-      return std::make_unique<MaterializeResourceCachesPass>(options);
-    });
+static PassRegistration<MaterializeResourceCachesPass> pass([] {
+  auto options = getTargetOptionsFromFlags();
+  return std::make_unique<MaterializeResourceCachesPass>(options);
+});
 
 }  // namespace HAL
 }  // namespace IREE

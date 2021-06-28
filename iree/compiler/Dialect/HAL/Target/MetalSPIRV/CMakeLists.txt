@@ -29,8 +29,8 @@ iree_cc_library(
     MLIRSPIRV
     MLIRSPIRVSerialization
     MLIRVector
-    iree::compiler::Conversion::Common
-    iree::compiler::Conversion::PassHeaders
+    iree::compiler::Codegen::Common
+    iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::SPIRVCommon
     iree::compiler::Utils

@@ -87,7 +87,6 @@ iree_bytecode_module(
   PUBLIC
 )
 
-# TODO(#6121): Adjust the flags to resolve segfault if necessary.
 iree_bytecode_module(
   NAME
     simple_embedding_test_bytecode_module_dylib_riscv_32
@@ -101,7 +100,7 @@ iree_bytecode_module(
     "-iree-hal-target-backends=dylib-llvm-aot"
     "-iree-llvm-target-triple=riscv32-pc-linux-elf"
     "-iree-llvm-target-cpu=generic-rv32"
-    "-iree-llvm-target-cpu-features=+m"
+    "-iree-llvm-target-cpu-features=+m,+f"
     "-iree-llvm-target-abi=ilp32"
     "-iree-llvm-link-embedded=true"
     "-iree-llvm-debug-symbols=false"

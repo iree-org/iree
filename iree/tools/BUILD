@@ -149,7 +149,7 @@ cc_library(
         ":init_iree_passes_and_dialects",
         ":init_mlir_passes_and_dialects",
         ":init_xla_dialects",
-        "//iree/compiler/Conversion",
+        "//iree/compiler/Codegen",
         "//iree/compiler/Dialect/HAL/Conversion:Passes",
     ],
 )
@@ -292,6 +292,25 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-run-trace",
+    srcs = ["iree-run-trace-main.c"],
+    deps = [
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/base/internal:file_io",
+        "//iree/base/internal:file_path",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/drivers",
+        "//iree/modules/hal",
+        "//iree/tools/utils:yaml_util",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
+
+cc_binary(
     name = "iree-tblgen",
     srcs = [
         "//iree/compiler/Dialect/IREE/Tools:GenSrcs",
@@ -318,7 +337,7 @@ cc_library(
         ":init_targets",
         ":init_translations",
         ":init_xla_dialects",
-        "//iree/compiler/Conversion",
+        "//iree/compiler/Codegen",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",

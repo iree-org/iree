@@ -8,7 +8,7 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
@@ -77,16 +77,26 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    passManager.addPass(createLowerExecutableTargetPass());
+    auto targetMachine = createTargetMachine(options_);
+    if (!targetMachine) {
+      llvm::errs() << "failed to create target machine for target triple '"
+                   << options_.targetTriple << "'";
+      return;
+    }
+    passManager.addPass(createLLVMCPULowerExecutableTargetPass());
     // Set target specific options.
+    LLVMCPUCodegenPassPipelineOptions codeGenOptions;
+    codeGenOptions.targetTriple = options_.targetTriple;
+    codeGenOptions.targetDataLayout =
+        targetMachine->createDataLayout().getStringRepresentation();
+
     // TODO(ataei): This is temporary here, should move when target specific
     // overrides options grows.
-    llvm::Triple triple(options_.targetTriple);
-    LLVMTransformPassPipelineOptions codeGenOptions;
-    if (triple.isWasm()) {
+    if (targetMachine->getTargetTriple().isWasm()) {
       codeGenOptions.unfuseFMAOps = true;
     }
-    buildLLVMTransformPassPipeline(passManager, codeGenOptions);
+
+    buildLLVMCPUCodegenPassPipeline(passManager, codeGenOptions);
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {

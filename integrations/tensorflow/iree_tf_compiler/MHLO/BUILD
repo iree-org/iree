@@ -24,7 +24,7 @@ cc_library(
         "IREE_COMPILER_TENSORFLOW_ENABLED",
     ],
     deps = [
-        "@iree//iree/compiler/Conversion:PassHeaders",
+        "@iree//iree/compiler/Codegen:PassHeaders",
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/Flow/Transforms",
         "@iree//iree/compiler/Dialect/IREE/IR",

@@ -184,21 +184,16 @@ lists:
     - invert_permutation
     - is_non_decreasing
     - is_strictly_increasing
-    - lbeta
-    - lgamma
     - log1p
     - log_sigmoid
+    # https://github.com/google/iree/issues/6310
     - log_softmax
-    - reduce_all
-    - reduce_any
     - reduce_logsumexp
-    - reduce_max
     - reduce_mean
-    - reduce_min
     - reduce_std
-    - reduce_sum
     - reduce_variance
-    - softmax
+    # TODO: Fix CHLO expansion of sinh to be high level
+    - sinh
     - softplus
     - xlog1py
     - zero_fraction
@@ -207,9 +202,7 @@ lists:
     - invert_permutation
     - sign
   - &VULKAN_DYNDIM_PASS_MATH_FUNCTIONS
-    - polygamma
     - real
-    - scalar_mul
 
 
 test_groups:

@@ -39,8 +39,6 @@ iree_e2e_cartesian_product_test_suite(
     "broadcast_to_test.py,iree_llvmaot,"
     "broadcasting_test.py,iree_llvmaot,"
     "conv_transpose_test.py,iree_llvmaot,"
-    "dynamic_mlp_relu_test.py,iree_llvmaot,"
-    "dynamic_mlp_test.py,iree_llvmaot,"
     "einsum_dynamic_test.py,iree_llvmaot,"
     "einsum_static_test.py,iree_llvmaot,"
     "einsum_vector_test.py,iree_llvmaot,"

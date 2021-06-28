@@ -5,12 +5,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from typing import Optional
+
 import json
 import logging
 
 import numpy as np
 
 from .binding import HalDevice, HalElementType, VmContext, VmFunction, VmVariantList
+from . import tracing
 
 __all__ = [
     "FunctionInvoker",
@@ -64,16 +67,19 @@ class FunctionInvoker:
       "_arg_descs",
       "_ret_descs",
       "_has_kwargs",
+      "_tracer",
   ]
 
   def __init__(self, vm_context: VmContext, device: HalDevice,
-               vm_function: VmFunction):
+               vm_function: VmFunction,
+               tracer: Optional[tracing.ContextTracer]):
     self._vm_context = vm_context
     # TODO: Needing to know the precise device to allocate on here is bad
     # layering and will need to be fixed in some fashion if/when doing
     # heterogenous dispatch.
     self._device = device
     self._vm_function = vm_function
+    self._tracer = tracer
     self._abi_dict = None
     self._arg_descs = None
     self._ret_descs = None
@@ -85,6 +91,10 @@ class FunctionInvoker:
     return self._vm_function
 
   def __call__(self, *args, **kwargs):
+    call_trace = None  # type: Optional[tracing.CallTrace]
+    if self._tracer:
+      call_trace = self._tracer.start_call(self._vm_function)
+
     # Initialize the capacity to our total number of args, since we should
     # be below that when doing a flat invocation. May want to be more
     # conservative here when considering nesting.
@@ -105,8 +115,14 @@ class FunctionInvoker:
     arg_list = VmVariantList(len(args))
     ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
     _merge_python_sequence_to_vm(inv, arg_list, args, self._arg_descs)
+    if call_trace:
+      call_trace.add_vm_list(arg_list, "args")
     self._vm_context.invoke(self._vm_function, arg_list, ret_list)
+    if call_trace:
+      call_trace.add_vm_list(ret_list, "results")
     returns = _extract_vm_sequence_to_python(inv, ret_list, ret_descs)
+    if call_trace:
+      call_trace.end_call()
     return_arity = len(returns)
     if return_arity == 1:
       return returns[0]

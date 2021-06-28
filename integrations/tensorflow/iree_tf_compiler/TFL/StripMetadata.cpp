@@ -26,6 +26,14 @@ static bool isTFLAttr(NamedAttribute &namedAttr) {
 class StripModuleMetadataPass
     : public PassWrapper<StripModuleMetadataPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-tflite-strip-module-metadata";
+  }
+
+  StringRef getDescription() const override {
+    return "Remove unneeded TFLite attributes from module ops";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
@@ -40,6 +48,14 @@ class StripModuleMetadataPass
 class StripFunctionMetadataPass
     : public PassWrapper<StripFunctionMetadataPass, OperationPass<FuncOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-tflite-strip-function-metadata";
+  }
+
+  StringRef getDescription() const override {
+    return "Remove unneeded TFLite attributes from func ops";
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
@@ -77,13 +93,8 @@ std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass() {
   return std::make_unique<StripFunctionMetadataPass>();
 }
 
-static PassRegistration<StripModuleMetadataPass> modulePass(
-    "iree-tflite-strip-module-metadata",
-    "Remove unneeded TFLite attributes from module ops");
-
-static PassRegistration<StripFunctionMetadataPass> funcPass(
-    "iree-tflite-strip-function-metadata",
-    "Remove unneeded TFLite attributes from func ops");
+static PassRegistration<StripModuleMetadataPass> modulePass;
+static PassRegistration<StripFunctionMetadataPass> funcPass;
 
 }  // namespace TFL
 }  // namespace iree_integrations

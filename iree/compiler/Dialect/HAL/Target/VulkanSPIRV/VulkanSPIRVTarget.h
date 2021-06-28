@@ -10,7 +10,7 @@
 #include <functional>
 #include <string>
 
-#include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
