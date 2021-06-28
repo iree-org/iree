@@ -21,7 +21,7 @@
 #  "@spirv_cross//"
 #  "@com_google_tracing_framework_cpp//"
 #  "@iree_vulkan_headers//"
-#  "//third_party/yaml/"
+#  "@com_github_yaml_libyaml//"
 
 package(
     default_visibility = ["//visibility:public"],
