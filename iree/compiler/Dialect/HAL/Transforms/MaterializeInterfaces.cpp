@@ -1123,7 +1123,7 @@ class MaterializeInterfacesPass
   }
 
   StringRef getArgument() const override {
-    return "iree-hal-materialize-interfaces2";
+    return "iree-hal-materialize-interfaces";
   }
 
   StringRef getDescription() const override {

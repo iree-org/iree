@@ -678,7 +678,7 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
 }
 
 // Records a dispatch using the given bindings attribute set populated by
-// the -iree-hal-materialize-interfaces2 pass.
+// the -iree-hal-materialize-interfaces pass.
 static void recordInterfaceBindings(Value device, Value commandBuffer,
                                     IREE::Flow::DispatchOp &dispatchOp,
                                     IREE::HAL::InterfaceOp &interfaceOp,

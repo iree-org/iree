@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces2 -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
 
 // CHECK-LABEL: hal.executable @static_tiled_dispatch
 //  CHECK-NEXT: hal.interface @[[IO:.+]] {
