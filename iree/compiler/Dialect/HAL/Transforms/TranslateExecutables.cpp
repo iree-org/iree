@@ -43,8 +43,7 @@ class TranslateExecutablesPass
       : TranslateExecutablesPass(other.executableOptions_) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<HALDialect>();
-
+    registry.insert<IREE::HAL::HALDialect>();
     for (auto &pipeline : pipelines_) {
       pipeline.passManager->getDependentDialects(registry);
     }

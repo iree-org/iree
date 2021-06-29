@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -28,6 +29,14 @@ class SerializeExecutablesPass
  public:
   explicit SerializeExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    auto targetBackends = matchTargetBackends(executableOptions_.targets);
+    for (auto &targetBackend : targetBackends) {
+      targetBackend->getDependentDialects(registry);
+    }
+  }
 
   StringRef getArgument() const override {
     return "iree-hal-serialize-executables";

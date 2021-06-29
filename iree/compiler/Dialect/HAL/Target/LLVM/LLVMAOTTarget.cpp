@@ -76,6 +76,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
   }
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    mlir::registerLLVMDialectTranslation(registry);
+  }
+
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
     auto targetMachine = createTargetMachine(options_);
     if (!targetMachine) {
@@ -100,8 +104,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
-    mlir::registerLLVMDialectTranslation(*moduleOp->getContext());
-
     OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     auto sourceExecutableOps =
