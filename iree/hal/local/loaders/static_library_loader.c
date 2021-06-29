@@ -125,7 +125,7 @@ static iree_status_t iree_hal_static_executable_issue_call(
   if (library->exports.tags != NULL) {
     const char* tag = library->exports.tags[ordinal];
     if (tag) {
-      IREE_TRACE_ZONE_APPEND_TEXT(tag);
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, tag);
     }
   }
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
