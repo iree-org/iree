@@ -18,24 +18,24 @@ bool iree_benchmark_keep_running(iree_benchmark_state_t* state,
   return false;
 }
 
-void iree_benchmark_skip(iree_benchmark_state_t* state, const char* message){};
+void iree_benchmark_skip(iree_benchmark_state_t* state, const char* message) {}
 
-void iree_benchmark_pause_timing(iree_benchmark_state_t* state){};
+void iree_benchmark_pause_timing(iree_benchmark_state_t* state) {}
 
-void iree_benchmark_resume_timing(iree_benchmark_state_t* state){};
+void iree_benchmark_resume_timing(iree_benchmark_state_t* state) {}
 
 void iree_benchmark_set_label(iree_benchmark_state_t* state,
-                              const char* label){};
+                              const char* label) {}
 
 void iree_benchmark_set_bytes_processed(iree_benchmark_state_t* state,
-                                        int64_t bytes){};
+                                        int64_t bytes) {}
 
 void iree_benchmark_set_items_processed(iree_benchmark_state_t* state,
-                                        int64_t items){};
+                                        int64_t items) {}
 
 void iree_benchmark_register(iree_string_view_t name,
-                             const iree_benchmark_def_t* benchmark_def){};
+                             const iree_benchmark_def_t* benchmark_def) {}
 
-void iree_benchmark_initialize(int* argc, char** argv){};
+void iree_benchmark_initialize(int* argc, char** argv) {}
 
-void iree_benchmark_run_specified(void){};
+void iree_benchmark_run_specified(void) {}
