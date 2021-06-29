@@ -44,7 +44,6 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
-option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
 
 option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
@@ -532,10 +531,6 @@ endif()
 
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
-endif()
-
-if(${IREE_BUILD_EMBEDDING_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
-  add_subdirectory(iree/samples/simple_embedding)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
