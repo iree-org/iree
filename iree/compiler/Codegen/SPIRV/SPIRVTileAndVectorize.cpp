@@ -537,8 +537,8 @@ struct LowerToLoops final : public OpRewritePattern<OpTy> {
 
 void SPIRVTileAndVectorizePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  IREE::HAL::ExecutableTargetOp targetOp = getOperation();
-  ModuleOp module = targetOp.getInnerModule();
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  ModuleOp module = variantOp.getInnerModule();
 
   for (FuncOp funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
@@ -747,7 +747,7 @@ void SPIRVTileAndVectorizePass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVTileAndVectorizePass(const SPIRVCodegenOptions &options) {
   return std::make_unique<SPIRVTileAndVectorizePass>(options);
 }

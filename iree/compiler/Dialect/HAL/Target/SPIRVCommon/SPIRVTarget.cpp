@@ -22,14 +22,14 @@ namespace HAL {
 SPIRVTargetBackend::SPIRVTargetBackend(SPIRVCodegenOptions options)
     : spvCodeGenOptions_(std::move(options)) {}
 
-void SPIRVTargetBackend::declareTargetOpsForEnv(
+void SPIRVTargetBackend::declareVariantOpsForEnv(
     IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp executableOp,
     spirv::TargetEnvAttr spvTargetEnv) {
   auto targetBuilder = OpBuilder::atBlockTerminator(&executableOp.getBlock());
-  auto targetOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
+  auto variantOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
       sourceOp.getLoc(), name(), filter_pattern());
 
-  auto containerBuilder = OpBuilder::atBlockTerminator(&targetOp.getBlock());
+  auto containerBuilder = OpBuilder::atBlockTerminator(&variantOp.getBlock());
   auto innerModuleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 
   // Attach SPIR-V target environment to the target's ModuleOp.

@@ -27,7 +27,7 @@ flow.executable @add_dispatch_0 {
 //  CHECK-NEXT:    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.target @vmvx, filter="vmvx" {
+//  CHECK-NEXT:   hal.executable.variant @vmvx, filter="vmvx" {
 //  CHECK-NEXT:     hal.executable.entry_point @entry attributes {
 //  CHECK-SAME:       interface = @io,
 //  CHECK-SAME:       ordinal = 0 : index

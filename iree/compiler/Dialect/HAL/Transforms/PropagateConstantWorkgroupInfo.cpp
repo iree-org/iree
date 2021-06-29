@@ -16,7 +16,7 @@ namespace HAL {
 
 class PropagateConstantWorkgroupInfoPass
     : public PassWrapper<PropagateConstantWorkgroupInfoPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+                         OperationPass<IREE::HAL::ExecutableVariantOp>> {
  public:
   StringRef getArgument() const override {
     return "iree-hal-propagate-constant-workgroup-info";
@@ -27,10 +27,10 @@ class PropagateConstantWorkgroupInfoPass
   }
 
   void runOnOperation() override {
-    auto targetOp = getOperation();
+    auto variantOp = getOperation();
 
-    SymbolTable targetSymbolTable(targetOp);
-    for (auto funcOp : targetOp.getInnerModule().getOps<FuncOp>()) {
+    SymbolTable targetSymbolTable(variantOp);
+    for (auto funcOp : variantOp.getInnerModule().getOps<FuncOp>()) {
       auto entryPointOp =
           targetSymbolTable.lookup<IREE::HAL::ExecutableEntryPointOp>(
               funcOp.getName());
@@ -53,7 +53,7 @@ class PropagateConstantWorkgroupInfoPass
   }
 };
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createPropagateConstantWorkgroupInfoPass() {
   return std::make_unique<PropagateConstantWorkgroupInfoPass>();
 }

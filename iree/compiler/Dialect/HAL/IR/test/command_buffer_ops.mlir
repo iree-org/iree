@@ -134,7 +134,7 @@ func @command_buffer_bind_descriptor_set(
 // -----
 
 hal.executable @ex {
-  hal.executable.target @backend, filter="backend" {
+  hal.executable.variant @backend, filter="backend" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index
@@ -163,7 +163,7 @@ func @command_buffer_dispatch(
 // -----
 
 hal.executable @ex {
-  hal.executable.target @backend, filter="backend" {
+  hal.executable.variant @backend, filter="backend" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index

@@ -109,17 +109,17 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     registry.insert<Vulkan::VulkanDialect, spirv::SPIRVDialect>();
   }
 
-  void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                        IREE::HAL::ExecutableOp executableOp) override {
+  void declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
+                         IREE::HAL::ExecutableOp executableOp) override {
     spirv::TargetEnvAttr spvTargetEnv =
         getSPIRVTargetEnv(options_.vulkanTargetEnv, options_.vulkanTargetTriple,
                           sourceOp.getContext());
-    declareTargetOpsForEnv(sourceOp, executableOp, spvTargetEnv);
+    declareVariantOpsForEnv(sourceOp, executableOp, spvTargetEnv);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
-    ModuleOp innerModuleOp = targetOp.getInnerModule();
+    ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
 
     FlatbufferBuilder builder;
@@ -129,7 +129,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     // final flatbuffer.
     SmallVector<uint32_t, 256> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
-      return targetOp.emitError() << "failed to serialize spv.module";
+      return variantOp.emitError() << "failed to serialize spv.module";
     }
     auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
                                                     spvBinary.size());
@@ -149,7 +149,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(),
+        variantOp.getLoc(), variantOp.sym_name(),
         executableBuilder.getStringAttr("SPVE"),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.mime_typeAttr(

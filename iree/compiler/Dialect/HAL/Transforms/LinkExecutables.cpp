@@ -51,7 +51,7 @@ class LinkExecutablesPass
     auto executableOps =
         llvm::to_vector<4>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     for (auto executableOp : executableOps) {
-      auto targetOps = executableOp.getOps<IREE::HAL::ExecutableTargetOp>();
+      auto targetOps = executableOp.getOps<IREE::HAL::ExecutableVariantOp>();
       if (targetOps.empty()) {
         executableOp.erase();
       }

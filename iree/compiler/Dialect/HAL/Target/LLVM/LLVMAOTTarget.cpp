@@ -116,14 +116,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Symbol visibility.
     unsigned moduleNumber = 0;
     for (auto sourceExecutableOp : enumerate(sourceExecutableOps)) {
-      auto targetOps = llvm::to_vector<4>(
-          sourceExecutableOp.value().getOps<IREE::HAL::ExecutableTargetOp>());
-      for (auto targetOp : targetOps) {
-        if (!matchPattern(targetOp.target_backend_filter(), filter_pattern())) {
+      auto variantOps = llvm::to_vector<4>(
+          sourceExecutableOp.value().getOps<IREE::HAL::ExecutableVariantOp>());
+      for (auto variantOp : variantOps) {
+        if (!matchPattern(variantOp.target_backend_filter(),
+                          filter_pattern())) {
           continue;
         }
 
-        auto sourceModuleOp = targetOp.getInnerModule();
+        auto sourceModuleOp = variantOp.getInnerModule();
         for (auto globalOp : sourceModuleOp.getOps<LLVM::GlobalOp>()) {
           if (globalOp.linkage() != LLVM::Linkage::Private) {
             continue;
@@ -150,9 +151,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     linkedExecutableOp.setVisibility(
         sourceExecutableOps.front().getVisibility());
 
-    // Add our hal.executable.target with an empty module.
+    // Add our hal.executable.variant with an empty module.
     builder.setInsertionPointToStart(linkedExecutableOp.getBody());
-    auto linkedTargetOp = builder.create<IREE::HAL::ExecutableTargetOp>(
+    auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
         moduleOp.getLoc(), name(), filter_pattern());
     builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
     builder.create<ModuleOp>(moduleOp.getLoc());
@@ -163,7 +164,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         [](mlir::ModuleOp moduleOp) { return moduleOp; }, builder);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
@@ -174,29 +175,29 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // intermediate code/binary files), and at runtime (loaded
     // libraries/symbols/etc).
     auto libraryName =
-        targetOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
+        variantOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
     // Validate flags for output mode.
     if (options_.linkEmbedded && !options_.staticLibraryOutput.empty()) {
-      return targetOp.emitError()
+      return variantOp.emitError()
              << "cannot embed ELF and produce static library simultaneously";
     }
 
     // Specialize the module to the target triple.
-    // The executable will have been cloned into other ExecutableTargetOps for
+    // The executable will have been cloned into other ExecutableVariantOps for
     // other triples so it's fine to mutate in-place.
     llvm::Triple targetTriple(options_.targetTriple);
-    targetOp.getInnerModule()->setAttr(
+    variantOp.getInnerModule()->setAttr(
         LLVM::LLVMDialect::getTargetTripleAttrName(),
         executableBuilder.getStringAttr(targetTriple.str()));
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
-    auto llvmModule = mlir::translateModuleToLLVMIR(targetOp.getInnerModule(),
+    auto llvmModule = mlir::translateModuleToLLVMIR(variantOp.getInnerModule(),
                                                     context, libraryName);
     if (!llvmModule) {
-      return targetOp.emitError() << "failed to translate the MLIR LLVM "
-                                     "dialect to the native llvm::Module";
+      return variantOp.emitError() << "failed to translate the MLIR LLVM "
+                                      "dialect to the native llvm::Module";
     }
 
     // Configure the functions in the module. This may override defaults set
@@ -237,7 +238,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       } break;
     }
     for (auto entryPointOp :
-         targetOp.getBlock().getOps<ExecutableEntryPointOp>()) {
+         variantOp.getBlock().getOps<ExecutableEntryPointOp>()) {
       // Find the matching function in the LLVM module.
       auto *llvmFunc = llvmModule->getFunction(entryPointOp.getName());
       llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
@@ -272,7 +273,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Try to grab a linker tool based on the options (and target environment).
     auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
     if (!linkerTool) {
-      return mlir::emitError(targetOp.getLoc())
+      return mlir::emitError(variantOp.getLoc())
              << "failed to find a target linker for the given target triple '"
              << options_.targetTriple << "'";
     }
@@ -281,7 +282,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // linking (such as initializer functions).
     if (failed(linkerTool->configureModule(llvmModule.get(),
                                            {queryLibraryFunc}))) {
-      return targetOp.emitError()
+      return variantOp.emitError()
              << "failed to configure LLVM module for target linker";
     }
 
@@ -289,7 +290,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // similar to what a frontend would do before passing to linking.
     auto targetMachine = createTargetMachine(options_);
     if (!targetMachine) {
-      return mlir::emitError(targetOp.getLoc())
+      return mlir::emitError(variantOp.getLoc())
              << "failed to create target machine for target triple '"
              << options_.targetTriple << "'";
     }
@@ -297,7 +298,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
     if (failed(
             runLLVMIRPasses(options_, targetMachine.get(), llvmModule.get()))) {
-      return targetOp.emitError()
+      return variantOp.emitError()
              << "failed to run LLVM-IR opt passes for IREE::HAL::ExecutableOp "
                 "targeting '"
              << options_.targetTriple << "'";
@@ -314,7 +315,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       std::string objectData;
       if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
                                       &objectData))) {
-        return targetOp.emitError()
+        return variantOp.emitError()
                << "failed to compile LLVM-IR module to an object file";
       }
       auto objectFile = Artifact::createTemporary(libraryName, "o");
@@ -340,8 +341,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     if (!options_.staticLibraryOutput.empty()) {
       if (objectFiles.size() != 1) {
         // Static library output only supports single object libraries.
-        return targetOp.emitError() << "generating static libraries from "
-                                       "multiple object files is not supported";
+        return variantOp.emitError()
+               << "generating static libraries from "
+                  "multiple object files is not supported";
       }
 
       // Copy the static object file to the specified output along with
@@ -350,7 +352,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       const auto library_name = objectFiles[0].path;
       if (!outputStaticLibrary(libraryName, queryFunctionName, libraryPath,
                                objectFiles[0].path)) {
-        return targetOp.emitError() << "static library generation failed";
+        return variantOp.emitError() << "static library generation failed";
       }
     }
 
@@ -358,15 +360,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto linkArtifactsOr =
         linkerTool->linkDynamicLibrary(libraryName, objectFiles);
     if (!linkArtifactsOr.hasValue()) {
-      return mlir::emitError(targetOp.getLoc())
+      return mlir::emitError(variantOp.getLoc())
              << "failed to link executable and generate target dylib using "
                 "linker toolchain "
              << linkerTool->getToolPath();
     }
     auto &linkArtifacts = linkArtifactsOr.getValue();
     if (options_.keepLinkerArtifacts) {
-      mlir::emitRemark(targetOp.getLoc())
-          << "linker artifacts for " << targetOp.getName() << " preserved:\n"
+      mlir::emitRemark(variantOp.getLoc())
+          << "linker artifacts for " << variantOp.getName() << " preserved:\n"
           << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
       for (auto &objectFile : objectFiles) {
@@ -378,8 +380,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       // Load the linked ELF file and pack into an attr.
       auto elfFile = linkArtifacts.libraryFile.read();
       if (!elfFile.hasValue()) {
-        return targetOp.emitError() << "failed to read back dylib temp file at "
-                                    << linkArtifacts.libraryFile.path;
+        return variantOp.emitError()
+               << "failed to read back dylib temp file at "
+               << linkArtifacts.libraryFile.path;
       }
       auto bufferAttr = DenseIntElementsAttr::get(
           VectorType::get({static_cast<int64_t>(elfFile->size())},
@@ -389,7 +392,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       // Add the binary to the parent hal.executable.
       auto executableFormatAttr = executableBuilder.getStringAttr("EX_ELF");
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
+          variantOp.getLoc(), variantOp.sym_name(), executableFormatAttr,
           bufferAttr);
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
@@ -401,7 +404,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       auto executableFormatAttr = std::string("static");
 
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
+          variantOp.getLoc(), variantOp.sym_name(), executableFormatAttr,
           libraryNameVector);
     } else {
       FlatbufferBuilder builder;
@@ -425,8 +428,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
             return linkArtifacts.libraryFile.readInto(stream);
           });
       if (!libraryEmbeddedRef) {
-        return targetOp.emitError() << "failed to read back dylib temp file at "
-                                    << linkArtifacts.libraryFile.path;
+        return variantOp.emitError()
+               << "failed to read back dylib temp file at "
+               << linkArtifacts.libraryFile.path;
       }
 
       iree_DyLibExecutableDef_library_embedded_add(builder, libraryEmbeddedRef);
@@ -442,7 +446,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
       // Add the binary data to the target executable.
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          targetOp.getLoc(), targetOp.sym_name(), executableFormatAttr,
+          variantOp.getLoc(), variantOp.sym_name(), executableFormatAttr,
           builder.getBufferAttr(executableBuilder.getContext()));
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-flatbuffers"));

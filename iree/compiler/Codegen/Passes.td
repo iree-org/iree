@@ -63,7 +63,7 @@ def OptimizeVectorTransfer :
 // polluting common pass declarations with HAL specific ops.
 def SetNumWorkgroups :
     Pass<"iree-set-num-workgroups",
-         "mlir::iree_compiler::IREE::HAL::ExecutableTargetOp"> {
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary =
       "Set the number of workgroups for entry point functions";
   let constructor = "mlir::iree_compiler::createSetNumWorkgroupsPass()";
@@ -90,7 +90,7 @@ def ConvertToLLVM :
 
 def LLVMCPULowerExecutableTarget :
     Pass<"iree-llvmcpu-lower-executable-target",
-         "mlir::iree_compiler::IREE::HAL::ExecutableTargetOp"> {
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary =
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
@@ -158,7 +158,7 @@ def ConvertToNVVM :
 
 // TODO: Bring the argument in line with the names used elsewhere.
 def LLVMGPULowerExecutableTarget :
-    Pass<"iree-llvmgpu-lower-executable-target-pass", "mlir::iree_compiler::IREE::HAL::ExecutableTargetOp"> {
+    Pass<"iree-llvmgpu-lower-executable-target-pass", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
@@ -170,7 +170,7 @@ def LLVMGPURemoveSingleIterationLoop :
 }
 
 def LLVMGPUTileAndDistribute :
-    Pass<"iree-llvmgpu-tile-and-distribute", "mlir::iree_compiler::IREE::HAL::ExecutableTargetOp"> {
+    Pass<"iree-llvmgpu-tile-and-distribute", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistributeToThreads()";
 }
@@ -194,7 +194,7 @@ def ConvertToSPIRV :
 
 def SPIRVConcretizeWorkgroupTiles :
     Pass<"iree-spirv-concretize-workgroup-tiles",
-    "mlir::iree_compiler::IREE::HAL::ExecutableTargetOp"> {
+    "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Replace hal.interface.workgroup.* ops with constant values";
   let constructor =
      "mlir::iree_compiler::createSPIRVConcretizeWorkgroupTilesPass(mlir::iree_compiler::SPIRVCodegenOptions::getFromCLOptions())";
@@ -203,7 +203,7 @@ def SPIRVConcretizeWorkgroupTiles :
 // TODO: Rename argument to be fully qualified.
 def SPIRVConvertToGPU :
     Pass<"iree-spirv-convert-to-gpu",
-         "mlir::iree_compiler::IREE::HAL::ExecutableTargetOp"> {
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Map tiled linalg and loop ops to GPU";
   let constructor = "mlir::iree_compiler::createSPIRVConvertToGPUPass()";
 }
@@ -212,7 +212,7 @@ def SPIRVConvertToGPU :
 // TODO: Does not appear used?
 def SPIRVFoldProcessorIDUses :
     Pass<"iree-spirv-fold-gpu-procid-uses",
-         "mlir::iree_compiler::IREE::HAL::ExecutableTargetOp"> {
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Fold GPU processor ID uses where possible";
   let constructor = "mlir::iree_compiler::createSPIRVFoldProcessorIDUsesPass()";
 }
@@ -220,7 +220,7 @@ def SPIRVFoldProcessorIDUses :
 // TODO: Rename argument to be fully qualified.
 def SPIRVTileAndVectorize :
     Pass<"iree-spirv-tile-and-vectorize",
-         "mlir::iree_compiler::IREE::HAL::ExecutableTargetOp"> {
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary =
       "Tile and vectorize Linalg operations on buffers in one workgroup";
   let constructor =

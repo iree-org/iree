@@ -2023,7 +2023,7 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     Symbol,
-    HasParent<"IREE::HAL::ExecutableTargetOp">,
+    HasParent<"IREE::HAL::ExecutableVariantOp">,
     IsolatedFromAbove
   ]> {
   let summary = [{executable entry point declaration}];
@@ -2091,14 +2091,14 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   }];
 }
 
-def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
+def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     IsolatedFromAbove,
     HasParent<"IREE::HAL::ExecutableOp">,
-    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableTargetEndOp">,
+    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableVariantEndOp">,
     Symbol,
     SymbolTable,
   ]> {
-  let summary = [{target executable IR}];
+  let summary = [{target-specific variant of an executable op}];
   let description = [{
     The target IR for the executable. This can be preserved for debugging but
     is usually removed during transformation.
@@ -2130,11 +2130,11 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
   }];
 }
 
-def HAL_ExecutableTargetEndOp : HAL_Op<"executable.target_end", [
-    HasParent<"IREE::HAL::ExecutableTargetOp">,
+def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
+    HasParent<"IREE::HAL::ExecutableVariantOp">,
     Terminator,
   ]> {
-  let summary = [{terminator pseudo-op for the executable target op}];
+  let summary = [{terminator pseudo-op for the executable variant op}];
   let assemblyFormat = "attr-dict";
 }
 

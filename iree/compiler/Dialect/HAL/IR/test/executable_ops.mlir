@@ -2,8 +2,8 @@
 
 // CHECK-LABEL: @ex
 hal.executable @ex {
-  // CHECK: hal.executable.target @backend, filter="backend"
-  hal.executable.target @backend, filter="backend" {
+  // CHECK: hal.executable.variant @backend, filter="backend"
+  hal.executable.variant @backend, filter="backend" {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : index
@@ -34,8 +34,8 @@ hal.executable @ex {
 
 // CHECK-LABEL: @ex_with_workgroup_count_region
 hal.executable @ex_with_workgroup_count_region {
-  // CHECK: hal.executable.target @backend, filter="backend"
-  hal.executable.target @backend, filter="backend" {
+  // CHECK: hal.executable.variant @backend, filter="backend"
+  hal.executable.variant @backend, filter="backend" {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : index

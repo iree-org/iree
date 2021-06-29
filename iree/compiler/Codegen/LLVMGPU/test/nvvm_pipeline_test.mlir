@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-to-nvvm-pipeline))" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))" %s | IreeFileCheck %s
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -8,7 +8,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @cuda, filter="cuda" {
+  hal.executable.variant @cuda, filter="cuda" {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   module  {
     func @add_dispatch_0() {
@@ -37,7 +37,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 }
 
 // CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-//       CHECK:   hal.executable.target @cuda, filter="cuda" {
+//       CHECK:   hal.executable.variant @cuda, filter="cuda" {
 //       CHECK:   llvm.fadd
 
 // -----
@@ -51,7 +51,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @cuda, filter="cuda" {
+  hal.executable.variant @cuda, filter="cuda" {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
     module  {
       func @dot_dispatch_0() {
@@ -100,7 +100,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 }
 
 //   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.target @cuda, filter="cuda" {
+//         CHECK:   hal.executable.variant @cuda, filter="cuda" {
 // CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //         CHECK:   llvm.br
 // CHECK-COUNT-6:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
@@ -111,7 +111,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 // -----
 
 hal.executable @conv2d_dispatch_0 attributes {sym_visibility = "private"} {
-hal.executable.target @cuda, filter="cuda" {
+hal.executable.variant @cuda, filter="cuda" {
   hal.interface @io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -176,7 +176,7 @@ hal.executable.target @cuda, filter="cuda" {
 }
 
 //   CHECK-LABEL: hal.executable @conv2d_dispatch_0
-//         CHECK:   hal.executable.target @cuda, filter="cuda" {
+//         CHECK:   hal.executable.variant @cuda, filter="cuda" {
 // CHECK-COUNT-3:   llvm.load %{{.*}} : !llvm.ptr<f32>
 //         CHECK:   lvm.fmul %{{.*}}, %{{.*}}  : f32
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : f32
@@ -189,7 +189,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @cuda, filter="cuda" {
+  hal.executable.variant @cuda, filter="cuda" {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   module  {
     func @add_dispatch_0() {
@@ -216,14 +216,14 @@ hal.executable @simpleMath_ex_dispatch_0 {
 }
 
 // CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-//       CHECK:   hal.executable.target @cuda, filter="cuda" {
+//       CHECK:   hal.executable.variant @cuda, filter="cuda" {
 //       CHECK:   llvm.mlir.global private constant @{{.*}}(dense<[1.000000e+00, 2.000000e+00, 3.000000e+00, 4.000000e+00, 5.000000e+00, 6.000000e+00, 7.000000e+00, 8.000000e+00, 9.000000e+00, 1.000000e+01, 1.100000e+01, 1.200000e+01, 1.300000e+01, 1.400000e+01, 1.500000e+01, 1.600000e+01]> : tensor<16xf32>)
 //       CHECK:   llvm.fadd
 
 // -----
 
 hal.executable @reduction_dispatch {
-hal.executable.target @cuda, filter="cuda" {
+hal.executable.variant @cuda, filter="cuda" {
   hal.executable.entry_point @reduction attributes {interface = @io, ordinal = 0 : index}
   module  {
     func @reduction() {
@@ -262,5 +262,5 @@ hal.executable.target @cuda, filter="cuda" {
 }
 
 // CHECK-LABEL: hal.executable @reduction_dispatch
-//       CHECK:   hal.executable.target @cuda, filter="cuda" {
+//       CHECK:   hal.executable.variant @cuda, filter="cuda" {
 //       CHECK:   llvm.fadd

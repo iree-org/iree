@@ -1,11 +1,11 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -pass-pipeline='hal.executable(hal.executable.target(iree-hal-propagate-constant-workgroup-info))' %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-hal-propagate-constant-workgroup-info))' %s | IreeFileCheck %s
 
 hal.executable @exe {
   hal.interface @interface {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @target, filter="target" {
+  hal.executable.variant @target, filter="target" {
     hal.executable.entry_point @entry attributes {
       interface = @interface,
       ordinal = 0 : index,

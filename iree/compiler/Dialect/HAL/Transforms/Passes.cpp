@@ -25,7 +25,7 @@ namespace {
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   Option<bool> serializeExecutables{
       *this, "serialize-executables",
-      llvm::cl::desc("Whether to serialize hal.executable.target ops to "
+      llvm::cl::desc("Whether to serialize hal.executable.variant ops to "
                      "hal.executable.binary ops."),
       llvm::cl::init(true)};
   Option<bool> linkExecutables{
@@ -63,9 +63,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // comminucate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass(targetOptions));
 
-  passManager.nest<ExecutableOp>().addNestedPass<ExecutableTargetOp>(
+  passManager.nest<ExecutableOp>().addNestedPass<ExecutableVariantOp>(
       createPropagateConstantWorkgroupInfoPass());
-  passManager.nest<ExecutableOp>().addNestedPass<ExecutableTargetOp>(
+  passManager.nest<ExecutableOp>().addNestedPass<ExecutableVariantOp>(
       createTranslateExecutablesPass(targetOptions));
 
   // Convert supported input dialects (std, flow, etc) into the HAL dialect.

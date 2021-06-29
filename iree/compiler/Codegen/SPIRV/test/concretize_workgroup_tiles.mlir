@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file  -iree-spirv-workgroup-tile-size=0,4,4,16 -iree-spirv-workgroup-size=4,4,1 -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-workgroup-tiles))" -canonicalize -cse  %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file  -iree-spirv-workgroup-tile-size=0,4,4,16 -iree-spirv-workgroup-size=4,4,1 -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-concretize-workgroup-tiles))" -canonicalize -cse  %s | IreeFileCheck %s
 
 hal.executable @conv2d_static_shape attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -6,7 +6,7 @@ hal.executable @conv2d_static_shape attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @conv2d_static_shape attributes {
       interface = @io,
       ordinal = 0 : index

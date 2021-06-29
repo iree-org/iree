@@ -149,7 +149,7 @@ class CUDATargetBackend final : public TargetBackend {
     buildLLVMGPUTransformPassPipeline(passManager, false);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
@@ -160,9 +160,9 @@ class CUDATargetBackend final : public TargetBackend {
     // intermediate code/binary files), and at runtime (loaded
     // libraries/symbols/etc).
     auto libraryName =
-        targetOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
+        variantOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
-    ModuleOp innerModuleOp = targetOp.getInnerModule();
+    ModuleOp innerModuleOp = variantOp.getInnerModule();
 
     // Remove all the functions that are not part of the CUDA kernel.
     // TODO: Find a better solution to handle this.
@@ -179,8 +179,8 @@ class CUDATargetBackend final : public TargetBackend {
     auto llvmModule =
         mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
     if (!llvmModule) {
-      return targetOp.emitError() << "failed to translate the MLIR LLVM "
-                                     "dialect to the native llvm::Module";
+      return variantOp.emitError() << "failed to translate the MLIR LLVM "
+                                      "dialect to the native llvm::Module";
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     std::vector<std::string> entryPointNames;
@@ -217,12 +217,12 @@ class CUDATargetBackend final : public TargetBackend {
       const llvm::Target *target =
           llvm::TargetRegistry::lookupTarget("", triple, error);
       if (target == nullptr) {
-        return targetOp.emitError() << "cannot initialize target triple";
+        return variantOp.emitError() << "cannot initialize target triple";
       }
       targetMachine.reset(target->createTargetMachine(triple.str(), targetChip,
                                                       features, {}, {}));
       if (targetMachine == nullptr) {
-        return targetOp.emitError() << "cannot initialize target machine";
+        return variantOp.emitError() << "cannot initialize target machine";
       }
     }
 
@@ -261,7 +261,7 @@ class CUDATargetBackend final : public TargetBackend {
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(),
+        variantOp.getLoc(), variantOp.sym_name(),
         executableBuilder.getStringAttr("PTXE"),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.mime_typeAttr(

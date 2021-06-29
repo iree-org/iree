@@ -108,10 +108,10 @@ static void renameWithDisambiguatedName(
   SymbolTable::setSymbolName(op, disambiguatedName);
 }
 
-void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                                     IREE::HAL::ExecutableOp executableOp) {
+void TargetBackend::declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
+                                      IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());
-  auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
+  auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
       sourceOp.getLoc(), name(), filter_pattern());
   OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
   containerBuilder.create<ModuleOp>(sourceOp.getLoc());
@@ -209,7 +209,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
     mlir::ModuleOp moduleOp,
     ArrayRef<IREE::HAL::ExecutableOp> sourceExecutableOps,
     IREE::HAL::ExecutableOp linkedExecutableOp,
-    IREE::HAL::ExecutableTargetOp linkedTargetOp,
+    IREE::HAL::ExecutableVariantOp linkedTargetOp,
     std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
     OpBuilder &builder) {
   llvm::SmallVector<IREE::HAL::InterfaceOp, 4> linkedInterfaceOps;
@@ -224,18 +224,18 @@ LogicalResult TargetBackend::linkExecutablesInto(
 
   // Iterate over all source executable ops, linking as many as we can.
   for (auto sourceExecutableOp : sourceExecutableOps) {
-    auto targetOps = llvm::to_vector<4>(
-        sourceExecutableOp.getOps<IREE::HAL::ExecutableTargetOp>());
-    for (auto targetOp : targetOps) {
+    auto variantOps = llvm::to_vector<4>(
+        sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
+    for (auto variantOp : variantOps) {
       // Only process targets matching our pattern.
-      if (!matchPattern(targetOp.target_backend_filter(), filter_pattern())) {
+      if (!matchPattern(variantOp.target_backend_filter(), filter_pattern())) {
         continue;
       }
 
       // Clone entry point ops and queue remapping ordinals and updating
       // symbol refs.
       for (auto entryPointOp :
-           targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+           variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
         // Lookup the interface used by this entry point.
         auto sourceInterfaceOp =
             SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
@@ -267,7 +267,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
         // this entry point.
         auto oldSymbolRefAttr =
             builder.getSymbolRefAttr(sourceExecutableOp.getName(),
-                                     {builder.getSymbolRefAttr(targetOp),
+                                     {builder.getSymbolRefAttr(variantOp),
                                       builder.getSymbolRefAttr(entryPointOp)});
         auto newSymbolRefAttr = builder.getSymbolRefAttr(
             linkedExecutableOp.getName(),
@@ -277,16 +277,16 @@ LogicalResult TargetBackend::linkExecutablesInto(
       }
 
       // Merge the existing module into the new linked module op.
-      auto sourceModuleOp = getInnerModuleFn(targetOp.getInnerModule());
+      auto sourceModuleOp = getInnerModuleFn(variantOp.getInnerModule());
       if (failed(mergeModuleInto(sourceModuleOp, linkedModuleOp,
                                  targetSymbolMap))) {
         return failure();
       }
 
-      targetOp.erase();
+      variantOp.erase();
     }
 
-    if (sourceExecutableOp.getOps<IREE::HAL::ExecutableTargetOp>().empty()) {
+    if (sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>().empty()) {
       sourceExecutableOp.erase();
     }
   }

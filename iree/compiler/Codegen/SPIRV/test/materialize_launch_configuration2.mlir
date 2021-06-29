@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-convert-to-gpu))" -canonicalize -cse -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-convert-to-gpu))" -canonicalize -cse -split-input-file %s | IreeFileCheck %s
 
 hal.executable @add attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -6,7 +6,7 @@ hal.executable @add attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @add attributes {
       interface = @io,
       ordinal = 0 : index

@@ -1,9 +1,9 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-fold-gpu-procid-uses))" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-fold-gpu-procid-uses))" %s | IreeFileCheck %s
 
 hal.executable @fold_block_id attributes {sym_visibility = "private"} {
   hal.interface @io {
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_block_id attributes {
       interface = @io,
       ordinal = 0 : index
@@ -38,7 +38,7 @@ hal.executable @fold_block_id attributes {sym_visibility = "private"} {
 hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "private"} {
   hal.interface @io {
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_interface_workgroup_id attributes {
       interface = @io,
       ordinal = 0 : index
@@ -73,7 +73,7 @@ hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "privat
 hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
   hal.interface @io {
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @fold_thread_id attributes {
       interface = @io,
       ordinal = 0 : index
@@ -103,7 +103,7 @@ hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
 hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
   hal.interface @io {
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_mod attributes {
       interface = @io,
       ordinal = 0 : index
@@ -125,7 +125,7 @@ hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
 hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
   hal.interface @io {
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_div attributes {
       interface = @io,
       ordinal = 0 : index
@@ -147,7 +147,7 @@ hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
 hal.executable @does_not_fold_symbol_mul_symbol attributes {sym_visibility = "private"} {
   hal.interface @io {
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @does_not_fold_symbol_mul_symbol attributes {
       interface = @io,
       ordinal = 0 : index

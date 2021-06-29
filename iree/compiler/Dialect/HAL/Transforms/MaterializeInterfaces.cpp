@@ -32,15 +32,15 @@ namespace IREE {
 namespace HAL {
 
 //===----------------------------------------------------------------------===//
-// hal.executable.target creation
+// hal.executable.variant creation
 //===----------------------------------------------------------------------===//
 
-// Creates zero or more hal.executable.target ops for each target backend.
+// Creates zero or more hal.executable.variant ops for each target backend.
 // The source op will contain the flow.executable contents and any attributes
 // the backend wants to carry along during transformation.
-static LogicalResult declareTargetOps(TargetOptions targetOptions,
-                                      IREE::Flow::ExecutableOp sourceOp,
-                                      IREE::HAL::ExecutableOp executableOp) {
+static LogicalResult declareVariantOps(TargetOptions targetOptions,
+                                       IREE::Flow::ExecutableOp sourceOp,
+                                       IREE::HAL::ExecutableOp executableOp) {
   // The user has specified what targets they want as a set of patterns. This
   // matches against those patterns so vulkan-* may match vulkan-v1.1 and
   // vulkan-v1.2.
@@ -62,15 +62,17 @@ static LogicalResult declareTargetOps(TargetOptions targetOptions,
     return diagnostic;
   }
 
-  // Materialize all of the hal.executable.target ops for all backends we are
+  // Materialize all of the hal.executable.variant ops for all backends we are
   // targeting. Note that each backend may create zero or more target ops.
   for (auto &targetBackend : targetBackends) {
-    targetBackend->declareTargetOps(sourceOp, executableOp);
+    targetBackend->declareVariantOps(sourceOp, executableOp);
   }
 
   // Ensure that at least one target op got created. If it didn't that means
   // the executable cannot be translated and it's better to fail now.
-  if (executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>().empty()) {
+  if (executableOp.getBlock()
+          .getOps<IREE::HAL::ExecutableVariantOp>()
+          .empty()) {
     auto diagnostic = sourceOp.emitError();
     diagnostic
         << "no target backend was able to handle this executable; tried = [ ";
@@ -1028,8 +1030,8 @@ static LogicalResult verifyEntryPointTypes(FuncOp entryFuncOp) {
 static LogicalResult declareEntryPointOps(
     IREE::Flow::ExecutableOp sourceExecutableOp,
     IREE::HAL::ExecutableOp targetExecutableOp, SymbolTable &symbolTable) {
-  auto targetOps =
-      targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>();
+  auto variantOps =
+      targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>();
   OpBuilder executableBuilder(&targetExecutableOp.getBlock().front());
 
   // For each Flow entry point, create a HAL entry point and dispatch thunk.
@@ -1064,9 +1066,9 @@ static LogicalResult declareEntryPointOps(
     interfaceBuilder.applyUsageMappings();
 
     auto baseFuncOp = interfaceBuilder.buildRegionFuncOp();
-    for (auto targetOp : targetOps) {
+    for (auto variantOp : variantOps) {
       // Declare the entry point on the target.
-      OpBuilder targetBuilder(&targetOp.getBlock().front());
+      OpBuilder targetBuilder(&variantOp.getBlock().front());
       targetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
           dispatchEntryOp.getLoc(),
           targetBuilder.getStringAttr(dispatchEntryOp.function_ref()),
@@ -1076,13 +1078,13 @@ static LogicalResult declareEntryPointOps(
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
-      targetOp.getInnerModule().push_back(targetFuncOp);
+      variantOp.getInnerModule().push_back(targetFuncOp);
 
       // Copy interface bindings into the target module so symbol references
       // work.
       auto inlinedInterfaceOp = interfaceOp.clone();
       inlinedInterfaceOp.setPrivate();
-      targetOp.getInnerModule().push_back(inlinedInterfaceOp);
+      variantOp.getInnerModule().push_back(inlinedInterfaceOp);
     }
 
     baseFuncOp.erase();
@@ -1156,8 +1158,8 @@ class MaterializeInterfacesPass
           sourceOp.getLoc(), sourceOp.getName());
       executableOp.setVisibility(sourceOp.getVisibility());
 
-      // Embed the hal.executable.target ops for each source.
-      if (failed(declareTargetOps(targetOptions_, sourceOp, executableOp))) {
+      // Embed the hal.executable.variant ops for each source.
+      if (failed(declareVariantOps(targetOptions_, sourceOp, executableOp))) {
         return signalPassFailure();
       }
 

@@ -106,7 +106,7 @@ func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_s
 // -----
 
 // TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
-//   - If there is no matching hal.executable.target then the executable will not be cached
+//   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
   hal.interface @interface0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -117,7 +117,7 @@ hal.executable @exe {
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2, set=0, binding=2, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @vmvx, filter="vmvx" {
+  hal.executable.variant @vmvx, filter="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface0,
       ordinal = 0 : index,

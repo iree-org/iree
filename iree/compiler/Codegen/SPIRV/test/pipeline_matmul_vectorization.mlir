@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-hlo-to-spirv-pipeline))" -iree-spirv-workgroup-tile-size=8,64,4 -iree-spirv-invocation-tile-size=8,4,4 -iree-spirv-workgroup-size=16,1,1 %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-codegen-hlo-to-spirv-pipeline))" -iree-spirv-workgroup-tile-size=8,64,4 -iree-spirv-invocation-tile-size=8,4,4 -iree-spirv-workgroup-size=16,1,1 %s | IreeFileCheck %s
 
 hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -6,7 +6,7 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {
       interface = @io,
       ordinal = 0 : index
@@ -72,7 +72,7 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {
       interface = @io,
       ordinal = 0 : index

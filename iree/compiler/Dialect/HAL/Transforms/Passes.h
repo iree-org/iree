@@ -68,11 +68,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions targetOptions);
 
 // Propagates hal.interface.workload.* information when constant.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createPropagateConstantWorkgroupInfoPass();
 
-// Translates hal.executable.target ops via a nested translation pipeline.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+// Translates hal.executable.variant ops via a nested translation pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTranslateExecutablesPass(TargetOptions targetOptions);
 
 // Calls into each target backend to have it link multiple hal.executables
@@ -85,7 +85,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass(
 // Resolves hal.executable.entry_point references to ordinals.
 std::unique_ptr<OperationPass<ModuleOp>> createResolveEntryPointOrdinalsPass();
 
-// Converts hal.executable.target ops to hal.executable.binary ops.
+// Converts hal.executable.variant ops to hal.executable.binary ops.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createSerializeExecutablesPass(TargetOptions targetOptions);
 

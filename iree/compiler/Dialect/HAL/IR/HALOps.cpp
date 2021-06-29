@@ -1336,12 +1336,12 @@ static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable.target
+// hal.executable.variant
 //===----------------------------------------------------------------------===//
 
-void ExecutableTargetOp::build(OpBuilder &builder, OperationState &state,
-                               StringRef symName,
-                               StringRef targetBackendFilter) {
+void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
+                                StringRef symName,
+                                StringRef targetBackendFilter) {
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
@@ -1349,8 +1349,8 @@ void ExecutableTargetOp::build(OpBuilder &builder, OperationState &state,
                      builder.getStringAttr(targetBackendFilter));
 }
 
-static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
-                                           OperationState *result) {
+static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
+                                            OperationState *result) {
   auto *body = result->addRegion();
   StringAttr nameAttr;
   StringAttr targetBackendFilterAttr;
@@ -1372,12 +1372,12 @@ static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
   }
 
   // Ensure that this module has a valid terminator.
-  ExecutableTargetOp::ensureTerminator(*body, parser.getBuilder(),
-                                       result->location);
+  ExecutableVariantOp::ensureTerminator(*body, parser.getBuilder(),
+                                        result->location);
   return success();
 }
 
-static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
+static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
   p << ", filter=\"" << op.target_backend_filter() << "\"";

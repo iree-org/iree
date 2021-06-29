@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-tile-and-vectorize,canonicalize,cse))" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))" %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @elementwise_static_shape
 //       CHECK:   vector.transfer_read %{{.+}}[%c0], {{.+}} memref<4xf32, #{{.+}}>, vector<4xf32>
@@ -11,7 +11,7 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @elementwise_static_shape attributes {
       interface = @io,
       ordinal = 0 : index
@@ -64,7 +64,7 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
+  hal.executable.variant @vulkan, filter="dylib*" {
     hal.executable.entry_point @elementwise_transpose attributes {
       interface = @io,
       ordinal = 0 : index

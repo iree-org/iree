@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-workgroup-tiles,iree-spirv-tile-and-vectorize))" -canonicalize -cse -iree-spirv-workgroup-tile-size=8,64,4 -iree-spirv-invocation-tile-size=8,4,4 -iree-spirv-workgroup-size=16,1,1 %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-concretize-workgroup-tiles,iree-spirv-tile-and-vectorize))" -canonicalize -cse -iree-spirv-workgroup-tile-size=8,64,4 -iree-spirv-invocation-tile-size=8,4,4 -iree-spirv-workgroup-size=16,1,1 %s | IreeFileCheck %s
 
 hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} {
   hal.interface @io attributes {sym_visibility = "private"} {
@@ -6,7 +6,7 @@ hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} 
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @matmul_static_shape_f16 attributes {
       interface = @io,
       ordinal = 0 : index
@@ -69,7 +69,7 @@ hal.executable @matmul_static_shape_f32 attributes {sym_visibility = "private"} 
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @matmul_static_shape_f32 attributes {
       interface = @io,
       ordinal = 0 : index

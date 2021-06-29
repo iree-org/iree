@@ -19,7 +19,7 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-/// Lowers an hal.executable.target operation to scalar/native-vector
+/// Lowers an hal.executable.variant operation to scalar/native-vector
 /// code. Invokes different compilation pipeline to
 /// - first lower to scalar/native-vector code
 /// - then convert to LLVM dialect.
@@ -45,18 +45,20 @@ class LLVMCPULowerExecutableTargetPass
       *this, "test-lowering-configuration",
       llvm::cl::desc(
           "Flag used for lit-testing the default configuration set for root "
-          "ops in hal.executable.targets. Defaults to false and is set to true "
+          "ops in hal.executable.variants. Defaults to false and is set to "
+          "true "
           "for lit tests. Not for general usage"),
       llvm::cl::init(false)};
 
   Option<std::string> useLoweringPipeline{
       *this, "use-lowering-pipeline",
-      llvm::cl::desc("List of passes to be applied for lowering the "
-                     "hal.executable.target. Note that this is used for all "
-                     "hal.executable.targets, so might be useful when there is "
-                     "only one such operation. The specified pass pipeline is "
-                     "expected to work on the std.module op within the "
-                     "hal.executable.target operation")};
+      llvm::cl::desc(
+          "List of passes to be applied for lowering the "
+          "hal.executable.variant. Note that this is used for all "
+          "hal.executable.variants, so might be useful when there is "
+          "only one such operation. The specified pass pipeline is "
+          "expected to work on the std.module op within the "
+          "hal.executable.variant operation")};
 
   ListOption<int> workloadPerWorkgroup{
       *this, "workload-per-workgroup", llvm::cl::MiscFlags::CommaSeparated,
@@ -89,11 +91,11 @@ static StringRef sanitizePipelineString(StringRef input) {
 }
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
-  IREE::HAL::ExecutableTargetOp targetOp = getOperation();
-  ModuleOp moduleOp = targetOp.getInnerModule();
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  ModuleOp moduleOp = variantOp.getInnerModule();
 
   OpPassManager executableLoweringPipeline(
-      IREE::HAL::ExecutableTargetOp::getOperationName());
+      IREE::HAL::ExecutableVariantOp::getOperationName());
 
   if (!useLoweringPipeline.empty()) {
     // Use the pass pipeline specified in the command line.
@@ -156,12 +158,12 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     }
   }
 
-  if (failed(runPipeline(executableLoweringPipeline, targetOp))) {
+  if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
     return signalPassFailure();
   }
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass(bool lowerToVectors) {
   return std::make_unique<LLVMCPULowerExecutableTargetPass>(lowerToVectors);
 }

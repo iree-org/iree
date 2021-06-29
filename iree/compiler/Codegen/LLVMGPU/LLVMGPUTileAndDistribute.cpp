@@ -324,8 +324,8 @@ struct LLVMGPUTileAndDistributePass
     registry.insert<AffineDialect, gpu::GPUDialect>();
   }
   void runOnOperation() override {
-    IREE::HAL::ExecutableTargetOp targetOp = getOperation();
-    ModuleOp module = targetOp.getInnerModule();
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+    ModuleOp module = variantOp.getInnerModule();
 
     MLIRContext *context = module->getContext();
     for (FuncOp funcOp : module.getOps<FuncOp>()) {
@@ -430,7 +430,7 @@ struct LLVMGPUTileAndDistributePass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPUTileAndDistributeToThreads() {
   return std::make_unique<LLVMGPUTileAndDistributePass>();
 }

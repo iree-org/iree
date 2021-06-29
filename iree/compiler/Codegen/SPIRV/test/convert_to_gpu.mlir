@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.target(iree-spirv-convert-to-gpu))' -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-convert-to-gpu))' -canonicalize -cse %s | IreeFileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 hal.executable @parallel_4D attributes {sym_visibility = "private"} {
@@ -7,7 +7,7 @@ hal.executable @parallel_4D attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @parallel_4D attributes {
       interface = @io,
       ordinal = 0 : index
@@ -84,7 +84,7 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @parallel_4D_static attributes {
       interface = @io,
       ordinal = 0 : index
@@ -163,7 +163,7 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @scalar_add attributes {
       interface = @io,
       ordinal = 0 : index
@@ -218,7 +218,7 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @reduce_sum attributes {
       interface = @io,
       ordinal = 0 : index

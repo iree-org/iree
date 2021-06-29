@@ -796,12 +796,12 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   IREE::HAL::DeviceSwitchRewriter switchRewriter(dispatchOp.getLoc(),
                                                  /*resultTypes=*/TypeRange{},
                                                  device, rewriter);
-  for (auto targetOp :
-       executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
+  for (auto variantOp :
+       executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>()) {
     for (auto &targetBackend : IREE::HAL::matchTargetBackends(
-             {targetOp.target_backend_filter().str()})) {
+             {variantOp.target_backend_filter().str()})) {
       auto entryPointOps =
-          targetOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
+          variantOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
       if (entryPointOps.empty()) {
         return dispatchOp.emitOpError() << "need at least one entry point";
       }

@@ -34,28 +34,28 @@ class SerializeExecutablesPass
   }
 
   StringRef getDescription() const override {
-    return "Serializes hal.executable.target ops to hal.executable.binary ops";
+    return "Serializes hal.executable.variant ops to hal.executable.binary ops";
   }
 
   void runOnOperation() override {
     auto executableOp = getOperation();
-    auto targetOps = llvm::to_vector<4>(
-        executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>());
-    for (auto targetOp : targetOps) {
+    auto variantOps = llvm::to_vector<4>(
+        executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>());
+    for (auto variantOp : variantOps) {
       for (auto &targetBackend :
-           matchTargetBackends({targetOp.target_backend_filter().str()})) {
+           matchTargetBackends({variantOp.target_backend_filter().str()})) {
         // Ask the target backend to serialize the executable. Note that it may
         // create one or more hal.executable.binary ops in the case of
         // multi-architecture binaries.
-        OpBuilder executableBuilder(targetOp);
-        if (failed(targetBackend->serializeExecutable(targetOp,
+        OpBuilder executableBuilder(variantOp);
+        if (failed(targetBackend->serializeExecutable(variantOp,
                                                       executableBuilder))) {
-          targetOp.emitError() << "failed to serialize op to target backend "
-                               << targetOp.target_backend_filter();
+          variantOp.emitError() << "failed to serialize op to target backend "
+                                << variantOp.target_backend_filter();
           return signalPassFailure();
         }
       }
-      targetOp.erase();
+      variantOp.erase();
     }
   }
 

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-tile-and-vectorize,canonicalize,cse))" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))" %s | IreeFileCheck %s
 
 #map0 = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<()[s0, s1] -> (8, s1 - s0 * 8)>
@@ -14,7 +14,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @matmul attributes {interface = @io, ordinal = 0 : index}
     module attributes {
       spv.target_env =
@@ -83,7 +83,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @conv_1d attributes {interface = @io, ordinal = 0 : index}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
       func @conv_1d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
@@ -163,7 +163,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="vulkan*" {
+  hal.executable.variant @vulkan, filter="vulkan*" {
     hal.executable.entry_point @conv_no_padding attributes {interface = @io, ordinal = 0 : index}
     module attributes {
       spv.target_env =
@@ -276,7 +276,7 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
     hal.executable.entry_point @conv_3d attributes {interface = @io, ordinal = 0 : index}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
       func @conv_3d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
@@ -341,7 +341,7 @@ module  {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.variant @vulkan, filter="vulkan*" {
       hal.executable.entry_point @pooling_nhwc_max attributes {interface = @io, ordinal = 0 : index} {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c4 = constant 4 : index

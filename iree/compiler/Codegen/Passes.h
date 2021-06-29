@@ -81,7 +81,7 @@ std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
 
 /// Sets the number of workgroups to use for each entry point in the dispatch
 /// region.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 
 //----------------------------------------------------------------------------//
@@ -104,10 +104,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     std::string targetTriple = "", std::string targetDataLayout = "",
     bool unfuseFMAOps = false);
 
-/// Pass to lower the module an hal.executable.target operation to external
+/// Pass to lower the module an hal.executable.variant operation to external
 /// dialect. Currently this pass lowers to LLVM dialect, but could be
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass(bool lowerToVectors = true);
 
 /// Pad linalg ops workgroup tiles into the next integer multiple of the target
@@ -208,14 +208,14 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPUTileAndDistributeToThreads();
 
 std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPURemoveSingleIterationLoopPass();
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
@@ -244,21 +244,21 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
 /// Creates a pass to concretize hal.interface.workgroup.* ops with concrete
 /// tiling and distribution scheme.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVConcretizeWorkgroupTilesPass(const SPIRVCodegenOptions &options);
 
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVConvertToGPUPass();
 
 /// Creates a pass to fold processor ID uses where possible.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVFoldProcessorIDUsesPass();
 
 /// Pass to tile and vectorize Linalg operations on buffers in a single
 /// workgroup.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVTileAndVectorizePass(const SPIRVCodegenOptions &options);
 
 /// Pass to convert vector read/write/arithmetic operations to the corresponding

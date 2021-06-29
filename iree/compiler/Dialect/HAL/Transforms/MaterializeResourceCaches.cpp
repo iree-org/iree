@@ -202,7 +202,7 @@ class MaterializeResourceCachesPass
 
     // Create a switch statement with a case for each backend.
     // Each case should then cache only executables which contain a matching
-    // ExecutableTargetOp.
+    // ExecutableVariantOp.
     // Afterwards, canonicalization will take care of de-duping/etc.
     DeviceSwitchBuilder switchBuilder(loc,
                                       /*resultTypes=*/TypeRange{executableType},
@@ -210,9 +210,9 @@ class MaterializeResourceCachesPass
     auto targetBackends = matchTargetBackends(targetOptions_.targets);
     for (auto &targetBackend : targetBackends) {
       // Skip executables with no matching target ops.
-      SmallVector<IREE::HAL::ExecutableTargetOp> executableTargetOps;
+      SmallVector<IREE::HAL::ExecutableVariantOp> executableTargetOps;
       for (auto executableTargetOp :
-           executableOp.getOps<IREE::HAL::ExecutableTargetOp>()) {
+           executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
         if (TargetBackend::matchPattern(
                 executableTargetOp.target_backend_filter(),
                 targetBackend->filter_pattern())) {
