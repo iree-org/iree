@@ -39,6 +39,25 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-benchmark-trace",
+    srcs = ["iree-benchmark-trace-main.c"],
+    deps = [
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/base/internal:atomic_slist",
+        "//iree/base/internal:file_path",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/drivers",
+        "//iree/testing:benchmark",
+        "//iree/tools/utils:trace_replay",
+        "//iree/tools/utils:yaml_util",
+        "//iree/vm",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
+
+cc_binary(
     name = "iree-check-module",
     testonly = True,
     srcs = ["iree-check-module-main.cc"],
@@ -297,15 +316,13 @@ cc_binary(
     deps = [
         "//iree/base",
         "//iree/base:tracing",
-        "//iree/base/internal:file_io",
         "//iree/base/internal:file_path",
         "//iree/base/internal:flags",
         "//iree/hal",
         "//iree/hal/drivers",
-        "//iree/modules/hal",
+        "//iree/tools/utils:trace_replay",
         "//iree/tools/utils:yaml_util",
         "//iree/vm",
-        "//iree/vm:bytecode_module",
         "@com_github_yaml_libyaml//:yaml",
     ],
 )

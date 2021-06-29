@@ -14,7 +14,6 @@ package(
 
 cc_library(
     name = "benchmark",
-    testonly = True,
     srcs = [
         "benchmark_full.cc",
     ],

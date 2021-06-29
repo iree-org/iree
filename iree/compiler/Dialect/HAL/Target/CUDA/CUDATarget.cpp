@@ -73,17 +73,24 @@ static bool requiresDeviceLib(const llvm::Module &module) {
 static void linkModule(llvm::Module &module) {
   llvm::Linker linker(module);
 
-  llvm::MemoryBufferRef bitcode_ref(
+  llvm::MemoryBufferRef bitcodeBufferRef(
       llvm::StringRef(cuda_libdevice_create()->data,
                       cuda_libdevice_create()->size),
       "libdevice bitcode");
-  std::unique_ptr<llvm::Module> bitcode_module =
-      std::move(llvm::parseBitcodeFile(bitcode_ref, module.getContext()).get());
+  auto bitcodeModuleValue =
+      llvm::parseBitcodeFile(bitcodeBufferRef, module.getContext());
+  if (!bitcodeModuleValue) {
+    llvm::errs() << "failed to parse CUDA libdevice bitcode: "
+                 << bitcodeModuleValue.takeError();
+    return;
+  }
+  std::unique_ptr<llvm::Module> bitcodeModule =
+      std::move(bitcodeModuleValue.get());
   // Ignore the data layout of the module we're importing. This avoids a
   // warning from the linker.
-  bitcode_module->setDataLayout(module.getDataLayout());
+  bitcodeModule->setDataLayout(module.getDataLayout());
   linker.linkInModule(
-      std::move(bitcode_module), llvm::Linker::Flags::LinkOnlyNeeded,
+      std::move(bitcodeModule), llvm::Linker::Flags::LinkOnlyNeeded,
       [](llvm::Module &M, const llvm::StringSet<> &GVS) {
         llvm::internalizeModule(M, [&GVS](const llvm::GlobalValue &GV) {
           return !GV.hasName() || (GVS.count(GV.getName()) == 0);

@@ -8,16 +8,35 @@
 
 #include "iree/runtime/api.h"
 
-iree_status_t counter_get_value(iree_runtime_session_t* session,
-                                int* out_value) {
+iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
+                            int values_length, int* out_result) {
   iree_runtime_call_t call;
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
-      session, iree_make_cstring_view("module.get_value"), &call));
+      session, iree_make_cstring_view("module.reduce_sum_1d"), &call));
 
+  iree_hal_buffer_view_t* arg0 = NULL;
+  const iree_hal_dim_t arg0_shape[1] = {values_length};
+
+  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
+  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_view_clone_heap_buffer(
+        iree_runtime_session_device_allocator(session), arg0_shape,
+        IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        IREE_HAL_BUFFER_USAGE_ALL,
+        iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
+        &arg0);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_call_inputs_push_back_buffer_view(&call, arg0);
+  }
+  iree_hal_buffer_view_release(arg0);
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
   }
+
   iree_hal_buffer_view_t* buffer_view = NULL;
   if (iree_status_is_ok(status)) {
     status =
@@ -30,7 +49,7 @@ iree_status_t counter_get_value(iree_runtime_session_t* session,
                                        IREE_WHOLE_BUFFER, &buffer_mapping);
   }
   if (iree_status_is_ok(status)) {
-    *out_value = *buffer_mapping.contents.data;
+    *out_result = *buffer_mapping.contents.data;
   }
   iree_hal_buffer_unmap_range(&buffer_mapping);
   iree_hal_buffer_view_release(buffer_view);
@@ -39,15 +58,15 @@ iree_status_t counter_get_value(iree_runtime_session_t* session,
   return status;
 }
 
-iree_status_t counter_set_value(iree_runtime_session_t* session,
-                                int new_value) {
+iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
+                            size_t values_length,
+                            iree_hal_buffer_view_t** out_buffer_view) {
   iree_runtime_call_t call;
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
-      session, iree_make_cstring_view("module.set_value"), &call));
+      session, iree_make_cstring_view("module.reduce_sum_2d"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
-  static const iree_hal_dim_t arg0_shape[1] = {1};
-  int arg0_data[1] = {new_value};
+  const iree_hal_dim_t arg0_shape[2] = {values_length / 3, 3};
 
   // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
   //   * debugging some apparent memory corruption with the stack-local value
@@ -58,7 +77,8 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,
-        iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);
+        iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
+        &arg0);
   }
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_inputs_push_back_buffer_view(&call, arg0);
@@ -68,18 +88,24 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
   }
 
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_runtime_call_outputs_pop_front_buffer_view(&call, out_buffer_view);
+  }
+
   iree_runtime_call_deinitialize(&call);
   return status;
 }
 
-iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
+iree_status_t add_one(iree_runtime_session_t* session, const int* values,
+                      size_t values_length,
+                      iree_hal_buffer_view_t** out_buffer_view) {
   iree_runtime_call_t call;
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
-      session, iree_make_cstring_view("module.add_to_value"), &call));
+      session, iree_make_cstring_view("module.add_one"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
-  static const iree_hal_dim_t arg0_shape[1] = {1};
-  int arg0_data[1] = {x};
+  const iree_hal_dim_t arg0_shape[1] = {values_length};
 
   // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
   //   * debugging some apparent memory corruption with the stack-local value
@@ -90,7 +116,8 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,
-        iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);
+        iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
+        &arg0);
   }
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_inputs_push_back_buffer_view(&call, arg0);
@@ -100,16 +127,10 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
   }
 
-  iree_runtime_call_deinitialize(&call);
-  return status;
-}
-
-iree_status_t counter_reset_value(iree_runtime_session_t* session) {
-  iree_runtime_call_t call;
-  IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
-      session, iree_make_cstring_view("module.reset_value"), &call));
-
-  iree_status_t status = iree_runtime_call_invoke(&call, /*flags=*/0);
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_runtime_call_outputs_pop_front_buffer_view(&call, out_buffer_view);
+  }
 
   iree_runtime_call_deinitialize(&call);
   return status;
@@ -162,50 +183,58 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   //===-------------------------------------------------------------------===//
 
   //===-------------------------------------------------------------------===//
-  // Call functions to manipulate the counter
+  // Call the exported sample functions with some test inputs
   fprintf(stdout, "Calling functions\n\n");
 
-  // 1. get_value() // initial value
-  int value = -1;
+  // reduce_sum_1d([1, 10, 100])
   if (iree_status_is_ok(status)) {
-    status = counter_get_value(session, &value);
-    fprintf(stdout, "Initial get_value()    : %d\n", value);
+    const int input[3] = {1, 10, 100};
+    int result = -1;
+    status = reduce_sum_1d(session, input, 3, &result);
+    fprintf(stdout, "reduce_sum_1d([1, 10, 100]): %d\n", result);
   }
 
-  // 2. set_value(101)
+  // reduce_sum_2d([[1, 2, 3], [10, 20, 30]])
   if (iree_status_is_ok(status)) {
-    status = counter_set_value(session, 101);
-  }
-  if (iree_status_is_ok(status)) {
-    status = counter_get_value(session, &value);
-    fprintf(stdout, "After set_value(101)   : %d\n", value);
-  }
-
-  // 3. add_to_value(20)
-  if (iree_status_is_ok(status)) {
-    status = counter_add_to_value(session, 20);
-  }
-  if (iree_status_is_ok(status)) {
-    status = counter_get_value(session, &value);
-    fprintf(stdout, "After add_to_value(20) : %d\n", value);
+    const int input[6] = {1, 2, 3, 10, 20, 30};
+    iree_hal_buffer_view_t* result_buffer_view = NULL;
+    status = reduce_sum_2d(session, input, 6, &result_buffer_view);
+    if (iree_status_is_ok(status)) {
+      fprintf(stdout, "reduce_sum_2d([[1, 2, 3], [10, 20, 30]]): ");
+      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
+                                           /*max_element_count=*/4096);
+      fprintf(stdout, "\n");
+    }
+    iree_hal_buffer_view_release(result_buffer_view);
   }
 
-  // 4. add_to_value(-50)
+  // reduce_sum_2d([[1, 2, 3], [10, 20, 30], [100, 200, 300]])
   if (iree_status_is_ok(status)) {
-    status = counter_add_to_value(session, -50);
-  }
-  if (iree_status_is_ok(status)) {
-    status = counter_get_value(session, &value);
-    fprintf(stdout, "After add_to_value(-50): %d\n", value);
+    const int input[9] = {1, 2, 3, 10, 20, 30, 100, 200, 300};
+    iree_hal_buffer_view_t* result_buffer_view = NULL;
+    status = reduce_sum_2d(session, input, 9, &result_buffer_view);
+    if (iree_status_is_ok(status)) {
+      fprintf(stdout,
+              "reduce_sum_2d([[1, 2, 3], [10, 20, 30], [100, 200, 300]]): ");
+      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
+                                           /*max_element_count=*/4096);
+      fprintf(stdout, "\n");
+    }
+    iree_hal_buffer_view_release(result_buffer_view);
   }
 
-  // 5. reset_value()
+  // add_one([1, 10, 100])
   if (iree_status_is_ok(status)) {
-    status = counter_reset_value(session);
-  }
-  if (iree_status_is_ok(status)) {
-    status = counter_get_value(session, &value);
-    fprintf(stdout, "After reset_value()    : %d\n", value);
+    const int input[3] = {1, 10, 100};
+    iree_hal_buffer_view_t* result_buffer_view = NULL;
+    status = add_one(session, input, 3, &result_buffer_view);
+    if (iree_status_is_ok(status)) {
+      fprintf(stdout, "add_one([1, 10, 100]): ");
+      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
+                                           /*max_element_count=*/64);
+      fprintf(stdout, "\n");
+    }
+    iree_hal_buffer_view_release(result_buffer_view);
   }
   //===-------------------------------------------------------------------===//
 
@@ -222,7 +251,7 @@ int main(int argc, char** argv) {
   if (argc != 3) {
     fprintf(
         stderr,
-        "Usage: variables-and-state </path/to/counter.vmfb> <driver_name>\n");
+        "Usage: dynamic-shapes </path/to/dynamic_shapes.vmfb> <driver_name>\n");
     fprintf(stderr, "  (See the README for this sample for details)\n ");
     return -1;
   }
@@ -232,6 +261,7 @@ int main(int argc, char** argv) {
 
   iree_status_t result = run_sample(bytecode_module_path, driver_name);
   if (!iree_status_is_ok(result)) {
+    fprintf(stdout, "Failed!\n");
     iree_status_fprint(stderr, result);
     iree_status_ignore(result);
     return -1;

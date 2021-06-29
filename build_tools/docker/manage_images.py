@@ -59,6 +59,7 @@ IMAGES_TO_DEPENDENCIES = {
     ],
     'cmake-bazel-frontends-nvidia': ['cmake-bazel-frontends-vulkan'],
     'rbe-toolchain': ['vulkan'],
+    'samples': ['cmake-python-swiftshader'],
     'swiftshader': ['cmake'],
     'util': [],
     'vulkan': ['util'],
