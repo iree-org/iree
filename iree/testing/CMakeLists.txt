@@ -29,7 +29,7 @@ else()
     HDRS
       "benchmark.h"
     SRCS
-      "benchmark_nops.c"
+      "benchmark_nop.c"
     DEPS
       iree::base
       iree::base::tracing

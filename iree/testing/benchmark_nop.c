@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Create no-ops for the functions in benchmark.h
-
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/testing/benchmark.h"
@@ -20,34 +18,24 @@ bool iree_benchmark_keep_running(iree_benchmark_state_t* state,
   return false;
 }
 
-void iree_benchmark_skip(iree_benchmark_state_t* state, const char* message) {
-  return;
-}
+void iree_benchmark_skip(iree_benchmark_state_t* state, const char* message){};
 
-void iree_benchmark_pause_timing(iree_benchmark_state_t* state) { return; }
+void iree_benchmark_pause_timing(iree_benchmark_state_t* state){};
 
-void iree_benchmark_resume_timing(iree_benchmark_state_t* state) { return; }
+void iree_benchmark_resume_timing(iree_benchmark_state_t* state){};
 
 void iree_benchmark_set_label(iree_benchmark_state_t* state,
-                              const char* label) {
-  return;
-}
+                              const char* label){};
 
 void iree_benchmark_set_bytes_processed(iree_benchmark_state_t* state,
-                                        int64_t bytes) {
-  return;
-}
+                                        int64_t bytes){};
 
 void iree_benchmark_set_items_processed(iree_benchmark_state_t* state,
-                                        int64_t items) {
-  return;
-}
+                                        int64_t items){};
 
 void iree_benchmark_register(iree_string_view_t name,
-                             const iree_benchmark_def_t* benchmark_def) {
-  return;
-}
+                             const iree_benchmark_def_t* benchmark_def){};
 
-void iree_benchmark_initialize(int* argc, char** argv) { return; }
+void iree_benchmark_initialize(int* argc, char** argv){};
 
-void iree_benchmark_run_specified(void) { return; }
+void iree_benchmark_run_specified(void){};
