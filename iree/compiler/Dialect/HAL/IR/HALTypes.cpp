@@ -699,6 +699,40 @@ void DeviceMatchMemoryModelAttr::print(DialectAsmPrinter &p) const {
 }
 
 // static
+Attribute DeviceMatchFeatureAttr::parse(DialectAsmParser &p) {
+  StringAttr patternAttr;
+  if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(patternAttr);
+}
+
+void DeviceMatchFeatureAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<\"";
+  os << pattern();
+  os << "\">";
+}
+
+// static
+Attribute DeviceMatchArchitectureAttr::parse(DialectAsmParser &p) {
+  StringAttr patternAttr;
+  if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(patternAttr);
+}
+
+void DeviceMatchArchitectureAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<\"";
+  os << pattern();
+  os << "\">";
+}
+
+// static
 Attribute ExConstantStorageAttr::parse(DialectAsmParser &p) {
   StringAttr bindingAttr;
   StringAttr storageAttr;

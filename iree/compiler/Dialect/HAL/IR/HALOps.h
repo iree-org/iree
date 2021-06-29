@@ -9,6 +9,7 @@
 
 #include <cstdint>
 
+#include "iree/compiler/Dialect/HAL/IR/HALTraits.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETraits.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"

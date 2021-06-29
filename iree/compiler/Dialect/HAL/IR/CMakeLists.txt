@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "HALDialect.h"
     "HALOps.h"
+    "HALTraits.h"
     "HALTypes.h"
     "LoweringConfig.h"
   TEXTUAL_HDRS

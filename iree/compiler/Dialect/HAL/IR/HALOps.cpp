@@ -1059,6 +1059,20 @@ void DeviceAllocatorOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.device.query
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDeviceQueryOp(DeviceQueryOp op) {
+  if (op.default_value().hasValue()) {
+    if (op.default_value()->getType() != op.value().getType()) {
+      return op.emitOpError()
+             << "type mismatch between result and default value";
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.device.switch
 //===----------------------------------------------------------------------===//
 

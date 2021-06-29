@@ -133,8 +133,11 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
     return DeviceMatchIDAttr::parse(parser);
   } else if (attrKind == DeviceMatchMemoryModelAttr::getKindName()) {
     return DeviceMatchMemoryModelAttr::parse(parser);
-  }
-  if (attrKind == ExConstantStorageAttr::getKindName()) {
+  } else if (attrKind == DeviceMatchFeatureAttr::getKindName()) {
+    return DeviceMatchFeatureAttr::parse(parser);
+  } else if (attrKind == DeviceMatchArchitectureAttr::getKindName()) {
+    return DeviceMatchArchitectureAttr::parse(parser);
+  } else if (attrKind == ExConstantStorageAttr::getKindName()) {
     return ExConstantStorageAttr::parse(parser);
   } else if (attrKind == ExPushConstantAttr::getKindName()) {
     return ExPushConstantAttr::parse(parser);

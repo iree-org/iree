@@ -587,7 +587,8 @@ static Attribute convertConstIntegerValue(Attribute value) {
   if (value.isa<UnitAttr>()) {
     return IntegerAttr::get(integerType, APInt(SZ, 1));
   } else if (auto v = value.dyn_cast<BoolAttr>()) {
-    return IntegerAttr::get(integerType, APInt(SZ, v.getValue() ? 1 : 0));
+    return IntegerAttr::get(integerType,
+                            APInt(SZ, v.getValue() ? 1 : 0, false));
   } else if (auto v = value.dyn_cast<IntegerAttr>()) {
     return IntegerAttr::get(integerType,
                             APInt(SZ, v.getValue().getLimitedValue()));

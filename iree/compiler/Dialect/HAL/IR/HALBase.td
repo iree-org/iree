@@ -497,6 +497,8 @@ def HAL_ExResultBufferAttr :
 // Expression matching attributes
 //===----------------------------------------------------------------------===//
 
+def HAL_DeviceQuery : NativeOpTrait<"IREE::HAL::DeviceQuery">;
+
 def HAL_MatchAlwaysAttr :
   IREE_StructAttr<"match.always", "MatchAlwaysAttr", HAL_Dialect, []> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
@@ -526,6 +528,24 @@ def HAL_DeviceMatchIDAttr :
 def HAL_DeviceMatchMemoryModelAttr : IREE_StructAttr<
     "device.match.memory_model", "DeviceMatchMemoryModelAttr", HAL_Dialect, [
     IREE_StructFieldAttr<"memory_model", HAL_MemoryModelAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_DeviceMatchFeatureAttr :
+  IREE_StructAttr<"device.match.feature",
+                  "DeviceMatchFeatureAttr",
+                  HAL_Dialect, [
+    IREE_StructFieldAttr<"pattern", StrAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_DeviceMatchArchitectureAttr :
+  IREE_StructAttr<"device.match.architecture",
+                  "DeviceMatchArchitectureAttr",
+                  HAL_Dialect, [
+    IREE_StructFieldAttr<"pattern", StrAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }

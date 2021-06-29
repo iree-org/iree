@@ -44,6 +44,7 @@ cc_library(
     hdrs = [
         "HALDialect.h",
         "HALOps.h",
+        "HALTraits.h",
         "HALTypes.h",
         "LoweringConfig.h",
     ],
