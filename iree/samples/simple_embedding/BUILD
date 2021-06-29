@@ -16,7 +16,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_TARGET_BACKEND_VMVX} AND ${IREE_HAL_DRIVER_VMVX})
+if(${IREE_HAL_DRIVER_VMVX} AND (${IREE_TARGET_BACKEND_VMVX} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -65,7 +65,7 @@ endif()
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} AND ${IREE_HAL_DRIVER_DYLIB})
+if(${IREE_HAL_DRIVER_DYLIB} AND (${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -223,7 +223,7 @@ iree_cmake_extra_content(
     content = """
 endif()
 
-if(${IREE_TARGET_BACKEND_VULKAN-SPIRV} AND ${IREE_HAL_DRIVER_VULKAN})
+if(${IREE_HAL_DRIVER_VULKAN} AND (${IREE_TARGET_BACKEND_VULKAN-SPIRV} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
