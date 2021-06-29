@@ -113,6 +113,7 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
     SRCS
       "tracing.cc"
     DEPS
+      ${CMAKE_DL_LIBS}
       ::core_headers
     DEFINES
       "IREE_TRACING_MODE=2"
