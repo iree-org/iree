@@ -22,8 +22,9 @@ TargetOptions getTargetOptionsFromFlags() {
       "IREE HAL executable target options");
 
   // This function is called as part of registering the pass
-  // TranslateExecutablesPass. Pass registery is also staticly initialized,
-  // so targetBackendsFlags needs to be here to be initialized first.
+  // TranslateExecutableVariantsPass. Pass registery is also staticly
+  // initialized, so targetBackendsFlags needs to be here to be initialized
+  // first.
   static llvm::cl::list<std::string> *targetBackendsFlag =
       new llvm::cl::list<std::string>{
           "iree-hal-target-backends",

@@ -53,7 +53,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Handle large constants (weights/params/etc) first so that we can use the
   // resulting constant pools to determine the interfaces.
   passManager.addPass(createIdentifyConstantPoolsPass(targetOptions));
-  passManager.addNestedPass<ConstantPoolOp>(
+  passManager.addNestedPass<IREE::HAL::ConstantPoolOp>(
       createPackConstantPoolStoragePass());
   passManager.addPass(createMaterializeConstantPoolBuffersPass());
   passManager.addPass(createCanonicalizerPass());
@@ -63,10 +63,12 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // comminucate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass(targetOptions));
 
-  passManager.nest<ExecutableOp>().addNestedPass<ExecutableVariantOp>(
-      createPropagateConstantWorkgroupInfoPass());
-  passManager.nest<ExecutableOp>().addNestedPass<ExecutableVariantOp>(
-      createTranslateExecutablesPass(targetOptions));
+  passManager.nest<IREE::HAL::ExecutableOp>()
+      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
+          createPropagateConstantWorkgroupInfoPass());
+  passManager.nest<IREE::HAL::ExecutableOp>()
+      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
+          createTranslateExecutableVariantsPass());
 
   // Convert supported input dialects (std, flow, etc) into the HAL dialect.
   passManager.addPass(createConvertToHALPass());
@@ -92,11 +94,11 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // ordinals, we allow the backends to link executables together. For example,
   // the LLVM AOT backend may combine all executable targets for the same
   // architecture into a single executable and link it as a shared library.
-  // TODO(scotttodd): Move after createTranslateExecutablesPass
+  // TODO(scotttodd): Move after createTranslateExecutableVariantsPass
   //   * ConvertStreamOps under ConvertFlowToHALPass assumes one entry point.
   //     Adjust it to handle multiple entry points then this can move up.
   if (transformOptions.linkExecutables) {
-    passManager.addPass(createLinkExecutablesPass(targetOptions));
+    passManager.addPass(createLinkExecutablesPass());
   }
 
   // Resolve entry point ordinals from nested symbol references prior to
@@ -128,8 +130,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCSEVariableLoadsPass());
 
   if (transformOptions.serializeExecutables) {
-    passManager.addNestedPass<ExecutableOp>(
-        createSerializeExecutablesPass(targetOptions));
+    passManager.addNestedPass<IREE::HAL::ExecutableOp>(
+        createSerializeExecutablesPass());
     // NOTE: symbol DCE will destroy executable target contents, so only run it
     // if we serialized things.
     passManager.addPass(createSymbolDCEPass());

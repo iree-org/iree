@@ -48,6 +48,12 @@ std::vector<std::string> getRegisteredTargetBackends();
 std::vector<std::unique_ptr<TargetBackend>> matchTargetBackends(
     ArrayRef<std::string> patterns);
 
+// Returns a sorted uniqued set of target backends used in the executable.
+SmallVector<std::string> gatherExecutableTargetNames(
+    IREE::HAL::ExecutableOp executableOp);
+// Returns a sorted uniqued set of target backends used in the entire module.
+SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp);
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

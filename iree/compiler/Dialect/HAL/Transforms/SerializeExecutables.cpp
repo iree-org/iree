@@ -23,23 +23,25 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-class SerializeExecutablesPass
-    : public PassWrapper<SerializeExecutablesPass,
+class SerializeTargetExecutablesPass
+    : public PassWrapper<SerializeTargetExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
  public:
-  explicit SerializeExecutablesPass(TargetOptions executableOptions)
-      : executableOptions_(executableOptions) {}
+  SerializeTargetExecutablesPass() = default;
+  SerializeTargetExecutablesPass(const SerializeTargetExecutablesPass &pass) {}
+  SerializeTargetExecutablesPass(StringRef target) {
+    this->target = target.str();
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackends = matchTargetBackends(executableOptions_.targets);
-    for (auto &targetBackend : targetBackends) {
+    for (auto &targetBackend : matchTargetBackends({target})) {
       targetBackend->getDependentDialects(registry);
     }
   }
 
   StringRef getArgument() const override {
-    return "iree-hal-serialize-executables";
+    return "iree-hal-serialize-target-executables";
   }
 
   StringRef getDescription() const override {
@@ -51,35 +53,78 @@ class SerializeExecutablesPass
     auto variantOps = llvm::to_vector<4>(
         executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
-      for (auto &targetBackend :
-           matchTargetBackends({variantOp.target_backend_filter().str()})) {
-        // Ask the target backend to serialize the executable. Note that it may
-        // create one or more hal.executable.binary ops in the case of
-        // multi-architecture binaries.
-        OpBuilder executableBuilder(variantOp);
-        if (failed(targetBackend->serializeExecutable(variantOp,
-                                                      executableBuilder))) {
-          variantOp.emitError() << "failed to serialize op to target backend "
-                                << variantOp.target_backend_filter();
-          return signalPassFailure();
+      OpBuilder executableBuilder(variantOp);
+      for (auto &targetBackend : matchTargetBackends({target})) {
+        if (TargetBackend::matchPattern(target,
+                                        variantOp.target_backend_filter())) {
+          // Ask the target backend to serialize the executable. Note that it
+          // may create one or more hal.executable.binary ops in the case of
+          // multi-architecture binaries.
+          if (failed(targetBackend->serializeExecutable(variantOp,
+                                                        executableBuilder))) {
+            variantOp.emitError()
+                << "failed to serialize executable for target backend "
+                << targetBackend->name();
+            return signalPassFailure();
+          }
+          variantOp.erase();
+          break;
         }
       }
-      variantOp.erase();
     }
   }
 
  private:
-  TargetOptions executableOptions_;
+  Option<std::string> target{
+      *this, "target",
+      llvm::cl::desc(
+          "Target backend name whose executables will be serialized by "
+          "this pass.")};
 };
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass(TargetOptions executableOptions) {
-  return std::make_unique<SerializeExecutablesPass>(executableOptions);
+createSerializeTargetExecutablesPass(StringRef target) {
+  return std::make_unique<SerializeTargetExecutablesPass>(target);
 }
 
-static PassRegistration<SerializeExecutablesPass> pass([] {
-  auto options = getTargetOptionsFromFlags();
-  return std::make_unique<SerializeExecutablesPass>(options);
+static PassRegistration<SerializeTargetExecutablesPass> linkTargetPass([] {
+  return std::make_unique<SerializeTargetExecutablesPass>();
+});
+
+class SerializeExecutablesPass
+    : public PassWrapper<SerializeExecutablesPass,
+                         OperationPass<IREE::HAL::ExecutableOp>> {
+ public:
+  SerializeExecutablesPass() = default;
+
+  StringRef getArgument() const override {
+    return "iree-hal-serialize-executables";
+  }
+
+  StringRef getDescription() const override {
+    return "Serializes hal.executable.variant ops to hal.executable.binary ops";
+  }
+
+  void runOnOperation() override {
+    auto executableOp = getOperation();
+    OpPassManager passManager(executableOp.getOperationName());
+    for (auto target : gatherExecutableTargetNames(executableOp)) {
+      passManager.addPass(createSerializeTargetExecutablesPass(target));
+    }
+    if (failed(runPipeline(passManager, executableOp))) {
+      executableOp.emitError() << "failed to serialize executables";
+      return signalPassFailure();
+    }
+  }
+};
+
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createSerializeExecutablesPass() {
+  return std::make_unique<SerializeExecutablesPass>();
+}
+
+static PassRegistration<SerializeExecutablesPass> linkPass([] {
+  return std::make_unique<SerializeExecutablesPass>();
 });
 
 }  // namespace HAL
