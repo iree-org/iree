@@ -438,6 +438,30 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
             return opOperand->get().getType().template isa<RankedTensorType>();
           });
       }]
+    >,
+    //===------------------------------------------------------------------===//
+    // Other static interface methods.
+    //===------------------------------------------------------------------===//
+    InterfaceMethod<
+      /*desc=*/[{
+        Clone the current operation with the given location and operands. This
+        is used to abstract away the optional underlying region creation. This
+        does not change the balance between input, output_buffer and
+        init_tensors operands.
+      }],
+      /*retTy=*/"Operation *",
+      /*methodName=*/"clone",
+      (ins "OpBuilder &":$b, "Location":$loc, "TypeRange":$resultTypes,
+           "ValueRange":$operands),
+      [{
+        BlockAndValueMapping bvm;
+        OperationState state(
+          loc, ConcreteOp::getOperationName(), operands, resultTypes,
+          $_op->getAttrs());
+        for (Region &r : $_op->getRegions())
+          r.cloneInto(state.addRegion(), bvm);
+        return b.createOperation(state);
+      }]
     >
   ];
 

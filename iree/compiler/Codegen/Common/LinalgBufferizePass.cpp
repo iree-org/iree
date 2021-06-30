@@ -46,6 +46,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -380,6 +381,21 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
   return tiedOperands;
 }
 
+static LogicalResult analyseLinalgExtOps(linalg_ext::LinalgExtOp op,
+                                         BufferizationPlan &plan) {
+  if (!op.hasTensorSemantics()) return success();
+  for (auto input : op.getInputOperands()) {
+    plan.insert(input->get());
+  }
+  for (auto output : op.getOutputOperands()) {
+    plan.insert(output->get());
+  }
+  for (auto result : op->getResults()) {
+    plan.insert(result);
+  }
+  return success();
+}
+
 /// Adds the corresponding `outs` and result tensors of the linalg op into the
 /// same equivalence class.
 static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
@@ -579,6 +595,9 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
         })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return analyseLinalgOps(linalgOp, plan);
+        })
+        .Case<linalg_ext::LinalgExtOp>([&](linalg_ext::LinalgExtOp linalgExtOp) {
+          return analyseLinalgExtOps(linalgExtOp, plan);
         })
         .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
             [&](auto reshapeOp) {
@@ -910,7 +929,8 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
             .Case<scf::IfOp, scf::ForOp, linalg::LinalgOp,
-                  tensor::InsertSliceOp, vector::TransferWriteOp>(
+                  linalg_ext::LinalgExtOp, tensor::InsertSliceOp,
+                  vector::TransferWriteOp>(
                 [&](auto op) { return resultBuffer; })
             .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
                 [&](auto reshapeOp) {
@@ -1123,9 +1143,10 @@ static LogicalResult getOrAllocateResultBuffers(
 /// Generic conversion pattern that matches any linalg::LinalgOp. This avoids
 /// template instantiating one pattern for each linalg::LinalgOp. The method
 /// expects all operands and results have already been mapped to memrefs.
+template <typename OpTy>
 static LogicalResult convertAnyLinalgOp(
-    OpBuilder &b, linalg::LinalgOp op, BlockAndValueMapping &bvm,
-    BufferizationPlan &plan, WorkgroupMemoryAllocationFn allocationFn) {
+    OpBuilder &b, OpTy op, BlockAndValueMapping &bvm, BufferizationPlan &plan,
+    WorkgroupMemoryAllocationFn allocationFn) {
   // Skip linalg ops inserted by this pass.
   if (op.hasBufferSemantics()) return success();
 
@@ -1545,6 +1566,13 @@ void LinalgBufferizePass::runOnOperation() {
             return failure();
           }
           return convertAnyLinalgOp(b, linalgOp, bvm, plan, allocationFn);
+        })
+        .Case<linalg_ext::LinalgExtOp>([&](linalg_ext::LinalgExtOp op) {
+          if (failed(getOrAllocateResultBuffers(b, op.getOperation(), bvm, plan,
+                                                allocationFn))) {
+            return failure();
+          }
+          return convertAnyLinalgOp(b, op, bvm, plan, allocationFn);
         })
         .Case<tensor::InsertSliceOp>(
             [&](tensor::InsertSliceOp subTensorInsertOp) {

@@ -58,6 +58,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Shape::IR
   PUBLIC
 )
