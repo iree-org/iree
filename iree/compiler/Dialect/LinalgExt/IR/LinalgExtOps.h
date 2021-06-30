@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_LINALGPLUS_IR_LINALGPLUSOPS_H_
-#define IREE_COMPILER_DIALECT_LINALGPLUS_IR_LINALGPLUSOPS_H_
+#ifndef IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_
+#define IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -16,16 +16,16 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace linalg_plus {
-class LinalgPlusOp;
+namespace linalg_ext {
+class LinalgExtOp;
 
-}  // namespace linalg_plus
+}  // namespace linalg_ext
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusOps.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h.inc"  // IWYU pragma: export
 
-#endif  // IREE_COMPILER_DIALECT_LINALGPLUS_IR_LINALGPLUSOPS_H_
+#endif  // IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_

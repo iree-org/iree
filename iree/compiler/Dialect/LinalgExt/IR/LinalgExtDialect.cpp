@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
@@ -18,19 +18,18 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace linalg_plus {
+namespace linalg_ext {
 
-LinalgPlusDialect::LinalgPlusDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context,
-              TypeID::get<LinalgPlusDialect>()) {
+LinalgExtDialect::LinalgExtDialect(MLIRContext *context)
+    : Dialect(getDialectNamespace(), context, TypeID::get<LinalgExtDialect>()) {
   // TODO(hanchung): Add interface to the dialect.
   // addInterfaces<IREEInlinerInterface>();
 #define GET_OP_LIST
   addOperations<
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusOps.cpp.inc"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
       >();
 }
 
-}  // namespace linalg_plus
+}  // namespace linalg_ext
 }  // namespace iree_compiler
 }  // namespace mlir

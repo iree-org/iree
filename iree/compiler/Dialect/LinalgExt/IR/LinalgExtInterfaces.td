@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_LINALGPLUS_INTERFACES
-#define IREE_DIALECT_LINALGPLUS_INTERFACES
+#ifndef IREE_DIALECT_LINALGEXT_INTERFACES
+#define IREE_DIALECT_LINALGEXT_INTERFACES
 
-include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusBase.td"
+include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 
 // The interface is a subset of LinalgStructuredInterface.
-def LinalgPlusInterface : OpInterface<"LinalgPlusOp"> {
+def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
   let methods = [
     //===------------------------------------------------------------------===//
     // Num input/output arguments handling.
@@ -460,7 +460,7 @@ def LinalgPlusInterface : OpInterface<"LinalgPlusOp"> {
     }
   }];
 
-  let verify = [{ return detail::verifyLinalgPlusOpInterface($_op); }];
+  let verify = [{ return detail::verifyLinalgExtOpInterface($_op); }];
 }
 
-#endif  // IREE_DIALECT_LINALGPLUS_INTERFACES
+#endif  // IREE_DIALECT_LINALGEXT_INTERFACES

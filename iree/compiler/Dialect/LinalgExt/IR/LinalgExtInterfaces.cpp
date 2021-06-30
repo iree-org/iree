@@ -4,11 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 
 namespace mlir {
 namespace iree_compiler {
-namespace linalg_plus {
+namespace linalg_ext {
 
 OpOperandVector::operator SmallVector<Value>() {
   SmallVector<Value> result;
@@ -19,10 +19,10 @@ OpOperandVector::operator SmallVector<Value>() {
 }
 
 namespace detail {
-LogicalResult verifyLinalgPlusOpInterface(Operation *op) { return success(); }
+LogicalResult verifyLinalgExtOpInterface(Operation *op) { return success(); }
 }  // namespace detail
 
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusInterfaces.cpp.inc"  // IWYU pragma: export
-}  // namespace linalg_plus
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.cpp.inc"  // IWYU pragma: export
+}  // namespace linalg_ext
 }  // namespace iree_compiler
 }  // namespace mlir

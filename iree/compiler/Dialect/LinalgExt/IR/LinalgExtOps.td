@@ -4,11 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_LINALGPLUS_OPS
-#define IREE_DIALECT_LINALGPLUS_OPS
+#ifndef IREE_DIALECT_LINALGEXT_OPS
+#define IREE_DIALECT_LINALGEXT_OPS
 
-include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusBase.td"
-include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusInterfaces.td"
+include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
+include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -16,12 +16,12 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 // Base class.
 //===----------------------------------------------------------------------===//
 
-class LinalgPlus_PureOp<string mnemonic, list<OpTrait> traits = []> :
-    Op<LinalgPlus_Dialect, mnemonic, traits> {
+class LinalgExt_PureOp<string mnemonic, list<OpTrait> traits = []> :
+    Op<LinalgExt_Dialect, mnemonic, traits> {
 }
 
-class LinalgPlus_Op<string mnemonic, list<OpTrait> traits = []> :
-    LinalgPlus_PureOp<mnemonic, !listconcat(traits, [LinalgPlusInterface])> {
+class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
+    LinalgExt_PureOp<mnemonic, !listconcat(traits, [LinalgExtInterface])> {
   let verifier = [{ return verify$cppClass(*this); }];
   let printer = [{ return print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
@@ -31,7 +31,7 @@ class LinalgPlus_Op<string mnemonic, list<OpTrait> traits = []> :
 // Non-structured ops
 //===----------------------------------------------------------------------===//
 
-def LinalgPlus_SortOp : LinalgPlus_Op<"sort", [
+def LinalgExt_SortOp : LinalgExt_Op<"sort", [
     AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     SingleBlockImplicitTerminator<"YieldOp">]> {
@@ -59,11 +59,11 @@ def LinalgPlus_SortOp : LinalgPlus_Op<"sort", [
 // Pure ops
 //===----------------------------------------------------------------------===//
 
-def LinalgPlus_YieldOp : LinalgPlus_PureOp<"yield", [NoSideEffect, ReturnLike, Terminator]> {
-  let summary = "LinalgPlus yield op";
+def LinalgExt_YieldOp : LinalgExt_PureOp<"yield", [NoSideEffect, ReturnLike, Terminator]> {
+  let summary = "LinalgExt yield op";
   let description = [{
-    `linalg_plus.yield` is a special terminator operation for blocks inside
-    regions in `linalg_plus` ops.
+    `linalg_ext.yield` is a special terminator operation for blocks inside
+    regions in `linalg_ext` ops.
   }];
 
   let arguments = (ins Variadic<AnyType>:$operands);
@@ -75,4 +75,4 @@ def LinalgPlus_YieldOp : LinalgPlus_PureOp<"yield", [NoSideEffect, ReturnLike, T
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
-#endif  // IREE_DIALECT_LINALGPLUS_OPS
+#endif  // IREE_DIALECT_LINALGEXT_OPS

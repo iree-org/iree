@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
@@ -23,7 +23,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace linalg_plus {
+namespace linalg_ext {
 
 //===----------------------------------------------------------------------===//
 // Utils.
@@ -210,9 +210,9 @@ static LogicalResult verifySortOp(SortOp op) {
   return success();
 }
 
-}  // namespace linalg_plus
+}  // namespace linalg_ext
 }  // namespace iree_compiler
 }  // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/LinalgPlus/IR/LinalgPlusOps.cpp.inc"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"

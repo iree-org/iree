@@ -1,4 +1,4 @@
-# Copyright 2021 The LinalgPlus Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -14,15 +14,15 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["LinalgPlusBase.td"])
+exports_files(["LinalgExtBase.td"])
 
 filegroup(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "LinalgPlusBase.td",
-            "LinalgPlusOps.td",
-            "LinalgPlusInterfaces.td",
+            "LinalgExtBase.td",
+            "LinalgExtOps.td",
+            "LinalgExtInterfaces.td",
         ],
         include = ["*.td"],
     ),
@@ -31,22 +31,22 @@ filegroup(
 cc_library(
     name = "IR",
     srcs = [
-        "LinalgPlusDialect.cpp",
-        "LinalgPlusInterfaces.cpp",
-        "LinalgPlusInterfaces.cpp.inc",
-        "LinalgPlusOps.cpp",
-        "LinalgPlusOps.cpp.inc",
+        "LinalgExtDialect.cpp",
+        "LinalgExtInterfaces.cpp",
+        "LinalgExtInterfaces.cpp.inc",
+        "LinalgExtOps.cpp",
+        "LinalgExtOps.cpp.inc",
     ],
     hdrs = [
-        "LinalgPlusDialect.h",
-        "LinalgPlusInterfaces.h",
-        "LinalgPlusInterfaces.h.inc",
-        "LinalgPlusOps.h",
-        "LinalgPlusOps.h.inc",
+        "LinalgExtDialect.h",
+        "LinalgExtInterfaces.h",
+        "LinalgExtInterfaces.h.inc",
+        "LinalgExtOps.h",
+        "LinalgExtOps.h.inc",
     ],
     deps = [
-        ":LinalgPlusInterfacesGen",
-        ":LinalgPlusOpsGen",
+        ":LinalgExtInterfacesGen",
+        ":LinalgExtOpsGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
@@ -58,19 +58,19 @@ cc_library(
 )
 
 gentbl_cc_library(
-    name = "LinalgPlusOpsGen",
+    name = "LinalgExtOpsGen",
     tbl_outs = [
         (
             ["-gen-op-decls"],
-            "LinalgPlusOps.h.inc",
+            "LinalgExtOps.h.inc",
         ),
         (
             ["-gen-op-defs"],
-            "LinalgPlusOps.cpp.inc",
+            "LinalgExtOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "LinalgPlusOps.td",
+    td_file = "LinalgExtOps.td",
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -80,19 +80,19 @@ gentbl_cc_library(
 )
 
 gentbl_cc_library(
-    name = "LinalgPlusInterfacesGen",
+    name = "LinalgExtInterfacesGen",
     tbl_outs = [
         (
             ["-gen-op-interface-decls"],
-            "LinalgPlusInterfaces.h.inc",
+            "LinalgExtInterfaces.h.inc",
         ),
         (
             ["-gen-op-interface-defs"],
-            "LinalgPlusInterfaces.cpp.inc",
+            "LinalgExtInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "LinalgPlusInterfaces.td",
+    td_file = "LinalgExtInterfaces.td",
     td_includes = ["third_party/iree"],
     td_srcs = [
         ":td_files",
@@ -101,15 +101,15 @@ gentbl_cc_library(
 )
 
 iree_tablegen_doc(
-    name = "LinalgPlusDialectDocGen",
+    name = "LinalgExtDialectDocGen",
     tbl_outs = [
         (
             ["-gen-dialect-doc"],
-            "LinalgPlusDialect.md",
+            "LinalgExtDialect.md",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "LinalgPlusOps.td",
+    td_file = "LinalgExtOps.td",
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
