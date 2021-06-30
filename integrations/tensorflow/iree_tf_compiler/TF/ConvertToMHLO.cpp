@@ -101,6 +101,10 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     // pattern in the legalize-tf pass.
     target.addIllegalOp<mhlo::LogisticOp>();
 
+    // IREE lacks a lowering for DynamicConvOp and it is unclear what value it
+    // brings.
+    target.addIllegalOp<mhlo::DynamicConvOp>();
+
     // In general, IREE does not support DynamicBroadcastInDim ops that do not
     // resolve to a static form. This excludes any TF2XLA expansions which
     // we ultimately lack a linalg lowering for. Matches the corresponding

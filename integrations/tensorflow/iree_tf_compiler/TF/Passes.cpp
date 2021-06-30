@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree_tf_compiler/MHLO/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -17,6 +18,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/transforms/tf_saved_model_passes.h"
+#include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
 namespace mlir {
 namespace iree_integrations {
@@ -61,9 +63,16 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
-  // Legalize to XLA
+  // Legalize to mid-level dialects (MHLO and TOSA).
+  // We prefer CHLO/MHLO lowerings if we have them. Note that this pass
+  // specifically disables lowerings that we do not support at this level.
+  // Then any remaining TF ops can be processed by the TOSA lowerings, which
+  // adds some more coverage, particularly for some dynamic shaped
+  // constructs that we want. It would be nice to have one thing that is good.
+  // But two things that add up to good seems to be where we are.
   //----------------------------------------------------------------------------
   pm.addPass(createConvertToMHLOPass());
+  pm.addPass(mlir::tosa::createLegalizeTFPass());
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
@@ -106,6 +115,11 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createVerifyFullyConvertedPass());
 
   MHLO::buildMHLOImportPassPipeline(pm);
+
+  //----------------------------------------------------------------------------
+  // And convert any TOSA ops.
+  //----------------------------------------------------------------------------
+  mlir::iree_compiler::buildTOSAInputConversionPassPipeline(pm);
 }
 
 void registerTFImportPassPipeline() {
