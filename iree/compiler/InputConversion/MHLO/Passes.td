@@ -15,6 +15,14 @@ def ConvertMHLOToLinalgOnTensors :
   let constructor = "mlir::iree_compiler::createMHLOToLinalgOnTensorsPass()";
 }
 
+def ConvertAndDistributeMHLOToLinalgExt
+    : Pass<"iree-mhlo-to-linalg-ext", "FuncOp"> {
+  let summary =
+      "Convert from XLA-HLO ops to LinalgExt ops and distribute to Flow ops";
+  let constructor =
+      "mlir::iree_compiler::createConvertAndDistributeMHLOToLinalgExtPass()";
+}
+
 def LegalizeInputTypes :
     Pass<"iree-mhlo-legalize-input-types", "ModuleOp"> {
   let summary = "Legalizes input types to ones supported by the IREE flow dialect";

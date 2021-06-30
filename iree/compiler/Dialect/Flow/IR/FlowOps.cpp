@@ -638,6 +638,18 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tensor.store
+//===----------------------------------------------------------------------===//
+
+void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
+                                  Value value, Value target,
+                                  ArrayRef<NamedAttribute> attributes) {
+  build(builder, state, ArrayRef<Type>(), value, target, ArrayRef<Value>(),
+        ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
+        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.workgroups
 //===----------------------------------------------------------------------===//
 
