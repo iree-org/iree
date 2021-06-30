@@ -7,7 +7,7 @@
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Conversion/TosaToSCF/TosaToSCF.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
@@ -30,13 +30,11 @@ void registerTOSAConversionPassPipeline() {
 
 // Prepare TOSA for use as an input to the Flow dialect.
 void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
-
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
-  // TODO: Currently recurses into SCF in Linalg generic - with hilarity.
-  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
+  passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
+  passManager.addNestedPass<FuncOp>(createTopLevelSCFToCFGPass());
 
   // Now that control flow has been lowered, promote and extract_element
   // to tensor loads. This will be done again later once everything that can

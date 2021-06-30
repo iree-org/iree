@@ -42,10 +42,10 @@ cc_library(
 )
 
 cc_library(
-    name = "TOSA",
+    name = "Common",
     srcs = [
         "Passes.cpp",
-        "VerifyCompilerTOSAInputLegality.cpp",
+        "TopLevelSCFToCFG.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -53,14 +53,10 @@ cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        "//iree/compiler/Dialect/Flow/Transforms",
-        "//iree/compiler/InputConversion/Common",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToStandard",
-        "@llvm-project//mlir:TosaDialect",
-        "@llvm-project//mlir:TosaToLinalg",
-        "@llvm-project//mlir:TosaToSCF",
-        "@llvm-project//mlir:TosaToStandard",
         "@llvm-project//mlir:Transforms",
     ],
 )

@@ -13,6 +13,9 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/tools/init_xla_dialects.h"
 #include "iree_tf_compiler/MHLO/Passes.h"
 #include "iree_tf_compiler/TF/Passes.h"
@@ -33,6 +36,12 @@ int main(int argc, char **argv) {
                   mlir::iree_compiler::IREE::HAL::HALDialect,
                   mlir::iree_compiler::IREEDialect>();
 
+  // Select IREE input passes.
+  mlir::iree_compiler::registerCommonInputConversionPasses();
+  mlir::iree_compiler::registerMHLOConversionPasses();
+  mlir::iree_compiler::registerTOSAConversionPasses();
+
+  // TensorFlow integration passes.
   mlir::RegisterAllTensorFlowDialects(registry);
   mlir::iree_integrations::TF::registerAllPasses();
   mlir::iree_integrations::MHLO::registerAllPasses();
