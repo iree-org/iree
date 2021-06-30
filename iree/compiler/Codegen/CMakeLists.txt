@@ -27,6 +27,7 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   DEPS
+    ::PassesIncGen
     MLIRLinalgTransforms
     MLIRPass
     MLIRTransforms
@@ -41,6 +42,7 @@ iree_cc_library(
     "Passes.cpp"
   DEPS
     ::PassHeaders
+    ::PassesIncGen
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::LLVMGPU
