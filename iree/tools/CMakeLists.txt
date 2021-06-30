@@ -243,7 +243,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRSCF
       MLIRSCFToGPU
       MLIRSCFTransforms
-      MLIRSDBM
       MLIRSPIRV
       MLIRSPIRVTransforms
       MLIRShape
