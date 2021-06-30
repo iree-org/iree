@@ -165,14 +165,18 @@ static void printSortOp(OpAsmPrinter &p, SortOp op) {
 }
 
 static LogicalResult verifySortOp(SortOp op) {
-  Block &block = op.region().front();
-  size_t numInputs = op.getNumInputs();
-  if (block.getNumArguments() != 2 * numInputs) {
-    return op.emitOpError("region block should have ")
-           << 2 * numInputs << " arguments";
+  if (op.getNumInputs()) {
+    return op.emitOpError("does not expect to take any inputs");
   }
 
-  int rank = op.getRank(op.getInputOperand(0));
+  Block &block = op.region().front();
+  size_t numOutputs = op.getNumOutputs();
+  if (block.getNumArguments() != 2 * numOutputs) {
+    return op.emitOpError("region block should have ")
+           << 2 * numOutputs << " arguments";
+  }
+
+  int rank = op.getRank(op.getOutputOperand(0));
   if (rank > 1 && !op.dimensionAttr()) {
     return op.emitOpError("dimension must be specified if rank > 1");
   }
