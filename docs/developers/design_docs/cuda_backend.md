@@ -59,10 +59,9 @@ NVVM is a CUDA specific IR composed of LLVM IR and NVVM specific intrinsics. It 
 
 ### IREE flow
 
-IREE's [`target independent codegen`][codegen-passes] converts the compiler input to Linalg on Tensors. Afterward IREE will call the LinalgToNVVM codegen passes.
-Note that IREE had a legacy mode generating Linalg on Buffers. It is not supported by this path.
+IREE's [`target independent codegen`][codegen-passes] converts the compiler input to Linalg on Tensors. Afterward IREE will call the LinalgToLLVMGPU codegen passes.
 
-Once we get into LinalgToNNVM passes we first do bufferize to generate Linalg on Buffers. Then we apply MLIR generic passes to  convert linalg to SCF dialect and then SCF to Standard dialect. After that we convert Standard dialect to LLVM+NVVM dialect.
+Once we get into LinalgToLLVMGPU passes we first do bufferize to generate Linalg on Buffers. Then we apply MLIR generic passes to  convert linalg to SCF dialect and then SCF to Standard dialect. After that we convert Standard dialect to LLVM+NVVM dialect.
 
 ## Example
 
@@ -75,7 +74,7 @@ func @add(%lhs: tensor<4xf32>, %rhs: tensor<4xf32>) -> tensor<4xf32> {
 ```
 
 ```shell
-# First translate into a VM bytecode module using linalg on tensors path.
+# First translate into a VM bytecode module.
 $ ../iree-build/iree/tools/iree-translate \
  -iree-input-type=mhlo \
  -iree-mlir-to-vm-bytecode-module \
