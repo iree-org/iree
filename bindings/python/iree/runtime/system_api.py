@@ -70,16 +70,12 @@ def _create_default_iree_driver(
   driver_exceptions = {}
   for driver_name in driver_names:
     if driver_name not in available_driver_names:
-      print(f"Could not create driver {driver_name} (not registered)",
-            file=sys.stderr)
+      logging.error("Could not create driver %s (not registered)", driver_name)
       continue
     try:
       driver = _binding.HalDriver.create(driver_name)
-      # TODO(laurenzo): Remove these prints to stderr (for now, more information
-      # is better and there is no better way to report it yet).
     except Exception as ex:  # pylint: disable=broad-except
-      print(f"Could not create default driver {driver_name}: {repr(ex)}",
-            file=sys.stderr)
+      logging.exception("Could not create default driver %s", driver_name)
       driver_exceptions[driver_name] = ex
       continue
 
@@ -90,12 +86,12 @@ def _create_default_iree_driver(
     try:
       device = driver.create_default_device()
     except Exception as ex:
-      print(f"Could not create default driver device {driver_name}: {repr(ex)}",
-            file=sys.stderr)
+      logging.exception("Could not create default driver device %s",
+                        driver_name)
       driver_exceptions[driver_name] = ex
       continue
 
-    print(f"Created IREE driver {driver_name}: {repr(driver)}", file=sys.stderr)
+    logging.debug("Created IREE driver %s: %r", driver_name, driver)
     return driver
 
   # All failed.
@@ -251,7 +247,7 @@ class SystemContext:
 
   def __init__(self, vm_modules=None, config: Optional[Config] = None):
     self._config = config if config is not None else _get_global_config()
-    print(f"SystemContext driver={repr(self._config.driver)}", file=sys.stderr)
+    logging.debug("SystemContext driver=%r", self._config.driver)
     self._is_dynamic = vm_modules is None
     if self._is_dynamic:
       init_vm_modules = None
