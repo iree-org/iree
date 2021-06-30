@@ -9,7 +9,6 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -76,6 +75,9 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     // Add TF->HLO legalization patterns.
     mhlo::PopulateLegalizeTfPatterns(context, &patterns);
 
+    // IREE Direct TF lowerings.
+    populateDirectLoweringPatterns(context, patterns);
+
     // TF::PopulateLoweringTFPatterns(context, &patterns);
 
     // ConstantLike op is convenient to create splat constants, but is
@@ -85,6 +87,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
 
     ConversionTarget target(*context);
     target.addLegalDialect<chlo::HloClientDialect>();
+    target.addLegalDialect<linalg::LinalgDialect>();
     target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<shape::ShapeDialect>();
@@ -97,6 +100,22 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     // supported in IREE. Also, remove the numerically unstable ConvertSigmoidOp
     // pattern in the legalize-tf pass.
     target.addIllegalOp<mhlo::LogisticOp>();
+
+    // In general, IREE does not support DynamicBroadcastInDim ops that do not
+    // resolve to a static form. This excludes any TF2XLA expansions which
+    // we ultimately lack a linalg lowering for. Matches the corresponding
+    // condition in legalize_to_linalg.cc for this op.
+    target.addDynamicallyLegalOp<mhlo::DynamicBroadcastInDimOp>(
+        [](mhlo::DynamicBroadcastInDimOp op) {
+          if (auto t = op.operand()
+                           .getType()
+                           .template dyn_cast<RankedTensorType>()) {
+            if (t.hasStaticShape()) {
+              return true;
+            }
+          }
+          return false;
+        });
 
     DenseSet<Operation *> prevUnconvertedOps;
     DenseSet<Operation *> unconvertedOps;
