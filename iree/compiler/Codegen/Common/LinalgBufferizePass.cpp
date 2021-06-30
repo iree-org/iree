@@ -1170,10 +1170,6 @@ static LogicalResult convertAnyLinalgOp(
   SmallVector<Value, 8> newOperands(newInputBuffers.begin(),
                                     newInputBuffers.end());
   newOperands.append(newOutputBuffers.begin(), newOutputBuffers.end());
-  auto otherOperands =
-      llvm::map_range(op.getAssumedNonShapedOperands(),
-                      [&bvm](Value v) { return bvm.lookupOrDefault(v); });
-  newOperands.append(otherOperands.begin(), otherOperands.end());
   op.clone(b, loc, {}, newOperands);
   return success();
 }

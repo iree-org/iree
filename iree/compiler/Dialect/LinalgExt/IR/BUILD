@@ -93,7 +93,6 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtInterfaces.td",
-    td_includes = ["third_party/iree"],
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",

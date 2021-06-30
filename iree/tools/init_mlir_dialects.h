@@ -20,7 +20,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Quant/QuantOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/SDBM/SDBMDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -47,7 +46,6 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   vector::VectorDialect,
                   tensor::TensorDialect,
                   tosa::TosaDialect,
-                  SDBMDialect,
                   shape::ShapeDialect>();
   // clang-format on
 }
