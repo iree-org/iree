@@ -14,6 +14,7 @@ cc_library(
     name = "TF",
     srcs = [
         "ConvertToMHLO.cpp",
+        "DirectLoweringPatterns.cpp",
         "LowerGlobalTensors.cpp",
         "Passes.cpp",
         "PrettifyDebugInfo.cpp",
@@ -41,6 +42,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:ShapeTransforms",

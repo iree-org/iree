@@ -18,9 +18,8 @@ bytecode with various target backends.
 # Build instructions
 
 ## CMake (native and cross compilation)
-Setting up the CMake configuration with one of the following configs
-* `-DIREE_BUILD_SAMPLES=ON` (default in the top-level CMakeLists.txt)
-* `-DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_EMBEDDING_SAMPLES=ON`
+
+Set up the CMake configuration with `-DIREE_BUILD_SAMPLES=ON` (default on)
 
 Then run
 ```sh

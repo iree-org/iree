@@ -18,6 +18,7 @@ set -e
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
+RISCV_CONFIG="${RISCV_CONFIG:-rv64}"
 
 "${CMAKE_BIN?}" --version
 ninja --version
@@ -46,7 +47,7 @@ fi
 
 
 # --------------------------------------------------------------------------- #
-# Build for the target (riscv64).
+# Build for the target (riscv).
 BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 if [[ -d "${BUILD_RISCV_DIR?}" ]]; then
   echo "build-riscv directory already exists. Will use cached results there."
@@ -55,16 +56,34 @@ else
   mkdir -p "${BUILD_RISCV_DIR?}"
 fi
 
-# Configure riscv for 64-bit linux config, then build.
-"${CMAKE_BIN?}" -G Ninja -B "${BUILD_RISCV_DIR?}" \
-  -DCMAKE_TOOLCHAIN_FILE="$(realpath ${ROOT_DIR?}/build_tools/cmake/riscv.toolchain.cmake)" \
-  -DIREE_HOST_BINARY_ROOT="$(realpath ${BUILD_HOST_DIR?}/install)" \
-  -DRISCV_CPU=rv64 \
-  -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_ENABLE_MLIR=OFF \
-  -DIREE_BUILD_TESTS=ON \
-  -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_BUILD_EMBEDDING_SAMPLES=ON \
-  -DRISCV_TOOLCHAIN_ROOT="${RISCV_TOOLCHAIN_ROOT?}" \
-  "${ROOT_DIR?}"
+echo "Build riscv target with the config of ${RISCV_CONFIG?}"
+declare -a args
+args=(
+  "-G" "Ninja"
+  "-B" "${BUILD_RISCV_DIR?}"
+  -DCMAKE_TOOLCHAIN_FILE="$(realpath ${ROOT_DIR?}/build_tools/cmake/riscv.toolchain.cmake)"
+  -DIREE_HOST_BINARY_ROOT="$(realpath ${BUILD_HOST_DIR?}/install)"
+  -DRISCV_CPU="${RISCV_CONFIG?}"
+  -DIREE_BUILD_COMPILER=OFF
+  -DIREE_ENABLE_MLIR=OFF
+  -DIREE_BUILD_SAMPLES=ON
+)
+
+if [[ "${RISCV_CONFIG?}" == "rv64" ]]; then
+  args+=(
+    -DRISCV_TOOLCHAIN_ROOT="${RISCV_TOOLCHAIN_ROOT?}"
+  )
+elif [[ "${RISCV_CONFIG?}" == "rv32-baremetal" ]]; then
+  args+=(
+    # TODO(#6353): Off until iree/tools are refactored to support threadless config.
+    -DIREE_BUILD_TESTS=OFF
+    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT?}"
+  )
+else
+  echo "riscv config not supported yet"
+  return -1
+fi
+
+args_str=$(IFS=' ' ; echo "${args[*]}")
+"${CMAKE_BIN?}" ${args_str} "${ROOT_DIR?}"
 "${CMAKE_BIN?}" --build "${BUILD_RISCV_DIR?}"

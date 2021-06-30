@@ -44,7 +44,6 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
-option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
 
 option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
@@ -95,10 +94,6 @@ option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disa
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
-
-if(${IREE_BUILD_SAMPLES})
-  set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
-endif()
 
 if(${IREE_BUILD_COMPILER})
   set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
@@ -169,10 +164,15 @@ set(IREE_ALL_TARGET_BACKENDS
   VMVX
 )
 
-if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
-  set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
+if(${IREE_BUILD_COMPILER})
+  if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
+    set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
+  endif()
+  message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
+else()
+  set(IREE_TARGET_BACKENDS_TO_BUILD "" CACHE STRING "" FORCE)
+  message(STATUS "Compiler is disabled, building no target backends")
 endif()
-message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
 
 # Default every IREE_TARGET_BACKEND_* to OFF
 foreach(_backend ${IREE_ALL_TARGET_BACKENDS})
@@ -531,10 +531,6 @@ endif()
 
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
-endif()
-
-if(${IREE_BUILD_EMBEDDING_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
-  add_subdirectory(iree/samples/simple_embedding)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
