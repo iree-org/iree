@@ -71,7 +71,7 @@ args=(
 
 if [[ "${RISCV_CONFIG?}" == "rv64" ]]; then
   args+=(
-    -DRISCV_TOOLCHAIN_ROOT="${RISCV_TOOLCHAIN_ROOT?}"
+    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}"
   )
 elif [[ "${RISCV_CONFIG?}" == "rv32-baremetal" ]]; then
   args+=(

@@ -358,7 +358,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
         IntegerType::get(rewriter.getContext(), 32), abiInputTypes);
     auto llvmFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
         stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
-        LLVM::Linkage::Internal, funcAttrs);
+        LLVM::Linkage::Internal, /*dso_local=*/false, funcAttrs);
     rewriter.inlineRegionBefore(stdFuncOp.getBody(), llvmFuncOp.getBody(),
                                 llvmFuncOp.end());
     if (failed(rewriter.convertRegionTypes(

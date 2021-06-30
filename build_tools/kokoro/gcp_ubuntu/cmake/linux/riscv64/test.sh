@@ -14,19 +14,21 @@ set -x
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-# Docker image has the QEMU installed at /usr/src/qemu-riscv.
-# Run the simple_embedding binaries under QEMU.
+# Environment variable used by the emulator and iree-translate for the
+# dylib-llvm-aot bytecode codegen.
+export RISCV_TOOLCHAIN_ROOT=${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}
 
+# Run the binaries under QEMU.
 echo "Test simple_embedding binaries"
 pushd "${BUILD_RISCV_DIR?}/iree/samples/simple_embedding" > /dev/null
 
-/usr/src/qemu-riscv/qemu-riscv64 -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
 -L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_dylib
 
-/usr/src/qemu-riscv/qemu-riscv64 -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
 -L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_embedded_sync
 
-/usr/src/qemu-riscv/qemu-riscv64 -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
 -L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_vmvx_sync
 
 popd > /dev/null
@@ -43,7 +45,7 @@ echo "Test e2e mlir --> bytecode module --> iree-run-module"
   "${ROOT_DIR?}/iree/tools/test/iree-run-module.mlir" \
   -o "${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb"
 
-IREE_RUN_OUT=$(/usr/src/qemu-riscv/qemu-riscv64 -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+IREE_RUN_OUT=$(${QEMU_RV64_BIN?} -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
     -L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" \
     "${BUILD_RISCV_DIR?}/iree/tools/iree-run-module" --driver=dylib \
     --module_file="${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb" \
