@@ -1,4 +1,5 @@
 vm.module @ref_ops {
+  
   vm.rodata private @buffer_i8 dense<[1, 2, 3]> : tensor<3xi8>
   vm.rodata private @buffer_i32 dense<[1, 2, 3]> : tensor<3xi32>
 

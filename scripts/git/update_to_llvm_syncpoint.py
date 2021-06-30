@@ -8,19 +8,17 @@
 # pylint: disable=missing-docstring
 """Updates LLVM-dependent submodules based on the current LLVM commit.
 
-Updates the third_party/llvm-bazel, third_party/tensorflow, and
-third_party/mlir-hlo submodules to commits that match the LLVM commit in the
-third_party/llvm-project submodule. We have special conditions around these
-submodules since they are synced as part of the integration of LLVM into
-Google's source repository. See
+Updates the third_party/tensorflow and third_party/mlir-hlo submodules to
+commits that match the LLVM commit in the third_party/llvm-project submodule.
+We have special conditions around these submodules since they are synced as part
+of the integration of LLVM into Google's source repository. See
 https://github.com/google/iree/blob/main/docs/developers/developing_iree/repository_management.md#the-special-relationship-with-llvm-and-tensorflow.
 
 Typical usage:
   Syntax: ./scripts/git/update_to_llvm_syncpoint.py
 
-  By default, this will update llvm-bazel to the tag corresponding to the
-  current LLVM commit and update TensorFlow and MLIR-HLO to the most recent
-  commit that has a matching LLVM commit.
+  By default, this will update TensorFlow and MLIR-HLO to the most recent commit
+  that has a matching LLVM commit.
 """
 
 import argparse
@@ -61,18 +59,6 @@ def parse_arguments():
                       help="Path to the LLVM sources "
                       "(defaults to third_party/llvm-project)",
                       default=None)
-  parser.add_argument("--llvm_bazel_path",
-                      help="Path to the LLVM Bazel BUILD files"
-                      "(defaults to third_party/llvm-bazel)",
-                      default=None)
-  parser.add_argument(
-      "--llvm_bazel_rev",
-      "--llvm_bazel_commit",
-      help=("Update llvm-bazel to this git rev, or a named option:"
-            f" {COMMIT_OPTIONS}."
-            f" {LATEST_MATCHING_COMMIT_OPTION} and {INTEGRATE_COMMIT_OPTION}"
-            " are equivalentfor this repository."),
-      default=LATEST_MATCHING_COMMIT_OPTION)
   parser.add_argument("--tensorflow_path",
                       help="Path to the tensorflow sources "
                       "(default to third_party/tensorflow)",
@@ -110,8 +96,6 @@ def parse_arguments():
   # Set some defaults.
   if not args.llvm_path:
     args.llvm_path = os.path.join(args.repo, "third_party", "llvm-project")
-  if not args.llvm_bazel_path:
-    args.llvm_bazel_path = os.path.join(args.repo, "third_party", "llvm-bazel")
   if not args.tensorflow_path:
     args.tensorflow_path = os.path.join(args.repo, "third_party", "tensorflow")
   if not args.mlir_hlo_path:
@@ -124,32 +108,16 @@ def main(args):
   print("IREE handy-dandy-LLVM-submodule-updater at your service...")
   print(f"  IREE Path: {args.repo}")
   print(f"  LLVM Path: {args.llvm_path}")
-  print(f"  LLVM Bazel Path: {args.llvm_bazel_path}")
   print(f"  TensorFlow Path: {args.tensorflow_path}")
   print(f"  MLIR-HLO Path: {args.tensorflow_path}")
 
   current_llvm_commit = parse_rev(args.llvm_path, "HEAD")
-  current_llvm_bazel_commit = parse_rev(args.llvm_bazel_path, "HEAD")
   current_tf_commit = parse_rev(args.tensorflow_path, "HEAD")
   current_mlir_hlo_commit = parse_rev(args.mlir_hlo_path, "HEAD")
   print("Current Commits:")
   print(f"  llvm = {current_llvm_commit}")
-  print(f"  llvm_bazel = {current_llvm_bazel_commit}")
   print(f"  tensorflow = {current_tf_commit}")
   print(f"  mlir-hlo = {current_mlir_hlo_commit}")
-
-  # Update LLVM-Bazel
-  new_llvm_bazel_commit = find_new_llvm_bazel_commit(args.llvm_bazel_path,
-                                                     current_llvm_commit,
-                                                     args.llvm_bazel_rev)
-  print(f"\n*** Updating LLVM Bazel to {new_llvm_bazel_commit} ***")
-  utils.execute(["git", "checkout", new_llvm_bazel_commit],
-                cwd=args.llvm_bazel_path)
-  stage_path(args.repo, args.llvm_bazel_path)
-
-  validate_llvm_bazel_commit(current_llvm_commit,
-                             args.llvm_bazel_path,
-                             exit_on_failure=args.validate)
 
   # Update TensorFlow
   new_tf_commit = find_new_commit_from_version_file(args.tensorflow_path,
@@ -187,45 +155,6 @@ def parse_rev(path, rev):
                        cwd=path,
                        silent=True,
                        capture_output=True).stdout.strip()
-
-
-def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_rev):
-  # Explicitly force-fetch tags. Tags in llvm-bazel are not guaranteed to be
-  # stable.
-  utils.execute(["git", "fetch", "--tags", "--force"], cwd=llvm_bazel_path)
-
-  if llvm_bazel_rev not in COMMIT_OPTIONS:
-    return parse_rev(llvm_bazel_path, llvm_bazel_rev)
-
-  if llvm_bazel_rev == KEEP_COMMIT_OPTION:
-    return parse_rev(llvm_bazel_path, "HEAD")
-
-  if llvm_bazel_rev == REMOTE_HEAD_COMMIT_OPTION:
-    return parse_rev(llvm_bazel_path, "origin/main")
-
-  if (llvm_bazel_rev == INTEGRATE_COMMIT_OPTION or
-      llvm_bazel_rev == LATEST_MATCHING_COMMIT_OPTION):
-    return parse_rev(llvm_bazel_path, f"llvm-project-{llvm_commit}")
-
-
-def validate_llvm_bazel_commit(llvm_commit,
-                               llvm_bazel_path,
-                               exit_on_failure=True):
-  llvm_bazel_llvm_commit = find_llvm_bazel_llvm_commit(llvm_bazel_path)
-
-  matches = llvm_bazel_llvm_commit == llvm_commit
-  if not matches:
-    print("WARNING: LLVM commit in llvm-bazel does not match that in IREE"
-          f" ({llvm_bazel_llvm_commit} vs {llvm_commit})")
-    if exit_on_failure:
-      sys.exit(1)
-
-
-def find_llvm_bazel_llvm_commit(llvm_bazel_path):
-  return utils.execute(
-      ["git", "submodule", "status", "third_party/llvm-project"],
-      capture_output=True,
-      cwd=llvm_bazel_path).stdout.split()[0].lstrip("+-")
 
 
 def find_llvm_commit_changes_to_file(repo_path,

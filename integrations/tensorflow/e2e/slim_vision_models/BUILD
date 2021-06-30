@@ -48,29 +48,17 @@ iree_e2e_cartesian_product_test_suite(
             "model": "amoebanet_a_n18_f448",
         },
         {
-            # Failing llvmjit and vulkan:
+            # Failing vulkan and llvmaot.
             "model": [
+                "inception_resnet_v2",
+                "inception_v2",
+                "inception_v3",
                 "nasnet_mobile",
                 "nasnet_large",
-                "pnasnet_large",
-                "resnet_v2_50",
-                "resnet_v2_101",
                 "resnet_v2_152",
             ],
             "target_backends": [
-                "iree_vulkan",
-            ],
-        },
-        {
-            # Failing vulkan:
-            "model": [
-                # [ERROR]: cannot separate Linalg/Parallel ops into multiple kernels
-                "inception_v1",
-                "inception_v2",
-                "inception_v3",
-                "inception_resnet_v2",
-            ],
-            "target_backends": [
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -140,8 +128,7 @@ iree_e2e_cartesian_product_test_suite(
             "resnet_v2_152",
         ],
         "target_backends": [
-            "tf",
-            "tflite",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },

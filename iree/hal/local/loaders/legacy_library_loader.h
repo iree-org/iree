@@ -24,6 +24,7 @@ extern "C" {
 // only a placeholder until the compiler can be switched to output
 // iree_hal_executable_library_t-compatible files.
 iree_status_t iree_hal_legacy_library_loader_create(
+    iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader);
 

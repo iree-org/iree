@@ -4,6 +4,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# TODO(#6247): Remove condition when bare-metal related APIs are cleaned up.
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Generic")
+  return()
+endif()
+
 set(_NAME "iree_samples_variables_and_state")
 add_executable(${_NAME} "")
 target_sources(${_NAME}

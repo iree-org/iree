@@ -7,10 +7,6 @@
 #ifndef IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_
 #define IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_
 
-#include "iree_tf_compiler/dialect/tf_strings/conversion/convert_tf_strings_to_strings.h"
-#include "iree_tf_compiler/dialect/tf_strings/conversion/convert_tf_to_tf_strings.h"
-#include "iree_tf_compiler/dialect/tf_tensorlist/conversion/convert_tf_tensorlist_to_tensorlist.h"
-#include "iree_tf_compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -62,10 +58,17 @@ std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass();
 std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass();
 
 //===----------------------------------------------------------------------===//
-// Registration
+// Patterns
 //===----------------------------------------------------------------------===//
 
-void registerAllDialects(mlir::DialectRegistry &registry);
+// Populates patterns for direct lowering TensorFlow ops that IREE manages
+// (augmenting the standard MHLO lowerings).
+void populateDirectLoweringPatterns(MLIRContext *context,
+                                    RewritePatternSet &patterns);
+
+//===----------------------------------------------------------------------===//
+// Registration
+//===----------------------------------------------------------------------===//
 
 inline void registerAllPasses() {
   registerTFImportPassPipeline();
@@ -79,11 +82,6 @@ inline void registerAllPasses() {
   createStripModuleMetadataPass();
   createStripFunctionMetadataPass();
   createVerifyFullyConvertedPass();
-
-  tf_strings::createConvertTFToTFStringsPass();
-  tf_strings::createConvertTFStringsToStringsPass();
-  tf_tensorlist::createConvertTFTensorListToTensorListPass();
-  tf_tensorlist::createConvertTFToTFTensorListPass();
 }
 
 }  // namespace TF

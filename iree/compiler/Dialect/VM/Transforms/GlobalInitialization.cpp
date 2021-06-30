@@ -36,6 +36,14 @@ namespace VM {
 class GlobalInitializationPass
     : public PassWrapper<GlobalInitializationPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-vm-global-initialization";
+  }
+
+  StringRef getDescription() const override {
+    return "Creates module-level global init/deinit functions";
+  }
+
   void runOnOperation() override {
     // Create the __init and __deinit functions. They may be empty if there are
     // no globals but that's fine.
@@ -203,9 +211,7 @@ createGlobalInitializationPass() {
   return std::make_unique<GlobalInitializationPass>();
 }
 
-static PassRegistration<GlobalInitializationPass> pass(
-    "iree-vm-global-initialization",
-    "Creates module-level global init/deinit functions");
+static PassRegistration<GlobalInitializationPass> pass;
 
 }  // namespace VM
 }  // namespace IREE

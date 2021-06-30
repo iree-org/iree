@@ -10,6 +10,24 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+cc_library(
+    name = "trace_replay",
+    srcs = ["trace_replay.c"],
+    hdrs = ["trace_replay.h"],
+    deps = [
+        ":yaml_util",
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/base/internal:file_io",
+        "//iree/base/internal:file_path",
+        "//iree/hal",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
+
 # TODO(benvanik): fold these into iree/runtime and use that instead.
 cc_library(
     name = "vm_util",
@@ -17,17 +35,16 @@ cc_library(
     hdrs = ["vm_util.h"],
     deps = [
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:file_io",
+        "//iree/base/internal:span",
         "//iree/hal",
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -44,6 +61,15 @@ cc_test(
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:cc",
-        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "yaml_util",
+    srcs = ["yaml_util.c"],
+    hdrs = ["yaml_util.h"],
+    deps = [
+        "//iree/base",
+        "@com_github_yaml_libyaml//:yaml",
     ],
 )

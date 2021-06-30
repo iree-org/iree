@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -160,10 +161,10 @@ struct LinalgTensorReshapeToFlowTensorReshape
 
 /// Convert subtensor insert operation flow.tensor.update where possible.
 struct SubTensorInsertToTensorUpdate
-    : public OpRewritePattern<SubTensorInsertOp> {
-  using OpRewritePattern<SubTensorInsertOp>::OpRewritePattern;
+    : public OpRewritePattern<tensor::InsertSliceOp> {
+  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(SubTensorInsertOp insertOp,
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
     if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
@@ -203,26 +204,27 @@ struct SubTensorInsertToTensorUpdate
 };
 
 /// Convert subtensor operation to flow.tensor.slice where possible.
-struct SubTensorToTensorSlice : public OpRewritePattern<SubTensorOp> {
-  using OpRewritePattern<SubTensorOp>::OpRewritePattern;
+struct SubTensorToTensorSlice
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(SubTensorOp subTensorOp,
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    if (subTensorOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (sliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
-    SmallVector<OpFoldResult, 4> offsets = subTensorOp.getMixedOffsets();
-    SmallVector<OpFoldResult, 4> sizes = subTensorOp.getMixedSizes();
-    SmallVector<OpFoldResult, 4> strides = subTensorOp.getMixedStrides();
-    ArrayRef<int64_t> srcShape = subTensorOp.getSourceType().getShape();
+    SmallVector<OpFoldResult, 4> offsets = sliceOp.getMixedOffsets();
+    SmallVector<OpFoldResult, 4> sizes = sliceOp.getMixedSizes();
+    SmallVector<OpFoldResult, 4> strides = sliceOp.getMixedStrides();
+    ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
     if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
                                              srcShape)) {
       return failure();
     }
-    Location loc = subTensorOp.getLoc();
+    Location loc = sliceOp.getLoc();
 
-    ShapedType sourceType = subTensorOp.getSourceType();
-    ShapedType resultType = subTensorOp.getType();
+    ShapedType sourceType = sliceOp.getSourceType();
+    ShapedType resultType = sliceOp.getType();
 
     // Handle rank reduced version.
     if (resultType.getRank() < sourceType.getRank()) {
@@ -235,17 +237,17 @@ struct SubTensorToTensorSlice : public OpRewritePattern<SubTensorOp> {
     auto offsetVals = getAsValues(rewriter, loc, offsets);
     auto sizeVals = getAsValues(rewriter, loc, sizes);
     auto sourceDynamicDims =
-        getDynamicDimValues(rewriter, loc, subTensorOp.source());
+        getDynamicDimValues(rewriter, loc, sliceOp.source());
     auto resultDynamicDims = getDynamicValues(sizes);
     Value replacement = rewriter.create<TensorSliceOp>(
-        loc, resultType, subTensorOp.source(), sourceDynamicDims, offsetVals,
+        loc, resultType, sliceOp.source(), sourceDynamicDims, offsetVals,
         sizeVals, resultDynamicDims);
-    if (resultType.getRank() > subTensorOp.getType().getRank()) {
+    if (resultType.getRank() > sliceOp.getType().getRank()) {
       replacement = rewriter.create<IREE::Flow::TensorReshapeOp>(
-          loc, subTensorOp.getType(), replacement, resultDynamicDims,
+          loc, sliceOp.getType(), replacement, resultDynamicDims,
           resultDynamicDims);
     }
-    rewriter.replaceOp(subTensorOp, replacement);
+    rewriter.replaceOp(sliceOp, replacement);
     return success();
   }
 };

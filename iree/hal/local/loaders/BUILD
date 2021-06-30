@@ -69,24 +69,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "system_library_loader",
-    srcs = ["system_library_loader.c"],
-    hdrs = ["system_library_loader.h"],
-    defines = [
-        "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1",
-    ],
-    deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-        "//iree/base/internal:file_io",
-        "//iree/base/internal:flatcc",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:executable_library",
-    ],
-)
-
 iree_cmake_extra_content(
     content = """
 if(${IREE_HAL_DRIVER_VMVX})

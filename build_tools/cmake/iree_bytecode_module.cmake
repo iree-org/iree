@@ -55,20 +55,28 @@ function(iree_bytecode_module)
   endif()
 
   iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
+  iree_get_executable_path(_EMBEDDED_LINKER_TOOL_EXECUTABLE "lld")
 
   set(_ARGS "${_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_NAME}.vmfb")
+  list(APPEND _ARGS "-iree-llvm-embedded-linker-path=${_EMBEDDED_LINKER_TOOL_EXECUTABLE}")
 
   # Depending on the binary instead of the target here given we might not have
   # a target in this CMake invocation when cross-compiling.
   add_custom_command(
-    OUTPUT "${_RULE_NAME}.vmfb"
-    COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
+    OUTPUT
+      "${_RULE_NAME}.vmfb"
+    COMMAND
+      ${_TRANSLATE_TOOL_EXECUTABLE}
+      ${_ARGS}
     # Changes to either the translation tool or the input source should
     # trigger rebuilding.
-    DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} ${_RULE_SRC}
+    DEPENDS
+      ${_TRANSLATE_TOOL_EXECUTABLE}
+      ${_EMBEDDED_LINKER_TOOL_EXECUTABLE}
+      ${_RULE_SRC}
   )
 
   if(_RULE_TESTONLY)
@@ -91,8 +99,8 @@ function(iree_bytecode_module)
       H_FILE_OUTPUT
         "${_RULE_NAME}_c.h"
       FLATTEN
-      "${_PUBLIC_ARG}"
-      "${_TESTONLY_ARG}"
+        "${_PUBLIC_ARG}"
+        "${_TESTONLY_ARG}"
     )
   endif()
 endfunction()

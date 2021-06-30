@@ -50,7 +50,7 @@ jobs:
           # Only needs to be built on Linux because platform independent.
           - os: ubuntu-18.04
             build_package: py-pure-pkgs
-            experimental: true
+            experimental: false
 
           # Windows packages.
           - os: windows-2019

@@ -1,4 +1,4 @@
-vm.module @assignment_ops_i64 {
+vm.module @assignment_ops_f32 {
 
   //===--------------------------------------------------------------------===//
   // ExtF32: Conditional assignment
@@ -13,9 +13,9 @@ vm.module @assignment_ops_i64 {
     %c2 = vm.const.f32 0.0 : f32
     %c3 = vm.const.f32 1.0 : f32
     %v1 = vm.select.f32 %c0dno, %c2, %c3 : f32
-    vm.check.eq %v1, %c3, "0 ? 0 : 1 = 1" : f32
+    vm.check.eq %v1, %c3, "0 ? 0.0 : 1.0 = 1.0" : f32
     %v2 = vm.select.f32 %c1dno, %c2, %c3 : f32
-    vm.check.eq %v2, %c2, "1 ? 0 : 1 = 0" : f32
+    vm.check.eq %v2, %c2, "1 ? 0.0 : 1.0 = 0.0" : f32
     vm.return
   }
 }

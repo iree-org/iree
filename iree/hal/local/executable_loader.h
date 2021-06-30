@@ -19,6 +19,43 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
+// iree_hal_executable_import_provider_t
+//===----------------------------------------------------------------------===//
+
+// Interface used to resolve executable imports at load-time.
+// This virtualizes some external provider and does not take ownership of the
+// instance: callers must ensure that the provider remains valid for the
+// lifetime of the executable loader that it is providing for.
+typedef struct iree_hal_executable_import_provider_t {
+  // TODO(benvanik): version field.
+  IREE_API_UNSTABLE
+
+  // User-defined pointer passed to all functions.
+  void* self;
+
+  // Resolves an import symbol with the given |symbol_name| and stores a pointer
+  // to the function (or its context) in |out_fn_ptr|.
+  iree_status_t(IREE_API_PTR* resolve)(void* self,
+                                       iree_string_view_t symbol_name,
+                                       void** out_fn_ptr);
+} iree_hal_executable_import_provider_t;
+
+static inline iree_hal_executable_import_provider_t
+iree_hal_executable_import_provider_null() {
+  iree_hal_executable_import_provider_t provider = {NULL, NULL};
+  return provider;
+}
+
+// Resolves an import symbol with the given |symbol_name| and stores a pointer
+// to the function (or its context) in |out_fn_ptr|.
+//
+// A |symbol_name| ending in `?` indicates that the symbol is weak and is
+// allowed to be resolved to NULL. Such cases will always return OK.
+iree_status_t iree_hal_executable_import_provider_resolve(
+    const iree_hal_executable_import_provider_t import_provider,
+    iree_string_view_t symbol_name, void** out_fn_ptr);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_executable_loader_t
 //===----------------------------------------------------------------------===//
 
@@ -37,12 +74,14 @@ typedef struct iree_hal_executable_loader_vtable_t
 typedef struct iree_hal_executable_loader_t {
   iree_atomic_ref_count_t ref_count;
   const iree_hal_executable_loader_vtable_t* vtable;
+  iree_hal_executable_import_provider_t import_provider;
 } iree_hal_executable_loader_t;
 
 // Initializes the base iree_hal_executable_loader_t type.
 // Called by subclasses upon allocating their loader.
 void iree_hal_executable_loader_initialize(
-    const void* vtable, iree_hal_executable_loader_t* out_base_loader);
+    const void* vtable, iree_hal_executable_import_provider_t import_provider,
+    iree_hal_executable_loader_t* out_base_loader);
 
 // Retains the given |executable_loader| for the caller.
 void iree_hal_executable_loader_retain(

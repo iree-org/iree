@@ -19,10 +19,11 @@ if(${IREE_ENABLE_EMITC})
       add_module_test
     SRCS
       "add_module_test.cc"
+      "add_module.h"
     DEPS
       ::add_module
       iree::base
-      iree::base::status
+      iree::base::cc
       iree::testing::gtest
       iree::testing::gtest_main
       iree::vm

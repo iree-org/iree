@@ -105,6 +105,7 @@ def get_target_backends() -> Sequence[module_utils.BackendInfo]:
     backends = module_utils.BackendInfo.get_all_backends()
   return backends
 
+
 # TODO(#4131) python>=3.7: Consider using a (frozen) dataclass.
 Modules = collections.namedtuple("Modules",
                                  ["ref_module", "tar_modules", "artifacts_dir"])

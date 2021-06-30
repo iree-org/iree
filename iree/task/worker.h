@@ -114,10 +114,18 @@ typedef struct iree_task_worker_t {
   // to ensure that the worker - who is pounding on local_task_queue - doesn't
   // contend with submissions or coordinators dropping new tasks in the mailbox.
   //
-  // TODO(benvanik): test on 32-bit platforms; I'm pretty sure we'll always be
-  // past the iree_hardware_constructive_interference_size given the bulk of
-  // stuff above, but it'd be nice to guarantee it.
-  uint8_t _padding[8];
+  // Today we don't need this, however on 32-bit systems or if we adjust the
+  // size of iree_task_affinity_t/iree_task_affinity_set_t/etc we may need to
+  // add it back.
+  //
+  // NOTE: due to the layout requirements of this structure (to avoid cache
+  // interference) this is the only place padding should be added.
+  // uint8_t _padding[8];
+
+  // Pointer to local memory available for use exclusively by the worker.
+  // The base address should be aligned to avoid false sharing with other
+  // workers.
+  iree_byte_span_t local_memory;
 
   // Worker-local FIFO queue containing the slices that will be processed by the
   // worker. This queue supports work-stealing by other workers if they run out
@@ -141,7 +149,8 @@ static_assert(offsetof(iree_task_worker_t, local_task_queue) >=
 iree_status_t iree_task_worker_initialize(
     iree_task_executor_t* executor, iree_host_size_t worker_index,
     const iree_task_topology_group_t* topology_group,
-    iree_prng_splitmix64_state_t* seed_prng, iree_task_worker_t* out_worker);
+    iree_byte_span_t local_memory, iree_prng_splitmix64_state_t* seed_prng,
+    iree_task_worker_t* out_worker);
 
 // Deinitializes a worker that has successfully exited. The worker must be in
 // the IREE_TASK_WORKER_STATE_ZOMBIE state.

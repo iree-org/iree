@@ -70,26 +70,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    system_library_loader
-  HDRS
-    "system_library_loader.h"
-  SRCS
-    "system_library_loader.c"
-  DEPS
-    iree::base
-    iree::base::internal::file_io
-    iree::base::internal::flatcc
-    iree::base::tracing
-    iree::hal
-    iree::hal::local
-    iree::hal::local::executable_library
-  DEFINES
-    "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
-  PUBLIC
-)
-
 if(${IREE_HAL_DRIVER_VMVX})
 
 iree_cc_library(

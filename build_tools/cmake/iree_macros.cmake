@@ -107,7 +107,7 @@ endfunction()
 #     the binary when importing a binary from a host build. Thus this should be
 #     the global unqualified name of the binary, not the fully-specified name.
 function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
-  if (NOT CMAKE_CROSSCOMPILING OR TARGET "${EXECUTABLE}")
+  if (NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${EXECUTABLE}")
     # We can either expect the target to be defined as part of this CMake
     # invocation (if not cross compiling) or the target is defined already.
     set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)

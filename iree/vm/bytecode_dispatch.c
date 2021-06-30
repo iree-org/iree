@@ -1555,9 +1555,9 @@ iree_status_t iree_vm_bytecode_dispatch(
               module_state->rwdata_storage.data_length);
         }
         int64_t* value = VM_DecResultRegI64("value");
-        const int64_t* global_ptr =
-            (const int64_t*)(module_state->rwdata_storage.data + byte_offset);
-        *value = *global_ptr;
+        const int64_t global_value =
+            vm_global_load_i64(module_state->rwdata_storage.data, byte_offset);
+        *value = global_value;
       });
 
       DISPATCH_OP(EXT_I64, GlobalStoreI64, {
@@ -1570,9 +1570,8 @@ iree_status_t iree_vm_bytecode_dispatch(
               module_state->rwdata_storage.data_length);
         }
         int64_t value = VM_DecOperandRegI64("value");
-        int64_t* global_ptr =
-            (int64_t*)(module_state->rwdata_storage.data + byte_offset);
-        *global_ptr = value;
+        vm_global_store_i64(module_state->rwdata_storage.data, byte_offset,
+                            value);
       });
 
       DISPATCH_OP(EXT_I64, GlobalLoadIndirectI64, {
@@ -1585,9 +1584,9 @@ iree_status_t iree_vm_bytecode_dispatch(
               module_state->rwdata_storage.data_length);
         }
         int64_t* value = VM_DecResultRegI64("value");
-        const int64_t* global_ptr =
-            (const int64_t*)(module_state->rwdata_storage.data + byte_offset);
-        *value = *global_ptr;
+        const int64_t global_value =
+            vm_global_load_i64(module_state->rwdata_storage.data, byte_offset);
+        *value = global_value;
       });
 
       DISPATCH_OP(EXT_I64, GlobalStoreIndirectI64, {
@@ -1600,9 +1599,8 @@ iree_status_t iree_vm_bytecode_dispatch(
               module_state->rwdata_storage.data_length);
         }
         int64_t value = VM_DecOperandRegI64("value");
-        int64_t* global_ptr =
-            (int64_t*)(module_state->rwdata_storage.data + byte_offset);
-        *global_ptr = value;
+        vm_global_store_i64(module_state->rwdata_storage.data, byte_offset,
+                            value);
       });
 
       //===----------------------------------------------------------------===//
@@ -1826,9 +1824,10 @@ iree_status_t iree_vm_bytecode_dispatch(
               module_state->rwdata_storage.data_length);
         }
         float* value = VM_DecResultRegF32("value");
-        const float* global_ptr =
-            (const float*)(module_state->rwdata_storage.data + byte_offset);
-        *value = *global_ptr;
+        const float global_value =
+            vm_global_load_f32(module_state->rwdata_storage.data, byte_offset);
+        *value = global_value;
+        
       });
 
       DISPATCH_OP(EXT_F32, GlobalStoreF32, {
@@ -1841,9 +1840,8 @@ iree_status_t iree_vm_bytecode_dispatch(
               module_state->rwdata_storage.data_length);
         }
         float value = VM_DecOperandRegF32("value");
-        float* global_ptr =
-            (float*)(module_state->rwdata_storage.data + byte_offset);
-        *global_ptr = value;
+        vm_global_store_f32(module_state->rwdata_storage.data, byte_offset,
+                            value);
       });
 
       DISPATCH_OP(EXT_F32, GlobalLoadIndirectF32, {
@@ -1856,9 +1854,9 @@ iree_status_t iree_vm_bytecode_dispatch(
               module_state->rwdata_storage.data_length);
         }
         float* value = VM_DecResultRegF32("value");
-        const float* global_ptr =
-            (const float*)(module_state->rwdata_storage.data + byte_offset);
-        *value = *global_ptr;
+        const float global_value =
+            vm_global_load_f32(module_state->rwdata_storage.data, byte_offset);
+        *value = global_value;
       });
 
       DISPATCH_OP(EXT_F32, GlobalStoreIndirectF32, {
@@ -1871,9 +1869,8 @@ iree_status_t iree_vm_bytecode_dispatch(
               module_state->rwdata_storage.data_length);
         }
         float value = VM_DecOperandRegF32("value");
-        float* global_ptr =
-            (float*)(module_state->rwdata_storage.data + byte_offset);
-        *global_ptr = value;
+        vm_global_store_f32(module_state->rwdata_storage.data, byte_offset,
+                            value);
       });
 
       //===----------------------------------------------------------------===//
@@ -1964,6 +1961,26 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
 
+      DISPATCH_OP_EXT_F32_UNARY_F32(AtanF32, vm_atan_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(Atan2F32, vm_atan2_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(CosF32, vm_cos_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(SinF32, vm_sin_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(ExpF32, vm_exp_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(Exp2F32, vm_exp2_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(ExpM1F32, vm_expm1_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(LogF32, vm_log_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(Log10F32, vm_log10_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(Log1pF32, vm_log1p_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(Log2F32, vm_log2_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(PowF32, vm_pow_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(RsqrtF32, vm_rsqrt_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(SqrtF32, vm_sqrt_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(TanhF32, vm_tanh_f32);
+
+      //===----------------------------------------------------------------===//
+      // ExtF32: Casting and type conversion/emulation
+      //===----------------------------------------------------------------===//
+
       DISPATCH_OP(EXT_F32, CastSI32F32, {
         int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
         float* result = VM_DecResultRegF32("result");
@@ -1984,26 +2001,6 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t* result = VM_DecResultRegI32("result");
         *result = vm_cast_f32ui32(operand);
       });
-
-      DISPATCH_OP_EXT_F32_UNARY_F32(AtanF32, vm_atan_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(Atan2F32, vm_atan2_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(CosF32, vm_cos_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(SinF32, vm_sin_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(ExpF32, vm_exp_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(Exp2F32, vm_exp2_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(ExpM1F32, vm_expm1_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(LogF32, vm_log_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(Log10F32, vm_log10_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(Log1pF32, vm_log1p_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(Log2F32, vm_log2_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(PowF32, vm_pow_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(RsqrtF32, vm_rsqrt_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(SqrtF32, vm_sqrt_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(TanhF32, vm_tanh_f32);
-
-      //===----------------------------------------------------------------===//
-      // ExtF32: Casting and type conversion/emulation
-      //===----------------------------------------------------------------===//
 
       //===----------------------------------------------------------------===//
       // ExtF32: Comparison ops

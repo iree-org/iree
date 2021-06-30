@@ -10,6 +10,7 @@
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetOptions.h"
 
 namespace mlir {
@@ -129,6 +130,19 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::init(llvmTargetOptions.debugSymbols));
   llvmTargetOptions.debugSymbols = clDebugSymbols;
 
+  static llvm::cl::opt<std::string> clLinkerPath(
+      "iree-llvm-linker-path",
+      llvm::cl::desc("Tool used to link shared libraries produced by IREE."),
+      llvm::cl::init(""));
+  llvmTargetOptions.linkerPath = clLinkerPath;
+
+  static llvm::cl::opt<std::string> clEmbeddedLinkerPath(
+      "iree-llvm-embedded-linker-path",
+      llvm::cl::desc("Tool used to link embedded ELFs produced by IREE (for "
+                     "-iree-llvm-link-embedded)."),
+      llvm::cl::init("ld.lld"));
+  llvmTargetOptions.embeddedLinkerPath = clEmbeddedLinkerPath;
+
   static llvm::cl::opt<bool> clLinkEmbedded(
       "iree-llvm-link-embedded",
       llvm::cl::desc("Links binaries into a platform-agnostic ELF to be loaded "
@@ -149,6 +163,25 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::desc("Keep LLVM linker target artifacts (.so/.dll/etc)"),
       llvm::cl::init(llvmTargetOptions.keepLinkerArtifacts));
   llvmTargetOptions.keepLinkerArtifacts = clKeepLinkerArtifacts;
+
+  static llvm::cl::opt<std::string> clStaticLibraryOutputPath(
+      "iree-llvm-static-library-output-path",
+      llvm::cl::desc(
+          "Path to output static object (EX: '/path/to/static-library.o'). "
+          "This will produce the static library at the specified path along "
+          "with a similarly named '.h' file for static linking."),
+      llvm::cl::init(llvmTargetOptions.staticLibraryOutput));
+  llvmTargetOptions.staticLibraryOutput = clStaticLibraryOutputPath;
+
+  static llvm::cl::opt<bool> clListTargets(
+      "iree-llvm-list-targets",
+      llvm::cl::desc("Lists all registered targets that the LLVM backend can "
+                     "generate code for."),
+      llvm::cl::init(false));
+  if (clListTargets) {
+    llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
+    exit(0);
+  }
 
   return llvmTargetOptions;
 }

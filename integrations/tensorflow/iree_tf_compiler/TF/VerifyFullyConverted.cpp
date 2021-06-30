@@ -40,6 +40,15 @@ class VerifyFullyConvertedPass
                     mlir::tf_saved_model::TensorFlowSavedModelDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-tf-verify-fully-converted";
+  }
+
+  StringRef getDescription() const override {
+    return "Verifies that all TensorFlow frontend ops were converted and none "
+           "remain";
+  }
+
   // Validates that no TensorFlow frontends ops are in the function.
   void runOnFunction() override {
     DenseSet<Operation *> illegalOps;
@@ -76,9 +85,7 @@ class VerifyFullyConvertedPass
   }
 };
 
-static PassRegistration<VerifyFullyConvertedPass> pass(
-    "iree-tf-verify-fully-converted",
-    "Verifies that all TensorFlow frontend ops were converted and none remain");
+static PassRegistration<VerifyFullyConvertedPass> pass;
 
 std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass() {
   return std::make_unique<VerifyFullyConvertedPass>();

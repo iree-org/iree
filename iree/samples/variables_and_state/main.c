@@ -169,8 +169,8 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   int value = -1;
   if (iree_status_is_ok(status)) {
     status = counter_get_value(session, &value);
+    fprintf(stdout, "Initial get_value()    : %d\n", value);
   }
-  fprintf(stdout, "Initial get_value()    : %d\n", value);
 
   // 2. set_value(101)
   if (iree_status_is_ok(status)) {
@@ -178,8 +178,8 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   }
   if (iree_status_is_ok(status)) {
     status = counter_get_value(session, &value);
+    fprintf(stdout, "After set_value(101)   : %d\n", value);
   }
-  fprintf(stdout, "After set_value(101)   : %d\n", value);
 
   // 3. add_to_value(20)
   if (iree_status_is_ok(status)) {
@@ -187,8 +187,8 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   }
   if (iree_status_is_ok(status)) {
     status = counter_get_value(session, &value);
+    fprintf(stdout, "After add_to_value(20) : %d\n", value);
   }
-  fprintf(stdout, "After add_to_value(20) : %d\n", value);
 
   // 4. add_to_value(-50)
   if (iree_status_is_ok(status)) {
@@ -196,8 +196,8 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   }
   if (iree_status_is_ok(status)) {
     status = counter_get_value(session, &value);
+    fprintf(stdout, "After add_to_value(-50): %d\n", value);
   }
-  fprintf(stdout, "After add_to_value(-50): %d\n", value);
 
   // 5. reset_value()
   if (iree_status_is_ok(status)) {
@@ -205,8 +205,8 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   }
   if (iree_status_is_ok(status)) {
     status = counter_get_value(session, &value);
+    fprintf(stdout, "After reset_value()    : %d\n", value);
   }
-  fprintf(stdout, "After reset_value()    : %d\n", value);
   //===-------------------------------------------------------------------===//
 
   //===-------------------------------------------------------------------===//

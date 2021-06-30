@@ -27,6 +27,14 @@ class BenchmarkBatchDispatchesPass
     registry.insert<HALDialect, StandardOpsDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "test-iree-hal-benchmark-batch-dispatches-2-times";
+  }
+
+  StringRef getDescription() const override {
+    return "Test pass used for benchmarking batch dispatches analysis";
+  }
+
   void runOnOperation() override {
     FuncOp f = getOperation();
     SmallVector<HAL::CommandBufferDispatchOp> ops;
@@ -64,10 +72,9 @@ std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
   return std::make_unique<BenchmarkBatchDispatchesPass>(repeatCount);
 }
 
-static PassRegistration<BenchmarkBatchDispatchesPass> pass(
-    "test-iree-hal-benchmark-batch-dispatches-2-times",
-    "Test pass used for benchmarking batch dispatches analysis",
-    [] { return std::make_unique<BenchmarkBatchDispatchesPass>(2); });
+static PassRegistration<BenchmarkBatchDispatchesPass> pass([] {
+  return std::make_unique<BenchmarkBatchDispatchesPass>(2);
+});
 
 }  // namespace HAL
 }  // namespace IREE

@@ -12,7 +12,10 @@
 // ELF modules for various platforms embedded in the binary:
 #include "iree/hal/local/elf/testdata/simple_mul_dispatch.h"
 
-const iree_const_byte_span_t GetCurrentPlatformFile() {
+static iree_status_t query_arch_test_file_data(
+    iree_const_byte_span_t* out_file_data) {
+  *out_file_data = iree_make_const_byte_span(NULL, 0);
+
   iree_string_view_t pattern = iree_string_view_empty();
 #if defined(IREE_ARCH_ARM_32)
   pattern = iree_make_cstring_view("*_arm_32.so");
@@ -35,20 +38,21 @@ const iree_const_byte_span_t GetCurrentPlatformFile() {
       const struct iree_file_toc_t* file_toc = &simple_mul_dispatch_create()[i];
       if (iree_string_view_match_pattern(iree_make_cstring_view(file_toc->name),
                                          pattern)) {
-        return iree_make_const_byte_span(file_toc->data, file_toc->size);
+        *out_file_data =
+            iree_make_const_byte_span(file_toc->data, file_toc->size);
+        return iree_ok_status();
       }
     }
   }
-  return iree_make_const_byte_span(NULL, 0);
+
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "no architecture-specific ELF binary embedded into "
+                          "the application for the current target platform");
 }
 
-iree_status_t Run() {
-  iree_status_t ret_status = iree_ok_status();
-  const iree_const_byte_span_t file_data = GetCurrentPlatformFile();
-  if (!file_data.data_length) {
-    fprintf(stdout, "No ELF file built for this platform, skip");
-    return ret_status;
-  }
+static iree_status_t run_test() {
+  iree_const_byte_span_t file_data;
+  IREE_RETURN_IF_ERROR(query_arch_test_file_data(&file_data));
 
   iree_elf_import_table_t import_table;
   memset(&import_table, 0, sizeof(import_table));
@@ -84,14 +88,17 @@ iree_status_t Run() {
                             "library name mismatches");
   }
 
-  if (library.v0->entry_point_count != 1) {
+  if (library.v0->exports.count != 1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "entry point count mismatches");
   }
 
+  // ret0 = arg0 * arg1
   float arg0[4] = {1.0f, 2.0f, 3.0f, 4.0f};
   float arg1[4] = {100.0f, 200.0f, 300.0f, 400.0f};
   float ret0[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  const float expected[4] = {100.0f, 400.0f, 900.0f, 1600.0f};
+
   size_t binding_lengths[3] = {
       sizeof(arg0),
       sizeof(arg1),
@@ -112,31 +119,36 @@ iree_status_t Run() {
   dispatch_state.binding_lengths = binding_lengths;
   dispatch_state.binding_ptrs = binding_ptrs;
   iree_hal_vec3_t workgroup_id = {{0, 0, 0}};
-  int ret = iree_elf_call_i_pp((const void*)library.v0->entry_points[0],
-                               (void*)&dispatch_state, (void*)&workgroup_id);
-
+  void* local_memory = NULL;
+  int ret = iree_elf_call_i_ppp((const void*)library.v0->exports.ptrs[0],
+                                (void*)&dispatch_state, (void*)&workgroup_id,
+                                local_memory);
   if (ret != 0) {
-    return iree_make_status(IREE_STATUS_INTERNAL, "elf call fails");
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "dispatch function returned failure: %d", ret);
   }
-  float expected_ret[4] = {100.0f, 400.0f, 900.0f, 1600.0f};
-  for (int i = 0; i < 4; ++i) {
-    if (ret0[i] != expected_ret[i]) {
-      fprintf(stderr, "ret[%d] is incorrect; expected: %.1f; actual: %.1f\n", i,
-              expected_ret[i], ret0[i]);
-      ret_status = iree_make_status(IREE_STATUS_INTERNAL, "output mismatches");
+
+  iree_status_t status = iree_ok_status();
+  for (int i = 0; i < IREE_ARRAYSIZE(expected); ++i) {
+    if (ret0[i] != expected[i]) {
+      status =
+          iree_make_status(IREE_STATUS_INTERNAL,
+                           "output mismatch: ret[%d] = %.1f, expected %.1f", i,
+                           ret0[i], expected[i]);
+      break;
     }
   }
 
   iree_elf_module_deinitialize(&module);
-  return ret_status;
+  return status;
 }
 
 int main() {
-  const iree_status_t result = Run();
+  const iree_status_t result = run_test();
   int ret = (int)iree_status_code(result);
   if (!iree_status_is_ok(result)) {
     iree_status_fprint(stderr, result);
-    iree_status_ignore(result);
+    iree_status_free(result);
   }
   return ret;
 }

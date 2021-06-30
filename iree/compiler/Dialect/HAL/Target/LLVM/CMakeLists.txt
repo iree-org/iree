@@ -27,10 +27,12 @@ iree_cc_library(
     ::LLVMIRPasses
     ::LLVMTargetOptions
     ::LinkerTool
+    ::StaticLibraryGenerator
     LLVMAArch64AsmParser
     LLVMAArch64CodeGen
     LLVMARMAsmParser
     LLVMARMCodeGen
+    LLVMBitWriter
     LLVMCore
     LLVMRISCVAsmParser
     LLVMRISCVCodeGen
@@ -43,10 +45,10 @@ iree_cc_library(
     MLIRLLVMToLLVMIRTranslation
     MLIRTargetLLVMIRExport
     iree::base::internal::flatcc
-    iree::compiler::Conversion::CodegenUtils
-    iree::compiler::Conversion::Common
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Conversion::PassHeaders
+    iree::compiler::Codegen::Common
+    iree::compiler::Codegen::LLVMCPU
+    iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Utils
     iree::schemas::dylib_executable_def_c_fbs
@@ -110,6 +112,18 @@ iree_cc_library(
     LLVMCore
     LLVMSupport
     MLIRSupport
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    StaticLibraryGenerator
+  HDRS
+    "StaticLibraryGenerator.h"
+  SRCS
+    "StaticLibraryGenerator.cpp"
+  DEPS
+    LLVMSupport
   PUBLIC
 )
 

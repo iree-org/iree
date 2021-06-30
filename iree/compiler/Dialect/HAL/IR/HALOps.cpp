@@ -314,7 +314,14 @@ SmallVector<int64_t, 4> TensorCastOp::getTiedResultOperandIndices() {
 // For example, this will return true if the variable type is a tensor<?xf32>
 // and the access is tensor<4xf32>.
 static bool isVariableTypeCompatible(Type variableType, Type accessType) {
-  return succeeded(mlir::verifyCompatibleShape(variableType, accessType));
+  // If one is a shaped type, then they both must be and have compatible
+  // shapes.
+  if (variableType.isa<ShapedType>() || accessType.isa<ShapedType>()) {
+    return succeeded(mlir::verifyCompatibleShape(variableType, accessType));
+  }
+
+  // Otherwise, the types must be the same.
+  return variableType == accessType;
 }
 
 static ParseResult parseVariableOp(OpAsmParser &parser,

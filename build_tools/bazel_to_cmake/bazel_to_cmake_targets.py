@@ -10,10 +10,8 @@
 EXPLICIT_TARGET_MAPPING = {
     # Internal utilities to emulate various binary/library options.
     "//build_tools:default_linkopts": [],
+    "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
-    # absl
-    "@com_google_absl//absl/flags:flag": ["absl::flags"],
-    "@com_google_absl//absl/flags:parse": ["absl::flags_parse"],
     # LLVM
     "@llvm-project//llvm:IPO": ["LLVMipo"],
     # MLIR
@@ -57,23 +55,12 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_benchmark//:benchmark": ["benchmark"],
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
+    "@com_github_yaml_libyaml//:yaml": ["yaml"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
     "@cpuinfo": ["cpuinfo"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
-
-
-def _convert_absl_target(target):
-  # Default to a pattern substitution approach.
-  # Take "absl::" and append the name part of the full target identifier, e.g.
-  #   "@com_google_absl//absl/types:optional" -> "absl::optional"
-  #   "@com_google_absl//absl/types:span"     -> "absl::span"
-  if ":" in target:
-    target_name = target.rsplit(":")[-1]
-  else:
-    target_name = target.rsplit("/")[-1]
-  return ["absl::" + target_name]
 
 
 def _convert_mlir_target(target):
@@ -110,8 +97,6 @@ def convert_external_target(target):
   """
   if target in EXPLICIT_TARGET_MAPPING:
     return EXPLICIT_TARGET_MAPPING[target]
-  if target.startswith("@com_google_absl//absl"):
-    return _convert_absl_target(target)
   if target.startswith("@llvm-project//llvm"):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):

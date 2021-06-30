@@ -20,10 +20,9 @@ cc_library(
         "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Conversion:PassHeaders",
-        "//iree/compiler/Conversion/Common",
-        "//iree/compiler/Conversion/HLOToLinalg",
-        "//iree/compiler/Conversion/LinalgToLLVM",
+        "//iree/compiler/Codegen:PassHeaders",
+        "//iree/compiler/Codegen/Common",
+        "//iree/compiler/Codegen/LLVMCPU",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/IREE/IR",
