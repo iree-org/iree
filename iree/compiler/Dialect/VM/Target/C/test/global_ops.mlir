@@ -46,9 +46,4 @@ vm.module @global_ops {
     %value = vm.global.load.i32 @c107_mut : i32
     vm.return %value : i32
   }
-
-  // check state initialization inside the alloc_state function
-  // CHECK: static iree_status_t global_ops_alloc_state(
-  // CHECK: vm_global_store_i32(state->rwdata, 0, 42);
-  // CHECK-NEXT: vm_global_store_i32(state->rwdata, 4, 107);
 }

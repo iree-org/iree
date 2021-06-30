@@ -256,12 +256,12 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
     SmallVector<Value, 4> updatedOperands(operands.begin(), operands.end());
 
     if (op.getNumResults() == 0) {
-      SmallVector<Attribute, 4> args_;
+      SmallVector<Attribute, 4> args;
       if (!isImported) {
         // The order is arguments, results, stack, state
-        args_ = indexSequence(updatedOperands.size(), ctx);
-        args_.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
-        args_.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+        args = indexSequence(updatedOperands.size(), ctx);
+        args.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args.push_back(emitc::OpaqueAttr::get(ctx, "state"));
       } else {
         int importOrdinal = 0;
         // TODO(simon-camp): split into multiple EmitC ops
@@ -269,21 +269,19 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
                                 std::to_string(importOrdinal) +
                                 std::string("]");
         // The order is stack, import, arguments, results
-        args_.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
-        args_.push_back(emitc::OpaqueAttr::get(ctx, importArg));
+        args.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args.push_back(emitc::OpaqueAttr::get(ctx, importArg));
 
         for (auto operandIndex : indexSequence(updatedOperands.size(), ctx)) {
-          args_.push_back(operandIndex);
+          args.push_back(operandIndex);
         }
       }
-
-      ArrayAttr args = rewriter.getArrayAttr(args_);
 
       auto callOp = failableCall(
           /*rewriter=*/rewriter,
           /*location=*/loc,
           /*callee=*/StringAttr::get(ctx, funcName.getValue()),
-          /*args=*/args,
+          /*args=*/rewriter.getArrayAttr(args),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/updatedOperands);
 
@@ -315,12 +313,12 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
       updatedOperands.push_back(ptrOp.getResult());
 
-      SmallVector<Attribute, 4> args_;
+      SmallVector<Attribute, 4> args;
       if (!isImported) {
         // The order is arguments, results, stack, state
-        args_ = indexSequence(updatedOperands.size(), ctx);
-        args_.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
-        args_.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+        args = indexSequence(updatedOperands.size(), ctx);
+        args.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args.push_back(emitc::OpaqueAttr::get(ctx, "state"));
       } else {
         int importOrdinal = 0;
         // TODO(simon-camp): split into multiple EmitC ops
@@ -328,21 +326,19 @@ class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
                                 std::to_string(importOrdinal) +
                                 std::string("]");
         // The order is stack, import, arguments, results
-        args_.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
-        args_.push_back(emitc::OpaqueAttr::get(ctx, importArg));
+        args.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args.push_back(emitc::OpaqueAttr::get(ctx, importArg));
 
         for (auto operandIndex : indexSequence(updatedOperands.size(), ctx)) {
-          args_.push_back(operandIndex);
+          args.push_back(operandIndex);
         }
       }
-
-      ArrayAttr args = rewriter.getArrayAttr(args_);
 
       auto callOp = failableCall(
           /*rewriter=*/rewriter,
           /*location=*/loc,
           /*callee=*/StringAttr::get(ctx, funcName.getValue()),
-          /*args=*/args,
+          /*args=*/rewriter.getArrayAttr(args),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/updatedOperands);
 

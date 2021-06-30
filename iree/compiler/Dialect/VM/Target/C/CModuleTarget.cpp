@@ -622,7 +622,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   // resolve_imports
   output << "static iree_status_t " << moduleName << "_resolve_import("
          << "void* self, iree_vm_module_state_t* module_state, "
-            "iree_host_size_t ordinal,const iree_vm_function_t* function, "
+            "iree_host_size_t ordinal, const iree_vm_function_t* function, "
             "const iree_vm_function_signature_t* signature) {\n"
          << moduleName << "_state_t* state = (" << moduleName
          << "_state_t*)module_state;\n"
