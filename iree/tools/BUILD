@@ -146,7 +146,6 @@ cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToGPUPass",
         "@llvm-project//mlir:SCFTransforms",
-        "@llvm-project//mlir:SDBM",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:Shape",
