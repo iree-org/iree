@@ -70,6 +70,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::Shape::IR
+    iree::compiler::InputConversion::Common
     tensorflow::mlir_hlo
   PUBLIC
 )

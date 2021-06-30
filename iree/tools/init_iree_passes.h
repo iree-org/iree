@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
@@ -38,6 +39,7 @@ inline void registerAllIreePasses() {
   IREE::TFLite::registerPasses();
   IREE::TFLite::registerTransformPassPipeline();
 
+  registerCommonInputConversionPasses();
   registerMHLOConversionPasses();
   registerTOSAConversionPasses();
 

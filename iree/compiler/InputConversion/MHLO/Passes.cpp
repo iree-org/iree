@@ -7,7 +7,7 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -31,8 +31,7 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
-  // TODO: Currently recurses into SCF in Linalg generic - with hilarity.
-  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
+  passManager.addNestedPass<FuncOp>(createTopLevelSCFToCFGPass());
 
   // Various shape functions may have been materialized in the `shape.shape_of`
   // style of treating shapes as tensors. We prefer to legalize these to
