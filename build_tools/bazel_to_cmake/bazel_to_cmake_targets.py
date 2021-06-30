@@ -101,11 +101,8 @@ def convert_target(target):
     # Bazel `:api`            -> CMake `::api`
     # Bazel `//iree/base`     -> CMake `iree::base`
     # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
-    target = target.replace("//bindings", "bindings")  # bindings:api
-    # Support for experimental targets is best effort with no guarantees.
-    target = target.replace("//experimental",
-                            "experimental")  # experimental:api
-    target = target.replace("//iree", "iree")  # iree/base:foo
+    if target.startswith("//"):
+      target = target[len("//"):]
     target = target.replace(":", "::")  # iree/base::foo or ::foo
     target = target.replace("/", "::")  # iree::base
     return [target]
