@@ -65,14 +65,8 @@ the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
 
 ### Target configuration
 
-Currently IREE verifies (and tests in CI) two RISC-V targets:
-* RISC-V 64-bit CPU with Linux OS
-* RISC-V 32-bit CPU with "bare-metal" config -- a limited subset of IREE runtime
-libraries that _can_ run on the bare-metal machine mode (with the machine BSP
-linker script), but can also run on larger machines without the system library
-support.
-
-For other RISC-V targets, please refer to
+The following instruction shows how to build for the RISC-V 64-bit Linux machine
+and 32-bit bare-metal machine. For other RISC-V targets, please refer to
 [riscv.toolchain.cmake](https://github.com/google/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
 as a reference of how to set up the cmake configuration.
 
