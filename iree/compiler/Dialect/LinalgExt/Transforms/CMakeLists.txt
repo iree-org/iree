@@ -30,12 +30,14 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRMemRef
     MLIRPass
     MLIRSCF
     MLIRStandard
     MLIRSupport
+    MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
