@@ -27,8 +27,8 @@ if(${IREE_ENABLE_EMITC})
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Conversion::VMToEmitC
-      iree::compiler::Dialect::VM::Target::CallingConventionUtils
-      iree::compiler::Dialect::VM::Target::ConstantEncodingUtils
+      iree::compiler::Dialect::VM::Utils::CallingConvention
+      iree::compiler::Dialect::VM::Utils::ConstantEncoding
     INCLUDES
       "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
     PUBLIC

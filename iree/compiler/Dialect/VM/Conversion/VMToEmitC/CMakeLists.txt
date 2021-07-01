@@ -26,6 +26,7 @@ if(${IREE_ENABLE_EMITC})
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
+      iree::compiler::Dialect::VM::Utils::CallingConvention
     INCLUDES
       "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
       "${PROJECT_BINARY_DIR}/third_party/mlir-emitc/include"
