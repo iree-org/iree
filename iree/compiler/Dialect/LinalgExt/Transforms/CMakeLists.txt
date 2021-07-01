@@ -30,6 +30,7 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.cpp"
   DEPS
+    ::PassesIncGen
     LLVMSupport
     MLIRIR
     MLIRMemRef

@@ -27,6 +27,7 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   DEPS
+    ::PassesIncGen
     MLIRPass
     MLIRTransforms
   PUBLIC
@@ -42,6 +43,7 @@ iree_cc_library(
     "TopLevelSCFToCFG.cpp"
   DEPS
     ::PassHeaders
+    ::PassesIncGen
     MLIRLinalg
     MLIRPass
     MLIRSCF
@@ -51,8 +53,3 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-# TODO: For some reason, these dependencies are not being added automatically.
-add_dependencies(
-  iree_compiler_InputConversion_Common_PassHeaders
-  iree_compiler_InputConversion_Common_PassesIncGen
-)
