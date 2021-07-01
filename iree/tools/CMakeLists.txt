@@ -209,6 +209,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::LinalgExt::IR
+      iree::compiler::Dialect::LinalgExt::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms
       iree::compiler::Dialect::Shape::IR
@@ -217,6 +218,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Transforms
       iree::compiler::Dialect::Vulkan::IR
+      iree::compiler::InputConversion::Common
       iree::compiler::InputConversion::MHLO
       iree::compiler::InputConversion::TOSA
       iree::compiler::Translation::IREEVM

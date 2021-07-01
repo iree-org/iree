@@ -28,39 +28,26 @@ gentbl_cc_library(
 )
 
 cc_library(
-    name = "PassHeaders",
-    hdrs = [
+    name = "Transforms",
+    srcs = [
+        "ConvertToLoops.cpp",
         "PassDetail.h",
+        "Passes.cpp",
+    ],
+    hdrs = [
         "Passes.h",
         "Passes.h.inc",
     ],
     deps = [
         ":PassesIncGen",
+        "//iree/compiler/Dialect/LinalgExt/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Transforms",
-    ],
-)
-
-cc_library(
-    name = "TOSA",
-    srcs = [
-        "Passes.cpp",
-        "VerifyCompilerTOSAInputLegality.cpp",
-    ],
-    hdrs = [
-        "Passes.h",
-    ],
-    deps = [
-        ":PassHeaders",
-        ":PassesIncGen",
-        "//iree/compiler/Dialect/Flow/Transforms",
-        "//iree/compiler/InputConversion/Common",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SCFToStandard",
-        "@llvm-project//mlir:TosaDialect",
-        "@llvm-project//mlir:TosaToLinalg",
-        "@llvm-project//mlir:TosaToSCF",
-        "@llvm-project//mlir:TosaToStandard",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
     ],
 )
