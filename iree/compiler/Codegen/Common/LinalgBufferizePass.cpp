@@ -384,6 +384,11 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
 static LogicalResult analyseLinalgExtOps(linalg_ext::LinalgExtOp op,
                                          BufferizationPlan &plan) {
   if (!op.hasTensorSemantics()) return success();
+  // TODO(hanchung): Revisit if we can tie together op.getOutputOperands() with
+  // the corresponding op.getInputOperands(). For now we have limit LinalgExt
+  // ops, and there is no use case. So we ignore it.
+  // Note: this is what should be done for LinalgOps, except for a what is done
+  // for operand fusion today.
   for (auto input : op.getInputOperands()) {
     plan.insert(input->get());
   }
@@ -1561,16 +1566,9 @@ void LinalgBufferizePass::runOnOperation() {
           }
           return convertPadTensorOp(b, padTensorOp, bvm);
         })
-        .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-          if (failed(getOrAllocateResultBuffers(b, linalgOp.getOperation(), bvm,
-                                                plan, allocationFn))) {
-            return failure();
-          }
-          return convertAnyLinalgOp(b, linalgOp, bvm, plan, allocationFn);
-        })
-        .Case<linalg_ext::LinalgExtOp>([&](linalg_ext::LinalgExtOp op) {
-          if (failed(getOrAllocateResultBuffers(b, op.getOperation(), bvm, plan,
-                                                allocationFn))) {
+        .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp>([&](auto op) {
+          if (failed(
+                  getOrAllocateResultBuffers(b, op, bvm, plan, allocationFn))) {
             return failure();
           }
           return convertAnyLinalgOp(b, op, bvm, plan, allocationFn);
