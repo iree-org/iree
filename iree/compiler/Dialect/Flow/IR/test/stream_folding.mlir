@@ -124,7 +124,7 @@ func @dagImmutability(%arg0: tensor<1xi32>) -> (tensor<i32>, tensor<1xi32>, tens
     %c0 = constant 0 : index
     %c3 = constant 3 : index
     %1 = flow.dispatch @_run_dispatch_1::@_run_dispatch_1[%c1, %c1, %c1]() : () -> tensor<i32>
-    %2 = flow.dispatch @_run_dispatch_2::@_run_dispatch_3[%c9, %c1, %c1](%1) : (tensor<i32>) -> tensor<9xi32>
+    %2 = flow.dispatch @_run_dispatch_2::@_run_dispatch_2[%c9, %c1, %c1](%1) : (tensor<i32>) -> tensor<9xi32>
     %3 = flow.tensor.reshape %1 : tensor<i32> -> tensor<1xi32>
     %4 = flow.tensor.slice %2[%c0 for %c3] : tensor<9xi32> -> tensor<3xi32>
     flow.return %1, %3, %4 : tensor<i32>, tensor<1xi32>, tensor<3xi32>
