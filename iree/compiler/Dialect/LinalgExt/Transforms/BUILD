@@ -30,7 +30,7 @@ gentbl_cc_library(
 cc_library(
     name = "Transforms",
     srcs = [
-        "Loops.cpp",
+        "ConvertToLoops.cpp",
         "PassDetail.h",
         "Passes.cpp",
     ],

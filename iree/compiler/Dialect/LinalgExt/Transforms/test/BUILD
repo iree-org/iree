@@ -17,7 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "loops.mlir",
+            "convert_to_loops.mlir",
         ],
         include = ["*.mlir"],
     ),

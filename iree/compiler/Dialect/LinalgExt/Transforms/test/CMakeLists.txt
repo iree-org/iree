@@ -14,7 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "loops.mlir"
+    "convert_to_loops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

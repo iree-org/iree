@@ -26,7 +26,7 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   SRCS
-    "Loops.cpp"
+    "ConvertToLoops.cpp"
     "PassDetail.h"
     "Passes.cpp"
   DEPS
@@ -38,13 +38,6 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
-)
-
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-# TODO: For some reason, these dependencies are not being added automatically.
-add_dependencies(
-  iree_compiler_Dialect_LinalgExt_Transforms_Transforms
-  iree_compiler_Dialect_LinalgExt_Transforms_PassesIncGen
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
