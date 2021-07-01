@@ -121,6 +121,7 @@ iree_check_single_backend_test_suite(
     "select.mlir"
     "sine.mlir"
     "slice.mlir"
+    "sort.mlir"
     "sqrt.mlir"
     "subtract.mlir"
     "tanh.mlir"
