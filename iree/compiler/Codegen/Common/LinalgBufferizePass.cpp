@@ -596,9 +596,10 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return analyseLinalgOps(linalgOp, plan);
         })
-        .Case<linalg_ext::LinalgExtOp>([&](linalg_ext::LinalgExtOp linalgExtOp) {
-          return analyseLinalgExtOps(linalgExtOp, plan);
-        })
+        .Case<linalg_ext::LinalgExtOp>(
+            [&](linalg_ext::LinalgExtOp linalgExtOp) {
+              return analyseLinalgExtOps(linalgExtOp, plan);
+            })
         .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
             [&](auto reshapeOp) {
               return analyseSingleOperandResultOp(reshapeOp.src(),
