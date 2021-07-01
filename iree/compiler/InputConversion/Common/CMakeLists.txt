@@ -39,16 +39,21 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "ConvertUpstreamToIREE.cpp"
     "Passes.cpp"
     "TopLevelSCFToCFG.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     MLIRLinalg
+    MLIRMemRef
     MLIRPass
     MLIRSCF
     MLIRSCFToStandard
+    MLIRStandard
+    MLIRTensor
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
   PUBLIC
 )
 

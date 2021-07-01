@@ -15,4 +15,10 @@ def TopLevelSCFToCFG :
   let constructor = "mlir::iree_compiler::createTopLevelSCFToCFGPass()";
 }
 
+def ConvertUpstreamToIREE :
+    Pass<"iree-convert-upstream-to-iree", "FuncOp"> {
+  let summary = "Catch-all pass to convert upstream MLIR ops that (for whatever reason) we prefer to be represented differently in IREE";
+  let constructor = "mlir::iree_compiler::createConvertUpstreamToIREE()";
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_TOSA_PASSES

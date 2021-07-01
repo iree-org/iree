@@ -8,15 +8,34 @@
 #define IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-//------------------------------------------------------------------------------
-// Conversions into Linalg
-//------------------------------------------------------------------------------
+//===----------------------------------------------------------------------===//
+// Pipelines
+//===----------------------------------------------------------------------===//
+
+// Performs input legalization for specific combination of input dialects.
+void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
+
+void registerCommonConversionPassPipelines();
+
+//===----------------------------------------------------------------------===//
+// Passes
+//===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<FuncOp>> createTopLevelSCFToCFGPass();
+std::unique_ptr<OperationPass<FuncOp>> createConvertUpstreamToIREE();
+
+//===----------------------------------------------------------------------===//
+// Patterns
+//===----------------------------------------------------------------------===//
+
+void populateConvertUpstreamToIREEPatterns(MLIRContext *context,
+                                           TypeConverter &typeConverter,
+                                           OwningRewritePatternList &patterns);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
