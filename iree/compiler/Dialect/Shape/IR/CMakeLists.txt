@@ -31,6 +31,8 @@ iree_cc_library(
     "ShapeOps.cpp.inc"
     "ShapeTypes.cpp"
   DEPS
+    ::ShapeInterfacesGen
+    ::ShapeOpsGen
     LLVMSupport
     MLIRControlFlowInterfaces
     MLIRIR

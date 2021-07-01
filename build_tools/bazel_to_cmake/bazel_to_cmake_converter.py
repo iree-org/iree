@@ -126,29 +126,7 @@ def _convert_target(target):
   """Returns a list of targets that correspond to the specified Bazel target.
   Note that this must be a list because some targets have a one to many mapping.
   """
-  if target.startswith(":") and target.endswith(("_gen", "Gen")):
-    # Files created by gentbl have to be included as source and header files
-    # and not as a dependency. Adding these targets to the dependencies list,
-    # results in linkage failures if the library including the gentbl dep is
-    # marked as ALWAYSLINK.
-    # This drops deps in the local namespace ending with '_gen' and 'Gen'
-    target = [""]
-  elif not target.startswith(("//bindings", "//experimental", "//iree", ":")):
-    # External target, call helper method for special case handling.
-    target = bazel_to_cmake_targets.convert_external_target(target)
-  else:
-    # Bazel `:api`            -> CMake `::api`
-    # Bazel `//iree/base`     -> CMake `iree::base`
-    # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
-    target = target.replace("//bindings", "bindings")  # bindings:api
-    # Support for experimental targets is best effort with no guarantees.
-    target = target.replace("//experimental",
-                            "experimental")  # experimental:api
-    target = target.replace("//iree", "iree")  # iree/base:foo
-    target = target.replace(":", "::")  # iree/base::foo or ::foo
-    target = target.replace("/", "::")  # iree::base
-    target = [target]
-  return target
+  return bazel_to_cmake_targets.convert_target(target)
 
 
 def _convert_single_target(target):

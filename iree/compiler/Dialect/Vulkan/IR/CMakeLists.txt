@@ -26,6 +26,8 @@ iree_cc_library(
     "VulkanEnums.cpp.inc"
     "VulkanTypes.cpp"
   DEPS
+    ::VulkanAttrsGen
+    ::VulkanEnumsGen
     LLVMSupport
     MLIRIR
     MLIRSPIRV

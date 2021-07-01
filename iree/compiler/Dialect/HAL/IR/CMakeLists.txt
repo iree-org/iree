@@ -39,6 +39,12 @@ iree_cc_library(
     "HALTypes.cpp"
     "LoweringConfig.cpp"
   DEPS
+    ::HALInterfacesGen
+    ::HALOpsGen
+    ::HALStructsGen
+    ::HALTypesGen
+    ::LoweringConfigEnumGen
+    ::LoweringConfigGen
     LLVMSupport
     MLIRIR
     MLIRMemRef

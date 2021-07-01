@@ -28,6 +28,7 @@ iree_cc_library(
     "Passes.h.inc"
     "Rewriters.h"
   DEPS
+    ::PassesIncGen
     MLIRPass
     MLIRTransforms
   PUBLIC
@@ -51,6 +52,7 @@ iree_cc_library(
     "VerifyCompilerMHLOInputLegality.cpp"
   DEPS
     ::PassHeaders
+    ::PassesIncGen
     LLVMSupport
     MLIRAffine
     MLIRComplex
