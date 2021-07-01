@@ -46,6 +46,7 @@ cc_library(
     name = "MHLO",
     srcs = [
         "BroadcastingToLinalgPatterns.cpp",
+        "ConvertAndDistributeMHLOToLinalgExt.cpp",
         "ConvertComplexToReal.cpp",
         "ConvertMHLOToFlow.cpp",
         "ConvertMHLOToFlow.h",
@@ -63,6 +64,7 @@ cc_library(
         ":PassesIncGen",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
+        "//iree/compiler/Dialect/LinalgExt/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/InputConversion/Common",
         "@llvm-project//llvm:Support",
@@ -86,6 +88,7 @@ cc_library(
         "@mlir-hlo//:hlo",
         "@mlir-hlo//:legalize_gather_to_torch_index_select",
         "@mlir-hlo//:legalize_to_linalg",
+        "@mlir-hlo//:map_lmhlo_to_scalar_op",
         "@mlir-hlo//:materialize_broadcasts",
         "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns",
         "@mlir-hlo//:unfuse_batch_norm",
