@@ -88,7 +88,7 @@ struct BubbleSortConversion : public OpRewritePattern<linalg_ext::SortOp> {
 
           b.setInsertionPointToEnd(&region.front());
           b.create<scf::IfOp>(
-              loc, ValueRange{}, cond,
+              loc, TypeRange{}, cond,
               [&](OpBuilder& b, Location loc) {
                 // Swap the pairs if true.
                 SmallVector<Value> indices(ivs.begin(), ivs.end());
