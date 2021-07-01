@@ -798,37 +798,39 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                                  device, rewriter);
   for (auto variantOp :
        executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>()) {
-    for (auto &targetBackend : IREE::HAL::matchTargetBackends(
-             {variantOp.target_backend_filter().str()})) {
-      auto entryPointOps =
-          variantOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
-      if (entryPointOps.empty()) {
-        return dispatchOp.emitOpError() << "need at least one entry point";
-      }
-      auto entryPointOp = *entryPointOps.begin();
-      auto interfaceOp =
-          dyn_cast<IREE::HAL::InterfaceOp>(SymbolTable::lookupSymbolIn(
-              executableOp, entryPointOp.interfaceAttr()));
-      auto executableLayout = schedulingState.lookupExecutableLayout(
-          IREE::HAL::ExecutableLayoutType::get(interfaceOp.getContext()),
-          interfaceOp.push_constantsAttr(),
-          interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
+    auto targetBackend = IREE::HAL::getTargetBackend(variantOp.target());
+    if (!targetBackend) {
+      return executableOp.emitError()
+             << "unregistered target backend '" << variantOp.target() << "'";
+    }
+    auto entryPointOps =
+        variantOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
+    if (entryPointOps.empty()) {
+      return dispatchOp.emitOpError() << "need at least one entry point";
+    }
+    auto entryPointOp = *entryPointOps.begin();
+    auto interfaceOp =
+        dyn_cast<IREE::HAL::InterfaceOp>(SymbolTable::lookupSymbolIn(
+            executableOp, entryPointOp.interfaceAttr()));
+    auto executableLayout = schedulingState.lookupExecutableLayout(
+        IREE::HAL::ExecutableLayoutType::get(interfaceOp.getContext()),
+        interfaceOp.push_constantsAttr(),
+        interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
 
-      auto bindingsAttr = dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings");
-      assert(bindingsAttr);
-      recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
-                              executableLayout, bindingsAttr, schedulingState,
-                              rewriter);
+    auto bindingsAttr = dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings");
+    assert(bindingsAttr);
+    recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
+                            executableLayout, bindingsAttr, schedulingState,
+                            rewriter);
 
-      dispatchState.entryPointOp = entryPointOp;
-      dispatchState.interfaceOp = interfaceOp;
-      dispatchState.executableLayout = executableLayout;
-      if (failed(targetBackend->recordDispatch(
-              dispatchOp.getLoc(), dispatchState, switchRewriter))) {
-        return dispatchOp.emitError()
-               << "unable to record dispatch for target backend "
-               << targetBackend->name();
-      }
+    dispatchState.entryPointOp = entryPointOp;
+    dispatchState.interfaceOp = interfaceOp;
+    dispatchState.executableLayout = executableLayout;
+    if (failed(targetBackend->recordDispatch(dispatchOp.getLoc(), dispatchState,
+                                             switchRewriter))) {
+      return dispatchOp.emitError()
+             << "unable to record dispatch for target backend "
+             << targetBackend->name();
     }
   }
   switchRewriter.build();

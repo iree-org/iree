@@ -23,8 +23,6 @@ namespace HAL {
 using CreateTargetBackendFn = std::function<std::unique_ptr<TargetBackend>()>;
 
 // Registers an executable translation target backend creation function.
-// The name will be matched using `matchTargetBackends` and convention is that
-// the name is namespaced with -'s.
 //
 // For example:
 //   llvm-aot-x86_64
@@ -39,18 +37,17 @@ struct TargetBackendRegistration {
 // Returns a list of registered target backends.
 std::vector<std::string> getRegisteredTargetBackends();
 
-// Matches a set of |patterns| against the registry to return zero or more
-// backends for each pattern.
-//
-// For example,
-// 'foo-*-bar' matches: 'foo-123-bar', 'foo-456-789-bar'
-// 'foo-10?' matches: 'foo-101', 'foo-102'
-std::vector<std::unique_ptr<TargetBackend>> matchTargetBackends(
-    ArrayRef<std::string> patterns);
+// Returns the target backend with the given name.
+std::unique_ptr<TargetBackend> getTargetBackend(StringRef targetName);
+
+// Returns one backend per entry in |targetNames|.
+SmallVector<std::unique_ptr<TargetBackend>> getTargetBackends(
+    ArrayRef<std::string> targetNames);
 
 // Returns a sorted uniqued set of target backends used in the executable.
 SmallVector<std::string> gatherExecutableTargetNames(
     IREE::HAL::ExecutableOp executableOp);
+
 // Returns a sorted uniqued set of target backends used in the entire module.
 SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp);
 

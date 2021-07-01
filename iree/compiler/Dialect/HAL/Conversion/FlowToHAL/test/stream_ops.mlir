@@ -5,7 +5,7 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.variant @vmvx, filter="vmvx" {
+  hal.executable.variant @vmvx, target="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index
@@ -149,7 +149,7 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Discard|Write"
   }
-  hal.executable.variant @vmvx, filter="vmvx" {
+  hal.executable.variant @vmvx, target="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index
@@ -268,7 +268,7 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.variant @vmvx, filter="vmvx" {
+  hal.executable.variant @vmvx, target="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index
@@ -327,7 +327,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @tgt, filter="dylib-llvm-aot" {
+  hal.executable.variant @tgt, target="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
       interface = @io,
       ordinal = 0 : index
@@ -371,7 +371,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @tgt, filter="dylib-llvm-aot" {
+  hal.executable.variant @tgt, target="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
       interface = @io,
       ordinal = 0 : index
@@ -399,7 +399,7 @@ func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: ind
     // CHECK-SAME:   offset(0)
     // CHECK-SAME:   values([%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}]) : i32, i32, i32, i32
 
-    // CHECK: #hal.device.match.id<"dylib*">(
+    // CHECK: #hal.device.match.id<"dylib">(
     // CHECK-SAME: %[[CMD_INNER:.+]] = %cmd : !hal.command_buffer,
     // CHECK-SAME: %[[COUNT_X:.+]] = %c1024 : index,
     // CHECK-SAME: %[[COUNT_Y:.+]] = %c512 : index,
@@ -431,7 +431,7 @@ hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @wo1, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @tgt, filter="dylib-llvm-aot" {
+  hal.executable.variant @tgt, target="dylib-llvm-aot" {
     hal.executable.entry_point @pad_dispatch_0 attributes {
       interface = @interface_io,
       ordinal = 0 : index
@@ -445,7 +445,7 @@ hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @rw1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.variant @tgt, filter="dylib-llvm-aot" {
+  hal.executable.variant @tgt, target="dylib-llvm-aot" {
     hal.executable.entry_point @pad_dispatch_1 attributes {
       interface = @interface_io,
       ordinal = 0 : index

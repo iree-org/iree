@@ -86,8 +86,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
         options_(std::move(options)) {}
 
   // NOTE: we could vary these based on the options such as 'vulkan-v1.1'.
-  std::string name() const override { return "vulkan_spirv"; }
-  std::string filter_pattern() const override { return "vulkan*"; }
+  std::string name() const override { return "vulkan"; }
 
   BufferConstraintsAttr queryBufferConstraints(MLIRContext *context) override {
     // Picked from here to start:
@@ -165,9 +164,12 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
 void registerVulkanSPIRVTargetBackends(
     std::function<VulkanSPIRVTargetOptions()> queryOptions) {
   getVulkanSPIRVTargetOptionsFromFlags();
-  static TargetBackendRegistration registration("vulkan-spirv", [=]() {
+  auto backendFactory = [=]() {
     return std::make_unique<VulkanSPIRVTargetBackend>(queryOptions());
-  });
+  };
+  static TargetBackendRegistration registration0("vulkan", backendFactory);
+  static TargetBackendRegistration registration1("vulkan-spirv",
+                                                 backendFactory);
 }
 
 }  // namespace HAL

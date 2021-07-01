@@ -39,7 +39,6 @@ class VMVXTargetBackend final : public TargetBackend {
   VMVXTargetBackend(VMVXTargetOptions options) : options_(std::move(options)) {}
 
   std::string name() const override { return "vmvx"; }
-  std::string filter_pattern() const override { return "vmvx"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<VM::VMDialect, VMVX::VMVXDialect>();
@@ -74,7 +73,7 @@ class VMVXTargetBackend final : public TargetBackend {
     // Add our VMVX hal.executable.variant with an empty module.
     builder.setInsertionPointToStart(linkedExecutableOp.getBody());
     auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
-        moduleOp.getLoc(), name(), filter_pattern());
+        moduleOp.getLoc(), name(), name());
     builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
     auto linkedModuleOp = builder.create<ModuleOp>(moduleOp.getLoc());
 

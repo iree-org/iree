@@ -37,35 +37,6 @@ TargetOptions getTargetOptionsFromFlags() {
 }
 
 // static
-bool TargetBackend::matchPattern(StringRef value, StringRef pattern) {
-  size_t nextCharIndex = pattern.find_first_of("*?");
-  if (nextCharIndex == std::string::npos) {
-    return value == pattern;
-  } else if (nextCharIndex > 0) {
-    if (value.substr(0, nextCharIndex) != pattern.substr(0, nextCharIndex)) {
-      return false;
-    }
-    value = value.substr(nextCharIndex);
-    pattern = pattern.substr(nextCharIndex);
-  }
-  if (value.empty() && pattern.empty()) {
-    return true;
-  }
-  char patternChar = pattern[0];
-  if (patternChar == '*' && pattern.size() > 1 && value.empty()) {
-    return false;
-  } else if (patternChar == '*' && pattern.size() == 1) {
-    return true;
-  } else if (patternChar == '?' || value[0] == patternChar) {
-    return matchPattern(value.substr(1), pattern.substr(1));
-  } else if (patternChar == '*') {
-    return matchPattern(value, pattern.substr(1)) ||
-           matchPattern(value.substr(1), pattern);
-  }
-  return false;
-}
-
-// static
 BufferConstraintsAttr TargetBackend::makeDefaultBufferConstraints(
     MLIRContext *context) {
   // Picked to represent what we kind of want on CPU today.
@@ -113,7 +84,7 @@ void TargetBackend::declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
                                       IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());
   auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
-      sourceOp.getLoc(), name(), filter_pattern());
+      sourceOp.getLoc(), name(), name());
   OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
   containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 }
@@ -229,9 +200,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
         sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       // Only process targets matching our pattern.
-      if (!matchPattern(variantOp.target_backend_filter(), filter_pattern())) {
-        continue;
-      }
+      if (variantOp.target() != name()) continue;
 
       // Clone entry point ops and queue remapping ordinals and updating
       // symbol refs.
@@ -403,7 +372,7 @@ LogicalResult TargetBackend::recordDispatch(
     regionArgs.push_back(dim);
   }
   auto *region = switchRewriter.addConditionRegion(
-      IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
+      IREE::HAL::DeviceMatchIDAttr::get(deviceID(), loc.getContext()),
       regionArgs);
   auto &entryBlock = region->front();
   auto commandBuffer = entryBlock.getArgument(0);

@@ -1354,28 +1354,24 @@ static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
 //===----------------------------------------------------------------------===//
 
 void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
-                                StringRef symName,
-                                StringRef targetBackendFilter) {
+                                StringRef symName, StringRef target) {
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
-  state.addAttribute("target_backend_filter",
-                     builder.getStringAttr(targetBackendFilter));
+  state.addAttribute("target", builder.getStringAttr(target));
 }
 
 static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
                                             OperationState *result) {
   auto *body = result->addRegion();
   StringAttr nameAttr;
-  StringAttr targetBackendFilterAttr;
+  StringAttr targetAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("filter")) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("target")) ||
       failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(targetBackendFilterAttr,
-                                   "target_backend_filter",
-                                   result->attributes)) ||
+      failed(parser.parseAttribute(targetAttr, "target", result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -1394,11 +1390,10 @@ static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
 static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
-  p << ", filter=\"" << op.target_backend_filter() << "\"";
+  p << ", target=\"" << op.target() << "\"";
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(),
-                       "target_backend_filter"});
+      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(), "target"});
   if (!op.body().empty()) {
     p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/false);

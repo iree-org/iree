@@ -102,16 +102,6 @@ TargetOptions getTargetOptionsFromFlags();
 //          data blob...
 class TargetBackend {
  public:
-  // Returns true if the given |value| matches |pattern| (normal * and ? rules).
-  // This accepts wildcards in the form of '*' and '?' for any delimited value.
-  // '*' will match zero or more of any character and '?' will match exactly one
-  // of any character.
-  //
-  // For example:
-  // 'foo-*-bar' matches: 'foo-123-bar', 'foo-456-789-bar'
-  // 'foo-10?' matches: 'foo-101', 'foo-102'
-  static bool matchPattern(StringRef value, StringRef pattern);
-
   // Returns a generic host-like set of constraints.
   static BufferConstraintsAttr makeDefaultBufferConstraints(
       MLIRContext *context);
@@ -120,9 +110,10 @@ class TargetBackend {
 
   // Returns a name for the backend used to differentiate between other targets.
   virtual std::string name() const = 0;
-  // Returns a filter pattern for the backend as expected to be matched with a
-  // call to matchPattern. For example, 'vulkan-v1.1' or 'vmvx*'.
-  virtual std::string filter_pattern() const = 0;
+
+  // Returns the name of the runtime device for this backend.
+  // TODO(benvanik): remove this once we can properly specify targets.
+  virtual std::string deviceID() const { return name(); }
 
   // Queries for compile-time known buffer constraints.
   // These should conservatively represent the min/max values even if the
@@ -229,8 +220,7 @@ class TargetBackend {
   // Backend transformation passes must check that the source op they receive
   // is for them using the `target_backend` attribute. Backends may have
   // multiple source ops in the same executable to transform such as when
-  // multiple target configurations are requested. Use the `matchPattern`
-  // utility when comparing the target backend name.
+  // multiple target configurations are requested.
   //
   // For example, as input:
   //   hal.executable @some_executable {
@@ -238,7 +228,7 @@ class TargetBackend {
   //       hal.interface.binding @arg0, set=0, binding=0, ...
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
-  //     hal.executable.variant @target, filter="target-backend" {
+  //     hal.executable.variant @target, target="target-backend" {
   //       hal.executable.entry_point @main attributes {
   //         interface = @main_io,
   //         ordinal = 0 : index
@@ -250,7 +240,7 @@ class TargetBackend {
   // As output:
   //   hal.executable @some_executable {
   //     hal.interface @main_io ...
-  //     hal.executable.variant @target, filter="target-backend" {
+  //     hal.executable.variant @target, target="target-backend" {
   //       hal.executable.entry_point @main ...
   //       module { spv.module { ... } }
   //     }
@@ -270,13 +260,13 @@ class TargetBackend {
   //
   // The input |moduleOp| may contain executables containing multiple targets,
   // so implementations should check target backend filters against their own
-  // `filter_pattern()` prior to modifying them.
+  // `name()` prior to modifying them.
   //
   // Sample output structure:
   //   hal.executable @linked_executable {
   //     hal.interface @io_0 { ... }
   //     hal.interface @io_1 { ... }
-  //     hal.executable.variant @target, filter="target-backend" {
+  //     hal.executable.variant @target, target="target-backend" {
   //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
   //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
   //       hal.executable.entry_point @main_dispatch_2 attributes { ... }
@@ -290,7 +280,7 @@ class TargetBackend {
   //   // Other targets within executables are not modified
   //   hal.executable @main_dispatch_0 {
   //     hal.interface @io { ... }
-  //     hal.executable.variant @other, filter="other" {
+  //     hal.executable.variant @other, target="other" {
   //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
   //       module { ... }
   //     }

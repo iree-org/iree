@@ -7,7 +7,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
@@ -25,7 +25,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
@@ -44,7 +44,7 @@ module {
       hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
@@ -83,7 +83,7 @@ module {
 // CHECK-NEXT:      hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer", access="Read"
 // CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
-// CHECK-NEXT:    hal.executable.variant @vmvx, filter="vmvx" {
+// CHECK-NEXT:    hal.executable.variant @vmvx, target="vmvx" {
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @io_0, ordinal = 1 : index}
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_2 attributes {interface = @io_1, ordinal = 2 : index}
@@ -122,7 +122,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
@@ -133,7 +133,7 @@ module {
         }
       }
     }
-    hal.executable.variant @othertarget, filter="othertarget" {
+    hal.executable.variant @othertarget, target="othertarget" {
       module {
       }
     }
@@ -143,7 +143,7 @@ module {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
@@ -154,7 +154,7 @@ module {
         }
       }
     }
-    hal.executable.variant @othertarget, filter="othertarget" {
+    hal.executable.variant @othertarget, target="othertarget" {
       module {
       }
     }
@@ -190,7 +190,7 @@ module {
 // CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 // CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
-// CHECK-NEXT:    hal.executable.variant @vmvx, filter="vmvx" {
+// CHECK-NEXT:    hal.executable.variant @vmvx, target="vmvx" {
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @io_1, ordinal = 1 : index}
 // CHECK-NEXT:      module {
@@ -211,10 +211,10 @@ module {
 // @dispatch_0/1 should remain, with just @othertarget
 // CHECK:  hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
 // CHECK:    hal.interface @io
-// CHECK:    hal.executable.variant @othertarget, filter="othertarget"
+// CHECK:    hal.executable.variant @othertarget, target="othertarget"
 // CHECK:  hal.executable @dispatch_1 attributes {sym_visibility = "private"} {
 // CHECK:    hal.interface @io
-// CHECK:    hal.executable.variant @othertarget, filter="othertarget"
+// CHECK:    hal.executable.variant @othertarget, target="othertarget"
 //
 // CHECK:       func @main() {
 // CHECK:         hal.device.switch<%device : !hal.device>
@@ -242,7 +242,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {}
@@ -255,7 +255,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {}
@@ -268,7 +268,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {}
@@ -298,7 +298,7 @@ module {
 module {
   hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface @io {}
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
@@ -321,7 +321,7 @@ module {
   }
   hal.executable @dispatch_1 attributes {sym_visibility = "private"} {
     hal.interface @io {}
-    hal.executable.variant @vmvx, filter="vmvx" {
+    hal.executable.variant @vmvx, target="vmvx" {
       hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
       module {
         vm.module @module {
@@ -353,7 +353,7 @@ module {
 // CHECK-NOT: hal.executable @dispatch_0
 // CHECK-NOT: hal.executable @dispatch_1
 // CHECK:       hal.executable @vmvx_linked attributes {sym_visibility = "private"} {
-// CHECK:       hal.executable.variant @vmvx, filter="vmvx" {
+// CHECK:       hal.executable.variant @vmvx, target="vmvx" {
 // CHECK:           module {
 // CHECK-NEXT:        vm.module @linked_module {
 // CHECK-NEXT:          vm.rodata public @rodata_a dense<0> : tensor<1xi32>

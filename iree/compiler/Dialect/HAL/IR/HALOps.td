@@ -2175,7 +2175,7 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
 
   let arguments = (ins
     StrAttr:$sym_name,
-    StrAttr:$target_backend_filter
+    StrAttr:$target
     // TODO(benvanik): add compatibility and versioning attributes.
     // TODO(scotttodd): add linking / preserve_ordinals attribute(s) for targets
     //                  with special linking requirements
@@ -2185,7 +2185,7 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "StringRef":$name, "StringRef":$targetBackendFilter)>,
+    OpBuilder<(ins "StringRef":$name, "StringRef":$target)>,
   ];
 
   let extraClassDeclaration = [{

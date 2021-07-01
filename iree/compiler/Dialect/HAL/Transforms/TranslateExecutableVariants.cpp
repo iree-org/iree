@@ -29,7 +29,7 @@ class TranslateExecutableVariantsPass
  public:
   explicit TranslateExecutableVariantsPass() {
     for (auto &targetBackend :
-         matchTargetBackends(getRegisteredTargetBackends())) {
+         getTargetBackends(getRegisteredTargetBackends())) {
       auto pm = std::make_unique<OpPassManager>(
           IREE::HAL::ExecutableVariantOp::getOperationName(),
           OpPassManager::Nesting::Implicit);
@@ -59,23 +59,17 @@ class TranslateExecutableVariantsPass
   void runOnOperation() override {
     auto variantOp = getOperation();
     for (auto &pipeline : pipelines_) {
-      if (TargetBackend::matchPattern(
-              pipeline.targetBackend->filter_pattern(),
-              variantOp.target_backend_filter().str())) {
-        if (failed(runPipeline(*pipeline.passManager, variantOp))) {
-          variantOp.emitError()
-              << "failed to run translation of source "
-                 "executable to target executable for backend "
-              << variantOp.target_backend_filter();
-          return signalPassFailure();
-        }
-        return;  // Converted successfully.
+      if (variantOp.target() != pipeline.targetBackend->name()) {
+        continue;
       }
+      if (failed(runPipeline(*pipeline.passManager, variantOp))) {
+        variantOp.emitError() << "failed to run translation of source "
+                                 "executable to target executable for backend "
+                              << variantOp.target();
+        return signalPassFailure();
+      }
+      break;  // Converted successfully; break out of loop.
     }
-    // Fallthrough for when no target backend can convert the op.
-    variantOp.emitError() << "no registered target backend matched "
-                          << variantOp.target_backend_filter();
-    return signalPassFailure();
   }
 
  private:

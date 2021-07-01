@@ -33,7 +33,8 @@ class LinkTargetExecutablesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    for (auto &targetBackend : matchTargetBackends({target})) {
+    auto targetBackend = getTargetBackend(target);
+    if (targetBackend) {
       targetBackend->getDependentDialects(registry);
     }
   }
@@ -48,13 +49,17 @@ class LinkTargetExecutablesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    for (auto &targetBackend : matchTargetBackends({target})) {
-      // Ask the target backend to link all executables it wants.
-      if (failed(targetBackend->linkExecutables(moduleOp))) {
-        moduleOp.emitError() << "failed to link executables for target backend "
-                             << targetBackend->name();
-        return signalPassFailure();
-      }
+    auto targetBackend = getTargetBackend(target);
+    if (!targetBackend) {
+      moduleOp.emitError() << "unregistered target backend '" << target << "'";
+      return signalPassFailure();
+    }
+
+    // Ask the target backend to link all executables it wants.
+    if (failed(targetBackend->linkExecutables(moduleOp))) {
+      moduleOp.emitError() << "failed to link executables for target backend "
+                           << targetBackend->name();
+      return signalPassFailure();
     }
 
     // Backends may move target ops from executables into linked executables.
@@ -100,9 +105,9 @@ class LinkExecutablesPass
     auto moduleOp = getOperation();
     OpPassManager passManager(moduleOp.getOperationName());
     for (auto &targetBackend :
-         matchTargetBackends(gatherExecutableTargetNames(moduleOp))) {
+         getTargetBackends(gatherExecutableTargetNames(moduleOp))) {
       passManager.addPass(
-          createLinkTargetExecutablesPass(targetBackend->filter_pattern()));
+          createLinkTargetExecutablesPass(targetBackend->name()));
     }
     if (failed(runPipeline(passManager, moduleOp))) {
       moduleOp.emitError() << "failed to link executables";

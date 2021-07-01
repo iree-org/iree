@@ -48,8 +48,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
         options_(std::move(options)) {}
 
   // NOTE: we could vary this based on the options such as 'metal-v2'.
-  std::string name() const override { return "metal_spirv"; }
-  std::string filter_pattern() const override { return "metal*"; }
+  std::string name() const override { return "metal"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
@@ -140,9 +139,11 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
 
 void registerMetalSPIRVTargetBackends(
     std::function<MetalSPIRVTargetOptions()> queryOptions) {
-  static TargetBackendRegistration registration("metal-spirv", [=]() {
+  auto backendFactory = [=]() {
     return std::make_unique<MetalSPIRVTargetBackend>(queryOptions());
-  });
+  };
+  static TargetBackendRegistration registration0("metal", backendFactory);
+  static TargetBackendRegistration registration1("metal-spirv", backendFactory);
 }
 
 }  // namespace HAL

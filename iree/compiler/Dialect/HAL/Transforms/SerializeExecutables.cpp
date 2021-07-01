@@ -35,7 +35,8 @@ class SerializeTargetExecutablesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    for (auto &targetBackend : matchTargetBackends({target})) {
+    auto targetBackend = getTargetBackend(target);
+    if (targetBackend) {
       targetBackend->getDependentDialects(registry);
     }
   }
@@ -50,27 +51,29 @@ class SerializeTargetExecutablesPass
 
   void runOnOperation() override {
     auto executableOp = getOperation();
+    auto targetBackend = getTargetBackend(target);
+    if (!targetBackend) {
+      executableOp.emitError()
+          << "unregistered target backend '" << target << "'";
+      return signalPassFailure();
+    }
+
     auto variantOps = llvm::to_vector<4>(
         executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
+      if (variantOp.target() != targetBackend->name()) continue;
       OpBuilder executableBuilder(variantOp);
-      for (auto &targetBackend : matchTargetBackends({target})) {
-        if (TargetBackend::matchPattern(target,
-                                        variantOp.target_backend_filter())) {
-          // Ask the target backend to serialize the executable. Note that it
-          // may create one or more hal.executable.binary ops in the case of
-          // multi-architecture binaries.
-          if (failed(targetBackend->serializeExecutable(variantOp,
-                                                        executableBuilder))) {
-            variantOp.emitError()
-                << "failed to serialize executable for target backend "
-                << targetBackend->name();
-            return signalPassFailure();
-          }
-          variantOp.erase();
-          break;
-        }
+      // Ask the target backend to serialize the executable. Note that it
+      // may create one or more hal.executable.binary ops in the case of
+      // multi-architecture binaries.
+      if (failed(targetBackend->serializeExecutable(variantOp,
+                                                    executableBuilder))) {
+        variantOp.emitError()
+            << "failed to serialize executable for target backend "
+            << targetBackend->name();
+        return signalPassFailure();
       }
+      variantOp.erase();
     }
   }
 

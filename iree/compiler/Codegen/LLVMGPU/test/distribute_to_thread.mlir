@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file  -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmgpu-tile-and-distribute))" %s | IreeFileCheck %s
 
 hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
-hal.executable.variant @cuda, filter="cuda" {
+hal.executable.variant @cuda, target="cuda" {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   module  {
     func @add_dispatch_0() attributes {llvmgpu_workgroup_size = dense<[32, 1, 1]> : vector<3xi64>} {
@@ -41,7 +41,7 @@ hal.executable.variant @cuda, filter="cuda" {
 // -----
 
 hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
-hal.executable.variant @cuda, filter="cuda" {
+hal.executable.variant @cuda, target="cuda" {
   hal.executable.entry_point @dot_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index}
   module  {
     func @dot_dispatch_0() attributes {llvmgpu_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
@@ -84,7 +84,7 @@ hal.executable.variant @cuda, filter="cuda" {
 }
 
 //   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.variant @cuda, filter="cuda" {
+//         CHECK:   hal.executable.variant @cuda, target="cuda" {
 //         CHECK:  memref.global "private" @{{.*}} : memref<4x256xf32, 3>
 //         CHECK:  memref.global "private" @{{.*}} : memref<2x4xf32, 3>
 //     CHECK-DAG:  %[[C1024:.+]] = constant 1024 : index
@@ -123,7 +123,7 @@ hal.executable.variant @cuda, filter="cuda" {
 
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
-hal.executable.variant @cuda, filter="cuda" {
+hal.executable.variant @cuda, target="cuda" {
     hal.executable.entry_point @predict_dispatch_153 attributes {interface = @io, ordinal = 0 : index}
     module  {
       func @predict_dispatch_153() attributes {llvmgpu_workgroup_size = dense<[32, 1, 1]> : vector<3xi64>} {

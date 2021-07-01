@@ -138,7 +138,6 @@ class CUDATargetBackend final : public TargetBackend {
   CUDATargetBackend(CUDATargetOptions options) : options_(std::move(options)) {}
 
   std::string name() const override { return "cuda"; }
-  std::string filter_pattern() const override { return "cuda"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);

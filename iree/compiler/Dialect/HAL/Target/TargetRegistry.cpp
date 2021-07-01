@@ -44,17 +44,24 @@ std::vector<std::string> getRegisteredTargetBackends() {
   return result;
 }
 
-std::vector<std::unique_ptr<TargetBackend>> matchTargetBackends(
-    ArrayRef<std::string> patterns) {
-  std::vector<std::unique_ptr<TargetBackend>> matches;
-  for (auto pattern : patterns) {
-    for (auto &entry : getTargetRegistry()) {
-      if (TargetBackend::matchPattern(entry.getKey(), pattern)) {
-        matches.push_back(entry.getValue()());
-      }
+std::unique_ptr<TargetBackend> getTargetBackend(StringRef targetName) {
+  for (auto &entry : getTargetRegistry()) {
+    if (entry.getKey() == targetName) {
+      return entry.getValue()();
     }
   }
+  return {};
+}
 
+SmallVector<std::unique_ptr<TargetBackend>> getTargetBackends(
+    ArrayRef<std::string> targetNames) {
+  SmallVector<std::unique_ptr<TargetBackend>> matches;
+  for (auto targetName : targetNames) {
+    auto targetBackend = getTargetBackend(targetName);
+    if (targetBackend) {
+      matches.push_back(std::move(targetBackend));
+    }
+  }
   // To ensure deterministic builds we sort matches by name.
   std::sort(matches.begin(), matches.end(),
             [](const auto &a, const auto &b) { return a->name() < b->name(); });
@@ -66,7 +73,7 @@ SmallVector<std::string> gatherExecutableTargetNames(
   SmallVector<std::string> targetNames;
   llvm::SmallDenseSet<StringRef> targets;
   executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
-    auto targetName = variantOp.target_backend_filter();
+    auto targetName = variantOp.target();
     if (targets.insert(targetName).second) {
       targetNames.push_back(targetName.str());
     }
@@ -81,7 +88,7 @@ SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp) {
   llvm::SmallDenseSet<StringRef> targets;
   moduleOp.walk([&](IREE::HAL::ExecutableOp executableOp) {
     executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
-      auto targetName = variantOp.target_backend_filter();
+      auto targetName = variantOp.target();
       if (targets.insert(targetName).second) {
         targetNames.push_back(targetName.str());
       }

@@ -27,7 +27,7 @@ void SPIRVTargetBackend::declareVariantOpsForEnv(
     spirv::TargetEnvAttr spvTargetEnv) {
   auto targetBuilder = OpBuilder::atBlockTerminator(&executableOp.getBlock());
   auto variantOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
-      sourceOp.getLoc(), name(), filter_pattern());
+      sourceOp.getLoc(), name(), name());
 
   auto containerBuilder = OpBuilder::atBlockTerminator(&variantOp.getBlock());
   auto innerModuleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());

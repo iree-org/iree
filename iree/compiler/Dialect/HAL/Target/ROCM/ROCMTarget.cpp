@@ -64,7 +64,6 @@ class ROCMTargetBackend final : public TargetBackend {
   ROCMTargetBackend(ROCMTargetOptions options) : options_(std::move(options)) {}
 
   std::string name() const override { return "rocm"; }
-  std::string filter_pattern() const override { return "rocm"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);

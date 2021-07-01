@@ -207,31 +207,29 @@ class MaterializeResourceCachesPass
     DeviceSwitchBuilder switchBuilder(loc,
                                       /*resultTypes=*/TypeRange{executableType},
                                       deviceValue, blockBuilder);
-    auto targetBackends = matchTargetBackends(targetOptions_.targets);
+    auto targetBackends = getTargetBackends(targetOptions_.targets);
     for (auto &targetBackend : targetBackends) {
       // Skip executables with no matching target ops.
-      SmallVector<IREE::HAL::ExecutableVariantOp> executableTargetOps;
-      for (auto executableTargetOp :
+      SmallVector<IREE::HAL::ExecutableVariantOp> executableVariantOps;
+      for (auto executableVariantOp :
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-        if (TargetBackend::matchPattern(
-                executableTargetOp.target_backend_filter(),
-                targetBackend->filter_pattern())) {
-          executableTargetOps.push_back(executableTargetOp);
+        if (executableVariantOp.target() == targetBackend->name()) {
+          executableVariantOps.push_back(executableVariantOp);
         }
       }
-      if (executableTargetOps.empty()) continue;
+      if (executableVariantOps.empty()) continue;
 
       // TODO(benvanik): support multiple target executables by adding a device
       // switch on supported format. This needs a new device match attr type.
-      if (executableTargetOps.size() > 1) {
+      if (executableVariantOps.size() > 1) {
         executableOp.emitError()
             << "multiple matching executable targets are not yet supported";
         return nullptr;
       }
-      auto executableTargetOp = executableTargetOps.front();
+      auto executableVariantOp = executableVariantOps.front();
 
       auto *region = switchBuilder.addConditionRegion(
-          IREE::HAL::DeviceMatchIDAttr::get(targetBackend->filter_pattern(),
+          IREE::HAL::DeviceMatchIDAttr::get(targetBackend->deviceID(),
                                             blockBuilder.getContext()),
           {deviceValue});
       auto &entryBlock = region->front();
@@ -242,7 +240,7 @@ class MaterializeResourceCachesPass
       // the executable.
       SmallVector<Value, 8> executableLayoutValues;
       for (auto entryPointOp :
-           executableTargetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+           executableVariantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
         auto interfaceOp =
             SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
                 executableOp, entryPointOp.interface());
@@ -261,7 +259,7 @@ class MaterializeResourceCachesPass
           SymbolRefAttr::get(
               loc.getContext(), executableOp.sym_name(),
               {SymbolRefAttr::get(loc.getContext(),
-                                  executableTargetOp.sym_name())}),
+                                  executableVariantOp.sym_name())}),
           executableLayoutValues);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);

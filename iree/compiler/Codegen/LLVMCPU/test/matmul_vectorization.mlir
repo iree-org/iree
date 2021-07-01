@@ -8,7 +8,7 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm_aot, filter="dylib*" {
+  hal.executable.variant @llvm, target="llvm" {
     hal.executable.entry_point @matmul_128x128x128 attributes {
       interface = @io,
       ordinal = 0 : index
@@ -121,7 +121,7 @@ hal.executable @matmul_i8_i8_i32 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm_aot, filter="dylib*" {
+  hal.executable.variant @llvm, target="llvm" {
     hal.executable.entry_point @matmul_i8_i8_i32_128x128x128 attributes {
       interface = @io,
       ordinal = 0 : index

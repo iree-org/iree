@@ -36,7 +36,7 @@ function compile_and_extract_library() {
       -iree-mlir-to-vm-bytecode-module
       -iree-input-type=mhlo
       ${ROOT_DIR}/iree/samples/simple_embedding/simple_embedding_test.mlir
-      -o=simple_embedding_test_dylib_llvm_aot_scratch.vmfb
+      -o=simple_embedding_test_dylib_llvm_scratch.vmfb
 
       -iree-hal-target-backends=dylib-llvm-aot
       -iree-llvm-link-embedded=true
@@ -48,14 +48,14 @@ function compile_and_extract_library() {
 
   # Unzip ELF files from the vmfb.
   # Note that `unzip` can't handle these files so we have to use 7zip.
-  7z e -aoa -bb0 simple_embedding_test_dylib_llvm_aot_scratch.vmfb -y >/dev/null || true
+  7z e -aoa -bb0 simple_embedding_test_dylib_llvm_scratch.vmfb -y >/dev/null || true
 
   # Move the exacted file to the location in-tree.
   mv \
-    _simple_mul_dispatch_0_llvm_aot_binary_ex_elf.so \
+    _simple_mul_dispatch_0_llvm_binary_ex_elf.so \
     "${ROOT_DIR}/iree/hal/local/elf/testdata/${so_name}"
 
-  rm simple_embedding_test_dylib_llvm_aot_scratch.vmfb
+  rm simple_embedding_test_dylib_llvm_scratch.vmfb
 }
 
 ARM_32=(

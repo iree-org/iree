@@ -44,7 +44,7 @@ static LogicalResult declareVariantOps(TargetOptions targetOptions,
   // The user has specified what targets they want as a set of patterns. This
   // matches against those patterns so vulkan-* may match vulkan-v1.1 and
   // vulkan-v1.2.
-  auto targetBackends = matchTargetBackends(targetOptions.targets);
+  auto targetBackends = getTargetBackends(targetOptions.targets);
   if (targetBackends.empty()) {
     auto diagnostic = sourceOp.emitError();
     diagnostic
@@ -1117,7 +1117,7 @@ class MaterializeInterfacesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackends = matchTargetBackends(targetOptions_.targets);
+    auto targetBackends = getTargetBackends(targetOptions_.targets);
     for (auto &targetBackend : targetBackends) {
       targetBackend->getDependentDialects(registry);
     }

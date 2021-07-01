@@ -6,7 +6,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan, target="vulkan" {
     hal.executable.entry_point @conv_static_shape_f32 attributes {
       interface = @io,
       ordinal = 0 : index
@@ -95,7 +95,7 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan_spirv, filter="vulkan*" {
+  hal.executable.variant @vulkan, target="vulkan" {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
       interface = @io,
       ordinal = 0 : index

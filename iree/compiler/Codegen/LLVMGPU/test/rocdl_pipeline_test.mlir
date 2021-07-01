@@ -8,7 +8,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @rocm, filter="rocm" {
+  hal.executable.variant @rocm, target="rocm" {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<writeonly:16xf32>) -> ()}
   module  {
     func @add_dispatch_0() {
@@ -37,7 +37,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 }
 
 // CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-//       CHECK:   hal.executable.variant @rocm, filter="rocm" {
+//       CHECK:   hal.executable.variant @rocm, target="rocm" {
 //       CHECK:   llvm.fadd
 
 // -----
@@ -51,7 +51,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @rocm, filter="rocm" {
+  hal.executable.variant @rocm, target="rocm" {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<writeonly:1024x1024xf32>) -> ()}
     module  {
       func @dot_dispatch_0() {
@@ -100,7 +100,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 }
 
 //   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.variant @rocm, filter="rocm" {
+//         CHECK:   hal.executable.variant @rocm, target="rocm" {
 // CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //         CHECK:   llvm.br
 // CHECK-COUNT-6:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
