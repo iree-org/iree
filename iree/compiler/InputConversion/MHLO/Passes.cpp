@@ -52,10 +52,6 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
 
   passManager.addNestedPass<FuncOp>(createMHLOToMHLOPreprocessingPass());
 
-  // Perform initial cleanup.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
-
   // Legalize input types. We do this after flattening tuples so that we don't
   // have to deal with them.
   // TODO(nicolasvasilache): createLegalizeInputTypesPass is old and does not
@@ -63,7 +59,14 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // when using ops with regions such as scf.for and linalg.generic.
   passManager.addPass(mlir::iree_compiler::createLegalizeInputTypesPass());
 
+  // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
+  // this context, some operations could be folded away.
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+
   // Convert to Linalg. After this point, MHLO will be eliminated.
+  passManager.addNestedPass<FuncOp>(
+      mlir::iree_compiler::createConvertAndDistributeMHLOToLinalgExtPass());
   passManager.addNestedPass<FuncOp>(
       mlir::iree_compiler::createMHLOToLinalgOnTensorsPass());
 
