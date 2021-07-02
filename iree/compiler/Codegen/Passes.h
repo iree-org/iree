@@ -118,6 +118,10 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUPadWorkgroupTilesPass();
 /// order.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUPlanConvLoopOrderPass();
 
+/// Synchronizes LLVM linkage with MLIR symbol visibility.
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMCPUSynchronizeSymbolVisibilityPass();
+
 /// Multi-level tiling, padding and vectorization of  linalg ops on tensors.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTilePadAndVectorizePass();
 

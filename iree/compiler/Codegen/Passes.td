@@ -111,6 +111,12 @@ def LLVMCPUPlanConvLoopOrder :
   let constructor = "mlir::iree_compiler::createLLVMCPUPlanConvLoopOrderPass()";
 }
 
+def LLVMCPUSynchronizeSymbolVisibility :
+    Pass<"iree-llvmcpu-synchronize-symbol-visibility", "ModuleOp"> {
+  let summary = "Synchronizes LLVM linkage with MLIR symbol visibility";
+  let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
+}
+
 def LLVMCPUTilePadAndVectorize :
     Pass<"iree-llvmcpu-tile-pad-and-vectorize", "FuncOp"> {
   let summary = "Tile and pad workgroups tiles";

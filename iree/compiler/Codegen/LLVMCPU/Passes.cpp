@@ -95,6 +95,10 @@ static void addLowerToLLVMPasses(
   passManager.addPass(createConvertToLLVMPass(
       options.targetTriple, options.targetDataLayout, options.unfuseFMAOps));
 
+  // We rely on MLIR symbol visibility being correct after this point and need
+  // to mirror the LLVM linkage that was assigned during conversion.
+  passManager.addPass(createLLVMCPUSynchronizeSymbolVisibilityPass());
+
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 }

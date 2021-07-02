@@ -104,35 +104,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     if (sourceExecutableOps.size() <= 1) return success();
 
-    // Ensure any LLVM symbol names we define are unique prior to linking.
-    //
-    // The link executables pass requires that there be no name conflicts
-    // between symbols with public MLIR Symbol visibility. LLVM dialect symbols
-    // use a different visibility mechanism, defaulting to public for MLIR
-    // Symbol visibility.
-    unsigned moduleNumber = 0;
-    for (auto sourceExecutableOp : enumerate(sourceExecutableOps)) {
-      auto variantOps = llvm::to_vector<4>(
-          sourceExecutableOp.value().getOps<IREE::HAL::ExecutableVariantOp>());
-      for (auto variantOp : variantOps) {
-        if (variantOp.target() != name()) continue;
-
-        auto sourceModuleOp = variantOp.getInnerModule();
-        for (auto globalOp : sourceModuleOp.getOps<LLVM::GlobalOp>()) {
-          if (globalOp.linkage() != LLVM::Linkage::Private) {
-            continue;
-          }
-          auto disambiguateName =
-              llvm::formatv("{0}_{1}", globalOp.sym_name(), moduleNumber).str();
-          SymbolTableCollection symbolTable;
-          SymbolUserMap symbolUsers(symbolTable, sourceModuleOp);
-          symbolUsers.replaceAllUsesWith(globalOp, disambiguateName);
-          SymbolTable::setSymbolName(globalOp, disambiguateName);
-        }
-        moduleNumber++;
-      }
-    }
-
     // Guess a module name, if needed, to make the output files readable.
     auto moduleName = guessModuleName(moduleOp);
 
