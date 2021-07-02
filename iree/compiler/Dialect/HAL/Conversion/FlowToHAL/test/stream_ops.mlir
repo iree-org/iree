@@ -187,6 +187,23 @@ func @tensorReshapeToDispatch(%arg0 : tensor<4x4x2xf32>) -> tensor<4x4x1x2xf32> 
 }
 
 // -----
+// CHECK-LABEL: @tensorReshapeWithTiedConstant
+// There is nothing to verify here except that correct IR is generated (if
+// constants are not handled properly, it will produce illegally ordered IR).
+func @tensorReshapeWithTiedConstant(%arg0: !hal.buffer_view) -> !hal.buffer_view {
+  %0 = hal.buffer_view.dim %arg0, 0 : index
+  %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?xf32>{%0}
+  %2 = flow.ex.stream.fragment(%1) : (tensor<?xf32>{%0}) -> tensor<4xf32> =
+      (%arg1: tensor<?xf32>) -> tensor<4xf32> {
+    %c4 = constant 4 : index
+    %4 = flow.tensor.reshape %arg1 : tensor<?xf32>{%c4} -> tensor<4xf32>
+    flow.return %4 : tensor<4xf32>
+  }
+  %3 = hal.tensor.cast %2 : tensor<4xf32> -> !hal.buffer_view
+  return %3 : !hal.buffer_view
+}
+
+// -----
 
 // CHECK-LABEL: @tensorSlice
 // CHECK-SAME: (%[[SBUF:.+]]:{{.+}})

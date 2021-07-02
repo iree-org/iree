@@ -943,6 +943,16 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
   return success();
 }
 
+static void hoistConstants(Block &streamBlock,
+                           ConversionPatternRewriter &rewriter) {
+  for (auto &op : streamBlock) {
+    if (isa<ConstantOp>(op)) {
+      auto newOp = rewriter.clone(op);
+      op.replaceAllUsesWith(newOp);
+    }
+  }
+}
+
 static LogicalResult recordStreamCommands(
     Value device, Value commandBuffer, Block &streamBlock,
     StreamSchedulingState &schedulingState,
@@ -971,7 +981,9 @@ static LogicalResult recordStreamCommands(
     } else if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(op)) {
       // No-op; handled by the buffer allocation.
     } else if (isa<ConstantOp>(op)) {
-      // HACK: all this code is going away soon.
+      // Note that even though constants were hoisted early, they can be
+      // materialized as part of various conversions so do it again to get
+      // any new ones.
       auto newOp = rewriter.clone(op);
       op.replaceAllUsesWith(newOp);
     } else if (isa<IREE::HAL::ConstantSubspanOp>(op) ||
@@ -1009,6 +1021,12 @@ class ExStreamFragmentOpConversion
     // Map stream captures to their external buffers or SSA values.
     // This covers all of the live-in stream values.
     auto &entryBlock = streamOp.body().front();
+
+    // Since constants can be tied to shapes, which are used in the size
+    // computations below, and since they are just simple RAUW transforms
+    // if recording, just hoist them out first to make dominance work out.
+    hoistConstants(entryBlock, rewriter);
+
     for (int i = 0; i < adaptor.operands().size(); ++i) {
       auto streamValue = entryBlock.getArgument(i);
       auto bufferValue = adaptor.operands()[i];
