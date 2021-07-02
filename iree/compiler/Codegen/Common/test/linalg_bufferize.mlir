@@ -2402,5 +2402,5 @@ func @linalg_ext_sort_1d() {
 // CHECK-LABEL: func @linalg_ext_sort_1d()
 //   CHECK-DAG:   %[[INOUT:.+]] = hal.interface.binding.subspan @io::@rw
 //       CHECK:   linalg_ext.sort
-//  CHECK-SAME:     dimension = 0 : i64
+//  CHECK-SAME:     dimension(0)
 //  CHECK-SAME:     outs(%[[INOUT]] : memref<128xi32>)
