@@ -12,7 +12,8 @@
 # happens every few months as we are not yet binary-stable but in the future
 # will be a bigger issue.
 #
-# To use, ensure iree-translate and 7z are on your PATH and run the script:
+# To use, ensure iree-translate, compiled ld.lld, and 7z are on your PATH and
+# run the script:
 #   $ ./iree/hal/local/elf/testdata/generate.sh
 
 # Uncomment to see the iree-translate commands issued:
@@ -72,9 +73,8 @@ compile_and_extract_library "simple_mul_dispatch_arm_64.so" ${ARM_64[@]}
 RISCV_32=(
   -iree-llvm-target-triple=riscv32-pc-linux-elf
   -iree-llvm-target-cpu=generic-rv32
-  -iree-llvm-target-cpu-features=+m,+a,+c,+f
-  -iree-llvm-target-abi=ilp32f
-  -iree-llvm-target-float-abi=hard
+  -iree-llvm-target-cpu-features=+m,+f
+  -iree-llvm-target-abi=ilp32
 )
 compile_and_extract_library "simple_mul_dispatch_riscv_32.so" ${RISCV_32[@]}
 
