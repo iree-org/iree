@@ -6,30 +6,27 @@
 
 if(${IREE_ENABLE_EMITC})
   iree_add_all_subdirs()
-  
+
   iree_cc_library(
     NAME
       VMToEmitC
     HDRS
       "ConvertVMToEmitC.h"
-      "EmitCTypeConverter.h"
       "DropExcludedExports.h"
+      "EmitCTypeConverter.h"
     SRCS
       "ConvertVMToEmitC.cpp"
       "DropExcludedExports.cpp"
     DEPS
+      MLIREmitC
       MLIRIR
       MLIRPass
-      MLIREmitC
       MLIRTransforms
       iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Utils::CallingConvention
-    INCLUDES
-      "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
-      "${PROJECT_BINARY_DIR}/third_party/mlir-emitc/include"
     PUBLIC
   )
 endif()
