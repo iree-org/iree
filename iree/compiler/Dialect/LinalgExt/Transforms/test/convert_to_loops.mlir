@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-linalg-ext-to-loops %s | IreeFileCheck %s
 
 func @sort_1d(%arg0: memref<128xi32>) {
-  linalg_ext.sort {dimension = 0 : i64}
+  linalg_ext.sort dimension(0)
     outs(%arg0 : memref<128xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
     %0 = cmpi sgt, %arg2, %arg3 : i32
@@ -30,7 +30,7 @@ func @sort_1d(%arg0: memref<128xi32>) {
 // -----
 
 func @sort_2d(%arg0: memref<16x32xi32>) {
-  linalg_ext.sort {dimension = 0 : i64}
+  linalg_ext.sort dimension(0)
     outs(%arg0 : memref<16x32xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
     %0 = cmpi sgt, %arg2, %arg3 : i32

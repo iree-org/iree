@@ -21,7 +21,10 @@ class LinalgExt_PureOp<string mnemonic, list<OpTrait> traits = []> :
 }
 
 class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
-    LinalgExt_PureOp<mnemonic, !listconcat(traits, [LinalgExtInterface])> {
+    LinalgExt_PureOp<mnemonic, !listconcat(traits,
+        [AttrSizedOperandSegments,
+         DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+         LinalgExtInterface, SingleBlockImplicitTerminator<"YieldOp">])> {
   let verifier = [{ return verify$cppClass(*this); }];
   let printer = [{ return print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
@@ -31,10 +34,28 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
 // Non-structured ops
 //===----------------------------------------------------------------------===//
 
-def LinalgExt_SortOp : LinalgExt_Op<"sort", [
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-    SingleBlockImplicitTerminator<"YieldOp">]> {
+def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
+  let summary = "Scatter operator";
+  let description = [{
+    Based on XLA operation semantics, generates a result which is the
+    value of the input array `operand`, with several slices (at
+    indices specified `indices`) updated with the values in `updates`
+    using `update_computation`.
+  }];
+  let arguments = (ins
+      Variadic<AnyRankedTensorOrMemRefType>:$inputs,
+      Variadic<AnyRankedTensorOrMemRefType>:$outputs
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
+     custom<LinalgExtOutsList>($outputs, type($outputs))
+    $region (`->` type($results)^)?
+  }];
+}
+
+def LinalgExt_SortOp : LinalgExt_Op<"sort"> {
   let summary = "Sort operator";
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given
@@ -51,8 +72,14 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort", [
                        Variadic<AnyShaped>:$outputs,
                        OptionalAttr<I64Attr>:$dimension
   );
-  let results = (outs Variadic<AnyRankedTensor>:$result_tensors);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    (`dimension` `(` $dimension^ `)`)?
+    attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
+    custom<LinalgExtOutsList>($outputs, type($outputs))
+    $region (`->` type($results)^)?
+  }];
 }
 
 //===----------------------------------------------------------------------===//

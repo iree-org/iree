@@ -9,6 +9,10 @@
 
 include "mlir/IR/OpBase.td"
 
+//===----------------------------------------------------------------------===//
+// Dialect definition
+//===----------------------------------------------------------------------===//
+
 def LinalgExt_Dialect : Dialect {
   let name = "linalg_ext";
   let cppNamespace = "::mlir::iree_compiler::linalg_ext";
@@ -17,5 +21,16 @@ def LinalgExt_Dialect : Dialect {
     non-structured operations, ie, can not be represented in Linalg operations.
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// Type definitions
+//===----------------------------------------------------------------------===//
+
+class RankedTensorOrMemRefOf<list<Type> allowedTypes> :
+  ShapedContainerType<allowedTypes,
+      Or<[IsMemRefTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
+  "ranked tensor or memref", "::mlir::ShapedType">;
+
+def AnyRankedTensorOrMemRefType : RankedTensorOrMemRefOf<[AnyType]>;
 
 #endif // IREE_DIALECT_LINALGEXT_BASE
