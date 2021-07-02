@@ -37,10 +37,15 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
 def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
   let summary = "Scatter operator";
   let description = [{
-    Based on XLA operation semantics, generates a result which is the
-    value of the input array `operand`, with several slices (at
-    indices specified `indices`) updated with the values in `updates`
-    using `update_computation`.
+    Based on XLA operation semantics, takes two `inputs` (`update` and
+    `indices`) and `outputs` value (`original`). The operation updates
+    the value at the slices specified by `indices` by combining the
+    current value with the value in `updates` using the computation
+    specified in `region`. The `region` specifies a binary operation
+    of signature (T, T) -> T, where `T` is the element-type of
+    `updates` (and `original`). The first argument correspond the
+    value to be updated (i.e. from `updates), and the second the
+    current value (i.e. value from `original`).
   }];
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
@@ -50,7 +55,7 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
     attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
-     custom<LinalgExtOutsList>($outputs, type($outputs))
+    custom<LinalgExtOutsList>($outputs, type($outputs))
     $region (`->` type($results)^)?
   }];
 }
