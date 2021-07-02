@@ -28,6 +28,10 @@
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
+#ifdef IREE_HAVE_EMITC_DIALECT
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
+#endif  // IREE_HAVE_EMITC_DIALECT
+
 namespace mlir {
 
 // Add all the MLIR dialects to the provided registry.
@@ -48,6 +52,10 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   tosa::TosaDialect,
                   shape::ShapeDialect>();
   // clang-format on
+
+#ifdef IREE_HAVE_EMITC_DIALECT
+  registry.insert<emitc::EmitCDialect>();
+#endif  // IREE_HAVE_EMITC_DIALECT
 }
 
 }  // namespace mlir
