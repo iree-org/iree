@@ -7,6 +7,7 @@ vm.module @global_ops {
   // CHECK-NEXT: uint8_t rwdata[8];
   // CHECK-NEXT: iree_vm_ref_t refs[0];
   // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[0];
+  // CHECK-NEXT: iree_vm_function_t imports[0];
   // CHECK-NEXT: };
 
   vm.global.i32 @c42 42 : i32
@@ -45,9 +46,4 @@ vm.module @global_ops {
     %value = vm.global.load.i32 @c107_mut : i32
     vm.return %value : i32
   }
-
-  // check state initialization inside the alloc_state function
-  // CHECK: static iree_status_t global_ops_alloc_state(
-  // CHECK: vm_global_store_i32(state->rwdata, 0, 42);
-  // CHECK-NEXT: vm_global_store_i32(state->rwdata, 4, 107);
 }

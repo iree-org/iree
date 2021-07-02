@@ -26,6 +26,8 @@ iree_cc_library(
     "LinalgExtOps.cpp"
     "LinalgExtOps.cpp.inc"
   DEPS
+    ::LinalgExtInterfacesGen
+    ::LinalgExtOpsGen
     LLVMSupport
     MLIRControlFlowInterfaces
     MLIRIR

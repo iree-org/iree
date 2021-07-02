@@ -172,7 +172,9 @@ struct InsertImmutabilityPreservingStreamClones
         tiedOperand.replaceUsesWithIf(clonedOperand, [&](OpOperand &use) {
           Operation *user = use.getOwner();
           return !excludedOps.count(user) &&
-                 user->getBlock() == clonedOperand.getDefiningOp()->getBlock();
+                 user->getBlock() ==
+                     clonedOperand.getDefiningOp()->getBlock() &&
+                 clonedOperand.getDefiningOp()->isBeforeInBlock(user);
         });
         didClone = true;
       }

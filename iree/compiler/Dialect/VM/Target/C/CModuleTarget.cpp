@@ -6,15 +6,15 @@
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
-#include "emitc/Target/Cpp/Cpp.h"
+#include "emitc/Target/Cpp/CppEmitter.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
-#include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
-#include "iree/compiler/Dialect/VM/Target/ConstantEncodingUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
+#include "iree/compiler/Dialect/VM/Utils/ConstantEncoding.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -105,6 +105,8 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
          << moduleOp.ordinal_counts().getValue().global_refs() << "];\n";
   output << "iree_vm_buffer_t rodata_buffers["
          << moduleOp.ordinal_counts().getValue().rodatas() << "];\n";
+  output << "iree_vm_function_t imports["
+         << moduleOp.ordinal_counts().getValue().import_funcs() << "];\n";
   output << "};\n";
 
   output << "typedef struct " << moduleName << "_t " << moduleName << "_t;\n";
@@ -335,6 +337,8 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
     output << ", ";
   }
 
+  output << "iree_vm_stack_t* stack, ";
+
   // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
   // struct argument name here must not be changed.
   output << moduleName << "_state_t* state)";
@@ -483,6 +487,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
       argNames.push_back(resultName);
     }
 
+    argNames.push_back("stack");
     argNames.push_back("state");
 
     output << llvm::join(argNames, ", ");
@@ -615,7 +620,16 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "}\n";
 
   // resolve_imports
-  // TODO(simon-camp):
+  output << "static iree_status_t " << moduleName << "_resolve_import("
+         << "void* self, iree_vm_module_state_t* module_state, "
+            "iree_host_size_t ordinal, const iree_vm_function_t* function, "
+            "const iree_vm_function_signature_t* signature) {\n"
+         << moduleName << "_state_t* state = (" << moduleName
+         << "_state_t*)module_state;\n"
+         << "state->imports[ordinal] = *function;\n"
+         << "return iree_ok_status();\n}";
+
+  output << "\n";
 
   // create
   output << "static iree_status_t " << moduleName << "_create("
@@ -627,7 +641,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "interface.destroy = NULL;\n"
          << "interface.alloc_state = " << moduleName << "_alloc_state;\n"
          << "interface.free_state = " << moduleName << "_free_state;\n"
-         << "interface.resolve_import = NULL;\n"
+         << "interface.resolve_import = " << moduleName << "_resolve_import;\n"
          << "return iree_vm_native_module_create(&interface, "
             "&"
          << descriptorName << ", allocator, out_module);\n"

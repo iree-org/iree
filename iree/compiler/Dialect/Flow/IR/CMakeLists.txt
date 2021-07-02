@@ -31,6 +31,9 @@ iree_cc_library(
     "FlowOps.cpp.inc"
     "FlowTypes.cpp"
   DEPS
+    ::FlowEnumsGen
+    ::FlowInterfacesGen
+    ::FlowOpsGen
     LLVMSupport
     MLIRIR
     MLIRInferTypeOpInterface

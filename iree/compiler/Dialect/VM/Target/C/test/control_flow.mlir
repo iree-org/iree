@@ -15,7 +15,7 @@ vm.module @control_flow_module {
     vm.return %0 : i32
   }
 }
-// CHECK: static iree_status_t control_flow_module_control_flow_test_impl(int32_t [[A:[^ ]*]], int32_t [[COND:[^ ]*]], int32_t *[[RESULT:[^ ]*]], control_flow_module_state_t* [[STATE:[^ ]*]]) {
+// CHECK: static iree_status_t control_flow_module_control_flow_test_impl(int32_t [[A:[^ ]*]], int32_t [[COND:[^ ]*]], int32_t *[[RESULT:[^ ]*]], iree_vm_stack_t* stack, control_flow_module_state_t* [[STATE:[^ ]*]]) {
   // CHECK-NEXT: VARIABLE DECLARATIONS
   // CHECK-NEXT: RESULTS
   // CHECK-NEXT: int32_t [[B:[^ ]*]];

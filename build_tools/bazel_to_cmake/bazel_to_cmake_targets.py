@@ -79,8 +79,8 @@ def _convert_llvm_target(target):
   return ["LLVM" + target.rsplit(":")[-1]]
 
 
-def convert_external_target(target):
-  """Converts an external (non-IREE) Bazel target to a list of CMake targets.
+def convert_target(target):
+  """Converts a Bazel target to a list of CMake targets.
 
   IREE targets are expected to follow a standard form between Bazel and CMake
   that facilitates conversion. External targets *may* have their own patterns,
@@ -97,6 +97,15 @@ def convert_external_target(target):
   """
   if target in EXPLICIT_TARGET_MAPPING:
     return EXPLICIT_TARGET_MAPPING[target]
+  if not target.startswith("@"):
+    # Bazel `:api`            -> CMake `::api`
+    # Bazel `//iree/base`     -> CMake `iree::base`
+    # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
+    if target.startswith("//"):
+      target = target[len("//"):]
+    target = target.replace(":", "::")  # iree/base::foo or ::foo
+    target = target.replace("/", "::")  # iree::base
+    return [target]
   if target.startswith("@llvm-project//llvm"):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
