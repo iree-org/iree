@@ -53,64 +53,138 @@ static void getEffectsImpl(
 // Common methods from Linalg dialect.
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseCommonStructuredOpParts(
-    OpAsmParser &parser, OperationState &result,
-    SmallVectorImpl<Type> &inputTypes, SmallVectorImpl<Type> &outputTypes) {
-  llvm::SMLoc inputsOperandsLoc, outputsOperandsLoc;
-  SmallVector<OpAsmParser::OperandType, 4> inputsOperands, outputsOperands;
-
-  parser.parseOptionalAttrDict(result.attributes);
-
-  if (succeeded(parser.parseOptionalKeyword("ins"))) {
-    if (parser.parseLParen()) return failure();
-
-    inputsOperandsLoc = parser.getCurrentLocation();
-    if (parser.parseOperandList(inputsOperands) ||
-        parser.parseColonTypeList(inputTypes) || parser.parseRParen())
+static ParseResult parseLinalgExtOperandList(
+    OpAsmParser &parser, StringRef keyword,
+    SmallVectorImpl<OpAsmParser::OperandType> &values,
+    SmallVectorImpl<Type> &types) {
+  StringRef parsedKeyword;
+  if (succeeded(parser.parseOptionalKeyword(&parsedKeyword, {keyword}))) {
+    if (parser.parseLParen() || parser.parseOperandList(values) ||
+        parser.parseColonTypeList(types) || parser.parseRParen()) {
       return failure();
+    }
   }
-
-  if (succeeded(parser.parseOptionalKeyword("outs"))) {
-    outputsOperandsLoc = parser.getCurrentLocation();
-    if (parser.parseLParen() || parser.parseOperandList(outputsOperands) ||
-        parser.parseColonTypeList(outputTypes) || parser.parseRParen())
-      return failure();
-  }
-
-  if (parser.resolveOperands(inputsOperands, inputTypes, inputsOperandsLoc,
-                             result.operands) ||
-      parser.resolveOperands(outputsOperands, outputTypes, outputsOperandsLoc,
-                             result.operands))
-    return failure();
-
-  result.addAttribute("operand_segment_sizes",
-                      parser.getBuilder().getI32VectorAttr(
-                          {static_cast<int32_t>(inputsOperands.size()),
-                           static_cast<int32_t>(outputsOperands.size())}));
   return success();
 }
 
-static ParseResult parseNamedStructuredOpResults(
-    OpAsmParser &parser, SmallVectorImpl<Type> &resultTypes) {
-  if (parser.parseOptionalArrowTypeList(resultTypes)) return failure();
+static ParseResult parseLinalgExtInsList(
+    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &values,
+    SmallVectorImpl<Type> &types) {
+  return parseLinalgExtOperandList(parser, "ins", values, types);
+}
+
+static ParseResult parseLinalgExtOutsList(
+    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &values,
+    SmallVectorImpl<Type> &types) {
+  return parseLinalgExtOperandList(parser, "outs", values, types);
+}
+
+static void printLinalgExtOperandList(OpAsmPrinter &printer, Operation *op,
+                                      StringRef keyword, OperandRange values,
+                                      TypeRange types) {
+  if (!values.empty()) {
+    printer << keyword << "(";
+    printer.printOperands(values);
+    printer << " : " << types << ")";
+  }
+}
+
+static void printLinalgExtInsList(OpAsmPrinter &printer, Operation *op,
+                                  OperandRange values, TypeRange types) {
+  return printLinalgExtOperandList(printer, op, "ins", values, types);
+}
+
+static void printLinalgExtOutsList(OpAsmPrinter &printer, Operation *op,
+                                   OperandRange values, TypeRange types) {
+  return printLinalgExtOperandList(printer, op, "outs", values, types);
+}
+
+//===----------------------------------------------------------------------===//
+// ScatterOp
+//===----------------------------------------------------------------------===//
+
+void ScatterOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  SmallVector<Value> inputBuffers = getInputBufferOperands();
+  SmallVector<Value> outputBuffers = getOutputBufferOperands();
+  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
+                 outputBuffers);
+}
+
+static LogicalResult verifyScatterOp(ScatterOp op) {
+  if (op.inputs().size() != 2) {
+    return op.emitOpError("expected two input operands");
+  }
+  if (op.outputs().size() != 1) {
+    return op.emitOpError("expected one output operand");
+  }
+  auto checkDimensionsMatch = [&](ShapedType t1, ShapedType t2, unsigned dim) {
+    return t1.getShape()[dim] == t2.getShape()[dim];
+  };
+  auto indicesType = op.inputs()[1].getType().cast<ShapedType>();
+  if (indicesType.getRank() != 1 ||
+      !indicesType.getElementType().isInteger(32)) {
+    return op.emitOpError(
+        "expected indices to be of rank 1 of i32 element type");
+  }
+  // The first dimension of the indices should match the first dimension of the
+  // output.
+  auto updateType = op.inputs()[0].getType().cast<ShapedType>();
+  if (updateType.getRank() < 1) {
+    return op.emitOpError("expected update value to be at least rank 1");
+  }
+  if (!checkDimensionsMatch(indicesType, updateType, 0)) {
+    return op.emitOpError(
+        "mismatch in shape of indices and update value at dim#0");
+  }
+  auto originalType = op.outputs()[0].getType().cast<ShapedType>();
+  if (originalType.getRank() != updateType.getRank()) {
+    return op.emitOpError(
+        "mismatch in rank of update value and original value");
+  }
+  for (auto dim : llvm::seq<unsigned>(1, originalType.getRank())) {
+    if (!checkDimensionsMatch(updateType, originalType, dim)) {
+      return op.emitOpError(
+                 "mismatch in shape of update value and original value at dim#")
+             << dim;
+    }
+  }
+  Region &region = op.region();
+  Block *body = &region.front();
+  if (body->getNumArguments() != 2) {
+    return op.emitOpError("expected region to have two arguments");
+  }
+  Type arg0Type = body->getArgument(0).getType();
+  Type arg1Type = body->getArgument(1).getType();
+  if (!arg0Type.isIntOrFloat() || !arg1Type.isIntOrFloat()) {
+    return op.emitOpError(
+        "expected region to have scalar argument of integer or float types");
+  }
+  if (arg0Type != updateType.getElementType()) {
+    return op.emitOpError("mismatch in argument 0 of region ")
+           << arg0Type << " and element type of update value "
+           << updateType.getElementType();
+  }
+  if (arg1Type != originalType.getElementType()) {
+    return op.emitOpError("mismatch in argument 1 of region ")
+           << arg1Type << " and element type of original value "
+           << originalType.getElementType();
+  }
+  if (arg0Type != arg1Type) {
+    return op.emitOpError("mismatch in region argument types ")
+           << arg0Type << " and " << arg1Type;
+  }
+  auto yieldOp = cast<linalg_ext::YieldOp>(body->getTerminator());
+  if (yieldOp->getNumOperands() != 1) {
+    return yieldOp.emitOpError("expected region to yield a single value");
+  }
+  auto yieldedType = yieldOp->getOperand(0).getType();
+  if (yieldedType != arg0Type) {
+    return yieldOp.emitOpError("mismatch in type of yielded value ")
+           << yieldedType << " and argument of the region " << arg0Type;
+  }
   return success();
-}
-
-template <typename NamedStructuredOpType>
-static void printCommonStructuredOpParts(OpAsmPrinter &p,
-                                         NamedStructuredOpType op) {
-  if (!op.inputs().empty()) {
-    p << " ins(" << op.inputs() << " : " << op.inputs().getTypes() << ")";
-  }
-  if (!op.outputs().empty()) {
-    p << " outs(" << op.outputs() << " : " << op.outputs().getTypes() << ")";
-  }
-}
-
-static void printNamedStructuredOpResults(OpAsmPrinter &p,
-                                          TypeRange resultTypes) {
-  if (resultTypes.empty()) return;
-  p.printOptionalArrowTypeList(resultTypes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -124,44 +198,6 @@ void SortOp::getEffects(
   SmallVector<Value> outputBuffers = getOutputBufferOperands();
   getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
                  outputBuffers);
-}
-
-static ParseResult parseSortOp(OpAsmParser &parser, OperationState &result) {
-  DictionaryAttr dictAttr;
-  parser.parseOptionalAttribute(dictAttr, "_", result.attributes);
-  if (dictAttr) {
-    result.attributes.assign(dictAttr.getValue().begin(),
-                             dictAttr.getValue().end());
-  }
-
-  // Parsing is shared with named ops, except for the region.
-  SmallVector<Type> inputTypes, outputTypes;
-  if (parseCommonStructuredOpParts(parser, result, inputTypes, outputTypes))
-    return failure();
-
-  SmallVector<OpAsmParser::OperandType> regionOperands;
-  std::unique_ptr<Region> region = std::make_unique<Region>();
-  SmallVector<Type> operandTypes, regionTypes;
-  if (parser.parseRegion(*region, regionOperands, regionTypes))
-    return failure();
-  result.addRegion(std::move(region));
-
-  SmallVector<Type> outputTensorsTypes;
-  if (parseNamedStructuredOpResults(parser, outputTensorsTypes))
-    return failure();
-  result.addTypes(outputTensorsTypes);
-  return success();
-}
-
-static void printSortOp(OpAsmPrinter &p, SortOp op) {
-  p << op.getOperationName();
-  p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"operand_segment_sizes"});
-  printCommonStructuredOpParts(p, op);
-  if (!op.region().empty()) {
-    p.printRegion(op.region());
-  }
-  printNamedStructuredOpResults(p, op.result_tensors().getTypes());
 }
 
 static LogicalResult verifySortOp(SortOp op) {
