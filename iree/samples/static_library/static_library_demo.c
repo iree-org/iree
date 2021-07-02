@@ -56,7 +56,7 @@ iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
   iree_task_executor_release(executor);
   iree_hal_executable_loader_release(library_loader);
 
-  return iree_ok_status();
+  return status;
 }
 
 iree_status_t Run() {
