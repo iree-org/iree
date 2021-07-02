@@ -44,7 +44,7 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
     specified in `region`. The `region` specifies a binary operation
     of signature (T, T) -> T, where `T` is the element-type of
     `updates` (and `original`). The first argument correspond the
-    value to be updated (i.e. from `updates), and the second the
+    value to be updated (i.e. from `updates`), and the second the
     current value (i.e. value from `original`).
   }];
   let arguments = (ins
