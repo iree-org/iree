@@ -15,6 +15,8 @@
 #include "mlir/IR/DialectImplementation.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"    // IWYU pragma: keep
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc"    // IWYU pragma: keep
 #include "iree/compiler/Dialect/HAL/IR/HALStructs.cpp.inc"  // IWYU pragma: keep
 // clang-format on
@@ -606,6 +608,53 @@ void DescriptorSetLayoutBindingAttr::print(DialectAsmPrinter &p) const {
 }
 
 // static
+ExecutableTargetAttr ExecutableTargetAttr::get(MLIRContext *context,
+                                               StringRef target) {
+  // TODO(benvanik): query from target backend.
+  return get(context, StringAttr::get(context, target),
+             DictionaryAttr::get(context));
+}
+
+// static
+Attribute ExecutableTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
+                                      Type type) {
+  auto b = p.getBuilder();
+  StringAttr targetAttr;
+  DictionaryAttr configurationAttr;
+  // `<"target"`
+  if (failed(p.parseLess()) || failed(p.parseAttribute(targetAttr))) {
+    return {};
+  }
+  // `, {config}`
+  if (succeeded(p.parseOptionalComma()) &&
+      failed(p.parseAttribute(configurationAttr))) {
+    return {};
+  }
+  // `>`
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(b.getContext(), targetAttr, configurationAttr);
+}
+
+void ExecutableTargetAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getMnemonic() << "<";
+  p.printAttribute(getTarget());
+  auto config = getConfiguration();
+  if (config && !config.empty()) {
+    os << ", ";
+    p.printAttribute(config);
+  }
+  os << ">";
+}
+
+bool ExecutableTargetAttr::someMethod(unsigned idx) const {
+  // TODO(benvanik): target registry query.
+  return false;
+}
+
+// static
 Attribute MatchAlwaysAttr::parse(DialectAsmParser &p) {
   return get(p.getBuilder().getContext());
 }
@@ -824,6 +873,11 @@ void ExResultBufferAttr::print(DialectAsmPrinter &p) const {
   os << ">";
 }
 
+//===----------------------------------------------------------------------===//
+// Dialect registration
+//===----------------------------------------------------------------------===//
+
+#include "iree/compiler/Dialect/HAL/IR/HALAttrInterfaces.cpp.inc"
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterfaces.cpp.inc"
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
@@ -836,12 +890,141 @@ void HALDialect::registerAttributes() {
                 //
                 MatchAlwaysAttr, MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
                 DeviceMatchMemoryModelAttr>();
+  addAttributes<
+#define GET_ATTRDEF_LIST
+#include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
+      >();
 }
+
 void HALDialect::registerTypes() {
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
            ExecutableType, ExecutableLayoutType, RingBufferType,
            SemaphoreType>();
+}
+
+//===----------------------------------------------------------------------===//
+// Attribute printing and parsing
+//===----------------------------------------------------------------------===//
+
+Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
+                                     Type type) const {
+  StringRef mnemonic;
+  if (failed(parser.parseKeyword(&mnemonic))) return {};
+  Attribute genAttr;
+  OptionalParseResult parseResult =
+      generatedAttributeParser(getContext(), parser, mnemonic, type, genAttr);
+  if (parseResult.hasValue()) return genAttr;
+  if (mnemonic == BufferConstraintsAttr::getKindName()) {
+    return BufferConstraintsAttr::parse(parser);
+  } else if (mnemonic == ByteRangeAttr::getKindName()) {
+    return ByteRangeAttr::parse(parser);
+  } else if (mnemonic == DescriptorSetLayoutBindingAttr::getKindName()) {
+    return DescriptorSetLayoutBindingAttr::parse(parser);
+  } else if (mnemonic == MatchAlwaysAttr::getKindName()) {
+    return MatchAlwaysAttr::parse(parser);
+  } else if (mnemonic == MatchAnyAttr::getKindName()) {
+    return MatchAnyAttr::parse(parser);
+  } else if (mnemonic == MatchAllAttr::getKindName()) {
+    return MatchAllAttr::parse(parser);
+  } else if (mnemonic == DeviceMatchIDAttr::getKindName()) {
+    return DeviceMatchIDAttr::parse(parser);
+  } else if (mnemonic == DeviceMatchMemoryModelAttr::getKindName()) {
+    return DeviceMatchMemoryModelAttr::parse(parser);
+  } else if (mnemonic == DeviceMatchFeatureAttr::getKindName()) {
+    return DeviceMatchFeatureAttr::parse(parser);
+  } else if (mnemonic == DeviceMatchArchitectureAttr::getKindName()) {
+    return DeviceMatchArchitectureAttr::parse(parser);
+  } else if (mnemonic == ExConstantStorageAttr::getKindName()) {
+    return ExConstantStorageAttr::parse(parser);
+  } else if (mnemonic == ExPushConstantAttr::getKindName()) {
+    return ExPushConstantAttr::parse(parser);
+  } else if (mnemonic == ExOperandBufferAttr::getKindName()) {
+    return ExOperandBufferAttr::parse(parser);
+  } else if (mnemonic == ExResultBufferAttr::getKindName()) {
+    return ExResultBufferAttr::parse(parser);
+  }
+  parser.emitError(parser.getNameLoc())
+      << "unknown HAL attribute: " << mnemonic;
+  return {};
+}
+
+void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
+  TypeSwitch<Attribute>(attr)
+      .Case<BufferConstraintsAttr, ByteRangeAttr,
+            DescriptorSetLayoutBindingAttr,
+            //
+            ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
+            ExResultBufferAttr,
+            //
+            MatchAlwaysAttr, MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
+            DeviceMatchMemoryModelAttr>(
+          [&](auto typedAttr) { typedAttr.print(p); })
+      .Default([&](Attribute) {
+        if (failed(generatedAttributePrinter(attr, p))) {
+          llvm_unreachable("unhandled HAL attribute kind");
+        }
+      });
+}
+
+//===----------------------------------------------------------------------===//
+// Type printing and parsing
+//===----------------------------------------------------------------------===//
+
+Type HALDialect::parseType(DialectAsmParser &parser) const {
+  StringRef typeKind;
+  if (parser.parseKeyword(&typeKind)) return {};
+  auto type =
+      llvm::StringSwitch<Type>(typeKind)
+          .Case("allocator", AllocatorType::get(getContext()))
+          .Case("buffer", BufferType::get(getContext()))
+          .Case("buffer_view", BufferViewType::get(getContext()))
+          .Case("command_buffer", CommandBufferType::get(getContext()))
+          .Case("descriptor_set", DescriptorSetType::get(getContext()))
+          .Case("descriptor_set_layout",
+                DescriptorSetLayoutType::get(getContext()))
+          .Case("device", DeviceType::get(getContext()))
+          .Case("event", EventType::get(getContext()))
+          .Case("executable", ExecutableType::get(getContext()))
+          .Case("executable_layout", ExecutableLayoutType::get(getContext()))
+          .Case("ring_buffer", RingBufferType::get(getContext()))
+          .Case("semaphore", SemaphoreType::get(getContext()))
+          .Default(nullptr);
+  if (!type) {
+    parser.emitError(parser.getCurrentLocation())
+        << "unknown HAL type: " << typeKind;
+  }
+  return type;
+}
+
+void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
+  if (type.isa<AllocatorType>()) {
+    p << "allocator";
+  } else if (type.isa<BufferType>()) {
+    p << "buffer";
+  } else if (type.isa<BufferViewType>()) {
+    p << "buffer_view";
+  } else if (type.isa<CommandBufferType>()) {
+    p << "command_buffer";
+  } else if (type.isa<DescriptorSetType>()) {
+    p << "descriptor_set";
+  } else if (type.isa<DescriptorSetLayoutType>()) {
+    p << "descriptor_set_layout";
+  } else if (type.isa<DeviceType>()) {
+    p << "device";
+  } else if (type.isa<EventType>()) {
+    p << "event";
+  } else if (type.isa<ExecutableType>()) {
+    p << "executable";
+  } else if (type.isa<ExecutableLayoutType>()) {
+    p << "executable_layout";
+  } else if (type.isa<RingBufferType>()) {
+    p << "ring_buffer";
+  } else if (type.isa<SemaphoreType>()) {
+    p << "semaphore";
+  } else {
+    llvm_unreachable("unknown HAL type");
+  }
 }
 
 }  // namespace HAL

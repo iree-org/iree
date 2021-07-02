@@ -8,6 +8,7 @@
 #define IREE_DIALECT_HAL_BASE
 
 include "iree/compiler/Dialect/HAL/IR/HALDialect.td"
+include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // HAL enums
@@ -452,6 +453,24 @@ def HAL_DescriptorSetLayoutBindingAttr :
 def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
     HAL_DescriptorSetLayoutBindingAttr,
     "HAL descriptor set layout binding array attribute">;
+
+def HAL_ExecutableTargetAttr :
+    AttrDef<HAL_Dialect, "ExecutableTarget", [
+      DeclareAttrInterfaceMethods<HAL_ExecutableTargetAttrInterface>,
+    ]> {
+  let mnemonic = "executable.target";
+  let summary = [{Generic executable target specification.}];
+  let description = [{
+    Specifies how to compile an executable for a specific target backend.
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$target,
+    AttrParameter<"DictionaryAttr", "">:$configuration
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$target)>,
+  ];
+}
 
 // TODO(benvanik): drop this when we have a HAL dispatch abstraction.
 def HAL_ExConstantStorageAttr :

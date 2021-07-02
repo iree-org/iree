@@ -20,6 +20,10 @@ iree_cc_library(
     "HALTypes.h"
     "LoweringConfig.h"
   TEXTUAL_HDRS
+    "HALAttrInterfaces.cpp.inc"
+    "HALAttrInterfaces.h.inc"
+    "HALAttrs.cpp.inc"
+    "HALAttrs.h.inc"
     "HALEnums.cpp.inc"
     "HALEnums.h.inc"
     "HALOpInterfaces.cpp.inc"
@@ -90,6 +94,8 @@ iree_tablegen_library(
   TD_FILE
     "HALInterfaces.td"
   OUTS
+    -gen-attr-interface-decls HALAttrInterfaces.h.inc
+    -gen-attr-interface-defs HALAttrInterfaces.cpp.inc
     -gen-op-interface-decls HALOpInterfaces.h.inc
     -gen-op-interface-defs HALOpInterfaces.cpp.inc
     -gen-type-interface-decls HALTypeInterfaces.h.inc
@@ -124,6 +130,8 @@ iree_tablegen_library(
   TD_FILE
     "HALBase.td"
   OUTS
+    -gen-attrdef-decls HALAttrs.h.inc
+    -gen-attrdef-defs HALAttrs.cpp.inc
     -gen-enum-decls HALEnums.h.inc
     -gen-enum-defs HALEnums.cpp.inc
 )
