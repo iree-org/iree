@@ -100,6 +100,7 @@ nav:
       - TensorFlow Lite: 'ml-frameworks/tensorflow-lite.md'
       - JAX: 'ml-frameworks/jax.md'
   - 'Deployment configurations':
+      - CPU - Bare-Metal: 'deployment-configurations/bare-metal.md'
       - CPU - Dylib: 'deployment-configurations/cpu-dylib.md'
       - GPU - Vulkan: 'deployment-configurations/gpu-vulkan.md'
   - 'Building from source':
