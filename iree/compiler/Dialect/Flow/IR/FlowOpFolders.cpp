@@ -172,7 +172,9 @@ struct InsertImmutabilityPreservingStreamClones
         tiedOperand.replaceUsesWithIf(clonedOperand, [&](OpOperand &use) {
           Operation *user = use.getOwner();
           return !excludedOps.count(user) &&
-                 user->getBlock() == clonedOperand.getDefiningOp()->getBlock();
+                 user->getBlock() ==
+                     clonedOperand.getDefiningOp()->getBlock() &&
+                 clonedOperand.getDefiningOp()->isBeforeInBlock(user);
         });
         didClone = true;
       }
@@ -446,7 +448,7 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
         loadOp.strides().empty()) {
       return failure();
     }
-    rewriter.replaceOpWithNewOp<SubTensorOp>(
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
         loadOp, loadOp.source(), loadOp.getMixedOffsets(),
         loadOp.getMixedSizes(), loadOp.getMixedStrides());
     return success();

@@ -33,6 +33,14 @@ class MaterializeConstantPoolBuffersPass
     registry.insert<IREE::HAL::HALDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-hal-materialize-constant-pool-buffers";
+  }
+
+  StringRef getDescription() const override {
+    return "Materializes runtime buffers for constant pools.";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -308,9 +316,7 @@ createMaterializeConstantPoolBuffersPass() {
   return std::make_unique<MaterializeConstantPoolBuffersPass>();
 }
 
-static PassRegistration<MaterializeConstantPoolBuffersPass> pass(
-    "iree-hal-materialize-constant-pool-buffers",
-    "Materializes runtime buffers for constant pools.");
+static PassRegistration<MaterializeConstantPoolBuffersPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

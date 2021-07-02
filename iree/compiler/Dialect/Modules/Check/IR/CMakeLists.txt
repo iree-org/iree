@@ -20,6 +20,7 @@ iree_cc_library(
     "CheckOps.cpp"
     "CheckOps.cpp.inc"
   DEPS
+    ::check_ops_gen
     MLIRIR
     MLIRStandard
     iree::compiler::Dialect::HAL::IR
@@ -35,6 +36,7 @@ iree_cc_library(
     "CheckDialect.cpp"
   DEPS
     ::IR
+    ::check_ops_gen
     MLIRIR
     MLIRParser
     MLIRTransforms

@@ -30,6 +30,15 @@ class WrapEntryPointsPass
     registry.insert<StandardOpsDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-tflite-wrap-entry-points";
+  }
+
+  StringRef getDescription() const override {
+    return "Wraps model entry points in functions compatible with the tflite "
+           "bindings";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -158,10 +167,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createWrapEntryPointsPass() {
   return std::make_unique<WrapEntryPointsPass>();
 }
 
-static PassRegistration<WrapEntryPointsPass> pass(
-    "iree-tflite-wrap-entry-points",
-    "Wraps model entry points in functions compatible with the tflite "
-    "bindings");
+static PassRegistration<WrapEntryPointsPass> pass;
 
 }  // namespace TFLite
 }  // namespace IREE

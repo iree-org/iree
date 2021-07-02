@@ -7,26 +7,12 @@
 # Default implementations for HAL types that use the host resources.
 # These are generally just wrappers around host heap memory and host threads.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-# TODO(benvanik): move into base/? may be useful for other backends or for other
-# parts of the system (like modules handling IO/RPC).
-cc_library(
-    name = "event_pool",
-    srcs = ["event_pool.c"],
-    hdrs = ["event_pool.h"],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/base/internal",
-        "//iree/base/internal:synchronization",
-        "//iree/base/internal:wait_handle",
-    ],
 )
 
 cc_library(
@@ -116,6 +102,35 @@ cc_library(
         "//iree/base/internal:arena",
         "//iree/base/internal:synchronization",
         "//iree/hal",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Thread dependent packages
+#===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+""",
+    inline = True,
+)
+
+# TODO(benvanik): move into base/? may be useful for other backends or for other
+# parts of the system (like modules handling IO/RPC).
+cc_library(
+    name = "event_pool",
+    srcs = ["event_pool.c"],
+    hdrs = ["event_pool.h"],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+        "//iree/base/internal",
+        "//iree/base/internal:synchronization",
+        "//iree/base/internal:wait_handle",
     ],
 )
 

@@ -22,6 +22,15 @@ class CSEVariableLoadsPass
     registry.insert<HALDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-hal-cse-variable-loads";
+  }
+
+  StringRef getDescription() const override {
+    return "Eliminates redundant 'hal.variable.load' ops within functions with "
+           "no 'hal.variable.store' ops";
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
 
@@ -78,10 +87,7 @@ std::unique_ptr<OperationPass<FuncOp>> createCSEVariableLoadsPass() {
   return std::make_unique<CSEVariableLoadsPass>();
 }
 
-static PassRegistration<CSEVariableLoadsPass> pass(
-    "iree-hal-cse-variable-loads",
-    "Eliminates redundant 'hal.variable.load' ops within functions with no "
-    "'hal.variable.store' ops");
+static PassRegistration<CSEVariableLoadsPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

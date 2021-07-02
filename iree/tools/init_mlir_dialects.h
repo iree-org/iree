@@ -20,7 +20,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Quant/QuantOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/SDBM/SDBMDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -28,6 +27,10 @@
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
+
+#ifdef IREE_HAVE_EMITC_DIALECT
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
+#endif  // IREE_HAVE_EMITC_DIALECT
 
 namespace mlir {
 
@@ -47,9 +50,12 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   vector::VectorDialect,
                   tensor::TensorDialect,
                   tosa::TosaDialect,
-                  SDBMDialect,
                   shape::ShapeDialect>();
   // clang-format on
+
+#ifdef IREE_HAVE_EMITC_DIALECT
+  registry.insert<emitc::EmitCDialect>();
+#endif  // IREE_HAVE_EMITC_DIALECT
 }
 
 }  // namespace mlir

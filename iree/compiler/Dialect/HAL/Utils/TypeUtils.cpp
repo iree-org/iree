@@ -103,9 +103,8 @@ Value getValueSize(Location loc, Value value, OpBuilder &builder) {
   if (!elementType) return {};
   auto shape = IREE::HAL::getShapeDims(loc, value, builder);
   if (!shape) return {};
-  auto deviceValue = builder.createOrFold<IREE::HAL::ExSharedDeviceOp>(loc);
-  auto allocatorValue =
-      builder.createOrFold<IREE::HAL::DeviceAllocatorOp>(loc, deviceValue);
+  auto allocatorValue = builder.createOrFold<IREE::HAL::BufferAllocatorOp>(
+      loc, IREE::HAL::AllocatorType::get(builder.getContext()), value);
   return builder.createOrFold<IREE::HAL::AllocatorComputeSizeOp>(
       loc, allocatorValue, *shape, elementType.getValue());
 }

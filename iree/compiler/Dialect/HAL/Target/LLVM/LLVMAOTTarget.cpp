@@ -8,7 +8,7 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/dylib_executable_def_builder.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -76,16 +77,26 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    passManager.addPass(createLowerExecutableTargetPass());
+    auto targetMachine = createTargetMachine(options_);
+    if (!targetMachine) {
+      llvm::errs() << "failed to create target machine for target triple '"
+                   << options_.targetTriple << "'";
+      return;
+    }
+    passManager.addPass(createLLVMCPULowerExecutableTargetPass());
     // Set target specific options.
+    LLVMCPUCodegenPassPipelineOptions codeGenOptions;
+    codeGenOptions.targetTriple = options_.targetTriple;
+    codeGenOptions.targetDataLayout =
+        targetMachine->createDataLayout().getStringRepresentation();
+
     // TODO(ataei): This is temporary here, should move when target specific
     // overrides options grows.
-    llvm::Triple triple(options_.targetTriple);
-    LLVMTransformPassPipelineOptions codeGenOptions;
-    if (triple.isWasm()) {
+    if (targetMachine->getTargetTriple().isWasm()) {
       codeGenOptions.unfuseFMAOps = true;
     }
-    buildLLVMTransformPassPipeline(passManager, codeGenOptions);
+
+    buildLLVMCPUCodegenPassPipeline(passManager, codeGenOptions);
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
@@ -200,13 +211,19 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
       // -ffreestanding-like behavior.
       func.addFnAttr("no-builtins");
+
+      // Our dispatches are all hot - that's kind of the point.
+      // This may favor more aggressive optimizations.
+      func.addFnAttr("hot");
     }
 
     // Build the IREE HAL executable library metadata. The runtime uses this to
     // find the entry point functions and their information.
-    LibraryBuilder libraryBuilder(
-        llvmModule.get(), LibraryBuilder::Mode::INCLUDE_REFLECTION_ATTRS,
-        LibraryBuilder::Version::V_0);
+    // TODO(benvanik): add a flag for this (adds a few KB/binary).
+    LibraryBuilder::Mode libraryBuilderMode =
+        LibraryBuilder::Mode::INCLUDE_REFLECTION_ATTRS;
+    LibraryBuilder libraryBuilder(llvmModule.get(), libraryBuilderMode,
+                                  LibraryBuilder::Version::V_0);
     switch (options_.sanitizerKind) {
       case SanitizerKind::kNone: {
         libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
@@ -221,10 +238,21 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
     for (auto entryPointOp :
          targetOp.getBlock().getOps<ExecutableEntryPointOp>()) {
+      // Find the matching function in the LLVM module.
       auto *llvmFunc = llvmModule->getFunction(entryPointOp.getName());
       llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
       llvmFunc->setDSOLocal(true);
-      libraryBuilder.addEntryPoint(entryPointOp.getName(), "", llvmFunc);
+
+      // Optionally entry points may specify that they require workgroup local
+      // memory. We fetch that value here and plumb it through so the runtime
+      // knows how much memory to reserve and pass in.
+      int64_t localMemorySize = entryPointOp.workgroup_local_memory()
+                                    .getValueOr(APInt(64, 0))
+                                    .getSExtValue();
+
+      libraryBuilder.addExport(entryPointOp.getName(), "",
+                               LibraryBuilder::DispatchAttrs{localMemorySize},
+                               llvmFunc);
     }
 
     auto queryFunctionName = std::string(kQueryFunctionName);
@@ -289,12 +317,24 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         return targetOp.emitError()
                << "failed to compile LLVM-IR module to an object file";
       }
-      auto objectFile = Artifact::createTemporary(libraryName, "obj");
+      auto objectFile = Artifact::createTemporary(libraryName, "o");
       auto &os = objectFile.outputFile->os();
       os << objectData;
       os.flush();
       os.close();
       objectFiles.push_back(std::move(objectFile));
+    }
+
+    // If we are keeping artifacts then let's also add the bitcode for easier
+    // debugging (vs just the binary object file).
+    if (options_.keepLinkerArtifacts) {
+      auto bitcodeFile =
+          Artifact::createVariant(objectFiles.front().path, "bc");
+      auto &os = bitcodeFile.outputFile->os();
+      llvm::WriteBitcodeToFile(*llvmModule, os);
+      os.flush();
+      os.close();
+      bitcodeFile.outputFile->keep();
     }
 
     if (!options_.staticLibraryOutput.empty()) {
@@ -326,9 +366,12 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto &linkArtifacts = linkArtifactsOr.getValue();
     if (options_.keepLinkerArtifacts) {
       mlir::emitRemark(targetOp.getLoc())
-          << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
+          << "linker artifacts for " << targetOp.getName() << " preserved:\n"
           << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
+      for (auto &objectFile : objectFiles) {
+        objectFile.outputFile->keep();
+      }
     }
 
     if (options_.linkEmbedded) {

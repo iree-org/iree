@@ -25,6 +25,13 @@ void iree_hal_local_executable_initialize(
         (iree_hal_local_executable_layout_t*)source_executable_layouts[i];
     iree_hal_executable_layout_retain(source_executable_layouts[i]);
   }
+
+  // Function attributes are optional and populated by the parent type.
+  out_base_executable->dispatch_attrs = NULL;
+
+  // Imports will be provided by the parent type, if needed.
+  out_base_executable->import_thunk = NULL;
+  out_base_executable->imports = NULL;
 }
 
 void iree_hal_local_executable_deinitialize(
@@ -44,18 +51,20 @@ iree_hal_local_executable_t* iree_hal_local_executable_cast(
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id) {
+    const iree_hal_vec3_t* workgroup_id, iree_byte_span_t local_memory) {
   IREE_ASSERT_ARGUMENT(executable);
   IREE_ASSERT_ARGUMENT(dispatch_state);
   IREE_ASSERT_ARGUMENT(workgroup_id);
   return ((const iree_hal_local_executable_vtable_t*)
               executable->resource.vtable)
-      ->issue_call(executable, ordinal, dispatch_state, workgroup_id);
+      ->issue_call(executable, ordinal, dispatch_state, workgroup_id,
+                   local_memory);
 }
 
 iree_status_t iree_hal_local_executable_issue_dispatch_inline(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
-    const iree_hal_executable_dispatch_state_v0_t* dispatch_state) {
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    iree_byte_span_t local_memory) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // TODO(benvanik): annotate with executable name to calculate total time.
 
@@ -79,7 +88,7 @@ iree_status_t iree_hal_local_executable_issue_dispatch_inline(
       for (workgroup_id.x = 0; workgroup_id.x < workgroup_count.x;
            ++workgroup_id.x) {
         status = iree_hal_local_executable_issue_call(
-            executable, ordinal, dispatch_state, &workgroup_id);
+            executable, ordinal, dispatch_state, &workgroup_id, local_memory);
         if (!iree_status_is_ok(status)) break;
       }
     }

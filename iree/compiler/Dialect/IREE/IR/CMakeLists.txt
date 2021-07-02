@@ -27,6 +27,8 @@ iree_cc_library(
     "IREEOps.cpp.inc"
     "IREETypes.cpp"
   DEPS
+    ::IREEInterfacesGen
+    ::IREEOpsGen
     LLVMSupport
     MLIRIR
     MLIRParser

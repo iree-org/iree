@@ -52,14 +52,6 @@ class WasmLinkerTool : public LinkerTool {
   LogicalResult configureModule(
       llvm::Module *llvmModule,
       ArrayRef<llvm::Function *> exportedFuncs) override {
-    for (auto &func : *llvmModule) {
-      // Enable frame pointers to ensure that stack unwinding works.
-      func.addFnAttr("frame-pointer", "all");
-
-      // -ffreestanding-like behavior.
-      func.addFnAttr("no-builtins");
-    }
-
     // https://lld.llvm.org/WebAssembly.html#exports
     // Note: once we can set --shared this shouldn't be needed, since we set
     // default visibility on exported functions.

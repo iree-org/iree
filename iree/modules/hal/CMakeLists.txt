@@ -14,11 +14,11 @@ iree_cc_library(
   NAME
     hal
   HDRS
-    "hal_module.h"
+    "module.h"
   TEXTUAL_HDRS
     "exports.inl"
   SRCS
-    "hal_module.c"
+    "module.c"
   DEPS
     iree::base
     iree::base::tracing

@@ -543,6 +543,13 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     attr-dict `:` type($value) `->` type($target)
   }];
 
+  let builders = [
+    // Builder for tensor.store with empty offset, sizes and strides operands.
+    // This is used to store an entire tensor.
+    OpBuilder<(ins "Value":$value, "Value":$target,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+  ];
+
   let extraClassDeclaration = [{
     /// Return the expected rank of each of the`static_offsets`, `static_sizes`
     /// and `static_strides` attributes.

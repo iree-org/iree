@@ -36,6 +36,16 @@ class WrapEntryPointsPass
                     memref::MemRefDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-abi-wrap-entry-points";
+  }
+
+  StringRef getDescription() const override {
+    return " Wraps all entry points in a function that is compatible with the "
+           "expected invocation semantics of bindings following the native "
+           "IREE ABI.";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -167,10 +177,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createWrapEntryPointsPass() {
   return std::make_unique<WrapEntryPointsPass>();
 }
 
-static PassRegistration<WrapEntryPointsPass> pass(
-    "iree-abi-wrap-entry-points",
-    " Wraps all entry points in a function that is compatible with the "
-    "expected invocation semantics of bindings following the native IREE ABI.");
+static PassRegistration<WrapEntryPointsPass> pass;
 
 }  // namespace ABI
 }  // namespace IREE

@@ -10,15 +10,32 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+cc_library(
+    name = "check",
+    testonly = True,
+    srcs = ["module.cc"],
+    hdrs = ["module.h"],
+    deps = [
+        "//iree/base",
+        "//iree/base:cc",
+        "//iree/base/internal",
+        "//iree/hal",
+        "//iree/modules/hal",
+        "//iree/testing:gtest",
+        "//iree/vm",
+        "//iree/vm:cc",
+    ],
+)
+
 cc_test(
     name = "check_test",
     srcs = ["check_test.cc"],
     deps = [
-        ":native_module",
+        ":check",
         "//iree/base",
-        "//iree/base:logging",
-        "//iree/base:status",
+        "//iree/base:cc",
         "//iree/base/internal",
+        "//iree/base/internal:span",
         "//iree/hal",
         "//iree/hal/vmvx/registration",
         "//iree/modules/hal",
@@ -27,24 +44,5 @@ cc_test(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:cc",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "native_module",
-    testonly = True,
-    srcs = ["native_module.cc"],
-    hdrs = ["native_module.h"],
-    deps = [
-        "//iree/base",
-        "//iree/base:status",
-        "//iree/base/internal",
-        "//iree/hal",
-        "//iree/modules/hal",
-        "//iree/testing:gtest",
-        "//iree/vm",
-        "//iree/vm:cc",
-        "@com_google_absl//absl/types:span",
     ],
 )

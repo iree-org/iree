@@ -10,6 +10,13 @@
 
 iree_add_all_subdirs()
 
+# Generic (bare-metal) system doesn't have the file system support and can be
+# thread-less.
+# TODO(#6247) Remove the condition when bare-metal related APIs are cleaned-up.
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Generic")
+  return()
+endif()
+
 iree_cc_library(
   NAME
     runtime

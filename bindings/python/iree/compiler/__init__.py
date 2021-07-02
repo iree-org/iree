@@ -6,4 +6,5 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from .core import *
+from .debugging import TempFileSaver
 from .tools import CompilerToolError

@@ -23,6 +23,7 @@ iree_cc_library(
     "custom_ops.cc.inc"
   DEPS
     ::custom_imports
+    ::custom_ops_gen
     LLVMSupport
     MLIRIR
     MLIRParser

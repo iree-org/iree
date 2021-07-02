@@ -48,7 +48,7 @@ iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
   iree_status_t status = iree_ok_status();
 
   void* base_address =
-      aligned_alloc(IREE_MEMORY_PAGE_SIZE_NORMAL, total_length);
+      iree_aligned_alloc(IREE_MEMORY_PAGE_SIZE_NORMAL, total_length);
   if (base_address == NULL) {
     status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                               "malloc failed on reservation");
@@ -63,7 +63,7 @@ void iree_memory_view_release(void* base_address,
                               iree_host_size_t total_length) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  free(base_address);
+  iree_aligned_free(base_address);
 
   IREE_TRACE_ZONE_END(z0);
 }

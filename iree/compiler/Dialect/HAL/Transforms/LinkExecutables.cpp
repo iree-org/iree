@@ -28,6 +28,12 @@ class LinkExecutablesPass
   explicit LinkExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
+  StringRef getArgument() const override { return "iree-hal-link-executables"; }
+
+  StringRef getDescription() const override {
+    return "Links together hal.executables depending on target backend rules";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
     for (auto &targetBackend :
@@ -61,12 +67,10 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass(
   return std::make_unique<LinkExecutablesPass>(executableOptions);
 }
 
-static PassRegistration<LinkExecutablesPass> pass(
-    "iree-hal-link-executables",
-    "Links together hal.executables depending on target backend rules", [] {
-      auto options = getTargetOptionsFromFlags();
-      return std::make_unique<LinkExecutablesPass>(options);
-    });
+static PassRegistration<LinkExecutablesPass> pass([] {
+  auto options = getTargetOptionsFromFlags();
+  return std::make_unique<LinkExecutablesPass>(options);
+});
 
 }  // namespace HAL
 }  // namespace IREE

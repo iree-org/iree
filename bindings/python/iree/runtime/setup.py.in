@@ -11,12 +11,8 @@ import os
 from setuptools import setup, find_namespace_packages, Extension
 import sysconfig
 
-
-README = """# IREE Python Runtime Components
-
-This package provides an API for running compiled IREE binaries and interfacing
-with the hardware-abstraction-layer.
-"""
+with open(os.path.join(os.path.dirname(__file__), "README.md"), "r") as f:
+  README = f.read()
 
 setup(
     name="iree-runtime@IREE_RELEASE_PACKAGE_SUFFIX@",
@@ -35,7 +31,8 @@ setup(
         "Development Status :: 3 - Alpha",
     ],
     python_requires=">=3.6",
-    packages=find_namespace_packages(include=["iree.runtime", "iree.runtime.*"]),
+    packages=find_namespace_packages(
+        include=["iree.runtime", "iree.runtime.*"]),
     ext_modules=[
         Extension(name="iree.runtime.binding", sources=[]),
     ],

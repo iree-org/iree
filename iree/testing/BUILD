@@ -14,7 +14,6 @@ package(
 
 cc_library(
     name = "benchmark",
-    testonly = True,
     srcs = [
         "benchmark_full.cc",
     ],
@@ -46,9 +45,7 @@ cc_library(
         "status_matchers.h",
     ],
     deps = [
-        "//iree/base:status",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "//iree/base:cc",
         "@com_google_googletest//:gtest",
     ],
 )

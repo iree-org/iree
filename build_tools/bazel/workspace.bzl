@@ -24,12 +24,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.local_repository,
-        name = "com_google_absl",
-        path = paths.join(iree_path, "third_party/abseil-cpp"),
-    )
-
-    maybe(
-        native.local_repository,
         name = "com_google_googletest",
         path = paths.join(iree_path, "third_party/googletest"),
     )
@@ -39,6 +33,13 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
         name = "com_github_dvidelabs_flatcc",
         build_file = iree_repo_alias + "//:build_tools/third_party/flatcc/BUILD.overlay",
         path = paths.join(iree_path, "third_party/flatcc"),
+    )
+
+    maybe(
+        native.new_local_repository,
+        name = "com_github_yaml_libyaml",
+        build_file = iree_repo_alias + "//:build_tools/third_party/libyaml/BUILD.overlay",
+        path = paths.join(iree_path, "third_party/libyaml"),
     )
 
     # TODO(scotttodd): TensorFlow is squatting on the vulkan_headers repo name, so

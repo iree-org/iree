@@ -41,6 +41,13 @@ struct LLVMTargetOptions {
   // Sanitizer Kind for CPU Kernels
   SanitizerKind sanitizerKind = SanitizerKind::kNone;
 
+  // Tool to use for linking (like lld). Acts as a prefix to the command line
+  // and can contain additional arguments.
+  std::string linkerPath;
+
+  // Tool to use for linking embedded ELFs specifically. Must be lld.
+  std::string embeddedLinkerPath;
+
   // Build for the IREE embedded platform-agnostic ELF loader.
   bool linkEmbedded = false;
 

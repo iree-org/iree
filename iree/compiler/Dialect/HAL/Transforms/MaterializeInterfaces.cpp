@@ -1071,7 +1071,8 @@ static LogicalResult declareEntryPointOps(
           dispatchEntryOp.getLoc(),
           targetBuilder.getStringAttr(dispatchEntryOp.function_ref()),
           targetBuilder.getIndexAttr(ordinal),
-          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{});
+          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{},
+          IntegerAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
@@ -1119,6 +1120,14 @@ class MaterializeInterfacesPass
     for (auto &targetBackend : targetBackends) {
       targetBackend->getDependentDialects(registry);
     }
+  }
+
+  StringRef getArgument() const override {
+    return "iree-hal-materialize-interfaces2";
+  }
+
+  StringRef getDescription() const override {
+    return "Materializes hal.executable ops from flow.executable ops";
   }
 
   void runOnOperation() override {
@@ -1188,12 +1197,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
   return std::make_unique<MaterializeInterfacesPass>(executableOptions);
 }
 
-static PassRegistration<MaterializeInterfacesPass> pass(
-    "iree-hal-materialize-interfaces2",
-    "Materializes hal.executable ops from flow.executable ops", [] {
-      auto options = getTargetOptionsFromFlags();
-      return std::make_unique<MaterializeInterfacesPass>(options);
-    });
+static PassRegistration<MaterializeInterfacesPass> pass([] {
+  auto options = getTargetOptionsFromFlags();
+  return std::make_unique<MaterializeInterfacesPass>(options);
+});
 
 }  // namespace HAL
 }  // namespace IREE

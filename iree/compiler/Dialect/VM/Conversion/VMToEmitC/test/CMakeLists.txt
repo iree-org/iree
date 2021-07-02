@@ -6,12 +6,28 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "arithmetic_ops.mlir"
+    "arithmetic_ops_f32.mlir"
+    "arithmetic_ops_i64.mlir"
+    "assignment_ops.mlir"
+    "assignment_ops_f32.mlir"
+    "assignment_ops_i64.mlir"
+    "comparison_ops.mlir"
+    "comparison_ops_f32.mlir"
+    "comparison_ops_i64.mlir"
+    "const_ops.mlir"
+    "const_ops_f32.mlir"
+    "const_ops_i64.mlir"
+    "conversion_ops.mlir"
+    "conversion_ops_f32.mlir"
+    "conversion_ops_i64.mlir"
+    "shift_ops.mlir"
+    "shift_ops_i64.mlir"
+    "type_conversion.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

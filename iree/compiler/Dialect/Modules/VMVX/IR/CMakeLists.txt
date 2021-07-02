@@ -27,6 +27,9 @@ iree_cc_library(
     "VMVXOps.cpp"
     "VMVXTypes.cpp"
   DEPS
+    ::VMVXEnumsGen
+    ::VMVXOpInterfaceGen
+    ::VMVXOpsGen
     LLVMSupport
     MLIRIR
     MLIRSideEffectInterfaces
