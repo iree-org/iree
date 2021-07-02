@@ -11,7 +11,7 @@
 
 #include "iree/hal/local/loaders/static_library_loader.h"
 #include "iree/hal/local/task_device.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
 #include "iree/samples/static_library/simple_mul_c.h"
 #include "iree/task/api.h"
@@ -38,7 +38,8 @@ iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
   iree_hal_executable_loader_t* library_loader = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_static_library_loader_create(
-        IREE_ARRAYSIZE(libraries), libraries, iree_allocator_system(),
+        IREE_ARRAYSIZE(libraries), libraries,
+        iree_hal_executable_import_provider_null(), iree_allocator_system(),
         &library_loader);
   }
 
