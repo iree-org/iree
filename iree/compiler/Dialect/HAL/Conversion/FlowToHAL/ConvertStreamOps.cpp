@@ -980,6 +980,12 @@ static LogicalResult recordStreamCommands(
       }
     } else if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(op)) {
       // No-op; handled by the buffer allocation.
+    } else if (isa<ConstantOp>(op)) {
+      // Note that even though constants were hoisted early, they can be
+      // materialized as part of various conversions so do it again to get
+      // any new ones.
+      auto newOp = rewriter.clone(op);
+      op.replaceAllUsesWith(newOp);
     } else if (isa<IREE::HAL::ConstantSubspanOp>(op) ||
                isa<IREE::Flow::TensorReshapeOp>(op)) {
       // No work to perform.
