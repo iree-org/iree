@@ -73,12 +73,12 @@ struct ConcatenateOpConversion
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0; i < rank; ++i) {
       offsets.push_back(rewriter.create<ConstantIndexOp>(loc, 0));
-      sizes.push_back(rewriter.create<memref::DimOp>(loc, args[0], i));
+      sizes.push_back(rewriter.create<tensor::DimOp>(loc, args[0], i));
       strides.push_back(rewriter.create<ConstantIndexOp>(loc, 1));
     }
     Value resultDimSize = rewriter.create<ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
-      auto size = rewriter.create<memref::DimOp>(loc, arg, dim);
+      auto size = rewriter.create<tensor::DimOp>(loc, arg, dim);
       resultDimSize = rewriter.create<AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
@@ -92,7 +92,7 @@ struct ConcatenateOpConversion
     Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
       offsets[dim] = accBound;
-      sizes[dim] = rewriter.create<memref::DimOp>(loc, arg, dim);
+      sizes[dim] = rewriter.create<tensor::DimOp>(loc, arg, dim);
       result = rewriter.create<tensor::InsertSliceOp>(loc, arg, result, offsets,
                                                       sizes, strides);
       accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);

@@ -17,7 +17,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -104,7 +103,7 @@ struct DispatchLinalgOnTensorsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                memref::MemRefDialect, scf::SCFDialect, ShapeDialect>();
+                scf::SCFDialect, ShapeDialect, tensor::TensorDialect>();
   }
   DispatchLinalgOnTensorsPass() = default;
   DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
@@ -665,7 +664,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
     if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
       for (unsigned i = 0; i < rt.getRank(); ++i) {
         if (!rt.isDynamicDim(i)) continue;
-        auto dim = builder.createOrFold<memref::DimOp>(dispatchOp.getLoc(),
+        auto dim = builder.createOrFold<tensor::DimOp>(dispatchOp.getLoc(),
                                                        operand, i);
         operandDynamicDims.push_back(dim);
       }
@@ -715,7 +714,7 @@ static Optional<SmallVector<SmallVector<Value, 4>, 1>> computeOutputShape(
 
 static bool hasOnlyDimUses(Operation *op) {
   return llvm::all_of(op->getUsers(), [&](Operation *user) {
-    return isa<memref::DimOp>(user);
+    return isa<tensor::DimOp>(user);
   });
 }
 
@@ -808,7 +807,7 @@ struct TileAndDistributeOnTensorsPattern
 
     rewriter.replaceOpWithIf(op, dispatchOp.getResults(),
                              [&](OpOperand &operand) {
-                               return !isa<memref::DimOp>(operand.getOwner());
+                               return !isa<tensor::DimOp>(operand.getOwner());
                              });
     return success();
   }
@@ -865,7 +864,7 @@ static Optional<SmallVector<SmallVector<Value>>> getResultShapes(
     SmallVector<Value> shape;
     for (auto dim :
          llvm::seq<int64_t>(0, v.getType().cast<ShapedType>().getRank())) {
-      shape.push_back(rewriter.createOrFold<memref::DimOp>(loc, v, dim));
+      shape.push_back(rewriter.createOrFold<tensor::DimOp>(loc, v, dim));
     }
     return shape;
   };
@@ -898,7 +897,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
         llvm::all_of(op->getUsers(), [](Operation *user) {
           return isDispatchableOp(user) ||
                  user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ||
-                 isa<IREE::Flow::DispatchWorkgroupsOp, memref::DimOp>(user);
+                 isa<IREE::Flow::DispatchWorkgroupsOp, tensor::DimOp>(user);
         })) {
       return failure();
     }
@@ -966,7 +965,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     rewriter.replaceOpWithIf(op, dispatchOp.getOperation()->getResults(),
                              [&](OpOperand &operand) {
                                Operation *user = operand.getOwner();
-                               return !isa<memref::DimOp>(user);
+                               return !isa<tensor::DimOp>(user);
                              });
     return success();
   }

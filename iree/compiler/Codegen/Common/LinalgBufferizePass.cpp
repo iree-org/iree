@@ -427,7 +427,7 @@ static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
 static bool hasSingleRealUse(Value value) {
   int numUsers = 0;
   for (OpOperand &use : value.getUses()) {
-    if (!isa<memref::DimOp>(use.getOwner())) {
+    if (!isa<memref::DimOp, tensor::DimOp>(use.getOwner())) {
       numUsers++;
     }
   }
@@ -549,7 +549,8 @@ static LogicalResult hasDestructiveUpdateLoopPattern(scf::ForOp forOp,
               [&](tensor::InsertSliceOp subTensorInsertOp) {
                 return subTensorInsertOp.dest() == arg;
               })
-          .Case<memref::DimOp, scf::YieldOp>([&](auto op) { return true; })
+          .Case<memref::DimOp, scf::YieldOp, tensor::DimOp>(
+              [&](auto op) { return true; })
           .Default([&](Operation *op) { return false; });
     };
     if (llvm::all_of(arg.getUses(), isDestructiveUpdateUses)) {
@@ -1616,7 +1617,7 @@ void LinalgBufferizePass::runOnOperation() {
         .Case<tensor::ExtractOp>([&](tensor::ExtractOp op) {
           return convertTensorExtractOp(b, op, bvm);
         })
-        .Case<memref::DimOp, vector::TransferReadOp>([&](auto op) {
+        .Case<vector::TransferReadOp>([&](auto op) {
           for (unsigned i : llvm::seq<unsigned>(0, op->getNumOperands())) {
             Value operand = op->getOperand(i);
             if (operand.getType().isa<RankedTensorType>()) {
@@ -1624,6 +1625,14 @@ void LinalgBufferizePass::runOnOperation() {
               if (remappedVal) op->setOperand(i, remappedVal);
             }
           }
+          return success();
+        })
+        .Case<tensor::DimOp>([&](tensor::DimOp dimOp) {
+          Value operand = dimOp.source();
+          Value remappedVal = bvm.lookupOrNull(operand);
+          Value newDimOp = b.create<memref::DimOp>(dimOp.getLoc(), remappedVal,
+                                                   dimOp.index());
+          dimOp.replaceAllUsesWith(newDimOp);
           return success();
         })
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
