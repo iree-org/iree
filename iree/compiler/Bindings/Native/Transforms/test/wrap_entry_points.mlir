@@ -12,9 +12,9 @@
 //  CHECK-NEXT:   %[[ARG1_DIM0:.+]] = hal.buffer_view.dim %[[ARG1]], 0 : index
 //  CHECK-NEXT:   %[[ARG1_TENSOR:.+]] = hal.tensor.cast %[[ARG1]] : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG1_DIM0]]}
 //  CHECK-NEXT:   %[[RET_TENSOR:.+]]:2 = call @_dynamicEntry(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
-//       CHECK:   %[[RET0_DIM0:.+]] = memref.dim %[[RET_TENSOR]]#0, %c0{{.*}} : tensor<?x8x8x3xf32>
+//       CHECK:   %[[RET0_DIM0:.+]] = tensor.dim %[[RET_TENSOR]]#0, %c0{{.*}} : tensor<?x8x8x3xf32>
 //  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.cast %[[RET_TENSOR]]#0 : tensor<?x8x8x3xf32>{%[[RET0_DIM0]]} -> !hal.buffer_view
-//       CHECK:   %[[RET1_DIM0:.+]] = memref.dim %[[RET_TENSOR]]#1, %c0{{.*}} : tensor<?x8x8x3xf32>
+//       CHECK:   %[[RET1_DIM0:.+]] = tensor.dim %[[RET_TENSOR]]#1, %c0{{.*}} : tensor<?x8x8x3xf32>
 //  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.cast %[[RET_TENSOR]]#1 : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
 //  CHECK-NEXT:   return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }

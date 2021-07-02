@@ -94,7 +94,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     target.addLegalDialect<tensor::TensorDialect>();
     target.addLegalOp<mlir::CallOp>();
     target.addLegalOp<mlir::tensor::CastOp>();
-    target.addLegalOp<mlir::memref::DimOp>();
+    target.addLegalOp<mlir::tensor::DimOp>();
 
     // TODO(suderman): Enable logicistic op for lowering once the op is
     // supported in IREE. Also, remove the numerically unstable ConvertSigmoidOp

@@ -970,8 +970,8 @@ func @subtensor_insert() {
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>
   %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
   %4 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
-  %5 = memref.dim %3, %c0 : tensor<?x?xi32>
-  %6 = memref.dim %3, %c1 : tensor<?x?xi32>
+  %5 = tensor.dim %3, %c0 : tensor<?x?xi32>
+  %6 = tensor.dim %3, %c1 : tensor<?x?xi32>
   %7 = tensor.insert_slice %3 into %4[3, 4] [%5, %6] [1, 1] : tensor<?x?xi32> into tensor<?x?xi32>
   flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
@@ -1118,8 +1118,8 @@ func @gather() {
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
   %4 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = []: !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %5 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
-  %d0 = memref.dim %5, %c0 : tensor<?xi32>
-  %d1 = memref.dim %4, %c1 : tensor<?x?xf32>
+  %d0 = tensor.dim %5, %c0 : tensor<?xi32>
+  %d1 = tensor.dim %4, %c1 : tensor<?x?xf32>
   %3 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
   %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<?xi32>) outs(%3 : tensor<?x?xf32>) {
   ^bb0( %arg2: i32, %arg3: f32):  // no predecessors
@@ -1203,8 +1203,8 @@ func @read_only_subtensor() {
   %workgroup_count_y = hal.interface.workgroup.count[1] : index
   %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
   %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-  %dim0 = memref.dim %2, %c0 : tensor<?x?xf32>
-  %dim1 = memref.dim %2, %c1 : tensor<?x?xf32>
+  %dim0 = tensor.dim %2, %c0 : tensor<?x?xf32>
+  %dim1 = tensor.dim %2, %c1 : tensor<?x?xf32>
   scf.for %arg0 = %5 to %dim0 step %6 {
     %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
     %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
@@ -1263,7 +1263,7 @@ func @reshape_read_only() {
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %3 = linalg.tensor_collapse_shape %2 [[0, 1]]
       : tensor<?x?xf32> into tensor<?xf32>
-  %4 = memref.dim %3, %c0 : tensor<?xf32>
+  %4 = tensor.dim %3, %c0 : tensor<?xf32>
   %5 = linalg.init_tensor [%4] : tensor<?xf32>
   %6 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
@@ -1496,8 +1496,8 @@ func @rank_reduced_subtensor_insert() {
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<readwrite:?x?x?xf32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:?x?x?xf32> -> tensor<?x?x?xf32>
-  %4 = memref.dim %3, %c1 : tensor<?x?x?xf32>
-  %5 = memref.dim %3, %c2 : tensor<?x?x?xf32>
+  %4 = tensor.dim %3, %c1 : tensor<?x?x?xf32>
+  %5 = tensor.dim %3, %c2 : tensor<?x?x?xf32>
   %6 = tensor.insert_slice %2 into %3[0, 0, 0] [1, %4, %5] [1, 1, 1] : tensor<?x?xf32> into tensor<?x?x?xf32>
   flow.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = [] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<readwrite:?x?x?xf32>
   return
@@ -2035,9 +2035,9 @@ module  {
               %18 = tensor.extract_slice %8[%arg2, %arg6] [%16, %17] [1, 1] : tensor<?x144xf32> to tensor<?x?xf32>
               %19 = affine.min #map5(%arg4)
               %20 = tensor.extract_slice %10[%arg6, %arg4] [%17, %19] [1, 1] : tensor<144x?xf32> to tensor<?x?xf32>
-              %21 = memref.dim %arg7, %c0 : tensor<?x?xf32>
+              %21 = tensor.dim %arg7, %c0 : tensor<?x?xf32>
               %22 = affine.min #map6(%21, %arg2)
-              %23 = memref.dim %arg7, %c1 : tensor<?x?xf32>
+              %23 = tensor.dim %arg7, %c1 : tensor<?x?xf32>
               %24 = affine.min #map6(%23, %arg4)
               %25 = tensor.extract_slice %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
               %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -2140,9 +2140,9 @@ module  {
               %18 = tensor.extract_slice %8[%arg2, %arg6] [%16, %17] [1, 1] : tensor<?x144xf32> to tensor<?x?xf32>
               %19 = affine.min #map5(%arg4)
               %20 = tensor.extract_slice %10[%arg6, %arg4] [%17, %19] [1, 1] : tensor<144x?xf32> to tensor<?x?xf32>
-              %21 = memref.dim %arg7, %c0 : tensor<?x?xf32>
+              %21 = tensor.dim %arg7, %c0 : tensor<?x?xf32>
               %22 = affine.min #map6(%21, %arg2)
-              %23 = memref.dim %arg7, %c1 : tensor<?x?xf32>
+              %23 = tensor.dim %arg7, %c1 : tensor<?x?xf32>
               %24 = affine.min #map6(%23, %arg4)
               %25 = tensor.extract_slice %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
               %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -2241,9 +2241,9 @@ module  {
               %18 = tensor.extract_slice %8[%arg2, %arg6] [%16, %17] [1, 1] : tensor<?x144xf32> to tensor<?x?xf32>
               %19 = affine.min #map5(%arg4)
               %20 = tensor.extract_slice %10[%arg6, %arg4] [%17, %19] [1, 1] : tensor<144x?xf32> to tensor<?x?xf32>
-              %21 = memref.dim %arg7, %c0 : tensor<?x?xf32>
+              %21 = tensor.dim %arg7, %c0 : tensor<?x?xf32>
               %22 = affine.min #map6(%21, %arg2)
-              %23 = memref.dim %arg7, %c1 : tensor<?x?xf32>
+              %23 = tensor.dim %arg7, %c1 : tensor<?x?xf32>
               %24 = affine.min #map6(%23, %arg4)
               %25 = tensor.extract_slice %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
               %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>

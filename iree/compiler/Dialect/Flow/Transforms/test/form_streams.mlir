@@ -347,7 +347,7 @@ func @ordering(%w : index) -> (tensor<i32>, tensor<f32>, tensor<i32>) {
 func @metadata_only(%t: tensor<?xf32>) -> (tensor<?xf32>, !shapex.ranked_shape<[?]>) {
   // CHECK-NOT: flow.ex.stream.fragment
   %c0 = constant 0 : index
-  %4 = memref.dim %t, %c0 : tensor<?xf32>
+  %4 = tensor.dim %t, %c0 : tensor<?xf32>
   %5 = shapex.make_ranked_shape %4 : (index) -> !shapex.ranked_shape<[?]>
   %6 = shapex.tie_shape %t, %5 : tensor<?xf32>, !shapex.ranked_shape<[?]>
   return %6, %5 : tensor<?xf32>, !shapex.ranked_shape<[?]>

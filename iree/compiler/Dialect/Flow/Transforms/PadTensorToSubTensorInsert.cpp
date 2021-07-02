@@ -61,7 +61,7 @@ struct PadTensorOpConversion : public OpRewritePattern<linalg::PadTensorOp> {
     SmallVector<OpFoldResult> outputShape;
     for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
       SmallVector<Value> mapValues;
-      Value sourceDim = rewriter.createOrFold<memref::DimOp>(loc, source, dim);
+      Value sourceDim = rewriter.createOrFold<tensor::DimOp>(loc, source, dim);
       mapValues.push_back(sourceDim);
       sourceShape.push_back(sourceDim);
       AffineExpr expr = rewriter.getAffineDimExpr(0);

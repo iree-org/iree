@@ -9,8 +9,8 @@
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -37,22 +37,20 @@ class LegalizeTieShapePattern : public OpConversionPattern<Shape::TieShapeOp> {
 // Lowers dim operations against values that were originally tensors but have
 // been converted to HAL buffer types.
 class BackingBufferBufferViewDimPattern
-    : public OpConversionPattern<memref::DimOp> {
+    : public OpConversionPattern<tensor::DimOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      memref::DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
+      tensor::DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    memref::DimOp::Adaptor operands(rawOperands);
-    if (!dimOp.memrefOrTensor().getType().isa<TensorType>() ||
-        !IREE::HAL::TensorRewriteAdaptor::isValidNewType(
-            operands.memrefOrTensor().getType())) {
+    tensor::DimOp::Adaptor operands(rawOperands);
+    if (!IREE::HAL::TensorRewriteAdaptor::isValidNewType(
+            operands.source().getType())) {
       return failure();
     }
     auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
-        dimOp.getLoc(), dimOp.memrefOrTensor(), operands.memrefOrTensor(),
-        rewriter);
+        dimOp.getLoc(), dimOp.source(), operands.source(), rewriter);
 
     Optional<int64_t> index = dimOp.getConstantIndex();
     assert(index.hasValue() && "expect constant index in `std.dim` operation");
