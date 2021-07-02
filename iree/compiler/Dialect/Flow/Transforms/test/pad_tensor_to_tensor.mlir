@@ -23,8 +23,8 @@ module  {
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
-//   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
-//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP0]]()[%[[ARG3]], %[[D0]]]
 //   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]], %[[D1]]]
 //       CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[RD0]], %[[RD1]]]

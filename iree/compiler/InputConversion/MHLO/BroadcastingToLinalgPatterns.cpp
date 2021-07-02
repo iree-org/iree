@@ -293,7 +293,7 @@ void appendExtents(OpBuilder &builder, Location loc,
   for (int i = 0; i < t.getRank(); ++i) {
     if (t.isDynamicDim(i)) {
       // Emit a dim op.
-      Value dim = builder.create<memref::DimOp>(loc, v, i);
+      Value dim = builder.create<tensor::DimOp>(loc, v, i);
       extents.push_back(dim);
     } else {
       // Static dim.

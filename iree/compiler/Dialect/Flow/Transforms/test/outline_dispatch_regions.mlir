@@ -156,10 +156,10 @@ func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
   %c1 = constant 1 : index
   %c3 = constant 3 : index
-  // CHECK-DAG: %[[ARG0_DIM1:.+]] = memref.dim %[[ARG0]], %c1
-  %dim1 = memref.dim %arg0, %c1 : tensor<7x?x24x?xf32>
-  // CHECK-DAG: %[[ARG0_DIM3:.+]] = memref.dim %[[ARG0]], %c3
-  %dim3 = memref.dim %arg0, %c3 : tensor<7x?x24x?xf32>
+  // CHECK-DAG: %[[ARG0_DIM1:.+]] = tensor.dim %[[ARG0]], %c1
+  %dim1 = tensor.dim %arg0, %c1 : tensor<7x?x24x?xf32>
+  // CHECK-DAG: %[[ARG0_DIM3:.+]] = tensor.dim %[[ARG0]], %c3
+  %dim3 = tensor.dim %arg0, %c3 : tensor<7x?x24x?xf32>
   // CHECK-DAG: %[[X:.+]] = constant 1024
   %x = constant 1024 : index
   // CHECK-DAG: %[[Y:.+]] = constant 512

@@ -122,7 +122,7 @@ static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
   SmallVector<Value, 4> dynamicDims;
   for (auto dim : llvm::enumerate(v.getType().cast<ShapedType>().getShape())) {
     if (dim.value() != ShapedType::kDynamicSize) continue;
-    dynamicDims.push_back(b.createOrFold<memref::DimOp>(loc, v, dim.index()));
+    dynamicDims.push_back(b.createOrFold<tensor::DimOp>(loc, v, dim.index()));
   }
   return dynamicDims;
 }

@@ -242,7 +242,7 @@ LogicalResult elideTieShapeUsagePattern(TieShapeOp op,
     if (auto carryingOp = dyn_cast<ShapeCarryingInterface>(use.getOwner())) {
       carryingOp->setOperand(use.getOperandNumber(), operands.operand());
       didAnything = true;
-    } else if (auto dimOp = dyn_cast<memref::DimOp>(use.getOwner())) {
+    } else if (auto dimOp = dyn_cast<tensor::DimOp>(use.getOwner())) {
       auto index = dimOp.getConstantIndex();
       if (index.hasValue()) {
         rewriter.replaceOpWithNewOp<RankedDimOp>(dimOp, op.shape(),

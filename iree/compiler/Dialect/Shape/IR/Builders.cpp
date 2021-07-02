@@ -261,7 +261,7 @@ SmallVector<Value, 4> buildOrFindDynamicDimsForValue(Location loc, Value value,
     // hopefully converted to ranked shape types.
     for (unsigned i = 0; i < valueSt.getRank(); ++i) {
       if (valueSt.isDynamicDim(i)) {
-        result.push_back(builder.createOrFold<memref::DimOp>(loc, value, i));
+        result.push_back(builder.createOrFold<tensor::DimOp>(loc, value, i));
       }
     }
   }
