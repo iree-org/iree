@@ -154,65 +154,6 @@ class TargetBackend {
   virtual void declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
                                  IREE::HAL::ExecutableOp executableOp);
 
-  // Captured state from the point at which a dispatch is to be recorded.
-  struct DispatchState {
-    // The original flow.dispatch op.
-    // This may contain additional placement hints or options and can be used to
-    // carry across per-dispatch backend-specific flags.
-    IREE::Flow::DispatchOp dispatchOp;
-
-    // SSA value of the hal.device the command buffer is from.
-    Value device;
-
-    // SSA value of the hal.command_buffer to record into.
-    Value commandBuffer;
-
-    // Executable being dispatched, with translated target ops nested as
-    // `hal.executable.variant`. Backends can dispatch any of the available
-    // target executables.
-    IREE::HAL::ExecutableOp executableOp;
-
-    // Entry point on the public executable API that is being dispatched.
-    // Note that many entry points may exist within a single executable.
-    IREE::HAL::ExecutableEntryPointOp entryPointOp;
-
-    // ABI interface used by the |entryPointOp|.
-    IREE::HAL::InterfaceOp interfaceOp;
-
-    // SSA value of the loaded hal.executable_layout reference.
-    Value executableLayout;
-
-    // SSA values of the workgroup count of the dispatch. See `flow.dispatch`
-    // for more information on how this is calculated.
-    SmallVector<Value, 3> workgroupCount;
-
-    // A base offset within the push constants array that all new push constants
-    // must follow. Note that backend-specific push constants must have been
-    // allocated during `extractInterface`.
-    int basePushConstantOffset = 0;
-  };
-
-  // Records a dispatch to a command buffer given the dispatch state.
-  // Push constants and bindings are already set and at minimum only a
-  // `hal.command_buffer.dispatch` is required.
-  //
-  // If a backend wants to provide additional push constants it can push them
-  // beginning at offset |dispatchState.basePushConstantOffset|. Note that the
-  // push constants must have been declared by `extractInterface`.
-  //
-  // The provided |dispatchState.workgroupCount| can be used to access the
-  // workgroup count values for dispatch as provided on the original
-  // flow.dispatch op. These arbitrarily-ranked dimensions need to be adapted
-  // into the target-dependent 3-D XYZ grid space.
-  //
-  // |dispatchState.operands| and |dispatchState.results| can be used to access
-  // the buffers allocated in case additional command buffer operations are
-  // needed. Note that any introduced scheduling dependency must be handled,
-  // such as by inserting an  `hal.command_buffer.execution_barrier`.
-  virtual LogicalResult recordDispatch(Location loc,
-                                       DispatchState dispatchState,
-                                       DeviceSwitchRewriter &switchRewriter);
-
   // Inserts passes used to translate the `hal.executable.variant` op contents.
   // The pass manager will be nested on `hal.executable` such that the pipeline
   // will only run on executable contents.
@@ -312,27 +253,6 @@ class TargetBackend {
       IREE::HAL::ExecutableVariantOp linkedTargetOp,
       std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
       OpBuilder &builder);
-
-  // Calculates the workgroup size (x, y, z). These are the dimension numbers
-  // for a single workgroup.
-  virtual std::array<Value, 3> calculateDispatchWorkgroupSize(
-      Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
-      OpBuilder &builder);
-
-  // Calculates the workgroup count (x, y, z) for dispatching to the given
-  // |entryPointOp|. The provided N-dimensional |workload| is the total number
-  // of invocations required as calculated by the generic workload logic
-  // (basically, number of output elements in tensors).
-  virtual std::array<Value, 3> calculateDispatchWorkgroupCount(
-      Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
-      OpBuilder &builder);
-  // Calculates the workgroup count (x, y, z) given the total N-dimensional
-  // |workload| and specific |workgroupSize|.
-  std::array<Value, 3> calculateDispatchWorkgroupCount(
-      Location loc, ValueRange workload,
-      const std::array<Value, 3> &workgroupSize, OpBuilder &builder);
 };
 
 }  // namespace HAL

@@ -771,29 +771,123 @@ static void recordInterfaceBindings(Value device, Value commandBuffer,
   }
 }
 
+// Calculates the workgroup size (x, y, z). These are the dimension numbers
+// for a single workgroup.
+static std::array<Value, 3> calculateDispatchWorkgroupSize(
+    Location loc, IREE::HAL::ExecutableOp executableOp,
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
+    OpBuilder &builder) {
+  // When no workgroup size is specified we just assume [1,1,1].
+  // This yields a workgroup count that models the extents of the workload.
+  return {
+      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
+  };
+}
+
+static std::array<Value, 3> calculateDispatchWorkgroupCountFromRegion(
+    Location loc, IREE::HAL::ExecutableEntryPointOp entryPointOp,
+    ValueRange workload, OpBuilder &builder) {
+  Block *body = entryPointOp.getBlock();
+  BlockAndValueMapping bvm;
+  for (auto args : llvm::enumerate(workload)) {
+    bvm.map(body->getArgument(args.index()), args.value());
+  }
+  for (Operation &op : body->without_terminator()) {
+    builder.clone(op, bvm);
+  }
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  // Verifier of EntryPointOp checks that the return has 3 values.
+  SmallVector<Value, 4> count = llvm::to_vector<4>(llvm::map_range(
+      returnOp.operands(), [&bvm](Value v) { return bvm.lookup(v); }));
+  return {count[0], count[1], count[2]};
+}
+
+// Calculates the workgroup count (x, y, z) given the total N-dimensional
+// |workload| and specific |workgroupSize|.
+static std::array<Value, 3> calculateWorkloadWorkgroupCount(
+    Location loc, ValueRange workload,
+    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+  std::array<Value, 3> result;
+
+  auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
+  if (workload.size() <= 3) {
+    // 1-D to 3-D are easy (pad 2 to 0 dimensions) and divide by workgroup size.
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      Value workloadI = i < workload.size() ? workload[i] : constantOne;
+      workloadI = builder.createOrFold<mlir::SubIOp>(
+          loc,
+          builder.createOrFold<mlir::AddIOp>(loc, workloadI, workgroupSize[i]),
+          constantOne);
+      result[i] = builder.createOrFold<UnsignedDivIOp>(loc, workloadI,
+                                                       workgroupSize[i]);
+    }
+  } else {
+    // TODO(#4140): remapping of N-D to 3-D: this is not how you do this!
+    Value flatWorkload = constantOne;
+    for (auto workloadI : workload) {
+      flatWorkload = builder.createOrFold<MulIOp>(loc, flatWorkload, workloadI);
+    }
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      auto rounded = builder.createOrFold<mlir::SubIOp>(
+          loc,
+          builder.createOrFold<mlir::AddIOp>(loc, flatWorkload,
+                                             workgroupSize[i]),
+          constantOne);
+      auto workgroupCountI = builder.createOrFold<mlir::UnsignedDivIOp>(
+          loc, rounded, workgroupSize[i]);
+      result[i] = workgroupCountI;
+
+      // Multiply back out and subtract from invocations.
+      flatWorkload = builder.createOrFold<SubIOp>(
+          loc, flatWorkload,
+          builder.createOrFold<MulIOp>(loc, workgroupCountI, rounded));
+    }
+  }
+
+  return result;
+}
+
+// Calculates the workgroup count (x, y, z) for dispatching to the given
+// |entryPointOp|. The provided N-dimensional |workload| is the total number
+// of invocations required as calculated by the generic workload logic
+// (basically, number of output elements in tensors).
+static std::array<Value, 3> calculateDispatchWorkgroupCount(
+    Location loc, IREE::HAL::ExecutableOp executableOp,
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
+    OpBuilder &builder) {
+  Region *region = entryPointOp.getBody();
+  if (region) {
+    return calculateDispatchWorkgroupCountFromRegion(loc, entryPointOp,
+                                                     workload, builder);
+  }
+  auto workgroupSize = calculateDispatchWorkgroupSize(
+      loc, executableOp, entryPointOp, workload, builder);
+  return calculateWorkloadWorkgroupCount(loc, workload, workgroupSize, builder);
+}
+
 // Records a dispatch operation.
 static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                     IREE::Flow::DispatchOp &dispatchOp,
                                     StreamSchedulingState &schedulingState,
                                     ConversionPatternRewriter &rewriter) {
+  auto loc = dispatchOp.getLoc();
+
   // Get the handle to the executable that is compatible with our device.
   auto executableOp =
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
           dispatchOp, dispatchOp.executable()));
 
-  IREE::HAL::TargetBackend::DispatchState dispatchState;
-  dispatchState.dispatchOp = dispatchOp;
-  dispatchState.executableOp = executableOp;
-  dispatchState.device = device;
-  dispatchState.commandBuffer = commandBuffer;
+  SmallVector<Value> workgroupCount;
   for (auto dim : dispatchOp.workgroup_count()) {
-    dispatchState.workgroupCount.push_back(rewriter.getRemappedValue(dim));
+    workgroupCount.push_back(rewriter.getRemappedValue(dim));
   }
-  // TODO(benvanik): support extended push constants.
-  dispatchState.basePushConstantOffset = 0;
 
   // Ask each target backend to record their dispatch logic.
-  IREE::HAL::DeviceSwitchRewriter switchRewriter(dispatchOp.getLoc(),
+  IREE::HAL::DeviceSwitchRewriter switchRewriter(loc,
                                                  /*resultTypes=*/TypeRange{},
                                                  device, rewriter);
   for (auto variantOp :
@@ -823,15 +917,34 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                             executableLayout, bindingsAttr, schedulingState,
                             rewriter);
 
-    dispatchState.entryPointOp = entryPointOp;
-    dispatchState.interfaceOp = interfaceOp;
-    dispatchState.executableLayout = executableLayout;
-    if (failed(targetBackend->recordDispatch(dispatchOp.getLoc(), dispatchState,
-                                             switchRewriter))) {
-      return dispatchOp.emitError()
-             << "unable to record dispatch for target backend "
-             << targetBackend->name();
+    SmallVector<Value, 4> regionArgs;
+    regionArgs.push_back(commandBuffer);
+    for (auto dim : workgroupCount) {
+      regionArgs.push_back(dim);
     }
+    auto *region = switchRewriter.addConditionRegion(
+        IREE::HAL::DeviceMatchIDAttr::get(targetBackend->deviceID(),
+                                          loc.getContext()),
+        regionArgs);
+    auto &entryBlock = region->front();
+    auto caseCommandBuffer = entryBlock.getArgument(0);
+    SmallVector<Value, 3> originalWorkgroupCount;
+    for (int i = 0; i < workgroupCount.size(); ++i) {
+      originalWorkgroupCount.push_back(entryBlock.getArgument(1 + i));
+    }
+
+    auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
+    auto entryPointSymRef = caseBuilder.getSymbolRefAttr(
+        executableOp.getName(),
+        {caseBuilder.getSymbolRefAttr(entryPointOp->getParentOp()),
+         caseBuilder.getSymbolRefAttr(entryPointOp)});
+    auto remappedWorkgroupCount = calculateDispatchWorkgroupCount(
+        loc, executableOp, entryPointOp, originalWorkgroupCount, caseBuilder);
+    caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
+        loc, caseCommandBuffer, entryPointSymRef, remappedWorkgroupCount[0],
+        remappedWorkgroupCount[1], remappedWorkgroupCount[2]);
+
+    caseBuilder.create<IREE::HAL::ReturnOp>(loc);
   }
   switchRewriter.build();
 
