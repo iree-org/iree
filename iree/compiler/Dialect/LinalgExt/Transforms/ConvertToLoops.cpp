@@ -90,7 +90,11 @@ struct BubbleSortConversion : public OpRewritePattern<linalg_ext::SortOp> {
           b.create<scf::IfOp>(
               loc, TypeRange{}, cond,
               [&](OpBuilder& b, Location loc) {
-                // Swap the pairs if true.
+                // Do not swap the pairs if true.
+                b.create<scf::YieldOp>(loc);
+              },
+              [&](OpBuilder& b, Location loc) {
+                // Swap the pairs if false.
                 SmallVector<Value> indices(ivs.begin(), ivs.end());
                 Value ivPlusOne =
                     b.create<AddIOp>(loc, scfFor.getInductionVar(), one);
@@ -104,10 +108,6 @@ struct BubbleSortConversion : public OpRewritePattern<linalg_ext::SortOp> {
                   b.create<memref::StoreOp>(
                       loc, v1, op.getOutputOperand(i)->get(), indices);
                 }
-                b.create<scf::YieldOp>(loc);
-              },
-              [&](OpBuilder& b, Location loc) {
-                // Do not swap the pairs if false.
                 b.create<scf::YieldOp>(loc);
               });
 

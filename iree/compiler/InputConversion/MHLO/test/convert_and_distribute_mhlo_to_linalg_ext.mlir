@@ -16,7 +16,7 @@ func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 // CHECK:           %[[ARG1:.+]]: !flow.dispatch.tensor<readwrite:128xi32>
 // CHECK:           %[[IN:.+]] = flow.dispatch.tensor.load %[[ARG1]]
 // CHECK:           %[[SORT:.+]] = linalg_ext.sort
-// CHECK-SAME:        dimension = 0 : i64
+// CHECK-SAME:        dimension(0)
 // CHECK-SAME:        outs(%[[IN]] : tensor<128xi32>)
 // CHECK:          ^bb0(%[[ARG2:.+]]: i32, %[[ARG3:.+]]: i32)
 // CHECK:            %[[CMP:.+]] = cmpi sgt, %[[ARG2]], %[[ARG3]]
@@ -42,7 +42,7 @@ func @sort_2d(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
 // CHECK:           %[[ARG1:.+]]: !flow.dispatch.tensor<readwrite:16x32xi32>
 // CHECK:           %[[IN:.+]] = flow.dispatch.tensor.load %[[ARG1]]
 // CHECK:           %[[SORT:.+]] = linalg_ext.sort
-// CHECK-SAME:        dimension = 0 : i64
+// CHECK-SAME:        dimension(0)
 // CHECK-SAME:        outs(%[[IN]] : tensor<16x32xi32>)
 // CHECK:          ^bb0(%[[ARG2:.+]]: i32, %[[ARG3:.+]]: i32)
 // CHECK:            %[[CMP:.+]] = cmpi sgt, %[[ARG2]], %[[ARG3]]
@@ -72,7 +72,7 @@ func @topk(%arg0: tensor<128xi32>, %arg1: tensor<128xi32>) -> (tensor<128xi32>) 
 // CHECK:           %[[IN1:.+]] = flow.dispatch.tensor.load %[[ARG2]]
 // CHECK:           %[[IN2:.+]] = flow.dispatch.tensor.load %[[ARG3]]
 // CHECK:           %[[SORT:.+]]:2 = linalg_ext.sort
-// CHECK-SAME:        dimension = 0 : i64
+// CHECK-SAME:        dimension(0)
 // CHECK-SAME:        outs(%[[IN1]], %[[IN2]] : tensor<128xi32>, tensor<128xi32>)
 // CHECK:          ^bb0(%[[ARG4:.+]]: i32, %[[ARG5:.+]]: i32, %{{.*}}: i32, %{{.*}}: i32)
 // CHECK:            %[[CMP:.+]] = cmpi sgt, %[[ARG4]], %[[ARG5]]

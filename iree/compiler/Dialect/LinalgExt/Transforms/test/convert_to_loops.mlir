@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-linalg-ext-to-loops %s | IreeFileCheck %s
 
 func @sort_1d(%arg0: memref<128xi32>) {
-  linalg_ext.sort {dimension = 0 : i64}
+  linalg_ext.sort dimension(0)
     outs(%arg0 : memref<128xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
     %0 = cmpi sgt, %arg2, %arg3 : i32
@@ -22,6 +22,7 @@ func @sort_1d(%arg0: memref<128xi32>) {
 // CHECK:             %[[V2:.+]] = memref.load %[[BUF]][%[[T1]]]
 // CHECK:             %[[COND:.+]] = cmpi sgt, %[[V1]], %[[V2]] : i32
 // CHECK:             scf.if %[[COND]] {
+// CHECK:             } else {
 // CHECK:               %[[T2:.+]] = addi %[[ARG2]], %[[C1]] : index
 // CHECK:               memref.store %[[V2]], %[[BUF]][%[[ARG2]]]
 // CHECK:               memref.store %[[V1]], %[[BUF]][%[[T2]]]
@@ -30,7 +31,7 @@ func @sort_1d(%arg0: memref<128xi32>) {
 // -----
 
 func @sort_2d(%arg0: memref<16x32xi32>) {
-  linalg_ext.sort {dimension = 0 : i64}
+  linalg_ext.sort dimension(0)
     outs(%arg0 : memref<16x32xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
     %0 = cmpi sgt, %arg2, %arg3 : i32
@@ -53,6 +54,7 @@ func @sort_2d(%arg0: memref<16x32xi32>) {
 // CHECK:               %[[V2:.+]] = memref.load %[[BUF]][%[[T1]], %[[ARG2]]]
 // CHECK:               %[[COND:.+]] = cmpi sgt, %[[V1]], %[[V2]] : i32
 // CHECK:               scf.if %[[COND]] {
+// CHECK:               } else {
 // CHECK:                 %[[T2:.+]] = addi %[[ARG3]], %[[C1]] : index
 // CHECK:                 memref.store %[[V2]], %[[BUF]][%[[ARG3]], %[[ARG2]]]
 // CHECK:                 memref.store %[[V1]], %[[BUF]][%[[T2]], %[[ARG2]]]
@@ -85,6 +87,7 @@ func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
 // CHECK:             %[[V4:.+]] = memref.load %[[BUF2]][%[[T1]]]
 // CHECK:             %[[COND:.+]] = cmpf ogt, %[[V1]], %[[V2]] : f32
 // CHECK:             scf.if %[[COND]] {
+// CHECK:             } else {
 // CHECK:               %[[T2:.+]] = addi %[[ARG2]], %[[C1]] : index
 // CHECK:               memref.store %[[V2]], %[[BUF1]][%[[ARG2]]]
 // CHECK:               memref.store %[[V1]], %[[BUF1]][%[[T2]]]
