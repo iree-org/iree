@@ -129,7 +129,8 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
     return op.emitOpError(
         "expected indices to be of rank 2 of i32 element type");
   }
-  if (indicesType.isDynamicDim(1)) {
+  auto indexDepth = op.getIndexDepth();
+  if (indexDepth == ShapedType::kDynamicSize) {
     return op.emitOpError("expected index depth is static");
   }
 
@@ -144,7 +145,6 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
         "mismatch in shape of indices and update value at dim#0");
   }
   auto originalType = op.outputs()[0].getType().cast<ShapedType>();
-  auto indexDepth = indicesType.getDimSize(1);
   // indexDepth + update dims should match to original dims. The first dim of
   // update is the number of updates.
   if (originalType.getRank() != indexDepth + updateType.getRank() - 1) {

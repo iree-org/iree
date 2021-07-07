@@ -73,6 +73,17 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
     custom<LinalgExtOutsList>($outputs, type($outputs))
     $region (`->` type($results)^)?
   }];
+
+  let extraClassDeclaration = [{
+    int64_t getIndexDepth() {
+      return getInputOperand(1)
+          ->get()
+          .getType()
+          .cast<ShapedType>()
+          .getShape()
+          .back();
+    }
+  }];
 }
 
 def LinalgExt_SortOp : LinalgExt_Op<"sort"> {
