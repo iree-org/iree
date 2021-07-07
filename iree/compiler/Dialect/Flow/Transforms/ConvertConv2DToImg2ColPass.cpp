@@ -119,11 +119,11 @@ class Conv2DImg2ColMatmulConversion
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
         });
 
-    SmallVector<linalg::ReassociationIndices>
-        img2ColTensorReassociationIndices = {{0, 1, 2}, {3, 4, 5}};
+    SmallVector<ReassociationIndices> img2ColTensorReassociationIndices = {
+        {0, 1, 2}, {3, 4, 5}};
 
-    SmallVector<linalg::ReassociationIndices>
-        filterAndOutputReassociationIndices = {{0, 1, 2}, {3}};
+    SmallVector<ReassociationIndices> filterAndOutputReassociationIndices = {
+        {0, 1, 2}, {3}};
 
     auto reshapedImg2ColTensorType = RankedTensorType::get(
         {outputShape[1] * outputShape[2],
