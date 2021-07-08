@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
     MLIRIR
+    MLIRLLVMCommonConversion
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRMath
