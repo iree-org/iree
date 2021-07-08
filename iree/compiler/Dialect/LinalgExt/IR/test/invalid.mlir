@@ -27,11 +27,11 @@ func @sort_without_dimension(%arg0: tensor<3x4xi32>) -> tensor<3x4xi32> {
 // -----
 
 func @scatter_mixed_tensor_memref(
-    %update : memref<?x?xf32>, %indices : tensor<?xi32>,
+    %update : memref<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{expected `ins` operand #0 to be of RankedTensorType}}
   %0 = linalg_ext.scatter
-      ins(%update, %indices : memref<?x?xf32>, tensor<?xi32>)
+      ins(%update, %indices : memref<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
       ^bb0(%arg1: f32, %arg2: f32):
         %1 = addf %arg1, %arg2 : f32
@@ -43,11 +43,11 @@ func @scatter_mixed_tensor_memref(
 // -----
 
 func @scatter_mixed_tensor_memref(
-    %update : tensor<?x?xf32>, %indices : memref<?xi32>,
+    %update : tensor<?x?xf32>, %indices : memref<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{expected `ins` operand #1 to be of RankedTensorType}}
   %0 = linalg_ext.scatter
-      ins(%update, %indices : tensor<?x?xf32>, memref<?xi32>)
+      ins(%update, %indices : tensor<?x?xf32>, memref<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
       ^bb0(%arg1: f32, %arg2: f32):
         %1 = addf %arg1, %arg2 : f32
@@ -59,11 +59,11 @@ func @scatter_mixed_tensor_memref(
 // -----
 
 func @scatter_extra_outputs(
-    %update : tensor<?x?xf32>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
   // expected-error @+1 {{expected number of outputs to be same as the number of results}}
   %0, %1 = linalg_ext.scatter
-      ins(%update, %indices : tensor<?x?xf32>, tensor<?xi32>)
+      ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
       ^bb0(%arg1: f32, %arg2: f32):
         %1 = addf %arg1, %arg2 : f32
@@ -75,11 +75,11 @@ func @scatter_extra_outputs(
 // -----
 
 func @scatter_mixed_tensor_memref(
-    %update : tensor<?x?xf32>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : memref<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{expected type of `outs` operand #0 'memref<?x?xf32>' to be same as result type 'tensor<?x?xf32>'}}
   %0 = linalg_ext.scatter
-      ins(%update, %indices : tensor<?x?xf32>, tensor<?xi32>)
+      ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : memref<?x?xf32>) {
       ^bb0(%arg1: f32, %arg2: f32):
         %1 = addf %arg1, %arg2 : f32
@@ -91,11 +91,11 @@ func @scatter_mixed_tensor_memref(
 // -----
 
 func @scatter_mixed_tensor_memref(
-    %update : tensor<?x?xf32>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> memref<?x?xf32> {
   // expected-error @+1 {{expected result #0 to be of RankedTensorType}}
   %0 = linalg_ext.scatter
-      ins(%update, %indices : tensor<?x?xf32>, tensor<?xi32>)
+      ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
       ^bb0(%arg1: f32, %arg2: f32):
         %1 = addf %arg1, %arg2 : f32
@@ -107,11 +107,11 @@ func @scatter_mixed_tensor_memref(
 // -----
 
 func @scatter_mixed_tensor_memref(
-    %update : memref<?x?xf32>, %indices : tensor<?xi32>,
+    %update : memref<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : memref<?x?xf32>) {
   // expected-error @+1 {{expected `ins` operand #1 to be of MemRefType}}
   linalg_ext.scatter
-    ins(%update, %indices : memref<?x?xf32>, tensor<?xi32>)
+    ins(%update, %indices : memref<?x?xf32>, tensor<?x1xi32>)
     outs(%original : memref<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = addf %arg1, %arg2 : f32
@@ -123,11 +123,11 @@ func @scatter_mixed_tensor_memref(
 // -----
 
 func @scatter_mixed_tensor_memref(
-    %update : memref<?x?xf32>, %indices : memref<?xi32>,
+    %update : memref<?x?xf32>, %indices : memref<?x1xi32>,
     %original : tensor<?x?xf32>) {
   // expected-error @+1 {{expected `outs` operand #0 to be of MemRefType}}
   linalg_ext.scatter
-    ins(%update, %indices : memref<?x?xf32>, memref<?xi32>)
+    ins(%update, %indices : memref<?x?xf32>, memref<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = addf %arg1, %arg2 : f32
@@ -139,11 +139,11 @@ func @scatter_mixed_tensor_memref(
 // -----
 
 func @scatter_dim_mismatch(
-    %update : tensor<?x?xf32>, %indices : tensor<48xi32>,
+    %update : tensor<?x?xf32>, %indices : tensor<48x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{mismatch in shape of indices and update value at dim#0}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xf32>, tensor<48xi32>)
+    ins(%update, %indices : tensor<?x?xf32>, tensor<48x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = addf %arg1, %arg2 : f32
@@ -155,11 +155,11 @@ func @scatter_dim_mismatch(
 // -----
 
 func @scatter_dim_mismatch(
-    %update : tensor<64x?xf32>, %indices : tensor<48xi32>,
+    %update : tensor<64x?xf32>, %indices : tensor<48x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{mismatch in shape of indices and update value at dim#0}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<64x?xf32>, tensor<48xi32>)
+    ins(%update, %indices : tensor<64x?xf32>, tensor<48x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = addf %arg1, %arg2 : f32
@@ -171,11 +171,11 @@ func @scatter_dim_mismatch(
 // -----
 
 func @scatter_dim_mismatch(
-    %update : tensor<?x?x?xf32>, %indices : tensor<?xi32>,
+    %update : tensor<?x?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @+1 {{mismatch in rank of update value and original value}}
+  // expected-error @+1 {{mismatch in rank of update value, index depth and original value}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?x?xf32>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = addf %arg1, %arg2 : f32
@@ -187,11 +187,11 @@ func @scatter_dim_mismatch(
 // -----
 
 func @scatter_dim_mismatch(
-    %update : tensor<?x4xf32>, %indices : tensor<?xi32>,
+    %update : tensor<?x4xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @+1 {{mismatch in shape of update value and original value at dim#1}}
+  // expected-error @+1 {{mismatch in shape of update value dim#1 and original value at dim#1}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x4xf32>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x4xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = addf %arg1, %arg2 : f32
@@ -203,11 +203,11 @@ func @scatter_dim_mismatch(
 // -----
 
 func @scatter_region_type_mismatch(
-    %update : tensor<?x?xi32>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xi32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi32>) -> tensor<?x?xi32> {
   // expected-error @+1 {{expected region to have scalar argument of integer or float types}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xi32>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x?xi32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi32>) {
     ^bb0(%arg1: index, %arg2: index):
       %1 = addi %arg1, %arg2 : index
@@ -220,11 +220,11 @@ func @scatter_region_type_mismatch(
 // -----
 
 func @scatter_region_type_mismatch(
-    %update : tensor<?x?xi32>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xi32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi32>) -> tensor<?x?xi32> {
   // expected-error @+1 {{mismatch in argument 0 of region 'i64' and element type of update value 'i32'}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xi32>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x?xi32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi32>) {
     ^bb0(%arg1: i64, %arg2: i32):
       %1 = trunci %arg1 : i64 to i32
@@ -237,11 +237,11 @@ func @scatter_region_type_mismatch(
 // -----
 
 func @scatter_region_type_mismatch(
-    %update : tensor<?x?xi32>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xi32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi32>) -> tensor<?x?xi32> {
   // expected-error @+1 {{mismatch in argument 1 of region 'i64' and element type of original value 'i32'}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xi32>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x?xi32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi32>) {
     ^bb0(%arg1: i32, %arg2: i64):
       %1 = trunci %arg2 : i64 to i32
@@ -254,11 +254,11 @@ func @scatter_region_type_mismatch(
 // -----
 
 func @scatter_region_type_mismatch(
-    %update : tensor<?x?xi32>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xi32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   // expected-error @+1 {{mismatch in region argument types 'i32' and 'i64'}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xi32>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x?xi32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi64>) {
     ^bb0(%arg1: i32, %arg2: i64):
       %1 = sexti %arg1 : i32 to i64
@@ -271,11 +271,11 @@ func @scatter_region_type_mismatch(
 // -----
 
 func @scatter_region_type_mismatch(
-    %update : tensor<?x?xi64>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xi64>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   // expected-error @+1 {{expected region to have two arguments}}
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xi64>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x?xi64>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi64>) {
     ^bb0(%arg1: i64, %arg2: i64, %arg3 : i64):
       %1 = addi %arg1, %arg2 : i64
@@ -288,10 +288,10 @@ func @scatter_region_type_mismatch(
 // -----
 
 func @scatter_yield_mismatch(
-    %update : tensor<?x?xi64>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xi64>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xi64>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x?xi64>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi64>) {
     ^bb0(%arg1: i64, %arg2: i64):
       %1 = addi %arg1, %arg2 : i64
@@ -305,15 +305,49 @@ func @scatter_yield_mismatch(
 // -----
 
 func @scatter_yield_mismatch(
-    %update : tensor<?x?xi64>, %indices : tensor<?xi32>,
+    %update : tensor<?x?xi64>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   %0 = linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xi64>, tensor<?xi32>)
+    ins(%update, %indices : tensor<?x?xi64>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi64>) {
     ^bb0(%arg1: i64, %arg2: i64):
       %1 = addi %arg1, %arg2 : i64
       %2 = trunci %1 : i64 to i32
       // expected-error @+1 {{expected region to yield a single value}}
+      linalg_ext.yield %1, %2 : i64, i32
+    } -> tensor<?x?xi64>
+  return %0 : tensor<?x?xi64>
+}
+
+// -----
+
+func @scatter_index_depth_dynamic(
+    %update : tensor<?x?xi64>, %indices : tensor<?x?xi32>,
+    %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
+  // expected-error @+1 {{expected index depth is static}}
+  %0 = linalg_ext.scatter
+    ins(%update, %indices : tensor<?x?xi64>, tensor<?x?xi32>)
+    outs(%original : tensor<?x?xi64>) {
+    ^bb0(%arg1: i64, %arg2: i64):
+      %1 = addi %arg1, %arg2 : i64
+      %2 = trunci %1 : i64 to i32
+      linalg_ext.yield %1, %2 : i64, i32
+    } -> tensor<?x?xi64>
+  return %0 : tensor<?x?xi64>
+}
+
+// -----
+
+func @scatter_original_rank_mismatch(
+    %update : tensor<?x?xi64>, %indices : tensor<?x2xi32>,
+    %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
+  // expected-error @+1 {{mismatch in rank of update value, index depth and original value}}
+  %0 = linalg_ext.scatter
+    ins(%update, %indices : tensor<?x?xi64>, tensor<?x2xi32>)
+    outs(%original : tensor<?x?xi64>) {
+    ^bb0(%arg1: i64, %arg2: i64):
+      %1 = addi %arg1, %arg2 : i64
+      %2 = trunci %1 : i64 to i32
       linalg_ext.yield %1, %2 : i64, i32
     } -> tensor<?x?xi64>
   return %0 : tensor<?x?xi64>

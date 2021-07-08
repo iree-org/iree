@@ -122,14 +122,20 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
   auto checkDimensionsMatch = [&](ShapedType t1, ShapedType t2, unsigned dim) {
     return t1.getShape()[dim] == t2.getShape()[dim];
   };
+
   auto indicesType = op.inputs()[1].getType().cast<ShapedType>();
-  if (indicesType.getRank() != 1 ||
+  if (indicesType.getRank() != 2 ||
       !indicesType.getElementType().isInteger(32)) {
     return op.emitOpError(
-        "expected indices to be of rank 1 of i32 element type");
+        "expected indices to be of rank 2 of i32 element type");
   }
+  auto indexDepth = op.getIndexDepth();
+  if (indexDepth == ShapedType::kDynamicSize) {
+    return op.emitOpError("expected index depth is static");
+  }
+
   // The first dimension of the indices should match the first dimension of the
-  // output.
+  // output. They indicate to the number of updates.
   auto updateType = op.inputs()[0].getType().cast<ShapedType>();
   if (updateType.getRank() < 1) {
     return op.emitOpError("expected update value to be at least rank 1");
@@ -139,15 +145,18 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
         "mismatch in shape of indices and update value at dim#0");
   }
   auto originalType = op.outputs()[0].getType().cast<ShapedType>();
-  if (originalType.getRank() != updateType.getRank()) {
+  // indexDepth + update dims should match to original dims. The first dim of
+  // update is the number of updates.
+  if (originalType.getRank() != indexDepth + updateType.getRank() - 1) {
     return op.emitOpError(
-        "mismatch in rank of update value and original value");
+        "mismatch in rank of update value, index depth and original value");
   }
-  for (auto dim : llvm::seq<unsigned>(1, originalType.getRank())) {
-    if (!checkDimensionsMatch(updateType, originalType, dim)) {
-      return op.emitOpError(
-                 "mismatch in shape of update value and original value at dim#")
-             << dim;
+  for (auto dim : llvm::seq<unsigned>(indexDepth, originalType.getRank())) {
+    // Offset one because the first dim is the number of updates.
+    if (updateType.getDimSize(1 + dim - indexDepth) !=
+        originalType.getDimSize(dim)) {
+      return op.emitOpError("mismatch in shape of update value dim#")
+             << (1 + dim - indexDepth) << " and original value at dim#" << dim;
     }
   }
   Region &region = op.region();
