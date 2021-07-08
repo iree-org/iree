@@ -83,6 +83,26 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
           .getShape()
           .back();
     }
+
+    Value updates() {
+      return getInputOperand(0)->get();
+    }
+
+    Value indices() {
+      return getInputOperand(1)->get();
+    }
+
+    Value original() {
+      return getOutputOperand(0)->get();
+    }
+
+    int64_t getUpdateSliceRank() {
+      return updates().getType().cast<ShapedType>().getRank() - 1;
+    }
+
+    bool isScalarUpdate() {
+      return getUpdateSliceRank() == 0;
+    }
   }];
 }
 

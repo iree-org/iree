@@ -136,31 +136,30 @@ struct ScatterScalarConversion
                                 PatternRewriter& rewriter) const final {
     if (!op.hasBufferSemantics()) return failure();
 
-    auto updates = op.getInputOperand(0);
-    auto indices = op.getInputOperand(1);
-    auto original = op.getOutputOperand(0);
-    if (op.getRank(updates) != 1) return failure();
+    auto updates = op.updates();
+    auto indices = op.indices();
+    auto original = op.original();
+    if (!op.isScalarUpdate()) return failure();
 
     Location loc = op.getLoc();
     Value zero = rewriter.create<ConstantIndexOp>(loc, 0);
     Value one = rewriter.create<ConstantIndexOp>(loc, 1);
-    Value ub = rewriter.createOrFold<memref::DimOp>(loc, updates->get(), zero);
+    Value ub = rewriter.createOrFold<memref::DimOp>(loc, updates, zero);
     auto indexDepth = op.getIndexDepth();
     rewriter.create<scf::ForOp>(
         loc, zero, ub, one, ValueRange{},
         [&](OpBuilder& b, Location loc, Value iv, ValueRange iters) {
-          Value update = b.create<memref::LoadOp>(loc, updates->get(), iv);
+          Value update = b.create<memref::LoadOp>(loc, updates, iv);
           SmallVector<Value> starts;
           SmallVector<Value> ivs = {iv, Value()};
           for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
             ivs.back() = b.create<ConstantIndexOp>(loc, i);
-            Value idx = b.create<memref::LoadOp>(loc, indices->get(), ivs);
+            Value idx = b.create<memref::LoadOp>(loc, indices, ivs);
             starts.push_back(
                 b.create<IndexCastOp>(loc, rewriter.getIndexType(), idx));
           }
-          Value init = b.create<memref::LoadOp>(loc, original->get(), starts);
+          Value init = b.create<memref::LoadOp>(loc, original, starts);
 
-          // TODO(hanchung): Integrate the below body into TiedOpInterface.
           BlockAndValueMapping bvm;
           Block& block = op.region().front();
           bvm.map(block.getArgument(0), update);
@@ -171,8 +170,7 @@ struct ScatterScalarConversion
           }
           // The last op is linalg_ext.yield op. Store the operand to
           // destination.
-          b.create<memref::StoreOp>(loc, res->getOperand(0), original->get(),
-                                    starts);
+          b.create<memref::StoreOp>(loc, res->getOperand(0), original, starts);
           rewriter.replaceOp(res, {});
           b.create<scf::YieldOp>(loc);
         });
@@ -188,40 +186,38 @@ struct ScatterSliceConversion : public OpRewritePattern<linalg_ext::ScatterOp> {
                                 PatternRewriter& rewriter) const final {
     if (!op.hasBufferSemantics()) return failure();
 
-    auto updates = op.getInputOperand(0);
-    auto indices = op.getInputOperand(1);
-    auto original = op.getOutputOperand(0);
-    if (op.getRank(updates) == 1) return failure();
+    auto updates = op.updates();
+    auto indices = op.indices();
+    auto original = op.original();
+    if (op.isScalarUpdate()) return failure();
 
     Location loc = op.getLoc();
     Value zero = rewriter.create<ConstantIndexOp>(loc, 0);
     Value one = rewriter.create<ConstantIndexOp>(loc, 1);
-    Value ub = rewriter.createOrFold<memref::DimOp>(loc, updates->get(), zero);
+    Value ub = rewriter.createOrFold<memref::DimOp>(loc, updates, zero);
     auto indexDepth = op.getIndexDepth();
     rewriter.create<scf::ForOp>(
         loc, zero, ub, one, ValueRange{},
         [&](OpBuilder& b, Location loc, Value iv, ValueRange iters) {
           Value update =
-              b.create<memref::SubViewOp>(loc, updates->get(), iv, one, one);
+              b.create<memref::SubViewOp>(loc, updates, iv, one, one);
 
           SmallVector<Value> ivs = {iv, Value()};
           SmallVector<Value> starts;
           for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
             ivs.back() = b.create<ConstantIndexOp>(loc, i);
-            Value idx = b.create<memref::LoadOp>(loc, indices->get(), ivs);
+            Value idx = b.create<memref::LoadOp>(loc, indices, ivs);
             starts.push_back(
                 b.create<IndexCastOp>(loc, rewriter.getIndexType(), idx));
           }
           SmallVector<Value> ones(indexDepth, one);
-          Value subview = b.create<memref::SubViewOp>(loc, original->get(),
-                                                      starts, ones, ones);
+          Value subview =
+              b.create<memref::SubViewOp>(loc, original, starts, ones, ones);
 
-          // TODO(hanchung): Integrate the below body into TiedOpInterface.
-          auto nloops = op.getRank(updates) - 1;
+          auto nloops = op.getUpdateSliceRank();
           SmallVector<AffineMap> maps;
           {
-            SmallVector<AffineExpr> exprs;
-            exprs.push_back(b.getAffineConstantExpr(0));
+            SmallVector<AffineExpr> exprs(1, b.getAffineConstantExpr(0));
             for (int i = 0; i < nloops; ++i) {
               exprs.push_back(b.getAffineDimExpr(i));
             }
