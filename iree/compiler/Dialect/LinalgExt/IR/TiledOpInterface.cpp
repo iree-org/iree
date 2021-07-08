@@ -8,8 +8,10 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace linalg_ext {
 
 #include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.cpp.inc"
 
 }
+}  // namespace iree_compiler
 }  // namespace mlir

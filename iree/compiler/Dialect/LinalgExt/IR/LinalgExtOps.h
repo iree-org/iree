@@ -7,23 +7,14 @@
 #ifndef IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_
 #define IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-
-namespace mlir {
-namespace iree_compiler {
-namespace linalg_ext {
-class LinalgExtOp;
-
-}  // namespace linalg_ext
-}  // namespace iree_compiler
-}  // namespace mlir
-
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h.inc"  // IWYU pragma: export

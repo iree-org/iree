@@ -88,6 +88,7 @@ iree_cc_library(
     "TiledOpInterface.cpp"
     "TiledOpInterface.cpp.inc"
   DEPS
+    ::TiledOpInterfaceGen
     LLVMSupport
     MLIRIR
     MLIRSupport

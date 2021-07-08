@@ -31,12 +31,14 @@ cc_library(
     name = "Transforms",
     srcs = [
         "ConvertToLoops.cpp",
-        "PassDetail.h",
         "Passes.cpp",
+        "Tiling.cpp",
     ],
     hdrs = [
+        "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
+        "Transforms.h",
     ],
     deps = [
         ":PassesIncGen",

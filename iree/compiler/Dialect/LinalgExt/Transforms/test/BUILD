@@ -18,6 +18,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "convert_to_loops.mlir",
+            "tiling.mlir",
         ],
         include = ["*.mlir"],
     ),

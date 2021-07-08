@@ -9,10 +9,16 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SMLoc.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
@@ -47,6 +53,21 @@ static void getEffectsImpl(
     effects.emplace_back(MemoryEffects::Write::get(), value,
                          SideEffects::DefaultResource::get());
   }
+}
+
+static Value getSlice(OpBuilder &b, Location loc, Value source,
+                      ValueRange offsets, ValueRange sizes,
+                      ValueRange strides) {
+  return TypeSwitch<Type, Value>(source.getType())
+      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
+        return b.create<tensor::ExtractSliceOp>(loc, source, offsets, sizes,
+                                                strides);
+      })
+      .Case<MemRefType>([&](MemRefType type) -> Value {
+        return b.create<memref::SubViewOp>(loc, source, offsets, sizes,
+                                           strides);
+      })
+      .Default([&](Type t) { return nullptr; });
 }
 
 //===----------------------------------------------------------------------===//
@@ -123,7 +144,7 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
     return t1.getShape()[dim] == t2.getShape()[dim];
   };
 
-  auto indicesType = op.inputs()[1].getType().cast<ShapedType>();
+  auto indicesType = op.getIndicesType();
   if (indicesType.getRank() != 2 ||
       !indicesType.getElementType().isInteger(32)) {
     return op.emitOpError(
@@ -136,7 +157,7 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
 
   // The first dimension of the indices should match the first dimension of the
   // output. They indicate to the number of updates.
-  auto updateType = op.inputs()[0].getType().cast<ShapedType>();
+  auto updateType = op.getUpdateType();
   if (updateType.getRank() < 1) {
     return op.emitOpError("expected update value to be at least rank 1");
   }
@@ -144,7 +165,7 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
     return op.emitOpError(
         "mismatch in shape of indices and update value at dim#0");
   }
-  auto originalType = op.outputs()[0].getType().cast<ShapedType>();
+  auto originalType = op.getOriginalType();
   // indexDepth + update dims should match to original dims. The first dim of
   // update is the number of updates.
   if (originalType.getRank() != indexDepth + updateType.getRank() - 1) {
@@ -194,6 +215,48 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
            << yieldedType << " and argument of the region " << arg0Type;
   }
   return success();
+}
+
+SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
+  return SmallVector<StringRef>(getOriginalType().getRank(),
+                                getParallelIteratorTypeName());
+}
+
+SmallVector<Range> ScatterOp::getLoopBounds(OpBuilder &builder) {
+  Location loc = getLoc();
+  Value zero = builder.create<ConstantIndexOp>(loc, 0);
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  Value updateVal = update();
+  SmallVector<Range> loopBounds(getUpdateType().getRank());
+  for (auto dim : llvm::seq<unsigned>(0, getUpdateType().getRank())) {
+    Value ub = builder.create<memref::DimOp>(loc, updateVal, dim);
+    loopBounds[dim] = {zero, ub, one};
+  }
+  return loopBounds;
+}
+
+Operation *ScatterOp::getTiledImplementation(
+    OpBuilder &builder, ValueRange outputs, ValueRange offsets,
+    ValueRange sizes, SmallVectorImpl<SmallVector<Value, 4>> &resultOffsets) {
+  assert(outputs.size() == 1);
+  Location loc = getLoc();
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  SmallVector<Value> strides(getUpdateType().getRank(), one);
+  Value tiledUpdate = getSlice(builder, loc, update(), offsets, sizes, strides);
+  Value tiledIndices =
+      getSlice(builder, loc, indices(), offsets[0], sizes[0], one);
+  assert(tiledUpdate && tiledIndices &&
+         "failed to get slice of update/indices");
+  resultOffsets.resize(1);
+  Value zero = builder.create<ConstantIndexOp>(loc, 0);
+  resultOffsets[0].resize(getUpdateType().getRank(), zero);
+  SmallVector<Type> resultTypes;
+  if (getNumResults()) {
+    resultTypes.push_back(getResultTypes()[0]);
+  }
+  return cast<LinalgExtOp>(getOperation())
+      .clone(builder, loc, resultTypes,
+             ValueRange{tiledUpdate, tiledIndices, outputs[0]});
 }
 
 //===----------------------------------------------------------------------===//

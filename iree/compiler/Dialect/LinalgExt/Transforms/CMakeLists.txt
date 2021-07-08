@@ -23,12 +23,14 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
+    "Transforms.h"
   SRCS
     "ConvertToLoops.cpp"
-    "PassDetail.h"
     "Passes.cpp"
+    "Tiling.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport

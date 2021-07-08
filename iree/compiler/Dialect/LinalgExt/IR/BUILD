@@ -23,6 +23,7 @@ filegroup(
             "LinalgExtBase.td",
             "LinalgExtOps.td",
             "LinalgExtInterfaces.td",
+            "TiledOpInterface.td",
         ],
         include = ["*.td"],
     ),
@@ -140,12 +141,12 @@ gentbl_cc_library(
 cc_library(
     name = "TiledOpInterface",
     srcs = [
+        "TiledOpInterface.cpp",
         "TiledOpInterface.cpp.inc",
-        "TiledOpInterface.cpp"
     ],
     hdrs = [
-        "TiledOpInterface.h.inc",
         "TiledOpInterface.h",
+        "TiledOpInterface.h.inc",
     ],
     deps = [
         ":TiledOpInterfaceGen",

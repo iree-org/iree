@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
+include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -34,7 +35,8 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
 // Non-structured ops
 //===----------------------------------------------------------------------===//
 
-def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
+def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
+    [DeclareOpInterfaceMethods<TiledOpInterface>]> {
   let summary = "Scatter operator";
   let description = [{
     Based on XLA operation semantics, takes two `inputs` (`update` and
@@ -88,12 +90,24 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
       return getInputOperand(0)->get();
     }
 
+    ShapedType getUpdateType() {
+      return update().getType().cast<ShapedType>();
+    }
+
     Value indices() {
       return getInputOperand(1)->get();
     }
 
+    ShapedType getIndicesType() {
+      return indices().getType().cast<ShapedType>();
+    }
+
     Value original() {
       return getOutputOperand(0)->get();
+    }
+
+    ShapedType getOriginalType() {
+      return original().getType().cast<ShapedType>();
     }
 
     int64_t getUpdateSliceRank() {

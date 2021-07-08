@@ -13,6 +13,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace linalg_ext {
 
+std::unique_ptr<OperationPass<FuncOp>> createLinalgExtTilingPass();
+
 std::unique_ptr<OperationPass<FuncOp>> createLinalgExtToLoopsPass();
 
 void registerLinalgExtPasses();
