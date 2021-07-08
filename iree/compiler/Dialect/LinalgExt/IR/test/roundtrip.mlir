@@ -173,3 +173,72 @@ func @scatter_memref_multi_index_depth(
 //  CHECK-SAME:     outs(%[[ORIGINAL]]
 //       CHECK:     linalg_ext.yield %{{.+}} : f32
 //       CHECK:   return
+
+// -----
+
+func @scatter_update_scalar_1D(
+    %original: tensor<8xi32>, %indices: tensor<3x1xi32>,
+    %updates: tensor<3xi32>) -> tensor<8xi32> {
+  %0 = linalg_ext.scatter
+    ins(%updates, %indices : tensor<3xi32>, tensor<3x1xi32>)
+    outs(%original : tensor<8xi32>)  {
+    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+      linalg_ext.yield %arg0 : i32
+    } -> tensor<8xi32>
+  return %0 : tensor<8xi32>
+}
+// CHECK-LABEL: func @scatter_update_scalar_1D(
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.scatter
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     linalg_ext.yield %{{.+}} : i32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func @scatter_update_scalar_2D(
+    %original: tensor<4x3xi32>, %indices: tensor<3x2xi32>,
+    %updates: tensor<3xi32>) -> tensor<4x3xi32> {
+  %0 = linalg_ext.scatter
+    ins(%updates, %indices : tensor<3xi32>, tensor<3x2xi32>)
+    outs(%original : tensor<4x3xi32>)  {
+    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+      linalg_ext.yield %arg0 : i32
+    } -> tensor<4x3xi32>
+  return %0 : tensor<4x3xi32>
+}
+// CHECK-LABEL: func @scatter_update_scalar_2D(
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.scatter
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     linalg_ext.yield %{{.+}} : i32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func @scatter_update_slice_2D(
+    %original: tensor<4x3xi32>, %indices: tensor<1x1xi32>,
+    %updates: tensor<1x3xi32>) -> tensor<4x3xi32> {
+  %0 = linalg_ext.scatter
+    ins(%updates, %indices : tensor<1x3xi32>, tensor<1x1xi32>)
+    outs(%original : tensor<4x3xi32>)  {
+    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+      linalg_ext.yield %arg0 : i32
+    } -> tensor<4x3xi32>
+  return %0 : tensor<4x3xi32>
+}
+// CHECK-LABEL: func @scatter_update_slice_2D(
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.scatter
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     linalg_ext.yield %{{.+}} : i32
+//       CHECK:   return %[[RESULT]]
