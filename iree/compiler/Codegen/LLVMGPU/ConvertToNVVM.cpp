@@ -50,7 +50,6 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       OwningRewritePatternList patterns(&getContext());
       populateScalarizeMathOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-      vector::populateVectorSlicesLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
           patterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(

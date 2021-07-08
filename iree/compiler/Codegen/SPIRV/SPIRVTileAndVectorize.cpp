@@ -343,8 +343,8 @@ static void populateVectorizationPatterns(MLIRContext *context,
 
 static void populateVectorUnrollPatterns(MLIRContext *context,
                                          RewritePatternSet &patterns) {
-  patterns.insert<vector::UnrollVectorPattern>(
-      context,
+  vector::populateVectorUnrollPatterns(
+      patterns,
       vector::UnrollVectorOptions().setNativeShapeFn(getSPIRVNativeVectorSize));
 }
 
@@ -421,18 +421,7 @@ static void applyVectorTransformation(FuncOp funcOp) {
                                          std::move(vectorUnrollPatterns));
     }
     {
-      RewritePatternSet canonicalizationPatterns1(funcOp.getContext());
-
-      vector::populateVectorToVectorTransformationPatterns(
-          canonicalizationPatterns1);
-      vector::populateVectorToVectorCanonicalizationPatterns(
-          canonicalizationPatterns1);
-      vector::populateSplitVectorTransferPatterns(canonicalizationPatterns1);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns1));
-
       RewritePatternSet canonicalizationPatterns2(funcOp.getContext());
-      vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2);
       vector::populateVectorTransferLoweringPatterns(canonicalizationPatterns2);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns2));

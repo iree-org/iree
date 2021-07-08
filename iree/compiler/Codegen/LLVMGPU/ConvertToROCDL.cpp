@@ -50,7 +50,6 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       OwningRewritePatternList patterns(&getContext());
       populateScalarizeMathOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-      vector::populateVectorSlicesLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
           patterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
