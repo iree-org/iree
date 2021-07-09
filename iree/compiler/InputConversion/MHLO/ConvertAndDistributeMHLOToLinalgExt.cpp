@@ -195,6 +195,9 @@ struct ScatterOpConversion
   /// * Scatter dims to operand dims order: (0, ... , n)
   /// * Inserted window dims order: (0, ... , d)
   /// * Update window dims order: (d + 1, ... , m)
+  ///
+  /// TODO(hanchung): Add a pattern for legalizing mhlo.scatter to canonical
+  /// form to MHLOToMHLOPreprocessingPass.
   static bool hasCanonicalDimensionNumbers(mhlo::ScatterOp op) {
     auto dimNumbers = op.scatter_dimension_numbers();
     auto indicesType = op.scatter_indices().getType().cast<ShapedType>();
