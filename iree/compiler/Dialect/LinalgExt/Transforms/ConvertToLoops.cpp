@@ -11,6 +11,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -22,6 +23,10 @@ namespace mlir {
 namespace iree_compiler {
 namespace linalg_ext {
 namespace {
+
+//===----------------------------------------------------------------------===//
+// SortOp
+//===----------------------------------------------------------------------===//
 
 struct BubbleSortConversion : public OpRewritePattern<linalg_ext::SortOp> {
   using OpRewritePattern<linalg_ext::SortOp>::OpRewritePattern;
@@ -119,23 +124,162 @@ struct BubbleSortConversion : public OpRewritePattern<linalg_ext::SortOp> {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// ScatterOp
+//===----------------------------------------------------------------------===//
+
+struct ScatterScalarConversion
+    : public OpRewritePattern<linalg_ext::ScatterOp> {
+  using OpRewritePattern<linalg_ext::ScatterOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg_ext::ScatterOp op,
+                                PatternRewriter& rewriter) const final {
+    if (!op.hasBufferSemantics()) return failure();
+
+    auto updates = op.updates();
+    auto indices = op.indices();
+    auto original = op.original();
+    if (!op.isScalarUpdate()) return failure();
+
+    Location loc = op.getLoc();
+    Value zero = rewriter.create<ConstantIndexOp>(loc, 0);
+    Value one = rewriter.create<ConstantIndexOp>(loc, 1);
+    Value ub = rewriter.createOrFold<memref::DimOp>(loc, updates, zero);
+    auto indexDepth = op.getIndexDepth();
+    rewriter.create<scf::ForOp>(
+        loc, zero, ub, one, ValueRange{},
+        [&](OpBuilder& b, Location loc, Value iv, ValueRange iters) {
+          Value update = b.create<memref::LoadOp>(loc, updates, iv);
+          SmallVector<Value> starts;
+          SmallVector<Value> ivs = {iv, Value()};
+          for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
+            ivs.back() = b.create<ConstantIndexOp>(loc, i);
+            Value idx = b.create<memref::LoadOp>(loc, indices, ivs);
+            starts.push_back(
+                b.create<IndexCastOp>(loc, rewriter.getIndexType(), idx));
+          }
+          Value init = b.create<memref::LoadOp>(loc, original, starts);
+
+          BlockAndValueMapping bvm;
+          Block& block = op.region().front();
+          bvm.map(block.getArgument(0), update);
+          bvm.map(block.getArgument(1), init);
+          Operation* res;
+          for (auto& blockOp : block.getOperations()) {
+            res = b.clone(blockOp, bvm);
+          }
+          // The last op is linalg_ext.yield op. Store the operand to
+          // destination.
+          b.create<memref::StoreOp>(loc, res->getOperand(0), original, starts);
+          rewriter.replaceOp(res, {});
+          b.create<scf::YieldOp>(loc);
+        });
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+struct ScatterSliceConversion : public OpRewritePattern<linalg_ext::ScatterOp> {
+  using OpRewritePattern<linalg_ext::ScatterOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg_ext::ScatterOp op,
+                                PatternRewriter& rewriter) const final {
+    if (!op.hasBufferSemantics()) return failure();
+
+    auto updates = op.updates();
+    auto indices = op.indices();
+    auto original = op.original();
+    if (op.isScalarUpdate()) return failure();
+
+    Location loc = op.getLoc();
+    Value zero = rewriter.create<ConstantIndexOp>(loc, 0);
+    Value one = rewriter.create<ConstantIndexOp>(loc, 1);
+    Value ub = rewriter.createOrFold<memref::DimOp>(loc, updates, zero);
+    auto indexDepth = op.getIndexDepth();
+    rewriter.create<scf::ForOp>(
+        loc, zero, ub, one, ValueRange{},
+        [&](OpBuilder& b, Location loc, Value iv, ValueRange iters) {
+          Value update =
+              b.create<memref::SubViewOp>(loc, updates, iv, one, one);
+
+          SmallVector<Value> ivs = {iv, Value()};
+          SmallVector<Value> starts;
+          for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
+            ivs.back() = b.create<ConstantIndexOp>(loc, i);
+            Value idx = b.create<memref::LoadOp>(loc, indices, ivs);
+            starts.push_back(
+                b.create<IndexCastOp>(loc, rewriter.getIndexType(), idx));
+          }
+          SmallVector<Value> ones(indexDepth, one);
+          Value subview =
+              b.create<memref::SubViewOp>(loc, original, starts, ones, ones);
+
+          auto nloops = op.getUpdateSliceRank();
+          SmallVector<AffineMap> maps;
+          {
+            SmallVector<AffineExpr> exprs(1, b.getAffineConstantExpr(0));
+            for (int i = 0; i < nloops; ++i) {
+              exprs.push_back(b.getAffineDimExpr(i));
+            }
+            maps.push_back(AffineMap::get(nloops, 0, exprs, b.getContext()));
+          }
+          {
+            SmallVector<AffineExpr> exprs(indexDepth,
+                                          b.getAffineConstantExpr(0));
+            for (int i = 0; i < nloops; ++i) {
+              exprs.push_back(b.getAffineDimExpr(i));
+            }
+            maps.push_back(AffineMap::get(nloops, 0, exprs, b.getContext()));
+          }
+
+          SmallVector<StringRef> iterTypes(nloops,
+                                           getParallelIteratorTypeName());
+          auto genericOp =
+              b.create<linalg::GenericOp>(loc, TypeRange{}, ValueRange{update},
+                                          ValueRange{subview}, maps, iterTypes);
+          rewriter.inlineRegionBefore(op.region(), genericOp.region(),
+                                      genericOp.region().end());
+
+          // Replace linalg_ext.yield with linalg.yield.
+          auto linalgExtYieldOp = llvm::to_vector<4>(
+              genericOp.region().front().getOps<linalg_ext::YieldOp>())[0];
+          {
+            OpBuilder::InsertionGuard guard(b);
+            b.setInsertionPointToEnd(&genericOp.region().back());
+            b.create<linalg::YieldOp>(loc, linalgExtYieldOp.operands());
+          }
+          rewriter.replaceOp(linalgExtYieldOp, {});
+
+          b.create<scf::YieldOp>(loc);
+        });
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Pass
+//===----------------------------------------------------------------------===//
+
 struct LinalgExtToLoopsPass
     : public LinalgExtToLoopsBase<LinalgExtToLoopsPass> {
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry
-        .insert<StandardOpsDialect, memref::MemRefDialect, scf::SCFDialect>();
+    registry.insert<linalg::LinalgDialect, StandardOpsDialect,
+                    memref::MemRefDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
     MLIRContext* context = &getContext();
 
     OwningRewritePatternList patterns(context);
-    patterns.insert<BubbleSortConversion>(context);
+    patterns.insert<BubbleSortConversion, ScatterScalarConversion,
+                    ScatterSliceConversion>(context);
 
     ConversionTarget target(getContext());
-    target.addLegalDialect<memref::MemRefDialect, StandardOpsDialect,
-                           scf::SCFDialect>();
-    target.addIllegalOp<linalg_ext::SortOp>();
+    target.addLegalDialect<linalg::LinalgDialect, memref::MemRefDialect,
+                           StandardOpsDialect, scf::SCFDialect>();
+    target.addIllegalDialect<linalg_ext::LinalgExtDialect>();
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {

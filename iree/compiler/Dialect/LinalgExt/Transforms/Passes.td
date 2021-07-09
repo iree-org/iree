@@ -11,7 +11,7 @@ include "mlir/Pass/PassBase.td"
 
 def LinalgExtToLoops :
     Pass<"iree-linalg-ext-to-loops", "FuncOp"> {
-  let summary = "";
+  let summary = "Convert LinalgExt ops to loops and Linalg ops.";
   let constructor = "mlir::iree_compiler::linalg_ext::createLinalgExtToLoopsPass()";
 }
 

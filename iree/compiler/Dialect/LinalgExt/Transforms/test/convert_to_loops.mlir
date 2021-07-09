@@ -94,3 +94,275 @@ func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
 // CHECK:               memref.store %[[V4]], %[[BUF2]][%[[ARG2]]]
 // CHECK:               memref.store %[[V3]], %[[BUF2]][%[[T2]]]
 // CHECK:             }
+
+// -----
+
+func @scatter_update_scalar_1D(
+    %original: memref<8xi32>, %indices: memref<3x1xi32>,
+    %updates: memref<3xi32>) {
+  linalg_ext.scatter
+    ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
+    outs(%original : memref<8xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    linalg_ext.yield %arg0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @scatter_update_scalar_1D
+// CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[C3:.+]] = constant 3 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
+// CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<3xi32>
+// CHECK:           %[[C0:.+]] = constant 0 : index
+// CHECK:           %[[T2:.+]] =  memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<3x1xi32>
+// CHECK:           %[[IDX:.+]] = index_cast %[[T2]] : i32 to index
+// CHECK:           memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
+
+// -----
+
+func @scatter_add_scalar_2D(
+    %original: memref<4x3xi32>, %indices: memref<3x2xi32>,
+    %updates: memref<3xi32>) {
+  linalg_ext.scatter
+    ins(%updates, %indices : memref<3xi32>, memref<3x2xi32>)
+    outs(%original : memref<4x3xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    %0 = addi %arg1, %arg0 : i32
+    linalg_ext.yield %0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @scatter_add_scalar_2D
+// CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[C3:.+]] = constant 3 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
+// CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<3xi32>
+// CHECK:           %[[C0:.+]] = constant 0 : index
+// CHECK:           %[[T2:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<3x2xi32>
+// CHECK:           %[[IDX1:.+]] = index_cast %[[T2]] : i32 to index
+// CHECK:           %[[C1:.+]] = constant 1 : index
+// CHECK:           %[[T3:.+]] = memref.load %[[INDICES]][%[[I]], %[[C1]]] : memref<3x2xi32>
+// CHECK:           %[[IDX2:.+]] = index_cast %[[T3]] : i32 to index
+// CHECK:           %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]] : memref<4x3xi32>
+// CHECK:           %[[ADD:.+]] = addi %[[ORI]], %[[T1]] : i32
+// CHECK:           memref.store %[[ADD]], %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]]
+
+// -----
+
+func @scatter_update_slice_2D(
+    %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
+    %updates: memref<2x3xi32>) {
+  linalg_ext.scatter
+    ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
+    outs(%original : memref<4x3xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    linalg_ext.yield %arg0 : i32
+  }
+  return
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0) -> (0, d0)>
+// CHECK:       func @scatter_update_slice_2D
+// CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = constant 2 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK:           %[[SUB_UPDATE:.+]] = memref.subview
+// CHECK-SAME:        %[[UPDATES]][%[[I]]] [%[[C1]]] [%[[C1]]]
+// CHECK-SAME:      : memref<2x3xi32> to memref<?x3xi32, #[[MAP0]]>
+// CHECK:           %[[C0:.+]] = constant 0 : index
+// CHECK:           %[[T1:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<2x1xi32>
+// CHECK:           %[[IDX:.+]] = index_cast %[[T1]] : i32 to index
+// CHECK:           %[[SUB_ORI:.+]] = memref.subview
+// CHECK-SAME:        %[[ORIGINAL]][%[[IDX]]] [%[[C1]]] [%[[C1]]]
+// CHECK-SAME:      : memref<4x3xi32> to memref<?x3xi32, #[[MAP0]]>
+// CHECK:           linalg.generic
+// CHECK-SAME:        indexing_maps = [#[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:        iterator_types = ["parallel"]
+// CHECK-SAME:        ins(%[[SUB_UPDATE]] : memref<?x3xi32, #[[MAP0]]>)
+// CHECK-SAME:        outs(%[[SUB_ORI]] : memref<?x3xi32, #[[MAP0]]>)
+// CHECK:           ^bb0(%[[ARG4:.+]]: i32, %{{.+}}: i32):
+// CHECK:             linalg.yield %[[ARG4]]
+
+// -----
+
+func @scatter_add_scalar_1D(
+    %original: memref<8xi32>, %indices: memref<3x1xi32>,
+    %updates: memref<3xi32>) {
+  linalg_ext.scatter
+    ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
+    outs(%original : memref<8xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    %0 = addi %arg1, %arg0 : i32
+    linalg_ext.yield %0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @scatter_add_scalar_1D
+// CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[C3:.+]] = constant 3 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
+// CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<3xi32>
+// CHECK:           %[[C0:.+]] = constant 0 : index
+// CHECK:           %[[T2:.+]] =  memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<3x1xi32>
+// CHECK:           %[[IDX:.+]] = index_cast %[[T2]] : i32 to index
+// CHECK:           %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX]]] : memref<8xi32>
+// CHECK:           %[[ADD:.+]] = addi %[[ORI]], %[[T1]] : i32
+// CHECK:           memref.store %[[ADD]], %[[ORIGINAL]][%[[IDX]]]
+
+// -----
+
+func @scatter_add_slice_2D(
+    %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
+    %updates: memref<2x3xi32>) {
+  linalg_ext.scatter
+    ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
+    outs(%original : memref<4x3xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    %0 = addi %arg1, %arg0 : i32
+    linalg_ext.yield %0 : i32
+  }
+  return
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0) -> (0, d0)>
+// CHECK:       func @scatter_add_slice_2D
+// CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = constant 2 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK:           %[[SUB_UPDATE:.+]] = memref.subview
+// CHECK-SAME:        %[[UPDATES]][%[[I]]] [%[[C1]]] [%[[C1]]]
+// CHECK-SAME:      : memref<2x3xi32> to memref<?x3xi32, #[[MAP0]]>
+// CHECK:           %[[C0:.+]] = constant 0 : index
+// CHECK:           %[[T1:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<2x1xi32>
+// CHECK:           %[[IDX:.+]] = index_cast %[[T1]] : i32 to index
+// CHECK:           %[[SUB_ORI:.+]] = memref.subview
+// CHECK-SAME:        %[[ORIGINAL]][%[[IDX]]] [%[[C1]]] [%[[C1]]]
+// CHECK-SAME:      : memref<4x3xi32> to memref<?x3xi32, #[[MAP0]]>
+// CHECK:           linalg.generic
+// CHECK-SAME:        indexing_maps = [#[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:        iterator_types = ["parallel"]
+// CHECK-SAME:        ins(%[[SUB_UPDATE]] : memref<?x3xi32, #[[MAP0]]>)
+// CHECK-SAME:        outs(%[[SUB_ORI]] : memref<?x3xi32, #[[MAP0]]>)
+// CHECK:           ^bb0(%[[ARG4:.+]]: i32, %[[ARG5:.+]]: i32):
+// CHECK:             %[[RES:.+]] = addi %[[ARG5]], %[[ARG4]] : i32
+// CHECK:             linalg.yield %[[RES]]
+
+// -----
+
+func @scatter_update_scalar_dynamic_1D(
+    %original: memref<?xi32>, %indices: memref<?x1xi32>,
+    %updates: memref<?xi32>) {
+  linalg_ext.scatter
+    ins(%updates, %indices : memref<?xi32>, memref<?x1xi32>)
+    outs(%original : memref<?xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    linalg_ext.yield %arg0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @scatter_update_scalar_dynamic_1D
+// CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[UB:.+]] = memref.dim %[[UPDATES]], %[[C0]] : memref<?xi32>
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[UB]] step %[[C1]] {
+// CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<?xi32>
+// CHECK:           %[[C0:.+]] = constant 0 : index
+// CHECK:           %[[T2:.+]] =  memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<?x1xi32>
+// CHECK:           %[[IDX:.+]] = index_cast %[[T2]] : i32 to index
+// CHECK:           memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
+
+// -----
+
+func @scatter_add_scalar_dynamic_2D(
+    %original: memref<?x?xi32>, %indices: memref<?x2xi32>,
+    %updates: memref<?xi32>) {
+  linalg_ext.scatter
+    ins(%updates, %indices : memref<?xi32>, memref<?x2xi32>)
+    outs(%original : memref<?x?xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    %0 = addi %arg1, %arg0 : i32
+    linalg_ext.yield %0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @scatter_add_scalar_dynamic_2D
+// CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[UB:.+]] = memref.dim %[[UPDATES]], %[[C0]] : memref<?xi32>
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[UB]] step %[[C1]] {
+// CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<?xi32>
+// CHECK:           %[[C0:.+]] = constant 0 : index
+// CHECK:           %[[T2:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<?x2xi32>
+// CHECK:           %[[IDX1:.+]] = index_cast %[[T2]] : i32 to index
+// CHECK:           %[[C1:.+]] = constant 1 : index
+// CHECK:           %[[T3:.+]] = memref.load %[[INDICES]][%[[I]], %[[C1]]] : memref<?x2xi32>
+// CHECK:           %[[IDX2:.+]] = index_cast %[[T3]] : i32 to index
+// CHECK:           %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]] : memref<?x?xi32>
+// CHECK:           %[[ADD:.+]] = addi %[[ORI]], %[[T1]] : i32
+// CHECK:           memref.store %[[ADD]], %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]]
+
+// -----
+
+func @scatter_update_slice_dynamic_2D(
+    %original: memref<?x?xi32>, %indices: memref<?x1xi32>,
+    %updates: memref<?x?xi32>) {
+  linalg_ext.scatter
+    ins(%updates, %indices : memref<?x?xi32>, memref<?x1xi32>)
+    outs(%original : memref<?x?xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    linalg_ext.yield %arg0 : i32
+  }
+  return
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0) -> (0, d0)>
+// CHECK:       func @scatter_update_slice_dynamic_2D
+// CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[UB:.+]] = memref.dim %[[UPDATES]], %[[C0]] : memref<?x?xi32>
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[UB]] step %[[C1]] {
+// CHECK:           %[[SUB_UPDATE:.+]] = memref.subview
+// CHECK-SAME:        %[[UPDATES]][%[[I]]] [%[[C1]]] [%[[C1]]]
+// CHECK-SAME:      : memref<?x?xi32> to memref<?x?xi32, #[[MAP0]]>
+// CHECK:           %[[C0:.+]] = constant 0 : index
+// CHECK:           %[[T1:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<?x1xi32>
+// CHECK:           %[[IDX:.+]] = index_cast %[[T1]] : i32 to index
+// CHECK:           %[[SUB_ORI:.+]] = memref.subview
+// CHECK-SAME:        %[[ORIGINAL]][%[[IDX]]] [%[[C1]]] [%[[C1]]]
+// CHECK-SAME:      : memref<?x?xi32> to memref<?x?xi32, #[[MAP0]]>
+// CHECK:           linalg.generic
+// CHECK-SAME:        indexing_maps = [#[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:        iterator_types = ["parallel"]
+// CHECK-SAME:        ins(%[[SUB_UPDATE]] : memref<?x?xi32, #[[MAP0]]>)
+// CHECK-SAME:        outs(%[[SUB_ORI]] : memref<?x?xi32, #[[MAP0]]>)
+// CHECK:           ^bb0(%[[ARG4:.+]]: i32, %{{.+}}: i32):
+// CHECK:             linalg.yield %[[ARG4]]
