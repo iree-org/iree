@@ -159,16 +159,17 @@ Status GetTargetBackends(std::vector<std::string>* out_target_backends) {
   auto target_backends =
       mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags().targets;
   if (target_backends.empty()) {
+    iree_allocator_t host_allocator = iree_allocator_system();
     iree_hal_driver_info_t* driver_infos = NULL;
     iree_host_size_t driver_info_count = 0;
     IREE_RETURN_IF_ERROR(iree_hal_driver_registry_enumerate(
-        iree_hal_driver_registry_default(), iree_allocator_system(),
-        &driver_infos, &driver_info_count));
+        iree_hal_driver_registry_default(), host_allocator, &driver_infos,
+        &driver_info_count));
     for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
       target_backends.push_back(std::string(driver_infos[i].driver_name.data,
                                             driver_infos[i].driver_name.size));
     }
-    iree_allocator_system_free(NULL, driver_infos);
+    iree_allocator_free(host_allocator, driver_infos);
   }
   *out_target_backends = std::move(target_backends);
   return OkStatus();

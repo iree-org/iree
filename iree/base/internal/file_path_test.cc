@@ -62,7 +62,7 @@ static std::string JoinPaths(std::string lhs, std::string rhs) {
   std::string result;
   result.resize(strlen(result_str));
   memcpy((char*)result.data(), result_str, result.size());
-  iree_allocator_system_free(NULL, result_str);
+  iree_allocator_free(iree_allocator_system(), result_str);
   return result;
 }
 

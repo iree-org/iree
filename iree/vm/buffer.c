@@ -162,8 +162,8 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
   // over all of it.
   uint8_t* data_ptr = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, allocator.alloc(allocator.self, /*mode=*/0, total_size,
-                          (void**)&data_ptr));
+      z0, iree_allocator_malloc_uninitialized(allocator, total_size,
+                                              (void**)&data_ptr));
 
   // Initialize the prefix buffer handle.
   iree_vm_buffer_t* buffer = (iree_vm_buffer_t*)data_ptr;

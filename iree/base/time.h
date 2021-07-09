@@ -35,7 +35,7 @@ typedef int64_t iree_time_t;
 typedef int64_t iree_duration_t;
 
 // A zero-length duration.
-// Like IREE_TIME_INFINITE_FUTURE this forces APIs that would wait to instead
+// Like IREE_TIME_INFINITE_PAST this forces APIs that would wait to instead
 // return IREE_STATUS_DEADLINE_EXCEEDED immediately.
 #define IREE_DURATION_ZERO 0
 
