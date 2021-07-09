@@ -72,6 +72,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::InputConversion::Common
