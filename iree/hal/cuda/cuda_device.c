@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/context_wrapper.h"
 #include "iree/hal/cuda/cuda_allocator.h"
@@ -18,7 +19,7 @@
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/event_semaphore.h"
 #include "iree/hal/cuda/executable_layout.h"
-#include "iree/hal/cuda/graph_command_buffer.h"
+#include "iree/hal/cuda/direct_command_buffer.h"
 #include "iree/hal/cuda/nop_executable_cache.h"
 #include "iree/hal/cuda/status_util.h"
 
@@ -29,6 +30,13 @@
 typedef struct iree_hal_cuda_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
+
+  // Block pool used for small allocations like tasks and submissions.
+  iree_arena_block_pool_t small_block_pool;
+
+  // Block pool used for command buffers with a larger block size (as command
+  // buffers can contain inlined data uploads).
+  iree_arena_block_pool_t large_block_pool;
 
   // Optional driver that owns the CUDA symbols. We retain it for our lifetime
   // to ensure the symbols remains valid.
@@ -51,6 +59,25 @@ static iree_hal_cuda_device_t* iree_hal_cuda_device_cast(
   return (iree_hal_cuda_device_t*)base_value;
 }
 
+void iree_hal_cuda_device_params_initialize(
+    iree_hal_cuda_device_params_t* out_params) {
+  out_params->arena_block_size = 32 * 1024;
+  out_params->queue_count = 8;
+}
+
+static iree_status_t iree_hal_cuda_device_check_params(
+    const iree_hal_cuda_device_params_t* params) {
+  if (params->arena_block_size < 4096) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "arena block size too small (< 4096 bytes)");
+  }
+  if (params->queue_count == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "at least one queue is required");
+  }
+  return iree_ok_status();
+}
+
 static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
@@ -61,9 +88,10 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   CUDA_IGNORE_ERROR(device->context_wrapper.syms,
                     cuStreamDestroy(device->stream));
 
+  iree_arena_block_pool_deinitialize(&device->large_block_pool);
+  iree_arena_block_pool_deinitialize(&device->small_block_pool);
   // Finally, destroy the device.
   iree_hal_driver_release(device->driver);
-
   iree_allocator_free(host_allocator, device);
 
   IREE_TRACE_ZONE_END(z0);
@@ -71,6 +99,7 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
 
 static iree_status_t iree_hal_cuda_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
+    const iree_hal_cuda_device_params_t* params,
     CUdevice cu_device, CUstream stream, CUcontext context,
     iree_hal_cuda_dynamic_symbols_t* syms, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
@@ -89,6 +118,10 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->stream = stream;
   device->context_wrapper.cu_context = context;
   device->context_wrapper.host_allocator = host_allocator;
+  iree_arena_block_pool_initialize(4096, host_allocator,
+                                   &device->small_block_pool);
+  iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
+                                   &device->large_block_pool);
   device->context_wrapper.syms = syms;
   iree_status_t status = iree_hal_cuda_allocator_create(
       &device->context_wrapper, &device->device_allocator);
@@ -102,11 +135,15 @@ static iree_status_t iree_hal_cuda_device_create_internal(
 
 iree_status_t iree_hal_cuda_device_create(iree_hal_driver_t* driver,
                                           iree_string_view_t identifier,
+                                          const iree_hal_cuda_device_params_t* params,
                                           iree_hal_cuda_dynamic_symbols_t* syms,
                                           CUdevice device,
                                           iree_allocator_t host_allocator,
                                           iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(params);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                    iree_hal_cuda_device_check_params(params));
   CUcontext context;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, CU_RESULT_TO_STATUS(syms, cuCtxCreate(&context, 0, device)));
@@ -115,8 +152,8 @@ iree_status_t iree_hal_cuda_device_create(iree_hal_driver_t* driver,
       syms, cuStreamCreate(&stream, CU_STREAM_NON_BLOCKING));
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_cuda_device_create_internal(driver, identifier, device,
-                                                  stream, context, syms,
+    status = iree_hal_cuda_device_create_internal(driver, identifier, params,
+                                                  device, stream, context, syms,
                                                   host_allocator, out_device);
   }
   if (!iree_status_is_ok(status)) {
@@ -163,9 +200,9 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  return iree_hal_cuda_graph_command_buffer_allocate(
-      &device->context_wrapper, mode, command_categories, queue_affinity,
-      out_command_buffer);
+  return iree_hal_cuda_direct_command_buffer_allocate(
+      &device->context_wrapper, mode, command_categories,
+      &device->large_block_pool, queue_affinity, out_command_buffer);
 }
 
 static iree_status_t iree_hal_cuda_device_create_descriptor_set(
@@ -229,19 +266,17 @@ static iree_status_t iree_hal_cuda_device_queue_submit(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_command_buffer_t* target_command_buffer = batches[0].command_buffers[0];
   for (int i = 0; i < batch_count; i++) {
     for (int j = 0; j < batches[i].command_buffer_count; j++) {
-      CUgraphExec exec = iree_hal_cuda_graph_command_buffer_exec(
-          batches[i].command_buffers[j]);
-      CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                           cuGraphLaunch(exec, device->stream),
-                           "cuGraphLaunch");
+      IREE_RETURN_IF_ERROR(iree_hal_cuda_direct_command_buffer_apply(
+          batches[i].command_buffers[j], target_command_buffer));
     }
   }
   // TODO(thomasraoux): Conservatively syncronize after every submit until we
   // support semaphores.
   CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                       cuStreamSynchronize(device->stream),
+                       cuStreamSynchronize(0),
                        "cuStreamSynchronize");
   return iree_ok_status();
 }

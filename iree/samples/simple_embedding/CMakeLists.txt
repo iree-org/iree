@@ -221,6 +221,22 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
+iree_cc_binary(
+  NAME
+    simple_embedding_cuda
+  SRCS
+    "device_cuda.c"
+    "simple_embedding.c"
+  DEPS
+    ::simple_embedding_test_bytecode_module_vulkan_c
+    iree::base
+    iree::hal
+    iree::hal::cuda::registration
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+)
+
 iree_bytecode_module(
   NAME
     simple_embedding_test_bytecode_module_vulkan
@@ -232,6 +248,7 @@ iree_bytecode_module(
     "-iree-input-type=mhlo"
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=vulkan-spirv"
+    "-iree-hal-target-backends=cuda"
     "-iree-llvm-debug-symbols=false"
   PUBLIC
 )

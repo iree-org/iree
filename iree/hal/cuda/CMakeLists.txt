@@ -12,6 +12,9 @@ if(NOT ${IREE_HAL_DRIVER_CUDA})
   return()
 endif()
 
+find_package(CUDA REQUIRED)
+include_directories("${CUDA_INCLUDE_DIRS}")
+
 iree_add_all_subdirs()
 
 iree_cc_library(
@@ -37,8 +40,8 @@ iree_cc_library(
     "event_semaphore.h"
     "executable_layout.c"
     "executable_layout.h"
-    "graph_command_buffer.c"
-    "graph_command_buffer.h"
+    "direct_command_buffer.c"
+    "direct_command_buffer.h"
     "native_executable.c"
     "native_executable.h"
     "nop_executable_cache.c"
@@ -50,6 +53,7 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::arena
     iree::base::internal::flatcc
     iree::base::internal::synchronization
     iree::base::tracing

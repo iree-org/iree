@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/api.h"
+#include "iree/hal/cuda/cuda_device.h"
 
 #define IREE_HAL_CUDA_DRIVER_ID 0x43554441u  // CUDA
 
@@ -41,6 +42,8 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
                             driver_id);
   }
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_cuda_device_params_t default_params;
+  iree_hal_cuda_device_params_initialize(&default_params);
   // When we expose more than one driver (different cuda versions, etc) we
   // can name them here:
   iree_string_view_t identifier = iree_make_cstring_view("cuda");
@@ -48,7 +51,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);
   iree_status_t status = iree_hal_cuda_driver_create(
-      identifier, &driver_options, allocator, out_driver);
+      identifier, &default_params, &driver_options, allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
