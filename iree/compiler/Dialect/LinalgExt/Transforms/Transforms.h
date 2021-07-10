@@ -15,12 +15,17 @@ namespace mlir {
 namespace iree_compiler {
 namespace linalg_ext {
 
+/// Structure to represent the result of tiling operation.
 struct TiledOp {
+  /// Tiled op.
   Operation *op;
+  /// Loops generated during tiling.
   SmallVector<Operation *> loops;
+  /// Values that are replacements for the untiled operations.
   SmallVector<Value> results;
 };
 
+/// Main entry point for tiling LinalgExtOps using TiledOpInterface.
 FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TiledOpInterface op,
                                    const linalg::LinalgTilingOptions &options);
 

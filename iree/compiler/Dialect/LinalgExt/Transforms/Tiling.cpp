@@ -56,7 +56,7 @@ static LogicalResult verifySupportedTilingOptions(
   return success();
 }
 
-/// Converts a `Value`, to an `OpFoldRedult` by extracting the constant value if
+/// Converts a `Value` to an `OpFoldRedult` by extracting the constant value if
 /// the value is defined by a constant op.
 static OpFoldResult getOpFoldResult(Value value) {
   IntegerAttr::ValueType attr;
@@ -70,7 +70,7 @@ static SmallVector<OpFoldResult, 4> getOpFoldResult(ArrayRef<Value> values) {
       values, [](Value value) { return getOpFoldResult(value); }));
 }
 
-/// Converts an `OpFoldResult` to a `Value` by building an constant op if
+/// Converts an `OpFoldResult` to a `Value` by building a constant op if
 /// needed.
 static Value getValue(OpBuilder &builder, Location loc,
                       OpFoldResult valueOrAttr) {
@@ -82,11 +82,11 @@ static Value getValue(OpBuilder &builder, Location loc,
 }
 
 /// Returns true if loop is untiled. Only checks if the value is statically
-/// zero.
+/// zero. It is assumed that a `Value` defined by a constant op is already
+/// converted to an `IntegerAttr` of that value. So here just return true if
+/// this is an attribute with a zero value.
+
 bool isUntiledLoop(OpFoldResult valueOrAttr) {
-  // It is assumed that a `Value` defined by a constant op is already converted
-  // to an `IntegerAttr` of that value. So here just return true if this is an
-  // attribute with a zero value.
   auto attr = valueOrAttr.dyn_cast<Attribute>();
   return attr && attr.cast<IntegerAttr>().getValue() == 0;
 }
@@ -101,9 +101,10 @@ bool isUntiledLoop(OpFoldResult valueOrAttr) {
 /// - `loopBounds` are the bounds of all the loops of the op returned by the
 ///   TiledOpInterface.
 /// - `loopDepth` is the current loop depth being processed.
-/// - `offsets` is the values that represent the position of the tile being
-///   operated. The offsets are computed as the tiled loops are being generated.
-/// - `distributionInfo` is the proc_id and nprocs Values to be used for
+/// - `offsets` are the `Value`s that represent the position of the tile being
+///   operated on. The offsets are computed as the tiled loops are being
+///   generated.
+/// - `distributionInfo` is the proc_id and nprocs `Value`s to be used for
 ///   distributed loops. It is a stack, and once an entry at the top of the
 ///   stack is used for distribution it is popped before processing the inner
 ///   loops.
@@ -173,7 +174,7 @@ static FailureOr<TiledOp> tileLinalgExtOpImpl(
   }
   Value step = getValue(builder, loc, tileSizes[loopDepth]);
 
-  // Update for cyclic distribution.
+  // Update lb, ub and step for cyclic distribution.
   if (!distributionInfo.empty() &&
       iteratorTypes[loopDepth] == getParallelIteratorTypeName()) {
     linalg::updateBoundsForCyclicDistribution(
@@ -211,7 +212,6 @@ static FailureOr<TiledOp> tileLinalgExtOpImpl(
   return innerReturnValue;
 }
 
-/// Main entry point for tiling LinalgExtOps using TiledOpInterface.
 FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
                                    const linalg::LinalgTilingOptions &options) {
   TiledOpInterface tilableOp = dyn_cast<TiledOpInterface>(op.getOperation());

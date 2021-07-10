@@ -55,6 +55,8 @@ static void getEffectsImpl(
   }
 }
 
+/// Returns a memref.subview or a tensor.extract_slice based on the type of the
+/// `source`.
 static Value getSlice(OpBuilder &b, Location loc, Value source,
                       ArrayRef<OpFoldResult> offsets,
                       ArrayRef<OpFoldResult> sizes,
