@@ -42,6 +42,7 @@ cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/LinalgExt/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",

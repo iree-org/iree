@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
