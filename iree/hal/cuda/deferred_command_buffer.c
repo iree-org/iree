@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/cuda/direct_command_buffer.h"
+#include "iree/hal/cuda/deferred_command_buffer.h"
 
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/cuda_buffer.h"
@@ -133,10 +133,9 @@ static iree_status_t iree_hal_cmd_list_clone_data(iree_hal_cmd_list_t* cmd_list,
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_cuda_direct_command_buffer_t implementation
+// iree_hal_cuda_deferred_command_buffer_t implementation
 //===----------------------------------------------------------------------===//
 
-// Command buffer implementation that directly maps to cuda direct.
 // This records the commands on the calling thread without additional threading
 // indirection.
 
@@ -150,19 +149,19 @@ typedef struct {
   // size_t total_size;
   // Keep track of the current set of kernel arguments.
   void *current_descriptor[];
-} iree_hal_cuda_direct_command_buffer_t;
+} iree_hal_cuda_deferred_command_buffer_t;
 
 extern const iree_hal_command_buffer_vtable_t
-    iree_hal_cuda_direct_command_buffer_vtable;
+    iree_hal_cuda_deferred_command_buffer_vtable;
 
-static iree_hal_cuda_direct_command_buffer_t *
-iree_hal_cuda_direct_command_buffer_cast(
+static iree_hal_cuda_deferred_command_buffer_t *
+iree_hal_cuda_deferred_command_buffer_cast(
     iree_hal_command_buffer_t *base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_direct_command_buffer_vtable);
-  return (iree_hal_cuda_direct_command_buffer_t *)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_deferred_command_buffer_vtable);
+  return (iree_hal_cuda_deferred_command_buffer_t *)base_value;
 }
 
-iree_status_t iree_hal_cuda_direct_command_buffer_allocate(
+iree_status_t iree_hal_cuda_deferred_command_buffer_allocate(
     iree_hal_cuda_context_wrapper_t *context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -175,14 +174,14 @@ iree_status_t iree_hal_cuda_direct_command_buffer_allocate(
   *out_command_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda_direct_command_buffer_t *command_buffer = NULL;
+  iree_hal_cuda_deferred_command_buffer_t *command_buffer = NULL;
   // size_t total_size = sizeof(*command_buffer) +
   //                     IREE_HAL_CUDA_MAX_BINDING_COUNT * sizeof(void *) +
   //                     IREE_HAL_CUDA_MAX_BINDING_COUNT * sizeof(CUdeviceptr);
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, sizeof(*command_buffer), (void **)&command_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda_direct_command_buffer_vtable,
+    iree_hal_resource_initialize(&iree_hal_cuda_deferred_command_buffer_vtable,
                                  &command_buffer->resource);
     command_buffer->context = context;
     command_buffer->mode = mode;
@@ -203,10 +202,10 @@ iree_status_t iree_hal_cuda_direct_command_buffer_allocate(
   return status;
 }
 
-static void iree_hal_cuda_direct_command_buffer_destroy(
+static void iree_hal_cuda_deferred_command_buffer_destroy(
     iree_hal_command_buffer_t *base_command_buffer) {
-  iree_hal_cuda_direct_command_buffer_t *command_buffer =
-      iree_hal_cuda_direct_command_buffer_cast(base_command_buffer);
+  iree_hal_cuda_deferred_command_buffer_t *command_buffer =
+      iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_cmd_list_deinitialize(&command_buffer->cmd_list);
@@ -215,30 +214,30 @@ static void iree_hal_cuda_direct_command_buffer_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_hal_command_buffer_mode_t iree_hal_cuda_direct_command_buffer_mode(
+static iree_hal_command_buffer_mode_t iree_hal_cuda_deferred_command_buffer_mode(
     const iree_hal_command_buffer_t *base_command_buffer) {
-  const iree_hal_cuda_direct_command_buffer_t *command_buffer =
-      (const iree_hal_cuda_direct_command_buffer_t *)(base_command_buffer);
+  const iree_hal_cuda_deferred_command_buffer_t *command_buffer =
+      (const iree_hal_cuda_deferred_command_buffer_t *)(base_command_buffer);
   return command_buffer->mode;
 }
 
 static iree_hal_command_category_t
-iree_hal_cuda_direct_command_buffer_allowed_categories(
+iree_hal_cuda_deferred_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t *base_command_buffer) {
-  const iree_hal_cuda_direct_command_buffer_t *command_buffer =
-      (const iree_hal_cuda_direct_command_buffer_t *)(base_command_buffer);
+  const iree_hal_cuda_deferred_command_buffer_t *command_buffer =
+      (const iree_hal_cuda_deferred_command_buffer_t *)(base_command_buffer);
   return command_buffer->allowed_categories;
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_begin(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_begin(
     iree_hal_command_buffer_t *base_command_buffer) {
-  iree_hal_cuda_direct_command_buffer_t *command_buffer =
-      iree_hal_cuda_direct_command_buffer_cast(base_command_buffer);
+  iree_hal_cuda_deferred_command_buffer_t *command_buffer =
+      iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_reset(&command_buffer->cmd_list);
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_end(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_end(
     iree_hal_command_buffer_t *base_command_buffer) {
   return iree_ok_status();
 }
@@ -258,7 +257,7 @@ typedef struct iree_hal_cmd_execution_barrier_t {
   const iree_hal_buffer_barrier_t* buffer_barriers;
 } iree_hal_cmd_execution_barrier_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_execution_barrier(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_execution_barrier(
     iree_hal_command_buffer_t *base_command_buffer,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
@@ -269,7 +268,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_execution_barrier(
     const iree_hal_buffer_barrier_t *buffer_barriers) {
   // TODO: Implement barrier
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_execution_barrier_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_EXECUTION_BARRIER, sizeof(*cmd), (void**)&cmd));
@@ -295,7 +294,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_execution_barrier(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_execution_barrier(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_execution_barrier(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_execution_barrier_t* cmd) {
   return iree_hal_command_buffer_execution_barrier(
@@ -314,12 +313,12 @@ typedef struct iree_hal_cmd_signal_event_t {
   iree_hal_execution_stage_t source_stage_mask;
 } iree_hal_cmd_signal_event_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_signal_event(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_signal_event(
     iree_hal_command_buffer_t *base_command_buffer, iree_hal_event_t *event,
     iree_hal_execution_stage_t source_stage_mask) {
   // TODO: Implement barrier
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_signal_event_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_SIGNAL_EVENT, sizeof(*cmd), (void**)&cmd));
@@ -328,7 +327,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_signal_event(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_signal_event(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_signal_event(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_signal_event_t* cmd) {
   return iree_hal_command_buffer_signal_event(target_command_buffer, cmd->event,
@@ -345,12 +344,12 @@ typedef struct iree_hal_cmd_reset_event_t {
   iree_hal_execution_stage_t source_stage_mask;
 } iree_hal_cmd_reset_event_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_reset_event(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_reset_event(
     iree_hal_command_buffer_t *base_command_buffer, iree_hal_event_t *event,
     iree_hal_execution_stage_t source_stage_mask) {
   // TODO: Implement barrier
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_reset_event_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_RESET_EVENT, sizeof(*cmd), (void**)&cmd));
@@ -359,7 +358,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_reset_event(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_reset_event(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_reset_event(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_reset_event_t* cmd) {
   return iree_hal_command_buffer_reset_event(target_command_buffer, cmd->event,
@@ -382,7 +381,7 @@ typedef struct iree_hal_cmd_wait_events_t {
   iree_hal_event_t* events[];
 } iree_hal_cmd_wait_events_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_wait_events(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_wait_events(
     iree_hal_command_buffer_t *base_command_buffer,
     iree_host_size_t event_count, const iree_hal_event_t **events,
     iree_hal_execution_stage_t source_stage_mask,
@@ -393,7 +392,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_wait_events(
     const iree_hal_buffer_barrier_t *buffer_barriers) {
   // TODO: Implement barrier
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_wait_events_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_WAIT_EVENTS,
@@ -421,7 +420,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_wait_events(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_wait_events(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_wait_events(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_wait_events_t* cmd) {
   return iree_hal_command_buffer_wait_events(
@@ -440,11 +439,11 @@ typedef struct iree_hal_cmd_discard_buffer_t {
   iree_hal_buffer_t* buffer;
 } iree_hal_cmd_discard_buffer_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_discard_buffer(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_discard_buffer(
     iree_hal_command_buffer_t *base_command_buffer, iree_hal_buffer_t *buffer) {
   // nothing to do.
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_discard_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_DISCARD_BUFFER, sizeof(*cmd), (void**)&cmd));
@@ -452,7 +451,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_discard_buffer(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_discard_buffer(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_discard_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_discard_buffer_t* cmd) {
   return iree_hal_command_buffer_discard_buffer(target_command_buffer,
@@ -494,13 +493,13 @@ typedef struct iree_hal_cmd_fill_buffer_t {
   iree_host_size_t pattern_length;
 } iree_hal_cmd_fill_buffer_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_fill_buffer(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_fill_buffer(
     iree_hal_command_buffer_t *base_command_buffer,
     iree_hal_buffer_t *target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, const void *pattern,
     iree_host_size_t pattern_length) {
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_fill_buffer_t* cmd = NULL;
   if (pattern_length > sizeof(cmd->pattern)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -516,11 +515,11 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_fill_buffer(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_fill_buffer(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_fill_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_cmd_fill_buffer_t* cmd) {
-  iree_hal_cuda_direct_command_buffer_t *command_buffer =
-      iree_hal_cuda_direct_command_buffer_cast(target_command_buffer);
+  iree_hal_cuda_deferred_command_buffer_t *command_buffer =
+      iree_hal_cuda_deferred_command_buffer_cast(target_command_buffer);
   CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(cmd->target_buffer));
   cmd->target_offset += iree_hal_buffer_byte_offset(cmd->target_buffer);
@@ -550,12 +549,12 @@ typedef struct iree_hal_cmd_update_buffer_t {
   uint8_t source_buffer[];
 } iree_hal_cmd_update_buffer_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_update_buffer(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_update_buffer(
     iree_hal_command_buffer_t *base_command_buffer, const void *source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t *target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_update_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_UPDATE_BUFFER,
@@ -570,7 +569,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_update_buffer(
   //                         "need cuda implementation");
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_update_buffer(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_update_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_update_buffer_t* cmd) {
   return iree_hal_command_buffer_update_buffer(
@@ -591,13 +590,13 @@ typedef struct iree_hal_cmd_copy_buffer_t {
   iree_device_size_t length;
 } iree_hal_cmd_copy_buffer_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_copy_buffer(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_copy_buffer(
     iree_hal_command_buffer_t *base_command_buffer,
     iree_hal_buffer_t *source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t *target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length) {
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_copy_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_COPY_BUFFER, sizeof(*cmd), (void**)&cmd));
@@ -609,11 +608,11 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_copy_buffer(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_copy_buffer(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_copy_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_cmd_copy_buffer_t* cmd) {
-  iree_hal_cuda_direct_command_buffer_t *command_buffer =
-      iree_hal_cuda_direct_command_buffer_cast(target_command_buffer);
+  iree_hal_cuda_deferred_command_buffer_t *command_buffer =
+      iree_hal_cuda_deferred_command_buffer_cast(target_command_buffer);
   CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(cmd->target_buffer));
   cmd->target_offset += iree_hal_buffer_byte_offset(cmd->target_buffer);
@@ -644,12 +643,12 @@ typedef struct iree_hal_cmd_push_constants_t {
   uint8_t values[];
 } iree_hal_cmd_push_constants_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_push_constants(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_push_constants(
     iree_hal_command_buffer_t *base_command_buffer,
     iree_hal_executable_layout_t *executable_layout, iree_host_size_t offset,
     const void *values, iree_host_size_t values_length) {
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_push_constants_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_PUSH_CONSTANTS,
@@ -663,7 +662,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_push_constants(
   //                         "need cuda implementation");
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_push_constants(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_push_constants(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_push_constants_t* cmd) {
   return iree_hal_command_buffer_push_constants(
@@ -698,13 +697,13 @@ typedef struct iree_hal_cmd_push_descriptor_set_t {
   iree_hal_descriptor_set_binding_t bindings[];
 } iree_hal_cmd_push_descriptor_set_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_push_descriptor_set(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t *base_command_buffer,
     iree_hal_executable_layout_t *executable_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t *bindings) {
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_push_descriptor_set_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_PUSH_DESCRIPTOR_SET,
@@ -716,11 +715,11 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_push_descriptor_set(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_push_descriptor_set(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_push_descriptor_set(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_push_descriptor_set_t* cmd) {
-  iree_hal_cuda_direct_command_buffer_t *command_buffer =
-      iree_hal_cuda_direct_command_buffer_cast(target_command_buffer);
+  iree_hal_cuda_deferred_command_buffer_t *command_buffer =
+      iree_hal_cuda_deferred_command_buffer_cast(target_command_buffer);
   // Convention with the compiler side. We map bindings to kernel argument.
   // We compact the bindings to get a dense set of arguments and keep them order
   // based on the binding index.
@@ -761,14 +760,14 @@ typedef struct iree_hal_cmd_bind_descriptor_set_t {
   iree_device_size_t dynamic_offsets[];
 } iree_hal_cmd_bind_descriptor_set_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_bind_descriptor_set(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_bind_descriptor_set(
     iree_hal_command_buffer_t *base_command_buffer,
     iree_hal_executable_layout_t *executable_layout, uint32_t set,
     iree_hal_descriptor_set_t *descriptor_set,
     iree_host_size_t dynamic_offset_count,
     const iree_device_size_t *dynamic_offsets) {
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_bind_descriptor_set_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_BIND_DESCRIPTOR_SET,
@@ -785,7 +784,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_bind_descriptor_set(
   //                         "need cuda implementation");
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_bind_descriptor_set(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_bind_descriptor_set(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_bind_descriptor_set_t* cmd) {
   return iree_hal_command_buffer_bind_descriptor_set(
@@ -806,12 +805,12 @@ typedef struct iree_hal_cmd_dispatch_t {
   uint32_t workgroup_z;
 } iree_hal_cmd_dispatch_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_dispatch(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_dispatch_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_DISPATCH, sizeof(*cmd), (void**)&cmd));
@@ -823,11 +822,11 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_dispatch(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_dispatch(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_dispatch(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_dispatch_t* cmd) {
-  iree_hal_cuda_direct_command_buffer_t *command_buffer =
-      iree_hal_cuda_direct_command_buffer_cast(target_command_buffer);
+  iree_hal_cuda_deferred_command_buffer_t *command_buffer =
+      iree_hal_cuda_deferred_command_buffer_cast(target_command_buffer);
   int32_t block_size_x, block_size_y, block_size_z;
   IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
       cmd->executable, cmd->entry_point, &block_size_x, &block_size_y, &block_size_z));
@@ -859,13 +858,13 @@ typedef struct iree_hal_cmd_dispatch_indirect_t {
   iree_device_size_t workgroups_offset;
 } iree_hal_cmd_dispatch_indirect_t;
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_dispatch_indirect(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t *base_command_buffer,
     iree_hal_executable_t *executable, int32_t entry_point,
     iree_hal_buffer_t *workgroups_buffer,
     iree_device_size_t workgroups_offset) {
   iree_hal_cmd_list_t* cmd_list =
-      &iree_hal_cuda_direct_command_buffer_cast(base_command_buffer)->cmd_list;
+      &iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
   iree_hal_cmd_dispatch_indirect_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_DISPATCH_INDIRECT, sizeof(*cmd), (void**)&cmd));
@@ -878,7 +877,7 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_dispatch_indirect(
   //                         "need cuda implementation");
 }
 
-static iree_status_t iree_hal_cuda_direct_command_buffer_apply_dispatch_indirect(
+static iree_status_t iree_hal_cuda_deferred_command_buffer_apply_dispatch_indirect(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_dispatch_indirect_t* cmd) {
   return iree_hal_command_buffer_dispatch_indirect(
@@ -892,40 +891,40 @@ static iree_status_t iree_hal_cuda_direct_command_buffer_apply_dispatch_indirect
 
 static const iree_hal_cmd_apply_fn_t iree_hal_cmd_apply_table[] = {
     [IREE_HAL_CMD_EXECUTION_BARRIER] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_execution_barrier,
+        iree_hal_cuda_deferred_command_buffer_apply_execution_barrier,
     [IREE_HAL_CMD_SIGNAL_EVENT] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_signal_event,
+        iree_hal_cuda_deferred_command_buffer_apply_signal_event,
     [IREE_HAL_CMD_RESET_EVENT] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_reset_event,
+        iree_hal_cuda_deferred_command_buffer_apply_reset_event,
     [IREE_HAL_CMD_WAIT_EVENTS] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_wait_events,
+        iree_hal_cuda_deferred_command_buffer_apply_wait_events,
     [IREE_HAL_CMD_DISCARD_BUFFER] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_discard_buffer,
+        iree_hal_cuda_deferred_command_buffer_apply_discard_buffer,
     [IREE_HAL_CMD_FILL_BUFFER] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_fill_buffer,
+        iree_hal_cuda_deferred_command_buffer_apply_fill_buffer,
     [IREE_HAL_CMD_UPDATE_BUFFER] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_update_buffer,
+        iree_hal_cuda_deferred_command_buffer_apply_update_buffer,
     [IREE_HAL_CMD_COPY_BUFFER] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_copy_buffer,
+        iree_hal_cuda_deferred_command_buffer_apply_copy_buffer,
     [IREE_HAL_CMD_PUSH_CONSTANTS] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_push_constants,
+        iree_hal_cuda_deferred_command_buffer_apply_push_constants,
     [IREE_HAL_CMD_PUSH_DESCRIPTOR_SET] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_push_descriptor_set,
+        iree_hal_cuda_deferred_command_buffer_apply_push_descriptor_set,
     [IREE_HAL_CMD_BIND_DESCRIPTOR_SET] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_bind_descriptor_set,
+        iree_hal_cuda_deferred_command_buffer_apply_bind_descriptor_set,
     [IREE_HAL_CMD_DISPATCH] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_dispatch,
+        iree_hal_cuda_deferred_command_buffer_apply_dispatch,
     [IREE_HAL_CMD_DISPATCH_INDIRECT] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_cuda_direct_command_buffer_apply_dispatch_indirect,
+        iree_hal_cuda_deferred_command_buffer_apply_dispatch_indirect,
 };
 
-iree_status_t iree_hal_cuda_direct_command_buffer_apply(
+iree_status_t iree_hal_cuda_deferred_command_buffer_apply(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_command_buffer_t* target_command_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda_direct_command_buffer_t* command_buffer =
-      iree_hal_cuda_direct_command_buffer_cast(base_command_buffer);
+  iree_hal_cuda_deferred_command_buffer_t* command_buffer =
+      iree_hal_cuda_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
 
   iree_status_t status = iree_hal_command_buffer_begin(target_command_buffer);
@@ -950,28 +949,28 @@ iree_status_t iree_hal_cuda_direct_command_buffer_apply(
 }
 
 const iree_hal_command_buffer_vtable_t
-    iree_hal_cuda_direct_command_buffer_vtable = {
-        .destroy = iree_hal_cuda_direct_command_buffer_destroy,
-        .mode = iree_hal_cuda_direct_command_buffer_mode,
+    iree_hal_cuda_deferred_command_buffer_vtable = {
+        .destroy = iree_hal_cuda_deferred_command_buffer_destroy,
+        .mode = iree_hal_cuda_deferred_command_buffer_mode,
         .allowed_categories =
-            iree_hal_cuda_direct_command_buffer_allowed_categories,
-        .begin = iree_hal_cuda_direct_command_buffer_begin,
-        .end = iree_hal_cuda_direct_command_buffer_end,
+            iree_hal_cuda_deferred_command_buffer_allowed_categories,
+        .begin = iree_hal_cuda_deferred_command_buffer_begin,
+        .end = iree_hal_cuda_deferred_command_buffer_end,
         .execution_barrier =
-            iree_hal_cuda_direct_command_buffer_execution_barrier,
-        .signal_event = iree_hal_cuda_direct_command_buffer_signal_event,
-        .reset_event = iree_hal_cuda_direct_command_buffer_reset_event,
-        .wait_events = iree_hal_cuda_direct_command_buffer_wait_events,
-        .discard_buffer = iree_hal_cuda_direct_command_buffer_discard_buffer,
-        .fill_buffer = iree_hal_cuda_direct_command_buffer_fill_buffer,
-        .update_buffer = iree_hal_cuda_direct_command_buffer_update_buffer,
-        .copy_buffer = iree_hal_cuda_direct_command_buffer_copy_buffer,
-        .push_constants = iree_hal_cuda_direct_command_buffer_push_constants,
+            iree_hal_cuda_deferred_command_buffer_execution_barrier,
+        .signal_event = iree_hal_cuda_deferred_command_buffer_signal_event,
+        .reset_event = iree_hal_cuda_deferred_command_buffer_reset_event,
+        .wait_events = iree_hal_cuda_deferred_command_buffer_wait_events,
+        .discard_buffer = iree_hal_cuda_deferred_command_buffer_discard_buffer,
+        .fill_buffer = iree_hal_cuda_deferred_command_buffer_fill_buffer,
+        .update_buffer = iree_hal_cuda_deferred_command_buffer_update_buffer,
+        .copy_buffer = iree_hal_cuda_deferred_command_buffer_copy_buffer,
+        .push_constants = iree_hal_cuda_deferred_command_buffer_push_constants,
         .push_descriptor_set =
-            iree_hal_cuda_direct_command_buffer_push_descriptor_set,
+            iree_hal_cuda_deferred_command_buffer_push_descriptor_set,
         .bind_descriptor_set =
-            iree_hal_cuda_direct_command_buffer_bind_descriptor_set,
-        .dispatch = iree_hal_cuda_direct_command_buffer_dispatch,
+            iree_hal_cuda_deferred_command_buffer_bind_descriptor_set,
+        .dispatch = iree_hal_cuda_deferred_command_buffer_dispatch,
         .dispatch_indirect =
-            iree_hal_cuda_direct_command_buffer_dispatch_indirect,
+            iree_hal_cuda_deferred_command_buffer_dispatch_indirect,
 };

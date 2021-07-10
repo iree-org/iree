@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_CUDA_DIRECT_COMMAND_BUFFER_H_
-#define IREE_HAL_CUDA_DIRECT_COMMAND_BUFFER_H_
+#ifndef IREE_HAL_CUDA_DEFERRED_COMMAND_BUFFER_H_
+#define IREE_HAL_CUDA_DEFERRED_COMMAND_BUFFER_H_
 
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
@@ -29,8 +29,8 @@ typedef struct {
   void **kernelParams;
 } cuda_launch_params;
 
-// Creates a cuda direct command buffer.
-iree_status_t iree_hal_cuda_direct_command_buffer_allocate(
+// Creates a cuda deferred command buffer.
+iree_status_t iree_hal_cuda_deferred_command_buffer_allocate(
     iree_hal_cuda_context_wrapper_t *context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -38,7 +38,7 @@ iree_status_t iree_hal_cuda_direct_command_buffer_allocate(
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t **out_command_buffer);
 
-iree_status_t iree_hal_cuda_direct_command_buffer_apply(
+iree_status_t iree_hal_cuda_deferred_command_buffer_apply(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_command_buffer_t* target_command_buffer);
 
@@ -46,4 +46,4 @@ iree_status_t iree_hal_cuda_direct_command_buffer_apply(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_CUDA_DIRECT_COMMAND_BUFFER_H_
+#endif  // IREE_HAL_CUDA_DEFERRED_COMMAND_BUFFER_H_
