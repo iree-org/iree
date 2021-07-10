@@ -47,9 +47,9 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
         /*args=*/(ins
             "OpBuilder &":$b,
             "ValueRange ":$outputs,
-            "ValueRange ":$offsets,
-            "ValueRange ":$sizes,
-            "SmallVectorImpl<SmallVector<Value, 4>> &":$resultOffsets)
+            "ArrayRef<OpFoldResult> ":$offsets,
+            "ArrayRef<OpFoldResult> ":$sizes,
+            "SmallVectorImpl<SmallVector<OpFoldResult, 4>> &":$resultOffsets)
       >
   ];
 }

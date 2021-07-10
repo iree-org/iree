@@ -16,6 +16,22 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+namespace mlir {
+namespace iree_compiler {
+namespace linalg_ext {
+
+/// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
+/// `dim`.
+Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim);
+
+/// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
+/// `dim`. If the shape is constant, returns the shape as an `IntegerAttr`.
+OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim);
+
+}  // namespace linalg_ext
+}  // namespace iree_compiler
+}  // namespace mlir
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h.inc"  // IWYU pragma: export
 

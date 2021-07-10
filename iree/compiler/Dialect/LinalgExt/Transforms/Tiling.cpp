@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -55,6 +56,41 @@ static LogicalResult verifySupportedTilingOptions(
   return success();
 }
 
+/// Converts a `Value`, to an `OpFoldRedult` by extracting the constant value if
+/// the value is defined by a constant op.
+static OpFoldResult getOpFoldResult(Value value) {
+  IntegerAttr::ValueType attr;
+  if (matchPattern(value, m_ConstantInt(&attr))) {
+    return IntegerAttr::get(value.getType(), attr);
+  }
+  return value;
+}
+static SmallVector<OpFoldResult, 4> getOpFoldResult(ArrayRef<Value> values) {
+  return llvm::to_vector<4>(llvm::map_range(
+      values, [](Value value) { return getOpFoldResult(value); }));
+}
+
+/// Converts an `OpFoldResult` to a `Value` by building an constant op if
+/// needed.
+static Value getValue(OpBuilder &builder, Location loc,
+                      OpFoldResult valueOrAttr) {
+  if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+    return builder.create<ConstantIndexOp>(loc,
+                                           attr.cast<IntegerAttr>().getInt());
+  }
+  return valueOrAttr.get<Value>();
+}
+
+/// Returns true if loop is untiled. Only checks if the value is statically
+/// zero.
+bool isUntiledLoop(OpFoldResult valueOrAttr) {
+  // It is assumed that a `Value` defined by a constant op is already converted
+  // to an `IntegerAttr` of that value. So here just return true if this is an
+  // attribute with a zero value.
+  auto attr = valueOrAttr.dyn_cast<Attribute>();
+  return attr && attr.cast<IntegerAttr>().getValue() == 0;
+}
+
 /// Generates the tiled loops and the body by invoking the interface methods of
 /// TiledOpInterface.
 /// - `outputs` are the operands to use for outputs of the tiled operation.
@@ -73,15 +109,15 @@ static LogicalResult verifySupportedTilingOptions(
 ///   loops.
 static FailureOr<TiledOp> tileLinalgExtOpImpl(
     OpBuilder &builder, TiledOpInterface op, ValueRange outputs,
-    MutableArrayRef<Value> tileSizes, ArrayRef<StringRef> iteratorTypes,
+    MutableArrayRef<OpFoldResult> tileSizes, ArrayRef<StringRef> iteratorTypes,
     ArrayRef<Range> loopBounds, unsigned loopDepth,
-    SmallVectorImpl<Value> &offsets,
+    SmallVectorImpl<OpFoldResult> &offsets,
     ArrayRef<linalg::ProcInfo> distributionInfo) {
   Location loc = op.getLoc();
   // If this is the innermost loop, then generated the tiled implementation of
   // the op by invoking the TiledOpInterface methods.
   if (loopDepth == tileSizes.size()) {
-    SmallVector<SmallVector<Value, 4>> resultOffsets;
+    SmallVector<SmallVector<OpFoldResult, 4>> resultOffsets;
     Operation *tiledOp = op.getTiledImplementation(builder, outputs, offsets,
                                                    tileSizes, resultOffsets);
     if (!tiledOp) {
@@ -100,15 +136,13 @@ static FailureOr<TiledOp> tileLinalgExtOpImpl(
       results.reserve(tiledOp->getNumResults());
       for (auto en : llvm::enumerate(tiledOp->getResults())) {
         Value result = en.value();
-        ArrayRef<Value> offsets(resultOffsets[en.index()]);
+        ArrayRef<OpFoldResult> offsets(resultOffsets[en.index()]);
         auto resultType = result.getType().cast<ShapedType>();
-        Value one = builder.create<ConstantIndexOp>(loc, 1);
-        SmallVector<Value> strides(resultType.getRank(), one);
+        auto oneAttr = builder.getI64IntegerAttr(1);
+        SmallVector<OpFoldResult> strides(resultType.getRank(), oneAttr);
         auto sizes = llvm::to_vector<4>(llvm::map_range(
             llvm::seq<int64_t>(0, resultType.getRank()),
-            [&](int64_t dim) -> Value {
-              return builder.create<memref::DimOp>(loc, result, dim);
-            }));
+            [&](int64_t dim) { return getDim(builder, loc, result, dim); }));
         Value insert = builder.create<tensor::InsertSliceOp>(
             loc, result, outputs[en.index()], offsets, sizes, strides);
         results.push_back(insert);
@@ -119,12 +153,12 @@ static FailureOr<TiledOp> tileLinalgExtOpImpl(
   }
 
   // If tile size at this depth is empty, do nothing.
-  if (matchPattern(tileSizes[loopDepth], m_Zero())) {
-    Value zero = builder.create<ConstantIndexOp>(loc, 0);
-    offsets.push_back(zero);
+  if (isUntiledLoop(tileSizes[loopDepth])) {
+    auto zeroAttr = builder.getI64IntegerAttr(0);
+    offsets.push_back(zeroAttr);
     assert(matchPattern(loopBounds[loopDepth].offset, m_Zero()) &&
            "expected loop bounds to have lower bound of zero");
-    tileSizes[loopDepth] = loopBounds[loopDepth].size;
+    tileSizes[loopDepth] = getOpFoldResult(loopBounds[loopDepth].size);
     return tileLinalgExtOpImpl(builder, op, outputs, tileSizes, iteratorTypes,
                                loopBounds, loopDepth + 1, offsets,
                                distributionInfo);
@@ -137,7 +171,7 @@ static FailureOr<TiledOp> tileLinalgExtOpImpl(
     return static_cast<LogicalResult>(
         op.emitOpError("expected stride to be 1"));
   }
-  Value step = tileSizes[loopDepth];
+  Value step = getValue(builder, loc, tileSizes[loopDepth]);
 
   // Update for cyclic distribution.
   if (!distributionInfo.empty() &&
@@ -157,8 +191,10 @@ static FailureOr<TiledOp> tileLinalgExtOpImpl(
         auto affineMaps = AffineMap::inferFromExprList({ArrayRef<AffineExpr>{
             b.getAffineSymbolExpr(0),
             b.getAffineSymbolExpr(1) - b.getAffineDimExpr(0)}})[0];
-        tileSizes[loopDepth] = b.create<AffineMinOp>(
-            loc, affineMaps, ValueRange{iv, tileSizes[loopDepth], ub});
+        Value inBoundsTileSize = b.create<AffineMinOp>(
+            loc, affineMaps,
+            ValueRange{iv, getValue(builder, loc, tileSizes[loopDepth]), ub});
+        tileSizes[loopDepth] = getOpFoldResult(inBoundsTileSize);
         // Recursively proceed to generate the tiled loop for the next level.
         innerReturnValue = tileLinalgExtOpImpl(
             b, op, (isBufferTiling ? outputs : args), tileSizes, iteratorTypes,
@@ -183,18 +219,18 @@ FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
 
   SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
   SmallVector<Range> loopBounds = tilableOp.getLoopBounds(b);
-  SmallVector<Value, 4> tileSizes =
+  SmallVector<Value, 4> tileSizesVals =
       options.tileSizeComputationFunction(b, tilableOp.getOperation());
-
+  auto tileSizes = getOpFoldResult(tileSizesVals);
   Location loc = tilableOp.getLoc();
-  Value zero = b.create<ConstantIndexOp>(loc, 0);
-  tileSizes.resize(loopBounds.size(), zero);
+  auto zeroAttr = b.getI64IntegerAttr(0);
+  tileSizes.resize(loopBounds.size(), zeroAttr);
 
   // Trivial early exit case of tile sizes being zero for all parallel loops.
   if (llvm::all_of(llvm::zip(tileSizes, iteratorTypes),
-                   [&](std::tuple<Value, StringRef> v) {
+                   [&](std::tuple<OpFoldResult, StringRef> v) {
                      return std::get<1>(v) != getParallelIteratorTypeName() ||
-                            matchPattern(std::get<0>(v), m_Zero());
+                            isUntiledLoop(std::get<0>(v));
                    })) {
     return TiledOp{op.getOperation(), {}, {}};
   }
@@ -208,7 +244,7 @@ FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
   if (options.distribution) {
     SmallVector<Range> distributedLoopRange;
     for (auto i : llvm::seq<unsigned>(0, tileSizes.size())) {
-      if (matchPattern(tileSizes[i], m_Zero())) continue;
+      if (isUntiledLoop(tileSizes[i])) continue;
       if (iteratorTypes[i] != getParallelIteratorTypeName()) continue;
       distributedLoopRange.push_back(loopBounds[i]);
     }
@@ -216,7 +252,7 @@ FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
         options.distribution->procInfo(b, loc, distributedLoopRange);
   }
 
-  SmallVector<Value> offsets;
+  SmallVector<OpFoldResult> offsets;
   return tileLinalgExtOpImpl(b, tilableOp, op.outputs(), tileSizes,
                              iteratorTypes, loopBounds, 0, offsets,
                              distributionInfo);

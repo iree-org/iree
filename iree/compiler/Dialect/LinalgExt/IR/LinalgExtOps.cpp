@@ -56,8 +56,9 @@ static void getEffectsImpl(
 }
 
 static Value getSlice(OpBuilder &b, Location loc, Value source,
-                      ValueRange offsets, ValueRange sizes,
-                      ValueRange strides) {
+                      ArrayRef<OpFoldResult> offsets,
+                      ArrayRef<OpFoldResult> sizes,
+                      ArrayRef<OpFoldResult> strides) {
   return TypeSwitch<Type, Value>(source.getType())
       .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
         return b.create<tensor::ExtractSliceOp>(loc, source, offsets, sizes,
@@ -68,6 +69,25 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
                                            strides);
       })
       .Default([&](Type t) { return nullptr; });
+}
+
+Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
+  return TypeSwitch<Type, Value>(v.getType())
+      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
+        return builder.create<tensor::DimOp>(loc, v, dim);
+      })
+      .Case<MemRefType>([&](MemRefType t) -> Value {
+        return builder.create<memref::DimOp>(loc, v, dim);
+      })
+      .Default([&](Type t) { return Value(); });
+}
+
+OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
+  ShapedType t = v.getType().cast<ShapedType>();
+  if (t.isDynamicDim(dim)) {
+    return getDimValue(builder, loc, v, dim);
+  }
+  return builder.getI64IntegerAttr(t.getShape()[dim]);
 }
 
 //===----------------------------------------------------------------------===//
@@ -218,38 +238,56 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
 }
 
 SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
-  return SmallVector<StringRef>(getOriginalType().getRank(),
-                                getParallelIteratorTypeName());
+  return {getParallelIteratorTypeName()};
 }
 
 SmallVector<Range> ScatterOp::getLoopBounds(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<ConstantIndexOp>(loc, 0);
   Value one = builder.create<ConstantIndexOp>(loc, 1);
-  Value updateVal = update();
-  SmallVector<Range> loopBounds(getUpdateType().getRank());
-  for (auto dim : llvm::seq<unsigned>(0, getUpdateType().getRank())) {
-    Value ub = builder.create<memref::DimOp>(loc, updateVal, dim);
-    loopBounds[dim] = {zero, ub, one};
-  }
-  return loopBounds;
+  Value ub = getDimValue(builder, loc, updates(), 0);
+  return {Range{zero, ub, one}};
 }
 
 Operation *ScatterOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ValueRange offsets,
-    ValueRange sizes, SmallVectorImpl<SmallVector<Value, 4>> &resultOffsets) {
-  assert(outputs.size() == 1);
+    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets) {
+  assert(outputs.size() == 1 && offsets.size() == 1 && sizes.size() == 1);
   Location loc = getLoc();
-  Value one = builder.create<ConstantIndexOp>(loc, 1);
-  SmallVector<Value> strides(getUpdateType().getRank(), one);
-  Value tiledUpdate = getSlice(builder, loc, update(), offsets, sizes, strides);
-  Value tiledIndices =
-      getSlice(builder, loc, indices(), offsets[0], sizes[0], one);
-  assert(tiledUpdate && tiledIndices &&
-         "failed to get slice of update/indices");
+  auto zeroAttr = builder.getI64IntegerAttr(0);
+  auto oneAttr = builder.getI64IntegerAttr(1);
+
+  // Slice of the updates.
+  auto updateRank = getUpdateType().getRank();
+  SmallVector<OpFoldResult> updateOffsets(updateRank, zeroAttr);
+  SmallVector<OpFoldResult> updateSizes(updateRank, zeroAttr);
+  updateOffsets[0] = offsets[0];
+  updateSizes[0] = sizes[0];
+  for (auto dim : llvm::seq<int64_t>(1, updateRank)) {
+    updateSizes[dim] = getDim(builder, loc, updates(), dim);
+  }
+  SmallVector<OpFoldResult> updateStrides(updateRank, oneAttr);
+  Value tiledUpdate = getSlice(builder, loc, updates(), updateOffsets,
+                               updateSizes, updateStrides);
+  assert(tiledUpdate && "failed to get slice of update");
+
+  // Slice of indices.
+  auto indicesRank = getIndicesType().getRank();
+  SmallVector<OpFoldResult> indicesOffsets(indicesRank, zeroAttr);
+  SmallVector<OpFoldResult> indicesSizes(indicesRank, zeroAttr);
+  indicesOffsets[0] = offsets[0];
+  indicesSizes[0] = sizes[0];
+  for (auto dim : llvm::seq<int64_t>(1, indicesRank)) {
+    indicesSizes[dim] = getDim(builder, loc, indices(), dim);
+  }
+  SmallVector<OpFoldResult> indicesStrides(indicesRank, oneAttr);
+  Value tiledIndices = getSlice(builder, loc, indices(), indicesOffsets,
+                                indicesSizes, indicesStrides);
+  assert(tiledIndices && "failed to get slice of indices");
+
   resultOffsets.resize(1);
-  Value zero = builder.create<ConstantIndexOp>(loc, 0);
-  resultOffsets[0].resize(getUpdateType().getRank(), zero);
+  resultOffsets[0].resize(getUpdateType().getRank(), zeroAttr);
   SmallVector<Type> resultTypes;
   if (getNumResults()) {
     resultTypes.push_back(getResultTypes()[0]);

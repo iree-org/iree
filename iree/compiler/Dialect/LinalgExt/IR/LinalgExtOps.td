@@ -91,7 +91,7 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
     }
 
     ShapedType getUpdateType() {
-      return update().getType().cast<ShapedType>();
+      return updates().getType().cast<ShapedType>();
     }
 
     Value indices() {
