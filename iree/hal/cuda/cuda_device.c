@@ -19,7 +19,7 @@
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/event_semaphore.h"
 #include "iree/hal/cuda/executable_layout.h"
-#include "iree/hal/cuda/direct_command_buffer.h"
+#include "iree/hal/cuda/deferred_command_buffer.h"
 #include "iree/hal/cuda/nop_executable_cache.h"
 #include "iree/hal/cuda/status_util.h"
 
@@ -200,7 +200,7 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  return iree_hal_cuda_direct_command_buffer_allocate(
+  return iree_hal_cuda_deferred_command_buffer_allocate(
       &device->context_wrapper, mode, command_categories,
       &device->large_block_pool, queue_affinity, out_command_buffer);
 }
@@ -269,7 +269,7 @@ static iree_status_t iree_hal_cuda_device_queue_submit(
   iree_hal_command_buffer_t* target_command_buffer = batches[0].command_buffers[0];
   for (int i = 0; i < batch_count; i++) {
     for (int j = 0; j < batches[i].command_buffer_count; j++) {
-      IREE_RETURN_IF_ERROR(iree_hal_cuda_direct_command_buffer_apply(
+      IREE_RETURN_IF_ERROR(iree_hal_cuda_deferred_command_buffer_apply(
           batches[i].command_buffers[j], target_command_buffer));
     }
   }
