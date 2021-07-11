@@ -34,6 +34,7 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     LLVMSupport
+    MLIRAffine
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -42,6 +43,7 @@ iree_cc_library(
     MLIRSCF
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
