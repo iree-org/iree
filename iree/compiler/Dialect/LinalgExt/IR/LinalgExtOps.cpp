@@ -316,6 +316,9 @@ static LogicalResult verifySortOp(SortOp op) {
   if (op.getNumInputs()) {
     return op.emitOpError("does not expect to take any inputs");
   }
+  if (op.getNumOutputs() == 0) {
+    return op.emitOpError("expected at least one `outs` operand");
+  }
 
   Block &block = op.region().front();
   size_t numOutputs = op.getNumOutputs();
@@ -324,7 +327,8 @@ static LogicalResult verifySortOp(SortOp op) {
            << 2 * numOutputs << " arguments";
   }
 
-  int rank = op.getRank(op.getOutputOperand(0));
+  int64_t rank = op.getOperandRank();
+  ArrayRef<int64_t> shape = op.getOperandShape();
   if (rank > 1 && !op.dimensionAttr()) {
     return op.emitOpError("dimension must be specified if rank > 1");
   }
@@ -336,10 +340,18 @@ static LogicalResult verifySortOp(SortOp op) {
     return op.emitOpError("dimension must be within (0, ") << rank << "]";
   }
 
-  for (auto indexedOperand : llvm::enumerate(op.inputs())) {
+  for (auto indexedOperand : llvm::enumerate(op.outputs())) {
     int index = indexedOperand.index();
-    Type elemType =
-        indexedOperand.value().getType().cast<ShapedType>().getElementType();
+    auto operandType = op.getOperandType(index);
+    if (operandType.getRank() != rank) {
+      return op.emitOpError("expected operand ")
+             << index << " to be rank " << rank << ", same as other operands";
+    }
+    if (operandType.getShape() != shape) {
+      return op.emitOpError("expected operand ")
+             << index << " to have same shape as other operands";
+    }
+    Type elemType = operandType.getElementType();
     for (int i : {2 * index, 2 * index + 1}) {
       Type argType = block.getArgument(i).getType();
       if (argType != elemType) {
@@ -351,15 +363,69 @@ static LogicalResult verifySortOp(SortOp op) {
   }
 
   auto yieldOp = cast<YieldOp>(block.getTerminator());
-  if (yieldOp.getNumOperands() != 1) {
-    return op.emitOpError("should yield exactly one operand");
+  if (yieldOp.getNumOperands() != op.outputs().size()) {
+    return op.emitOpError("should yield exactly")
+           << op.outputs().size() << " values";
   }
-  auto ty = yieldOp.getOperand(0).getType().dyn_cast<IntegerType>();
-  if (!ty || ty.getWidth() != 1) {
-    return op.emitOpError("should yield i1 type");
+  for (auto yieldValue : yieldOp.getOperands()) {
+    auto ty = yieldValue.getType().dyn_cast<IntegerType>();
+    if (!ty || ty.getWidth() != 1) {
+      return op.emitOpError("should yield i1 type");
+    }
   }
 
   return success();
+}
+
+SmallVector<StringRef> SortOp::getLoopIteratorTypes() {
+  // All loops except the dimension to sort along are parallel.
+  SmallVector<StringRef> iteratorTypes(getOperandRank(),
+                                       getParallelIteratorTypeName());
+  iteratorTypes[getSortedDimension()] = getReductionIteratorTypeName();
+  return iteratorTypes;
+}
+
+SmallVector<Range> SortOp::getLoopBounds(OpBuilder &builder) {
+  int64_t operandRank = getOperandRank();
+  SmallVector<Range> loopBounds(operandRank);
+  Location loc = getLoc();
+  Value zero = builder.create<ConstantIndexOp>(loc, 0);
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  Value source = operand(0);
+  for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].stride = one;
+  }
+  return loopBounds;
+}
+
+Operation *SortOp::getTiledImplementation(
+    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets) {
+  assert(outputs.size() == this->outputs().size());
+  int64_t rank = getOperandRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         sizes.size() == static_cast<size_t>(rank));
+  auto oneAttr = builder.getI64IntegerAttr(1);
+  SmallVector<OpFoldResult> strides(rank, oneAttr);
+  Location loc = getLoc();
+  SmallVector<Value> tiledOperands(outputs.size());
+  resultOffsets.resize(outputs.size());
+  for (auto en : llvm::enumerate(outputs)) {
+    tiledOperands[en.index()] =
+        getSlice(builder, getLoc(), en.value(), offsets, sizes, strides);
+    assert(tiledOperands[en.index()] && "failed to get slice of operand");
+    resultOffsets[en.index()].assign(offsets.begin(), offsets.end());
+  }
+  SmallVector<Type, 4> resultTypes;
+  if (getNumResults()) {
+    resultTypes = llvm::to_vector<4>(
+        llvm::map_range(tiledOperands, [&](Value v) { return v.getType(); }));
+  }
+  return cast<LinalgExtOp>(getOperation())
+      .clone(builder, loc, resultTypes, tiledOperands);
 }
 
 }  // namespace linalg_ext

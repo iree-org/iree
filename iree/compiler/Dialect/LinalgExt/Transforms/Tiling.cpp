@@ -85,8 +85,7 @@ static Value getValue(OpBuilder &builder, Location loc,
 /// zero. It is assumed that a `Value` defined by a constant op is already
 /// converted to an `IntegerAttr` of that value. So here just return true if
 /// this is an attribute with a zero value.
-
-bool isUntiledLoop(OpFoldResult valueOrAttr) {
+static bool isUntiledLoop(OpFoldResult valueOrAttr) {
   auto attr = valueOrAttr.dyn_cast<Attribute>();
   return attr && attr.cast<IntegerAttr>().getValue() == 0;
 }
@@ -218,27 +217,31 @@ FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
   if (!tilableOp) return TiledOp{};
 
   SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
-  SmallVector<Range> loopBounds = tilableOp.getLoopBounds(b);
   SmallVector<Value, 4> tileSizesVals =
       options.tileSizeComputationFunction(b, tilableOp.getOperation());
-  auto tileSizes = getOpFoldResult(tileSizesVals);
-  Location loc = tilableOp.getLoc();
   auto zeroAttr = b.getI64IntegerAttr(0);
-  tileSizes.resize(loopBounds.size(), zeroAttr);
+
+  // The actual tile sizes used converts `Value` defined as constant 0, to a
+  // zero integer attributes. Currently if the iterator type is not "parallel",
+  // the tile size is forced to zero as well.
+  auto tileSizes = getOpFoldResult(tileSizesVals);
+  tileSizes.resize(iteratorTypes.size(), zeroAttr);
+  for (auto en : llvm::enumerate(iteratorTypes)) {
+    if (en.value() != getParallelIteratorTypeName()) {
+      tileSizes[en.index()] = zeroAttr;
+    }
+  }
 
   // Trivial early exit case of tile sizes being zero for all parallel loops.
-  if (llvm::all_of(llvm::zip(tileSizes, iteratorTypes),
-                   [&](std::tuple<OpFoldResult, StringRef> v) {
-                     return std::get<1>(v) != getParallelIteratorTypeName() ||
-                            isUntiledLoop(std::get<0>(v));
-                   })) {
+  if (llvm::all_of(tileSizes, isUntiledLoop)) {
     return TiledOp{op.getOperation(), {}, {}};
   }
 
+  SmallVector<Range> loopBounds = tilableOp.getLoopBounds(b);
   SmallVector<linalg::ProcInfo> distributionInfo;
   // If the tiled loops are distributed, get the proc_id and nprocs for the
   // distributed loops. First collect the parallel loops by iterating over the
-  // tileSizes and getting the loops that are
+  // tileSizes and getting the loops that are distribute, i.e.,
   // - parallel, i.e. iteratorTypes is "parallel"
   // - tiled, i.e. tileSize != 0
   if (options.distribution) {
@@ -249,7 +252,7 @@ FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
       distributedLoopRange.push_back(loopBounds[i]);
     }
     distributionInfo =
-        options.distribution->procInfo(b, loc, distributedLoopRange);
+        options.distribution->procInfo(b, op.getLoc(), distributedLoopRange);
   }
 
   SmallVector<OpFoldResult> offsets;
@@ -357,16 +360,17 @@ void LinalgExtTilingPass::runOnOperation() {
   FuncOp funcOp = getOperation();
   MLIRContext *context = funcOp.getContext();
   RewritePatternSet patterns(context);
-  patterns.add<LinalgExtTilingPattern<ScatterOp>>(
-      context, linalg::LinalgTilingOptions().setTileSizes({10}),
-      linalg::LinalgTransformationFilter(
-          Identifier::get("scatter_tiling_input", context),
-          Identifier::get("scatter_tiling_output", context)));
+  patterns
+      .add<LinalgExtTilingPattern<ScatterOp>, LinalgExtTilingPattern<SortOp>>(
+          context, linalg::LinalgTilingOptions().setTileSizes({10, 20}),
+          linalg::LinalgTransformationFilter(
+              Identifier::get("tiling_input", context),
+              Identifier::get("tiling_output", context)));
   patterns.add<LinalgExtTilingPattern<ScatterOp>>(
       context, linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{0}),
       linalg::LinalgTransformationFilter(
-          Identifier::get("scatter_no_tiling_input", context),
-          Identifier::get("scatter_no_tiling_output", context)));
+          Identifier::get("no_tiling_input", context),
+          Identifier::get("no_tiling_output", context)));
 
   static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
       [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
@@ -387,14 +391,15 @@ void LinalgExtTilingPass::runOnOperation() {
       DenseMap<StringRef,
                std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 
-  patterns.add<LinalgExtTilingPattern<ScatterOp>>(
-      context,
-      linalg::LinalgTilingOptions()
-          .setTileSizes(ArrayRef<int64_t>{10})
-          .setDistributionOptions(workgroupDistributionOptions),
-      linalg::LinalgTransformationFilter(
-          Identifier::get("scatter_distribute_input", context),
-          Identifier::get("scatter_distribute_output", context)));
+  patterns
+      .add<LinalgExtTilingPattern<ScatterOp>, LinalgExtTilingPattern<SortOp>>(
+          context,
+          linalg::LinalgTilingOptions()
+              .setTileSizes(ArrayRef<int64_t>{10, 20, 30})
+              .setDistributionOptions(workgroupDistributionOptions),
+          linalg::LinalgTransformationFilter(
+              Identifier::get("distribute_input", context),
+              Identifier::get("distribute_output", context)));
 
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
