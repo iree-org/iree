@@ -248,9 +248,8 @@ func @sort_2d_multi_result(
        {__internal_linalg_transform__ = "tiling_input"}
        outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
        ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-         %0 = cmpi sgt, %arg2, %arg3 : i32
          %1 = cmpf ogt, %arg4, %arg5 : f32
-         linalg_ext.yield %0, %1 : i1, i1
+         linalg_ext.yield %1 : i1
        } -> tensor<?x?xi32>, tensor<?x?xf32>
   return %0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xf32>
 }
@@ -292,9 +291,8 @@ func @sort_2d_multi_result_memref(
      {__internal_linalg_transform__ = "tiling_input"}
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-       %0 = cmpi sgt, %arg2, %arg3 : i32
-       %1 = cmpf ogt, %arg4, %arg5 : f32
-       linalg_ext.yield %0, %1 : i1, i1
+       %0 = cmpf ogt, %arg4, %arg5 : f32
+       linalg_ext.yield %0 : i1
      }
   return
 }
@@ -326,9 +324,8 @@ func @sort_3d_multi_result_distribute(
       {__internal_linalg_transform__ = "distribute_input"}
       outs(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-        %0 = cmpi sgt, %arg2, %arg3 : i32
-        %1 = cmpf ogt, %arg4, %arg5 : f32
-        linalg_ext.yield %0, %1 : i1, i1
+        %2 = cmpf ogt, %arg4, %arg5 : f32
+        linalg_ext.yield %2 : i1
       } -> tensor<?x?x?xi32>, tensor<?x?x?xf32>
   return %0, %1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>
 }
@@ -384,9 +381,8 @@ func @sort_3d_multi_result_distribute_memref(
       {__internal_linalg_transform__ = "distribute_input"}
       outs(%arg0, %arg1 : memref<?x?x?xi32>, memref<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-        %0 = cmpi sgt, %arg2, %arg3 : i32
-        %1 = cmpf ogt, %arg4, %arg5 : f32
-        linalg_ext.yield %0, %1 : i1, i1
+        %0 = cmpf ogt, %arg4, %arg5 : f32
+        linalg_ext.yield %0 : i1
       }
   return
 }

@@ -38,9 +38,8 @@ func @sort_multi_result_tensor(
   %0:2 = linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-        %1 = cmpi sgt, %arg2, %arg3 : i32
-        %2 = cmpf ogt, %arg4, %arg5 : f32
-        linalg_ext.yield %1, %2 : i1, i1
+        %1 = cmpf ogt, %arg4, %arg5 : f32
+        linalg_ext.yield %1 : i1
       } -> tensor<?x?xi32>, tensor<?x?xf32>
   return %0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xf32>
 }
@@ -58,9 +57,8 @@ func @sort_multi_result_memref(
   linalg_ext.sort dimension(0)
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-       %1 = cmpi sgt, %arg2, %arg3 : i32
-       %2 = cmpf ogt, %arg4, %arg5 : f32
-       linalg_ext.yield %1, %2 : i1, i1
+       %1 = cmpf ogt, %arg4, %arg5 : f32
+       linalg_ext.yield %1 : i1
      }
   return
 }

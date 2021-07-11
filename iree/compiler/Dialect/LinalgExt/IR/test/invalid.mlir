@@ -32,9 +32,8 @@ func @sort_mismatch_rank(%arg0: tensor<?x?xi32>, %arg1: tensor<?xf32>)
   %0:2 = linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-        %1 = cmpi sgt, %arg2, %arg3 : i32
-        %2 = cmpf ogt, %arg4, %arg5 : f32
-        linalg_ext.yield %1, %2 : i1, i1
+        %1 = cmpf ogt, %arg4, %arg5 : f32
+        linalg_ext.yield %1 : i1
       } -> tensor<?x?xi32>, tensor<?xf32>
   return %0#0, %0#1 : tensor<?x?xi32>, tensor<?xf32>
 }
@@ -47,9 +46,8 @@ func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
   %0:2 = linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?xi32>, tensor<42xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-        %1 = cmpi sgt, %arg2, %arg3 : i32
-        %2 = cmpf ogt, %arg4, %arg5 : f32
-        linalg_ext.yield %1, %2 : i1, i1
+        %1 = cmpf ogt, %arg4, %arg5 : f32
+        linalg_ext.yield %1 : i1
       } -> tensor<?xi32>, tensor<42xf32>
   return %0#0, %0#1 : tensor<?xi32>, tensor<42xf32>
 }

@@ -363,15 +363,12 @@ static LogicalResult verifySortOp(SortOp op) {
   }
 
   auto yieldOp = cast<YieldOp>(block.getTerminator());
-  if (yieldOp.getNumOperands() != op.outputs().size()) {
-    return op.emitOpError("should yield exactly")
-           << op.outputs().size() << " values";
+  if (yieldOp.getNumOperands() != 1) {
+    return op.emitOpError("should yield exactly one operand");
   }
-  for (auto yieldValue : yieldOp.getOperands()) {
-    auto ty = yieldValue.getType().dyn_cast<IntegerType>();
-    if (!ty || ty.getWidth() != 1) {
-      return op.emitOpError("should yield i1 type");
-    }
+  auto ty = yieldOp.getOperand(0).getType().dyn_cast<IntegerType>();
+  if (!ty || ty.getWidth() != 1) {
+    return op.emitOpError("should yield i1 type");
   }
 
   return success();
