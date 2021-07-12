@@ -756,8 +756,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printModuleComment(moduleOp, output);
   output << "\n";
 
-  mlir::emitc::CppEmitter emitter(output, /*restrictToC=*/true,
-                                  /*forwardDeclareVariables=*/true);
+  mlir::emitc::CppEmitter emitter(output, /*declareVariablesAtTop=*/true);
   mlir::emitc::CppEmitter::Scope scope(emitter);
 
   if (failed(printRodataBuffers(moduleOp, emitter))) {
