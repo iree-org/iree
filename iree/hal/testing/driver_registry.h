@@ -37,7 +37,7 @@ static std::vector<std::string> EnumerateAvailableDrivers() {
     driver_names[i] = std::string(driver_infos[i].driver_name.data,
                                   driver_infos[i].driver_name.size);
   }
-  iree_allocator_system_free(NULL, driver_infos);
+  iree_allocator_free(iree_allocator_system(), driver_infos);
   return driver_names;
 }
 

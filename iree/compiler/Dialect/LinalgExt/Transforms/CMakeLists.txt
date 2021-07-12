@@ -33,6 +33,7 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRIR
+    MLIRLinalg
     MLIRMemRef
     MLIRPass
     MLIRSCF

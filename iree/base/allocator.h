@@ -130,32 +130,64 @@ static inline void iree_aligned_free(void* p) {
 // iree_allocator_t (std::allocator-like interface)
 //===----------------------------------------------------------------------===//
 
-// Defines how an allocation from an iree_allocator_t should be made.
-enum iree_allocation_mode_bits_t {
+// Controls the behavior of an iree_allocator_ctl_fn_t callback function.
+typedef enum iree_allocator_command_e {
+  // Allocates |byte_length| of memory and stores the pointer in |inout_ptr|.
+  // Systems should align to 16 byte boundaries (or otherwise their natural
+  // SIMD alignment). The runtime pools internally and small allocations
+  // (usually) won't be made through this interface.
+  //
+  // iree_allocator_ctl_fn_t:
+  //   params: iree_allocator_alloc_params_t
+  //   inout_ptr: set to allocated pointer
+  IREE_ALLOCATOR_COMMAND_MALLOC = 0,
+
+  // As with IREE_ALLOCATOR_COMMAND_MALLOC but zeros the memory.
+  //
   // The contents of the allocation *must* be zeroed by the allocator prior to
   // returning. Allocators may be able to elide the zeroing if they allocate
   // fresh pages from the system. It is always safe to zero contents if the
   // behavior of the allocator is not under our control.
-  IREE_ALLOCATION_MODE_ZERO_CONTENTS = 1u << 0,
-  // Tries to reuse an existing allocation provided via |out_ptr| if possible.
+  //
+  // iree_allocator_ctl_fn_t:
+  //   params: iree_allocator_alloc_params_t
+  //   inout_ptr: set to allocated pointer
+  IREE_ALLOCATOR_COMMAND_CALLOC,
+
+  // Tries to resize an allocation provided via |inout_ptr|, if possible.
   // If the existing allocation is not reused then it is freed as if a call to
   // iree_allocator_free had been called on it. If the allocation fails then
-  // the provided existing allocation is unmodified.
+  // the provided existing allocation is unmodified. Only pointers previously
+  // received from the iree_allocator_t are valid.
   //
-  // This models the C realloc behavior.
-  IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING = 1u << 1,
-};
-typedef uint32_t iree_allocation_mode_t;
+  // iree_allocator_ctl_fn_t:
+  //   params: iree_allocator_alloc_params_t
+  //   inout_ptr: pointer of existing allocation; updated to realloced pointer
+  IREE_ALLOCATOR_COMMAND_REALLOC,
 
-// TODO(benvanik): replace with a single method with the mode setting. This will
-// reduce the overhead to just two pointers per allocator (from 3) and allow us
-// to add more distinct behavior in the future. If we really wanted to stretch
-// we could turn it into a pointer and require the allocator live somewhere
-// (possibly in .text as a const static), but two pointers seems fine.
-typedef iree_status_t(IREE_API_PTR* iree_allocator_alloc_fn_t)(
-    void* self, iree_allocation_mode_t mode, iree_host_size_t byte_length,
-    void** out_ptr);
-typedef void(IREE_API_PTR* iree_allocator_free_fn_t)(void* self, void* ptr);
+  // Frees the memory pointed to by |inout_ptr|.
+  //
+  // iree_allocator_ctl_fn_t:
+  //   params: unused
+  //   inout_ptr: pointer to free
+  IREE_ALLOCATOR_COMMAND_FREE,
+} iree_allocator_command_t;
+
+// Parameters for various allocation commands.
+typedef struct iree_allocator_alloc_params_t {
+  // Minimum size, in bytes, of the allocation. The underlying allocator may
+  // pad the length out if needed.
+  iree_host_size_t byte_length;
+} iree_allocator_alloc_params_t;
+
+// Function pointer for an iree_allocator_t control function.
+// |command| provides the operation to perform. Optionally some commands may use
+// |params| to pass additional operation-specific parameters. |inout_ptr| usage
+// is defined by each operation but is general a pointer to the pointer to
+// set to the newly allocated memory or a pointer to the pointer to free.
+typedef iree_status_t(IREE_API_PTR* iree_allocator_ctl_fn_t)(
+    void* self, iree_allocator_command_t command, const void* params,
+    void** inout_ptr);
 
 // An allocator for host-memory allocations.
 // IREE will attempt to use this in place of the system malloc and free.
@@ -163,13 +195,9 @@ typedef void(IREE_API_PTR* iree_allocator_free_fn_t)(void* self, void* ptr);
 typedef struct iree_allocator_t {
   // User-defined pointer passed to all functions.
   void* self;
-  // Allocates |byte_length| of memory and stores the pointer in |out_ptr|.
-  // Systems should align to 16 byte boundaries (or otherwise their natural
-  // SIMD alignment). The runtime pools internally and small allocations
-  // (usually) won't be made through this interface.
-  iree_allocator_alloc_fn_t alloc;
-  // Frees |ptr| from a previous alloc call.
-  iree_allocator_free_fn_t free;
+  // ioctl-style control function servicing all allocator-related commands.
+  // See iree_allocator_command_t for more information.
+  iree_allocator_ctl_fn_t ctl;
 } iree_allocator_t;
 
 // Allocates a block of |byte_length| bytes from the given allocator.
@@ -177,10 +205,19 @@ typedef struct iree_allocator_t {
 IREE_API_EXPORT iree_status_t iree_allocator_malloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
 
-// Reallocates |out_ptr| to |byte_length| bytes with the given allocator.
-// If the reallocation fails then the original |out_ptr| is unmodified.
-IREE_API_EXPORT iree_status_t iree_allocator_realloc(
+// Allocates a block of |byte_length| bytes from the given allocator.
+// The content of the buffer returned is undefined: it may be zeros, a
+// debug-fill pattern, or random memory from elsewhere in the process.
+// Only use this when immediately overwriting all memory.
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_uninitialized(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
+
+// Reallocates |inout_ptr| to |byte_length| bytes with the given allocator.
+// If the reallocation fails then the original |inout_ptr| is unmodified.
+//
+// WARNING: when extending the newly allocated bytes are undefined.
+IREE_API_EXPORT iree_status_t iree_allocator_realloc(
+    iree_allocator_t allocator, iree_host_size_t byte_length, void** inout_ptr);
 
 // Duplicates the given byte block by allocating memory and copying it in.
 IREE_API_EXPORT iree_status_t
@@ -190,26 +227,22 @@ iree_allocator_clone(iree_allocator_t allocator,
 // Frees a previously-allocated block of memory to the given allocator.
 IREE_API_EXPORT void iree_allocator_free(iree_allocator_t allocator, void* ptr);
 
-// Allocates a block of |byte_length| bytes from the default system allocator.
+// Default C allocator controller using malloc/free.
 IREE_API_EXPORT iree_status_t
-iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
-                               iree_host_size_t byte_length, void** out_ptr);
-
-// Frees a previously-allocated block of memory to the default system allocator.
-IREE_API_EXPORT void iree_allocator_system_free(void* self, void* ptr);
+iree_allocator_system_ctl(void* self, iree_allocator_command_t command,
+                          const void* params, void** inout_ptr);
 
 // Allocates using the iree_allocator_malloc and iree_allocator_free methods.
 // These will usually be backed by malloc and free.
 static inline iree_allocator_t iree_allocator_system(void) {
-  iree_allocator_t v = {NULL, iree_allocator_system_allocate,
-                        iree_allocator_system_free};
+  iree_allocator_t v = {NULL, iree_allocator_system_ctl};
   return v;
 }
 
 // Does not perform any allocation or deallocation; used to wrap objects that
 // are owned by external code/live in read-only memory/etc.
 static inline iree_allocator_t iree_allocator_null(void) {
-  iree_allocator_t v = {NULL, NULL, NULL};
+  iree_allocator_t v = {NULL, NULL};
   return v;
 }
 

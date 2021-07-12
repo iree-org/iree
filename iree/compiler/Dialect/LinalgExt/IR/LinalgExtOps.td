@@ -46,6 +46,21 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
     `updates` (and `original`). The first argument correspond the
     value to be updated (i.e. from `updates`), and the second the
     current value (i.e. value from `original`).
+
+    The `indices` is a 2D tensor/memref type. The first dim is the number of
+    updates, and the second dim is index depth. The index depth should always be
+    static.
+
+    The first dim of `updates` and `indices` is identical, since they represent
+    the number of updates.
+
+    The rank of the `original`/`result` is `index_depth + rank(%updates) - 1`.
+    The first `index_depth` indices are derived from `indices` and the shape of
+    update value must match the rest shape of `original`.
+
+    The shapes definition follows tensorflow operations execept that it force
+    batch dims to be 1D. See more information in
+      https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update
   }];
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
@@ -57,6 +72,37 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
     attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
     custom<LinalgExtOutsList>($outputs, type($outputs))
     $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = [{
+    int64_t getIndexDepth() {
+      return getInputOperand(1)
+          ->get()
+          .getType()
+          .cast<ShapedType>()
+          .getShape()
+          .back();
+    }
+
+    Value updates() {
+      return getInputOperand(0)->get();
+    }
+
+    Value indices() {
+      return getInputOperand(1)->get();
+    }
+
+    Value original() {
+      return getOutputOperand(0)->get();
+    }
+
+    int64_t getUpdateSliceRank() {
+      return updates().getType().cast<ShapedType>().getRank() - 1;
+    }
+
+    bool isScalarUpdate() {
+      return getUpdateSliceRank() == 0;
+    }
   }];
 }
 

@@ -61,9 +61,9 @@ iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
     // to be a need for more anyway.
     uint8_t* block_base = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, block_pool->block_allocator.alloc(block_pool->block_allocator.self,
-                                              0, block_pool->total_block_size,
-                                              (void**)&block_base));
+        z0, iree_allocator_malloc_uninitialized(block_pool->block_allocator,
+                                                block_pool->total_block_size,
+                                                (void**)&block_base));
     block = (iree_arena_block_t*)(block_base + (block_pool->total_block_size -
                                                 sizeof(iree_arena_block_t)));
   }
@@ -130,9 +130,8 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     iree_host_size_t allocation_size =
         sizeof(iree_arena_oversized_allocation_t) + byte_length;
     iree_arena_oversized_allocation_t* allocation = NULL;
-    IREE_RETURN_IF_ERROR(block_pool->block_allocator.alloc(
-        block_pool->block_allocator.self, 0, allocation_size,
-        (void**)&allocation));
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc_uninitialized(
+        block_pool->block_allocator, allocation_size, (void**)&allocation));
     allocation->next = arena->allocation_head;
     arena->allocation_head = allocation;
     arena->total_allocation_size += allocation_size;
@@ -167,23 +166,41 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
   return iree_ok_status();
 }
 
-static iree_status_t iree_arena_allocate_thunk(void* self,
-                                               iree_allocation_mode_t mode,
-                                               iree_host_size_t byte_length,
-                                               void** out_ptr) {
+static iree_status_t iree_arena_allocator_ctl(void* self,
+                                              iree_allocator_command_t command,
+                                              const void* params,
+                                              void** inout_ptr) {
   iree_arena_allocator_t* arena = (iree_arena_allocator_t*)self;
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, byte_length, out_ptr));
-  if (mode & IREE_ALLOCATION_MODE_ZERO_CONTENTS) {
-    memset(*out_ptr, 0, byte_length);
+  switch (command) {
+    case IREE_ALLOCATOR_COMMAND_MALLOC:
+    case IREE_ALLOCATOR_COMMAND_CALLOC: {
+      const iree_allocator_alloc_params_t* alloc_params =
+          (const iree_allocator_alloc_params_t*)params;
+      IREE_RETURN_IF_ERROR(
+          iree_arena_allocate(arena, alloc_params->byte_length, inout_ptr));
+      if (command == IREE_ALLOCATOR_COMMAND_CALLOC) {
+        memset(*inout_ptr, 0, alloc_params->byte_length);
+      }
+      return iree_ok_status();
+    }
+    case IREE_ALLOCATOR_COMMAND_FREE: {
+      // Do nothing: can't free from an arena.
+      return iree_ok_status();
+    }
+    default:
+      // NOTE: we could try to support IREE_ALLOCATOR_COMMAND_REALLOC, but
+      // it requires the original size to be able to do properly (without
+      // copying memory we shouldn't have access to). For this and other reasons
+      // we very rarely realloc in IREE so having this limitation isn't too bad.
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unsupported iree_arena_t allocator command");
   }
-  return iree_ok_status();
 }
 
 iree_allocator_t iree_arena_allocator(iree_arena_allocator_t* arena) {
   iree_allocator_t v = {
       .self = arena,
-      .alloc = (iree_allocator_alloc_fn_t)iree_arena_allocate_thunk,
-      .free = NULL,
+      .ctl = iree_arena_allocator_ctl,
   };
   return v;
 }

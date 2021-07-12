@@ -24,16 +24,14 @@
 // Flag manipulation utilities
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_flags_leaky_alloc(void* self,
-                                            iree_allocation_mode_t mode,
-                                            iree_host_size_t byte_length,
-                                            void** out_ptr) {
+static iree_status_t iree_flags_leaky_allocator_ctl(
+    void* self, iree_allocator_command_t command, const void* params,
+    void** inout_ptr) {
   IREE_LEAK_CHECK_DISABLE_PUSH();
-  void* ptr = malloc(byte_length);
+  iree_status_t status =
+      iree_allocator_system_ctl(/*self=*/NULL, command, params, inout_ptr);
   IREE_LEAK_CHECK_DISABLE_POP();
-  memset(ptr, 0, byte_length);
-  *out_ptr = ptr;
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_flags_leaky_free(void* self, void* ptr) { free(ptr); }
@@ -44,9 +42,8 @@ static void iree_flags_leaky_free(void* self, void* ptr) { free(ptr); }
 // private working set size).
 static iree_allocator_t iree_flags_leaky_allocator(void) {
   iree_allocator_t allocator = {
-      .alloc = iree_flags_leaky_alloc,
-      .free = iree_flags_leaky_free,
       .self = NULL,
+      .ctl = iree_flags_leaky_allocator_ctl,
   };
   return allocator;
 }

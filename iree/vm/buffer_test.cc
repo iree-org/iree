@@ -27,9 +27,14 @@ TEST_F(VMBufferTest, Initialize) {
   bool did_free = false;
   iree_allocator_t test_allocator = {
       /*.self=*/&did_free,
-      /*.alloc=*/NULL,
-      /*.free=*/
-      +[](void* self, void* ptr) { *(bool*)self = true; },
+      /*.ctl=*/
+      +[](void* self, iree_allocator_command_t command, const void* params,
+          void** inout_ptr) {
+        if (command == IREE_ALLOCATOR_COMMAND_FREE) {
+          *(bool*)self = true;
+        }
+        return iree_ok_status();
+      },
   };
 
   uint32_t data[] = {0, 1, 2, 3};
