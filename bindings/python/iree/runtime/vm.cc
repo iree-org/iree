@@ -127,20 +127,22 @@ VmModule VmModule::FromFlatbufferBlob(py::object flatbuffer_blob_object) {
 
   // Bridge to the C-based deallocator API.
   auto* raw_ptr = flatbuffer_blob.ptr();
-  auto free_fn = +([](void* self, void*) {
-    PyObject* self_ptr = static_cast<PyObject*>(self);
-    Py_XDECREF(self_ptr);
+  auto ctl_fn = +([](void* self, iree_allocator_command_t command,
+                     const void* params, void** inout_ptr) {
+    assert(command == IREE_ALLOCATOR_COMMAND_FREE);
+    PyObject* object_ptr = static_cast<PyObject*>(*inout_ptr);
+    Py_XDECREF(object_ptr);
+    return iree_ok_status();
   });
   flatbuffer_blob.inc_ref();
-  iree_allocator_t deallocator{raw_ptr /* self */, nullptr /* alloc */,
-                               free_fn /* dealloc */};
+  iree_allocator_t deallocator{/*self=*/NULL, /*ctl=*/ctl_fn};
 
   auto status = iree_vm_bytecode_module_create(
       {static_cast<const uint8_t*>(buffer_info.ptr),
        static_cast<iree_host_size_t>(buffer_info.size)},
       deallocator, iree_allocator_system(), &module);
   if (!iree_status_is_ok(status)) {
-    deallocator.free(raw_ptr, nullptr);
+    iree_allocator_free(deallocator, raw_ptr);
   }
 
   CheckApiStatus(status, "Error creating vm module from flatbuffer");
