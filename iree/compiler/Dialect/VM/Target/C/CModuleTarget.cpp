@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Dialect/VM/Utils/ConstantEncoding.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -177,8 +178,8 @@ static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-static LogicalResult translateBranchOp(IREE::VM::BranchOp branchOp,
-                                       mlir::emitc::CppEmitter &emitter) {
+static LogicalResult translateOp(IREE::VM::BranchOp branchOp,
+                                 mlir::emitc::CppEmitter &emitter) {
   auto &output = emitter.ostream();
   Block &successor = *branchOp.getSuccessor();
 
@@ -198,8 +199,8 @@ static LogicalResult translateBranchOp(IREE::VM::BranchOp branchOp,
   return success();
 }
 
-static LogicalResult translateCondBranchOp(IREE::VM::CondBranchOp condBranchOp,
-                                           mlir::emitc::CppEmitter &emitter) {
+static LogicalResult translateOp(IREE::VM::CondBranchOp condBranchOp,
+                                 mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
 
   Block &trueSuccessor = *condBranchOp.getTrueDest();
@@ -285,20 +286,23 @@ static LogicalResult translateOpToC(Operation &op,
                                     mlir::emitc::CppEmitter &emitter,
                                     SmallVector<std::string, 4> resultNames,
                                     bool hasRefs) {
-  if (auto branchOp = dyn_cast<IREE::VM::BranchOp>(op))
-    return translateBranchOp(branchOp, emitter);
-  if (auto condBranchOp = dyn_cast<IREE::VM::CondBranchOp>(op))
-    return translateCondBranchOp(condBranchOp, emitter);
-  if (auto failOp = dyn_cast<IREE::VM::FailOp>(op))
-    return translateFailOp(failOp, emitter, hasRefs);
-  if (auto returnOp = dyn_cast<IREE::VM::ReturnOp>(op))
-    return translateReturnOpToC(returnOp, emitter, resultNames, hasRefs);
-  // Fall back to generic emitc printer
-  if (succeeded(emitter.emitOperation(op, /*trailingSemicolon=*/true))) {
-    return success();
-  }
+  LogicalResult status =
+      llvm::TypeSwitch<Operation *, LogicalResult>(&op)
+          .Case<IREE::VM::BranchOp, IREE::VM::CondBranchOp>(
+              [&](auto op) { return translateOp(op, emitter); })
+          .Case<IREE::VM::FailOp>(
+              [&](auto op) { return translateFailOp(op, emitter, hasRefs); })
+          .Case<IREE::VM::ReturnOp>([&](auto op) {
+            return translateReturnOpToC(op, emitter, resultNames, hasRefs);
+          })
+          // Fall back to generic emitc printer
+          .Default([&](Operation *) {
+            return emitter.emitOperation(op, /*trailingSemicolon=*/true);
+          });
 
-  return failure();
+  if (failed(status)) return failure();
+
+  return success();
 }
 
 static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
