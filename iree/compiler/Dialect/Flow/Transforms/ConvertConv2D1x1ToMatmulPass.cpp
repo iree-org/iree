@@ -51,8 +51,8 @@ class Convert1x1ConvolutionMatmulOp
         }))
       return failure();
 
-    SmallVector<linalg::ReassociationIndices, 4> reassociationIndices = {
-        {0, 1, 2}, {3}};
+    SmallVector<ReassociationIndices, 4> reassociationIndices = {{0, 1, 2},
+                                                                 {3}};
 
     auto reshapedInputType =
         RankedTensorType::get({inputShape[1] * inputShape[2], inputShape[3]},

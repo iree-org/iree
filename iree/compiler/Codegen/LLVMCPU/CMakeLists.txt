@@ -31,6 +31,7 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRIR
+    MLIRLLVMCommonConversion
     MLIRLLVMIR
     MLIRLinalg
     MLIRLinalgToLLVM

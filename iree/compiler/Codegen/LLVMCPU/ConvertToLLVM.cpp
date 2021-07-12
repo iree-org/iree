@@ -17,7 +17,12 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
@@ -651,7 +656,6 @@ void ConvertToLLVMPass::runOnOperation() {
   {
     OwningRewritePatternList patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-    vector::populateVectorSlicesLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(patterns);
     vector::populateVectorTransposeLoweringPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
@@ -696,6 +700,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateLoopToStdConversionPatterns(patterns);
   populateExpandTanhPattern(patterns);
 
+  populateMemRefToLLVMConversionPatterns(converter, patterns);
   populateStdToLLVMConversionPatterns(converter, patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);

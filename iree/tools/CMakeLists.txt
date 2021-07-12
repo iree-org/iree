@@ -234,7 +234,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       MLIRAffine
       MLIRAffineTransforms
-      MLIRGPU
+      MLIRGPUOps
       MLIRGPUToSPIRV
       MLIRIR
       MLIRLLVMIR
