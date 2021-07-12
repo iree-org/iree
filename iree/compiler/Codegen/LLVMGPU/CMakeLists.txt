@@ -29,9 +29,10 @@ iree_cc_library(
   DEPS
     MLIRAffine
     MLIRAffineToStandard
-    MLIRGPU
+    MLIRGPUOps
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
+    MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLinalg

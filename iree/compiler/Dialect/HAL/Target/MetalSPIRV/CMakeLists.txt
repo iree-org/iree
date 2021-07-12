@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     ::SPIRVToMSL
     MLIRAffine
-    MLIRGPU
+    MLIRGPUOps
     MLIRLinalg
     MLIRSPIRV
     MLIRSPIRVSerialization
