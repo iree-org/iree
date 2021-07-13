@@ -139,7 +139,7 @@ ${QEMU_BIN} \
 [https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
 
 The SIMD code can be generated following the
-[IREE dynamic library CPU HAL driver flow](https://google.github.io/iree/deployment-configurations/cpu-dylib)
+[IREE dynamic library CPU HAL driver flow](../deployment-configurations/cpu-dylib.md)
 with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
