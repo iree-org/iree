@@ -3,6 +3,7 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -71,7 +72,7 @@ static SmallVector<OpFoldResult, 4> getOpFoldResult(ArrayRef<Value> values) {
 }
 
 /// Converts an `OpFoldResult` to a `Value` by building a constant op if
-/// needed.
+/// if the `OpFoldResult` is an `IntegerAttr`.
 static Value getValue(OpBuilder &builder, Location loc,
                       OpFoldResult valueOrAttr) {
   if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
@@ -191,6 +192,9 @@ static FailureOr<TiledOp> tileLinalgExtOpImpl(
         auto affineMaps = AffineMap::inferFromExprList({ArrayRef<AffineExpr>{
             b.getAffineSymbolExpr(0),
             b.getAffineSymbolExpr(1) - b.getAffineDimExpr(0)}})[0];
+        // Similar to linalg tiling, the tile size is the min(tileSizes, ub -
+        // iv) to account for cases where tile size does not divide (ub - lb)
+        // exactly.
         Value inBoundsTileSize = b.create<AffineMinOp>(
             loc, affineMaps,
             ValueRange{iv, getValue(builder, loc, tileSizes[loopDepth]), ub});
@@ -227,8 +231,10 @@ FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
   auto tileSizes = getOpFoldResult(tileSizesVals);
   tileSizes.resize(iteratorTypes.size(), zeroAttr);
   for (auto en : llvm::enumerate(iteratorTypes)) {
-    if (en.value() != getParallelIteratorTypeName()) {
-      tileSizes[en.index()] = zeroAttr;
+    if (en.value() == getParallelIteratorTypeName()) continue;
+    if (!isUntiledLoop(tileSizes[en.index()])) {
+      return static_cast<LogicalResult>(op.emitOpError(
+          "unimplemented tiling of non-parallel loop iterator type"));
     }
   }
 
@@ -300,11 +306,14 @@ struct LinalgExtTilingPattern : public LinalgExtBaseTilingPattern {
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     TiledOp tiledOp;
+    // Check for failure.
     if (failed(LinalgExtBaseTilingPattern::matchAndRewriteBase(op, rewriter,
                                                                tiledOp))) {
       return failure();
     }
-    if (tiledOp.op && tiledOp.op != op) {
+    // Check for do-nothing case.
+    if (!tiledOp.op) return failure();
+    if (tiledOp.op != op) {
       if (tiledOp.results.empty()) {
         rewriter.eraseOp(op);
       } else {

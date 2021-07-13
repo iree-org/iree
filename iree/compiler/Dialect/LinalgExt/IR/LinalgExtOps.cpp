@@ -85,11 +85,11 @@ Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
 }
 
 OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
-  ShapedType t = v.getType().cast<ShapedType>();
+  auto t = v.getType().cast<ShapedType>();
   if (t.isDynamicDim(dim)) {
     return getDimValue(builder, loc, v, dim);
   }
-  return builder.getI64IntegerAttr(t.getShape()[dim]);
+  return builder.getI64IntegerAttr(t.getDimSize(dim));
 }
 
 //===----------------------------------------------------------------------===//

@@ -25,8 +25,9 @@ struct TiledOp {
   SmallVector<Value> results;
 };
 
-/// Main entry point for tiling LinalgExtOps using TiledOpInterface.
-FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TiledOpInterface op,
+/// Main entry point for tiling LinalgExtOps using TiledOpInterface.  If the
+/// `op` does not implement the `TiledOpInterface` returns a `TiledOp{}` value.
+FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
                                    const linalg::LinalgTilingOptions &options);
 
 }  // namespace linalg_ext
