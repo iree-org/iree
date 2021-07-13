@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRMath
+    MLIRMathToLLVM
     MLIRMathTransforms
     MLIRMemRef
     MLIRMemRefToLLVM
