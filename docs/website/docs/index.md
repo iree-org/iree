@@ -35,7 +35,7 @@ and can generate efficient code for a variety of runtime platforms:
 - [x] Android
 - [ ] macOS (planned)
 - [ ] iOS (planned)
-- [ ] Bare metal (planned)
+- [x] Bare metal
 - [ ] WebAssembly (planned)
 
 and architectures:
