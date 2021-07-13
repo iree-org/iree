@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -289,12 +290,11 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
         });
 
-    SmallVector<linalg::ReassociationIndices>
-        img2ColTensorReassociationIndices = {{0, 1}, {2, 3}, {4, 5}};
-    SmallVector<linalg::ReassociationIndices> filterReassociationIndice = {
-        {0}, {1, 2}};
-    SmallVector<linalg::ReassociationIndices> outputReassociationIndice = {
-        {0, 1}, {2, 3}};
+    SmallVector<ReassociationIndices> img2ColTensorReassociationIndices = {
+        {0, 1}, {2, 3}, {4, 5}};
+    SmallVector<ReassociationIndices> filterReassociationIndice = {{0}, {1, 2}};
+    SmallVector<ReassociationIndices> outputReassociationIndice = {{0, 1},
+                                                                   {2, 3}};
 
     auto reshapedImg2ColTensorType = RankedTensorType::get(
         {outputShape[0] * transposedFilterShape[0],
@@ -326,8 +326,8 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
         ValueRange{reshapedImg2ColTensor, reshapedFilterTensor},
         ValueRange{reshapedoutputTensor});
 
-    SmallVector<linalg::ReassociationIndices> batchMatVecReassociationIndice = {
-        {0, 1}, {2, 3}};
+    SmallVector<ReassociationIndices> batchMatVecReassociationIndice = {{0, 1},
+                                                                        {2, 3}};
 
     Value batchMatVecResultReshaped =
         rewriter.create<linalg::TensorExpandShapeOp>(
