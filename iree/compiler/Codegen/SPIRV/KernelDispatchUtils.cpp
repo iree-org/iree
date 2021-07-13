@@ -838,10 +838,17 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
   auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
   if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
       targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
-    // Don't unroll cooperative martrix load as they should match the size of
-    // the contract.
-    return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
-                                   op.getVectorType().getDimSize(1));
+    // Unroll cooperative martrix load based on the size of the contract.
+    VectorType dstVec;
+    for (Operation *users : op->getUsers()) {
+      auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
+      if (!extract) return llvm::None;
+      auto vecType = extract.getResult().getType().cast<VectorType>();
+      if (dstVec && dstVec != vecType) return llvm::None;
+      dstVec = vecType;
+    }
+    return SmallVector<int64_t, 4>(dstVec.getShape().begin(),
+                                   dstVec.getShape().end());
   }
 
   // Map to load4.
@@ -863,10 +870,11 @@ getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
   auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
   if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
       targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
-    // Don't unroll cooperative martrix store as they should match the size of
-    // the contract.
-    return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
-                                   op.getVectorType().getDimSize(1));
+    // Unroll cooperative martrix store based on the size of the contract.
+    auto insert = op.vector().getDefiningOp<vector::InsertStridedSliceOp>();
+    if (!insert) return llvm::None;
+    ArrayRef<int64_t> shape = insert.getSourceVectorType().getShape();
+    return SmallVector<int64_t, 4>(shape.begin(), shape.end());
   }
 
   // Map to store4.

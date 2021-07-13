@@ -41,7 +41,7 @@ struct ConvertExplicitSqueezePattern
     }
 
     auto reassociationIndices =
-        mlir::linalg::getReassociationIndicesForReshape(inputType, resultType);
+        mlir::getReassociationIndicesForReshape(inputType, resultType);
     if (!reassociationIndices) {
       return rewriter.notifyMatchFailure(
           op, "could not compute reassociation indices");
@@ -93,8 +93,8 @@ struct ConvertConstExpandDimsPattern
           op, "inferred expanded type not equal to result type");
     }
 
-    auto reassociationIndices = mlir::linalg::getReassociationIndicesForReshape(
-        inputType, expandedType);
+    auto reassociationIndices =
+        mlir::getReassociationIndicesForReshape(inputType, expandedType);
     if (!reassociationIndices) {
       return rewriter.notifyMatchFailure(
           op, "could not compute reassociation indices");

@@ -15,6 +15,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/map_lmhlo_to_scalar_op.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -251,7 +252,7 @@ struct ScatterOpConversion
       }
     }
 
-    SmallVector<linalg::ReassociationIndices> map;
+    SmallVector<ReassociationIndices> map;
     map.emplace_back(
         llvm::to_vector<4>(llvm::seq<int64_t>(0, indicesRank - 1)));
     map.emplace_back(1, indicesRank - 1);

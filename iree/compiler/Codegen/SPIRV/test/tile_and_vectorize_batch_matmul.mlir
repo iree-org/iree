@@ -205,7 +205,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[READ_LHS_0_3_S:.+]] = splat %[[READ_LHS_0_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_0_3:.+]] = vector.fma %[[READ_LHS_0_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_0_2]] : vector<4xf32>
 
-//      CHECK:    %[[FMA_0_3_C:.+]] = vector.shape_cast %[[FMA_0_3]] : vector<4xf32> to vector<1x1x4xf32>
+//  CHECK-DAG:    %[[FMA_0_3_C:.+]] = vector.shape_cast %[[FMA_0_3]] : vector<4xf32> to vector<1x1x4xf32>
 
 //  CHECK-DAG:    %[[READ_LHS_1_0_E:.+]] = vector.extract %[[READ_LHS_1_0]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_1_0_S:.+]] = splat %[[READ_LHS_1_0_E]] : vector<4xf32>
@@ -224,7 +224,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[READ_LHS_1_3_S:.+]] = splat %[[READ_LHS_1_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_1_3:.+]] = vector.fma %[[READ_LHS_1_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_1_2]] : vector<4xf32>
 
-//      CHECK:    %[[FMA_1_3_C:.+]] = vector.shape_cast %[[FMA_1_3]] : vector<4xf32> to vector<1x1x4xf32>
+//  CHECK-DAG:    %[[FMA_1_3_C:.+]] = vector.shape_cast %[[FMA_1_3]] : vector<4xf32> to vector<1x1x4xf32>
 
 //  CHECK-DAG:    %[[READ_LHS_2_0_E:.+]] = vector.extract %[[READ_LHS_2_0]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_2_0_S:.+]] = splat %[[READ_LHS_2_0_E]] : vector<4xf32>
@@ -243,7 +243,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[READ_LHS_2_3_S:.+]] = splat %[[READ_LHS_2_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_2_3:.+]] = vector.fma %[[READ_LHS_2_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_2_2]] : vector<4xf32>
 
-//      CHECK:    %[[FMA_2_3_C:.+]] = vector.shape_cast %[[FMA_2_3]] : vector<4xf32> to vector<1x1x4xf32>
+//  CHECK-DAG:    %[[FMA_2_3_C:.+]] = vector.shape_cast %[[FMA_2_3]] : vector<4xf32> to vector<1x1x4xf32>
 
 //  CHECK-DAG:    %[[READ_LHS_3_0_E:.+]] = vector.extract %[[READ_LHS_3_0]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_3_0_S:.+]] = splat %[[READ_LHS_3_0_E]] : vector<4xf32>
@@ -262,7 +262,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[READ_LHS_3_3_S:.+]] = splat %[[READ_LHS_3_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_3_3:.+]] = vector.fma %[[READ_LHS_3_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_3_2]] : vector<4xf32>
 
-//      CHECK:    %[[FMA_3_3_C:.+]] = vector.shape_cast %[[FMA_3_3]] : vector<4xf32> to vector<1x1x4xf32>
+//  CHECK-DAG:    %[[FMA_3_3_C:.+]] = vector.shape_cast %[[FMA_3_3]] : vector<4xf32> to vector<1x1x4xf32>
 
 //  CHECK-DAG:    %[[READ_LHS_4_0_E:.+]] = vector.extract %[[READ_LHS_4_0]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_4_0_S:.+]] = splat %[[READ_LHS_4_0_E]] : vector<4xf32>
@@ -281,7 +281,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[READ_LHS_4_3_S:.+]] = splat %[[READ_LHS_4_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_4_3:.+]] = vector.fma %[[READ_LHS_4_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_4_2]] : vector<4xf32>
 
-//      CHECK:    %[[FMA_4_3_C:.+]] = vector.shape_cast %[[FMA_4_3]] : vector<4xf32> to vector<1x1x4xf32>
+//  CHECK-DAG:    %[[FMA_4_3_C:.+]] = vector.shape_cast %[[FMA_4_3]] : vector<4xf32> to vector<1x1x4xf32>
 
 //  CHECK-DAG:    %[[READ_LHS_5_0_E:.+]] = vector.extract %[[READ_LHS_5_0]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_5_0_S:.+]] = splat %[[READ_LHS_5_0_E]] : vector<4xf32>
@@ -300,7 +300,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[READ_LHS_5_3_S:.+]] = splat %[[READ_LHS_5_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_5_3:.+]] = vector.fma %[[READ_LHS_5_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_5_2]] : vector<4xf32>
 
-//      CHECK:    %[[FMA_5_3_C:.+]] = vector.shape_cast %[[FMA_5_3]] : vector<4xf32> to vector<1x1x4xf32>
+//  CHECK-DAG:    %[[FMA_5_3_C:.+]] = vector.shape_cast %[[FMA_5_3]] : vector<4xf32> to vector<1x1x4xf32>
 
 //  CHECK-DAG:    %[[READ_LHS_6_0_E:.+]] = vector.extract %[[READ_LHS_6_0]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_6_0_S:.+]] = splat %[[READ_LHS_6_0_E]] : vector<4xf32>
@@ -319,7 +319,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[READ_LHS_6_3_S:.+]] = splat %[[READ_LHS_6_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_6_3:.+]] = vector.fma %[[READ_LHS_6_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_6_2]] : vector<4xf32>
 
-//      CHECK:    %[[FMA_6_3_C:.+]] = vector.shape_cast %[[FMA_6_3]] : vector<4xf32> to vector<1x1x4xf32>
+//  CHECK-DAG:    %[[FMA_6_3_C:.+]] = vector.shape_cast %[[FMA_6_3]] : vector<4xf32> to vector<1x1x4xf32>
 
 //  CHECK-DAG:    %[[READ_LHS_7_0_E:.+]] = vector.extract %[[READ_LHS_7_0]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_7_0_S:.+]] = splat %[[READ_LHS_7_0_E]] : vector<4xf32>
@@ -338,7 +338,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //  CHECK-DAG:    %[[READ_LHS_7_3_S:.+]] = splat %[[READ_LHS_7_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_7_3:.+]] = vector.fma %[[READ_LHS_7_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_7_2]] : vector<4xf32>
 
-//      CHECK:    %[[FMA_7_3_C:.+]] = vector.shape_cast %[[FMA_7_3]] : vector<4xf32> to vector<1x1x4xf32>
+//  CHECK-DAG:    %[[FMA_7_3_C:.+]] = vector.shape_cast %[[FMA_7_3]] : vector<4xf32> to vector<1x1x4xf32>
 
 //      CHECK:  scf.yield %[[FMA_0_3_C]], %[[FMA_1_3_C]], %[[FMA_2_3_C]],
 // CHECK-SAME:  %[[FMA_3_3_C]], %[[FMA_4_3_C]], %[[FMA_5_3_C]], %[[FMA_6_3_C]],

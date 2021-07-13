@@ -29,13 +29,17 @@ iree_cc_library(
   DEPS
     MLIRAffine
     MLIRAffineToStandard
-    MLIRGPU
+    MLIRGPUOps
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
+    MLIRGPUTransforms
     MLIRIR
+    MLIRLLVMCommonConversion
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRMath
+    MLIRMathToLLVM
+    MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRNVVMIR
     MLIRPass

@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_COMMON_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_COMMON_H_
 
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
 
 namespace mlir {
 namespace iree_compiler {

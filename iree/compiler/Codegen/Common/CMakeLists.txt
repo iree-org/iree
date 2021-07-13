@@ -36,7 +36,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineUtils
-    MLIRGPU
+    MLIRGPUOps
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms

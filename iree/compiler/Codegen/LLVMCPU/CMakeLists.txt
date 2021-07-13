@@ -31,13 +31,16 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRIR
+    MLIRLLVMCommonConversion
     MLIRLLVMIR
     MLIRLinalg
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRMath
+    MLIRMathToLLVM
     MLIRMathTransforms
     MLIRMemRef
+    MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF

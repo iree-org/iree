@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffine
-    MLIRGPU
+    MLIRGPUOps
     MLIRIR
     MLIRLinalg
     MLIRParser
