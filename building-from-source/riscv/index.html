@@ -9,14 +9,14 @@
       
       
       
-        <link rel="canonical" href="https://google.github.io/iree/ml-frameworks/tensorflow-lite/">
+        <link rel="canonical" href="https://google.github.io/iree/building-from-source/riscv/">
       
       <link rel="icon" href="../../ghost.svg">
       <meta name="generator" content="mkdocs-1.2.1, mkdocs-material-7.1.10">
     
     
       
-        <title>TensorFlow Lite - IREE</title>
+        <title>RISC-V cross-compilation - IREE</title>
       
     
     
@@ -69,7 +69,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#tensorflow-lite-integration" class="md-skip">
+        <a href="#risc-v-cross-compilation" class="md-skip">
           Skip to content
         </a>
       
@@ -99,7 +99,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              TensorFlow Lite
+              RISC-V cross-compilation
             
           </span>
         </div>
@@ -240,16 +240,14 @@
 
   
   
-    
-  
   
     
       
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_2" type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_2" type="checkbox" id="__nav_2" >
       
       <label class="md-nav__link" for="__nav_2">
         ML frameworks
@@ -267,7 +265,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensorflow/" class="md-nav__link">
+      <a href="../../ml-frameworks/tensorflow/" class="md-nav__link">
         TensorFlow
       </a>
     </li>
@@ -277,85 +275,11 @@
             
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          TensorFlow Lite
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../ml-frameworks/tensorflow-lite/" class="md-nav__link">
         TensorFlow Lite
       </a>
-      
-        
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#importing-models" class="md-nav__link">
-    Importing models
-  </a>
-  
-    <nav class="md-nav" aria-label="Importing models">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#using-the-command-line-tool" class="md-nav__link">
-    Using the command-line tool
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-the-python-api" class="md-nav__link">
-    Using the python API
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#samples" class="md-nav__link">
-    Samples
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -365,7 +289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../jax/" class="md-nav__link">
+      <a href="../../ml-frameworks/jax/" class="md-nav__link">
         JAX
       </a>
     </li>
@@ -440,14 +364,16 @@
 
   
   
+    
+  
   
     
       
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_4" type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_4" type="checkbox" id="__nav_4" checked>
       
       <label class="md-nav__link" for="__nav_4">
         Building from source
@@ -465,7 +391,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building-from-source/getting-started/" class="md-nav__link">
+      <a href="../getting-started/" class="md-nav__link">
         Getting started
       </a>
     </li>
@@ -477,7 +403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building-from-source/optional-features/" class="md-nav__link">
+      <a href="../optional-features/" class="md-nav__link">
         Optional features
       </a>
     </li>
@@ -489,7 +415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building-from-source/android/" class="md-nav__link">
+      <a href="../android/" class="md-nav__link">
         Android cross-compilation
       </a>
     </li>
@@ -499,11 +425,145 @@
             
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../../building-from-source/riscv/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          RISC-V cross-compilation
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         RISC-V cross-compilation
       </a>
+      
+        
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    Prerequisites
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#host-environment-setup" class="md-nav__link">
+    Host environment setup
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-risc-v-cross-compile-toolchain-and-emulator" class="md-nav__link">
+    Install RISC-V cross-compile toolchain and emulator
+  </a>
+  
+    <nav class="md-nav" aria-label="Install RISC-V cross-compile toolchain and emulator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain" class="md-nav__link">
+    Install prebuilt RISC-V tools (RISC-V 64-bit Linux toolchain)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#support-vector-extension" class="md-nav__link">
+    Support vector extension
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configure-and-build" class="md-nav__link">
+    Configure and build
+  </a>
+  
+    <nav class="md-nav" aria-label="Configure and build">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#host-configuration" class="md-nav__link">
+    Host configuration
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-configuration" class="md-nav__link">
+    Target configuration
+  </a>
+  
+    <nav class="md-nav" aria-label="Target configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#risc-v-64-bit-linux-target" class="md-nav__link">
+    RISC-V 64-bit Linux target
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-iree-bytecode-modules-on-the-risc-v-system" class="md-nav__link">
+    Running IREE bytecode modules on the RISC-V system
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-configuration" class="md-nav__link">
+    Optional configuration
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -656,27 +716,40 @@
     Prerequisites
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#importing-models" class="md-nav__link">
-    Importing models
-  </a>
-  
-    <nav class="md-nav" aria-label="Importing models">
+    <nav class="md-nav" aria-label="Prerequisites">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#using-the-command-line-tool" class="md-nav__link">
-    Using the command-line tool
+  <a href="#host-environment-setup" class="md-nav__link">
+    Host environment setup
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#using-the-python-api" class="md-nav__link">
-    Using the python API
+  <a href="#install-risc-v-cross-compile-toolchain-and-emulator" class="md-nav__link">
+    Install RISC-V cross-compile toolchain and emulator
   </a>
+  
+    <nav class="md-nav" aria-label="Install RISC-V cross-compile toolchain and emulator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain" class="md-nav__link">
+    Install prebuilt RISC-V tools (RISC-V 64-bit Linux toolchain)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#support-vector-extension" class="md-nav__link">
+    Support vector extension
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -686,8 +759,55 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#samples" class="md-nav__link">
-    Samples
+  <a href="#configure-and-build" class="md-nav__link">
+    Configure and build
+  </a>
+  
+    <nav class="md-nav" aria-label="Configure and build">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#host-configuration" class="md-nav__link">
+    Host configuration
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-configuration" class="md-nav__link">
+    Target configuration
+  </a>
+  
+    <nav class="md-nav" aria-label="Target configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#risc-v-64-bit-linux-target" class="md-nav__link">
+    RISC-V 64-bit Linux target
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-iree-bytecode-modules-on-the-risc-v-system" class="md-nav__link">
+    Running IREE bytecode modules on the RISC-V system
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-configuration" class="md-nav__link">
+    Optional configuration
   </a>
   
 </li>
@@ -705,81 +825,138 @@
               
                 
                 
-                <h1 id="tensorflow-lite-integration">TensorFlow Lite Integration<a class="headerlink" href="#tensorflow-lite-integration" title="Permanent link">&para;</a></h1>
-<p>IREE supports compiling and running pre-trained TensorFlow Lite (TFLite)
-models.  It converts a model to
-<a href="https://mlir.llvm.org/docs/Dialects/TOSA/">TOSA MLIR</a>, then compiles it into a
-VM module.</p>
+                <h1 id="risc-v-cross-compilation">RISC-V cross-compilation<a class="headerlink" href="#risc-v-cross-compilation" title="Permanent link">&para;</a></h1>
+<p>Running on a platform like RISC-V involves cross-compiling from a <em>host</em>
+platform (e.g. Linux) to a <em>target</em> platform (a specific RISC-V CPU architecture
+and operating system):</p>
+<ul>
+<li>IREE's <em>compiler</em> is built on the host and is used there to generate modules
+  for the target</li>
+<li>IREE's <em>runtime</em> is built on the host for the target. The runtime is then
+  pushed to the target to run natively.</li>
+</ul>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>Download a pre-trained TFLite model from the list of
-<a href="https://www.tensorflow.org/lite/guide/hosted_models">hosted models</a>, or use the
-<a href="https://www.tensorflow.org/lite/convert">TensorFlow Lite converter</a> to convert
-a TensorFlow model to a .tflite flatbuffer.</p>
-<p>Install IREE pip packages, either from pip or by
-<a href="../../building-from-source/optional-features/#building-python-bindings">building from source</a>:</p>
-<div class="highlight"><pre><span></span><code>python -m pip install <span class="se">\</span>
-  iree-compiler-snapshot <span class="se">\</span>
-  iree-runtime-snapshot <span class="se">\</span>
-  iree-tools-tflite-snapshot <span class="se">\</span>
-  -f https://github.com/google/iree/releases
-</code></pre></div>
-<h2 id="importing-models">Importing models<a class="headerlink" href="#importing-models" title="Permanent link">&para;</a></h2>
-<p>Fist, import the TFLite model to TOSA MLIR:</p>
-<div class="highlight"><pre><span></span><code>iree-import-tflite <span class="se">\</span>
-  sample.tflite <span class="se">\</span>
-  -o sample.mlir
-</code></pre></div>
-<p>Next, compile the TOSA MLIR to a VM flatbuffer, using either the command line
-tools or the <a href="https://google.github.io/iree/bindings/python/">Python API</a>:</p>
-<h4 id="using-the-command-line-tool">Using the command-line tool<a class="headerlink" href="#using-the-command-line-tool" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code>iree-translate <span class="se">\</span>
-  --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
-  --iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
-  sample.mlir <span class="se">\</span>
-  -o sample.vmfb
-</code></pre></div>
-<h4 id="using-the-python-api">Using the python API<a class="headerlink" href="#using-the-python-api" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">iree.compiler</span> <span class="kn">import</span> <span class="n">compile_str</span>
-<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;sample.mlir&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sample_tosa_mlir</span><span class="p">:</span>
-  <span class="n">compiled_flatbuffer</span> <span class="o">=</span> <span class="n">compile_str</span><span class="p">(</span><span class="n">sample_tosa_mlir</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span>
-    <span class="n">input_type</span><span class="o">=</span><span class="s2">&quot;tosa&quot;</span><span class="p">,</span>
-    <span class="n">target_backends</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;vmvx&quot;</span><span class="p">],</span>
-    <span class="n">extra_args</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;--iree-native-bindings-support=false&quot;</span><span class="p">,</span>
-      <span class="s2">&quot;--iree-tflite-bindings-support&quot;</span><span class="p">])</span>
-</code></pre></div>
-<div class="admonition todo">
-<p class="admonition-title">Todo</p>
-<p><a href="https://github.com/google/iree/issues/5462">Issue#5462</a>: Link to
-TensorFlow Lite bindings documentation once it has been written.</p>
+<h3 id="host-environment-setup">Host environment setup<a class="headerlink" href="#host-environment-setup" title="Permanent link">&para;</a></h3>
+<p>You should already be able to build IREE from source on your host platform.
+Please make sure you have followed the <a href="../getting-started/">getting started</a>
+steps.</p>
+<h3 id="install-risc-v-cross-compile-toolchain-and-emulator">Install RISC-V cross-compile toolchain and emulator<a class="headerlink" href="#install-risc-v-cross-compile-toolchain-and-emulator" title="Permanent link">&para;</a></h3>
+<p>You'll need a RISC-V LLVM compilation toolchain and a RISC-V enabled QEMU
+emulator.</p>
+<p>See instructions in the following links</p>
+<ul>
+<li><a href="https://clang.llvm.org/get_started.html">Clang getting started</a></li>
+<li><a href="https://github.com/riscv/riscv-gnu-toolchain">RISC-V GNU toolchain</a></li>
+<li><a href="https://github.com/qemu/qemu">QEMU</a></li>
+<li><a href="https://risc-v-getting-started-guide.readthedocs.io/en/latest/linux-qemu.html">RISC-V Linux QEMU</a></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code>RISCV_TOOLCHAIN_ROOT</code> environment variable needs
+to be set to the root directory of the installed GNU toolchain when building
+the RISC-V compiler target and the runtime library.</p>
 </div>
-<p>The flatbuffer can then be loaded to a VM module and run through IREE's runtime.</p>
-<h2 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Colab notebooks</th>
-<th></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Text classification with TFLite and IREE</td>
-<td><a href="https://colab.research.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
-</tr>
-</tbody>
-</table>
-<p>An example smoke test of the
-<a href="https://github.com/google/iree/tree/main/bindings/tflite">TensorFlow Lite C API</a>
-is available
-<a href="https://github.com/google/iree/blob/main/bindings/tflite/smoke_test.cc">here</a>.</p>
-<div class="admonition todo">
-<p class="admonition-title">Todo</p>
-<p><a href="https://github.com/google/iree/issues/3954">Issue#3954</a>: Add documentation
-for an Android demo using the
-<a href="https://github.com/google/iree/tree/main/bindings/tflite/java">Java TFLite bindings</a>,
-once it is complete at
-<a href="https://github.com/not-jenni/iree-android-tflite-demo">not-jenni/iree-android-tflite-demo</a>.</p>
+<h4 id="install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain">Install prebuilt RISC-V tools (RISC-V 64-bit Linux toolchain)<a class="headerlink" href="#install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain" title="Permanent link">&para;</a></h4>
+<p>Execute the following script to download the prebuilt RISC-V toolchain and QEMU
+from the IREE root directory:</p>
+<div class="highlight"><pre><span></span><code>./build_tools/riscv/riscv_bootstrap.sh
+</code></pre></div>
+<h4 id="support-vector-extension">Support vector extension<a class="headerlink" href="#support-vector-extension" title="Permanent link">&para;</a></h4>
+<p>For RISC-V vector extensions support, see
+<a href="#optional-configuration">additional instructions</a></p>
+<h2 id="configure-and-build">Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">&para;</a></h2>
+<h3 id="host-configuration">Host configuration<a class="headerlink" href="#host-configuration" title="Permanent link">&para;</a></h3>
+<p>Build and install on your host machine:</p>
+<div class="highlight"><pre><span></span><code>cmake -B ../iree-build/ <span class="se">\</span>
+  -DCMAKE_INSTALL_PREFIX<span class="o">=</span>../iree-build/install <span class="se">\</span>
+  -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
+  .
+cmake --build ../iree-build/ --target install
+</code></pre></div>
+<h3 id="target-configuration">Target configuration<a class="headerlink" href="#target-configuration" title="Permanent link">&para;</a></h3>
+<p>The following instruction shows how to build for a RISC-V 64-bit Linux machine.
+For other RISC-V targets, please refer to
+<a href="https://github.com/google/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake">riscv.toolchain.cmake</a>
+as a reference of how to set up the cmake configuration.</p>
+<h4 id="risc-v-64-bit-linux-target">RISC-V 64-bit Linux target<a class="headerlink" href="#risc-v-64-bit-linux-target" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code>cmake -B ../iree-build-riscv/ <span class="se">\</span>
+  -DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;./build_tools/cmake/riscv.toolchain.cmake&quot;</span> <span class="se">\</span>
+  -DIREE_HOST_BINARY_ROOT<span class="o">=</span><span class="k">$(</span>realpath ../iree-build-host/install<span class="k">)</span> <span class="se">\</span>
+  -DRISCV_CPU<span class="o">=</span>rv64 <span class="se">\</span>
+  -DIREE_BUILD_COMPILER<span class="o">=</span>OFF <span class="se">\</span>
+  -DIREE_ENABLE_MLIR<span class="o">=</span>OFF <span class="se">\</span>
+  -DRISCV_TOOLCHAIN_ROOT<span class="o">=</span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>
+  .
+</code></pre></div>
+<h2 id="running-iree-bytecode-modules-on-the-risc-v-system">Running IREE bytecode modules on the RISC-V system<a class="headerlink" href="#running-iree-bytecode-modules-on-the-risc-v-system" title="Permanent link">&para;</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The following instructions are meant for the RISC-V 64-bit Linux
+target. For the bare-metal target, please refer to
+<a href="https://github.com/google/iree/blob/main/iree/samples/simple_embedding">simple_embedding</a>
+to see how to build a ML workload for a bare-metal machine.</p>
 </div>
+<p>Set the path to qemu-riscv64 Linux emulator binary in the <code>QEMU_BIN</code> environment
+variable. If it is installed with <code>riscv_bootstrap.sh</code>, the path is default at
+${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">QEMU_BIN</span><span class="o">=</span>&lt;path to qemu-riscv64 binary&gt;
+</code></pre></div>
+<p>Invoke the host compiler tools to produce a bytecode module flatbuffer:</p>
+<div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-translate <span class="se">\</span>
+  -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
+  -iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
+  iree/samples/models/simple_abs.mlir <span class="se">\</span>
+  -o /tmp/simple_abs_vmvx.vmfb
+</code></pre></div>
+<p>Run the RISC-V emulation:</p>
+<div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span> <span class="se">\</span>
+  -cpu rv64 <span class="se">\</span>
+  -L <span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/ <span class="se">\</span>
+  ../iree-build-riscv/iree/tools/iree-run-module <span class="se">\</span>
+  --driver<span class="o">=</span>vmvx <span class="se">\</span>
+  --module_file<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb <span class="se">\</span>
+  --entry_function<span class="o">=</span>abs <span class="se">\</span>
+  --function_input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-5
+</code></pre></div>
+<h2 id="optional-configuration">Optional configuration<a class="headerlink" href="#optional-configuration" title="Permanent link">&para;</a></h2>
+<p><a href="https://github.com/riscv/riscv-v-spec">RISC-V Vector extensions</a> allows SIMD
+ code to run more efficiently. To enable the vector extension for the compiler
+ toolchain and the emulator, build the tools from the following sources:</p>
+<ul>
+<li>RISC-V toolchain is built from
+<a href="https://github.com/llvm/llvm-project">https://github.com/llvm/llvm-project</a> (main branch).</li>
+<li>Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
+    GNU linker, and C libraries. You need to build GNU toolchain first.</li>
+<li>Clone GNU toolchain from:
+  <a href="https://github.com/riscv/riscv-gnu-toolchain">https://github.com/riscv/riscv-gnu-toolchain</a>
+    (master branch). Switch the "riscv-binutils" submodule to <code>rvv-1.0.x-zfh</code>
+    branch manually.</li>
+<li>RISC-V QEMU is built from
+<a href="https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh">https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh</a>.</li>
+</ul>
+<p>The SIMD code can be generated following the
+<a href="../../deployment-configurations/cpu-dylib/">IREE dynamic library CPU HAL driver flow</a>
+with the additional command-line flags</p>
+<div class="highlight"><pre><span></span><code>iree/tools/iree-translate <span class="se">\</span>
+  -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
+<span class="hll">  -iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
+</span><span class="hll">  -iree-llvm-target-triple<span class="o">=</span>riscv64 <span class="se">\</span>
+</span><span class="hll">  -iree-llvm-target-cpu<span class="o">=</span>generic-rv64 <span class="se">\</span>
+</span><span class="hll">  -iree-llvm-target-abi<span class="o">=</span>lp64d <span class="se">\</span>
+</span><span class="hll">  -iree-llvm-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+experimental-v&quot;</span> <span class="se">\</span>
+</span><span class="hll">  -riscv-v-vector-bits-min<span class="o">=</span><span class="m">128</span> -riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span> <span class="se">\</span>
+</span>  iree_input.mlir -o mobilenet-dylib.vmfb
+</code></pre></div>
+<p>Then run on the RISC-V QEMU:</p>
+<div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span><span class="o">}</span> <span class="se">\</span>
+<span class="hll">  -cpu rv64,x-v<span class="o">=</span>true,x-k<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">256</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0 <span class="se">\</span>
+</span>  -L <span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/ <span class="se">\</span>
+  ../iree-build-riscv/iree/tools/iree-run-module <span class="se">\</span>
+<span class="hll">  --driver<span class="o">=</span>dylib <span class="se">\</span>
+</span>  --module_file<span class="o">=</span>mobilenet-dylib.vmfb <span class="se">\</span>
+  --entry_function<span class="o">=</span>predict <span class="se">\</span>
+  --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+</code></pre></div>
                 
               
               
