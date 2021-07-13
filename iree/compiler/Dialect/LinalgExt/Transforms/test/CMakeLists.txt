@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "convert_to_loops.mlir"
+    "tiling.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

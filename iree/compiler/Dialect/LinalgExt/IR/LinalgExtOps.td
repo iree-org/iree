@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
+include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -34,7 +35,9 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
 // Non-structured ops
 //===----------------------------------------------------------------------===//
 
-def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
+def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+        ["getTiledImplementation"]>]> {
   let summary = "Scatter operator";
   let description = [{
     Based on XLA operation semantics, takes two `inputs` (`update` and
@@ -88,12 +91,24 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
       return getInputOperand(0)->get();
     }
 
+    ShapedType getUpdateType() {
+      return updates().getType().cast<ShapedType>();
+    }
+
     Value indices() {
       return getInputOperand(1)->get();
     }
 
+    ShapedType getIndicesType() {
+      return indices().getType().cast<ShapedType>();
+    }
+
     Value original() {
       return getOutputOperand(0)->get();
+    }
+
+    ShapedType getOriginalType() {
+      return original().getType().cast<ShapedType>();
     }
 
     int64_t getUpdateSliceRank() {
@@ -106,7 +121,9 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
   }];
 }
 
-def LinalgExt_SortOp : LinalgExt_Op<"sort"> {
+def LinalgExt_SortOp : LinalgExt_Op<"sort",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+        ["getTiledImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given
@@ -116,7 +133,7 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort"> {
   }];
 
   // Define arguments and results like linalg.generic op. The attribute has the
-  // same definision as mhlo.sort::dimension. If the rank is greater than 1,
+  // same definition as mhlo.sort::dimension. If the rank is greater than 1,
   // the attribute must be set. If the rank is exacatly 1, the dimension is
   // optional.
   let arguments = (ins Variadic<AnyType>:$inputs,
@@ -130,6 +147,27 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort"> {
     attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
     custom<LinalgExtOutsList>($outputs, type($outputs))
     $region (`->` type($results)^)?
+  }];
+  let extraClassDeclaration = [{
+    Value operand(int index) {
+      return outputs()[index];
+    }
+    ShapedType getOperandType(int index) {
+      return operand(index).getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType(0).getRank();
+    }
+    ArrayRef<int64_t> getOperandShape() {
+      return getOperandType(0).getShape();
+    }
+    uint64_t getSortedDimension() {
+      uint64_t sortedDim = 0;
+      if (auto setSortedDim = dimension()) {
+        sortedDim = *setSortedDim;
+      }
+      return sortedDim;
+    }
   }];
 }
 

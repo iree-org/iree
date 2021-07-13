@@ -23,6 +23,7 @@ filegroup(
             "LinalgExtBase.td",
             "LinalgExtOps.td",
             "LinalgExtInterfaces.td",
+            "TiledOpInterface.td",
         ],
         include = ["*.td"],
     ),
@@ -47,13 +48,17 @@ cc_library(
     deps = [
         ":LinalgExtInterfacesGen",
         ":LinalgExtOpsGen",
+        ":TiledOpInterface",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
     ],
 )
 
@@ -114,5 +119,43 @@ iree_tablegen_doc(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "TiledOpInterfaceGen",
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "TiledOpInterface.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "TiledOpInterface.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "TiledOpInterface.td",
+    td_srcs = [
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+cc_library(
+    name = "TiledOpInterface",
+    srcs = [
+        "TiledOpInterface.cpp",
+        "TiledOpInterface.cpp.inc",
+    ],
+    hdrs = [
+        "TiledOpInterface.h",
+        "TiledOpInterface.h.inc",
+    ],
+    deps = [
+        ":TiledOpInterfaceGen",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
