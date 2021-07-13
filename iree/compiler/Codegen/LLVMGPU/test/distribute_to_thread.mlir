@@ -121,6 +121,71 @@ hal.executable.target @cuda, filter="cuda" {
 
 // -----
 
+// Test that non aligned sizes compile correctly.
+hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
+hal.executable.target @cuda, filter="cuda" {
+  hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
+  module  {
+    func @dot_dispatch_1() attributes {llvmgpu_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
+      %c0 = constant 0 : index
+      %c4 = constant 4 : index
+      %c2 = constant 2 : index
+      %cst = constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan @io::@ro0[%c0] : memref<2x3xf32>
+      %1 = hal.interface.binding.subspan @io::@ro1[%c0] : memref<3x4xf32>
+      %2 = hal.interface.binding.subspan @io::@wo2[%c0] : memref<2x4xf32>
+      %workgroup_size_x = hal.interface.workgroup.size[0] : index
+      %workgroup_size_y = hal.interface.workgroup.size[1] : index
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_count_x = hal.interface.workgroup.count[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %workgroup_count_y = hal.interface.workgroup.count[1] : index
+      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+      scf.for %arg0 = %3 to %c2 step %4 {
+        %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+        %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+        scf.for %arg1 = %5 to %c4 step %6 {
+          %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 2)>(%arg0)[%workgroup_size_y]
+          %8 = memref.subview %0[%arg0, 0] [%7, 3] [1, 1] : memref<2x3xf32> to memref<?x3xf32, affine_map<(d0, d1)[s0] -> (d0 * 3 + s0 + d1)>>
+          %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg1)[%workgroup_size_x]
+          %10 = memref.subview %1[0, %arg1] [3, %9] [1, 1] : memref<3x4xf32> to memref<3x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
+          %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<2x4xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
+          linalg.fill(%cst, %11) {lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
+          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} ins(%8, %10 : memref<?x3xf32, affine_map<(d0, d1)[s0] -> (d0 * 3 + s0 + d1)>>, memref<3x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>)
+        }
+      }
+      return
+    }
+    hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    }
+  }
+}
+}
+//   CHECK-LABEL: hal.executable @dot_dispatch_1
+//     CHECK-DAG:  %[[C0:.+]] = constant 0 : index
+//     CHECK-DAG:  %[[C1:.+]] = constant 1 : index
+//     CHECK-DAG:  %[[C2:.+]] = constant 2 : index
+//     CHECK-DAG:  %[[C3:.+]] = constant 3 : index
+//     CHECK-DAG:  %[[C256:.+]] = constant 256 : index
+//         CHECK:  gpu.barrier
+//         CHECK:  scf.for %[[IND:.+]] = %{{.*}} to %[[C2]] step %[[C2]] {
+//     CHECK-DAG:    %[[SRC:.+]] = memref.subview %{{.*}}[%[[IND]], 0] [1, 3] [1, 1] : memref<2x3xf32, #{{.*}}> to memref<1x3xf32, #{{.*}}>
+//     CHECK-DAG:    %[[DST:.+]] = memref.subview %{{.*}}[%[[IND]], 0] [1, 3] [1, 1] : memref<2x3xf32, #{{.*}}, 3> to memref<1x3xf32, #{{.*}}, 3>
+//         CHECK:    linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x3xf32, #{{.*}}>, memref<1x3xf32, #{{.*}}, 3>
+//         CHECK:    }
+//         CHECK:  scf.for %[[IND0:.+]] = %{{.*}} to %[[C3]] step %[[C1]] {
+//         CHECK:    scf.for %[[IND1:.+]] = %{{.*}} to %{{.*}} step %[[C256]] {
+//     CHECK-DAG:      %[[SRC:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 4] [1, 1] : memref<{{.*}}> to memref<1x4xf32, #{{.*}}>
+//     CHECK-DAG:      %[[DST:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 4] [1, 1] : memref<{{.*}}, 3> to memref<1x4xf32, #{{.*}}, 3>
+//         CHECK:      linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x4xf32, #{{.*}}>, memref<1x4xf32, #{{.*}}, 3>
+//         CHECK:    }
+//         CHECK:  }
+// -----
+
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
 hal.executable.target @cuda, filter="cuda" {
