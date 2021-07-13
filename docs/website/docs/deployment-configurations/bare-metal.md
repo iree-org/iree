@@ -1,10 +1,13 @@
 # Run on a Bare-Metal Platform
 
 IREE supports CPU model execution on a bare-metal platform. That is, a platform
-without operating system support and the executable runs on the machine mode.
-The IREE compiler follows the path to generate the code runs on the
-[dynamic library CPU HAL driver](https://google.github.io/iree/deployment-configurations/cpu-dylib/)
-and a subset of runtime library can be used to execute the model.
+without operating system support, and the executable is built with the
+machine-specific linker script and/or the board support package (BSP).
+
+Bare-metal deployment typically uses IREE's LLVM compiler target much like the
+[CPU - Dylib](./cpu-dylib.md)
+configuration, but using a limited subset of IREE's CPU HAL driver at runtime to
+load and execute compiled programs.
 
 ## Prerequisites
 
@@ -16,7 +19,7 @@ ready, such as
 * Firmware libraries
 
 Please follow the
-[instructions](https://google.github.io/iree/deployment-configurations/cpu-dylib/#get-compiler-for-cpu-native-instructions)
+[instructions](./cpu-dylib.md#get-compiler-for-cpu-native-instructions)
 to retrieve the IREE compiler.
 
 ## Compile the model for bare-metal
@@ -53,12 +56,12 @@ See [generate.sh](https://github.com/google/iree/blob/main/iree/hal/local/elf/te
 for example command-line instructions of some common architectures
 
 You can replace the MLIR file with the other MLIR model files, following the
-[instructions](https://google.github.io/iree/deployment-configurations/cpu-dylib/#compile-the-model)
+[instructions](./cpu-dylib.md#compile-the-model)
 
 !!! todo
-    add the static library support
+    Add the static library support
 
-## Build bare-metal runtime from the source (CMake only)
+## Build bare-metal runtime from the source
 
 A few CMake options and macros should be set to build a subset of IREE runtime
 libraries compatible with the bare-metal platform. We assume there's no
@@ -68,19 +71,23 @@ model execution is in a single-thread synchronous fashion.
 ### Set CMake options
 
 * `set(IREE_BUILD_COMPILER OFF)`: Build IREE runtime only
-* `set(IREE_ENABLE_MLIR OFF)`: Disable LLVM/MLIR dependencis for the runtime
+* `set(IREE_ENABLE_MLIR OFF)`: Disable LLVM/MLIR dependencies for the runtime
 library
-* `set(CMAKE_SYSTEM_NAME Generic)`: Let CMake to generate the runtime without
-targeting a specific operating system
+* `set(CMAKE_SYSTEM_NAME Generic)`: Tell CMake to skip targeting a specific
+operating system
 * `set(IREE_BINDINGS_TFLITE OFF)`: Disable the TFLite binding support
-* `set(IREE_ENABLE_THREADINGS OFF)`: Disable multi-thread library support
-* `set(IREE_HAL_DRIVERS_TO_BUILD "Dylib;VMVX")`: Build the runtime HAL drivers
-for the dynamic library and VMVX backends.
-* `set(IREE_BUILD_TESTS OFF)`: IREE test tools assumes the multi-thread system
-support
+* `set(IREE_ENABLE_THREADING OFF)`: Disable multi-thread library support
+* `set(IREE_HAL_DRIVERS_TO_BUILD "Dylib;VMVX")`: Build only the dynamic library
+and VMVX runtime HAL drivers
+* `set(IREE_BUILD_TESTS OFF)`: Disable tests until IREE supports running them on
+bare-metal platforms
 * `set(IREE_BUILD_SAMPLES ON)`: Build
 [simple_embedding](https://github.com/google/iree/tree/main/iree/samples/simple_embedding)
 example
+
+!!! todo
+    Clean the list up after [#6353](https://github.com/google/iree/issues/6353)
+    is fixed.
 
 Also, set the toolchain-specific cmake file to match the tool path, target
 architecture, target abi, linker script, system library path, etc.
