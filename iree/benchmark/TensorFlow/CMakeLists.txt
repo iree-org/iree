@@ -52,6 +52,14 @@ set(MOBILENET_V3SMALL_MODULE
   "1x224x224x3xf32"  # FUNCTION_INPUTS
 )
 
+set(MOBILENET_SSD_FP32_MODULE
+  "MobileNetSSD"    # MODULE_NAME
+  "fp32"            # MODULE_TAGS
+  "https://storage.googleapis.com/iree-model-artifacts/MobileNetSSD.tar.gz" # MLIR_SOURCE
+  "main"            # ENTRY_FUNCTION
+  "1x320x320x3xf32" # FUNCTION_INPUTS
+)
+
 ################################################################################
 #                                                                              #
 # Common benchmark configurations                                              #
@@ -280,6 +288,24 @@ iree_mlir_benchmark_suite(
     "--batch_size=32"
 )
 
+# CPU, VMVX, 3-thread, little-core, full-inference
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILENET_SSD_FP32_MODULE}
+
+  BENCHMARK_MODES
+    "3-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "vmvx"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+  DRIVER
+    "vmvx"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=3"
+)
 ################################################################################
 #                                                                              #
 # Speical benchmark configurations                                             #
