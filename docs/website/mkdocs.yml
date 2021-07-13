@@ -107,6 +107,7 @@ nav:
       - 'building-from-source/getting-started.md'
       - Optional features: 'building-from-source/optional-features.md'
       - Android cross-compilation: 'building-from-source/android.md'
+      - RISC-V cross-compilation: 'building-from-source/riscv.md'
   - 'Bindings':
       - C API: 'bindings/c-api.md'
       - Python: 'bindings/python.md'
