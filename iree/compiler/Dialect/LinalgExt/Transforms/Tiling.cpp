@@ -369,17 +369,26 @@ void LinalgExtTilingPass::runOnOperation() {
   FuncOp funcOp = getOperation();
   MLIRContext *context = funcOp.getContext();
   RewritePatternSet patterns(context);
-  patterns
-      .add<LinalgExtTilingPattern<ScatterOp>, LinalgExtTilingPattern<SortOp>>(
-          context, linalg::LinalgTilingOptions().setTileSizes({10, 20}),
-          linalg::LinalgTransformationFilter(
-              Identifier::get("tiling_input", context),
-              Identifier::get("tiling_output", context)));
+  patterns.add<LinalgExtTilingPattern<ScatterOp>>(
+      context, linalg::LinalgTilingOptions().setTileSizes({10, 20}),
+      linalg::LinalgTransformationFilter(
+          Identifier::get("tiling_input", context),
+          Identifier::get("tiling_output", context)));
   patterns.add<LinalgExtTilingPattern<ScatterOp>>(
       context, linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{0}),
       linalg::LinalgTransformationFilter(
           Identifier::get("no_tiling_input", context),
           Identifier::get("no_tiling_output", context)));
+  patterns.add<LinalgExtTilingPattern<SortOp>>(
+      context, linalg::LinalgTilingOptions().setTileSizes({0, 20}),
+      linalg::LinalgTransformationFilter(
+          Identifier::get("outer_reduce_input", context),
+          Identifier::get("outer_reduce_output", context)));
+  patterns.add<LinalgExtTilingPattern<SortOp>>(
+      context, linalg::LinalgTilingOptions().setTileSizes({10, 0, 0}),
+      linalg::LinalgTransformationFilter(
+          Identifier::get("inner_reduce_input", context),
+          Identifier::get("inner_reduce_output", context)));
 
   static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
       [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
@@ -404,7 +413,7 @@ void LinalgExtTilingPass::runOnOperation() {
       .add<LinalgExtTilingPattern<ScatterOp>, LinalgExtTilingPattern<SortOp>>(
           context,
           linalg::LinalgTilingOptions()
-              .setTileSizes(ArrayRef<int64_t>{10, 20, 30})
+              .setTileSizes(ArrayRef<int64_t>{10, 0, 30})
               .setDistributionOptions(workgroupDistributionOptions),
           linalg::LinalgTransformationFilter(
               Identifier::get("distribute_input", context),

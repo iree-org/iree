@@ -154,7 +154,7 @@ func @scatter_no_tiling(
 
 func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
   %0 = linalg_ext.sort
-       {__internal_linalg_transform__ = "tiling_input"}
+       {__internal_linalg_transform__ = "outer_reduce_input"}
        outs(%arg0 : tensor<?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
          %0 = cmpi sgt, %arg2, %arg3 : i32
@@ -165,7 +165,7 @@ func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
 //      CHECK: func @sort_1d(
 // CHECK-SAME:   %[[OPERAND:.+]]: tensor<?xi32>
 //      CHECK:   %[[RESULT:.+]] = linalg_ext.sort
-// CHECK-SAME:       {__internal_linalg_transform__ = "tiling_output"}
+// CHECK-SAME:       {__internal_linalg_transform__ = "outer_reduce_output"}
 // CHECK-SAME:       outs(%[[OPERAND]] :
 //      CHECK:   return %[[RESULT]]
 
@@ -173,7 +173,7 @@ func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
 
 func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %0 = linalg_ext.sort dimension(1)
-       {__internal_linalg_transform__ = "tiling_input"}
+       {__internal_linalg_transform__ = "inner_reduce_input"}
        outs(%arg0 : tensor<?x?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
          %0 = cmpi sgt, %arg2, %arg3 : i32
@@ -195,7 +195,7 @@ func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 //       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[INIT]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     %[[SORT_TILE:.+]] = linalg_ext.sort
-//  CHECK-SAME:         __internal_linalg_transform__ = "tiling_output"
+//  CHECK-SAME:         __internal_linalg_transform__ = "inner_reduce_output"
 //  CHECK-SAME:         outs(%[[OPERAND_SLICE]]
 //   CHECK-DAG:     %[[SLICE_D0:.+]] = tensor.dim %[[SORT_TILE]], %[[C0]]
 //   CHECK-DAG:     %[[SLICE_D1:.+]] = tensor.dim %[[SORT_TILE]], %[[C1]]
@@ -208,7 +208,7 @@ func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 
 func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %0 = linalg_ext.sort dimension(0)
-       {__internal_linalg_transform__ = "tiling_input"}
+       {__internal_linalg_transform__ = "outer_reduce_input"}
        outs(%arg0 : tensor<?x?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
          %0 = cmpi sgt, %arg2, %arg3 : i32
@@ -230,7 +230,7 @@ func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 //       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[INIT]][0, %[[IV]]]
 //  CHECK-SAME:         [%[[D0]], %[[USED_TILESIZE]]]
 //       CHECK:     %[[SORT_TILE:.+]] = linalg_ext.sort
-//  CHECK-SAME:         __internal_linalg_transform__ = "tiling_output"
+//  CHECK-SAME:         __internal_linalg_transform__ = "outer_reduce_output"
 //  CHECK-SAME:         outs(%[[OPERAND_SLICE]]
 //   CHECK-DAG:     %[[SLICE_D0:.+]] = tensor.dim %[[SORT_TILE]], %[[C0]]
 //   CHECK-DAG:     %[[SLICE_D1:.+]] = tensor.dim %[[SORT_TILE]], %[[C1]]
@@ -245,7 +245,7 @@ func @sort_2d_multi_result(
     %arg0: tensor<?x?xi32>, %arg1: tensor<?x?xf32>)
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
   %0:2 = linalg_ext.sort dimension(1)
-       {__internal_linalg_transform__ = "tiling_input"}
+       {__internal_linalg_transform__ = "inner_reduce_input"}
        outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
        ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
          %1 = cmpf ogt, %arg4, %arg5 : f32
@@ -270,7 +270,7 @@ func @sort_2d_multi_result(
 //       CHECK:     %[[OPERAND2_SLICE:.+]] = tensor.extract_slice %[[INIT2]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     %[[SORT_TILE:.+]]:2 = linalg_ext.sort
-//  CHECK-SAME:         __internal_linalg_transform__ = "tiling_output"
+//  CHECK-SAME:         __internal_linalg_transform__ = "inner_reduce_output"
 //  CHECK-SAME:         outs(%[[OPERAND1_SLICE]], %[[OPERAND2_SLICE]]
 //   CHECK-DAG:     %[[SLICE_D0:.+]] = tensor.dim %[[SORT_TILE]]#0, %[[C0]]
 //   CHECK-DAG:     %[[SLICE_D1:.+]] = tensor.dim %[[SORT_TILE]]#0, %[[C1]]
@@ -288,7 +288,7 @@ func @sort_2d_multi_result(
 func @sort_2d_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
   linalg_ext.sort dimension(0)
-     {__internal_linalg_transform__ = "tiling_input"}
+     {__internal_linalg_transform__ = "outer_reduce_input"}
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
        %0 = cmpf ogt, %arg4, %arg5 : f32
@@ -312,7 +312,7 @@ func @sort_2d_multi_result_memref(
 //       CHECK:     %[[OPERAND2_SLICE:.+]] = memref.subview %[[OPERAND2]][0, %[[IV]]]
 //  CHECK-SAME:         [%[[D0]], %[[USED_TILESIZE]]]
 //       CHECK:     linalg_ext.sort
-//  CHECK-SAME:         __internal_linalg_transform__ = "tiling_output"
+//  CHECK-SAME:         __internal_linalg_transform__ = "outer_reduce_output"
 //  CHECK-SAME:         outs(%[[OPERAND1_SLICE]], %[[OPERAND2_SLICE]]
 
 // -----
