@@ -95,7 +95,6 @@ iree_status_t Run() {
         instance, &session_options, device,
         iree_runtime_instance_host_allocator(instance), &session);
   }
-  iree_hal_device_release(device);
 
   // Load bytecode module from the embedded data. Append to the session.
   const struct iree_file_toc_t* module_file_toc =
@@ -109,7 +108,7 @@ iree_status_t Run() {
                                             &bytecode_module);
   }
   if (iree_status_is_ok(status)) {
-    iree_runtime_session_append_module(session, bytecode_module);
+    status = iree_runtime_session_append_module(session, bytecode_module);
   }
 
   // Lookup the entry point function call.
@@ -175,17 +174,24 @@ iree_status_t Run() {
   }
 
   // Read back the results and ensure we got the right values.
-  iree_hal_buffer_mapping_t mapped_memory;
+  iree_hal_buffer_mapping_t mapped_memory = {0};
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_map_range(
         iree_hal_buffer_view_buffer(ret_buffer_view),
         IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &mapped_memory);
   }
   if (iree_status_is_ok(status)) {
-    for (int i = 0; i < mapped_memory.contents.data_length / sizeof(float);
-         ++i) {
-      if (((const float*)mapped_memory.contents.data)[i] != 8.0f) {
-        return iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");
+    if (mapped_memory.contents.data_length / sizeof(float) != kElementCount) {
+      status = iree_make_status(IREE_STATUS_UNKNOWN,
+                                "result does not match element count ");
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    const float* data = (const float*)mapped_memory.contents.data;
+    for (iree_host_size_t i = 0;
+         i < mapped_memory.contents.data_length / sizeof(float); ++i) {
+      if (data[i] != 8.0f) {
+        status = iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");
       }
     }
   }
@@ -196,6 +202,7 @@ iree_status_t Run() {
   iree_runtime_call_deinitialize(&call);
 
   // Cleanup session and instance.
+  iree_hal_device_release(device);
   iree_runtime_session_release(session);
   iree_runtime_instance_release(instance);
 
