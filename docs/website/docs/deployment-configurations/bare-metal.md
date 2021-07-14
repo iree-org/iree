@@ -98,6 +98,7 @@ architecture, target abi, linker script, system library path, etc.
 targeting a specific platform
 * `-DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1`: Disable thread synchronization
 support
+* `-DIREE_FILE_IO_ENABLE=0`: Disable file I/O
 * `-DIREE_TIME_NOW_FN`: A function to return the system time. For the bare-metal
 system, it can be set as `-DIREE_TIME_NOW_FN=\"\{ return 0;\}\"` as there's no
 asynchronous wait handling
