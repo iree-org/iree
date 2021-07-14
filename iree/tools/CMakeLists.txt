@@ -49,10 +49,7 @@ if(IREE_ENABLE_EMITC)
   )
   set(IREE_TRANSLATE_CONDITIONAL_DEPS
     MLIREmitC
-    MLIRTargetCpp
-  )
-  set(IREE_EMITC_INCLUDES
-    "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
+    emitc::TranslateToCpp
   )
 endif()
 
@@ -271,8 +268,6 @@ if(${IREE_BUILD_COMPILER})
       ::init_xla_dialects
       iree::compiler::Codegen::Codegen
       iree::compiler::Dialect::HAL::Conversion::Passes
-    INCLUDES
-      "${IREE_EMITC_INCLUDES}"
     PUBLIC
   )
 
@@ -360,8 +355,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
       ${IREE_TRANSLATE_CONDITIONAL_DEPS}
-    INCLUDES
-      "${IREE_EMITC_INCLUDES}"
     PUBLIC
   )
 

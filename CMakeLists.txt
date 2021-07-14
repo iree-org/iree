@@ -339,10 +339,6 @@ set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
 # been added and within the scope of its settings (i.e. build type override,
 # etc).
 function(add_bundled_mlir_dependent_projects)
-  if(${IREE_ENABLE_EMITC})
-    add_subdirectory(third_party/mlir-emitc EXCLUDE_FROM_ALL)
-  endif()
-
   if(${IREE_BUILD_COMPILER})
     add_subdirectory(third_party/mlir-hlo EXCLUDE_FROM_ALL)
   endif()
@@ -457,6 +453,10 @@ endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
+endif()
+
+if(${IREE_ENABLE_EMITC})
+  add_subdirectory(build_tools/third_party/mlir-emitc EXCLUDE_FROM_ALL)
 endif()
 
 if(${IREE_BUILD_TESTS})
