@@ -1875,10 +1875,8 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
   ];
 }
 
-// TODO(benvanik): additional factory functions and submission ops.
-// TODO(benvanik): %0 = hal.device.query %device, group, property : i32/etc
-
-def HAL_DeviceMatchIDOp : HAL_PureOp<"device.match.id"> {
+def HAL_DeviceMatchIDOp :
+    HAL_PureOp<"device.match.id", [HAL_DeviceQuery]> {
   let summary = [{returns true if the device ID matches the pattern}];
   let description = [{
     Pattern matches the device ID with the given wildcard pattern.
@@ -1907,7 +1905,8 @@ def HAL_DeviceMatchIDOp : HAL_PureOp<"device.match.id"> {
   }];
 }
 
-def HAL_DeviceMatchMemoryModelOp : HAL_PureOp<"device.match.memory_model"> {
+def HAL_DeviceMatchMemoryModelOp :
+    HAL_PureOp<"device.match.memory_model", [HAL_DeviceQuery]> {
   let summary = [{returns true if the device memory model matches the value}];
   let description = [{
     Compares the device's memory model against the specified model.
@@ -1936,11 +1935,76 @@ def HAL_DeviceMatchMemoryModelOp : HAL_PureOp<"device.match.memory_model"> {
   }];
 }
 
-def HAL_DeviceQueryOp : HAL_PureOp<"device.query"> {
+def HAL_DeviceMatchFeatureOp :
+    HAL_PureOp<"device.match.feature", [HAL_DeviceQuery]> {
+  let summary = [{returns true if the device supports the provided feature}];
+  let description = [{
+    Matches a feature pattern against the given device, returning true if the
+    feature is reported as supported. This can be used to conditionally evaluate
+    device-specific code when the device is not known at compile-time.
+
+    The feature patterns supported are device backend dependent.
+
+    ```mlir
+    %is_match = hal.device.match.feature<%device : !hal.device>
+                                 pattern("some-feature-v*") : i1
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    StrAttr:$pattern
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `pattern` `(` $pattern `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_DeviceMatchArchitectureOp :
+    HAL_PureOp<"device.match.architecture", [HAL_DeviceQuery]> {
+  let summary = [{returns true if the device matches the given architecture}];
+  let description = [{
+    Matches an architecture pattern against the given device, returning true if
+    the architecture is compatible. This can be used to conditionally evaluate
+    device-specific code when the device is not known at compile-time.
+
+    The architecture patterns supported are device backend dependent.
+
+    ```mlir
+    %is_match = hal.device.match.architecture<%device : !hal.device>
+                                      pattern("aarch64-*") : i1
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    StrAttr:$pattern
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `pattern` `(` $pattern `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_DeviceQueryOp :
+    HAL_PureOp<"device.query", [HAL_DeviceQuery]> {
   let summary = [{returns a runtime configuration parameter from the device}];
   let description = [{
     Queries a device configuration parameter with the given key.
-    Returns a status indicating whether the key was recognized/available and if
+    Returns a status indicating whether the pair was recognized/available and if
     it was the value converted to the specified type. Queries must return the
     same value for the lifetime of the module though may vary from run to run.
 
@@ -1963,7 +2027,9 @@ def HAL_DeviceQueryOp : HAL_PureOp<"device.query"> {
 
   let arguments = (ins
     HAL_Device:$device,
-    StrAttr:$key
+    StrAttr:$category,
+    StrAttr:$key,
+    OptionalAttr<AnyAttr>:$default_value
   );
   let results = (outs
     I1:$ok,
@@ -1972,10 +2038,13 @@ def HAL_DeviceQueryOp : HAL_PureOp<"device.query"> {
 
   let assemblyFormat = [{
     `<` $device `:` type($device) `>`
-    `key` `(` $key `)`
+    `key` `(` $category `:` `` `:` $key `)`
     `:` type($ok) `,` type($value)
+    (`=` $default_value^)?
     attr-dict-with-keyword
   }];
+
+  let verifier = [{ return verifyDeviceQueryOp(*this); }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -2023,7 +2092,7 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     Symbol,
-    HasParent<"IREE::HAL::ExecutableTargetOp">,
+    HasParent<"IREE::HAL::ExecutableVariantOp">,
     IsolatedFromAbove
   ]> {
   let summary = [{executable entry point declaration}];
@@ -2091,14 +2160,14 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   }];
 }
 
-def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
+def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     IsolatedFromAbove,
     HasParent<"IREE::HAL::ExecutableOp">,
-    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableTargetEndOp">,
+    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableVariantEndOp">,
     Symbol,
     SymbolTable,
   ]> {
-  let summary = [{target executable IR}];
+  let summary = [{target-specific variant of an executable op}];
   let description = [{
     The target IR for the executable. This can be preserved for debugging but
     is usually removed during transformation.
@@ -2106,7 +2175,7 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
 
   let arguments = (ins
     StrAttr:$sym_name,
-    StrAttr:$target_backend_filter
+    StrAttr:$target
     // TODO(benvanik): add compatibility and versioning attributes.
     // TODO(scotttodd): add linking / preserve_ordinals attribute(s) for targets
     //                  with special linking requirements
@@ -2116,7 +2185,7 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "StringRef":$name, "StringRef":$targetBackendFilter)>,
+    OpBuilder<(ins "StringRef":$name, "StringRef":$target)>,
   ];
 
   let extraClassDeclaration = [{
@@ -2130,11 +2199,11 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
   }];
 }
 
-def HAL_ExecutableTargetEndOp : HAL_Op<"executable.target_end", [
-    HasParent<"IREE::HAL::ExecutableTargetOp">,
+def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
+    HasParent<"IREE::HAL::ExecutableVariantOp">,
     Terminator,
   ]> {
-  let summary = [{terminator pseudo-op for the executable target op}];
+  let summary = [{terminator pseudo-op for the executable variant op}];
   let assemblyFormat = "attr-dict";
 }
 

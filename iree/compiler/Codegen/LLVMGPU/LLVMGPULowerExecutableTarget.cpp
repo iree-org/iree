@@ -19,7 +19,7 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-/// Lowers an hal.executable.target operation to scalar/native-vector
+/// Lowers an hal.executable.variant operation to scalar/native-vector
 /// code. Invokes different compilation pipeline to
 /// - first lower to scalar/native-vector code
 /// - then convert to NVVM/ROCDL dialect.
@@ -43,11 +43,11 @@ class LLVMGPULowerExecutableTargetPass
 }  // namespace
 
 void LLVMGPULowerExecutableTargetPass::runOnOperation() {
-  IREE::HAL::ExecutableTargetOp targetOp = getOperation();
-  ModuleOp moduleOp = targetOp.getInnerModule();
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  ModuleOp moduleOp = variantOp.getInnerModule();
 
   OpPassManager executableLoweringPipeline(
-      IREE::HAL::ExecutableTargetOp::getOperationName());
+      IREE::HAL::ExecutableVariantOp::getOperationName());
 
   if (failed(initGPULaunchConfig(moduleOp))) {
     return signalPassFailure();
@@ -106,12 +106,12 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       llvm_unreachable("Unsupported pipeline on GPU target.");
   }
 
-  if (failed(runPipeline(executableLoweringPipeline, targetOp))) {
+  if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
     return signalPassFailure();
   }
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass() {
   return std::make_unique<LLVMGPULowerExecutableTargetPass>();
 }

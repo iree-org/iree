@@ -72,6 +72,19 @@ static Value buildConditionExpression(Location loc, Value device,
     //     hal.device.match.memory_model
     return funcBuilder.createOrFold<IREE::HAL::DeviceMatchMemoryModelOp>(
         loc, funcBuilder.getI1Type(), device, matchAttr.memory_modelAttr());
+  } else if (auto matchAttr =
+                 conditionAttr.dyn_cast<IREE::HAL::DeviceMatchFeatureAttr>()) {
+    // #hal.device.match.feature<"pattern"> ->
+    //     hal.device.match.feature
+    return funcBuilder.createOrFold<IREE::HAL::DeviceMatchFeatureOp>(
+        loc, funcBuilder.getI1Type(), device, matchAttr.patternAttr());
+  } else if (auto matchAttr =
+                 conditionAttr
+                     .dyn_cast<IREE::HAL::DeviceMatchArchitectureAttr>()) {
+    // #hal.device.match.architecture<"pattern"> ->
+    //     hal.device.match.architecture
+    return funcBuilder.createOrFold<IREE::HAL::DeviceMatchArchitectureOp>(
+        loc, funcBuilder.getI1Type(), device, matchAttr.patternAttr());
   }
   llvm_unreachable("unhandled condition expression attribute");
   return {};

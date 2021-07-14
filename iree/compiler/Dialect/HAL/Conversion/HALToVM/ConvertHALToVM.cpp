@@ -113,6 +113,7 @@ class ConvertHALToVMPass
   }
 
   void runOnOperation() override {
+    if (getOperation().getBody()->empty()) return;
     auto *context = &getContext();
 
     VMConversionTarget conversionTarget(context);

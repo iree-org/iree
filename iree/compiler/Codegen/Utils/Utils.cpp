@@ -27,9 +27,9 @@ unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
 }
 
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
-  auto targetOp =
-      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+  auto variantOp =
+      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
       return op;
     }
@@ -39,10 +39,10 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
 
 llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
     ModuleOp module) {
-  auto targetOp =
-      module.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
+  auto variantOp =
+      module.getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
-  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+  for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     entryPointOps[op.sym_name()] = op;
   }
   return entryPointOps;

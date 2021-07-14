@@ -18,6 +18,7 @@ cc_library(
         "LLVMCPULowerExecutableTarget.cpp",
         "LLVMCPUPadWorkgroupTiles.cpp",
         "LLVMCPUPlanConvLoopOrder.cpp",
+        "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUTilePadAndVectorize.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
         "LLVMCPUVectorization.cpp",
