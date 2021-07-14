@@ -15,4 +15,10 @@ def LinalgExtToLoops :
   let constructor = "mlir::iree_compiler::linalg_ext::createLinalgExtToLoopsPass()";
 }
 
+def LinalgExtTiling :
+    Pass<"iree-linalg-ext-tile", "FuncOp"> {
+  let summary = "Test pass for tiling LinalgExt ops using TiledOpInterface";
+  let constructor = "mlir::iree_compiler::linalg_ext::createLinalgExtTilingPass()";
+}
+
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

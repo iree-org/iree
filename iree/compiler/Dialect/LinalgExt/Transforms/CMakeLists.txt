@@ -23,23 +23,29 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
+    "Transforms.h"
   SRCS
     "ConvertToLoops.cpp"
-    "PassDetail.h"
     "Passes.cpp"
+    "Tiling.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
+    MLIRAffine
     MLIRIR
     MLIRLinalg
+    MLIRLinalgTransforms
     MLIRMemRef
     MLIRPass
     MLIRSCF
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )

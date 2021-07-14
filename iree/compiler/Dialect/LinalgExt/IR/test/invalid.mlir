@@ -26,6 +26,34 @@ func @sort_without_dimension(%arg0: tensor<3x4xi32>) -> tensor<3x4xi32> {
 
 // -----
 
+func @sort_mismatch_rank(%arg0: tensor<?x?xi32>, %arg1: tensor<?xf32>)
+    -> (tensor<?x?xi32>, tensor<?xf32>) {
+  // expected-error @+1 {{expected operand 1 to be rank 2, same as other operands}}
+  %0:2 = linalg_ext.sort dimension(0)
+      outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?xf32>) {
+      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+        %1 = cmpf ogt, %arg4, %arg5 : f32
+        linalg_ext.yield %1 : i1
+      } -> tensor<?x?xi32>, tensor<?xf32>
+  return %0#0, %0#1 : tensor<?x?xi32>, tensor<?xf32>
+}
+
+// -----
+
+func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
+    -> (tensor<?xi32>, tensor<42xf32>) {
+  // expected-error @+1 {{expected operand 1 to have same shape as other operands}}
+  %0:2 = linalg_ext.sort dimension(0)
+      outs(%arg0, %arg1 : tensor<?xi32>, tensor<42xf32>) {
+      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+        %1 = cmpf ogt, %arg4, %arg5 : f32
+        linalg_ext.yield %1 : i1
+      } -> tensor<?xi32>, tensor<42xf32>
+  return %0#0, %0#1 : tensor<?xi32>, tensor<42xf32>
+}
+
+// -----
+
 func @scatter_mixed_tensor_memref(
     %update : memref<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {

@@ -28,13 +28,16 @@ iree_cc_library(
   DEPS
     ::LinalgExtInterfacesGen
     ::LinalgExtOpsGen
+    ::TiledOpInterface
     LLVMSupport
     MLIRControlFlowInterfaces
     MLIRIR
+    MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport
+    MLIRTensor
   PUBLIC
 )
 
@@ -65,6 +68,34 @@ iree_tablegen_doc(
     "LinalgExtOps.td"
   OUTS
     -gen-dialect-doc LinalgExtDialect.md
+)
+
+iree_tablegen_library(
+  NAME
+    TiledOpInterfaceGen
+  TD_FILE
+    "TiledOpInterface.td"
+  OUTS
+    -gen-op-interface-decls TiledOpInterface.h.inc
+    -gen-op-interface-defs TiledOpInterface.cpp.inc
+)
+
+iree_cc_library(
+  NAME
+    TiledOpInterface
+  HDRS
+    "TiledOpInterface.h"
+    "TiledOpInterface.h.inc"
+  SRCS
+    "TiledOpInterface.cpp"
+    "TiledOpInterface.cpp.inc"
+  DEPS
+    ::TiledOpInterfaceGen
+    LLVMSupport
+    MLIRIR
+    MLIRSupport
+    MLIRViewLikeInterface
+  PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

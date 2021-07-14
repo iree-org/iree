@@ -35,7 +35,7 @@ and can generate efficient code for a variety of runtime platforms:
 - [x] Android
 - [ ] macOS (planned)
 - [ ] iOS (planned)
-- [ ] Bare metal (planned)
+- [x] Bare metal
 - [ ] WebAssembly (planned)
 
 and architectures:
@@ -147,12 +147,12 @@ _bindings_ for running IREE models using other languages:
 
 IREE is in the early stages of development and is not yet ready for broad
 adoption. Check out the
-[long-term design roadmap](https://github.com/google/iree/blob/main/docs/design_roadmap.md)
+[long-term design roadmap](https://github.com/google/iree/blob/main/docs/developers/design_roadmap.md)
 to get a sense of where we're headed.
 
 We plan on a quarterly basis using [OKRs](https://en.wikipedia.org/wiki/OKR).
 Review our latest
-[objectives](https://github.com/google/iree/blob/main/docs/objectives.md) to
+[objectives](https://github.com/google/iree/blob/main/docs/developers/objectives.md) to
 see what we're up to.
 
 We use [GitHub Projects](https://github.com/google/iree/projects) to track

@@ -32,6 +32,44 @@ func @sort_memref(%arg0: memref<128xi32>) {
 
 // -----
 
+func @sort_multi_result_tensor(
+    %arg0: tensor<?x?xi32>, %arg1: tensor<?x?xf32>)
+    -> (tensor<?x?xi32>, tensor<?x?xf32>) {
+  %0:2 = linalg_ext.sort dimension(0)
+      outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
+      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+        %1 = cmpf ogt, %arg4, %arg5 : f32
+        linalg_ext.yield %1 : i1
+      } -> tensor<?x?xi32>, tensor<?x?xf32>
+  return %0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xf32>
+}
+// CHECK-LABEL: func @sort_multi_result_tensor
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xi32>
+//  CHECK-SAME:   %[[ARG1:.+]]: tensor<?x?xf32>
+//       CHECK:   %[[RESULT:.+]]:2 = linalg_ext.sort dimension(0)
+//  CHECK-SAME:      outs(%[[ARG0]], %[[ARG1]]
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func @sort_multi_result_memref(
+    %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
+  linalg_ext.sort dimension(0)
+     outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
+     ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+       %1 = cmpf ogt, %arg4, %arg5 : f32
+       linalg_ext.yield %1 : i1
+     }
+  return
+}
+// CHECK-LABEL: func @sort_multi_result_memref
+//  CHECK-SAME:   %[[ARG0:.+]]: memref<?x?xi32>
+//  CHECK-SAME:   %[[ARG1:.+]]: memref<?x?xf32>
+//       CHECK:   linalg_ext.sort dimension(0)
+//  CHECK-SAME:      outs(%[[ARG0]], %[[ARG1]]
+
+// -----
+
 func @scatter_tensor_dynamic(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update: tensor<?x?xf32>) -> tensor<?x?xf32> {
