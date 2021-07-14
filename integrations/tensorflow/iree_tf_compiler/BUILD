@@ -73,6 +73,7 @@ cc_binary(
     name = "iree-import-tf",
     srcs = ["iree-import-tf-main.cpp"],
     deps = [
+        "//iree_tf_compiler/MHLO",
         "//iree_tf_compiler/TF",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
