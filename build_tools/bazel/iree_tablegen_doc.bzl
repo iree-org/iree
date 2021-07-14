@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl_filegroup")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_filegroup")
 
 def iree_tablegen_doc(*args, **kwargs):
     """iree_tablegen_doc() generates documentation from a table definition file.
