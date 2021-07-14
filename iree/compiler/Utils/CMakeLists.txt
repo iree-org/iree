@@ -21,6 +21,7 @@ iree_cc_library(
   SRCS
     "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
+    "TracingUtils.cpp"
   DEPS
     LLVMSupport
     MLIRIR
