@@ -22,9 +22,9 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FoldTensorExtractOp.td",
-    td_srcs = [
-        "@llvm-project//mlir:OpBaseTdFiles",
+    deps = [
         "@llvm-project//mlir:MemRefOpsTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:TensorOpsTdFiles",
     ],
 )
