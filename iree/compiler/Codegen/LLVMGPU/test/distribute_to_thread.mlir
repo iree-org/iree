@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file  -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmgpu-tile-and-distribute))" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-tile-and-distribute))' %s | IreeFileCheck %s
 
 hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.variant @cuda, target="cuda" {
@@ -123,7 +123,7 @@ hal.executable.variant @cuda, target="cuda" {
 
 // Test that non aligned sizes compile correctly.
 hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
-hal.executable.target @cuda, filter="cuda" {
+hal.executable.variant @cuda, target="cuda" {
   hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
   module  {
     func @dot_dispatch_1() attributes {llvmgpu_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
