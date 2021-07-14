@@ -24,6 +24,7 @@ iree_lit_test_suite(
             "convert_complex_to_real.mlir",
             "dynamic_shape.mlir",
             "fft.mlir",
+            "invalid_slice.mlir",
             "legalize_input_types.mlir",
             "mhlo_to_mhlo_preprocessing.mlir",
             "mhlo_to_mhlo_preprocessing_canoncalize_dot_general.mlir",

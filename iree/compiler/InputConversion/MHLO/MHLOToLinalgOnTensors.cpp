@@ -209,6 +209,49 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 };
 }  // namespace
 
+//===----------------------------------------------------------------------===//
+// mhlo.fft conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// TODO(#6402): Delete the pattern after no invalid ops are created and the
+// verifier is added. Sometimes the type infered from attributes does not match
+// to the result type. In this case, we choose to use result type to make MLIR
+// rewriting chain work.
+class SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
+ public:
+  using OpConversionPattern<mhlo::SliceOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::SliceOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const final {
+    auto loc = op.getLoc();
+    auto argType = args[0].getType().dyn_cast<ShapedType>();
+    if (!argType || !argType.hasRank()) {
+      return rewriter.notifyMatchFailure(op, "expects known-rank args");
+    }
+
+    SmallVector<OpFoldResult, 3> offsets, sizes, strides;
+    auto resultType = op.getResult().getType().cast<ShapedType>();
+    for (int i = 0, e = argType.getRank(); i < e; ++i) {
+      auto start = op.start_indices().getValue<int64_t>(i);
+      auto limit = op.limit_indices().getValue<int64_t>(i);
+      auto stride = op.strides().getValue<int64_t>(i);
+      auto size = (limit - start) / stride;
+      if (!resultType.isDynamicDim(i)) size = resultType.getDimSize(i);
+      offsets.push_back(rewriter.getI64IntegerAttr(start));
+      sizes.push_back(rewriter.getI64IntegerAttr(size));
+      strides.push_back(rewriter.getI64IntegerAttr(stride));
+    }
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(op, args[0], offsets,
+                                                        sizes, strides);
+    return success();
+  }
+};
+
+}  // namespace
+
 struct ConvertMHLOToLinalgOnTensorsPass
     : public ConvertMHLOToLinalgOnTensorsBase<
           ConvertMHLOToLinalgOnTensorsPass> {
@@ -274,10 +317,9 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
-  // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
-  //              then remove the PatternBenefit here
-  patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion>(
-      typeConverter, context, PatternBenefit(1000));
+  patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion,
+                  SliceOpConversion>(typeConverter, context,
+                                     PatternBenefit(1000));
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass() {
