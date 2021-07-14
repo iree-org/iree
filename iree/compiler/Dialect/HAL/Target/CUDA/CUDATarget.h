@@ -14,16 +14,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Options controlling the CUDA translation.
-struct CUDATargetOptions {};
-
-// Returns a CUDATargetOptions struct initialized with the
-// --iree-hal-cuda-* flags.
-CUDATargetOptions getCUDATargetOptionsFromFlags();
-
 // Registers the CUDA backends.
-void registerCUDATargetBackends(
-    std::function<CUDATargetOptions()> queryOptions);
+void registerCUDATargetBackends();
 
 }  // namespace HAL
 }  // namespace IREE

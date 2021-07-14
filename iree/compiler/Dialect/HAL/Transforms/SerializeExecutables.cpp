@@ -61,7 +61,7 @@ class SerializeTargetExecutablesPass
     auto variantOps = llvm::to_vector<4>(
         executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
-      if (variantOp.target() != targetBackend->name()) continue;
+      if (variantOp.target().getBackend().getValue() != target) continue;
       OpBuilder executableBuilder(variantOp);
       // Ask the target backend to serialize the executable. Note that it
       // may create one or more hal.executable.binary ops in the case of
@@ -69,8 +69,7 @@ class SerializeTargetExecutablesPass
       if (failed(targetBackend->serializeExecutable(variantOp,
                                                     executableBuilder))) {
         variantOp.emitError()
-            << "failed to serialize executable for target backend "
-            << targetBackend->name();
+            << "failed to serialize executable for target backend " << target;
         return signalPassFailure();
       }
       variantOp.erase();
@@ -111,8 +110,8 @@ class SerializeExecutablesPass
   void runOnOperation() override {
     auto executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
-    for (auto target : gatherExecutableTargetNames(executableOp)) {
-      passManager.addPass(createSerializeTargetExecutablesPass(target));
+    for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
+      passManager.addPass(createSerializeTargetExecutablesPass(targetName));
     }
     if (failed(runPipeline(passManager, executableOp))) {
       executableOp.emitError() << "failed to serialize executables";

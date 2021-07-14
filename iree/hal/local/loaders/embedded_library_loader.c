@@ -314,10 +314,8 @@ static bool iree_hal_embedded_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format) {
-  // TODO(benvanik): runtime configured triple. Ask the ELF loader if it can
-  // handle it.
-  return iree_string_view_equal(executable_format,
-                                iree_make_cstring_view("EX_ELF"));
+  return iree_string_view_equal(
+      executable_format, iree_make_cstring_view("embedded-elf-" IREE_ARCH));
 }
 
 static iree_status_t iree_hal_embedded_library_loader_try_load(

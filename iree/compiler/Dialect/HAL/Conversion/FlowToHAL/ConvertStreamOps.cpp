@@ -890,17 +890,18 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                                  device, rewriter);
   for (auto variantOp :
        executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>()) {
-    auto targetBackend = IREE::HAL::getTargetBackend(variantOp.target());
-    if (!targetBackend) {
-      return executableOp.emitError()
-             << "unregistered target backend '" << variantOp.target() << "'";
-    }
     auto entryPointOps =
         variantOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
-    if (entryPointOps.empty()) {
-      return dispatchOp.emitOpError() << "need at least one entry point";
+    auto entryPointIt =
+        llvm::find_if(entryPointOps, [&](IREE::HAL::ExecutableEntryPointOp op) {
+          return op.getName() == dispatchOp.entry_point().getLeafReference();
+        });
+    if (entryPointIt == entryPointOps.end()) {
+      return variantOp.emitError()
+             << "hal.executable.variant is missing the flow entry point for "
+             << dispatchOp.entry_point();
     }
-    auto entryPointOp = *entryPointOps.begin();
+    auto entryPointOp = *entryPointIt;
     auto interfaceOp =
         dyn_cast<IREE::HAL::InterfaceOp>(SymbolTable::lookupSymbolIn(
             executableOp, entryPointOp.interfaceAttr()));
@@ -909,9 +910,8 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
         interfaceOp.push_constantsAttr(),
         interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
 
-    auto *region =
-        switchRewriter.addConditionRegion(IREE::HAL::DeviceMatchIDAttr::get(
-            loc.getContext(), targetBackend->deviceID()));
+    auto *region = switchRewriter.addConditionRegion(
+        variantOp.target().getMatchExpression());
     auto &entryBlock = region->front();
     auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
 

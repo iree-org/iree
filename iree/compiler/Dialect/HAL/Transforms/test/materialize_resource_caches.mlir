@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-materialize-resource-caches %s -iree-hal-target-backends=vmvx | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-materialize-resource-caches %s | IreeFileCheck %s
 
 //      CHECK: hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout
 // CHECK-NEXT: func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
@@ -105,6 +105,8 @@ func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_s
 
 // -----
 
+module attributes {hal.device.targets = [#hal.device.target<"cpu">]} {
+
 // TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
 //   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
@@ -117,7 +119,7 @@ hal.executable @exe {
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2, set=0, binding=2, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.variant @vmvx, target="vmvx" {
+  hal.executable.variant @vmvx, target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb"> {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface0,
       ordinal = 0 : index,
@@ -145,7 +147,7 @@ hal.executable @exe {
 // CHECK: func private @_executable_exe_initializer() -> !hal.executable {
 // CHECK:   %[[DEV:.+]] = hal.ex.shared_device : !hal.device
 // CHECK:   %[[RET:.+]] = hal.device.switch<%[[DEV]] : !hal.device> -> !hal.executable
-// CHECK:   #hal.device.match.id<"vmvx"> {
+// CHECK:   #hal.device.match.executable.format<"vmvx-bytecode-fb"> {
 // CHECK:     %[[LAYOUT0:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
 // CHECK:     %[[LAYOUT0_2:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
 // CHECK:     %[[LAYOUT1:.+]] = hal.variable.load @_executable_layout_1 : !hal.executable_layout
@@ -170,4 +172,6 @@ func @exeLookup(%device : !hal.device) -> !hal.executable {
                              executable(@exe) : !hal.executable
   // CHECK-NEXT: return %[[EXE]]
   return %0 : !hal.executable
+}
+
 }

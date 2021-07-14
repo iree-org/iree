@@ -13,6 +13,7 @@
 // The build system defines one of the following top-level platforms and then
 // one platform+architecture pair for that platform.
 //
+// IREE_ARCH ("arm_32", "arm_64", etc)
 // IREE_ARCH_ARM_32
 // IREE_ARCH_ARM_64
 // IREE_ARCH_RISCV_32
@@ -60,29 +61,37 @@
     defined(__thumb__) || defined(__TARGET_ARCH_ARM) ||             \
     defined(__TARGET_ARCH_THUMB) || defined(_M_ARM)
 #if defined(__arm64) || defined(__aarch64__)
+#define IREE_ARCH "arm_64"
 #define IREE_ARCH_ARM_64 1
 #else
+#define IREE_ARCH "arm_32"
 #define IREE_ARCH_ARM_32 1
 #endif  // __arm64
 #endif  // ARM
 
 #if defined(__wasm32__)
+#define IREE_ARCH "wasm_32"
 #define IREE_ARCH_WASM_32 1
 #elif defined(__wasm64__)
+#define IREE_ARCH "wasm_64"
 #define IREE_ARCH_WASM_64 1
 #endif  // WASM
 
 #if defined(__i386__) || defined(__i486__) || defined(__i586__) || \
     defined(__i686__) || defined(__i386) || defined(_M_IX86) || defined(_X86_)
+#define IREE_ARCH "x86_32"
 #define IREE_ARCH_X86_32 1
 #elif defined(__x86_64) || defined(__x86_64__) || defined(__amd64__) || \
     defined(__amd64) || defined(_M_X64)
+#define IREE_ARCH "x86_64"
 #define IREE_ARCH_X86_64 1
 #endif  // X86
 
 #if defined(__riscv) && (__riscv_xlen == 32)
+#define IREE_ARCH "riscv_32"
 #define IREE_ARCH_RISCV_32 1
 #elif defined(__riscv) && (__riscv_xlen == 64)
+#define IREE_ARCH "riscv_64"
 #define IREE_ARCH_RISCV_64 1
 #endif
 

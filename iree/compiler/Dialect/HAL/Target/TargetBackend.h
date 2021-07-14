@@ -102,10 +102,6 @@ TargetOptions getTargetOptionsFromFlags();
 //          data blob...
 class TargetBackend {
  public:
-  // Returns a generic host-like set of constraints.
-  static BufferConstraintsAttr makeDefaultBufferConstraints(
-      MLIRContext *context);
-
   virtual ~TargetBackend() = default;
 
   // Returns a name for the backend used to differentiate between other targets.
@@ -115,44 +111,15 @@ class TargetBackend {
   // TODO(benvanik): remove this once we can properly specify targets.
   virtual std::string deviceID() const { return name(); }
 
-  // Queries for compile-time known buffer constraints.
-  // These should conservatively represent the min/max values even if the
-  // backend may support others at runtime.
-  virtual BufferConstraintsAttr queryBufferConstraints(MLIRContext *context);
-
-  // Register dependent dialects for the TargetBackend.
+  // Registers dependent dialects for the TargetBackend.
   // Mirrors the method on mlir::Pass of the same name. A TargetBackend is
   // expected to register the dialects it will create entities for (Operations,
-  // Types, Attributes) in |declareVariantOps|.
+  // Types, Attributes).
   virtual void getDependentDialects(DialectRegistry &registry) const {}
 
-  // Creates an interface representing the bindings and push constants required
-  // to dispatch the executable. Interfaces used across backends and executables
-  // will be deduplicated to reduce code size and runtime overhead and being
-  // consistent with the conventions used by the default extraction will ensure
-  // that maximum reuse is possible.
-  //
-  // TODO(benvanik): document default interface layout, when defined.
-  // TODO(benvanik): multiple interfaces.
-  // virtual IREE::HAL::InterfaceOp extractInterface(
-  //     IREE::Flow::ExecutableOp sourceOp);
-
-  // Creates zero or more hal.executable.variant ops for the target backend.
-  // The target op's inner module should be constructed with any attributes
-  // the backends wants to carry along during transformation and will later be
-  // filled in with the flow.executable's contents.
-  //
-  // A backend may decide to create multiple variants of an executable given
-  // different parameters or target device requirements. For example, if the
-  // |sourceOp| represents a reduction the backend may produce:
-  //   my-backend-v1-reduce-init
-  //   my-backend-v1-reduce-downsample-aligned
-  //   my-backend-v1-reduce-downsample-unaligned
-  //   my-backend-v1-reduce-final
-  // The `recordDispatch` implementation can then switch between these binaries
-  // as needed based on dispatch context.
-  virtual void declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
-                                 IREE::HAL::ExecutableOp executableOp);
+  // Returns the default device this backend targets.
+  virtual IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const = 0;
 
   // Inserts passes used to translate the `hal.executable.variant` op contents.
   // The pass manager will be nested on `hal.executable` such that the pipeline

@@ -1,7 +1,18 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=cuda %s | IreeFileCheck %s
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=cuda -iree-cuda-dump-ptx %s 2>&1 | IreeFileCheck %s -check-prefix=PTX
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-cuda-dump-ptx %s 2>&1 | IreeFileCheck %s -check-prefix=PTX
 
 #map = affine_map<(d0) -> (d0)>
+
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"cuda", {
+      executable_targets = [
+        #hal.executable.target<"cuda", "cuda-nvptx-fb">
+      ]
+    }>
+  ]
+} {
+
 flow.executable @add_dispatch_0 {
   flow.dispatch.entry @add_dispatch_0 attributes {
     workgroup_rank = 3 : index
@@ -23,10 +34,12 @@ flow.executable @add_dispatch_0 {
   }
 }
 
+}
+
 // PTX: .entry add_dispatch_0
 // PTX:   add.rn.f32
 // PTX:   sqrt
 
-//      CHECK:   hal.executable.binary @cuda attributes {
+//      CHECK:   hal.executable.binary @cuda_nvptx_fb attributes {
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = "PTXE"
+// CHECK-SAME:     format = "cuda-nvptx-fb"

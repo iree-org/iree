@@ -859,9 +859,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32,  //
                    rrr, ii) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_vm_buffer_t* ns = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &ns));
-  iree_string_view_t category_str = iree_vm_buffer_as_string(ns);
+  iree_vm_buffer_t* category = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &category));
+  iree_string_view_t category_str = iree_vm_buffer_as_string(category);
   iree_vm_buffer_t* key = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r2, &key));
   iree_string_view_t key_str = iree_vm_buffer_as_string(key);

@@ -58,17 +58,26 @@ class TranslateExecutableVariantsPass
 
   void runOnOperation() override {
     auto variantOp = getOperation();
+    auto targetBackend =
+        getTargetBackend(variantOp.target().getBackend().getValue());
+    if (!targetBackend) {
+      variantOp.emitError()
+          << "unregistered target backend '" << variantOp.target() << "'";
+      return signalPassFailure();
+    }
+
+    // TODO(benvanik): replace all this pipeline caching/lookup goo.
     for (auto &pipeline : pipelines_) {
-      if (variantOp.target() != pipeline.targetBackend->name()) {
-        continue;
+      if (pipeline.targetBackend->name() == targetBackend->name()) {
+        if (failed(runPipeline(*pipeline.passManager, variantOp))) {
+          variantOp.emitError()
+              << "failed to run translation of source "
+                 "executable to target executable for backend "
+              << variantOp.target();
+          return signalPassFailure();
+        }
+        break;  // Converted successfully; break out of loop.
       }
-      if (failed(runPipeline(*pipeline.passManager, variantOp))) {
-        variantOp.emitError() << "failed to run translation of source "
-                                 "executable to target executable for backend "
-                              << variantOp.target();
-        return signalPassFailure();
-      }
-      break;  // Converted successfully; break out of loop.
     }
   }
 

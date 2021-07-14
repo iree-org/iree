@@ -1,20 +1,20 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
-//      CHECK: #executable_target_vmvx_bytecode = #hal.executable.target<"vmvx-bytecode">
-//      CHECK: #executable_target_vulkan_spirv0 = #hal.executable.target<"vulkan-spirv">
-//      CHECK: #executable_target_vulkan_spirv1 = #hal.executable.target<"vulkan-spirv", {
+//      CHECK: #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+//      CHECK: #executable_target_vulkan_spirv_fb0 = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb">
+//      CHECK: #executable_target_vulkan_spirv_fb1 = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
 // CHECK-SAME:   key = "value",
 // CHECK-SAME:   property = 7 : index
 // CHECK-SAME: }>
 
 // CHECK-LABEL: executable.targets
 "executable.targets"() {
-  // CHECK-SAME: a = #executable_target_vmvx_bytecode,
-  a = #hal.executable.target<"vmvx-bytecode">,
-  // CHECK-SAME: b = #executable_target_vulkan_spirv0,
-  b = #hal.executable.target<"vulkan-spirv">,
-  // CHECK-SAME: c = #executable_target_vulkan_spirv1
-  c = #hal.executable.target<"vulkan-spirv", {
+  // CHECK-SAME: a = #executable_target_vmvx_bytecode_fb,
+  a = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">,
+  // CHECK-SAME: b = #executable_target_vulkan_spirv_fb0,
+  b = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb">,
+  // CHECK-SAME: c = #executable_target_vulkan_spirv_fb1
+  c = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
     key = "value",
     property = 7 : index
   }>

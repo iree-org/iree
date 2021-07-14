@@ -14,22 +14,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Options controlling the VM/LA translation.
-struct VMVXTargetOptions {
-  // TODO(benvanik): target configuration.
-  // We'll want things like:
-  // - what data types are we supporting (f32, f64, etc)
-  // - what version of the ISA are we targeting (v0/v1/v2)
-  // - how much scratchpad size can we use (16KB, 32KB, etc)
-};
-
-// Returns a VMVXTargetOptions struct initialized with the
-// --iree-hal-vm-la-* flags.
-VMVXTargetOptions getVMVXTargetOptionsFromFlags();
-
 // Registers the VMVX backends.
-void registerVMVXTargetBackends(
-    std::function<VMVXTargetOptions()> queryOptions);
+void registerVMVXTargetBackends();
 
 }  // namespace HAL
 }  // namespace IREE

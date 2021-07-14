@@ -38,34 +38,37 @@ namespace HAL {
 // Creates zero or more hal.executable.variant ops for each target backend.
 // The source op will contain the flow.executable contents and any attributes
 // the backend wants to carry along during transformation.
-static LogicalResult declareVariantOps(TargetOptions targetOptions,
-                                       IREE::Flow::ExecutableOp sourceOp,
+static LogicalResult declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
                                        IREE::HAL::ExecutableOp executableOp) {
-  // The user has specified what targets they want as a set of patterns. This
-  // matches against those patterns so vulkan-* may match vulkan-v1.1 and
-  // vulkan-v1.2.
-  auto targetBackends = getTargetBackends(targetOptions.targets);
-  if (targetBackends.empty()) {
-    auto diagnostic = sourceOp.emitError();
-    diagnostic
-        << "no target backends available for executable translation; ensure "
-        << "they are linked in and the target options are properly "
-        << "specified. requested = [ ";
-    for (const auto &target : targetOptions.targets) {
-      diagnostic << "'" << target << "' ";
-    }
-    diagnostic << "], available = [ ";
-    for (const auto &target : getRegisteredTargetBackends()) {
-      diagnostic << "'" << target << "' ";
-    }
-    diagnostic << "]";
-    return diagnostic;
+  // Gather a list of all #hal.executable.targets that we should produce
+  // variants for.
+  auto executableTargetAttrs =
+      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
+  if (executableTargetAttrs.empty()) {
+    return sourceOp.emitError()
+           << "no executable targets specified for translation";
   }
 
   // Materialize all of the hal.executable.variant ops for all backends we are
   // targeting. Note that each backend may create zero or more target ops.
-  for (auto &targetBackend : targetBackends) {
-    targetBackend->declareVariantOps(sourceOp, executableOp);
+  SymbolTable targetSymbolTable(executableOp);
+  OpBuilder targetBuilder(&executableOp.getBlock().back());
+  for (auto &targetAttr : executableTargetAttrs) {
+    auto targetContainerOp =
+        targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
+            sourceOp.getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
+    targetSymbolTable.insert(targetContainerOp);
+    OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
+    auto moduleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
+
+    // TODO(benvanik): something more structured here; for now we just copy over
+    // any dialect attrs from the configuration to the inner module.
+    auto configAttr = targetAttr.getConfiguration();
+    if (configAttr) {
+      for (auto item : configAttr) {
+        moduleOp->setAttr(item.first, item.second);
+      }
+    }
   }
 
   // Ensure that at least one target op got created. If it didn't that means
@@ -76,8 +79,8 @@ static LogicalResult declareVariantOps(TargetOptions targetOptions,
     auto diagnostic = sourceOp.emitError();
     diagnostic
         << "no target backend was able to handle this executable; tried = [ ";
-    for (const auto &target : targetOptions.targets) {
-      diagnostic << "'" << target << "' ";
+    for (const auto &targetAttr : executableTargetAttrs) {
+      diagnostic << targetAttr.getFormat() << " ";
     }
     diagnostic << "]";
     return diagnostic;
@@ -1112,12 +1115,11 @@ class ConverterDispatchWorkgroupInfoPattern final
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
-  explicit MaterializeInterfacesPass(TargetOptions targetOptions)
-      : targetOptions_(targetOptions) {}
+  MaterializeInterfacesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackends = getTargetBackends(targetOptions_.targets);
+    auto targetBackends = getTargetBackends(getRegisteredTargetBackends());
     for (auto &targetBackend : targetBackends) {
       targetBackend->getDependentDialects(registry);
     }
@@ -1158,7 +1160,7 @@ class MaterializeInterfacesPass
       executableOp.setVisibility(sourceOp.getVisibility());
 
       // Embed the hal.executable.variant ops for each source.
-      if (failed(declareVariantOps(targetOptions_, sourceOp, executableOp))) {
+      if (failed(declareVariantOps(sourceOp, executableOp))) {
         return signalPassFailure();
       }
 
@@ -1188,19 +1190,14 @@ class MaterializeInterfacesPass
       sourceOp.erase();
     }
   }
-
- private:
-  TargetOptions targetOptions_;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
-    TargetOptions executableOptions) {
-  return std::make_unique<MaterializeInterfacesPass>(executableOptions);
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass() {
+  return std::make_unique<MaterializeInterfacesPass>();
 }
 
 static PassRegistration<MaterializeInterfacesPass> pass([] {
-  auto options = getTargetOptionsFromFlags();
-  return std::make_unique<MaterializeInterfacesPass>(options);
+  return std::make_unique<MaterializeInterfacesPass>();
 });
 
 }  // namespace HAL

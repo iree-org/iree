@@ -36,26 +36,6 @@ TargetOptions getTargetOptionsFromFlags() {
   return targetOptions;
 }
 
-// static
-BufferConstraintsAttr TargetBackend::makeDefaultBufferConstraints(
-    MLIRContext *context) {
-  // Picked to represent what we kind of want on CPU today.
-  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
-  uint64_t minBufferOffsetAlignment = 16ull;
-  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
-  uint64_t minBufferRangeAlignment = 16ull;
-  Builder b(context);
-  return BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
-                                    b.getIndexAttr(minBufferOffsetAlignment),
-                                    b.getIndexAttr(maxBufferRange),
-                                    b.getIndexAttr(minBufferRangeAlignment));
-}
-
-BufferConstraintsAttr TargetBackend::queryBufferConstraints(
-    MLIRContext *context) {
-  return makeDefaultBufferConstraints(context);
-}
-
 // Renames |op| within |moduleOp| with a new name that is unique within both
 // |moduleOp| and |optionalSymbolTable| (if one is provided).
 static void renameWithDisambiguatedName(
@@ -78,15 +58,6 @@ static void renameWithDisambiguatedName(
   SymbolUserMap symbolUsers(symbolTable, moduleOp);
   symbolUsers.replaceAllUsesWith(op, disambiguatedName);
   SymbolTable::setSymbolName(op, disambiguatedName);
-}
-
-void TargetBackend::declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
-                                      IREE::HAL::ExecutableOp executableOp) {
-  OpBuilder targetBuilder(&executableOp.getBlock().back());
-  auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
-      sourceOp.getLoc(), name(), name());
-  OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-  containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 }
 
 // Destructively merges |sourceModuleOp| into |targetModuleOp|.
@@ -200,7 +171,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
         sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       // Only process targets matching our pattern.
-      if (variantOp.target() != name()) continue;
+      if (variantOp.target().getBackend().getValue() != name()) continue;
 
       // Clone entry point ops and queue remapping ordinals and updating
       // symbol refs.

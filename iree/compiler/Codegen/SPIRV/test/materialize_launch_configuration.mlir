@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-concretize-workgroup-tiles))" -canonicalize -cse -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-concretize-workgroup-tiles))' -canonicalize -cse -split-input-file %s | IreeFileCheck %s
 
 hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -6,7 +6,7 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm, target="llvm" {
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
     hal.executable.entry_point @matmul_tensors attributes {
       interface = @io,
       ordinal = 0 : index

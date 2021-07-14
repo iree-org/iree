@@ -72,6 +72,20 @@ bool iree_hal_executable_loader_query_support(
       executable_loader, caching_mode, executable_format);
 }
 
+bool iree_hal_query_any_executable_loader_support(
+    iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_string_view_t executable_format) {
+  IREE_ASSERT_ARGUMENT(loaders);
+  for (iree_host_size_t i = 0; i < loader_count; ++i) {
+    if (iree_hal_executable_loader_query_support(loaders[i], caching_mode,
+                                                 executable_format)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 iree_status_t iree_hal_executable_loader_try_load(
     iree_hal_executable_loader_t* executable_loader,
     const iree_hal_executable_spec_t* executable_spec,

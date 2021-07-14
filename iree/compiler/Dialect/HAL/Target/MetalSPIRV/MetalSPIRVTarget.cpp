@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
 
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/SPIRVToMSL.h"
-#include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/metal_executable_def_builder.h"
@@ -25,11 +25,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-MetalSPIRVTargetOptions getMetalSPIRVTargetOptionsFromFlags() {
-  MetalSPIRVTargetOptions targetOptions;
-  return targetOptions;
-}
-
 // TODO(antiagainst): provide a proper target environment for Metal.
 static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
   auto triple = spirv::VerCapExtAttr::get(
@@ -41,11 +36,9 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
                                    spirv::getDefaultResourceLimits(context));
 }
 
-class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
+class MetalSPIRVTargetBackend : public TargetBackend {
  public:
-  MetalSPIRVTargetBackend(MetalSPIRVTargetOptions options)
-      : SPIRVTargetBackend(SPIRVCodegenOptions()),
-        options_(std::move(options)) {}
+  MetalSPIRVTargetBackend() = default;
 
   // NOTE: we could vary this based on the options such as 'metal-v2'.
   std::string name() const override { return "metal"; }
@@ -54,10 +47,21 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     registry.insert<spirv::SPIRVDialect>();
   }
 
-  void declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
-                         IREE::HAL::ExecutableOp executableOp) override {
-    declareVariantOpsForEnv(sourceOp, executableOp,
-                            getMetalTargetEnv(sourceOp.getContext()));
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    configItems.emplace_back(b.getIdentifier("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
+  }
+
+  void buildTranslationPassPipeline(OpPassManager &passManager) override {
+    buildSPIRVCodegenPassPipeline(passManager, SPIRVCodegenOptions());
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
@@ -125,7 +129,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     // 5. Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),
-        executableBuilder.getStringAttr("MTLE"),
+        variantOp.target().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.mime_typeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
@@ -133,16 +137,38 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     return success();
   }
 
- protected:
-  MetalSPIRVTargetOptions options_;
+ private:
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    targetAttrs.push_back(
+        getExecutableTarget(context, getMetalTargetEnv(context)));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context, spirv::TargetEnvAttr targetEnv) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    configItems.emplace_back(b.getIdentifier(spirv::getTargetEnvAttrName()),
+                             targetEnv);
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::ExecutableTargetAttr::get(
+        context, b.getStringAttr("metal"), b.getStringAttr("metal-msl-fb"),
+        configAttr);
+  }
 };
 
-void registerMetalSPIRVTargetBackends(
-    std::function<MetalSPIRVTargetOptions()> queryOptions) {
+void registerMetalSPIRVTargetBackends() {
   auto backendFactory = [=]() {
-    return std::make_unique<MetalSPIRVTargetBackend>(queryOptions());
+    return std::make_unique<MetalSPIRVTargetBackend>();
   };
+  // #hal.device.target<"metal", ...
   static TargetBackendRegistration registration0("metal", backendFactory);
+  // #hal.executable.target<"metal-spirv", ...
   static TargetBackendRegistration registration1("metal-spirv", backendFactory);
 }
 

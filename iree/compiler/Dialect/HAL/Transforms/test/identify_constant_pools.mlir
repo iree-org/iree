@@ -1,4 +1,14 @@
-// RUN: iree-opt -split-input-file -iree-hal-identify-constant-pools -iree-hal-target-backends=vmvx -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-identify-constant-pools %s | IreeFileCheck %s
+
+#device_target_cpu = #hal.device.target<"cpu", {
+  buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 16, max_buffer_range = 1073741824, min_buffer_range_alignment = 16>
+}>
+#device_target_gpu = #hal.device.target<"gpu", {
+  buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 256, max_buffer_range = 134217728, min_buffer_range_alignment = 16>
+}>
+module attributes {
+  hal.device.targets = [#device_target_cpu, #device_target_gpu]
+} {
 
 //      CHECK: hal.constant_pool @_const_pool attributes
 // CHECK-SAME:     buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 256, max_buffer_range = 134217728, min_buffer_range_alignment = 16>
@@ -18,6 +28,8 @@ func @immutable_variables() -> (tensor<1xf32>, tensor<4xf32>, tensor<3xi8>) {
   // CHECK-NEXT: = hal.constant_pool.load @_const_pool::@cst2 : tensor<3xi8>
   %cst2 = flow.variable.load @cst2 : tensor<3xi8>
   return %cst0, %cst1, %cst2 : tensor<1xf32>, tensor<4xf32>, tensor<3xi8>
+}
+
 }
 
 // -----

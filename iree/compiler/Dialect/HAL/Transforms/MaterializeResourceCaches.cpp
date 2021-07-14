@@ -8,8 +8,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
@@ -207,30 +205,10 @@ class MaterializeResourceCachesPass
     DeviceSwitchBuilder switchBuilder(loc,
                                       /*resultTypes=*/TypeRange{executableType},
                                       deviceValue, blockBuilder);
-    auto targetBackends = getTargetBackends(targetOptions_.targets);
-    for (auto &targetBackend : targetBackends) {
-      // Skip executables with no matching target ops.
-      SmallVector<IREE::HAL::ExecutableVariantOp> executableVariantOps;
-      for (auto executableVariantOp :
-           executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-        if (executableVariantOp.target() == targetBackend->name()) {
-          executableVariantOps.push_back(executableVariantOp);
-        }
-      }
-      if (executableVariantOps.empty()) continue;
-
-      // TODO(benvanik): support multiple target executables by adding a device
-      // switch on supported format. This needs a new device match attr type.
-      if (executableVariantOps.size() > 1) {
-        executableOp.emitError()
-            << "multiple matching executable targets are not yet supported";
-        return nullptr;
-      }
-      auto executableVariantOp = executableVariantOps.front();
-
-      auto *region =
-          switchBuilder.addConditionRegion(IREE::HAL::DeviceMatchIDAttr::get(
-              blockBuilder.getContext(), targetBackend->deviceID()));
+    for (auto executableVariantOp :
+         executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
+      auto *region = switchBuilder.addConditionRegion(
+          executableVariantOp.target().getMatchExpression());
       auto &entryBlock = region->front();
       auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
 

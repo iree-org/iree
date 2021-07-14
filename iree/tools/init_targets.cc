@@ -38,24 +38,21 @@ void registerHALTargetBackends() {
   static bool init_once = []() {
 
 #ifdef IREE_HAVE_CUDA_TARGET
-    IREE::HAL::registerCUDATargetBackends(
-        []() { return IREE::HAL::getCUDATargetOptionsFromFlags(); });
+    IREE::HAL::registerCUDATargetBackends();
 #endif  // IREE_HAVE_CUDA_TARGET
 #ifdef IREE_HAVE_LLVMAOT_TARGET
     IREE::HAL::registerLLVMAOTTargetBackends(
         []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
 #endif  // IREE_HAVE_LLVMAOT_TARGET
 #ifdef IREE_HAVE_METALSPIRV_TARGET
-    IREE::HAL::registerMetalSPIRVTargetBackends(
-        []() { return IREE::HAL::getMetalSPIRVTargetOptionsFromFlags(); });
+    IREE::HAL::registerMetalSPIRVTargetBackends();
 #endif  // IREE_HAVE_METALSPIRV_TARGET
 #ifdef IREE_HAVE_ROCM_TARGET
     IREE::HAL::registerROCMTargetBackends(
         []() { return IREE::HAL::getROCMTargetOptionsFromFlags(); });
 #endif  // IREE_HAVE_ROCM_TARGET
 #ifdef IREE_HAVE_VMVX_TARGET
-    IREE::HAL::registerVMVXTargetBackends(
-        []() { return IREE::HAL::getVMVXTargetOptionsFromFlags(); });
+    IREE::HAL::registerVMVXTargetBackends();
 #endif  // IREE_HAVE_VMVX_TARGET
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
     IREE::HAL::registerVulkanSPIRVTargetBackends(

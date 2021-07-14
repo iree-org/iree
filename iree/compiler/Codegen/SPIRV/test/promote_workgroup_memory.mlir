@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))" -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))' -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s
 
 hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -6,7 +6,7 @@ hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "pr
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target="vulkan" {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul_promote_workgroup_memory attributes {
       interface = @io,
       ordinal = 0 : index
@@ -82,7 +82,7 @@ hal.executable @conv_promote_workgroup_memory attributes {sym_visibility = "priv
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target="vulkan" {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_promote_workgroup_memory attributes {
       interface = @io,
       ordinal = 0 : index

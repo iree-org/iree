@@ -58,7 +58,7 @@ class LinkTargetExecutablesPass
     // Ask the target backend to link all executables it wants.
     if (failed(targetBackend->linkExecutables(moduleOp))) {
       moduleOp.emitError() << "failed to link executables for target backend "
-                           << targetBackend->name();
+                           << target;
       return signalPassFailure();
     }
 
@@ -104,10 +104,8 @@ class LinkExecutablesPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
     OpPassManager passManager(moduleOp.getOperationName());
-    for (auto &targetBackend :
-         getTargetBackends(gatherExecutableTargetNames(moduleOp))) {
-      passManager.addPass(
-          createLinkTargetExecutablesPass(targetBackend->name()));
+    for (const auto &targetName : gatherExecutableTargetNames(moduleOp)) {
+      passManager.addPass(createLinkTargetExecutablesPass(targetName));
     }
     if (failed(runPipeline(passManager, moduleOp))) {
       moduleOp.emitError() << "failed to link executables";
