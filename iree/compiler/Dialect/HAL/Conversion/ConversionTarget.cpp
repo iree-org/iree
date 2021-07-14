@@ -40,7 +40,8 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
   // There are a variety of patterns which convert std.dim and std.rank ops
   // to corresponding HAL ops. All should be eliminated.
   addIllegalOp<memref::DimOp>();
-  addIllegalOp<RankOp>();
+  addIllegalOp<mlir::RankOp>();
+  addIllegalOp<tensor::DimOp>();
 
   // Metadata ops are dynamically legal if their types are legal.
   addDynamicallyLegalOp<Shape::TieShapeOp>([&](Shape::TieShapeOp op) {

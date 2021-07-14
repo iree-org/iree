@@ -200,7 +200,7 @@ class MaterializeResourceCachesPass
     OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
 
-    // Create a switch statement with a case for each backend.
+    // Create a switch statement with a case for each variant.
     // Each case should then cache only executables which contain a matching
     // ExecutableVariantOp.
     // Afterwards, canonicalization will take care of de-duping/etc.
@@ -228,13 +228,11 @@ class MaterializeResourceCachesPass
       }
       auto executableVariantOp = executableVariantOps.front();
 
-      auto *region = switchBuilder.addConditionRegion(
-          IREE::HAL::DeviceMatchIDAttr::get(targetBackend->deviceID(),
-                                            blockBuilder.getContext()),
-          {deviceValue});
+      auto *region =
+          switchBuilder.addConditionRegion(IREE::HAL::DeviceMatchIDAttr::get(
+              blockBuilder.getContext(), targetBackend->deviceID()));
       auto &entryBlock = region->front();
       auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
-      auto caseDeviceValue = entryBlock.getArgument(0);
 
       // Gather each of the executable layouts needed for each entry point in
       // the executable.
@@ -255,7 +253,7 @@ class MaterializeResourceCachesPass
       }
 
       auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
-          loc, ExecutableType::get(loc.getContext()), caseDeviceValue,
+          loc, ExecutableType::get(loc.getContext()), deviceValue,
           SymbolRefAttr::get(
               loc.getContext(), executableOp.sym_name(),
               {SymbolRefAttr::get(loc.getContext(),
@@ -266,7 +264,7 @@ class MaterializeResourceCachesPass
     }
 
     auto *defaultRegion = switchBuilder.addConditionRegion(
-        IREE::HAL::MatchAlwaysAttr::get(loc.getContext()), {});
+        IREE::HAL::MatchAlwaysAttr::get(loc.getContext()));
     auto defaultBuilder = OpBuilder::atBlockBegin(&defaultRegion->front());
     auto nullValue =
         defaultBuilder.createOrFold<IREE::NullOp>(loc, executableType);

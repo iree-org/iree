@@ -649,19 +649,14 @@ void ExecutableTargetAttr::print(DialectAsmPrinter &p) const {
   os << ">";
 }
 
-bool ExecutableTargetAttr::someMethod(unsigned idx) const {
-  // TODO(benvanik): target registry query.
-  return false;
-}
+//===----------------------------------------------------------------------===//
+// #hal.match.*
+//===----------------------------------------------------------------------===//
 
-// static
-Attribute MatchAlwaysAttr::parse(DialectAsmParser &p) {
-  return get(p.getBuilder().getContext());
-}
-
-void MatchAlwaysAttr::print(DialectAsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << getKindName();
+Value MatchAlwaysAttr::buildConditionExpression(Location loc, Value value,
+                                                OpBuilder builder) const {
+  // #hal.match.always -> true
+  return builder.createOrFold<ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
 }
 
 static ArrayAttr parseMultiMatchAttrArray(DialectAsmParser &p) {
@@ -693,93 +688,186 @@ static void printMultiMatchAttrList(ArrayAttr conditionAttrs,
 }
 
 // static
-Attribute MatchAnyAttr::parse(DialectAsmParser &p) {
-  return get(parseMultiMatchAttrArray(p));
+Attribute MatchAnyAttr::parse(MLIRContext *context, DialectAsmParser &p,
+                              Type type) {
+  return get(context, parseMultiMatchAttrArray(p));
 }
 
 void MatchAnyAttr::print(DialectAsmPrinter &p) const {
-  p << getKindName();
-  printMultiMatchAttrList(conditions().cast<ArrayAttr>(), p);
+  p << getMnemonic();
+  printMultiMatchAttrList(getConditions(), p);
+}
+
+Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
+                                             OpBuilder builder) const {
+  // #hal.match.any<[a, b, c]> -> or(or(a, b), c)
+  if (getConditions().empty()) {
+    // Empty returns false (no conditions match).
+    return builder.create<ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
+  }
+  auto conditionValues =
+      llvm::map_range(getConditions(), [&](MatchAttrInterface attr) {
+        return attr.buildConditionExpression(loc, value, builder);
+      });
+  Value resultValue;
+  for (auto conditionValue : conditionValues) {
+    resultValue = resultValue ? builder.createOrFold<OrOp>(loc, resultValue,
+                                                           conditionValue)
+                              : conditionValue;
+  }
+  return resultValue;
 }
 
 // static
-Attribute MatchAllAttr::parse(DialectAsmParser &p) {
-  return get(parseMultiMatchAttrArray(p));
+Attribute MatchAllAttr::parse(MLIRContext *context, DialectAsmParser &p,
+                              Type type) {
+  return get(context, parseMultiMatchAttrArray(p));
 }
 
 void MatchAllAttr::print(DialectAsmPrinter &p) const {
-  p << getKindName();
-  printMultiMatchAttrList(conditions().cast<ArrayAttr>(), p);
+  p << getMnemonic();
+  printMultiMatchAttrList(getConditions(), p);
+}
+
+Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
+                                             OpBuilder builder) const {
+  // #hal.match.all<[a, b, c]> -> and(and(a, b), c)
+  if (getConditions().empty()) {
+    // Empty returns true (all 0 conditions match).
+    return builder.create<ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
+  }
+  auto conditionValues =
+      llvm::map_range(getConditions(), [&](MatchAttrInterface attr) {
+        return attr.buildConditionExpression(loc, value, builder);
+      });
+  Value resultValue;
+  for (auto conditionValue : conditionValues) {
+    resultValue = resultValue ? builder.createOrFold<AndOp>(loc, resultValue,
+                                                            conditionValue)
+                              : conditionValue;
+  }
+  return resultValue;
 }
 
 // static
-Attribute DeviceMatchIDAttr::parse(DialectAsmParser &p) {
+Attribute DeviceMatchIDAttr::parse(MLIRContext *context, DialectAsmParser &p,
+                                   Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(patternAttr);
+  return get(context, patternAttr);
 }
 
 void DeviceMatchIDAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<\"";
-  os << pattern();
-  os << "\">";
+  os << getMnemonic() << "<";
+  p.printAttribute(getPattern());
+  os << ">";
+}
+
+Value DeviceMatchIDAttr::buildConditionExpression(Location loc, Value device,
+                                                  OpBuilder builder) const {
+  auto i1Type = builder.getI1Type();
+  return builder
+      .create<IREE::HAL::DeviceQueryOp>(
+          loc, i1Type, i1Type, device, builder.getStringAttr("hal.device.id"),
+          getPattern(), builder.getZeroAttr(i1Type))
+      .value();
 }
 
 // static
-Attribute DeviceMatchMemoryModelAttr::parse(DialectAsmParser &p) {
-  MemoryModelAttr memoryModelAttr;
-  if (failed(p.parseLess()) ||
-      failed(parseEnumAttr(p, "memory_model", memoryModelAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(memoryModelAttr);
-}
-
-void DeviceMatchMemoryModelAttr::print(DialectAsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << getKindName() << "<\"";
-  os << stringifyMemoryModel(memory_model());
-  os << "\">";
-}
-
-// static
-Attribute DeviceMatchFeatureAttr::parse(DialectAsmParser &p) {
+Attribute DeviceMatchFeatureAttr::parse(MLIRContext *context,
+                                        DialectAsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(patternAttr);
+  return get(context, patternAttr);
 }
 
 void DeviceMatchFeatureAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<\"";
-  os << pattern();
-  os << "\">";
+  os << getMnemonic() << "<";
+  p.printAttribute(getPattern());
+  os << ">";
+}
+
+Value DeviceMatchFeatureAttr::buildConditionExpression(
+    Location loc, Value device, OpBuilder builder) const {
+  auto i1Type = builder.getI1Type();
+  return builder
+      .create<IREE::HAL::DeviceQueryOp>(
+          loc, i1Type, i1Type, device,
+          builder.getStringAttr("hal.device.feature"), getPattern(),
+          builder.getZeroAttr(i1Type))
+      .value();
 }
 
 // static
-Attribute DeviceMatchArchitectureAttr::parse(DialectAsmParser &p) {
+Attribute DeviceMatchArchitectureAttr::parse(MLIRContext *context,
+                                             DialectAsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(patternAttr);
+  return get(context, patternAttr);
 }
 
 void DeviceMatchArchitectureAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<\"";
-  os << pattern();
-  os << "\">";
+  os << getMnemonic() << "<";
+  p.printAttribute(getPattern());
+  os << ">";
 }
+
+Value DeviceMatchArchitectureAttr::buildConditionExpression(
+    Location loc, Value device, OpBuilder builder) const {
+  auto i1Type = builder.getI1Type();
+  return builder
+      .create<IREE::HAL::DeviceQueryOp>(
+          loc, i1Type, i1Type, device,
+          builder.getStringAttr("hal.device.architecture"), getPattern(),
+          builder.getZeroAttr(i1Type))
+      .value();
+}
+
+// static
+Attribute DeviceMatchExecutableFormatAttr::parse(MLIRContext *context,
+                                                 DialectAsmParser &p,
+                                                 Type type) {
+  StringAttr patternAttr;
+  if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(context, patternAttr);
+}
+
+void DeviceMatchExecutableFormatAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getMnemonic() << "<";
+  p.printAttribute(getPattern());
+  os << ">";
+}
+
+Value DeviceMatchExecutableFormatAttr::buildConditionExpression(
+    Location loc, Value device, OpBuilder builder) const {
+  auto i1Type = builder.getI1Type();
+  return builder
+      .create<IREE::HAL::DeviceQueryOp>(
+          loc, i1Type, i1Type, device,
+          builder.getStringAttr("hal.executable.format"), getPattern(),
+          builder.getZeroAttr(i1Type))
+      .value();
+}
+
+//===----------------------------------------------------------------------===//
+// Experimental interface plumbing
+//===----------------------------------------------------------------------===//
 
 // static
 Attribute ExConstantStorageAttr::parse(DialectAsmParser &p) {
@@ -884,12 +972,9 @@ void ExResultBufferAttr::print(DialectAsmPrinter &p) const {
 void HALDialect::registerAttributes() {
   addAttributes<BufferConstraintsAttr, ByteRangeAttr,
                 DescriptorSetLayoutBindingAttr,
-                //
+                // Experimental:
                 ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
-                ExResultBufferAttr,
-                //
-                MatchAlwaysAttr, MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
-                DeviceMatchMemoryModelAttr>();
+                ExResultBufferAttr>();
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
@@ -921,20 +1006,6 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
     return ByteRangeAttr::parse(parser);
   } else if (mnemonic == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
-  } else if (mnemonic == MatchAlwaysAttr::getKindName()) {
-    return MatchAlwaysAttr::parse(parser);
-  } else if (mnemonic == MatchAnyAttr::getKindName()) {
-    return MatchAnyAttr::parse(parser);
-  } else if (mnemonic == MatchAllAttr::getKindName()) {
-    return MatchAllAttr::parse(parser);
-  } else if (mnemonic == DeviceMatchIDAttr::getKindName()) {
-    return DeviceMatchIDAttr::parse(parser);
-  } else if (mnemonic == DeviceMatchMemoryModelAttr::getKindName()) {
-    return DeviceMatchMemoryModelAttr::parse(parser);
-  } else if (mnemonic == DeviceMatchFeatureAttr::getKindName()) {
-    return DeviceMatchFeatureAttr::parse(parser);
-  } else if (mnemonic == DeviceMatchArchitectureAttr::getKindName()) {
-    return DeviceMatchArchitectureAttr::parse(parser);
   } else if (mnemonic == ExConstantStorageAttr::getKindName()) {
     return ExConstantStorageAttr::parse(parser);
   } else if (mnemonic == ExPushConstantAttr::getKindName()) {
@@ -953,13 +1024,9 @@ void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
       .Case<BufferConstraintsAttr, ByteRangeAttr,
             DescriptorSetLayoutBindingAttr,
-            //
+            // Experimental:
             ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
-            ExResultBufferAttr,
-            //
-            MatchAlwaysAttr, MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
-            DeviceMatchMemoryModelAttr>(
-          [&](auto typedAttr) { typedAttr.print(p); })
+            ExResultBufferAttr>([&](auto typedAttr) { typedAttr.print(p); })
       .Default([&](Attribute) {
         if (failed(generatedAttributePrinter(attr, p))) {
           llvm_unreachable("unhandled HAL attribute kind");

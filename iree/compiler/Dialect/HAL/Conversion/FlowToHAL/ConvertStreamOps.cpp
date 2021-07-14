@@ -679,13 +679,11 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
 
 // Records a dispatch using the given bindings attribute set populated by
 // the -iree-hal-materialize-interfaces pass.
-static void recordInterfaceBindings(Value device, Value commandBuffer,
-                                    IREE::Flow::DispatchOp &dispatchOp,
-                                    IREE::HAL::InterfaceOp &interfaceOp,
-                                    Value executableLayout,
-                                    ArrayAttr bindingsAttr,
-                                    StreamSchedulingState &schedulingState,
-                                    ConversionPatternRewriter &rewriter) {
+static void recordInterfaceBindings(
+    Value device, Value commandBuffer, IREE::Flow::DispatchOp &dispatchOp,
+    IREE::HAL::InterfaceOp &interfaceOp, Value executableLayout,
+    ArrayAttr bindingsAttr, StreamSchedulingState &schedulingState,
+    ConversionPatternRewriter &rewriter, OpBuilder &builder) {
   // Accumulate a potentially sparse set of push constants.
   // If we had canonicalizers for hal.command_buffer.push_constants then we
   // would instead just emit each constant individually and let that collapse
@@ -723,7 +721,7 @@ static void recordInterfaceBindings(Value device, Value commandBuffer,
       assert(bindingOp);
       assert(bindingOp.set().getSExtValue() == setOrdinal);
       auto storageBuffer = schedulingState.loadVariable(
-          IREE::HAL::BufferType::get(rewriter.getContext()),
+          IREE::HAL::BufferType::get(builder.getContext()),
           constantStorageAttr.storage(), rewriter);
       bindings.push_back(std::make_tuple(
           schedulingState.lookupOrCreateIndex(
@@ -760,12 +758,12 @@ static void recordInterfaceBindings(Value device, Value commandBuffer,
     }
   }
 
-  rewriter.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
+  builder.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
       dispatchOp.getLoc(), commandBuffer, executableLayout,
       schedulingState.lookupOrCreateIndex(setOrdinal, rewriter), bindings);
 
   if (!pushConstantValues.empty()) {
-    rewriter.create<IREE::HAL::CommandBufferPushConstantsOp>(
+    builder.create<IREE::HAL::CommandBufferPushConstantsOp>(
         dispatchOp.getLoc(), commandBuffer, executableLayout,
         rewriter.getIndexAttr(pushConstantBase), pushConstantValues);
   }
@@ -911,38 +909,27 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
         interfaceOp.push_constantsAttr(),
         interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
 
+    auto *region =
+        switchRewriter.addConditionRegion(IREE::HAL::DeviceMatchIDAttr::get(
+            loc.getContext(), targetBackend->deviceID()));
+    auto &entryBlock = region->front();
+    auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
+
     auto bindingsAttr = dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings");
     assert(bindingsAttr);
     recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
                             executableLayout, bindingsAttr, schedulingState,
-                            rewriter);
+                            rewriter, caseBuilder);
 
-    SmallVector<Value, 4> regionArgs;
-    regionArgs.push_back(commandBuffer);
-    for (auto dim : workgroupCount) {
-      regionArgs.push_back(dim);
-    }
-    auto *region = switchRewriter.addConditionRegion(
-        IREE::HAL::DeviceMatchIDAttr::get(targetBackend->deviceID(),
-                                          loc.getContext()),
-        regionArgs);
-    auto &entryBlock = region->front();
-    auto caseCommandBuffer = entryBlock.getArgument(0);
-    SmallVector<Value, 3> originalWorkgroupCount;
-    for (int i = 0; i < workgroupCount.size(); ++i) {
-      originalWorkgroupCount.push_back(entryBlock.getArgument(1 + i));
-    }
-
-    auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
     auto entryPointSymRef = caseBuilder.getSymbolRefAttr(
         executableOp.getName(),
         {caseBuilder.getSymbolRefAttr(entryPointOp->getParentOp()),
          caseBuilder.getSymbolRefAttr(entryPointOp)});
-    auto remappedWorkgroupCount = calculateDispatchWorkgroupCount(
-        loc, executableOp, entryPointOp, originalWorkgroupCount, caseBuilder);
+    auto caseWorkgroupCount = calculateDispatchWorkgroupCount(
+        loc, executableOp, entryPointOp, workgroupCount, caseBuilder);
     caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-        loc, caseCommandBuffer, entryPointSymRef, remappedWorkgroupCount[0],
-        remappedWorkgroupCount[1], remappedWorkgroupCount[2]);
+        loc, commandBuffer, entryPointSymRef, caseWorkgroupCount[0],
+        caseWorkgroupCount[1], caseWorkgroupCount[2]);
 
     caseBuilder.create<IREE::HAL::ReturnOp>(loc);
   }

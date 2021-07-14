@@ -71,19 +71,23 @@ def HAL_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
   ];
 }
 
-def HAL_ExecutableTargetAttrInterface :
-    AttrInterface<"ExecutableTargetAttrInterface"> {
+def HAL_MatchAttrInterface :
+    AttrInterface<"MatchAttrInterface"> {
   let description = [{
-    An attribute that specifies a compilation target for device executables.
-    Attributes conforming to this interface are queried throughout the HAL
-    transformation pipeline for their target capabilities and to provide
-    translation, linking, and serialization pipelines.
+    An attribute that can be used in `hal.*.match.*` expressions.
+    Each attribute defines some subexpression that can be expanded to one or
+    more operations that performs the actual query and matching logic.
   }];
 
   let methods = [
     InterfaceMethod<
-      [{TODO}],
-      "bool", "someMethod", (ins "unsigned":$idx)
+      [{
+        Builds a set of operations that evaluate to a boolean (i1) value
+        indicating whether the expression tree represented by the match
+        attribute is true for the given value.
+      }],
+      "Value", "buildConditionExpression",
+      (ins "Location":$loc, "Value":$value, "OpBuilder":$builder)
     >,
   ];
 }

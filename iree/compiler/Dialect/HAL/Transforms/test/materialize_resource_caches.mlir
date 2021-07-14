@@ -143,9 +143,9 @@ hal.executable @exe {
 
 // CHECK: hal.variable @_executable_exe init(@_executable_exe_initializer) : !hal.executable
 // CHECK: func private @_executable_exe_initializer() -> !hal.executable {
-// CHECK:   %[[IN_DEV:.+]] = hal.ex.shared_device : !hal.device
-// CHECK:   %[[RET:.+]] = hal.device.switch<%[[IN_DEV]] : !hal.device> -> !hal.executable
-// CHECK:   #hal.device.match.id<"vmvx">(%[[DEV:.+]] = %[[IN_DEV]] : !hal.device) {
+// CHECK:   %[[DEV:.+]] = hal.ex.shared_device : !hal.device
+// CHECK:   %[[RET:.+]] = hal.device.switch<%[[DEV]] : !hal.device> -> !hal.executable
+// CHECK:   #hal.device.match.id<"vmvx"> {
 // CHECK:     %[[LAYOUT0:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
 // CHECK:     %[[LAYOUT0_2:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
 // CHECK:     %[[LAYOUT1:.+]] = hal.variable.load @_executable_layout_1 : !hal.executable_layout
@@ -156,7 +156,7 @@ hal.executable @exe {
 // CHECK-SAME:  : !hal.executable
 // CHECK:     hal.return %[[EXE]] : !hal.executable
 // CHECK:   },
-// CHECK:   #hal.match.always() {
+// CHECK:   #hal.match.always {
 // CHECK:     %[[NULL:.+]] = iree.null : !hal.executable
 // CHECK:     hal.return %[[NULL]] : !hal.executable
 // CHECK:   }
