@@ -71,4 +71,21 @@ def HAL_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
   ];
 }
 
+def HAL_ExecutableTargetAttrInterface :
+    AttrInterface<"ExecutableTargetAttrInterface"> {
+  let description = [{
+    An attribute that specifies a compilation target for device executables.
+    Attributes conforming to this interface are queried throughout the HAL
+    transformation pipeline for their target capabilities and to provide
+    translation, linking, and serialization pipelines.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      [{TODO}],
+      "bool", "someMethod", (ins "unsigned":$idx)
+    >,
+  ];
+}
+
 #endif  // IREE_DIALECT_HAL_INTERFACES

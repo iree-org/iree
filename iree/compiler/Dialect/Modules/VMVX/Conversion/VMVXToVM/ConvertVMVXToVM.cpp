@@ -65,8 +65,11 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
                      << importFqName;
       return failure();
     }
-    return rewriteToCall(op, Adaptor{operands}, importOp, typeConverter,
-                         rewriter);
+    auto results =
+        rewriteToCall(op, Adaptor{operands}, importOp, typeConverter, rewriter);
+    if (!results.hasValue()) return failure();
+    rewriter.replaceOp(op, results.getValue());
+    return success();
   }
 
  protected:

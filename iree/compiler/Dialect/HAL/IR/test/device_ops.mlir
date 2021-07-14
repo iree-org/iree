@@ -57,7 +57,7 @@ func @device_matchers(%device : !hal.device) -> i1 {
 // CHECK-LABEL: @device_query
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
 func @device_query(%device : !hal.device) -> (i1, i32) {
-  // CHECK: = hal.device.query<%[[DEVICE]] : !hal.device> key("foo") : i1, i32
-  %ok, %value = hal.device.query<%device : !hal.device> key("foo") : i1, i32
+  // CHECK: = hal.device.query<%[[DEVICE]] : !hal.device> key("sys" :: "foo") : i1, i32
+  %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i32
   return %ok, %value : i1, i32
 }

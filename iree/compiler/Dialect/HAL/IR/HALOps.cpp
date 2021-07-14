@@ -1059,6 +1059,20 @@ void DeviceAllocatorOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.device.query
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDeviceQueryOp(DeviceQueryOp op) {
+  if (op.default_value().hasValue()) {
+    if (op.default_value()->getType() != op.value().getType()) {
+      return op.emitOpError()
+             << "type mismatch between result and default value";
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.device.switch
 //===----------------------------------------------------------------------===//
 
@@ -1336,32 +1350,28 @@ static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable.target
+// hal.executable.variant
 //===----------------------------------------------------------------------===//
 
-void ExecutableTargetOp::build(OpBuilder &builder, OperationState &state,
-                               StringRef symName,
-                               StringRef targetBackendFilter) {
+void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
+                                StringRef symName, StringRef target) {
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
-  state.addAttribute("target_backend_filter",
-                     builder.getStringAttr(targetBackendFilter));
+  state.addAttribute("target", builder.getStringAttr(target));
 }
 
-static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
-                                           OperationState *result) {
+static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
+                                            OperationState *result) {
   auto *body = result->addRegion();
   StringAttr nameAttr;
-  StringAttr targetBackendFilterAttr;
+  StringAttr targetAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("filter")) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("target")) ||
       failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(targetBackendFilterAttr,
-                                   "target_backend_filter",
-                                   result->attributes)) ||
+      failed(parser.parseAttribute(targetAttr, "target", result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -1372,19 +1382,18 @@ static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
   }
 
   // Ensure that this module has a valid terminator.
-  ExecutableTargetOp::ensureTerminator(*body, parser.getBuilder(),
-                                       result->location);
+  ExecutableVariantOp::ensureTerminator(*body, parser.getBuilder(),
+                                        result->location);
   return success();
 }
 
-static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
+static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
-  p << ", filter=\"" << op.target_backend_filter() << "\"";
+  p << ", target=\"" << op.target() << "\"";
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(),
-                       "target_backend_filter"});
+      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(), "target"});
   if (!op.body().empty()) {
     p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/false);

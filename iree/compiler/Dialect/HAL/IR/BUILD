@@ -44,10 +44,15 @@ cc_library(
     hdrs = [
         "HALDialect.h",
         "HALOps.h",
+        "HALTraits.h",
         "HALTypes.h",
         "LoweringConfig.h",
     ],
     textual_hdrs = [
+        "HALAttrs.cpp.inc",
+        "HALAttrs.h.inc",
+        "HALAttrInterfaces.cpp.inc",
+        "HALAttrInterfaces.h.inc",
         "HALEnums.cpp.inc",
         "HALEnums.h.inc",
         "HALOpInterfaces.cpp.inc",
@@ -108,6 +113,14 @@ cc_library(
 gentbl_cc_library(
     name = "HALInterfacesGen",
     tbl_outs = [
+        (
+            ["-gen-attr-interface-decls"],
+            "HALAttrInterfaces.h.inc",
+        ),
+        (
+            ["-gen-attr-interface-defs"],
+            "HALAttrInterfaces.cpp.inc",
+        ),
         (
             ["-gen-op-interface-decls"],
             "HALOpInterfaces.h.inc",
@@ -185,6 +198,14 @@ gentbl_cc_library(
 gentbl_cc_library(
     name = "HALTypesGen",
     tbl_outs = [
+        (
+            ["-gen-attrdef-decls"],
+            "HALAttrs.h.inc",
+        ),
+        (
+            ["-gen-attrdef-defs"],
+            "HALAttrs.cpp.inc",
+        ),
         (
             ["-gen-enum-decls"],
             "HALEnums.h.inc",

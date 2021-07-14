@@ -84,11 +84,11 @@ int dimensionToIndex(StringRef dimension) {
 
 IREE::HAL::ReturnOp getEntryPointReturnOp(Operation *op) {
   auto funcOp = op->getParentOfType<FuncOp>();
-  auto targetOp =
-      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
+  auto variantOp =
+      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
 
   IREE::HAL::ExecutableEntryPointOp entryPointOp;
-  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+  for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
       entryPointOp = op;
       break;
@@ -281,7 +281,7 @@ void populateFoldGPUProcessorIDUsesPatterns(
   AffineMinOp::getCanonicalizationPatterns(patterns, context);
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVFoldProcessorIDUsesPass() {
   return std::make_unique<SPIRVFoldProcessorIDUsesPass>();
 }
