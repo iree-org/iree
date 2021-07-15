@@ -325,41 +325,6 @@ void RankedDimsOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// shapex.from_extent_tensor
-//===----------------------------------------------------------------------===//
-
-LogicalResult fromExtentTensorOfToExtentTensorIsIdentity(
-    FromExtentTensorOp op, FromExtentTensorOp::Adaptor operands,
-    PatternRewriter &rewriter) {
-  auto toOp =
-      dyn_cast_or_null<ToExtentTensorOp>(op.extent_tensor().getDefiningOp());
-  if (!toOp) {
-    return failure();
-  }
-  rewriter.replaceOp(op, toOp.shape());
-  return success();
-}
-
-LogicalResult fromExtentTensorOfCastIndexBypass(
-    FromExtentTensorOp op, FromExtentTensorOp::Adaptor operands,
-    PatternRewriter &rewriter) {
-  auto toOp = dyn_cast_or_null<IndexCastOp>(op.extent_tensor().getDefiningOp());
-  if (!toOp) {
-    return failure();
-  }
-
-  rewriter.replaceOpWithNewOp<FromExtentTensorOp>(op, op.getType(), toOp.in());
-  return success();
-}
-
-void FromExtentTensorOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertGreedyPattern(patterns, context,
-                      fromExtentTensorOfToExtentTensorIsIdentity);
-  insertGreedyPattern(patterns, context, fromExtentTensorOfCastIndexBypass);
-}
-
-//===----------------------------------------------------------------------===//
 // Standard folding and canonicalization conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -400,9 +365,6 @@ void populateFoldConversionPatterns(MLIRContext *context,
   insertConversionPattern(patterns, context, identityMakeRankedShapePattern);
   insertConversionPattern(patterns, context, elideStaticGetRankedShapePattern);
   insertConversionPattern(patterns, context, safeCastCompatibleShapePattern);
-  insertConversionPattern(patterns, context,
-                          fromExtentTensorOfToExtentTensorIsIdentity);
-  insertConversionPattern(patterns, context, fromExtentTensorOfCastIndexBypass);
 }
 
 }  // namespace Shape
