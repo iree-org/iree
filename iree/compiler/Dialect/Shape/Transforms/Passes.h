@@ -9,7 +9,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Dialect/Shape/IR/ShapeInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
