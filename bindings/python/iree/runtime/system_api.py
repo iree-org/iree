@@ -50,7 +50,7 @@ DEFAULT_IREE_DRIVER_VALUE = "dylib,vulkan,vmvx"
 TARGET_BACKEND_TO_DRIVER = {
     "dylib-llvm-aot": "dylib",
     "vmvx": "vmvx",
-    "vulkan-*": "vulkan",
+    "vulkan-spirv": "vulkan",
 }
 
 

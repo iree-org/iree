@@ -86,8 +86,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
         options_(std::move(options)) {}
 
   // NOTE: we could vary these based on the options such as 'vulkan-v1.1'.
-  std::string name() const override { return "vulkan_spirv"; }
-  std::string filter_pattern() const override { return "vulkan*"; }
+  std::string name() const override { return "vulkan"; }
 
   BufferConstraintsAttr queryBufferConstraints(MLIRContext *context) override {
     // Picked from here to start:
@@ -109,17 +108,17 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     registry.insert<Vulkan::VulkanDialect, spirv::SPIRVDialect>();
   }
 
-  void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                        IREE::HAL::ExecutableOp executableOp) override {
+  void declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
+                         IREE::HAL::ExecutableOp executableOp) override {
     spirv::TargetEnvAttr spvTargetEnv =
         getSPIRVTargetEnv(options_.vulkanTargetEnv, options_.vulkanTargetTriple,
                           sourceOp.getContext());
-    declareTargetOpsForEnv(sourceOp, executableOp, spvTargetEnv);
+    declareVariantOpsForEnv(sourceOp, executableOp, spvTargetEnv);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
-    ModuleOp innerModuleOp = targetOp.getInnerModule();
+    ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
 
     FlatbufferBuilder builder;
@@ -129,7 +128,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     // final flatbuffer.
     SmallVector<uint32_t, 256> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
-      return targetOp.emitError() << "failed to serialize spv.module";
+      return variantOp.emitError() << "failed to serialize spv.module";
     }
     auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
                                                     spvBinary.size());
@@ -149,7 +148,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(),
+        variantOp.getLoc(), variantOp.sym_name(),
         executableBuilder.getStringAttr("SPVE"),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.mime_typeAttr(
@@ -165,9 +164,12 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
 void registerVulkanSPIRVTargetBackends(
     std::function<VulkanSPIRVTargetOptions()> queryOptions) {
   getVulkanSPIRVTargetOptionsFromFlags();
-  static TargetBackendRegistration registration("vulkan-spirv", [=]() {
+  auto backendFactory = [=]() {
     return std::make_unique<VulkanSPIRVTargetBackend>(queryOptions());
-  });
+  };
+  static TargetBackendRegistration registration0("vulkan", backendFactory);
+  static TargetBackendRegistration registration1("vulkan-spirv",
+                                                 backendFactory);
 }
 
 }  // namespace HAL

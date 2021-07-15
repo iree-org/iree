@@ -587,7 +587,8 @@ static Attribute convertConstIntegerValue(Attribute value) {
   if (value.isa<UnitAttr>()) {
     return IntegerAttr::get(integerType, APInt(SZ, 1));
   } else if (auto v = value.dyn_cast<BoolAttr>()) {
-    return IntegerAttr::get(integerType, APInt(SZ, v.getValue() ? 1 : 0));
+    return IntegerAttr::get(integerType,
+                            APInt(SZ, v.getValue() ? 1 : 0, false));
   } else if (auto v = value.dyn_cast<IntegerAttr>()) {
     return IntegerAttr::get(integerType,
                             APInt(SZ, v.getValue().getLimitedValue()));
@@ -769,6 +770,7 @@ static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
+      failed(parser.parseOptionalAttrDict(result->attributes)) ||
       failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
     return failure();
   }
@@ -786,6 +788,11 @@ static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   }
 
   p.printSymbolName(op.sym_name());
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
+                              visibilityAttrName,
+                              "sym_name",
+                              "value",
+                          });
   p << ' ';
   p.printAttribute(op.value());
 }

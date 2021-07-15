@@ -17,6 +17,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "Conversion.cpp"
+    "DeduplicateRodata.cpp"
     "GlobalInitialization.cpp"
     "HoistInlinedRodata.cpp"
     "OrdinalAllocation.cpp"

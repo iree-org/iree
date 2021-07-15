@@ -23,25 +23,10 @@ struct PassTracing : public PassInstrumentation {
   ~PassTracing() override = default;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  // Note: we could also trace pipelines and analyses.
-
-  void runBeforePass(Pass *pass, Operation *op) override {
-    IREE_TRACE_ZONE_BEGIN_EXTERNAL(z0, __FILE__, strlen(__FILE__), __LINE__,
-                                   pass->getName().data(),
-                                   pass->getName().size(), NULL, 0);
-    passTraceZonesStack.push_back(z0);
-  }
-  void runAfterPass(Pass *pass, Operation *op) override {
-    IREE_TRACE_ZONE_END(passTraceZonesStack.back());
-    passTraceZonesStack.pop_back();
-  }
-  void runAfterPassFailed(Pass *pass, Operation *op) override {
-    IREE_TRACE_ZONE_END(passTraceZonesStack.back());
-    passTraceZonesStack.pop_back();
-  }
+  void runBeforePass(Pass *pass, Operation *op) override;
+  void runAfterPass(Pass *pass, Operation *op) override;
+  void runAfterPassFailed(Pass *pass, Operation *op) override;
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
-  llvm::SmallVector<iree_zone_id_t, 8> passTraceZonesStack;
 };
 
 }  // namespace iree_compiler

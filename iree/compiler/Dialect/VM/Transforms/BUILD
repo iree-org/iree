@@ -14,6 +14,7 @@ cc_library(
     name = "Transforms",
     srcs = [
         "Conversion.cpp",
+        "DeduplicateRodata.cpp",
         "GlobalInitialization.cpp",
         "HoistInlinedRodata.cpp",
         "OrdinalAllocation.cpp",

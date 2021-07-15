@@ -37,25 +37,6 @@ func @ranked_dim(%arg0 : !shapex.ranked_shape<[2,4]>)  {
 }
 
 // -----
-// CHECK-LABEL: @ranked_dims
-func @ranked_dims(%arg0 : !shapex.ranked_shape<[2,4]>)  {
-  // CHECK: shapex.ranked_dims %arg0 : !shapex.ranked_shape<[2,4]> -> i32, i32
-  %0:2 = shapex.ranked_dims %arg0 : !shapex.ranked_shape<[2,4]> -> i32, i32
-  return
-}
-
-// -----
-// CHECK-LABEL: @cast_compatible_shape
-func @cast_compatible_shape(%arg0 : !shapex.ranked_shape<[2,4]>, %arg1 : !shapex.ranked_shape<[2,4]>)  {
-  // CHECK: shapex.cast_compatible_shape %arg0, %arg1 :
-  // CHECK-SAME: !shapex.ranked_shape<[2,4]>, !shapex.ranked_shape<[2,4]> ->
-  // CHECK-SAME: !shapex.ranked_shape<[2,4]>
-  %0 = shapex.cast_compatible_shape %arg0, %arg1 : !shapex.ranked_shape<[2,4]>, !shapex.ranked_shape<[2,4]> ->
-      !shapex.ranked_shape<[2,4]>
-  return
-}
-
-// -----
 // CHECK-LABEL: @make_ranked_shape
 func @make_ranked_shape(%arg0 : index, %arg1 : index) -> (!shapex.ranked_shape<[1,?,?,16]>) {
   // CHECK: shapex.make_ranked_shape %arg0, %arg1 : (index, index) -> !shapex.ranked_shape<[1,?,?,16]>

@@ -17,6 +17,7 @@ cc_library(
     srcs = [
         "FlatbufferUtils.cpp",
         "GraphUtils.cpp",
+        "TracingUtils.cpp",
     ],
     hdrs = [
         "FlatbufferUtils.h",

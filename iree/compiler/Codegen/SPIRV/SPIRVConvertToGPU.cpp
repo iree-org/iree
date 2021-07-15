@@ -677,7 +677,7 @@ void SPIRVConvertToGPUPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVConvertToGPUPass() {
   return std::make_unique<SPIRVConvertToGPUPass>();
 }

@@ -20,17 +20,15 @@ if(${IREE_ENABLE_EMITC})
       "TranslationRegistration.cpp"
     DEPS
       LLVMSupport
-      MLIRTargetCpp
       MLIRIR
       MLIRPass
       MLIRSupport
+      emitc::TranslateToCpp
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Conversion::VMToEmitC
       iree::compiler::Dialect::VM::Utils::CallingConvention
       iree::compiler::Dialect::VM::Utils::ConstantEncoding
-    INCLUDES
-      "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
     PUBLIC
   )
 endif()

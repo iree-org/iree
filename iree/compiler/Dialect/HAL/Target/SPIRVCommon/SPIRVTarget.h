@@ -24,9 +24,9 @@ class SPIRVTargetBackend : public TargetBackend {
  public:
   explicit SPIRVTargetBackend(SPIRVCodegenOptions options);
 
-  void declareTargetOpsForEnv(IREE::Flow::ExecutableOp sourceOp,
-                              IREE::HAL::ExecutableOp executableOp,
-                              spirv::TargetEnvAttr spvTargetEnv);
+  void declareVariantOpsForEnv(IREE::Flow::ExecutableOp sourceOp,
+                               IREE::HAL::ExecutableOp executableOp,
+                               spirv::TargetEnvAttr spvTargetEnv);
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override;
 

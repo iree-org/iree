@@ -29,7 +29,7 @@ cc_library(
         "PropagateConstantWorkgroupInfo.cpp",
         "ResolveEntryPointOrdinals.cpp",
         "SerializeExecutables.cpp",
-        "TranslateExecutables.cpp",
+        "TranslateExecutableVariants.cpp",
     ],
     hdrs = [
         "Passes.h",

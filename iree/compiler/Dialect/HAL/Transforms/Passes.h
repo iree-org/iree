@@ -68,26 +68,33 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions targetOptions);
 
 // Propagates hal.interface.workload.* information when constant.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createPropagateConstantWorkgroupInfoPass();
 
-// Translates hal.executable.target ops via a nested translation pipeline.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createTranslateExecutablesPass(TargetOptions targetOptions);
+// Translates hal.executable.variant ops via a nested translation pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createTranslateExecutableVariantsPass();
 
 // Calls into each target backend to have it link multiple hal.executables
 // together (if that makes sense). For example, the LLVM AOT backend may combine
 // all executable targets for the same architecture into a single executable and
 // link it as a shared library.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass(
-    TargetOptions targetOptions);
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass();
+
+// Links executables for the specified |target| backend.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkTargetExecutablesPass(
+    StringRef target);
 
 // Resolves hal.executable.entry_point references to ordinals.
 std::unique_ptr<OperationPass<ModuleOp>> createResolveEntryPointOrdinalsPass();
 
-// Converts hal.executable.target ops to hal.executable.binary ops.
+// Converts hal.executable.variants to one or more hal.executable.binary ops.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass(TargetOptions targetOptions);
+createSerializeExecutablesPass();
+
+// Serializes executables for the specified |target| backend.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createSerializeTargetExecutablesPass(StringRef target);
 
 //===----------------------------------------------------------------------===//
 // Resource initialization, caching, and optimization
@@ -137,10 +144,12 @@ inline void registerHALPasses() {
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
-  createTranslateExecutablesPass(targetOptions);
-  createLinkExecutablesPass(targetOptions);
+  createTranslateExecutableVariantsPass();
+  createLinkExecutablesPass();
+  createLinkTargetExecutablesPass("");
   createResolveEntryPointOrdinalsPass();
-  createSerializeExecutablesPass(targetOptions);
+  createSerializeExecutablesPass();
+  createSerializeTargetExecutablesPass("");
   createIdentifyConstantPoolsPass(targetOptions);
   createPackConstantPoolStoragePass();
   createMaterializeConstantPoolBuffersPass();

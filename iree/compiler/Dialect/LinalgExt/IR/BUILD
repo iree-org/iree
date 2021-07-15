@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -16,7 +16,7 @@ package(
 
 exports_files(["LinalgExtBase.td"])
 
-filegroup(
+td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
@@ -27,6 +27,11 @@ filegroup(
         ],
         include = ["*.td"],
     ),
+    deps = [
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SideEffectTdFiles",
+    ],
 )
 
 cc_library(
@@ -76,12 +81,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtOps.td",
-    td_srcs = [
-        ":td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:SideEffectTdFiles",
-        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
-    ],
+    deps = [":td_files"],
 )
 
 gentbl_cc_library(
@@ -98,10 +98,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtInterfaces.td",
-    td_srcs = [
-        ":td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-    ],
+    deps = [":td_files"],
 )
 
 iree_tablegen_doc(
@@ -114,12 +111,7 @@ iree_tablegen_doc(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtOps.td",
-    td_srcs = [
-        ":td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:SideEffectTdFiles",
-        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
-    ],
+    deps = [":td_files"],
 )
 
 gentbl_cc_library(
@@ -136,9 +128,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "TiledOpInterface.td",
-    td_srcs = [
-        "@llvm-project//mlir:OpBaseTdFiles",
-    ],
+    deps = [":td_files"],
 )
 
 cc_library(

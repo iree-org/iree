@@ -24,79 +24,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Given a #hal.match.* expression tree returns a boolean value indicating
-// whether the expression evaluates to true.
-static Value buildConditionExpression(Location loc, Value device,
-                                      Attribute conditionAttr,
-                                      OpBuilder funcBuilder) {
-  if (auto matchAttr = conditionAttr.dyn_cast<IREE::HAL::MatchAlwaysAttr>()) {
-    // #hal.match.always -> true
-    return funcBuilder.createOrFold<ConstantIntOp>(loc, 1, 1);
-  } else if (auto matchAttr =
-                 conditionAttr.dyn_cast<IREE::HAL::MatchAnyAttr>()) {
-    // #hal.match.any<[a, b, c]> -> or(or(a, b), c)
-    auto conditionAttrs = matchAttr.conditions().cast<ArrayAttr>();
-    auto conditionValues =
-        llvm::to_vector<4>(llvm::map_range(conditionAttrs, [&](Attribute attr) {
-          return buildConditionExpression(loc, device, attr, funcBuilder);
-        }));
-    Value resultValue = conditionValues[0];
-    for (int i = 1; i < conditionValues.size(); ++i) {
-      resultValue =
-          funcBuilder.createOrFold<OrOp>(loc, resultValue, conditionValues[i]);
-    }
-    return resultValue;
-  } else if (auto matchAttr =
-                 conditionAttr.dyn_cast<IREE::HAL::MatchAllAttr>()) {
-    // #hal.match.all<[a, b, c]> -> and(and(a, b), c)
-    auto conditionAttrs = matchAttr.conditions().cast<ArrayAttr>();
-    auto conditionValues =
-        llvm::to_vector<4>(llvm::map_range(conditionAttrs, [&](Attribute attr) {
-          return buildConditionExpression(loc, device, attr, funcBuilder);
-        }));
-    Value resultValue = conditionValues[0];
-    for (int i = 1; i < conditionValues.size(); ++i) {
-      resultValue =
-          funcBuilder.createOrFold<AndOp>(loc, resultValue, conditionValues[i]);
-    }
-    return resultValue;
-  } else if (auto matchAttr =
-                 conditionAttr.dyn_cast<IREE::HAL::DeviceMatchIDAttr>()) {
-    // #hal.device.match.id<"pattern"> -> hal.device.match.id
-    return funcBuilder.createOrFold<IREE::HAL::DeviceMatchIDOp>(
-        loc, funcBuilder.getI1Type(), device, matchAttr.patternAttr());
-  } else if (auto matchAttr =
-                 conditionAttr
-                     .dyn_cast<IREE::HAL::DeviceMatchMemoryModelAttr>()) {
-    // #hal.device.match.memory_model<"Unified"> ->
-    //     hal.device.match.memory_model
-    return funcBuilder.createOrFold<IREE::HAL::DeviceMatchMemoryModelOp>(
-        loc, funcBuilder.getI1Type(), device, matchAttr.memory_modelAttr());
-  }
-  llvm_unreachable("unhandled condition expression attribute");
-  return {};
-}
-
 // Inlines a condition region from a switch op into the function at the given
 // point. This assumes that the insertion point will only be reached if the
 // condition the region is predicated on is true.
-static void inlineConditionRegion(OperandRange regionArgs,
-                                  Region &conditionRegion, Block *exitBlock,
+static void inlineConditionRegion(Region &conditionRegion, Block *exitBlock,
                                   OpBuilder funcBuilder) {
   assert(!conditionRegion.empty() && "source regions must not be empty");
-
-  // Remap arguments from the function values captured by the switch into the
-  // entry block arguments for the region.
-  auto &entryBlock = conditionRegion.front();
-  assert(regionArgs.size() == entryBlock.getNumArguments() &&
-         "switch capture args must match region args");
-  for (auto argPair : llvm::zip(regionArgs, entryBlock.getArguments())) {
-    auto outerValue = std::get<0>(argPair);
-    auto innerValue = std::get<1>(argPair);
-    assert(outerValue.getType() == innerValue.getType() &&
-           "capture arg types must match");
-    innerValue.replaceAllUsesWith(outerValue);
-  }
+  assert(conditionRegion.front().getNumArguments() == 0 && "switch does not capture");
 
   // Splice in the region blocks.
   auto *insertBlock = funcBuilder.getBlock();
@@ -159,23 +93,17 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
   }
 
   funcBuilder.setInsertionPoint(beforeBlock, beforeBlock->end());
-  int argOffset = 0;
   for (auto condition : llvm::enumerate(llvm::zip(
            switchOp.conditions().getValue(), switchOp.condition_regions()))) {
-    auto conditionAttr = std::get<0>(condition.value());
+    auto conditionAttr =
+        std::get<0>(condition.value()).cast<IREE::HAL::MatchAttrInterface>();
     auto &conditionRegion = std::get<1>(condition.value());
-
-    // Get the arguments from the switch that we want to carry along in the
-    // block arguments.
-    auto regionOperands = conditionRegion.getArguments();
-    auto regionArgs = switchOp.args().slice(argOffset, regionOperands.size());
-    argOffset += regionOperands.size();
 
     // Insert the branch based on the match. We either match and jump to a
     // block that will contain the inlined region or don't match and need to
     // fall through.
-    auto isMatch = buildConditionExpression(
-        switchOp.getLoc(), switchOp.device(), conditionAttr, funcBuilder);
+    auto isMatch = conditionAttr.buildConditionExpression(
+        switchOp.getLoc(), switchOp.device(), funcBuilder);
     auto *matchBlock = conditionMatchBlocks[condition.index()];
     auto *fallthroughBlock = conditionFallthroughBlocks[condition.index()];
     funcBuilder.create<CondBranchOp>(switchOp.getLoc(), isMatch, matchBlock,
@@ -183,7 +111,7 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
 
     // Block that contains the inlined region and then jumps out of the chain.
     funcBuilder.setInsertionPointToStart(matchBlock);
-    inlineConditionRegion(regionArgs, conditionRegion, afterBlock, funcBuilder);
+    inlineConditionRegion(conditionRegion, afterBlock, funcBuilder);
 
     // Block that we enter to check the next condition.
     funcBuilder.setInsertionPointToStart(fallthroughBlock);
