@@ -228,6 +228,9 @@ int main(int argc, char **argv) {
           << "Running iree-import-tf pass pipeline failed (see diagnostics)\n";
       return 2;
     }
+    if (!saveTempMidLevelImport.empty()) {
+      if (failed(saveToFile(saveTempMidLevelImport))) return 10;
+    }
   }
   {
     PassManager pm(&context, PassManager::Nesting::Implicit);
@@ -237,9 +240,6 @@ int main(int argc, char **argv) {
       llvm::errs()
           << "Running iree-import-tf pass pipeline failed (see diagnostics)\n";
       return 2;
-    }
-    if (!saveTempMidLevelImport.empty()) {
-      if (failed(saveToFile(saveTempMidLevelImport))) return 10;
     }
   }
 
