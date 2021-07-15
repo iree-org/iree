@@ -66,17 +66,19 @@ class ExecutableCreateOpConversion
                             ->getParentOfType<IREE::HAL::ExecutableOp>();
     auto insertPoint = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(funcOp);
+    std::string rodataName = (StringRef("_") + executableOp.getName() + "_" +
+                              executableBinaryOp.getName() + "_binary")
+                                 .str();
+    std::replace(rodataName.begin(), rodataName.end(), '-', '_');
     auto rodataOp = rewriter.create<IREE::VM::RodataOp>(
-        executableBinaryOp.getLoc(),
-        (StringRef("_") + executableOp.getName() + "_" +
-         executableBinaryOp.getName() + "_binary_" +
-         executableBinaryOp.format().lower())
-            .str(),
-        executableBinaryOp.data());
+        executableBinaryOp.getLoc(), rodataName, executableBinaryOp.data());
     rodataOp.setPrivate();
     if (executableBinaryOp.mime_type().hasValue()) {
       rodataOp.mime_typeAttr(executableBinaryOp.mime_typeAttr());
     }
+    // TODO(benvanik): should these be page aligned? memcpy fastpath is fine for
+    // now.
+    rodataOp.alignmentAttr(rewriter.getI64IntegerAttr(16));
     rewriter.restoreInsertionPoint(insertPoint);
 
     auto executableFormatString = detail::rewriteAttrToOperands(

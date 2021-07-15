@@ -17,6 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "deduplicate_rodata.mlir",
             "global_initialization.mlir",
             "hoist_inlined_rodata.mlir",
             "ordinal_allocation.mlir",

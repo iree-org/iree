@@ -770,6 +770,7 @@ static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
+      failed(parser.parseOptionalAttrDict(result->attributes)) ||
       failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
     return failure();
   }
@@ -787,6 +788,11 @@ static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   }
 
   p.printSymbolName(op.sym_name());
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
+                              visibilityAttrName,
+                              "sym_name",
+                              "value",
+                          });
   p << ' ';
   p.printAttribute(op.value());
 }
