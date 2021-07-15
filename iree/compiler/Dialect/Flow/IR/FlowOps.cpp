@@ -1242,15 +1242,12 @@ static LogicalResult verifyTensorUpdateOp(TensorUpdateOp op) {
 
 Value TensorUpdateOp::buildOperandRankedShape(unsigned idx,
                                               OpBuilder &builder) {
-  switch (idx) {
-    case 0:
-      return Shape::buildRankedShapeForValue(getLoc(), update(), update_dims(),
-                                             builder);
-    case 2:
-      return Shape::buildRankedShapeForValue(getLoc(), target(), target_dims(),
-                                             builder);
-    default:
-      llvm_unreachable("unshaped operand");
+  if (idx == 0) {
+    return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
+                                                 target_dims(), builder);
+  } else {
+    return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
+                                                 update_dims(), builder);
   }
 }
 

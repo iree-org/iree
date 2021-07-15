@@ -55,34 +55,6 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
 Value TieShapeOp::getViewSource() { return operand(); }
 
 //===----------------------------------------------------------------------===//
-// shapex.cast_compatible_shape
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyCastCompatibleShapeOp(CastCompatibleShapeOp op) {
-  if (op.operands().empty()) {
-    return op.emitOpError() << "Must have at least one operand";
-  }
-
-  auto resultRs = op.result().getType().dyn_cast<RankedShapeType>();
-  if (resultRs) {
-    // TODO(laurenzo): Expand this to check true compatibility instead of
-    // just equality.
-    // Casting to a ranked shape.
-    for (auto operandType : op.getOperandTypes()) {
-      auto operandRs = operandType.dyn_cast<RankedShapeType>();
-      if (!operandRs || operandRs != resultRs) {
-        return op.emitOpError()
-               << "Incompatible static shape cast: " << operandRs << " -> "
-               << resultRs;
-      }
-    }
-    return success();
-  }
-
-  return failure();
-}
-
-//===----------------------------------------------------------------------===//
 // shapex.get_ranked_shape
 //===----------------------------------------------------------------------===//
 
@@ -207,24 +179,6 @@ static LogicalResult verifyRankedDimOp(RankedDimOp op) {
     return op.emitOpError() << "index out of bounds of shape";
   }
   return success();
-}
-
-//===----------------------------------------------------------------------===//
-// shapex.ranked_dims
-//===----------------------------------------------------------------------===//
-
-void RankedDimsOp::build(OpBuilder &builder, OperationState &result,
-                         Type dimType, Value shape) {
-  result.addOperands(shape);
-  auto rankedShapeType = shape.getType().cast<RankedShapeType>();
-  for (int i = 0; i < rankedShapeType.getRank(); ++i) {
-    result.types.push_back(dimType);
-  }
-}
-
-void RankedDimsOp::build(OpBuilder &builder, OperationState &result,
-                         Value shape) {
-  RankedDimsOp::build(builder, result, builder.getIndexType(), shape);
 }
 
 }  // namespace Shape
