@@ -27,7 +27,7 @@ struct TiledOp {
 
 /// Main entry point for tiling LinalgExtOps using TiledOpInterface.  If the
 /// `op` does not implement the `TiledOpInterface` returns a `TiledOp{}` value.
-FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, LinalgExtOp op,
+FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, Operation *op, ValueRange dest,
                                    const linalg::LinalgTilingOptions &options);
 
 }  // namespace linalg_ext
