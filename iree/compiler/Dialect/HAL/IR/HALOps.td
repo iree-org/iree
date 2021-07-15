@@ -1769,7 +1769,10 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   ];
 }
 
-def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [IsolatedFromAbove]> {
+def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [
+    NoRegionArguments,
+    RecursiveSideEffects,
+  ]> {
   let summary = [{runtime device switch pseudo op}];
   let description = [{
     Switches between multiple regions based on the runtime device type.
@@ -1824,8 +1827,7 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [IsolatedFromAbove]> {
 
   let arguments = (ins
     HAL_Device:$device,
-    ArrayAttr:$conditions,
-    Variadic<AnyType>:$args
+    ArrayAttr:$conditions
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -1839,15 +1841,9 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [IsolatedFromAbove]> {
       "TypeRange":$resultTypes,
       "Value":$device,
       "ArrayRef<Attribute>":$conditions,
-      "ArrayRef<SmallVector<Value, 4>>":$conditionArgs,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
     )>,
   ];
-
-  let extraClassDeclaration = [{
-    /// Returns the index of the args() operand in the Operation operands list.
-    unsigned mapArgOperandToOpOperand(unsigned i) { return i + 1; }
-  }];
 
 
   let verifier = [{ return verifyDeviceSwitchOp(*this); }];
@@ -1873,130 +1869,6 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
       build($_builder, $_state, llvm::None);
     }]>,
   ];
-}
-
-def HAL_DeviceMatchIDOp :
-    HAL_PureOp<"device.match.id", [HAL_DeviceQuery]> {
-  let summary = [{returns true if the device ID matches the pattern}];
-  let description = [{
-    Pattern matches the device ID with the given wildcard pattern.
-    This can be used to conditionally evaluate device-specific code when the
-    device is not known at compile-time.
-
-    ```mlir
-    %is_match = hal.device.match.id<%device : !hal.device>
-                            pattern("vulkan-*") : i1
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    StrAttr:$pattern
-  );
-  let results = (outs
-    I1:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $device `:` type($device) `>`
-    `pattern` `(` $pattern `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_DeviceMatchMemoryModelOp :
-    HAL_PureOp<"device.match.memory_model", [HAL_DeviceQuery]> {
-  let summary = [{returns true if the device memory model matches the value}];
-  let description = [{
-    Compares the device's memory model against the specified model.
-    This can be used to conditionally evaluate device-specific code when the
-    device is not known at compile-time.
-
-    ```mlir
-    %is_match = hal.device.match.memory_model<%device : !hal.device>
-                                        value("Unified") : i1
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    HAL_MemoryModelAttr:$model
-  );
-  let results = (outs
-    I1:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $device `:` type($device) `>`
-    `value` `(` $model `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_DeviceMatchFeatureOp :
-    HAL_PureOp<"device.match.feature", [HAL_DeviceQuery]> {
-  let summary = [{returns true if the device supports the provided feature}];
-  let description = [{
-    Matches a feature pattern against the given device, returning true if the
-    feature is reported as supported. This can be used to conditionally evaluate
-    device-specific code when the device is not known at compile-time.
-
-    The feature patterns supported are device backend dependent.
-
-    ```mlir
-    %is_match = hal.device.match.feature<%device : !hal.device>
-                                 pattern("some-feature-v*") : i1
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    StrAttr:$pattern
-  );
-  let results = (outs
-    I1:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $device `:` type($device) `>`
-    `pattern` `(` $pattern `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_DeviceMatchArchitectureOp :
-    HAL_PureOp<"device.match.architecture", [HAL_DeviceQuery]> {
-  let summary = [{returns true if the device matches the given architecture}];
-  let description = [{
-    Matches an architecture pattern against the given device, returning true if
-    the architecture is compatible. This can be used to conditionally evaluate
-    device-specific code when the device is not known at compile-time.
-
-    The architecture patterns supported are device backend dependent.
-
-    ```mlir
-    %is_match = hal.device.match.architecture<%device : !hal.device>
-                                      pattern("aarch64-*") : i1
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    StrAttr:$pattern
-  );
-  let results = (outs
-    I1:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $device `:` type($device) `>`
-    `pattern` `(` $pattern `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
 }
 
 def HAL_DeviceQueryOp :

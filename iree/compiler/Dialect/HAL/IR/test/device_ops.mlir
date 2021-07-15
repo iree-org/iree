@@ -21,35 +21,25 @@ func @device_switch(%device: !hal.device) -> i32 {
   %c2 = constant 2 : i32
   // CHECK: = hal.device.switch<%[[DEVICE]] : !hal.device> -> i32
   %0 = hal.device.switch<%device : !hal.device> -> i32
-    // CHECK-NEXT: #hal.device.match.id<"vulkan-v1.?-*">(%[[C1A:.+]] = %[[C1]] : i32) {
-    #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
-      // CHECK-NEXT: hal.return %[[C1A]] : i32
-      hal.return %c1a : i32
+    // CHECK-NEXT: #hal.device.match.id<"vulkan-v1.?-*"> {
+    #hal.device.match.id<"vulkan-v1.?-*"> {
+      // CHECK-NEXT: hal.return %[[C1]] : i32
+      hal.return %c1 : i32
       // CHECK-NEXT: },
     },
-    // CHECK-NEXT: #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]>(%[[C2A:.+]] = %[[C2]] : i32) {
-    #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
-      // CHECK-NEXT: hal.return %[[C2A]] : i32
-      hal.return %c2a : i32
+    // CHECK-NEXT: #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
+    #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
+      // CHECK-NEXT: hal.return %[[C2]] : i32
+      hal.return %c2 : i32
       // CHECK-NEXT: },
     },
-    // CHECK-NEXT: #hal.match.always(%[[C0A:.+]] = %[[C0]] : i32) {
-    #hal.match.always(%c0a = %c0 : i32) {
-      // CHECK-NEXT: hal.return %[[C0A]] : i32
-      hal.return %c0a : i32
+    // CHECK-NEXT: #hal.match.always {
+    #hal.match.always {
+      // CHECK-NEXT: hal.return %[[C0]] : i32
+      hal.return %c0 : i32
       // CHECK-NEXT: }
     }
   return %0 : i32
-}
-
-// -----
-
-// CHECK-LABEL: @device_matchers
-// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func @device_matchers(%device : !hal.device) -> i1 {
-  // CHECK: = hal.device.match.id<%[[DEVICE]] : !hal.device> pattern("vulkan-*") : i1
-  %0 = hal.device.match.id<%device : !hal.device> pattern("vulkan-*") : i1
-  return %0 : i1
 }
 
 // -----

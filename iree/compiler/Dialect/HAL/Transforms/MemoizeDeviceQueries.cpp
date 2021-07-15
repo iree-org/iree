@@ -22,54 +22,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-namespace {
-
-// TODO(benvanik): make this an interface pattern instead to allow for
-// backend-specific query ops.
-template <typename T>
-class DeviceMatchPatternExpansion : public OpRewritePattern<T> {
- public:
-  DeviceMatchPatternExpansion(MLIRContext *context, StringRef queryNamespace)
-      : OpRewritePattern<T>(context), queryNamespace(queryNamespace) {}
-
-  LogicalResult matchAndRewrite(T op,
-                                PatternRewriter &rewriter) const override {
-    auto queryOp = rewriter.create<IREE::HAL::DeviceQueryOp>(
-        op.getLoc(), rewriter.getI1Type(), rewriter.getI1Type(), op.device(),
-        rewriter.getStringAttr(queryNamespace), op.patternAttr(),
-        rewriter.getZeroAttr(rewriter.getI1Type()));
-    rewriter.replaceOp(op, {queryOp.value()});
-    return success();
-  }
-
- private:
-  StringRef queryNamespace;
-};
-
-}  // namespace
-
-// Expands various hal.device.match.* ops to their lowered query form.
-// This allows the memoization logic to deal with the simpler case of
-// hal.device.query.
-//
-// We have the hal.device.match.* ops so that we can perform global
-// optimizations and simplifications based on the semantics of the query, while
-// once this runs and we have just the raw query ops we are only able to assume
-// equality (vs. target-aware ranges/etc).
-static LogicalResult expandMatchOps(ModuleOp moduleOp) {
-  auto *context = moduleOp.getContext();
-  OwningRewritePatternList patterns(context);
-  patterns.insert<
-      DeviceMatchPatternExpansion<IREE::HAL::DeviceMatchArchitectureOp>>(
-      context, "hal.device.architecture");
-  patterns.insert<DeviceMatchPatternExpansion<IREE::HAL::DeviceMatchFeatureOp>>(
-      context, "hal.device.feature");
-  patterns.insert<DeviceMatchPatternExpansion<IREE::HAL::DeviceMatchIDOp>>(
-      context, "hal.device.id");
-  FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-  return applyPatternsAndFoldGreedily(moduleOp, frozenPatterns);
-}
-
 // NOTE: this implementation is just for a single active device. As we start to
 // support multiple devices we'll need to change this to be per-device.
 class MemoizeDeviceQueriesPass
@@ -85,11 +37,6 @@ class MemoizeDeviceQueriesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-
-    // Expand hal.device.match.* ops to hal.device.query ops.
-    if (failed(expandMatchOps(moduleOp))) {
-      return signalPassFailure();
-    }
 
     // Find all query ops we want to memoize and group them together.
     // This lets us easily replace all usages of a match with a single variable.
