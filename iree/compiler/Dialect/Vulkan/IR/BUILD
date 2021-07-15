@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -13,7 +13,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-filegroup(
+td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
@@ -22,6 +22,7 @@ filegroup(
         ],
         include = ["*.td"],
     ),
+    deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 cc_library(
@@ -65,10 +66,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VulkanAttributes.td",
-    td_srcs = [
-        ":td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-    ],
+    deps = [":td_files"],
 )
 
 gentbl_cc_library(
@@ -85,8 +83,5 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VulkanBase.td",
-    td_srcs = [
-        ":td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-    ],
+    deps = [":td_files"],
 )

@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -14,12 +14,17 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-filegroup(
+td_library(
     name = "td_files",
     srcs = enforce_glob(
         ["CheckOps.td"],
         include = ["*.td"],
     ),
+    deps = [
+        "//iree/compiler/Dialect/HAL/IR:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
 )
 
 cc_library(
@@ -75,12 +80,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CheckOps.td",
-    td_srcs = [
-        ":td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "//iree/compiler/Dialect/HAL/IR:td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-    ],
+    deps = [":td_files"],
 )
 
 iree_tablegen_doc(
@@ -93,10 +93,5 @@ iree_tablegen_doc(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CheckOps.td",
-    td_srcs = [
-        ":td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "//iree/compiler/Dialect/HAL/IR:td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-    ],
+    deps = [":td_files"],
 )
