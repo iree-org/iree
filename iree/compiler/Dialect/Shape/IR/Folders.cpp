@@ -23,29 +23,7 @@ namespace Shape {
 // Canonicalization
 //===----------------------------------------------------------------------===//
 
-LogicalResult safeCastCompatibleShapePattern(
-    CastCompatibleShapeOp op, CastCompatibleShapeOp::Adaptor operands,
-    PatternRewriter &rewriter) {
-  // TODO(laurenzo): This is just eliding if everything is the same. Make
-  // it generic.
-  auto resultRs = op.result().getType().dyn_cast<RankedShapeType>();
-  if (resultRs) {
-    // Casting to a ranked shape.
-    for (auto operand : operands.operands()) {
-      auto operandType = operand.getType();
-      auto operandRs = operandType.dyn_cast<RankedShapeType>();
-      if (!operandRs || operandRs != resultRs) {
-        return failure();
-      }
-    }
-    rewriter.replaceOp(op, operands.operands()[0]);
-    return success();
-  }
-
-  return failure();
-}
-
-LogicalResult elideShapeCarryingGetRankedShapePattern(
+static LogicalResult elideShapeCarryingGetRankedShapePattern(
     GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   auto carryingOp = dyn_cast_or_null<ShapeCarryingInterface>(
@@ -59,7 +37,7 @@ LogicalResult elideShapeCarryingGetRankedShapePattern(
   return success();
 }
 
-LogicalResult elideDuplicateGetRankedShapePattern(
+static LogicalResult elideDuplicateGetRankedShapePattern(
     GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   // If the immediate predecessor is a GetRankedShapeOp, then this op can be
@@ -72,7 +50,7 @@ LogicalResult elideDuplicateGetRankedShapePattern(
   return success();
 }
 
-LogicalResult elideStaticGetRankedShapePattern(
+static LogicalResult elideStaticGetRankedShapePattern(
     GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   auto operandType = operands.operand().getType().dyn_cast<RankedTensorType>();
@@ -85,7 +63,7 @@ LogicalResult elideStaticGetRankedShapePattern(
   return success();
 }
 
-LogicalResult identityMakeRankedShapePattern(
+static LogicalResult identityMakeRankedShapePattern(
     MakeRankedShapeOp op, MakeRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   if (operands.dynamic_dimensions().empty()) {
@@ -143,18 +121,17 @@ LogicalResult identityMakeRankedShapePattern(
 // using the individual SSA values. This naturally produces a lot of unused
 // shapex.make_ranked_shape ops which we need to delete for legality reasons.
 // This pattern allows conversions to erase those ops.
-LogicalResult eraseUnusedMakeRankedShapeOp(MakeRankedShapeOp op,
-                                           MakeRankedShapeOp::Adaptor operands,
-                                           PatternRewriter &rewriter) {
+static LogicalResult eraseUnusedMakeRankedShapeOp(
+    MakeRankedShapeOp op, MakeRankedShapeOp::Adaptor operands,
+    PatternRewriter &rewriter) {
   if (!op.getResult().use_empty())
     return rewriter.notifyMatchFailure(op, "op has uses");
   rewriter.eraseOp(op);
   return success();
 }
 
-LogicalResult dynamicMakeRankedShapeDimPattern(RankedDimOp op,
-                                               RankedDimOp::Adaptor operands,
-                                               PatternRewriter &rewriter) {
+static LogicalResult dynamicMakeRankedShapeDimPattern(
+    RankedDimOp op, RankedDimOp::Adaptor operands, PatternRewriter &rewriter) {
   // If the immediate predecessor is a MakeRankedShapeOp, then this op can be
   // erased in favor of the corresponding input to that op.
   auto shapeInput = operands.shape();
@@ -182,23 +159,9 @@ LogicalResult dynamicMakeRankedShapeDimPattern(RankedDimOp op,
   return success();
 }
 
-LogicalResult expandRankedShapeDimsPattern(RankedDimsOp op,
-                                           RankedDimsOp::Adaptor operands,
-                                           PatternRewriter &rewriter) {
-  auto shapeInput = operands.shape();
-  auto rsType = shapeInput.getType().cast<RankedShapeType>();
-  SmallVector<Value, 4> dims(rsType.getRank());
-  for (int i = 0; i < rsType.getRank(); ++i) {
-    dims[i] = rewriter.createOrFold<RankedDimOp>(
-        op.getLoc(), op.getResult(i).getType(), shapeInput, i);
-  }
-  rewriter.replaceOp(op, dims);
-  return success();
-}
-
-LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
-                                            TieShapeOp::Adaptor operands,
-                                            PatternRewriter &rewriter) {
+static LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
+                                                   TieShapeOp::Adaptor operands,
+                                                   PatternRewriter &rewriter) {
   // If the immediate predecessor is a TieShapeOp, then it can be possible
   // to merge these. This can often happen when function/block tie_shape
   // placeholders are inserted prior to materializing later parts of the
@@ -219,7 +182,7 @@ LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
 }
 
 // Removes tie_shape ops when the operand is produced by a shape-aware op.
-LogicalResult elideShapeCarryingOperandTieShapePattern(
+static LogicalResult elideShapeCarryingOperandTieShapePattern(
     TieShapeOp op, TieShapeOp::Adaptor operands, PatternRewriter &rewriter) {
   auto definingOp = operands.operand().getDefiningOp();
   if (!definingOp) return failure();
@@ -234,9 +197,9 @@ LogicalResult elideShapeCarryingOperandTieShapePattern(
 }
 
 // Reroutes uses of tie_shape ops by ops that are shape-aware or dim ops.
-LogicalResult elideTieShapeUsagePattern(TieShapeOp op,
-                                        TieShapeOp::Adaptor operands,
-                                        PatternRewriter &rewriter) {
+static LogicalResult elideTieShapeUsagePattern(TieShapeOp op,
+                                               TieShapeOp::Adaptor operands,
+                                               PatternRewriter &rewriter) {
   bool didAnything = false;
   for (auto &use : llvm::make_early_inc_range(op.result().getUses())) {
     if (auto carryingOp = dyn_cast<ShapeCarryingInterface>(use.getOwner())) {
@@ -264,15 +227,6 @@ void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
   insertGreedyPattern(patterns, context,
                       elideShapeCarryingOperandTieShapePattern);
   insertGreedyPattern(patterns, context, elideTieShapeUsagePattern);
-}
-
-//===----------------------------------------------------------------------===//
-// shapex.cast_compatible_shape
-//===----------------------------------------------------------------------===//
-
-void CastCompatibleShapeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertGreedyPattern(patterns, context, safeCastCompatibleShapePattern);
 }
 
 //===----------------------------------------------------------------------===//
@@ -316,15 +270,6 @@ void RankedDimOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// shapex.ranked_dims
-//===----------------------------------------------------------------------===//
-
-void RankedDimsOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertGreedyPattern(patterns, context, expandRankedShapeDimsPattern);
-}
-
-//===----------------------------------------------------------------------===//
 // Standard folding and canonicalization conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -361,10 +306,8 @@ void populateFoldConversionPatterns(MLIRContext *context,
   insertConversionPattern(patterns, context, elideTieShapeUsagePattern);
   insertConversionPattern(patterns, context,
                           elideShapeCarryingGetRankedShapePattern);
-  insertConversionPattern(patterns, context, expandRankedShapeDimsPattern);
   insertConversionPattern(patterns, context, identityMakeRankedShapePattern);
   insertConversionPattern(patterns, context, elideStaticGetRankedShapePattern);
-  insertConversionPattern(patterns, context, safeCastCompatibleShapePattern);
 }
 
 }  // namespace Shape

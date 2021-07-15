@@ -62,34 +62,6 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape", [
   let hasCanonicalizer = 1;
 }
 
-def Shape_CastCompatibleShapeOp : Shape_PureOp<"cast_compatible_shape"> {
-  let summary = "Casts and asserts that one or more shapes are compatible.";
-  let description = [{
-    In the most general case, each operand and the result can have different
-    shapes, so long as:
-      a) The operand shapes are co-compatible (known dimensions are equal
-         or unknown).
-      b) The result shape is at least as general as the operand shapes.
-
-    TODO: This op is currently very conservative, statically verifying that
-    all of the shapes are strictly the same.
-
-    Usage:
-      %0 = shapex.cast_compatible_shape %1, ... %3 :
-          !shapex.ranked_shape<...>...
-  }];
-
-  let arguments = (ins Variadic<Shape_RankedShape>:$operands);
-  let results = (outs Shape_RankedShape:$result);
-
-  let assemblyFormat = [{
-    operands `:` type(operands) `->` type($result) attr-dict
-  }];
-
-  let verifier = [{ return verify$cppClass(*this); }];
-  let hasCanonicalizer = 1;
-}
-
 def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
   let summary = "Gets the RankedShape associated with the given Tensor.";
   let description = [{
@@ -222,34 +194,6 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
     }
   }];
   let hasFolder = 1;
-  let hasCanonicalizer = 1;
-}
-
-def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims"> {
-  let summary = "Gets all dimension values from a ranked_shape.";
-  let description = [{
-    Static dimensions will fold to constants.
-
-    Usage:
-      %0 = shapex.const ranked_shape : !shapex.ranked_shape<[1,2]>
-      %1, %2 = shapex.ranked_dims %0 : !shapex.ranked_shape<[1,2]> -> (i32, i32)
-  }];
-
-  let arguments = (ins Shape_RankedShape:$shape);
-  let results = (outs Variadic<Shape_DimType>:$result);
-
-  let assemblyFormat = "$shape `:` type($shape) `->` type($result) attr-dict";
-
-  let builders = [
-    OpBuilder<(ins "Type":$dimType, "Value":$shape)>,
-    OpBuilder<(ins "Value":$shape)>,
-  ];
-
-  let extraClassDeclaration = [{
-    RankedShapeType getRankedShapeType() {
-      return shape().getType().cast<RankedShapeType>();
-    }
-  }];
   let hasCanonicalizer = 1;
 }
 
