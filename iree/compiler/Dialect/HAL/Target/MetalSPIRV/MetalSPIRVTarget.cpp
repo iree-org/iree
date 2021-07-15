@@ -48,22 +48,21 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
         options_(std::move(options)) {}
 
   // NOTE: we could vary this based on the options such as 'metal-v2'.
-  std::string name() const override { return "metal_spirv"; }
-  std::string filter_pattern() const override { return "metal*"; }
+  std::string name() const override { return "metal"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
   }
 
-  void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                        IREE::HAL::ExecutableOp executableOp) override {
-    declareTargetOpsForEnv(sourceOp, executableOp,
-                           getMetalTargetEnv(sourceOp.getContext()));
+  void declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
+                         IREE::HAL::ExecutableOp executableOp) override {
+    declareVariantOpsForEnv(sourceOp, executableOp,
+                            getMetalTargetEnv(sourceOp.getContext()));
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
-    ModuleOp innerModuleOp = targetOp.getInnerModule();
+    ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
 
     // The runtime use ordinals instead of names but Metal requires function
@@ -77,7 +76,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     // 1. Serialize the spirv::ModuleOp into binary format.
     SmallVector<uint32_t, 0> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary))) {
-      return targetOp.emitError() << "failed to serialize spv.module";
+      return variantOp.emitError() << "failed to serialize spv.module";
     }
 
     // 2. Cross compile SPIR-V to MSL source code.
@@ -87,7 +86,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
           // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
           llvm::makeArrayRef(spvBinary.data(), spvBinary.size()), entryPoint);
       if (!mslShader) {
-        return targetOp.emitError()
+        return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";
       }
       mslShaders.push_back(std::move(*mslShader));
@@ -125,7 +124,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
 
     // 5. Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(),
+        variantOp.getLoc(), variantOp.sym_name(),
         executableBuilder.getStringAttr("MTLE"),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.mime_typeAttr(
@@ -140,9 +139,11 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
 
 void registerMetalSPIRVTargetBackends(
     std::function<MetalSPIRVTargetOptions()> queryOptions) {
-  static TargetBackendRegistration registration("metal-spirv", [=]() {
+  auto backendFactory = [=]() {
     return std::make_unique<MetalSPIRVTargetBackend>(queryOptions());
-  });
+  };
+  static TargetBackendRegistration registration0("metal", backendFactory);
+  static TargetBackendRegistration registration1("metal-spirv", backendFactory);
 }
 
 }  // namespace HAL

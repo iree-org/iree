@@ -32,7 +32,7 @@ iree_cc_library(
     "PropagateConstantWorkgroupInfo.cpp"
     "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
-    "TranslateExecutables.cpp"
+    "TranslateExecutableVariants.cpp"
   DEPS
     LLVMSupport
     MLIRAffineToStandard

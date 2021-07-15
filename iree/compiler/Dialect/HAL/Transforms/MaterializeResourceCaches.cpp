@@ -200,49 +200,45 @@ class MaterializeResourceCachesPass
     OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
 
-    // Create a switch statement with a case for each backend.
+    // Create a switch statement with a case for each variant.
     // Each case should then cache only executables which contain a matching
-    // ExecutableTargetOp.
+    // ExecutableVariantOp.
     // Afterwards, canonicalization will take care of de-duping/etc.
     DeviceSwitchBuilder switchBuilder(loc,
                                       /*resultTypes=*/TypeRange{executableType},
                                       deviceValue, blockBuilder);
-    auto targetBackends = matchTargetBackends(targetOptions_.targets);
+    auto targetBackends = getTargetBackends(targetOptions_.targets);
     for (auto &targetBackend : targetBackends) {
       // Skip executables with no matching target ops.
-      SmallVector<IREE::HAL::ExecutableTargetOp> executableTargetOps;
-      for (auto executableTargetOp :
-           executableOp.getOps<IREE::HAL::ExecutableTargetOp>()) {
-        if (TargetBackend::matchPattern(
-                executableTargetOp.target_backend_filter(),
-                targetBackend->filter_pattern())) {
-          executableTargetOps.push_back(executableTargetOp);
+      SmallVector<IREE::HAL::ExecutableVariantOp> executableVariantOps;
+      for (auto executableVariantOp :
+           executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
+        if (executableVariantOp.target() == targetBackend->name()) {
+          executableVariantOps.push_back(executableVariantOp);
         }
       }
-      if (executableTargetOps.empty()) continue;
+      if (executableVariantOps.empty()) continue;
 
       // TODO(benvanik): support multiple target executables by adding a device
       // switch on supported format. This needs a new device match attr type.
-      if (executableTargetOps.size() > 1) {
+      if (executableVariantOps.size() > 1) {
         executableOp.emitError()
             << "multiple matching executable targets are not yet supported";
         return nullptr;
       }
-      auto executableTargetOp = executableTargetOps.front();
+      auto executableVariantOp = executableVariantOps.front();
 
-      auto *region = switchBuilder.addConditionRegion(
-          IREE::HAL::DeviceMatchIDAttr::get(targetBackend->filter_pattern(),
-                                            blockBuilder.getContext()),
-          {deviceValue});
+      auto *region =
+          switchBuilder.addConditionRegion(IREE::HAL::DeviceMatchIDAttr::get(
+              blockBuilder.getContext(), targetBackend->deviceID()));
       auto &entryBlock = region->front();
       auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
-      auto caseDeviceValue = entryBlock.getArgument(0);
 
       // Gather each of the executable layouts needed for each entry point in
       // the executable.
       SmallVector<Value, 8> executableLayoutValues;
       for (auto entryPointOp :
-           executableTargetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+           executableVariantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
         auto interfaceOp =
             SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
                 executableOp, entryPointOp.interface());
@@ -257,18 +253,18 @@ class MaterializeResourceCachesPass
       }
 
       auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
-          loc, ExecutableType::get(loc.getContext()), caseDeviceValue,
+          loc, ExecutableType::get(loc.getContext()), deviceValue,
           SymbolRefAttr::get(
               loc.getContext(), executableOp.sym_name(),
               {SymbolRefAttr::get(loc.getContext(),
-                                  executableTargetOp.sym_name())}),
+                                  executableVariantOp.sym_name())}),
           executableLayoutValues);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);
     }
 
     auto *defaultRegion = switchBuilder.addConditionRegion(
-        IREE::HAL::MatchAlwaysAttr::get(loc.getContext()), {});
+        IREE::HAL::MatchAlwaysAttr::get(loc.getContext()));
     auto defaultBuilder = OpBuilder::atBlockBegin(&defaultRegion->front());
     auto nullValue =
         defaultBuilder.createOrFold<IREE::NullOp>(loc, executableType);

@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
-load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
+load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -16,7 +16,7 @@ package(
 
 exports_files(["ShapeBase.td"])
 
-filegroup(
+td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
@@ -26,6 +26,14 @@ filegroup(
         ],
         include = ["*.td"],
     ),
+    deps = [
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SideEffectTdFiles",
+        "@llvm-project//mlir:StdOpsTdFiles",
+        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
+    ],
 )
 
 cc_library(
@@ -34,7 +42,6 @@ cc_library(
         "Builders.cpp",
         "Folders.cpp",
         "ShapeDialect.cpp",
-        "ShapeInterface.cpp",
         "ShapeInterfaces.cpp.inc",
         "ShapeOps.cpp",
         "ShapeOps.cpp.inc",
@@ -43,7 +50,6 @@ cc_library(
     hdrs = [
         "Builders.h",
         "ShapeDialect.h",
-        "ShapeInterface.h",
         "ShapeInterfaces.h.inc",
         "ShapeOps.h",
         "ShapeOps.h.inc",
@@ -82,12 +88,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ShapeInterfaces.td",
-    td_srcs = [
-        ":td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:StdOpsTdFiles",
-        "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
-    ],
+    deps = [":td_files"],
 )
 
 gentbl_cc_library(
@@ -104,15 +105,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ShapeOps.td",
-    td_srcs = [
-        ":td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
-        "@llvm-project//mlir:SideEffectTdFiles",
-        "@llvm-project//mlir:include/mlir/Interfaces/ViewLikeInterface.td",
-        "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
-    ],
+    deps = [":td_files"],
 )
 
 iree_tablegen_doc(
@@ -125,13 +118,5 @@ iree_tablegen_doc(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ShapeOps.td",
-    td_srcs = [
-        ":td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
-        "@llvm-project//mlir:SideEffectTdFiles",
-        "@llvm-project//mlir:include/mlir/Interfaces/ViewLikeInterface.td",
-        "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
-    ],
+    deps = [":td_files"],
 )

@@ -78,7 +78,7 @@ This (today) results in a single extracted file you pass to the tool:
 
 ```
 --executable_format=EX_ELF
---executable_file=_simple_mul_dispatch_0_llvm_aot_binary_ex_elf.so
+--executable_file=_simple_mul_dispatch_0_llvm_binary_ex_elf.so
 ```
 
 3. Find `ResolveEntryPointOrdinalsPass` and look for the dispatch:

@@ -14,7 +14,7 @@
 // ops. That is because the same source region is compiled towards different
 // target backends and each target backend could use different tiling and
 // distribution schemes. However, after HAL interface materialization, the
-// hal.executable.target is just meant for one target backend. We need to
+// hal.executable.variant is just meant for one target backend. We need to
 // concretize the tiling and distribution in order to inject static information
 // for further compilation.
 //
@@ -292,8 +292,8 @@ class SPIRVConcretizeWorkgroupTilesPass
   }
 
   void runOnOperation() override {
-    IREE::HAL::ExecutableTargetOp targetOp = getOperation();
-    ModuleOp module = targetOp.getInnerModule();
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+    ModuleOp module = variantOp.getInnerModule();
     for (FuncOp funcOp : module.getOps<FuncOp>()) {
       if (!funcOp.isPublic()) continue;
       (void)runOnFunction(funcOp);
@@ -402,7 +402,7 @@ class SPIRVConcretizeWorkgroupTilesPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVConcretizeWorkgroupTilesPass(const SPIRVCodegenOptions &options) {
   return std::make_unique<SPIRVConcretizeWorkgroupTilesPass>(options);
 }

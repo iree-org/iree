@@ -51,8 +51,13 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
 // Module layout
 //===----------------------------------------------------------------------===//
 
+// Hoists inline vm.rodata.inline values to module-level constant storage.
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createHoistInlinedRodataPass();
+
+// Deduplicates vm.rodata ops in the module.
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
+createDeduplicateRodataPass();
 
 //===----------------------------------------------------------------------===//
 // Module analysis and ordinal assignment
@@ -92,6 +97,7 @@ inline void registerVMPasses() {
   registerVMTransformPassPipeline();
   createConversionPass(targetOptions);
   createHoistInlinedRodataPass();
+  createDeduplicateRodataPass();
   createGlobalInitializationPass();
   createOrdinalAllocationPass();
   createSinkDefiningOpsPass();

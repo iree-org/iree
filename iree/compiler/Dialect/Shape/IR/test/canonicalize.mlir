@@ -54,34 +54,6 @@ func @foldFullyStaticRankedShape(%arg0: tensor<1x2xf32>) -> (i32, i32) {
 }
 
 // -----
-// CHECK-LABEL: @foldRankedShapeDims
-// CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<1x?xf32>
-func @foldRankedShapeDims(%arg0: tensor<1x?xf32>) -> (i32, i32) {
-  // CHECK-NOT: shapex.get_ranked_shape
-  // CHECK-NOT: shapex.ranked_dims
-  // CHECK: %[[DIM0:.+]] = constant 1
-  // CHECK: %[[DIM1:.+]] = shapex.ranked_dim %0[1]
-  %0 = shapex.get_ranked_shape %arg0 : tensor<1x?xf32> -> !shapex.ranked_shape<[1,?]>
-  %1:2 = shapex.ranked_dims %0 : !shapex.ranked_shape<[1,?]> -> i32, i32
-  // CHECK: return %[[DIM0]], %[[DIM1]]
-  return %1#0, %1#1 : i32, i32
-}
-
-// -----
-// CHECK-LABEL: @foldFullyStaticRankedShapeDims
-// CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<1x2xf32>
-func @foldFullyStaticRankedShapeDims(%arg0: tensor<1x2xf32>) -> (i32, i32) {
-  // CHECK-NOT: shapex.get_ranked_shape
-  // CHECK-NOT: shapex.ranked_dims
-  // CHECK-NOT: shapex.ranked_dim
-  // CHECK-DAG: constant 1
-  // CHECK-DAG: constant 2
-  %0 = shapex.get_ranked_shape %arg0 : tensor<1x2xf32> -> !shapex.ranked_shape<[1,2]>
-  %1:2 = shapex.ranked_dims %0 : !shapex.ranked_shape<[1,2]> -> i32, i32
-  return %1#0, %1#1 : i32, i32
-}
-
-// -----
 // CHECK-LABEL: @dynamicMakeRankedShapeDim
 // CHECK-SAME: %[[DD0:[^:[:space:]]+]]: index
 // CHECK-SAME: %[[DD1:[^:[:space:]]+]]: index
@@ -189,12 +161,4 @@ func @identityMakeRankedShape_nomatch_different_shape(%arg0 : !shapex.ranked_sha
   // CHECK: %[[RS:.+]] = shapex.make_ranked_shape
   // CHECK: return %[[RS]]
   return %2 : !shapex.ranked_shape<[?,16,?]>
-}
-
-// CHECK-LABEL: @constantFoldStaticRankedShapes(
-func @constantFoldStaticRankedShapes(%arg0: !shapex.ranked_shape<[2]>, %arg1: !shapex.ranked_shape<[2]>) -> !shapex.ranked_shape<[2]> {
-  // CHECK: %[[RS:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[2]>
-  // CHECK: return %[[RS]]
-  %0 = "shapex.ranked_broadcast_shape"(%arg0, %arg1) {lhs_broadcast_dimensions = dense<[0]> : tensor<1xi64>, rhs_broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (!shapex.ranked_shape<[2]>, !shapex.ranked_shape<[2]>) -> !shapex.ranked_shape<[2]>
-  return %0 : !shapex.ranked_shape<[2]>
 }

@@ -228,6 +228,9 @@ class BuildFileFunctions(object):
   def exports_files(self, *args, **kwargs):
     pass
 
+  def td_library(self, *args, **kwargs):
+    pass
+
   # Technically we could do something with a CMake equivalent but we have no use
   # case.
   def py_binary(self, *args, **kwargs):
@@ -238,13 +241,8 @@ class BuildFileFunctions(object):
     # attribute and pass them along to any targets that depend on the filegroup.
     # Cross-package dependencies and complicated globs could be hard to handle.
 
-    # We have a bunch of filegroups that just contain TD files. CMake doesn't
-    # model this at all, so we'll just hardcode this special case.
-    # TODO(gcmn): Handle this robustly
-    if name == "td_files":
-      return
-
     self._convert_unimplemented_function("filegroup", name)
+
 
   def sh_binary(self, name, **kwargs):
     self._convert_unimplemented_function("sh_binary", name)
@@ -475,7 +473,8 @@ class BuildFileFunctions(object):
                         td_file,
                         tbl_outs,
                         td_srcs=None,
-                        td_includes=None,
+                        deps=None,
+                        includes=None,
                         strip_include_prefix=None,
                         test=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -496,8 +495,9 @@ class BuildFileFunctions(object):
                         td_file,
                         tbl_outs,
                         td_srcs=None,
-                        td_includes=None,
-                        strip_include_prefix=None):
+                        includes=None,
+                        deps=None,
+                        test=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     tblgen_block = _convert_tblgen_block(tblgen)
     td_file_block = _convert_td_file_block(td_file)

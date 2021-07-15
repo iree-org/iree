@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "deduplicate_rodata.mlir"
     "global_initialization.mlir"
     "hoist_inlined_rodata.mlir"
     "ordinal_allocation.mlir"
