@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))" -cse -canonicalize -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))' -cse -canonicalize -split-input-file %s | IreeFileCheck %s
 
 hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
   hal.interface @io {

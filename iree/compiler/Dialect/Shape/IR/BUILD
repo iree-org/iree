@@ -42,7 +42,6 @@ cc_library(
         "Builders.cpp",
         "Folders.cpp",
         "ShapeDialect.cpp",
-        "ShapeInterface.cpp",
         "ShapeInterfaces.cpp.inc",
         "ShapeOps.cpp",
         "ShapeOps.cpp.inc",
@@ -51,7 +50,6 @@ cc_library(
     hdrs = [
         "Builders.h",
         "ShapeDialect.h",
-        "ShapeInterface.h",
         "ShapeInterfaces.h.inc",
         "ShapeOps.h",
         "ShapeOps.h.inc",
