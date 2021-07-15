@@ -33,6 +33,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createConversionPass(targetOptions));
 
   passManager.addNestedPass<VM::ModuleOp>(createHoistInlinedRodataPass());
+  passManager.addNestedPass<VM::ModuleOp>(createDeduplicateRodataPass());
   passManager.addNestedPass<VM::ModuleOp>(createGlobalInitializationPass());
 
   passManager.addPass(createInlinerPass());
