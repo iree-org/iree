@@ -6,6 +6,8 @@
 
 #include "experimental/rocm/status_util.h"
 
+#include <stddef.h>
+
 #include "experimental/rocm/dynamic_symbols.h"
 
 iree_status_t iree_hal_rocm_result_to_status(

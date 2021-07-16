@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_ROCM_STATUS_UTIL_H_
 #define IREE_HAL_ROCM_STATUS_UTIL_H_
 
+#include <stdint.h>
+
 #include "experimental/rocm/dynamic_symbols.h"
 #include "iree/base/api.h"
 

@@ -8,6 +8,7 @@
 #define IREE_HAL_ROCM_NOP_EXECUTABLE_CACHE_H_
 
 #include "experimental/rocm/context_wrapper.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus

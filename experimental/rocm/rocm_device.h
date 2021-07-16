@@ -9,6 +9,7 @@
 
 #include "experimental/rocm/api.h"
 #include "experimental/rocm/dynamic_symbols.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus

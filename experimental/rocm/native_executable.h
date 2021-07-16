@@ -7,8 +7,11 @@
 #ifndef IREE_HAL_ROCM_NATIVE_EXECUTABLE_H_
 #define IREE_HAL_ROCM_NATIVE_EXECUTABLE_H_
 
+#include <stdint.h>
+
 #include "experimental/rocm/context_wrapper.h"
 #include "experimental/rocm/rocm_headers.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus

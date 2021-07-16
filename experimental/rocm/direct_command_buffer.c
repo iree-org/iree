@@ -6,10 +6,15 @@
 
 #include "experimental/rocm/direct_command_buffer.h"
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "experimental/rocm/dynamic_symbols.h"
 #include "experimental/rocm/native_executable.h"
 #include "experimental/rocm/rocm_buffer.h"
-#include "experimental/rocm/rocm_event.h"
 #include "experimental/rocm/status_util.h"
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
 // Command buffer implementation that directly maps to rocm direct.

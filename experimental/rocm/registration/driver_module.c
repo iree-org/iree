@@ -7,9 +7,10 @@
 #include "experimental/rocm/registration/driver_module.h"
 
 #include <inttypes.h>
+#include <stddef.h>
 
 #include "experimental/rocm/api.h"
-#include "iree/base/target_platform.h"
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
 #define IREE_HAL_ROCM_DRIVER_ID 0x524f434d0au  // ROCM

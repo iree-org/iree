@@ -6,7 +6,11 @@
 
 #include "experimental/rocm/rocm_device.h"
 
-#include "experimental/rocm/api.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "experimental/rocm/context_wrapper.h"
 #include "experimental/rocm/descriptor_set_layout.h"
 #include "experimental/rocm/direct_command_buffer.h"
 #include "experimental/rocm/dynamic_symbols.h"
@@ -22,7 +26,7 @@
 // iree_hal_rocm_device_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_rocm_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 
