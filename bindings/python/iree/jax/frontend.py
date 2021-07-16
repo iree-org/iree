@@ -27,7 +27,7 @@ __all__ = [
 _BACKEND_TO_TARGETS = {
     "vmvx": "vmvx",
     "llvmaot": "dylib-llvm-aot",
-    "vulkan": "vulkan-*",
+    "vulkan": "vulkan-spirv",
 }
 _BACKENDS = tuple(_BACKEND_TO_TARGETS.keys())
 
