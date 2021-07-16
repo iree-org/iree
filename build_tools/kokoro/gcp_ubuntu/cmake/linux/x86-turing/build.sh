@@ -38,5 +38,6 @@ echo "Building with cmake"
 
 export IREE_VULKAN_F16_DISABLE=0
 export IREE_CUDA_DISABLE=0
+export IREE_CUDA_RUNTIME_DISABLE=0
 echo "Testing with ctest"
 ./build_tools/cmake/test.sh
