@@ -498,6 +498,7 @@ struct TiledOpInterfaceTilingPass
                 tensor::TensorDialect, scf::SCFDialect>();
   }
 
+  LogicalResult initialize(MLIRContext *context) override;
   void runOnOperation() override;
 };
 }  // namespace
@@ -505,6 +506,11 @@ struct TiledOpInterfaceTilingPass
 template <typename OpTy>
 static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
   return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
+}
+
+LogicalResult TiledOpInterfaceTilingPass::initialize(MLIRContext *context) {
+  tensor::InsertSliceOp::attachInterface<InsertSliceTiledOpInterface>(*context);
+  return success();
 }
 
 void TiledOpInterfaceTilingPass::runOnOperation() {
