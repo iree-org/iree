@@ -414,7 +414,7 @@ struct LinalgExtTilingPattern : public TiledOpInterfaceBaseTilingPattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    LinalgExtOp linalgExtOp = cast<LinalgExtOp>(op);
+    auto linalgExtOp = cast<LinalgExtOp>(op);
     TiledOp tiledOp;
     // Check for failure.
     if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
