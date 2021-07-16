@@ -655,7 +655,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //       CHECK: func @reshape_simple()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//       CHECK:   %[[RESHAPE:.+]] = linalg.expand_shape %[[ARG0]] {{\[}}[0, 1]]
+//       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]]
 //       CHECK:   linalg.copy(%[[RESHAPE]], %[[RET0]])
 
 // -----
@@ -690,7 +690,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<3x4xi32>
-//       CHECK:   %[[RESHAPE:.+]] = linalg.expand_shape %[[ARG0]] {{\[}}[0, 1]]
+//       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<3x4xi32>)
 //  CHECK-SAME:     outs(%[[RET0]] : memref<3x4xi32>)
@@ -731,7 +731,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@ret1[%[[C0]]] : memref<3x4xi32>
-//       CHECK:   %[[RESHAPE:.+]] = linalg.expand_shape %[[ARG0]] {{\[}}[0, 1]]
+//       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<3x4xi32>)
 //  CHECK-SAME:     outs(%[[RET0]] : memref<3x4xi32>)
@@ -769,7 +769,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<12xi32>
-//       CHECK:   %[[RESHAPE:.+]] = linalg.expand_shape %[[RET0]] {{\[}}[0, 1]]
+//       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[RET0]] {{\[}}[0, 1]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[ARG0]] : memref<3x4xi32>)
 //  CHECK-SAME:     outs(%[[RESHAPE]] : memref<3x4xi32>)
@@ -819,7 +819,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 // CHECK-LABEL: func @dot_general_lowering()
 //   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @io::@arg1
-//   CHECK-DAG:   %[[RESHAPE_LHS:.+]] = linalg.collapse_shape %[[LHS]]
+//   CHECK-DAG:   %[[RESHAPE_LHS:.+]] = memref.collapse_shape %[[LHS]]
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @io::@ret0
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
@@ -1097,7 +1097,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RHS:.+]] = memref.buffer_cast %[[CONSTANT]]
 //   CHECK-DAG:   %[[LHS_INPUT:.+]] = hal.interface.binding.subspan @io::@arg0[%{{.+}}] : memref<1x5x3x1xf32>
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @io::@ret0[%{{.+}}] : memref<5x5xf32>
-//       CHECK:   %[[LHS:.+]] = linalg.collapse_shape %[[LHS_INPUT]]
+//       CHECK:   %[[LHS:.+]] = memref.collapse_shape %[[LHS_INPUT]]
 //       CHECK:   scf.for %[[IV0:.+]] =
 //       CHECK:     scf.for %[[IV1:.+]] =
 //   CHECK-DAG:       %[[LHS_SUBVIEW:.+]] = memref.subview %[[LHS]][%[[IV0]], 0]
@@ -1279,7 +1279,7 @@ func @reshape_read_only() {
 // CHECK-LABEL: func @reshape_read_only
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan @io::@ro0
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan @io::@wo0
-//       CHECK:   %[[RESHAPE:.+]] = linalg.collapse_shape %[[INPUT]]
+//       CHECK:   %[[RESHAPE:.+]] = memref.collapse_shape %[[INPUT]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<?xf32>)
 //  CHECK-SAME:     outs(%[[OUTPUT]] : memref<?xf32>)
@@ -1916,9 +1916,9 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //       CHECK:      linalg.generic
 //  CHECK-SAME:        ins(%[[ARG0_SV]]
 //  CHECK-SAME:        outs(%[[ALLOC_ARG0]]
-//   CHECK-DAG:      %[[ALLOC_ARG0_RESHAPE:.+]] = linalg.collapse_shape %[[ALLOC_ARG0]]
-//   CHECK-DAG:      %[[ALLOC_ARG1_RESHAPE:.+]] = linalg.collapse_shape %[[ALLOC_ARG1]]
-//   CHECK-DAG:      %[[ALLOC_RET0_RESHAPE:.+]] = linalg.collapse_shape %[[ALLOC_RET0]]
+//   CHECK-DAG:      %[[ALLOC_ARG0_RESHAPE:.+]] = memref.collapse_shape %[[ALLOC_ARG0]]
+//   CHECK-DAG:      %[[ALLOC_ARG1_RESHAPE:.+]] = memref.collapse_shape %[[ALLOC_ARG1]]
+//   CHECK-DAG:      %[[ALLOC_RET0_RESHAPE:.+]] = memref.collapse_shape %[[ALLOC_RET0]]
 //       CHECK:      linalg.matmul
 //  CHECK-SAME:        ins(%[[ALLOC_ARG0_RESHAPE]], %[[ALLOC_ARG1_RESHAPE]]
 //  CHECK-SAME:        outs(%[[ALLOC_RET0_RESHAPE]]

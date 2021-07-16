@@ -855,7 +855,7 @@ static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
       resultBuffer.getType().cast<MemRefType>().getMemorySpaceAsInt());
   using ReverseReshapeOpTy = typename std::conditional<
       std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
-      linalg::ExpandShapeOp, linalg::CollapseShapeOp>::type;
+      memref::ExpandShapeOp, memref::CollapseShapeOp>::type;
   return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(), memrefType,
                                       resultBuffer, reshapeOp.reassociation());
 }
@@ -1004,7 +1004,7 @@ static Value getAliasingBufferForReshapeResult(OpBuilder &b,
       resultTensorType, {}, inputBufferType.getMemorySpaceAsInt());
   using ReshapeOpTy = typename std::conditional<
       std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
-      linalg::CollapseShapeOp, linalg::ExpandShapeOp>::type;
+      memref::CollapseShapeOp, memref::ExpandShapeOp>::type;
   Value bufferReshape = b.create<ReshapeOpTy>(loc, reshapeResultType,
                                               inputBuffer, op.reassociation());
   return bufferReshape;
