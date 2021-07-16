@@ -23,55 +23,52 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-class TranslateExecutablesPass
-    : public PassWrapper<TranslateExecutablesPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+class TranslateExecutableVariantsPass
+    : public PassWrapper<TranslateExecutableVariantsPass,
+                         OperationPass<IREE::HAL::ExecutableVariantOp>> {
  public:
-  explicit TranslateExecutablesPass(TargetOptions executableOptions)
-      : executableOptions_(executableOptions) {
+  explicit TranslateExecutableVariantsPass() {
     for (auto &targetBackend :
-         matchTargetBackends(executableOptions_.targets)) {
+         getTargetBackends(getRegisteredTargetBackends())) {
       auto pm = std::make_unique<OpPassManager>(
-          IREE::HAL::ExecutableTargetOp::getOperationName(),
+          IREE::HAL::ExecutableVariantOp::getOperationName(),
           OpPassManager::Nesting::Implicit);
       targetBackend->buildTranslationPassPipeline(*pm);
       pipelines_.push_back({std::move(targetBackend), std::move(pm)});
     }
   }
 
-  TranslateExecutablesPass(const TranslateExecutablesPass &other)
-      : TranslateExecutablesPass(other.executableOptions_) {}
+  TranslateExecutableVariantsPass(const TranslateExecutableVariantsPass &other)
+      : TranslateExecutableVariantsPass() {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<HALDialect>();
-
+    registry.insert<IREE::HAL::HALDialect>();
     for (auto &pipeline : pipelines_) {
       pipeline.passManager->getDependentDialects(registry);
     }
   }
 
   StringRef getArgument() const override {
-    return "iree-hal-translate-executables";
+    return "iree-hal-translate-executable-variants";
   }
 
   StringRef getDescription() const override {
-    return "Translates hal.executable.target via the target backend pipelines";
+    return "Translates hal.executable.variant via the target backend pipelines";
   }
 
   void runOnOperation() override {
-    auto targetOp = getOperation();
+    auto variantOp = getOperation();
     for (auto &pipeline : pipelines_) {
-      if (!TargetBackend::matchPattern(
-              pipeline.targetBackend->filter_pattern(),
-              targetOp.target_backend_filter().str())) {
+      if (variantOp.target() != pipeline.targetBackend->name()) {
         continue;
       }
-      if (failed(runPipeline(*pipeline.passManager, targetOp))) {
-        targetOp.emitError() << "failed to run translation of source "
-                                "executable to target executable for backend "
-                             << targetOp.target_backend_filter();
+      if (failed(runPipeline(*pipeline.passManager, variantOp))) {
+        variantOp.emitError() << "failed to run translation of source "
+                                 "executable to target executable for backend "
+                              << variantOp.target();
         return signalPassFailure();
       }
+      break;  // Converted successfully; break out of loop.
     }
   }
 
@@ -80,19 +77,16 @@ class TranslateExecutablesPass
     std::unique_ptr<TargetBackend> targetBackend;
     std::unique_ptr<OpPassManager> passManager;
   };
-
-  TargetOptions executableOptions_;
   llvm::SmallVector<Pipeline, 4> pipelines_;
 };
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createTranslateExecutablesPass(TargetOptions executableOptions) {
-  return std::make_unique<TranslateExecutablesPass>(executableOptions);
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createTranslateExecutableVariantsPass() {
+  return std::make_unique<TranslateExecutableVariantsPass>();
 }
 
-static PassRegistration<TranslateExecutablesPass> pass([] {
-  auto options = getTargetOptionsFromFlags();
-  return std::make_unique<TranslateExecutablesPass>(options);
+static PassRegistration<TranslateExecutableVariantsPass> pass([] {
+  return std::make_unique<TranslateExecutableVariantsPass>();
 });
 
 }  // namespace HAL

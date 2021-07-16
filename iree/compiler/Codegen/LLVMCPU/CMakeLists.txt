@@ -21,6 +21,7 @@ iree_cc_library(
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUPadWorkgroupTiles.cpp"
     "LLVMCPUPlanConvLoopOrder.cpp"
+    "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTilePadAndVectorize.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorization.cpp"
@@ -31,13 +32,16 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRIR
+    MLIRLLVMCommonConversion
     MLIRLLVMIR
     MLIRLinalg
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRMath
+    MLIRMathToLLVM
     MLIRMathTransforms
     MLIRMemRef
+    MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF

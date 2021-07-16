@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -22,11 +23,77 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+class LinkTargetExecutablesPass
+    : public PassWrapper<LinkTargetExecutablesPass,
+                         OperationPass<mlir::ModuleOp>> {
+ public:
+  LinkTargetExecutablesPass() = default;
+  LinkTargetExecutablesPass(const LinkTargetExecutablesPass &pass) {}
+  LinkTargetExecutablesPass(StringRef target) { this->target = target.str(); }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    auto targetBackend = getTargetBackend(target);
+    if (targetBackend) {
+      targetBackend->getDependentDialects(registry);
+    }
+  }
+
+  StringRef getArgument() const override {
+    return "iree-hal-link-target-executables";
+  }
+
+  StringRef getDescription() const override {
+    return "Links together hal.executables for the specified target.";
+  }
+
+  void runOnOperation() override {
+    auto moduleOp = getOperation();
+    auto targetBackend = getTargetBackend(target);
+    if (!targetBackend) {
+      moduleOp.emitError() << "unregistered target backend '" << target << "'";
+      return signalPassFailure();
+    }
+
+    // Ask the target backend to link all executables it wants.
+    if (failed(targetBackend->linkExecutables(moduleOp))) {
+      moduleOp.emitError() << "failed to link executables for target backend "
+                           << targetBackend->name();
+      return signalPassFailure();
+    }
+
+    // Backends may move target ops from executables into linked executables.
+    // If an executable ends up with no targets, remove it.
+    auto executableOps =
+        llvm::to_vector<4>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
+    for (auto executableOp : executableOps) {
+      auto targetOps = executableOp.getOps<IREE::HAL::ExecutableVariantOp>();
+      if (targetOps.empty()) {
+        executableOp.erase();
+      }
+    }
+  }
+
+ private:
+  Option<std::string> target{
+      *this, "target",
+      llvm::cl::desc("Target backend name whose executables will be linked by "
+                     "this pass.")};
+};
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkTargetExecutablesPass(
+    StringRef target) {
+  return std::make_unique<LinkTargetExecutablesPass>(target);
+}
+
+static PassRegistration<LinkTargetExecutablesPass> linkTargetPass([] {
+  return std::make_unique<LinkTargetExecutablesPass>();
+});
+
 class LinkExecutablesPass
     : public PassWrapper<LinkExecutablesPass, OperationPass<mlir::ModuleOp>> {
  public:
-  explicit LinkExecutablesPass(TargetOptions executableOptions)
-      : executableOptions_(executableOptions) {}
+  LinkExecutablesPass() = default;
 
   StringRef getArgument() const override { return "iree-hal-link-executables"; }
 
@@ -36,40 +103,25 @@ class LinkExecutablesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
+    OpPassManager passManager(moduleOp.getOperationName());
     for (auto &targetBackend :
-         matchTargetBackends(executableOptions_.targets)) {
-      // Ask the target backend to link all executables it wants.
-      if (failed(targetBackend->linkExecutables(moduleOp))) {
-        moduleOp.emitError() << "failed to link executables for target backend "
-                             << targetBackend->name();
-        return signalPassFailure();
-      }
+         getTargetBackends(gatherExecutableTargetNames(moduleOp))) {
+      passManager.addPass(
+          createLinkTargetExecutablesPass(targetBackend->name()));
     }
-
-    // Backends may move target ops from executables into linked executables.
-    // If an executable ends up with no targets, remove it.
-    auto executableOps =
-        llvm::to_vector<4>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
-    for (auto executableOp : executableOps) {
-      auto targetOps = executableOp.getOps<IREE::HAL::ExecutableTargetOp>();
-      if (targetOps.empty()) {
-        executableOp.erase();
-      }
+    if (failed(runPipeline(passManager, moduleOp))) {
+      moduleOp.emitError() << "failed to link executables";
+      return signalPassFailure();
     }
   }
-
- private:
-  TargetOptions executableOptions_;
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass(
-    TargetOptions executableOptions) {
-  return std::make_unique<LinkExecutablesPass>(executableOptions);
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass() {
+  return std::make_unique<LinkExecutablesPass>();
 }
 
-static PassRegistration<LinkExecutablesPass> pass([] {
-  auto options = getTargetOptionsFromFlags();
-  return std::make_unique<LinkExecutablesPass>(options);
+static PassRegistration<LinkExecutablesPass> linkPass([] {
+  return std::make_unique<LinkExecutablesPass>();
 });
 
 }  // namespace HAL

@@ -145,19 +145,26 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
     iree_hal_device_t* device);
 
 // Queries a configuration value as an int32_t.
-// The |key| will be provided to the device driver to interpret in a
-// device-specific way and if recognized the value will be converted to an
+// The |category| and |key| will be provided to the device driver to interpret
+// in a device-specific way and if recognized the value will be converted to an
 // int32_t and returned in |out_value|. Fails if the value represented by the
 // key is not convertable (overflows a 32-bit integer, not a number, etc).
 //
 // This is roughly equivalent to the `sysconf` linux syscall
 // (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
-// set of keys available and their interpretation is target-dependent.
+// set of categories and keys available and their interpretation is
+// target-dependent.
+//
+// Well-known queries (category :: key):
+//   hal.device.id :: some-pattern-*
+//   hal.device.feature :: some-pattern-*
+//   hal.device.architecture :: some-pattern-*
 //
 // Returned values must remain the same for the lifetime of the device as
 // callers may cache them to avoid redundant calls.
 IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
-    iree_hal_device_t* device, iree_string_view_t key, int32_t* out_value);
+    iree_hal_device_t* device, iree_string_view_t category,
+    iree_string_view_t key, int32_t* out_value);
 
 // Submits one or more batches of work to a device queue.
 //
@@ -248,6 +255,7 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device);
 
   iree_status_t(IREE_API_PTR* query_i32)(iree_hal_device_t* device,
+                                         iree_string_view_t category,
                                          iree_string_view_t key,
                                          int32_t* out_value);
 

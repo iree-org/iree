@@ -143,7 +143,7 @@ class IdentifyConstantPoolsPass
   // then they should not need to have matching constraints).
   BufferConstraintsAttr computeConservativeBufferConstraints(
       const TargetOptions &targetOptions, MLIRContext *context) {
-    auto targetBackends = matchTargetBackends(targetOptions.targets);
+    auto targetBackends = getTargetBackends(targetOptions.targets);
     BufferConstraintsAttr attr = {};
     for (auto &targetBackend : targetBackends) {
       if (attr) {

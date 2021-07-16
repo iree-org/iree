@@ -161,7 +161,8 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
         case 32:
           if (integerAttr.getInt()) {
             rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(
-                srcOp, integerAttr.getInt());
+                srcOp,
+                integerAttr.getType().isInteger(1) ? 1 : integerAttr.getInt());
           } else {
             rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
           }

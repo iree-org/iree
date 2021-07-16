@@ -68,8 +68,8 @@ static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
 }
 
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
-  patterns.add<vector::UnrollVectorPattern>(
-      patterns.getContext(),
+  vector::populateVectorUnrollPatterns(
+      patterns,
       vector::UnrollVectorOptions().setNativeShapeFn(getGPUNativeVectorSize));
 }
 
@@ -103,8 +103,6 @@ struct LLVMGPUVectorizationPass
       RewritePatternSet lowerTransferOpPatterns(funcOp.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
           lowerTransferOpPatterns);
-      vector::populateVectorToVectorTransformationPatterns(
-          lowerTransferOpPatterns);
       vector::populateVectorTransferLoweringPatterns(lowerTransferOpPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(lowerTransferOpPatterns));
@@ -120,15 +118,8 @@ struct LLVMGPUVectorizationPass
       RewritePatternSet canonicalizationPatterns1(funcOp.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
           canonicalizationPatterns1);
-      vector::populateVectorToVectorTransformationPatterns(
-          canonicalizationPatterns1);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns1));
-
-      RewritePatternSet canonicalizationPatterns2(funcOp.getContext());
-      vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns2));
 
       linalg::hoistRedundantVectorTransfers(funcOp);
     }

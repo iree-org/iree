@@ -107,7 +107,7 @@ run the tests, then report the status back to your host machine.
 
 ## Running tools directly
 
-Invoke the host compiler tools produce input files:
+Invoke the host compiler tools to produce a bytecode module flatbuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-translate \
@@ -117,7 +117,7 @@ Invoke the host compiler tools produce input files:
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
-Push the Android runtime tools to the device, along with any input files:
+Push the Android runtime tools to the device, along with any flatbuffer files:
 
 ``` shell
 adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/

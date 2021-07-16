@@ -22,8 +22,9 @@ TargetOptions getTargetOptionsFromFlags() {
       "IREE HAL executable target options");
 
   // This function is called as part of registering the pass
-  // TranslateExecutablesPass. Pass registery is also staticly initialized,
-  // so targetBackendsFlags needs to be here to be initialized first.
+  // TranslateExecutableVariantsPass. Pass registery is also staticly
+  // initialized, so targetBackendsFlags needs to be here to be initialized
+  // first.
   static llvm::cl::list<std::string> *targetBackendsFlag =
       new llvm::cl::list<std::string>{
           "iree-hal-target-backends",
@@ -33,35 +34,6 @@ TargetOptions getTargetOptionsFromFlags() {
   TargetOptions targetOptions;
   targetOptions.targets = *targetBackendsFlag;
   return targetOptions;
-}
-
-// static
-bool TargetBackend::matchPattern(StringRef value, StringRef pattern) {
-  size_t nextCharIndex = pattern.find_first_of("*?");
-  if (nextCharIndex == std::string::npos) {
-    return value == pattern;
-  } else if (nextCharIndex > 0) {
-    if (value.substr(0, nextCharIndex) != pattern.substr(0, nextCharIndex)) {
-      return false;
-    }
-    value = value.substr(nextCharIndex);
-    pattern = pattern.substr(nextCharIndex);
-  }
-  if (value.empty() && pattern.empty()) {
-    return true;
-  }
-  char patternChar = pattern[0];
-  if (patternChar == '*' && pattern.size() > 1 && value.empty()) {
-    return false;
-  } else if (patternChar == '*' && pattern.size() == 1) {
-    return true;
-  } else if (patternChar == '?' || value[0] == patternChar) {
-    return matchPattern(value.substr(1), pattern.substr(1));
-  } else if (patternChar == '*') {
-    return matchPattern(value, pattern.substr(1)) ||
-           matchPattern(value.substr(1), pattern);
-  }
-  return false;
 }
 
 // static
@@ -108,11 +80,11 @@ static void renameWithDisambiguatedName(
   SymbolTable::setSymbolName(op, disambiguatedName);
 }
 
-void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                                     IREE::HAL::ExecutableOp executableOp) {
+void TargetBackend::declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
+                                      IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());
-  auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
-      sourceOp.getLoc(), name(), filter_pattern());
+  auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
+      sourceOp.getLoc(), name(), name());
   OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
   containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 }
@@ -209,7 +181,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
     mlir::ModuleOp moduleOp,
     ArrayRef<IREE::HAL::ExecutableOp> sourceExecutableOps,
     IREE::HAL::ExecutableOp linkedExecutableOp,
-    IREE::HAL::ExecutableTargetOp linkedTargetOp,
+    IREE::HAL::ExecutableVariantOp linkedTargetOp,
     std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
     OpBuilder &builder) {
   llvm::SmallVector<IREE::HAL::InterfaceOp, 4> linkedInterfaceOps;
@@ -224,18 +196,16 @@ LogicalResult TargetBackend::linkExecutablesInto(
 
   // Iterate over all source executable ops, linking as many as we can.
   for (auto sourceExecutableOp : sourceExecutableOps) {
-    auto targetOps = llvm::to_vector<4>(
-        sourceExecutableOp.getOps<IREE::HAL::ExecutableTargetOp>());
-    for (auto targetOp : targetOps) {
+    auto variantOps = llvm::to_vector<4>(
+        sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
+    for (auto variantOp : variantOps) {
       // Only process targets matching our pattern.
-      if (!matchPattern(targetOp.target_backend_filter(), filter_pattern())) {
-        continue;
-      }
+      if (variantOp.target() != name()) continue;
 
       // Clone entry point ops and queue remapping ordinals and updating
       // symbol refs.
       for (auto entryPointOp :
-           targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+           variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
         // Lookup the interface used by this entry point.
         auto sourceInterfaceOp =
             SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
@@ -267,7 +237,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
         // this entry point.
         auto oldSymbolRefAttr =
             builder.getSymbolRefAttr(sourceExecutableOp.getName(),
-                                     {builder.getSymbolRefAttr(targetOp),
+                                     {builder.getSymbolRefAttr(variantOp),
                                       builder.getSymbolRefAttr(entryPointOp)});
         auto newSymbolRefAttr = builder.getSymbolRefAttr(
             linkedExecutableOp.getName(),
@@ -277,16 +247,16 @@ LogicalResult TargetBackend::linkExecutablesInto(
       }
 
       // Merge the existing module into the new linked module op.
-      auto sourceModuleOp = getInnerModuleFn(targetOp.getInnerModule());
+      auto sourceModuleOp = getInnerModuleFn(variantOp.getInnerModule());
       if (failed(mergeModuleInto(sourceModuleOp, linkedModuleOp,
                                  targetSymbolMap))) {
         return failure();
       }
 
-      targetOp.erase();
+      variantOp.erase();
     }
 
-    if (sourceExecutableOp.getOps<IREE::HAL::ExecutableTargetOp>().empty()) {
+    if (sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>().empty()) {
       sourceExecutableOp.erase();
     }
   }
@@ -300,130 +270,6 @@ LogicalResult TargetBackend::linkExecutablesInto(
     linkedExecutableOp.erase();
   }
 
-  return success();
-}
-
-std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupSize(
-    Location loc, IREE::HAL::ExecutableOp executableOp,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
-    OpBuilder &builder) {
-  // When no workgroup size is specified we just assume [1,1,1].
-  // This yields a workgroup count that models the extents of the workload.
-  return {
-      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
-      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
-      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
-  };
-}
-
-static std::array<Value, 3> calculateDispatchWorkgroupCountFromRegion(
-    Location loc, IREE::HAL::ExecutableEntryPointOp entryPointOp,
-    ValueRange workload, OpBuilder &builder) {
-  Block *body = entryPointOp.getBlock();
-  BlockAndValueMapping bvm;
-  for (auto args : llvm::enumerate(workload)) {
-    bvm.map(body->getArgument(args.index()), args.value());
-  }
-  for (Operation &op : body->without_terminator()) {
-    builder.clone(op, bvm);
-  }
-  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
-  // Verifier of EntryPointOp checks that the return has 3 values.
-  SmallVector<Value, 4> count = llvm::to_vector<4>(llvm::map_range(
-      returnOp.operands(), [&bvm](Value v) { return bvm.lookup(v); }));
-  return {count[0], count[1], count[2]};
-}
-
-std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupCount(
-    Location loc, IREE::HAL::ExecutableOp executableOp,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
-    OpBuilder &builder) {
-  Region *region = entryPointOp.getBody();
-  if (region) {
-    return calculateDispatchWorkgroupCountFromRegion(loc, entryPointOp,
-                                                     workload, builder);
-  }
-  auto workgroupSize = calculateDispatchWorkgroupSize(
-      loc, executableOp, entryPointOp, workload, builder);
-  return calculateDispatchWorkgroupCount(loc, workload, workgroupSize, builder);
-}
-
-std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupCount(
-    Location loc, ValueRange workload,
-    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
-  std::array<Value, 3> result;
-
-  auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
-  if (workload.size() <= 3) {
-    // 1-D to 3-D are easy (pad 2 to 0 dimensions) and divide by workgroup size.
-    for (int i = 0; i < 3; ++i) {
-      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
-      Value workloadI = i < workload.size() ? workload[i] : constantOne;
-      workloadI = builder.createOrFold<mlir::SubIOp>(
-          loc,
-          builder.createOrFold<mlir::AddIOp>(loc, workloadI, workgroupSize[i]),
-          constantOne);
-      result[i] = builder.createOrFold<UnsignedDivIOp>(loc, workloadI,
-                                                       workgroupSize[i]);
-    }
-  } else {
-    // TODO(#4140): remapping of N-D to 3-D: this is not how you do this!
-    Value flatWorkload = constantOne;
-    for (auto workloadI : workload) {
-      flatWorkload = builder.createOrFold<MulIOp>(loc, flatWorkload, workloadI);
-    }
-    for (int i = 0; i < 3; ++i) {
-      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
-      auto rounded = builder.createOrFold<mlir::SubIOp>(
-          loc,
-          builder.createOrFold<mlir::AddIOp>(loc, flatWorkload,
-                                             workgroupSize[i]),
-          constantOne);
-      auto workgroupCountI = builder.createOrFold<mlir::UnsignedDivIOp>(
-          loc, rounded, workgroupSize[i]);
-      result[i] = workgroupCountI;
-
-      // Multiply back out and subtract from invocations.
-      flatWorkload = builder.createOrFold<SubIOp>(
-          loc, flatWorkload,
-          builder.createOrFold<MulIOp>(loc, workgroupCountI, rounded));
-    }
-  }
-
-  return result;
-}
-
-LogicalResult TargetBackend::recordDispatch(
-    Location loc, DispatchState dispatchState,
-    DeviceSwitchRewriter &switchRewriter) {
-  SmallVector<Value, 4> regionArgs;
-  regionArgs.push_back(dispatchState.commandBuffer);
-  for (auto dim : dispatchState.workgroupCount) {
-    regionArgs.push_back(dim);
-  }
-  auto *region = switchRewriter.addConditionRegion(
-      IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
-      regionArgs);
-  auto &entryBlock = region->front();
-  auto commandBuffer = entryBlock.getArgument(0);
-  SmallVector<Value, 3> originalWorkgroupCount;
-  for (int i = 0; i < dispatchState.workgroupCount.size(); ++i) {
-    originalWorkgroupCount.push_back(entryBlock.getArgument(1 + i));
-  }
-
-  auto builder = OpBuilder::atBlockBegin(&entryBlock);
-  auto entryPointSymRef = builder.getSymbolRefAttr(
-      dispatchState.executableOp.getName(),
-      {builder.getSymbolRefAttr(dispatchState.entryPointOp->getParentOp()),
-       builder.getSymbolRefAttr(dispatchState.entryPointOp)});
-  auto remappedWorkgroupCount = calculateDispatchWorkgroupCount(
-      loc, dispatchState.executableOp, dispatchState.entryPointOp,
-      originalWorkgroupCount, builder);
-  builder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-      loc, commandBuffer, entryPointSymRef, remappedWorkgroupCount[0],
-      remappedWorkgroupCount[1], remappedWorkgroupCount[2]);
-
-  builder.create<IREE::HAL::ReturnOp>(loc);
   return success();
 }
 

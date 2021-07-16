@@ -13,6 +13,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -117,6 +118,7 @@ void setupStandardToHALLegality(MLIRContext *context,
   // have any types they are valid to be used on after this conversion.
   conversionTarget.addIllegalOp<memref::DimOp>();
   conversionTarget.addIllegalOp<mlir::RankOp>();
+  conversionTarget.addIllegalOp<tensor::DimOp>();
 
   // We must convert away any of our casts from higher level dialects.
   conversionTarget.addIllegalOp<IREE::HAL::TensorCastOp>();

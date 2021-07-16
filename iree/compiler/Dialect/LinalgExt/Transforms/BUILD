@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -22,7 +22,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "Passes.td",
-    td_srcs = [
+    deps = [
         "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )
@@ -31,23 +31,30 @@ cc_library(
     name = "Transforms",
     srcs = [
         "ConvertToLoops.cpp",
-        "PassDetail.h",
         "Passes.cpp",
+        "Tiling.cpp",
     ],
     hdrs = [
+        "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
+        "Transforms.h",
     ],
     deps = [
         ":PassesIncGen",
+        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/LinalgExt/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )

@@ -14,10 +14,9 @@ package(
 
 iree_cmake_extra_content(
     content = """
-# Generic (bare-metal) system doesn't have the file system support and can be
-# thread-less.
-# TODO(#6247) Remove the condition when bare-metal related APIs are cleaned-up.
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Generic")
+# iree::hal::drivers dependency requires threading
+# TODO(#4298): Separate HAL driver registration from threading.
+if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
 """,

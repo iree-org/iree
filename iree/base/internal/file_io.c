@@ -6,6 +6,10 @@
 
 #include "iree/base/internal/file_io.h"
 
+#include "iree/base/config.h"
+
+#if IREE_FILE_IO_ENABLE
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,3 +122,22 @@ iree_status_t iree_file_write_contents(const char* path,
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+#else
+
+iree_status_t iree_file_exists(const char* path) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "File I/O is disabled");
+}
+
+iree_status_t iree_file_read_contents(const char* path,
+                                      iree_allocator_t allocator,
+                                      iree_byte_span_t* out_contents) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "File I/O is disabled");
+}
+
+iree_status_t iree_file_write_contents(const char* path,
+                                       iree_const_byte_span_t content) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "File I/O is disabled");
+}
+
+#endif  // IREE_FILE_IO_ENABLE

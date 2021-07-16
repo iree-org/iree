@@ -18,6 +18,7 @@
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -175,7 +176,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
     for (int i = numDims - 1; i >= 0; i--) {
       std::array<int64_t, 3> &range = staticRanges[i];
       Value id = serializedId;
-      int64_t interval = (range[1] - range[0]) / range[2];
+      int64_t interval = ceilDiv(range[1] - range[0], range[2]);
       Value intervalValue = builder.create<ConstantIndexOp>(loc, interval);
       int64_t count = 0;
       if (numIds <= 1) {
@@ -324,8 +325,8 @@ struct LLVMGPUTileAndDistributePass
     registry.insert<AffineDialect, gpu::GPUDialect>();
   }
   void runOnOperation() override {
-    IREE::HAL::ExecutableTargetOp targetOp = getOperation();
-    ModuleOp module = targetOp.getInnerModule();
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+    ModuleOp module = variantOp.getInnerModule();
 
     MLIRContext *context = module->getContext();
     for (FuncOp funcOp : module.getOps<FuncOp>()) {
@@ -430,7 +431,7 @@ struct LLVMGPUTileAndDistributePass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPUTileAndDistributeToThreads() {
   return std::make_unique<LLVMGPUTileAndDistributePass>();
 }

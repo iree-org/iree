@@ -42,8 +42,8 @@ class SetNumWorkgroupsPass : public SetNumWorkgroupsBase<SetNumWorkgroupsPass> {
 
 void SetNumWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  IREE::HAL::ExecutableTargetOp targetOp = getOperation();
-  ModuleOp module = targetOp.getInnerModule();
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  ModuleOp module = variantOp.getInnerModule();
 
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
       getAllEntryPoints(module);
@@ -100,7 +100,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
   (void)applyPatternsAndFoldGreedily(module, std::move(canonicalization));
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize) {
   return std::make_unique<SetNumWorkgroupsPass>(workgroupSize);
 }

@@ -8,6 +8,7 @@
 #define IREE_DIALECT_HAL_BASE
 
 include "iree/compiler/Dialect/HAL/IR/HALDialect.td"
+include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // HAL enums
@@ -453,6 +454,22 @@ def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
     HAL_DescriptorSetLayoutBindingAttr,
     "HAL descriptor set layout binding array attribute">;
 
+def HAL_ExecutableTargetAttr :
+    AttrDef<HAL_Dialect, "ExecutableTarget", []> {
+  let mnemonic = "executable.target";
+  let summary = [{Generic executable target specification.}];
+  let description = [{
+    Specifies how to compile an executable for a specific target backend.
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$target,
+    AttrParameter<"DictionaryAttr", "">:$configuration
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$target)>,
+  ];
+}
+
 // TODO(benvanik): drop this when we have a HAL dispatch abstraction.
 def HAL_ExConstantStorageAttr :
   IREE_StructAttr<"ex.constant_storage",
@@ -497,37 +514,156 @@ def HAL_ExResultBufferAttr :
 // Expression matching attributes
 //===----------------------------------------------------------------------===//
 
+def HAL_DeviceQuery : NativeOpTrait<"IREE::HAL::DeviceQuery">;
+
 def HAL_MatchAlwaysAttr :
-  IREE_StructAttr<"match.always", "MatchAlwaysAttr", HAL_Dialect, []> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+    AttrDef<HAL_Dialect, "MatchAlways", [
+      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
+    ]> {
+  let mnemonic = "match.always";
+  let summary = [{always matches}];
+  let description = [{
+    Returns true (constant true).
+  }];
 }
 
 def HAL_MatchAnyAttr :
-  IREE_StructAttr<"match.any", "MatchAnyAttr", HAL_Dialect, [
-    IREE_StructFieldAttr<"conditions", AnyAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+    AttrDef<HAL_Dialect, "MatchAny", [
+      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
+    ]> {
+  let mnemonic = "match.any";
+  let summary = [{matches if any subexpression matches}];
+  let description = [{
+    Returns true if any subexpression matches (logical OR) and not empty.
+  }];
+  let parameters = (ins
+    AttrParameter<"ArrayAttr", "">:$conditions
+  );
+  let builders = [
+    AttrBuilder<(ins "ArrayRef<Attribute>":$conditions), [{
+      return $_get(context, ArrayAttr::get(context, conditions));
+    }]>,
+  ];
 }
 
 def HAL_MatchAllAttr :
-  IREE_StructAttr<"match.all", "MatchAllAttr", HAL_Dialect, [
-    IREE_StructFieldAttr<"conditions", AnyAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+    AttrDef<HAL_Dialect, "MatchAll", [
+      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
+    ]> {
+  let mnemonic = "match.all";
+  let summary = [{matches if all subexpressions match}];
+  let description = [{
+    Returns true only if all subexpressions return true (logical AND) or empty.
+  }];
+  let parameters = (ins
+    AttrParameter<"ArrayAttr", "">:$conditions
+  );
+  let builders = [
+    AttrBuilder<(ins "ArrayRef<Attribute>":$conditions), [{
+      return $_get(context, ArrayAttr::get(context, conditions));
+    }]>,
+  ];
 }
 
 def HAL_DeviceMatchIDAttr :
-  IREE_StructAttr<"device.match.id", "DeviceMatchIDAttr", HAL_Dialect, [
-    IREE_StructFieldAttr<"pattern", StrAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+    AttrDef<HAL_Dialect, "DeviceMatchID", [
+      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
+    ]> {
+  let mnemonic = "device.match.id";
+  let summary = [{matches against a device ID pattern}];
+  let description = [{
+    Matches a device by its canonical compiler/runtime ID.
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$pattern
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$pattern), [{
+      return $_get(context, StringAttr::get(context, pattern));
+    }]>,
+    AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
+      return $_get(pattern.getContext(), pattern);
+    }]>,
+  ];
 }
 
-def HAL_DeviceMatchMemoryModelAttr : IREE_StructAttr<
-    "device.match.memory_model", "DeviceMatchMemoryModelAttr", HAL_Dialect, [
-    IREE_StructFieldAttr<"memory_model", HAL_MemoryModelAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+def HAL_DeviceMatchFeatureAttr :
+    AttrDef<HAL_Dialect, "DeviceMatchFeature", [
+      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
+    ]> {
+  let mnemonic = "device.match.feature";
+  let summary = [{matches against a supported device feature pattern}];
+  let description = [{
+    Matches a device that supports the given feature. The format of the feature
+    pattern is device-dependent.
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$pattern
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$pattern), [{
+      return $_get(context, StringAttr::get(context, pattern));
+    }]>,
+    AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
+      return $_get(pattern.getContext(), pattern);
+    }]>,
+  ];
+}
+
+def HAL_DeviceMatchArchitectureAttr :
+    AttrDef<HAL_Dialect, "DeviceMatchArchitecture", [
+      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
+    ]> {
+  let mnemonic = "device.match.architecture";
+  let summary = [{matches against a device architecture pattern}];
+  let description = [{
+    Matches a device by its runtime architecture. The format of the architecture
+    pattern is device-dependent.
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$pattern
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$pattern), [{
+      return $_get(context, StringAttr::get(context, pattern));
+    }]>,
+    AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
+      return $_get(pattern.getContext(), pattern);
+    }]>,
+  ];
+}
+
+def HAL_DeviceMatchExecutableFormatAttr :
+    AttrDef<HAL_Dialect, "DeviceMatchExecutableFormat", [
+      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
+    ]> {
+  let mnemonic = "device.match.executable.format";
+  let summary = [{matches when a device supports the given executable format}];
+  let description = [{
+    Matches a device only if it claims to support the given executable format
+    pattern. It's still possible that the executable cannot be loaded such as if
+    it uses unavailable device features. This is used for queries such as
+    "can you load ELF libraries?" to quickly get to a set of executables to
+    attempt without needing to try dozens that definitely cannot be loaded.
+
+    Note that different devices may share the same executable formats: for
+    example a local synchronous CPU executor and a remote asynchronous CPU
+    executor can both load ELF libraries. It's also possible for the same device
+    to support multiple formats such as being able to load both
+    platform-agnostic ELF libraries and platform-specific DLL/MachO/etc
+    libraries.
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$pattern
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$pattern), [{
+      return $_get(context, StringAttr::get(context, pattern));
+    }]>,
+    AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
+      return $_get(pattern.getContext(), pattern);
+    }]>,
+  ];
 }
 
 //===----------------------------------------------------------------------===//

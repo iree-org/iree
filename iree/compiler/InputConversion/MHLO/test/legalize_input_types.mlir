@@ -143,3 +143,14 @@ func @linalg(%A: tensor<2xf32>)  -> tensor<2xf32> {
 
   return %init : tensor<2xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @linalg_non_structured_op
+// CHECK-SAME:    (%arg0: tensor<9xi32>) -> tensor<1x9xi32>
+func @linalg_non_structured_op(%arg0: tensor<9xi64>) -> tensor<1x9xi64> {
+  // CHECK:       %[[RES:.+]] = linalg.tensor_expand_shape %arg0 {{\[}}[0, 1]] : tensor<9xi32> into tensor<1x9xi32>
+  // CHECK:       return %[[RES:.+]] : tensor<1x9xi32>
+  %0 = linalg.tensor_expand_shape %arg0 [[0, 1]] : tensor<9xi64> into tensor<1x9xi64>
+  return %0 : tensor<1x9xi64>
+}

@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
+include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -34,7 +35,9 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
 // Non-structured ops
 //===----------------------------------------------------------------------===//
 
-def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
+def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+        ["getTiledImplementation"]>]> {
   let summary = "Scatter operator";
   let description = [{
     Based on XLA operation semantics, takes two `inputs` (`update` and
@@ -46,6 +49,21 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
     `updates` (and `original`). The first argument correspond the
     value to be updated (i.e. from `updates`), and the second the
     current value (i.e. value from `original`).
+
+    The `indices` is a 2D tensor/memref type. The first dim is the number of
+    updates, and the second dim is index depth. The index depth should always be
+    static.
+
+    The first dim of `updates` and `indices` is identical, since they represent
+    the number of updates.
+
+    The rank of the `original`/`result` is `index_depth + rank(%updates) - 1`.
+    The first `index_depth` indices are derived from `indices` and the shape of
+    update value must match the rest shape of `original`.
+
+    The shapes definition follows tensorflow operations execept that it force
+    batch dims to be 1D. See more information in
+      https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update
   }];
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
@@ -58,9 +76,54 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter"> {
     custom<LinalgExtOutsList>($outputs, type($outputs))
     $region (`->` type($results)^)?
   }];
+
+  let extraClassDeclaration = [{
+    int64_t getIndexDepth() {
+      return getInputOperand(1)
+          ->get()
+          .getType()
+          .cast<ShapedType>()
+          .getShape()
+          .back();
+    }
+
+    Value updates() {
+      return getInputOperand(0)->get();
+    }
+
+    ShapedType getUpdateType() {
+      return updates().getType().cast<ShapedType>();
+    }
+
+    Value indices() {
+      return getInputOperand(1)->get();
+    }
+
+    ShapedType getIndicesType() {
+      return indices().getType().cast<ShapedType>();
+    }
+
+    Value original() {
+      return getOutputOperand(0)->get();
+    }
+
+    ShapedType getOriginalType() {
+      return original().getType().cast<ShapedType>();
+    }
+
+    int64_t getUpdateSliceRank() {
+      return updates().getType().cast<ShapedType>().getRank() - 1;
+    }
+
+    bool isScalarUpdate() {
+      return getUpdateSliceRank() == 0;
+    }
+  }];
 }
 
-def LinalgExt_SortOp : LinalgExt_Op<"sort"> {
+def LinalgExt_SortOp : LinalgExt_Op<"sort",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+        ["getTiledImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given
@@ -70,7 +133,7 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort"> {
   }];
 
   // Define arguments and results like linalg.generic op. The attribute has the
-  // same definision as mhlo.sort::dimension. If the rank is greater than 1,
+  // same definition as mhlo.sort::dimension. If the rank is greater than 1,
   // the attribute must be set. If the rank is exacatly 1, the dimension is
   // optional.
   let arguments = (ins Variadic<AnyType>:$inputs,
@@ -84,6 +147,27 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort"> {
     attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
     custom<LinalgExtOutsList>($outputs, type($outputs))
     $region (`->` type($results)^)?
+  }];
+  let extraClassDeclaration = [{
+    Value operand(int index) {
+      return outputs()[index];
+    }
+    ShapedType getOperandType(int index) {
+      return operand(index).getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType(0).getRank();
+    }
+    ArrayRef<int64_t> getOperandShape() {
+      return getOperandType(0).getShape();
+    }
+    uint64_t getSortedDimension() {
+      uint64_t sortedDim = 0;
+      if (auto setSortedDim = dimension()) {
+        sortedDim = *setSortedDim;
+      }
+      return sortedDim;
+    }
   }];
 }
 

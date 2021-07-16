@@ -343,8 +343,8 @@ static void populateVectorizationPatterns(MLIRContext *context,
 
 static void populateVectorUnrollPatterns(MLIRContext *context,
                                          RewritePatternSet &patterns) {
-  patterns.insert<vector::UnrollVectorPattern>(
-      context,
+  vector::populateVectorUnrollPatterns(
+      patterns,
       vector::UnrollVectorOptions().setNativeShapeFn(getSPIRVNativeVectorSize));
 }
 
@@ -421,18 +421,7 @@ static void applyVectorTransformation(FuncOp funcOp) {
                                          std::move(vectorUnrollPatterns));
     }
     {
-      RewritePatternSet canonicalizationPatterns1(funcOp.getContext());
-
-      vector::populateVectorToVectorTransformationPatterns(
-          canonicalizationPatterns1);
-      vector::populateVectorToVectorCanonicalizationPatterns(
-          canonicalizationPatterns1);
-      vector::populateSplitVectorTransferPatterns(canonicalizationPatterns1);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns1));
-
       RewritePatternSet canonicalizationPatterns2(funcOp.getContext());
-      vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2);
       vector::populateVectorTransferLoweringPatterns(canonicalizationPatterns2);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns2));
@@ -537,8 +526,8 @@ struct LowerToLoops final : public OpRewritePattern<OpTy> {
 
 void SPIRVTileAndVectorizePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  IREE::HAL::ExecutableTargetOp targetOp = getOperation();
-  ModuleOp module = targetOp.getInnerModule();
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  ModuleOp module = variantOp.getInnerModule();
 
   for (FuncOp funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
@@ -747,7 +736,7 @@ void SPIRVTileAndVectorizePass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVTileAndVectorizePass(const SPIRVCodegenOptions &options) {
   return std::make_unique<SPIRVTileAndVectorizePass>(options);
 }

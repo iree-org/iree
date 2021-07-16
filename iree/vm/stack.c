@@ -297,7 +297,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_query_module_state(
 // Fails if dynamic stack growth is disabled or the allocator is OOM.
 static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
                                         iree_host_size_t minimum_capacity) {
-  if (stack->allocator.alloc == NULL) {
+  if (IREE_UNLIKELY(stack->allocator.ctl == NULL)) {
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
         "stack initialized on the host stack and cannot grow");

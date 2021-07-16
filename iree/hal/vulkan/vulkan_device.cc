@@ -904,14 +904,15 @@ static iree_hal_allocator_t* iree_hal_vulkan_device_allocator(
 }
 
 static iree_status_t iree_hal_vulkan_device_query_i32(
-    iree_hal_device_t* base_device, iree_string_view_t key,
-    int32_t* out_value) {
+    iree_hal_device_t* base_device, iree_string_view_t category,
+    iree_string_view_t key, int32_t* out_value) {
   // iree_hal_vulkan_device_t* device =
   //     iree_hal_vulkan_device_cast(base_device);
   *out_value = 0;
-  return iree_make_status(IREE_STATUS_NOT_FOUND,
-                          "unknown device configuration key value '%.*s'",
-                          (int)key.size, key.data);
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "unknown device configuration key value '%.*s :: %.*s'",
+      (int)category.size, category.data, (int)key.size, key.data);
 }
 
 // Returns the queue to submit work to based on the |queue_affinity|.

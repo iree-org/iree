@@ -88,7 +88,7 @@ func @subtensor7(%arg0 : tensor<5x?x48xf32>, %arg1 : index) -> tensor<2x48xf32> 
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[C48:.+]] = constant 48 : index
-//   CHECK-DAG:   %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C1]] : tensor<5x?x48xf32>
+//   CHECK-DAG:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<5x?x48xf32>
 //       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C0]] for %[[C1]], %[[C2]], %[[C48]]]
 //       CHECK:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
 //       CHECK:   return %[[RESULT]]
@@ -105,7 +105,7 @@ func @rank_reducing_subtensor(%arg0: tensor<?x513xi32>) -> tensor<513xi32> {
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = constant 4 : index
 //   CHECK-DAG:   %[[C513:.+]] = constant 513 : index
-//       CHECK:   %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//       CHECK:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]]
 //  CHECK-SAME:       [%[[C4]], %[[C0]] for %[[C1]], %[[C513]]]
 //  CHECK-SAME:       : tensor<?x513xi32>{%[[DIM]]} -> tensor<1x513xi32>
@@ -146,7 +146,7 @@ func @subtensor_insert_convert
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C2:.+]] = constant 2
 //   CHECK-DAG:   %[[C4:.+]] = constant 4
-//   CHECK-DAG:   %[[DIM0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[DIM0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[ARG1]], %[[ARG0]][%[[C4]], %[[C2]], %[[C0]]]
 //  CHECK-SAME:     : tensor<1x4x48xf32> -> tensor<?x24x48xf32>{%[[DIM0]]}
 
@@ -167,7 +167,7 @@ func @subtensor_insert_convert_rank_reducing
 //   CHECK-DAG:   %[[C2:.+]] = constant 2
 //   CHECK-DAG:   %[[C4:.+]] = constant 4
 //   CHECK-DAG:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[ARG1]] : tensor<4x48xf32> -> tensor<1x4x48xf32>
-//   CHECK-DAG:   %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[RESHAPE]], %[[ARG0]][%[[C4]], %[[C2]], %[[C0]]]
 //  CHECK-SAME:     : tensor<1x4x48xf32> -> tensor<?x24x48xf32>{%[[DIM]]}
 

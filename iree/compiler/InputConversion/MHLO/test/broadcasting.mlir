@@ -24,11 +24,11 @@ func @dynamicBroadcast(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?
   // Should broadcast %arg0 -> %arg1 and assert on dynamic expansion.
 
   // CHECK: %[[C0_0:.*]] = constant 0 : index
-  // CHECK: %[[ARG0_D0:.*]] = memref.dim %arg0, %[[C0_0]]
+  // CHECK: %[[ARG0_D0:.*]] = tensor.dim %arg0, %[[C0_0]]
   // CHECK: %[[C0_1:.*]] = constant 0 : index
-  // CHECK: %[[ARG1_D0:.*]] = memref.dim %arg1, %[[C0_1]] : tensor<?x?xf32>
+  // CHECK: %[[ARG1_D0:.*]] = tensor.dim %arg1, %[[C0_1]] : tensor<?x?xf32>
   // CHECK: %[[C1_0:.*]] = constant 1 : index
-  // CHECK: %[[ARG1_D1:.*]] = memref.dim %arg1, %[[C1_0]] : tensor<?x?xf32>
+  // CHECK: %[[ARG1_D1:.*]] = tensor.dim %arg1, %[[C1_0]] : tensor<?x?xf32>
   // CHECK: %[[EQ:.*]] = cmpi eq, %[[ARG0_D0]], %[[ARG1_D1]] : index
   // CHECK: assert %[[EQ]], "mismatched dynamic broadcast extents"
 
@@ -175,7 +175,7 @@ func @selectv2_broadcast_all(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi32>, 
 // CHECK-LABEL: func @selectv2_broadcast_dyn_pred
 func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x8x1xi32>, %arg2: tensor<1x1x8xi32>) -> tensor<?x8x8xi32> {
   // CHECK: %[[C0_0:.*]] = constant 0 : index
-  // CHECK: %[[DIM_PRED_0:.*]] = memref.dim %arg0, %[[C0_0]]
+  // CHECK: %[[DIM_PRED_0:.*]] = tensor.dim %arg0, %[[C0_0]]
   // CHECK: %[[INIT_PRED:.*]] = linalg.init_tensor [%[[DIM_PRED_0]], 8, 8]
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map0, #map1]
@@ -189,7 +189,7 @@ func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x8x1xi
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x8xi32>) outs(%[[INIT_ELSE]] : tensor<?x8x8xi32>)
   // CHECK: %[[C0_1:.*]] = constant 0 : index
-  // CHECK: %[[DIM_BCAST_PRED_0:.*]] = memref.dim %[[BCAST_PRED]], %[[C0_1]]
+  // CHECK: %[[DIM_BCAST_PRED_0:.*]] = tensor.dim %[[BCAST_PRED]], %[[C0_1]]
   // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [%[[DIM_BCAST_PRED_0]], 8, 8]
   // CHECK: linalg.generic
   //     CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %[[BCAST_ELSE]] : tensor<?x8x8xi1>, tensor<?x8x8xi32>, tensor<?x8x8xi32>) outs(%[[INIT_RESULT]] : tensor<?x8x8xi32>)
@@ -201,7 +201,7 @@ func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x8x1xi
 // CHECK-LABEL: func @selectv2_broadcast_dyn_then
 func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x?x1xi32>, %arg2: tensor<1x1x8xi32>) -> tensor<8x?x8xi32> {
   // CHECK: %[[C1_0:.*]] = constant 1 : index
-  // CHECK: %[[DIM_THEN_1:.*]] = memref.dim %arg1, %[[C1_0]]
+  // CHECK: %[[DIM_THEN_1:.*]] = tensor.dim %arg1, %[[C1_0]]
   // CHECK: %[[INIT_PRED:.*]] = linalg.init_tensor [8, %[[DIM_THEN_1]], 8]
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map0, #map1]
@@ -215,7 +215,7 @@ func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x?x1xi
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x8xi32>) outs(%[[INIT_ELSE]] : tensor<8x?x8xi32>)
   // CHECK: %[[C1_1:.*]] = constant 1 : index
-  // CHECK: %[[DIM_BCAST_PRED_1:.*]] = memref.dim %[[BCAST_PRED]], %[[C1_1]]
+  // CHECK: %[[DIM_BCAST_PRED_1:.*]] = tensor.dim %[[BCAST_PRED]], %[[C1_1]]
   // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [8, %[[DIM_BCAST_PRED_1]], 8]
   // CHECK: linalg.generic
   //     CHECK-SAME: ins(%2, %4, %6 : tensor<8x?x8xi1>, tensor<8x?x8xi32>, tensor<8x?x8xi32>) outs(%8 : tensor<8x?x8xi32>)
@@ -227,7 +227,7 @@ func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x?x1xi
 // CHECK-LABEL: func @selectv2_broadcast_dyn_else
 func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi32>, %arg2: tensor<1x1x?xi32>) -> tensor<8x8x?xi32> {
   // CHECK: %[[C2_0:.*]] = constant 2 : index
-  // CHECK: %[[DIM_ELSE_2:.*]] = memref.dim %arg2, %[[C2_0]]
+  // CHECK: %[[DIM_ELSE_2:.*]] = tensor.dim %arg2, %[[C2_0]]
   // CHECK: %[[INIT_PRED:.*]] = linalg.init_tensor [8, 8, %[[DIM_ELSE_2]]]
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map0, #map1]
@@ -242,7 +242,7 @@ func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x?xi32>) outs(%[[INIT_ELSE]] : tensor<8x8x?xi32>)
   // CHECK: %[[C2_1:.*]] = constant 2 : index
-  // CHECK: %[[DIM_BCAST_PRED_1:.*]] = memref.dim %[[BCAST_PRED]], %[[C2_1]]
+  // CHECK: %[[DIM_BCAST_PRED_1:.*]] = tensor.dim %[[BCAST_PRED]], %[[C2_1]]
   // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [8, 8, %[[DIM_BCAST_PRED_1]]]
   // CHECK: linalg.generic
   //     CHECK-SAME: ins(%2, %4, %6 : tensor<8x8x?xi1>, tensor<8x8x?xi32>, tensor<8x8x?xi32>) outs(%8 : tensor<8x8x?xi32>)
@@ -254,13 +254,13 @@ func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi
 // CHECK-LABEL: func @selectv2_broadcast_dyn_all
 func @selectv2_broadcast_dyn_all(%arg0: tensor<?x1x1xi1>, %arg1: tensor<?x8x1xi32>, %arg2: tensor<?x1x?xi32>) -> tensor<?x8x?xi32> {
   // CHECK: %[[C0:.*]] = constant 0 : index
-  // CHECK: %[[PRED_D0:.*]] = memref.dim %arg0, %[[C0]] : tensor<?x1x1xi1>
+  // CHECK: %[[PRED_D0:.*]] = tensor.dim %arg0, %[[C0]] : tensor<?x1x1xi1>
   // CHECK: %[[C0_0:.*]] = constant 0 : index
-  // CHECK: %[[THEN_D0:.*]] = memref.dim %arg1, %[[C0_0]] : tensor<?x8x1xi32>
+  // CHECK: %[[THEN_D0:.*]] = tensor.dim %arg1, %[[C0_0]] : tensor<?x8x1xi32>
   // CHECK: %[[C0_1:.*]] = constant 0 : index
-  // CHECK: %[[ELSE_D0:.*]] = memref.dim %arg2, %[[C0_1]] : tensor<?x1x?xi32>
+  // CHECK: %[[ELSE_D0:.*]] = tensor.dim %arg2, %[[C0_1]] : tensor<?x1x?xi32>
   // CHECK: %[[C2:.*]] = constant 2 : index
-  // CHECK: %[[ELSE_D2:.*]] = memref.dim %arg2, %[[C2]] : tensor<?x1x?xi32>
+  // CHECK: %[[ELSE_D2:.*]] = tensor.dim %arg2, %[[C2]] : tensor<?x1x?xi32>
   // CHECK: %[[CMP_0:.*]] = cmpi eq, %[[PRED_D0]], %[[THEN_D0]] : index
   // CHECK: assert %[[CMP_0]], "mismatched dynamic broadcast extents"
   // CHECK: %[[CMP_1:.*]] = cmpi eq, %[[PRED_D0]], %[[ELSE_D0]] : index
@@ -416,9 +416,9 @@ func @fallbackDynamicReshape(%arg0 : tensor<4x?x3x?xui32>, %arg1 : tensor<5xinde
   // CHECK-DAG: %[[C4:.*]] = constant 4 : index
   // CHECK-DAG: %[[RESULT_D4:.*]] = tensor.extract %arg1[%[[C4]]] : tensor<5xindex>
   // CHECK-DAG: %[[INDEX1:.*]] = constant 1 : index
-  // CHECK-DAG: %[[ARG_D1:.*]] = memref.dim %[[INPUT]], %[[INDEX1]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[ARG_D1:.*]] = tensor.dim %[[INPUT]], %[[INDEX1]] : tensor<4x?x3x?xi32>
   // CHECK-DAG: %[[INDEX3:.*]] = constant 3 : index
-  // CHECK-DAG: %[[ARG_D3:.*]] = memref.dim %[[INPUT]], %[[INDEX3]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[ARG_D3:.*]] = tensor.dim %[[INPUT]], %[[INDEX3]] : tensor<4x?x3x?xi32>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %[[INPUT]] : tensor<4x?x3x?xi32>{%[[ARG_D1]], %[[ARG_D3]]} -> tensor<12x?x?x1x?xi32>{%[[RESULT_D1]], %[[RESULT_D2]], %[[RESULT_D4]]}
   %0 = "mhlo.dynamic_reshape"(%arg0, %arg1) : (tensor<4x?x3x?xui32>, tensor<5xindex>) -> tensor<12x?x?x1x?xui32>
   // CHECK: %[[UNCONVERTED_RESULT:.*]] = unrealized_conversion_cast %[[RESULT]] : tensor<12x?x?x1x?xi32> to tensor<12x?x?x1x?xui32>
