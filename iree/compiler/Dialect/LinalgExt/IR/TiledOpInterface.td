@@ -54,6 +54,24 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
         /*defaultImplementation=*/[{
           return nullptr;
         }]
+      >,
+      InterfaceMethod<
+        /*desc=*/[{
+          Generates the loop body implementation. Assume that all the parallel
+          loops and reduction loops are created and the insertion point of the
+          build is set to the innermost of the loop. This method implements the
+          loop body IRs.
+        }],
+        /*retType=*/"void",
+        /*methodName=*/"generateLoopBodyImplementation",
+        /*args=*/(ins
+            "OpBuilder &":$b,
+            "Location ":$loc,
+            "ValueRange ":$ivs),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+          returnr;
+        }]
       >
   ];
 }
