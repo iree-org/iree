@@ -30,7 +30,8 @@ namespace HAL {
 static void inlineConditionRegion(Region &conditionRegion, Block *exitBlock,
                                   OpBuilder funcBuilder) {
   assert(!conditionRegion.empty() && "source regions must not be empty");
-  assert(conditionRegion.front().getNumArguments() == 0 && "switch does not capture");
+  assert(conditionRegion.front().getNumArguments() == 0 &&
+         "switch does not capture");
 
   // Splice in the region blocks.
   auto *insertBlock = funcBuilder.getBlock();
