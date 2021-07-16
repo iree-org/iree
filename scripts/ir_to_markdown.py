@@ -9,20 +9,21 @@
 
 Example usage:
   # Get a dump of IR from a compiler tool:
-  $ iree-translate \
+  $ iree-opt \
     -iree-transformation-pipeline \
     -iree-hal-target-backends=vmvx \
     -mlir-disable-threading \
     -print-ir-after-all \
+    -print-ir-after-change \
     -mlir-elide-elementsattrs-if-larger=8 \
     $PWD/iree/samples/models/simple_abs.mlir \
-    -o /tmp/simple_abs_vmvx.vmfb \
     2> /tmp/simple_abs_vmvx_pipeline.mlir
+    > /dev/null
 
   # Convert the IR dump to markdown:
   $ python3 ir_to_markdown.py \
-    /tmp/fullyconnected_vmvx_pipeline.mlir \
-    -o /tmp/fullyconnected_vmvx_pipeline.md
+    /tmp/simple_abs_vmvx_pipeline.mlir \
+    -o /tmp/simple_abs_vmvx_pipeline.md
 """
 
 import argparse
@@ -47,8 +48,8 @@ def parse_arguments():
                       required=True,
                       metavar="<output>",
                       help='Output file path (e.g. translation_ir.md)')
-  # TODO(scotttodd): flag for input IR path
-  # TODO(scotttodd): flag for command line used for compilation
+  # TODO(scotttodd): flags for original IR path and compilation command line
+  #                  .md could then show original IR + flags -> output
   # TODO(scotttodd): flag for markdown flavor (mkdocs, github, etc.)
   # TODO(scotttodd): flag for diff view (correlate IR before and IR after)?
 
