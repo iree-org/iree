@@ -114,6 +114,7 @@ iree_status_t Run() {
   // Lookup the entry point function call.
   const char kMainFunctionName[] = "module.simple_mul";
   iree_runtime_call_t call;
+  memset(&call, 0, sizeof(call));
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_initialize_by_name(
         session, iree_make_cstring_view(kMainFunctionName), &call);
