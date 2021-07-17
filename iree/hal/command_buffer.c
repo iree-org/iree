@@ -79,6 +79,22 @@ iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer) {
   return status;
 }
 
+IREE_API_EXPORT void iree_hal_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  _VTABLE_DISPATCH(command_buffer, begin_debug_group)
+  (command_buffer, label, label_color, location);
+}
+
+IREE_API_EXPORT void iree_hal_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* command_buffer) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  _VTABLE_DISPATCH(command_buffer, end_debug_group)
+  (command_buffer);
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_execution_stage_t source_stage_mask,

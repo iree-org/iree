@@ -141,6 +141,17 @@ vm.import @command_buffer.end(
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
 
+// Pushes a new debug group with the given |label|.
+vm.import @command_buffer.begin_debug_group(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %label : !vm.buffer
+)
+
+// Pops a debug group from the stack.
+vm.import @command_buffer.end_debug_group(
+  %command_buffer : !vm.ref<!hal.command_buffer>
+)
+
 // Defines an execution dependency between all commands recorded before the
 // barrier and all commands recorded after the barrier. Only the stages provided
 // will be affected.

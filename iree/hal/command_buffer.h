@@ -182,6 +182,26 @@ typedef struct iree_hal_buffer_barrier_t {
   iree_device_size_t length;
 } iree_hal_buffer_barrier_t;
 
+// An RGBA color.
+typedef struct iree_hal_label_color_t {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint8_t a;
+} iree_hal_label_color_t;
+
+// A source location attached to debug labels.
+typedef struct iree_hal_label_location_t {
+  iree_string_view_t file;
+  int line;
+} iree_hal_label_location_t;
+
+// An unspecified color; debugging tools are to choose their own.
+static inline iree_hal_label_color_t iree_hal_label_color_unspecified() {
+  iree_hal_label_color_t color = {0, 0, 0, 0};
+  return color;
+}
+
 // TODO(benvanik): replace with tables for iree_string_builder_*.
 #define iree_hal_command_buffer_mode_string(...) "TODO"
 //    {IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT, "ONE_SHOT"},
@@ -261,6 +281,25 @@ iree_hal_command_buffer_begin(iree_hal_command_buffer_t* command_buffer);
 // This must be called prior to submitting the command buffer for execution.
 IREE_API_EXPORT iree_status_t
 iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer);
+
+// Pushes a new debug group with the given |label|.
+// All commands between this and a mandatory matching call to
+// iree_hal_command_buffer_end_debug_group will be grouped together with the
+// given label. If a source location is available it can be provided via
+// |location| to allow mapping back into the source program that issued the
+// commands.
+//
+// An optional RGBA color to show in the debug UI may be provided via
+// |label_color|; otherwise iree_hal_label_color_unspecified can be used to let
+// the debug tool choose.
+IREE_API_EXPORT void iree_hal_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location);
+
+// Pops a debug group from the stack.
+IREE_API_EXPORT void iree_hal_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* command_buffer);
 
 // Defines a memory dependency between commands recorded before and after the
 // barrier. One or more memory or buffer barriers can be specified to indicate
@@ -467,6 +506,13 @@ typedef struct iree_hal_command_buffer_vtable_t {
 
   iree_status_t(IREE_API_PTR* begin)(iree_hal_command_buffer_t* command_buffer);
   iree_status_t(IREE_API_PTR* end)(iree_hal_command_buffer_t* command_buffer);
+
+  void(IREE_API_PTR* begin_debug_group)(
+      iree_hal_command_buffer_t* command_buffer, iree_string_view_t label,
+      iree_hal_label_color_t label_color,
+      const iree_hal_label_location_t* location);
+  void(IREE_API_PTR* end_debug_group)(
+      iree_hal_command_buffer_t* command_buffer);
 
   iree_status_t(IREE_API_PTR* execution_barrier)(
       iree_hal_command_buffer_t* command_buffer,
