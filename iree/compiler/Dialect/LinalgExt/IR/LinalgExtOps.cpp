@@ -254,7 +254,8 @@ SmallVector<Range> ScatterOp::getLoopBounds(OpBuilder &builder) {
 Operation *ScatterOp::getTiledImplementation(
     OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes,
-    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets) {
+    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets,
+    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultSizes) {
   assert(outputs.size() == 1 && offsets.size() == 1 && sizes.size() == 1);
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
@@ -289,7 +290,12 @@ Operation *ScatterOp::getTiledImplementation(
   assert(tiledIndices && "failed to get slice of indices");
 
   resultOffsets.resize(1);
-  resultOffsets[0].resize(getUpdateType().getRank(), zeroAttr);
+  resultOffsets[0].resize(updateRank, zeroAttr);
+  resultSizes.resize(1);
+  resultSizes[0].resize(updateRank);
+  for (auto dim : llvm::seq<int64_t>(0, updateRank)) {
+    resultSizes[0][dim] = getDim(builder, loc, original(), dim);
+  }
   SmallVector<Type> resultTypes;
   if (getNumResults()) {
     resultTypes.push_back(getResultTypes()[0]);
@@ -400,7 +406,8 @@ SmallVector<Range> SortOp::getLoopBounds(OpBuilder &builder) {
 Operation *SortOp::getTiledImplementation(
     OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes,
-    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets) {
+    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets,
+    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultSizes) {
   assert(outputs.size() == this->outputs().size());
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
@@ -410,11 +417,13 @@ Operation *SortOp::getTiledImplementation(
   Location loc = getLoc();
   SmallVector<Value> tiledOperands(outputs.size());
   resultOffsets.resize(outputs.size());
+  resultSizes.resize(outputs.size());
   for (auto en : llvm::enumerate(outputs)) {
     tiledOperands[en.index()] =
         getSlice(builder, getLoc(), en.value(), offsets, sizes, strides);
     assert(tiledOperands[en.index()] && "failed to get slice of operand");
     resultOffsets[en.index()].assign(offsets.begin(), offsets.end());
+    resultSizes[en.index()].assign(sizes.begin(), sizes.end());
   }
   SmallVector<Type, 4> resultTypes;
   if (getNumResults()) {

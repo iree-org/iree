@@ -49,7 +49,8 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
             "ValueRange ":$outputs,
             "ArrayRef<OpFoldResult> ":$offsets,
             "ArrayRef<OpFoldResult> ":$sizes,
-            "SmallVectorImpl<SmallVector<OpFoldResult, 4>> &":$resultOffsets),
+            "SmallVectorImpl<SmallVector<OpFoldResult, 4>> &":$resultOffsets,
+            "SmallVectorImpl<SmallVector<OpFoldResult, 4>> &":$resultSizes),
         /*methodBody=*/"",
         /*defaultImplementation=*/[{
           return nullptr;
