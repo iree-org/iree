@@ -6,10 +6,12 @@
 
 #include "experimental/rocm/descriptor_set_layout.h"
 
-#include "experimental/rocm/status_util.h"
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
-typedef struct {
+typedef struct iree_hal_rocm_descriptor_set_layout_t {
   iree_hal_resource_t resource;
   iree_hal_rocm_context_wrapper_t *context;
 } iree_hal_rocm_descriptor_set_layout_t;

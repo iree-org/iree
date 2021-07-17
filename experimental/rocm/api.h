@@ -21,7 +21,7 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // ROCM driver creation options.
-typedef struct {
+typedef struct iree_hal_rocm_driver_options_t {
   // Index of the default ROCM device to use within the list of available
   // devices.
   int default_device_index;

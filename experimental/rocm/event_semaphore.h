@@ -7,8 +7,11 @@
 #ifndef IREE_HAL_ROCM_SEMAPHORE_H_
 #define IREE_HAL_ROCM_SEMAPHORE_H_
 
+#include <stdint.h>
+
 #include "experimental/rocm/context_wrapper.h"
 #include "experimental/rocm/status_util.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus

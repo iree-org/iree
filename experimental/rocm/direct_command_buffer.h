@@ -10,6 +10,7 @@
 #include "experimental/rocm/context_wrapper.h"
 #include "experimental/rocm/dynamic_symbols.h"
 #include "experimental/rocm/rocm_headers.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus
