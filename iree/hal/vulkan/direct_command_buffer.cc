@@ -184,6 +184,13 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_begin(
                          command_buffer->handle, &begin_info),
                      "vkBeginCommandBuffer");
 
+  IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->handle,
+      /*file_name=*/NULL, 0,
+      /*line=*/0, /*func_name=*/NULL, 0,
+      "iree_hal_vulkan_direct_command_buffer",
+      strlen("iree_hal_vulkan_direct_command_buffer"));
+
   return iree_ok_status();
 }
 
@@ -191,6 +198,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
 
   VK_RETURN_IF_ERROR(
       command_buffer->syms->vkEndCommandBuffer(command_buffer->handle),
@@ -602,8 +612,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
     IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
         command_buffer->tracing_context, command_buffer->handle,
         source_location.file_name.data, source_location.file_name.size,
-        source_location.line, source_location.func_name.data,
-        source_location.func_name.size, NULL, 0);
+        source_location.line, /*func_name=*/NULL, 0,
+        source_location.func_name.data, source_location.func_name.size);
   });
 
   // Get the compiled and linked pipeline for the specified entry point and
@@ -638,8 +648,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->handle,
       source_location.file_name.data, source_location.file_name.size,
-      source_location.line, source_location.func_name.data,
-      source_location.func_name.size, NULL, 0);
+      source_location.line, /*func_name=*/NULL, 0,
+      source_location.func_name.data, source_location.func_name.size);
 
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.
