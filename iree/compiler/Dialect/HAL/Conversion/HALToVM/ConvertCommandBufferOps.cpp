@@ -74,6 +74,14 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferEndOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.end");
   patterns
+      .insert<VMImportOpConversion<IREE::HAL::CommandBufferBeginDebugGroupOp>>(
+          context, importSymbols, typeConverter,
+          "hal.command_buffer.begin_debug_group");
+  patterns
+      .insert<VMImportOpConversion<IREE::HAL::CommandBufferEndDebugGroupOp>>(
+          context, importSymbols, typeConverter,
+          "hal.command_buffer.end_debug_group");
+  patterns
       .insert<VMImportOpConversion<IREE::HAL::CommandBufferExecutionBarrierOp>>(
           context, importSymbols, typeConverter,
           "hal.command_buffer.execution_barrier");
