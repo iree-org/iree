@@ -15,8 +15,9 @@
 #define VMA_ASSERT IREE_DCHECK
 #define VMA_HEAVY_ASSERT IREE_DCHECK
 
-// Use IREE_LOG for logging.
-#ifndef NDEBUG
+// NOTE: logging is disabled by default as unless you are debugging VMA itself
+// the information is not useful and just slows things down.
+#if 0
 #define VMA_DEBUG_LOG(...) _IREE_LOG_INFO << __VA_ARGS__
 #else
 #define VMA_DEBUG_LOG(...)
