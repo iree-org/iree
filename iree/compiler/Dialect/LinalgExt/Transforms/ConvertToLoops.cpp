@@ -51,13 +51,17 @@ struct BubbleSortConversion : public OpRewritePattern<linalg_ext::SortOp> {
     lbs.append(op.getRank(arg0), zero);
     steps.append(op.getRank(arg0), one);
 
+    bool fail = false;
     mlir::scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps, ValueRange{},
         [&](OpBuilder& b, Location loc, ValueRange ivs, ValueRange iters) {
-          op.generateLoopBodyImplementation(b, loc, ivs);
+          if (failed(op.generateScalarImplementation(b, loc, ivs))) {
+            fail = true;
+          }
           b.create<scf::YieldOp>(loc);
           return scf::ValueVector();
         });
+    if (fail) return failure();
     rewriter.eraseOp(op);
     return success();
   }
@@ -78,12 +82,16 @@ struct ScatterConversion : public OpRewritePattern<linalg_ext::ScatterOp> {
     Value zero = rewriter.create<ConstantIndexOp>(loc, 0);
     Value one = rewriter.create<ConstantIndexOp>(loc, 1);
     Value ub = rewriter.createOrFold<memref::DimOp>(loc, updates, zero);
+    bool fail = false;
     rewriter.create<scf::ForOp>(
         loc, zero, ub, one, ValueRange{},
         [&](OpBuilder& b, Location loc, Value iv, ValueRange iters) {
-          op.generateLoopBodyImplementation(b, loc, iv);
+          if (failed(op.generateScalarImplementation(b, loc, iv))) {
+            fail = true;
+          }
           b.create<scf::YieldOp>(loc);
         });
+    if (fail) return failure();
     rewriter.eraseOp(op);
     return success();
   }

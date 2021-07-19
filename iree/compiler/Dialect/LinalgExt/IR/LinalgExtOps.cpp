@@ -384,8 +384,9 @@ void ScatterOp::generateSliceUpdateLoopBody(OpBuilder &b, Location loc,
   }
 }
 
-void ScatterOp::generateLoopBodyImplementation(OpBuilder &b, Location loc,
-                                               ValueRange ivs) {
+LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
+                                                      Location loc,
+                                                      ValueRange ivs) {
   assert(ivs.size() == 1);
 
   if (isScalarUpdate()) {
@@ -393,6 +394,7 @@ void ScatterOp::generateLoopBodyImplementation(OpBuilder &b, Location loc,
   } else {
     generateSliceUpdateLoopBody(b, loc, ivs);
   }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -521,8 +523,8 @@ Operation *SortOp::getTiledImplementation(
       .clone(builder, loc, resultTypes, tiledOperands);
 }
 
-void SortOp::generateLoopBodyImplementation(OpBuilder &b, Location loc,
-                                            ValueRange ivs) {
+LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                   ValueRange ivs) {
   auto sortDim = getSortedDimension();
   SmallVector<Value> indices, sortBlkArgs;
   indices.append(ivs.begin(), ivs.end());
@@ -594,6 +596,7 @@ void SortOp::generateLoopBodyImplementation(OpBuilder &b, Location loc,
         }
         b.create<scf::YieldOp>(loc);
       });
+  return success();
 }
 
 }  // namespace linalg_ext

@@ -62,15 +62,15 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
           build is set to the innermost of the loop. This method implements the
           loop body IRs.
         }],
-        /*retType=*/"void",
-        /*methodName=*/"generateLoopBodyImplementation",
+        /*retType=*/"LogicalResult",
+        /*methodName=*/"generateScalarImplementation",
         /*args=*/(ins
             "OpBuilder &":$b,
             "Location ":$loc,
             "ValueRange ":$ivs),
         /*methodBody=*/"",
         /*defaultImplementation=*/[{
-          return;
+          return failure();
         }]
       >
   ];
