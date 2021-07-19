@@ -824,10 +824,6 @@ iree_status_t iree_task_dispatch_shard_execute(
                                                    tiles_per_reservation,
                                                    iree_memory_order_relaxed);
   while (tile_base < tile_count) {
-    const uint32_t next_tile_base = iree_atomic_fetch_add_int32(
-        &shared_state->tile_index, tiles_per_reservation,
-        iree_memory_order_relaxed);
-
     const uint32_t tile_range =
         iree_min(tile_base + tiles_per_reservation, tile_count);
     for (uint32_t tile_index = tile_base; tile_index < tile_range;
@@ -865,7 +861,9 @@ iree_status_t iree_task_dispatch_shard_execute(
       }
     }
 
-    tile_base = next_tile_base;
+    tile_base = iree_atomic_fetch_add_int32(&shared_state->tile_index,
+                                            tiles_per_reservation,
+                                            iree_memory_order_relaxed);
   }
 
   // Push aggregate statistics up to the dispatch.
