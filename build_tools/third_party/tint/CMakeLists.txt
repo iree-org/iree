@@ -9,14 +9,17 @@ include(FetchContent)
 FetchContent_Declare(
   tint
   GIT_REPOSITORY https://dawn.googlesource.com/tint
-  GIT_TAG 874d1b66186ff8d0cb249bc73ccaea08144c36b0 # 2022-10-21
+  GIT_TAG ${IREE_TINT_TAG}
 )
 
 set(TINT_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+set(TINT_BUILD_DOCS  OFF CACHE BOOL "" FORCE)
 set(TINT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 # Our usage at compile time primarily needs the SPIR-V reader and WGSL writer,
-# but usage at runtime through Dawn needs a broader set.
+# but usage at runtime through Dawn needs a broader set. WebGPU on native is
+# not a supported production use case and is only for development/testing and
+# as such we don't get too particular about minimizing its size here.
 
 set(TINT_BUILD_SPV_READER ON CACHE BOOL "" FORCE)
 set(TINT_BUILD_WGSL_READER ON CACHE BOOL "" FORCE)
