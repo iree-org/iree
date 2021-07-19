@@ -228,10 +228,18 @@ if(APPLE)
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
 endif()
 
+# WebGPU is disabled by default as it's experimental.
+# TODO(benvanik): FindPackage the deps or default to on when under emscripten?
+set(IREE_HAL_DRIVER_WEBGPU_DEFAULT OFF)
+set(IREE_HAL_WEBGPU_PLATFORM_DEFAULT "dawn")
+set(IREE_HAL_WEBGPU_PLATFORM "${IREE_HAL_WEBGPU_PLATFORM_DEFAULT}"
+    CACHE STRING "Native WebGPU implementation ('dawn' or 'wgpu-native').")
+
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
+option(IREE_HAL_DRIVER_WEBGPU "Enables the 'webgpu' runtime HAL driver" ${IREE_HAL_DRIVER_WEBGPU_DEFAULT})
 
 option(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS "Sets the default value for all runtime HAL executable loaders" ON)
 set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
@@ -291,6 +299,9 @@ if(IREE_HAL_DRIVER_LOCAL_TASK)
 endif()
 if(IREE_HAL_DRIVER_VULKAN)
   message(STATUS "  - vulkan")
+endif()
+if(IREE_HAL_DRIVER_WEBGPU)
+  message(STATUS "  - webgpu")
 endif()
 if(IREE_EXTERNAL_HAL_DRIVERS)
   message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS}")
@@ -821,6 +832,7 @@ add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/wgpu-native EXCLUDE_FROM_ALL)
 
 iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
@@ -868,13 +880,28 @@ if(IREE_TARGET_BACKEND_METAL_SPIRV)
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
 endif()
 
-if(IREE_TARGET_BACKEND_WEBGPU)
+if(IREE_TARGET_BACKEND_WEBGPU OR
+  (IREE_HAL_DRIVER_WEBGPU AND ("${IREE_HAL_WEBGPU_PLATFORM}" STREQUAL "dawn")))
+  # NOTE: these all need to be synchronized with Dawn.
+  set(IREE_SPIRV_TOOLS_TAG  "37d2396cabe56b29d37551ea55d0d745d5748ded")
+  # https://dawn.googlesource.com/dawn/+/refs/heads/main/DEPS
+  # https://chromium.googlesource.com/vulkan-deps/+/main/DEPS
+  set(IREE_TINT_TAG         "5aca651c524caca8ac85962d1dff378238671eba")
+  set(IREE_DAWN_ABSEIL_TAG  "789af048b388657987c59d4da406859034fe310f")
+  set(IREE_DAWN_GLFW_TAG    "62e175ef9fae75335575964c845a302447c012c7")
+  set(IREE_DAWN_TAG         "2f1b0dc47d8316f3db6e5b9a55b873cd3079cea5")
+
   # Tint is needed to compile SPIR-V into WGSL source code.
   # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
+  # Dawn needs Tint (and thus SPIRV-Tools), but only at runtime.
+  # Order matters here, unfortunately.
   iree_set_spirv_headers_cmake_options()
   add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
   add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
   add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
+  if(IREE_HAL_DRIVER_WEBGPU AND ("${IREE_HAL_WEBGPU_PLATFORM}" STREQUAL "dawn"))
+    add_subdirectory(build_tools/third_party/dawn EXCLUDE_FROM_ALL)
+  endif()
 endif()
 
 #-------------------------------------------------------------------------------

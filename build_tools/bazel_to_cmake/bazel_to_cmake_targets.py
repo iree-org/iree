@@ -143,6 +143,8 @@ class TargetConverter:
         "@vulkan_memory_allocator//:impl_header_only": [
             "vulkan_memory_allocator"
         ],
+        "@webgpu_headers": [],
+        "@wgpu-native//:static": ["wgpu-native-static"],
     })
 
     self._initialize()

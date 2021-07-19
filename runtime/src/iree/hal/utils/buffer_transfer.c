@@ -121,6 +121,9 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
        iree_all_bits_set(iree_hal_buffer_allowed_usage(target.device_buffer),
                          IREE_HAL_BUFFER_USAGE_MAPPING));
+  // DO NOT SUBMIT
+  is_source_mappable = false;
+  is_target_mappable = false;
   if (is_source_mappable && is_target_mappable) {
     return iree_hal_device_transfer_mappable_range(
         device, source, source_offset, target, target_offset, data_length,
