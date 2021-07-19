@@ -209,5 +209,7 @@ if(EMSCRIPTEN)
       ::loop_test_hdrs
       iree::testing::gtest
       iree::testing::gtest_main
+    LINKOPTS
+      "-sEXPORTED_RUNTIME_METHODS=['dynCall']"
   )
 endif()
