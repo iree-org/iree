@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===--------------- InterchangeGenericOp.cpp -----------------------------===//
+//===--------------- InterchangeGenericOps.cpp ----------------------------===//
 //
 // Interchange loops in generic ops to force the reduction loops to be the most
 // inner loops.
@@ -54,7 +54,7 @@ struct GenericOpInterchangePattern
 };
 
 struct InterchangeGenericOpsPass
-    : public InterchangeGenericBase<InterchangeGenericOpsPass> {
+    : public InterchangeGenericOpsBase<InterchangeGenericOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
@@ -68,7 +68,7 @@ struct InterchangeGenericOpsPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createInterchangeLinalgGenericPass() {
+std::unique_ptr<OperationPass<FuncOp>> createInterchangeGenericOpsPass() {
   return std::make_unique<InterchangeGenericOpsPass>();
 }
 
