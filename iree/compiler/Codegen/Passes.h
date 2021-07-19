@@ -314,7 +314,7 @@ void populateFoldGPUProcessorIDUsesPatterns(MLIRContext *context,
 // Test passes
 //------------------------------------------------------------------------------
 
-std::unique_ptr<OperationPass<FuncOp>> createTestLLVMGPUScalarizeMathOpPass();
+std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

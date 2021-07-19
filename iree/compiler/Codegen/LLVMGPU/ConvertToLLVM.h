@@ -18,6 +18,9 @@ void populateLLVMConversionPatterns(MLIRContext *context,
 
 void populateScalarizeMathOps(RewritePatternSet &patterns);
 
+/// Add patterns to convert AllocOp of shared memory to a global variable.
+void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -62,15 +62,49 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
   }
 };
 
-/// Pass to test scalarization pattern.
-class TestLLVMGPUScalarizeMathOpPass
-    : public TestLLVMGPUScalarizeMathOpBase<TestLLVMGPUScalarizeMathOpPass> {
+struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
+  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::AllocOp allocOp,
+                                PatternRewriter &rewriter) const override {
+    if (allocOp.getType().getMemorySpaceAsInt() != 3) return failure();
+    ArrayRef<int64_t> shape = allocOp.getType().getShape();
+    if (llvm::any_of(
+            shape, [](int64_t dim) { return dim == ShapedType::kDynamicSize; }))
+      return failure();
+    // In CUDA workgroup memory is represented by a global variable.
+    MemRefType allocType = allocOp.getType();
+    auto funcOp = allocOp->getParentOfType<FuncOp>();
+    auto moduleOp = funcOp->getParentOfType<ModuleOp>();
+    SymbolTable symbolTable(moduleOp);
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(&moduleOp.front());
+    auto global = rewriter.create<memref::GlobalOp>(
+        funcOp.getLoc(), "__shared_memory__",
+        /*sym_visibility=*/rewriter.getStringAttr("private"),
+        /*type=*/allocType,
+        /*initial_value=*/ElementsAttr(),
+        /*constant=*/false);
+    symbolTable.insert(global);
+
+    rewriter.setInsertionPointToStart(&(*funcOp.getBody().begin()));
+    rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(allocOp, global.type(),
+                                                     global.getName());
+    return success();
+  }
+};
+
+/// Pass to test in dialect transformation used to legalize the IR before
+/// convertToNVVM/ConvertToROCDL.
+class TestLLVMGPULegalizeOpPass
+    : public TestLLVMGPUScalarizeMathOpBase<TestLLVMGPULegalizeOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
     populateScalarizeMathOps(patterns);
+    populateConvertSharedMemoryAllocOps(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
@@ -290,8 +324,12 @@ void populateScalarizeMathOps(RewritePatternSet &patterns) {
       patterns.getContext());
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createTestLLVMGPUScalarizeMathOpPass() {
-  return std::make_unique<TestLLVMGPUScalarizeMathOpPass>();
+void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {
+  patterns.add<ConvertSharedMemAllocOp>(patterns.getContext());
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass() {
+  return std::make_unique<TestLLVMGPULegalizeOpPass>();
 }
 
 }  // namespace iree_compiler
