@@ -338,6 +338,7 @@ ABI_TYPE_TO_DTYPE = {
     "i32": np.int32,
     "i64": np.int64,
     "f64": np.float64,
+    "i16": np.int16,
     "i1": np.bool_,
 }
 

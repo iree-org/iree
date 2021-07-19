@@ -170,7 +170,7 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
         .insert<ContractionOpToOuterProductOpLowering,
                 ContractionOpToMatmulOpLowering, ContractionOpLowering>(
             vectorTransformsOptions, context);
-    vector::populateVectorTransferLoweringPatterns(
+    vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorContractLoweringPatterns)))) {

@@ -145,6 +145,7 @@ cc_library(
         "@llvm-project//mlir:LinalgToSPIRV",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MathDialect",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:QuantOps",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToGPUPass",

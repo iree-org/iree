@@ -750,12 +750,9 @@ Optional<LaunchConfig> initGPULaunchConfig(
     DISPATCH(linalg::ConvInputNHWCFilterHWCFOp)
     DISPATCH(linalg::ConvInputNDHWCFilterDHWCFOp)
     DISPATCH(linalg::MatmulOp)
-    DISPATCH(linalg::PoolingNHWCMaxI8Op)
-    DISPATCH(linalg::PoolingNHWCMaxI16Op)
-    DISPATCH(linalg::PoolingNHWCMaxI32Op)
-    DISPATCH(linalg::PoolingNHWCMaxFOp)
-    DISPATCH(linalg::PoolingNHWCMinFOp)
-    DISPATCH(linalg::PoolingNHWCSumFOp)
+    DISPATCH(linalg::PoolingNhwcMaxOp)
+    DISPATCH(linalg::PoolingNhwcMinOp)
+    DISPATCH(linalg::PoolingNhwcSumOp)
   }
 
   // Any generic operations found are made the root if no other op is the root

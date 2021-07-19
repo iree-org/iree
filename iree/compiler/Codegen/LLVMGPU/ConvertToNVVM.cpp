@@ -59,6 +59,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
       mlir::vector::populateVectorTransposeLoweringPatterns(patterns);
+      mlir::vector::populateVectorTransferLoweringPatterns(patterns);
       (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
     }
     {

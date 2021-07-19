@@ -315,7 +315,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   ///   !spv.array.
   /// - unrealized_conversion_cast with the same source and target type.
   patterns.insert<
-      FoldAsNoOp<linalg::CollapseShapeOp>, FoldAsNoOp<linalg::ExpandShapeOp>,
+      FoldAsNoOp<memref::CollapseShapeOp>, FoldAsNoOp<memref::ExpandShapeOp>,
       FoldAsNoOp<memref::BufferCastOp>, RemoveIdentityConversionCast>(
       typeConverter, context);
 

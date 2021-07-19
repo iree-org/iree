@@ -103,7 +103,8 @@ struct LLVMGPUVectorizationPass
       RewritePatternSet lowerTransferOpPatterns(funcOp.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
           lowerTransferOpPatterns);
-      vector::populateVectorTransferLoweringPatterns(lowerTransferOpPatterns);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(
+          lowerTransferOpPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(lowerTransferOpPatterns));
     }
