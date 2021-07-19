@@ -204,8 +204,10 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id) {
 }  // extern "C"
 #endif  // __cplusplus
 
-#if defined(__cplusplus) && \
-    (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING)
+#if defined(__cplusplus) &&                                               \
+    (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING) && \
+    !IREE_SANITIZER_ADDRESS && !IREE_SANITIZER_MEMORY &&                  \
+    !IREE_SANITIZER_THREAD
 
 void* operator new(size_t count) noexcept {
   auto ptr = malloc(count);
