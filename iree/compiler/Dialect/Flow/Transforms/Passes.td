@@ -119,4 +119,10 @@ def StripAndSplatConstantVariables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
 }
 
+def InterchangeGeneric :
+    Pass<"iree-flow-interchange-generic-op", "FuncOp"> {
+  let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeLinalgGenericPass()";
+}
+
 #endif  // IREE_DIALECT_FLOW_PASSES

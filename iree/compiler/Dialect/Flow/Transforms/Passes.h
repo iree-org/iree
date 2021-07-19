@@ -57,6 +57,10 @@ std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass();
 /// Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
+/// Create a pass to interchange generic ops to force the reduction loop to be
+/// the most inner loops.
+std::unique_ptr<OperationPass<FuncOp>> createInterchangeLinalgGenericPass();
+
 // Convert operations to equivalent flow.tensor.* ops. This is run after
 // dispatch region creation to catch operations that were left outside of
 // dispatch regions and could be represented as flow.tensor.* ops.
