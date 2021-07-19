@@ -99,6 +99,7 @@ set(IREE_ALL_HAL_DRIVERS
   VMVX
   VMVX_Sync
   Vulkan
+  WebGPU_Native
 )
 
 if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
@@ -137,6 +138,7 @@ set(IREE_ALL_TARGET_BACKENDS
   ROCM
   Vulkan-SPIRV
   VMVX
+  WGSL-SPIRV
 )
 
 if(${IREE_BUILD_COMPILER})
@@ -431,6 +433,7 @@ add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/wgpu-native EXCLUDE_FROM_ALL)
 
 iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)

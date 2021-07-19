@@ -32,6 +32,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
     iree_string_view_t identifier, iree_allocator_t data_allocator,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(out_allocator);
+  *out_allocator = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_heap_allocator_t* allocator = NULL;
@@ -149,6 +150,9 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
     iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(base_allocator);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
   iree_hal_heap_allocator_t* allocator =
       iree_hal_heap_allocator_cast(base_allocator);
 

@@ -199,15 +199,16 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
     }
   }
   if (iree_status_is_ok(status)) {
-    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
-        &allocator->statistics, memory_type, allocation_size));
     status = iree_hal_cuda_buffer_wrap(
         (iree_hal_allocator_t*)allocator, memory_type,
         IREE_HAL_MEMORY_ACCESS_ALL, allowed_usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, device_ptr, host_ptr, out_buffer);
   }
-  if (!iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status)) {
+    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
+        &allocator->statistics, memory_type, allocation_size));
+  } else {
     iree_hal_cuda_allocator_free(base_allocator, memory_type, device_ptr,
                                  host_ptr, allocation_size);
   }

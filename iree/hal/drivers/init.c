@@ -32,6 +32,10 @@
 #include "iree/hal/vulkan/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_VULKAN_DRIVER_MODULE
 
+#if defined(IREE_HAL_HAVE_WEBGPU_NATIVE_DRIVER_MODULE)
+#include "iree/hal/webgpu/registration/driver_module_native.h"
+#endif  // IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE
+
 #if defined(IREE_BUILD_EXPERIMENTAL_ROCM)
 #include "experimental/rocm/registration/driver_module.h"
 #endif  // IREE_BUILD_EXPERIMENTAL_ROCM
@@ -69,6 +73,11 @@ iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry) {
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_vulkan_driver_module_register(registry));
 #endif  // IREE_HAL_HAVE_VULKAN_DRIVER_MODULE
+
+#if defined(IREE_HAL_HAVE_WEBGPU_NATIVE_DRIVER_MODULE)
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_webgpu_native_driver_module_register(registry));
+#endif  // IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE
 
 #if defined(IREE_BUILD_EXPERIMENTAL_ROCM)
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
