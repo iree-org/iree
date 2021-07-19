@@ -224,9 +224,8 @@ static bool isRootOp(Operation *op) {
   return isa<linalg::ConvInputNHWCFilterHWCFOp,
              linalg::DepthwiseConvInputNHWCFilterHWCOp,
              linalg::DepthwiseConvInputNHWCFilterHWCFOp,
-             linalg::PoolingNHWCMaxI8Op, linalg::PoolingNHWCMaxI16Op,
-             linalg::PoolingNHWCMaxI32Op, linalg::PoolingNHWCSumFOp,
-             linalg::PoolingNHWCMaxFOp, linalg::PoolingNHWCMinFOp>(op);
+             linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+             linalg::PoolingNhwcMinOp>(op);
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
