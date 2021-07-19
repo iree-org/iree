@@ -328,7 +328,7 @@ void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {
   patterns.add<ConvertSharedMemAllocOp>(patterns.getContext());
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createTestLLVMGPULegalizePass() {
+std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass() {
   return std::make_unique<TestLLVMGPULegalizeOpPass>();
 }
 

@@ -260,7 +260,7 @@ def SPIRVVectorToGPU :
 //------------------------------------------------------------------------------
 
 def TestLLVMGPUScalarizeMathOp :
-    Pass<"iree-test-llvmgpu-legalize-ops", "FuncOp"> {
+    Pass<"iree-test-llvmgpu-legalize-ops", "ModuleOp"> {
   let summary = "Test pass for several legalization patterns.";
   let constructor = "mlir::iree_compiler::createTestLLVMGPULegalizePass()";
 }
