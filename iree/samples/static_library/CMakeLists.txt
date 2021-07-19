@@ -63,7 +63,6 @@ iree_c_embed_data(
     simple_mul_c.h
   FLATTEN
   PUBLIC
-  TESTONLY
 )
 
 iree_cc_binary(
