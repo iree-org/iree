@@ -551,9 +551,6 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
           sortBlkArgs.push_back(
               b.create<memref::LoadOp>(loc, output->get(), indices));
         }
-        // A block must end with a terminator. This op will be erased
-        // later.
-        b.create<scf::YieldOp>(loc);
       });
 
   auto &srcBlock = region().front();
@@ -562,7 +559,6 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   {
     OpBuilder::InsertionGuard guard(b);
     auto &block = region.front();
-    block.getTerminator()->erase();
     b.setInsertionPointToEnd(&block);
     for (auto it : llvm::zip(srcBlock.getArguments(), sortBlkArgs)) {
       bvm.map(std::get<0>(it), std::get<1>(it));
