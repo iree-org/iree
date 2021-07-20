@@ -37,7 +37,7 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
 
 def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["getTiledImplementation"]>]> {
+        ["getTiledImplementation", "generateScalarImplementation"]>]> {
   let summary = "Scatter operator";
   let description = [{
     Based on XLA operation semantics, takes two `inputs` (`update` and
@@ -118,12 +118,17 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
     bool isScalarUpdate() {
       return getUpdateSliceRank() == 0;
     }
+
+    void generateScalarUpdateLoopBody(OpBuilder & b, Location loc,
+                                      ValueRange ivs);
+    void generateSliceUpdateLoopBody(OpBuilder & b, Location loc,
+                                      ValueRange ivs);
   }];
 }
 
 def LinalgExt_SortOp : LinalgExt_Op<"sort",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["getTiledImplementation"]>]> {
+        ["getTiledImplementation", "generateScalarImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given

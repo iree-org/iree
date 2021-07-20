@@ -32,8 +32,10 @@ iree_cc_library(
     LLVMSupport
     MLIRControlFlowInterfaces
     MLIRIR
+    MLIRLinalg
     MLIRMemRef
     MLIRParser
+    MLIRSCF
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport

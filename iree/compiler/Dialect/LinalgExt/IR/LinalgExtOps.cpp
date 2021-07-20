@@ -11,7 +11,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SMLoc.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -305,6 +307,102 @@ Operation *ScatterOp::getTiledImplementation(
              ValueRange{tiledUpdate, tiledIndices, outputs[0]});
 }
 
+void ScatterOp::generateScalarUpdateLoopBody(OpBuilder &b, Location loc,
+                                             ValueRange ivs) {
+  auto indexDepth = getIndexDepth();
+  Value update = b.create<memref::LoadOp>(loc, updates(), ivs);
+  SmallVector<Value> starts;
+  SmallVector<Value> loadIndices(ivs.begin(), ivs.end());
+  loadIndices.push_back(Value());
+  for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
+    loadIndices.back() = b.create<ConstantIndexOp>(loc, i);
+    Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
+    starts.push_back(b.create<IndexCastOp>(loc, b.getIndexType(), idx));
+  }
+  Value init = b.create<memref::LoadOp>(loc, original(), starts);
+
+  BlockAndValueMapping bvm;
+  Block &block = region().front();
+  bvm.map(block.getArgument(0), update);
+  bvm.map(block.getArgument(1), init);
+  for (auto &blockOp : block.without_terminator()) {
+    b.clone(blockOp, bvm);
+  }
+  // The last op is linalg_ext.yield op. Store the operand to
+  // destination.
+  b.create<memref::StoreOp>(
+      loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
+      original(), starts);
+}
+
+void ScatterOp::generateSliceUpdateLoopBody(OpBuilder &b, Location loc,
+                                            ValueRange ivs) {
+  auto indexDepth = getIndexDepth();
+  Value one = b.create<ConstantIndexOp>(loc, 1);
+  Value update = b.create<memref::SubViewOp>(loc, updates(), ivs, one, one);
+  SmallVector<Value> starts;
+  SmallVector<Value> loadIndices(ivs.begin(), ivs.end());
+  loadIndices.push_back(Value());
+  for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
+    loadIndices.back() = b.create<ConstantIndexOp>(loc, i);
+    Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
+    starts.push_back(b.create<IndexCastOp>(loc, b.getIndexType(), idx));
+  }
+  SmallVector<Value> ones(indexDepth, one);
+  Value subview =
+      b.create<memref::SubViewOp>(loc, original(), starts, ones, ones);
+
+  auto nloops = getUpdateSliceRank();
+  SmallVector<AffineMap> maps;
+  {
+    SmallVector<AffineExpr> exprs(1, b.getAffineConstantExpr(0));
+    for (int i = 0; i < nloops; ++i) {
+      exprs.push_back(b.getAffineDimExpr(i));
+    }
+    maps.push_back(AffineMap::get(nloops, 0, exprs, b.getContext()));
+  }
+  {
+    SmallVector<AffineExpr> exprs(indexDepth, b.getAffineConstantExpr(0));
+    for (int i = 0; i < nloops; ++i) {
+      exprs.push_back(b.getAffineDimExpr(i));
+    }
+    maps.push_back(AffineMap::get(nloops, 0, exprs, b.getContext()));
+  }
+
+  SmallVector<StringRef> iterTypes(nloops, getParallelIteratorTypeName());
+  auto genericOp =
+      b.create<linalg::GenericOp>(loc, TypeRange{}, ValueRange{update},
+                                  ValueRange{subview}, maps, iterTypes);
+  {
+    OpBuilder::InsertionGuard guard(b);
+    auto *block = b.createBlock(&genericOp.region(), genericOp.region().end());
+    b.setInsertionPointToEnd(block);
+    BlockAndValueMapping bvm;
+    auto &srcBlock = region().front();
+    for (auto blockArg : srcBlock.getArguments()) {
+      bvm.map(blockArg, block->addArgument(blockArg.getType()));
+    }
+    for (auto &blockOp : srcBlock.without_terminator()) {
+      b.clone(blockOp, bvm);
+    }
+    b.create<linalg::YieldOp>(
+        loc, bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0)));
+  }
+}
+
+LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
+                                                      Location loc,
+                                                      ValueRange ivs) {
+  assert(ivs.size() == 1);
+
+  if (isScalarUpdate()) {
+    generateScalarUpdateLoopBody(b, loc, ivs);
+  } else {
+    generateSliceUpdateLoopBody(b, loc, ivs);
+  }
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
@@ -432,6 +530,78 @@ Operation *SortOp::getTiledImplementation(
   }
   return cast<LinalgExtOp>(getOperation())
       .clone(builder, loc, resultTypes, tiledOperands);
+}
+
+LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                   ValueRange ivs) {
+  auto sortDim = getSortedDimension();
+  SmallVector<Value> indices, sortBlkArgs;
+  indices.append(ivs.begin(), ivs.end());
+  // Bubble sort innermost loop.
+  Value zero = b.create<ConstantIndexOp>(loc, 0);
+  Value one = b.create<ConstantIndexOp>(loc, 1);
+  Value ub;
+  if (getOperandType(0).isDynamicDim(sortDim)) {
+    ub = b.create<memref::DimOp>(loc, operand(0), sortDim);
+  } else {
+    ub = b.create<ConstantIndexOp>(loc, getOperandType(0).getDimSize(sortDim));
+  }
+  ub = b.create<SubIOp>(loc, ub, one);
+  auto scfFor = b.create<scf::ForOp>(
+      loc, zero, ub, one, ValueRange{},
+      [&](OpBuilder &b, Location loc, Value iv, ValueRange iters) {
+        SmallVector<Value> indices(ivs);
+        Value ivPlusOne = b.create<AddIOp>(loc, iv, one);
+        for (auto output : getOutputOperands()) {
+          indices[sortDim] = iv;
+          sortBlkArgs.push_back(
+              b.create<memref::LoadOp>(loc, output->get(), indices));
+          indices[sortDim] = ivPlusOne;
+          sortBlkArgs.push_back(
+              b.create<memref::LoadOp>(loc, output->get(), indices));
+        }
+      });
+
+  auto &srcBlock = region().front();
+  Region &region = scfFor.region();
+  BlockAndValueMapping bvm;
+  {
+    OpBuilder::InsertionGuard guard(b);
+    auto &block = region.front();
+    b.setInsertionPointToEnd(&block);
+    for (auto it : llvm::zip(srcBlock.getArguments(), sortBlkArgs)) {
+      bvm.map(std::get<0>(it), std::get<1>(it));
+    }
+    for (auto &blockOp : srcBlock.without_terminator()) {
+      b.clone(blockOp, bvm);
+    }
+  }
+  Value cond = bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0));
+
+  b.setInsertionPointToEnd(&region.front());
+  b.create<scf::IfOp>(
+      loc, TypeRange{}, cond,
+      [&](OpBuilder &b, Location loc) {
+        // Do not swap the pairs if true.
+        b.create<scf::YieldOp>(loc);
+      },
+      [&](OpBuilder &b, Location loc) {
+        // Swap the pairs if false.
+        SmallVector<Value> indices(ivs.begin(), ivs.end());
+        Value ivPlusOne = b.create<AddIOp>(loc, scfFor.getInductionVar(), one);
+        for (int i = 0, e = getNumOutputs(); i < e; ++i) {
+          Value v1 = sortBlkArgs[i * 2];
+          Value v2 = sortBlkArgs[i * 2 + 1];
+          indices[sortDim] = scfFor.getInductionVar();
+          b.create<memref::StoreOp>(loc, v2, getOutputOperand(i)->get(),
+                                    indices);
+          indices[sortDim] = ivPlusOne;
+          b.create<memref::StoreOp>(loc, v1, getOutputOperand(i)->get(),
+                                    indices);
+        }
+        b.create<scf::YieldOp>(loc);
+      });
+  return success();
 }
 
 }  // namespace linalg_ext

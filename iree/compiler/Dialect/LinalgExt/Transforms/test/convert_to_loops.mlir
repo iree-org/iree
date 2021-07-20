@@ -14,8 +14,11 @@ func @sort_1d(%arg0: memref<128xi32>) {
 // CHECK-DAG:     %[[C128:.+]] = constant 128 : index
 // CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-// CHECK-DAG:     %[[UB:.+]] = subi %[[C128]], %c1 : index
 // CHECK:         scf.for %[[ARG1:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
+// CHECK-DAG:       %[[C128:.+]] = constant 128 : index
+// CHECK-DAG:       %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:       %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:       %[[UB:.+]] = subi %[[C128]], %[[C1]] : index
 // CHECK:           scf.for %[[ARG2:.+]] = %[[C0]] to %[[UB]] step %[[C1]]
 // CHECK:             %[[T1:.+]] = addi %[[ARG2]], %[[C1]] : index
 // CHECK:             %[[V1:.+]] = memref.load %[[BUF]][%[[ARG2]]]
@@ -45,9 +48,12 @@ func @sort_2d(%arg0: memref<16x32xi32>) {
 // CHECK-DAG:     %[[C32:.+]] = constant 32 : index
 // CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-// CHECK-DAG:     %[[UB:.+]] = subi %[[C16]], %c1 : index
 // CHECK:         scf.for %[[ARG1:.+]] = %[[C0]] to %[[C16]] step %[[C1]]
 // CHECK:           scf.for %[[ARG2:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
+// CHECK-DAG:         %[[C16:.+]] = constant 16 : index
+// CHECK-DAG:         %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:         %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:         %[[UB:.+]] = subi %[[C16]], %[[C1]] : index
 // CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[UB]] step %[[C1]]
 // CHECK:               %[[T1:.+]] = addi %[[ARG3]], %[[C1]] : index
 // CHECK:               %[[V1:.+]] = memref.load %[[BUF]][%[[ARG3]], %[[ARG2]]]
@@ -77,8 +83,11 @@ func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
 // CHECK-DAG:     %[[C128:.+]] = constant 128 : index
 // CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-// CHECK-DAG:     %[[UB:.+]] = subi %[[C128]], %c1 : index
 // CHECK:         scf.for %[[ARG1:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
+// CHECK-DAG:       %[[C128:.+]] = constant 128 : index
+// CHECK-DAG:       %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:       %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:       %[[UB:.+]] = subi %[[C128]], %[[C1]] : index
 // CHECK:           scf.for %[[ARG2:.+]] = %[[C0]] to %[[UB]] step %[[C1]]
 // CHECK:             %[[T1:.+]] = addi %[[ARG2]], %[[C1]] : index
 // CHECK:             %[[V1:.+]] = memref.load %[[BUF1]][%[[ARG2]]]
@@ -178,6 +187,7 @@ func @scatter_update_slice_2D(
 // CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 // CHECK-DAG:     %[[C2:.+]] = constant 2 : index
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK-DAG:       %[[C1:.+]] = constant 1 : index
 // CHECK:           %[[SUB_UPDATE:.+]] = memref.subview
 // CHECK-SAME:        %[[UPDATES]][%[[I]]] [%[[C1]]] [%[[C1]]]
 // CHECK-SAME:      : memref<2x3xi32> to memref<?x3xi32, #[[MAP0]]>
@@ -249,6 +259,7 @@ func @scatter_add_slice_2D(
 // CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 // CHECK-DAG:     %[[C2:.+]] = constant 2 : index
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK-DAG:       %[[C1:.+]] = constant 1 : index
 // CHECK:           %[[SUB_UPDATE:.+]] = memref.subview
 // CHECK-SAME:        %[[UPDATES]][%[[I]]] [%[[C1]]] [%[[C1]]]
 // CHECK-SAME:      : memref<2x3xi32> to memref<?x3xi32, #[[MAP0]]>
@@ -350,6 +361,7 @@ func @scatter_update_slice_dynamic_2D(
 // CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 // CHECK-DAG:     %[[UB:.+]] = memref.dim %[[UPDATES]], %[[C0]] : memref<?x?xi32>
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[UB]] step %[[C1]] {
+// CHECK-DAG:       %[[C1:.+]] = constant 1 : index
 // CHECK:           %[[SUB_UPDATE:.+]] = memref.subview
 // CHECK-SAME:        %[[UPDATES]][%[[I]]] [%[[C1]]] [%[[C1]]]
 // CHECK-SAME:      : memref<?x?xi32> to memref<?x?xi32, #[[MAP0]]>
