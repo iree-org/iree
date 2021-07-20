@@ -505,7 +505,7 @@ add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_BENCHMARKS})
-  add_subdirectory(iree/benchmark)
+  add_subdirectory(benchmarks)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_ROCM})
