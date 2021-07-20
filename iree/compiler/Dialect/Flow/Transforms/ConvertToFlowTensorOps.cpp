@@ -142,8 +142,7 @@ struct LinalgTensorReshapeToFlowTensorReshape
       return failure();
     }
     SmallVector<SmallVector<Value>> outputShape;
-    if (failed(reshapeOp.reifyReturnTypeShapesPerResultDim(rewriter,
-                                                           outputShape))) {
+    if (failed(reshapeOp.reifyResultShapes(rewriter, outputShape))) {
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;

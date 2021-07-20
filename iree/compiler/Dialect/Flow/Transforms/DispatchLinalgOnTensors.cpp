@@ -843,11 +843,10 @@ static bool areAllShapesEqual(ArrayRef<SmallVector<Value>> shapes) {
 static Optional<SmallVector<SmallVector<Value>>> getResultShapes(
     PatternRewriter &rewriter, Operation *op) {
   if (op->getNumResults() == 0) return llvm::None;
-  SmallVector<SmallVector<Value>> resultShapes;
+  ReifiedRankedShapedTypeDims resultShapes;
   // Check if the op implements the shape interface.
-  if (auto shapedOp = dyn_cast<InferShapedTypeOpInterface>(op)) {
-    if (failed(shapedOp.reifyReturnTypeShapesPerResultDim(rewriter,
-                                                          resultShapes))) {
+  if (auto shapedOp = dyn_cast<ReifyRankedShapedTypeOpInterface>(op)) {
+    if (failed(shapedOp.reifyResultShapes(rewriter, resultShapes))) {
       return llvm::None;
     }
     return resultShapes;
