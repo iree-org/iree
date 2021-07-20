@@ -12,6 +12,7 @@
 // Since none of the TensorFlow imports come from an MLIR text form, it is a bit
 // of an odd fit for a *-translate style tool, which is why this diverges.
 
+#include "iree_tf_compiler/MHLO/Passes.h"
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -30,6 +31,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
 #include "tensorflow/compiler/mlir/tensorflow/translate/import_model.h"
 #include "tensorflow/core/platform/errors.h"
+
 using namespace llvm;
 using namespace mlir;
 
@@ -148,6 +150,9 @@ int main(int argc, char **argv) {
       "save-temp-tf-input",
       llvm::cl::desc("Save the TF pipeline input to this file"),
       llvm::cl::init(""));
+  static llvm::cl::opt<std::string> saveTempMidLevelImport(
+      "save-temp-mid-level-input",
+      llvm::cl::desc("Save the mid level IR to this file"), llvm::cl::init(""));
   static llvm::cl::opt<std::string> saveTempIreeImport(
       "save-temp-iree-input",
       llvm::cl::desc("Save the resultant IR to this file (useful for saving an "
@@ -209,18 +214,33 @@ int main(int argc, char **argv) {
   }
 
   // Run passes.
-  PassManager pm(&context, PassManager::Nesting::Implicit);
-  applyPassManagerCLOptions(pm);
+  {
+    PassManager pm(&context, PassManager::Nesting::Implicit);
+    applyPassManagerCLOptions(pm);
 
-  if (prettifyTfDebugInfo) {
-    pm.addPass(iree_integrations::TF::createPrettifyDebugInfoPass());
+    if (prettifyTfDebugInfo) {
+      pm.addPass(iree_integrations::TF::createPrettifyDebugInfoPass());
+    }
+
+    iree_integrations::TF::buildTFImportPassPipeline(pm);
+    if (failed(pm.run(*module))) {
+      llvm::errs()
+          << "Running iree-import-tf pass pipeline failed (see diagnostics)\n";
+      return 2;
+    }
+    if (!saveTempMidLevelImport.empty()) {
+      if (failed(saveToFile(saveTempMidLevelImport))) return 10;
+    }
   }
-
-  iree_integrations::TF::buildTFImportPassPipeline(pm);
-  if (failed(pm.run(*module))) {
-    llvm::errs()
-        << "Running iree-import-tf pass pipeline failed (see diagnostics)\n";
-    return 2;
+  {
+    PassManager pm(&context, PassManager::Nesting::Implicit);
+    applyPassManagerCLOptions(pm);
+    iree_integrations::MHLO::buildMHLOImportPassPipeline(pm);
+    if (failed(pm.run(*module))) {
+      llvm::errs()
+          << "Running iree-import-tf pass pipeline failed (see diagnostics)\n";
+      return 2;
+    }
   }
 
   // Save temp output.
