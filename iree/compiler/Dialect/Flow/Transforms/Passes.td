@@ -75,6 +75,12 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def InsertConstantClones :
+    Pass<"iree-flow-insert-constant-clones", "FuncOp"> {
+  let summary = "Inserts clones of constant values where they may be required";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInsertConstantClonesPass()";
+}
+
 def InterchangeGenericOps :
     Pass<"iree-flow-interchange-generic-ops", "FuncOp"> {
   let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
