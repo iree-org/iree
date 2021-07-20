@@ -281,9 +281,11 @@ class HALDispatchABI {
   }
 
   Value getIndexValue(Location loc, int64_t value, OpBuilder &builder) {
-    return builder.createOrFold<LLVM::DialectCastOp>(
-        loc, typeConverter->convertType(builder.getIndexType()),
+    SmallVector<Value> folded;
+    builder.createOrFold<UnrealizedConversionCastOp>(
+        folded, loc, typeConverter->convertType(builder.getIndexType()),
         builder.createOrFold<ConstantIndexOp>(loc, value));
+    return folded.front();
   }
 
   Value castValueToType(Location loc, Value value, Type resultType,
@@ -731,6 +733,7 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addIllegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
                            IREE::HAL::HALDialect, math::MathDialect,
                            tosa::TosaDialect>();
+  target.addIllegalOp<UnrealizedConversionCastOp>();
 
   // Don't apply patterns to private function (e.g num_workgroups func).
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {

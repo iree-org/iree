@@ -285,9 +285,9 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
       linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
       linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
       linalg::LinalgTilingPattern<linalg::GenericOp>,
-      linalg::LinalgTilingPattern<linalg::PoolingNHWCMaxFOp>,
-      linalg::LinalgTilingPattern<linalg::PoolingNHWCMinFOp>,
-      linalg::LinalgTilingPattern<linalg::PoolingNHWCSumFOp>>(
+      linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
+      linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
+      linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
@@ -421,8 +421,18 @@ static void applyVectorTransformation(FuncOp funcOp) {
                                          std::move(vectorUnrollPatterns));
     }
     {
+      linalg::hoistRedundantVectorTransfers(funcOp);
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After hoisting vector transfers ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
+    {
       RewritePatternSet canonicalizationPatterns2(funcOp.getContext());
-      vector::populateVectorTransferLoweringPatterns(canonicalizationPatterns2);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(
+          canonicalizationPatterns2);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns2));
 
@@ -449,16 +459,6 @@ static void applyVectorTransformation(FuncOp funcOp) {
     }
     LLVM_DEBUG({
       llvm::dbgs() << "--- After unrolling vector ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  {
-    linalg::hoistRedundantVectorTransfers(funcOp);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After hoisting vector transfers ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
@@ -722,9 +722,9 @@ void SPIRVTileAndVectorizePass::runOnOperation() {
                LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
                LowerToLoops<linalg::FillOp>, LowerToLoops<linalg::GenericOp>,
                LowerToLoops<linalg::MatmulOp>,
-               LowerToLoops<linalg::PoolingNHWCMaxFOp>,
-               LowerToLoops<linalg::PoolingNHWCMinFOp>,
-               LowerToLoops<linalg::PoolingNHWCSumFOp>>(context);
+               LowerToLoops<linalg::PoolingNhwcMaxOp>,
+               LowerToLoops<linalg::PoolingNhwcMinOp>,
+               LowerToLoops<linalg::PoolingNhwcSumOp>>(context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
     }
 

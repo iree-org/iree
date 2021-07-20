@@ -160,10 +160,8 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
             linalg::DepthwiseConvInputNHWCFilterHWCOp,
             linalg::ConvInputNHWCFilterHWCFOp,
             linalg::DepthwiseConvInputNHWCFilterHWCFOp,
-            linalg::DepthwiseConvInputNHWCFilterHWCOp,
-            linalg::PoolingNHWCMaxI8Op, linalg::PoolingNHWCMaxI16Op,
-            linalg::PoolingNHWCMaxI32Op, linalg::PoolingNHWCMaxFOp,
-            linalg::PoolingNHWCMinFOp, linalg::PoolingNHWCSumFOp>(
+            linalg::DepthwiseConvInputNHWCFilterHWCOp, linalg::PoolingNhwcMaxOp,
+            linalg::PoolingNhwcMinOp, linalg::PoolingNhwcSumOp>(
             op.getOperation())) {
       rootOperation = op;
       break;
