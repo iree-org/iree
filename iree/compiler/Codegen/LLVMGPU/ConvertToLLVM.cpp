@@ -109,28 +109,39 @@ class TestLLVMGPULegalizeOpPass
   }
 };
 
-// Convention with the HAL side to pass kernel arguments.
-// The bindings are ordered based on binding index then compressed and mapped to
-// dense set of arguments.
-// This function looks at the symbols and return the mapping between binding
-// index and kernel argument index. For instance if the kernel has bindings 1,
-// 5, 6 it will return the mapping [1, 0], [5, 1], [6, 2]
-static llvm::SmallDenseMap<uint64_t, size_t> getKernelArgMapping(
+/// Convention with the HAL side to pass kernel arguments.
+/// The bindings are ordered based on binding set and binding index then
+/// compressed and mapped to dense set of arguments.
+/// This function looks at the symbols and return the mapping between
+/// InterfaceBindingOp and kernel argument index.
+/// For instance if the kernel has (set, bindings) A(0, 1), B(1, 5), C(0, 6) it
+/// will return the mapping [A, 0], [C, 1], [B, 2]
+static llvm::SmallDenseMap<Operation *, size_t> getKernelArgMapping(
     Operation *func) {
-  llvm::SmallDenseMap<uint64_t, size_t> mapBindingArgIndex;
-  llvm::SmallVector<uint64_t> bindingUsed;
+  llvm::SmallDenseMap<Operation *, size_t> mapBindingArgIndex;
+  llvm::SmallVector<IREE::HAL::InterfaceBindingOp> bindingUsed;
   Operation *symbolTableOp = SymbolTable::getNearestSymbolTable(func);
   SymbolTable::walkSymbolTables(symbolTableOp, true, [&](Operation *op, bool) {
     if (auto interface = dyn_cast<IREE::HAL::InterfaceOp>(op)) {
       interface.walk([&](Operation *symbolOp) {
         if (auto binding = dyn_cast<IREE::HAL::InterfaceBindingOp>(symbolOp)) {
-          uint64_t bindingIndex = binding.binding().getZExtValue();
-          bindingUsed.push_back(bindingIndex);
+          bindingUsed.push_back(binding);
         }
       });
     }
   });
-  std::sort(bindingUsed.begin(), bindingUsed.end());
+
+  std::sort(bindingUsed.begin(), bindingUsed.end(),
+            [](IREE::HAL::InterfaceBindingOp bindingA,
+               IREE::HAL::InterfaceBindingOp bindingB) {
+              uint64_t bindingAIndex = bindingA.binding().getZExtValue();
+              uint64_t bindingASet = bindingA.set().getZExtValue();
+              uint64_t bindingBIndex = bindingB.binding().getZExtValue();
+              uint64_t bindingBSet = bindingB.set().getZExtValue();
+              if (bindingASet == bindingBSet)
+                return bindingAIndex < bindingBIndex;
+              return bindingASet < bindingBSet;
+            });
   for (auto binding : llvm::enumerate(bindingUsed)) {
     mapBindingArgIndex[binding.value()] = binding.index();
   }
@@ -154,7 +165,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     assert(fnType.getNumInputs() == 0 && fnType.getNumResults() == 0);
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
-    llvm::SmallDenseMap<uint64_t, size_t> argMapping =
+    llvm::SmallDenseMap<Operation *, size_t> argMapping =
         getKernelArgMapping(funcOp);
     SmallVector<Type, 8> llvmInputTypes(argMapping.size());
     funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp input) {
@@ -162,7 +173,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
       Type elType = memrefType.getElementType();
       auto llvmType =
           LLVM::LLVMPointerType::get(elType, memrefType.getMemorySpaceAsInt());
-      uint64_t binding = input.queryBindingOp().binding().getZExtValue();
+      IREE::HAL::InterfaceBindingOp binding = input.queryBindingOp();
       llvmInputTypes[argMapping[binding]] = llvmType;
     });
     signatureConverter.addInputs(llvmInputTypes);
@@ -211,14 +222,14 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     assert(llvmFuncOp.getNumArguments() > 0);
 
-    llvm::SmallDenseMap<uint64_t, size_t> argMapping =
+    llvm::SmallDenseMap<Operation *, size_t> argMapping =
         getKernelArgMapping(llvmFuncOp);
     Location loc = op->getLoc();
     auto ireeBindingOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
     IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(operands);
     MemRefType memrefType =
         ireeBindingOp.getResult().getType().dyn_cast<MemRefType>();
-    uint64_t binding = ireeBindingOp.queryBindingOp().binding().getZExtValue();
+    IREE::HAL::InterfaceBindingOp binding = ireeBindingOp.queryBindingOp();
     Value llvmBufferBasePtr = llvmFuncOp.getArgument(argMapping[binding]);
     // Add the byte offset.
     Value llvmBufferBasei8Ptr = rewriter.create<LLVM::BitcastOp>(

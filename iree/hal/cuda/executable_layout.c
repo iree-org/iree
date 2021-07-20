@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/cuda/descriptor_set_layout.h"
 
 typedef struct iree_hal_cuda_executable_layout_t {
   iree_hal_resource_t resource;
@@ -74,6 +75,20 @@ static void iree_hal_cuda_executable_layout_destroy(
   iree_allocator_free(host_allocator, executable_layout);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+iree_host_size_t iree_hal_cuda_base_binding_index(
+    iree_hal_executable_layout_t* base_executable_layout, uint32_t set) {
+  iree_hal_cuda_executable_layout_t* executable_layout =
+      iree_hal_cuda_executable_layout_cast(base_executable_layout);
+  iree_host_size_t base_binding = 0;
+  for (iree_host_size_t i = 0; i < set; ++i) {
+    iree_host_size_t binding_count =
+        iree_hal_cuda_descriptor_set_layout_binding_count(
+            executable_layout->set_layouts[i]);
+    base_binding += binding_count;
+  }
+  return base_binding;
 }
 
 const iree_hal_executable_layout_vtable_t

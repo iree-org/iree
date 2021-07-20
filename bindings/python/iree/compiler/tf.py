@@ -82,6 +82,7 @@ class ImportOptions(CompilerOptions):
                saved_model_tags: Set[str] = set(),
                import_extra_args: Sequence[str] = (),
                save_temp_tf_input: Optional[str] = None,
+               save_temp_mid_level_input: Optional[str] = None,
                save_temp_iree_input: Optional[str] = None,
                **kwargs):
     """Initialize options from keywords.
@@ -101,6 +102,8 @@ class ImportOptions(CompilerOptions):
       import_extra_args: Extra arguments to pass to the iree-import-tf tool.
       save_temp_tf_input: Optionally save the IR that is input to the
         TensorFlow pipeline.
+      save_temp_mid_level_input: Optionally save the IR that is input to the
+        mid level IR.
       save_temp_iree_input: Optionally save the IR that is the result of the
         import (ready to be passed to IREE).
     """
@@ -111,6 +114,7 @@ class ImportOptions(CompilerOptions):
     self.saved_model_tags = saved_model_tags
     self.import_extra_args = import_extra_args
     self.save_temp_tf_input = save_temp_tf_input
+    self.save_temp_mid_level_input = save_temp_mid_level_input
     self.save_temp_iree_input = save_temp_iree_input
 
 
@@ -151,6 +155,10 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
                                      export_as=options.save_temp_tf_input)
   if save_tf_input:
     cl.append(f"--save-temp-tf-input={save_tf_input}")
+  save_mid_level_input = tfs.alloc_optional(
+      "tf-mid-level-input.mlir", export_as=options.save_temp_mid_level_input)
+  if save_mid_level_input:
+    cl.append(f"--save-temp-mid-level-input={save_mid_level_input}")
   save_iree_input = tfs.alloc_optional("tf-iree-input.mlir",
                                        export_as=options.save_temp_iree_input)
   if save_iree_input:

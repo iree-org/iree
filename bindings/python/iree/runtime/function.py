@@ -381,7 +381,9 @@ def _cast_scalar_to_ndarray(inv: Invocation, x, desc):
   return dtype(x)
 
 
-def _raise_argument_error(inv: Invocation, summary: str, e: Exception = None):
+def _raise_argument_error(inv: Invocation,
+                          summary: str,
+                          e: Optional[Exception] = None):
   new_e = ValueError(f"Error passing argument: {summary} "
                      f"(while encoding argument {inv.summarize_arg_error()})")
   if e:
@@ -390,7 +392,9 @@ def _raise_argument_error(inv: Invocation, summary: str, e: Exception = None):
     raise new_e
 
 
-def _raise_return_error(inv: Invocation, summary: str, e: Exception = None):
+def _raise_return_error(inv: Invocation,
+                        summary: str,
+                        e: Optional[Exception] = None):
   new_e = ValueError(f"Error processing function return: {summary} "
                      f"(while decoding return {inv.summarize_return_error()})")
   if e:

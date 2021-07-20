@@ -59,7 +59,7 @@ std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
 /// Create a pass to interchange generic ops to force the reduction loop to be
 /// the most inner loops.
-std::unique_ptr<OperationPass<FuncOp>> createInterchangeLinalgGenericPass();
+std::unique_ptr<OperationPass<FuncOp>> createInterchangeGenericOpsPass();
 
 // Convert operations to equivalent flow.tensor.* ops. This is run after
 // dispatch region creation to catch operations that were left outside of
@@ -130,6 +130,9 @@ std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass();
 std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
 
 // TODO(benvanik): cross-function stream flows.
+
+// Inserts clones of constant values where they may be required.
+std::unique_ptr<OperationPass<FuncOp>> createInsertConstantClonesPass();
 
 //===----------------------------------------------------------------------===//
 // Module Analysis and Finalization

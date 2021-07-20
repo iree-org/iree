@@ -9,7 +9,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-
 def ConvertConv2D1x1ConvToMatmul :
     Pass<"iree-flow-convert-conv2d-1x1-to-matmul", "FuncOp"> {
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
@@ -76,6 +75,31 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def InsertConstantClones :
+    Pass<"iree-flow-insert-constant-clones", "FuncOp"> {
+  let summary = "Inserts clones of constant values where they may be required";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInsertConstantClonesPass()";
+}
+
+def InterchangeGenericOps :
+    Pass<"iree-flow-interchange-generic-ops", "FuncOp"> {
+  let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeGenericOpsPass()";
+}
+
+def OutlineDispatchRegions :
+    Pass<"iree-flow-outline-dispatch-regions2", "ModuleOp"> {
+  let summary = "Outlines dispatch regions into executables";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
+}
+
+def OutlineLargeConstants :
+    Pass<"iree-flow-outline-large-constants", "ModuleOp"> {
+  let summary = "Outlines large tensor constants into flow.variables at the module level.";
+  // TODO(#5493): add a flag for this.
+  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass(25)";
+}
+
 def PadLinalgOps :
     Pass<"iree-flow-pad-linalg-ops", "FuncOp"> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
@@ -94,19 +118,6 @@ def PromoteI1ToI8 :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
 }
 
-def OutlineDispatchRegions :
-    Pass<"iree-flow-outline-dispatch-regions2", "ModuleOp"> {
-  let summary = "Outlines dispatch regions into executables";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
-}
-
-def OutlineLargeConstants :
-    Pass<"iree-flow-outline-large-constants", "ModuleOp"> {
-  let summary = "Outlines large tensor constants into flow.variables at the module level.";
-  // TODO(#5493): add a flag for this.
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass(25)";
-}
-
 def PromoteTensorLoads :
     Pass<"iree-flow-promote-tensor-loads", "FuncOp"> {
   let summary = "Converts standard ops which match to flow.tensor.load (typically causing a read-back)";
@@ -117,12 +128,6 @@ def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "ModuleOp"> {
   let summary = "Strips constant flow.variables and replaces them with splats.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
-}
-
-def InterchangeGeneric :
-    Pass<"iree-flow-interchange-generic-op", "FuncOp"> {
-  let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeLinalgGenericPass()";
 }
 
 #endif  // IREE_DIALECT_FLOW_PASSES
