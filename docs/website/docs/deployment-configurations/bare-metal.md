@@ -58,8 +58,17 @@ for example command-line instructions of some common architectures
 You can replace the MLIR file with the other MLIR model files, following the
 [instructions](./cpu-dylib.md#compile-the-model)
 
-!!! todo
-    Add the static library support
+### Compiling the bare-metal model for static-library support
+
+See the [static_library](https://github.com/google/iree/tree/main/iree/samples/static_library)
+demo sample for an example and instructions on running a model with IREE's
+`static_library_loader`.
+
+By default, the demo targets the host machine when compiling. To produce a
+bare-metal compatible model, run `iree-translate` as in the previous example
+and add the additional `-iree-llvm-static-library-output-path=` flag to specify
+the static library destination. This will produce a `.h\.o` file to link
+directly into the target application.
 
 ## Build bare-metal runtime from the source
 
