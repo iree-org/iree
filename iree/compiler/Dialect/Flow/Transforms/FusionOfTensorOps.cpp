@@ -64,6 +64,14 @@ struct FusionOfTensorOpsPass
             }
           }
 
+          // Limit the number of operands. We have hard limit (32) of bindings
+          // passing down to HAL. Set the number to be as same as the limit --
+          // IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT.
+          constexpr int64_t kIreeMaxOperandCount = 32;
+          auto numOperands = producer.getOwner()->getNumOperands() +
+                             consumer.getOwner()->getNumOperands() - 1;
+          if (numOperands >= kIreeMaxOperandCount) return false;
+
           llvm::SmallDenseSet<Operation *, 4> numUsers;
           for (Operation *user : producer.getUsers()) {
             if (isa<linalg::GenericOp>(user)) continue;

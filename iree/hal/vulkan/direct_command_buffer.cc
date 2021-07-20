@@ -184,6 +184,13 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_begin(
                          command_buffer->handle, &begin_info),
                      "vkBeginCommandBuffer");
 
+  IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->handle,
+      /*file_name=*/NULL, 0,
+      /*line=*/0, /*func_name=*/NULL, 0,
+      "iree_hal_vulkan_direct_command_buffer",
+      strlen("iree_hal_vulkan_direct_command_buffer"));
+
   return iree_ok_status();
 }
 
@@ -191,6 +198,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
 
   VK_RETURN_IF_ERROR(
       command_buffer->syms->vkEndCommandBuffer(command_buffer->handle),
@@ -201,6 +211,49 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_end(
       command_buffer->descriptor_set_arena.Flush();
 
   return iree_ok_status();
+}
+
+static void iree_hal_vulkan_direct_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
+      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+  IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->handle,
+      location ? location->file.data : NULL, location ? location->file.size : 0,
+      location ? location->line : 0, /*func_name=*/NULL, 0, label.data,
+      label.size);
+  if (command_buffer->syms->vkCmdBeginDebugUtilsLabelEXT) {
+    char label_buffer[128];
+    snprintf(label_buffer, sizeof(label_buffer), "%.*s", (int)label.size,
+             label.data);
+    VkDebugUtilsLabelEXT label_info = {
+        /*.sType=*/VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+        /*.pNext=*/NULL,
+        /*.pLabelName=*/label_buffer,
+        /*.color=*/
+        {
+            /*r=*/label_color.r / 255.0f,
+            /*g=*/label_color.g / 255.0f,
+            /*b=*/label_color.b / 255.0f,
+            /*a=*/label_color.a / 255.0f,
+        },
+    };
+    command_buffer->syms->vkCmdBeginDebugUtilsLabelEXT(command_buffer->handle,
+                                                       &label_info);
+  }
+}
+
+static void iree_hal_vulkan_direct_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
+      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+  if (command_buffer->syms->vkCmdEndDebugUtilsLabelEXT) {
+    command_buffer->syms->vkCmdEndDebugUtilsLabelEXT(command_buffer->handle);
+  }
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
 }
 
 static VkPipelineStageFlags iree_hal_vulkan_convert_pipeline_stage_flags(
@@ -602,8 +655,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
     IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
         command_buffer->tracing_context, command_buffer->handle,
         source_location.file_name.data, source_location.file_name.size,
-        source_location.line, source_location.func_name.data,
-        source_location.func_name.size, NULL, 0);
+        source_location.line, /*func_name=*/NULL, 0,
+        source_location.func_name.data, source_location.func_name.size);
   });
 
   // Get the compiled and linked pipeline for the specified entry point and
@@ -638,8 +691,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->handle,
       source_location.file_name.data, source_location.file_name.size,
-      source_location.line, source_location.func_name.data,
-      source_location.func_name.size, NULL, 0);
+      source_location.line, /*func_name=*/NULL, 0,
+      source_location.func_name.data, source_location.func_name.size);
 
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.
@@ -671,6 +724,10 @@ const iree_hal_command_buffer_vtable_t
         iree_hal_vulkan_direct_command_buffer_allowed_categories,
         /*.begin=*/iree_hal_vulkan_direct_command_buffer_begin,
         /*.end=*/iree_hal_vulkan_direct_command_buffer_end,
+        /*.begin_debug_group=*/
+        iree_hal_vulkan_direct_command_buffer_begin_debug_group,
+        /*.end_debug_group=*/
+        iree_hal_vulkan_direct_command_buffer_end_debug_group,
         /*.execution_barrier=*/
         iree_hal_vulkan_direct_command_buffer_execution_barrier,
         /*.signal_event=*/

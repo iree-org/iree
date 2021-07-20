@@ -556,6 +556,35 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end,  //
   return iree_hal_command_buffer_end(command_buffer);
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_begin_debug_group,  //
+                   iree_hal_module_state_t,                           //
+                   rr, v) {
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
+  iree_vm_buffer_t* label = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &label));
+  iree_string_view_t label_str = iree_vm_buffer_as_string(label);
+  // TODO(benvanik): query from VM.
+  iree_hal_label_location_t location = {
+      .file = iree_string_view_empty(),
+      .line = 0,
+  };
+  iree_hal_command_buffer_begin_debug_group(
+      command_buffer, label_str, iree_hal_label_color_unspecified(), &location);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end_debug_group,  //
+                   iree_hal_module_state_t,                         //
+                   r, v) {
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
+  iree_hal_command_buffer_end_debug_group(command_buffer);
+  return iree_ok_status();
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_execution_barrier,  //
                    iree_hal_module_state_t,                           //
                    riii, v) {

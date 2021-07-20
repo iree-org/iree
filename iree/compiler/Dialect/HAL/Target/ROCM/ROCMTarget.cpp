@@ -39,8 +39,13 @@ ROCMTargetOptions getROCMTargetOptionsFromFlags() {
       llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<std::string> clROCMBitcodeDir(
+      "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
+      llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
+
   targetOptions.ROCMTargetChip = clROCMTargetChip;
   targetOptions.ROCMLinkBC = clROCMLinkBC;
+  targetOptions.ROCMBitcodeDir = clROCMBitcodeDir;
 
   return targetOptions;
 }
@@ -150,7 +155,8 @@ class ROCMTargetBackend final : public TargetBackend {
 
     // Link module to Device Library
     if (options_.ROCMLinkBC)
-      LinkROCDLIfNecessary(llvmModule.get(), options_.ROCMTargetChip);
+      LinkROCDLIfNecessary(llvmModule.get(), options_.ROCMTargetChip,
+                           options_.ROCMBitcodeDir);
 
     // Serialize hsaco kernel into the binary that we will embed in the
     // final flatbuffer.

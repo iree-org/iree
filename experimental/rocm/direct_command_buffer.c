@@ -6,10 +6,15 @@
 
 #include "experimental/rocm/direct_command_buffer.h"
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "experimental/rocm/dynamic_symbols.h"
 #include "experimental/rocm/native_executable.h"
 #include "experimental/rocm/rocm_buffer.h"
-#include "experimental/rocm/rocm_event.h"
 #include "experimental/rocm/status_util.h"
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
 // Command buffer implementation that directly maps to rocm direct.
@@ -18,13 +23,13 @@
 
 typedef struct {
   iree_hal_resource_t resource;
-  iree_hal_rocm_context_wrapper_t *context;
+  iree_hal_rocm_context_wrapper_t* context;
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
   iree_hal_queue_affinity_t queue_affinity;
   size_t total_size;
   // Keep track of the current set of kernel arguments.
-  void *current_descriptor[];
+  void* current_descriptor[];
 } iree_hal_rocm_direct_command_buffer_t;
 
 #define IREE_HAL_ROCM_MAX_BINDING_COUNT 64
@@ -32,29 +37,29 @@ typedef struct {
 extern const iree_hal_command_buffer_vtable_t
     iree_hal_rocm_direct_command_buffer_vtable;
 
-static iree_hal_rocm_direct_command_buffer_t *
+static iree_hal_rocm_direct_command_buffer_t*
 iree_hal_rocm_direct_command_buffer_cast(
-    iree_hal_command_buffer_t *base_value) {
+    iree_hal_command_buffer_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_rocm_direct_command_buffer_vtable);
-  return (iree_hal_rocm_direct_command_buffer_t *)base_value;
+  return (iree_hal_rocm_direct_command_buffer_t*)base_value;
 }
 
 iree_status_t iree_hal_rocm_direct_command_buffer_allocate(
-    iree_hal_rocm_context_wrapper_t *context,
+    iree_hal_rocm_context_wrapper_t* context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_command_buffer_t **out_command_buffer) {
+    iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_rocm_direct_command_buffer_t *command_buffer = NULL;
+  iree_hal_rocm_direct_command_buffer_t* command_buffer = NULL;
   size_t total_size = sizeof(*command_buffer) +
-                      IREE_HAL_ROCM_MAX_BINDING_COUNT * sizeof(void *) +
+                      IREE_HAL_ROCM_MAX_BINDING_COUNT * sizeof(void*) +
                       IREE_HAL_ROCM_MAX_BINDING_COUNT * sizeof(hipDeviceptr_t);
   iree_status_t status = iree_allocator_malloc(
-      context->host_allocator, total_size, (void **)&command_buffer);
+      context->host_allocator, total_size, (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_rocm_direct_command_buffer_vtable,
                                  &command_buffer->resource);
@@ -62,15 +67,15 @@ iree_status_t iree_hal_rocm_direct_command_buffer_allocate(
     command_buffer->mode = mode;
     command_buffer->allowed_categories = command_categories;
     command_buffer->queue_affinity = queue_affinity;
-    hipDeviceptr_t *device_ptrs =
-        (hipDeviceptr_t *)(command_buffer->current_descriptor +
-                           IREE_HAL_ROCM_MAX_BINDING_COUNT);
+    hipDeviceptr_t* device_ptrs =
+        (hipDeviceptr_t*)(command_buffer->current_descriptor +
+                          IREE_HAL_ROCM_MAX_BINDING_COUNT);
     for (size_t i = 0; i < IREE_HAL_ROCM_MAX_BINDING_COUNT; i++) {
       command_buffer->current_descriptor[i] = &device_ptrs[i];
     }
     command_buffer->total_size = total_size;
 
-    *out_command_buffer = (iree_hal_command_buffer_t *)command_buffer;
+    *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -78,8 +83,8 @@ iree_status_t iree_hal_rocm_direct_command_buffer_allocate(
 }
 
 static void iree_hal_rocm_direct_command_buffer_destroy(
-    iree_hal_command_buffer_t *base_command_buffer) {
-  iree_hal_rocm_direct_command_buffer_t *command_buffer =
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -89,91 +94,103 @@ static void iree_hal_rocm_direct_command_buffer_destroy(
 }
 
 static iree_hal_command_buffer_mode_t iree_hal_rocm_direct_command_buffer_mode(
-    const iree_hal_command_buffer_t *base_command_buffer) {
-  const iree_hal_rocm_direct_command_buffer_t *command_buffer =
-      (const iree_hal_rocm_direct_command_buffer_t *)(base_command_buffer);
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  const iree_hal_rocm_direct_command_buffer_t* command_buffer =
+      (const iree_hal_rocm_direct_command_buffer_t*)(base_command_buffer);
   return command_buffer->mode;
 }
 
 static iree_hal_command_category_t
 iree_hal_rocm_direct_command_buffer_allowed_categories(
-    const iree_hal_command_buffer_t *base_command_buffer) {
-  const iree_hal_rocm_direct_command_buffer_t *command_buffer =
-      (const iree_hal_rocm_direct_command_buffer_t *)(base_command_buffer);
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  const iree_hal_rocm_direct_command_buffer_t* command_buffer =
+      (const iree_hal_rocm_direct_command_buffer_t*)(base_command_buffer);
   return command_buffer->allowed_categories;
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_begin(
-    iree_hal_command_buffer_t *base_command_buffer) {
+    iree_hal_command_buffer_t* base_command_buffer) {
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_end(
-    iree_hal_command_buffer_t *base_command_buffer) {
+    iree_hal_command_buffer_t* base_command_buffer) {
   return iree_ok_status();
 }
 
+static void iree_hal_rocm_direct_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  // TODO(benvanik): tracy event stack.
+}
+
+static void iree_hal_rocm_direct_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  // TODO(benvanik): tracy event stack.
+}
+
 static iree_status_t iree_hal_rocm_direct_command_buffer_execution_barrier(
-    iree_hal_command_buffer_t *base_command_buffer,
+    iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
     iree_hal_execution_barrier_flags_t flags,
     iree_host_size_t memory_barrier_count,
-    const iree_hal_memory_barrier_t *memory_barriers,
+    const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
-    const iree_hal_buffer_barrier_t *buffer_barriers) {
+    const iree_hal_buffer_barrier_t* buffer_barriers) {
   // TODO: Implement barrier
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_signal_event(
-    iree_hal_command_buffer_t *base_command_buffer, iree_hal_event_t *event,
+    iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
   // TODO: Implement barrier
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_reset_event(
-    iree_hal_command_buffer_t *base_command_buffer, iree_hal_event_t *event,
+    iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
   // TODO: Implement barrier
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_wait_events(
-    iree_hal_command_buffer_t *base_command_buffer,
-    iree_host_size_t event_count, const iree_hal_event_t **events,
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_host_size_t event_count, const iree_hal_event_t** events,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
     iree_host_size_t memory_barrier_count,
-    const iree_hal_memory_barrier_t *memory_barriers,
+    const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
-    const iree_hal_buffer_barrier_t *buffer_barriers) {
+    const iree_hal_buffer_barrier_t* buffer_barriers) {
   // TODO: Implement barrier
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_discard_buffer(
-    iree_hal_command_buffer_t *base_command_buffer, iree_hal_buffer_t *buffer) {
+    iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* buffer) {
   // nothing to do.
   return iree_ok_status();
 }
 
 // Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte value.
-static uint32_t iree_hal_rocm_splat_pattern(const void *pattern,
+static uint32_t iree_hal_rocm_splat_pattern(const void* pattern,
                                             size_t pattern_length) {
   switch (pattern_length) {
     case 1: {
-      uint32_t pattern_value = *(const uint8_t *)(pattern);
+      uint32_t pattern_value = *(const uint8_t*)(pattern);
       return (pattern_value << 24) | (pattern_value << 16) |
              (pattern_value << 8) | pattern_value;
     }
     case 2: {
-      uint32_t pattern_value = *(const uint16_t *)(pattern);
+      uint32_t pattern_value = *(const uint16_t*)(pattern);
       return (pattern_value << 16) | pattern_value;
     }
     case 4: {
-      uint32_t pattern_value = *(const uint32_t *)(pattern);
+      uint32_t pattern_value = *(const uint32_t*)(pattern);
       return pattern_value;
     }
     default:
@@ -182,11 +199,11 @@ static uint32_t iree_hal_rocm_splat_pattern(const void *pattern,
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_fill_buffer(
-    iree_hal_command_buffer_t *base_command_buffer,
-    iree_hal_buffer_t *target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, const void *pattern,
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length) {
-  iree_hal_rocm_direct_command_buffer_t *command_buffer =
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
 
   hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
@@ -205,19 +222,19 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_fill_buffer(
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_update_buffer(
-    iree_hal_command_buffer_t *base_command_buffer, const void *source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_t *target_buffer,
+    iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
+    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "need rocm implementation");
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
-    iree_hal_command_buffer_t *base_command_buffer,
-    iree_hal_buffer_t *source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t *target_buffer, iree_device_size_t target_offset,
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length) {
-  iree_hal_rocm_direct_command_buffer_t *command_buffer =
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
 
   hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
@@ -237,9 +254,9 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_push_constants(
-    iree_hal_command_buffer_t *base_command_buffer,
-    iree_hal_executable_layout_t *executable_layout, iree_host_size_t offset,
-    const void *values, iree_host_size_t values_length) {
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    const void* values, iree_host_size_t values_length) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "need rocm implementation");
 }
@@ -251,20 +268,20 @@ typedef struct {
 } iree_hal_rocm_binding_mapping_t;
 
 // Helper to sort the binding based on their binding index.
-static int compare_binding_index(const void *a, const void *b) {
+static int compare_binding_index(const void* a, const void* b) {
   const iree_hal_rocm_binding_mapping_t buffer_a =
-      *(const iree_hal_rocm_binding_mapping_t *)a;
+      *(const iree_hal_rocm_binding_mapping_t*)a;
   const iree_hal_rocm_binding_mapping_t buffer_b =
-      *(const iree_hal_rocm_binding_mapping_t *)b;
+      *(const iree_hal_rocm_binding_mapping_t*)b;
   return buffer_a.binding < buffer_b.binding ? -1 : 1;
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
-    iree_hal_command_buffer_t *base_command_buffer,
-    iree_hal_executable_layout_t *executable_layout, uint32_t set,
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_layout_t* executable_layout, uint32_t set,
     iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t *bindings) {
-  iree_hal_rocm_direct_command_buffer_t *command_buffer =
+    const iree_hal_descriptor_set_binding_t* bindings) {
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
   // Convention with the compiler side. We map bindings to kernel argument.
   // We compact the bindings to get a dense set of arguments and keep them order
@@ -286,26 +303,26 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
         iree_hal_rocm_buffer_device_pointer(
             iree_hal_buffer_allocated_buffer(binding.buffer)) +
         iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
-    *((hipDeviceptr_t *)command_buffer->current_descriptor[i]) = device_ptr;
+    *((hipDeviceptr_t*)command_buffer->current_descriptor[i]) = device_ptr;
   }
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t *base_command_buffer,
-    iree_hal_executable_layout_t *executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t *descriptor_set,
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_descriptor_set_t* descriptor_set,
     iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t *dynamic_offsets) {
+    const iree_device_size_t* dynamic_offsets) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "need rocm implementation");
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch(
-    iree_hal_command_buffer_t *base_command_buffer,
-    iree_hal_executable_t *executable, int32_t entry_point,
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
-  iree_hal_rocm_direct_command_buffer_t *command_buffer =
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
   iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
 
@@ -327,9 +344,9 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch(
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t *base_command_buffer,
-    iree_hal_executable_t *executable, int32_t entry_point,
-    iree_hal_buffer_t *workgroups_buffer,
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_buffer_t* workgroups_buffer,
     iree_device_size_t workgroups_offset) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "need rocm implementation");
@@ -343,6 +360,9 @@ const iree_hal_command_buffer_vtable_t
             iree_hal_rocm_direct_command_buffer_allowed_categories,
         .begin = iree_hal_rocm_direct_command_buffer_begin,
         .end = iree_hal_rocm_direct_command_buffer_end,
+        .begin_debug_group =
+            iree_hal_rocm_direct_command_buffer_begin_debug_group,
+        .end_debug_group = iree_hal_rocm_direct_command_buffer_end_debug_group,
         .execution_barrier =
             iree_hal_rocm_direct_command_buffer_execution_barrier,
         .signal_event = iree_hal_rocm_direct_command_buffer_signal_event,

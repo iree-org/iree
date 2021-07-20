@@ -25,7 +25,7 @@ iree_lit_test_suite(
             "nvvm_pipeline_test.mlir",
             "remove_loops.mlir",
             "rocdl_pipeline_test.mlir",
-            "scalarize.mlir",
+            "legalize.mlir",
             "vectorization.mlir",
         ],
         include = ["*.mlir"],

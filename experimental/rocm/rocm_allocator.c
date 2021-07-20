@@ -6,11 +6,15 @@
 
 #include "experimental/rocm/rocm_allocator.h"
 
+#include <stddef.h>
+
+#include "experimental/rocm/dynamic_symbols.h"
 #include "experimental/rocm/rocm_buffer.h"
 #include "experimental/rocm/status_util.h"
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
-typedef struct iree_hal_rocm_allocator_s {
+typedef struct iree_hal_rocm_allocator_t {
   iree_hal_resource_t resource;
   iree_hal_rocm_context_wrapper_t *context;
 } iree_hal_rocm_allocator_t;

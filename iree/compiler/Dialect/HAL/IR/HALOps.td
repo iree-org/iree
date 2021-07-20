@@ -1125,6 +1125,43 @@ def HAL_CommandBufferDeviceOp : HAL_PureOp<"command_buffer.device"> {
   let hasCanonicalizer = 1;
 }
 
+def HAL_CommandBufferBeginDebugGroupOp : HAL_Op<"command_buffer.begin_debug_group"> {
+  let summary = [{pushes a command buffer debug group label}];
+  let description = [{
+    Pushes a new debug group with the given label.
+    All commands between this and a mandatory matching call to
+    `hal.command_buffer.end_debug_group` will be grouped together with the
+    given label.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    StrAttr:$label
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `label` `(` $label `)`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_CommandBufferEndDebugGroupOp : HAL_Op<"command_buffer.end_debug_group"> {
+  let summary = [{pops a command buffer debug group label}];
+  let description = [{
+    Pops a debug group from the stack.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    attr-dict-with-keyword
+  }];
+}
+
 def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier"> {
   let summary = [{command buffer execution barrier recording operation}];
   let description = [{

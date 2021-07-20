@@ -172,6 +172,22 @@ static iree_status_t iree_hal_inline_command_buffer_end(
 }
 
 //===----------------------------------------------------------------------===//
+// iree_hal_inline_command_buffer_t debug utilities
+//===----------------------------------------------------------------------===//
+
+static void iree_hal_inline_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  // TODO(benvanik): tracy event stack.
+}
+
+static void iree_hal_inline_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  // TODO(benvanik): tracy event stack.
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_execution_barrier
 //===----------------------------------------------------------------------===//
 
@@ -484,6 +500,8 @@ static const iree_hal_command_buffer_vtable_t
         .allowed_categories = iree_hal_inline_command_buffer_allowed_categories,
         .begin = iree_hal_inline_command_buffer_begin,
         .end = iree_hal_inline_command_buffer_end,
+        .begin_debug_group = iree_hal_inline_command_buffer_begin_debug_group,
+        .end_debug_group = iree_hal_inline_command_buffer_end_debug_group,
         .execution_barrier = iree_hal_inline_command_buffer_execution_barrier,
         .signal_event = iree_hal_inline_command_buffer_signal_event,
         .reset_event = iree_hal_inline_command_buffer_reset_event,

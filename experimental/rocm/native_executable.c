@@ -6,7 +6,11 @@
 
 #include "experimental/rocm/native_executable.h"
 
+#include <stddef.h>
+
+#include "experimental/rocm/dynamic_symbols.h"
 #include "experimental/rocm/status_util.h"
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
 // flatcc schemas:
@@ -14,14 +18,14 @@
 #include "iree/schemas/rocm_executable_def_reader.h"
 #include "iree/schemas/rocm_executable_def_verifier.h"
 
-typedef struct {
+typedef struct iree_hal_rocm_native_executable_function_t {
   hipFunction_t rocm_function;
   uint32_t block_size_x;
   uint32_t block_size_y;
   uint32_t block_size_z;
 } iree_hal_rocm_native_executable_function_t;
 
-typedef struct {
+typedef struct iree_hal_rocm_native_executable_t {
   iree_hal_resource_t resource;
   iree_hal_rocm_context_wrapper_t *context;
   iree_host_size_t entry_count;

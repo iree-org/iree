@@ -6,11 +6,15 @@
 
 #include "experimental/rocm/rocm_buffer.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "experimental/rocm/rocm_allocator.h"
-#include "experimental/rocm/status_util.h"
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
-typedef struct iree_hal_rocm_buffer_s {
+typedef struct iree_hal_rocm_buffer_t {
   iree_hal_buffer_t base;
   void *host_ptr;
   hipDeviceptr_t device_ptr;
