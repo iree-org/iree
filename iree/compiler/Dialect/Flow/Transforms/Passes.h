@@ -131,6 +131,9 @@ std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
 
 // TODO(benvanik): cross-function stream flows.
 
+// Inserts clones of constant values where they may be required.
+std::unique_ptr<OperationPass<FuncOp>> createInsertConstantClonesPass();
+
 //===----------------------------------------------------------------------===//
 // Module Analysis and Finalization
 //===----------------------------------------------------------------------===//

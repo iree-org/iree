@@ -26,6 +26,7 @@ iree_lit_test_suite(
     "form_streams.mlir"
     "hoist_unstreamable_ops.mlir"
     "inject_dispatch_tracing.mlir"
+    "insert_constant_clones.mlir"
     "interchange_generic_ops.mlir"
     "outline_dispatch_regions.mlir"
     "outline_large_constants.mlir"

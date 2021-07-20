@@ -40,6 +40,7 @@ iree_cc_library(
     "FusionOfTensorOps.cpp"
     "HoistUnstreamableOps.cpp"
     "InjectDispatchTracing.cpp"
+    "InsertConstantClones.cpp"
     "InterchangeGenericOps.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineLargeConstants.cpp"

@@ -169,6 +169,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // arbitrary ordering.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
+  // Clone constants that escape basic blocks until we have better analysis.
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createInsertConstantClonesPass());
+
+  // Group streamable ops into streams.
   passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
 
   // Prior to leaving the pipeline we need to clean things up for following
