@@ -12,7 +12,7 @@
         <link rel="canonical" href="https://google.github.io/iree/deployment-configurations/bare-metal/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.1, mkdocs-material-7.1.10">
+      <meta name="generator" content="mkdocs-1.2.2, mkdocs-material-7.1.11">
     
     
       
@@ -20,7 +20,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.1fe995fd.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.3754935a.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.f1a3b89f.min.css">
@@ -391,6 +391,19 @@
     Compile the model for bare-metal
   </a>
   
+    <nav class="md-nav" aria-label="Compile the model for bare-metal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#compiling-the-bare-metal-model-for-static-library-support" class="md-nav__link">
+    Compiling the bare-metal model for static-library support
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -682,6 +695,19 @@
     Compile the model for bare-metal
   </a>
   
+    <nav class="md-nav" aria-label="Compile the model for bare-metal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#compiling-the-bare-metal-model-for-static-library-support" class="md-nav__link">
+    Compiling the bare-metal model for static-library support
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -779,10 +805,15 @@ the artifact has a fixed ABI to be rendered by the
 for example command-line instructions of some common architectures</p>
 <p>You can replace the MLIR file with the other MLIR model files, following the
 <a href="../cpu-dylib/#compile-the-model">instructions</a></p>
-<div class="admonition todo">
-<p class="admonition-title">Todo</p>
-<p>Add the static library support</p>
-</div>
+<h3 id="compiling-the-bare-metal-model-for-static-library-support">Compiling the bare-metal model for static-library support<a class="headerlink" href="#compiling-the-bare-metal-model-for-static-library-support" title="Permanent link">&para;</a></h3>
+<p>See the <a href="https://github.com/google/iree/tree/main/iree/samples/static_library">static_library</a>
+demo sample for an example and instructions on running a model with IREE's
+<code>static_library_loader</code>.</p>
+<p>By default, the demo targets the host machine when compiling. To produce a
+bare-metal compatible model, run <code>iree-translate</code> as in the previous example
+and add the additional <code>-iree-llvm-static-library-output-path=</code> flag to specify
+the static library destination. This will produce a <code>.h\.o</code> file to link
+directly into the target application.</p>
 <h2 id="build-bare-metal-runtime-from-the-source">Build bare-metal runtime from the source<a class="headerlink" href="#build-bare-metal-runtime-from-the-source" title="Permanent link">&para;</a></h2>
 <p>A few CMake options and macros should be set to build a subset of IREE runtime
 libraries compatible with the bare-metal platform. We assume there's no
