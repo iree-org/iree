@@ -43,7 +43,7 @@ cc_library(
         "FusionOfTensorOps.cpp",
         "HoistUnstreamableOps.cpp",
         "InjectDispatchTracing.cpp",
-        "InterchangeGenericOp.cpp",
+        "InterchangeGenericOps.cpp",
         "OutlineDispatchRegions.cpp",
         "OutlineLargeConstants.cpp",
         "PadLinalgOps.cpp",
