@@ -215,7 +215,7 @@ class CompiledModule(object):
                         module_class: Type[tf.Module],
                         backend_info: "BackendInfo",
                         exported_names: Sequence[str] = (),
-                        artifacts_dir: str = None):
+                        artifacts_dir: Optional[str] = None):
     """Compile a tf.Module subclass to the target backend in backend_info.
 
     Args:
@@ -233,7 +233,7 @@ class CompiledModule(object):
                            module_instance: tf.Module,
                            backend_info: "BackendInfo",
                            exported_names: Sequence[str] = (),
-                           artifacts_dir: str = None):
+                           artifacts_dir: Optional[str] = None):
     """Compile a tf.Module instance to the target backend in backend_info.
 
     This is only implemented for IreeCompiledModule.
@@ -249,15 +249,16 @@ class CompiledModule(object):
     raise NotImplementedError()
 
   @classmethod
-  def create_from_signature_def_saved_model(cls,
-                                            saved_model_dir: str,
-                                            saved_model_tags: Set[str],
-                                            module_name: str,
-                                            backend_info: "BackendInfo",
-                                            exported_name: str,
-                                            input_names: Sequence[str],
-                                            output_names: Sequence[str],
-                                            artifacts_dir: str = None):
+  def create_from_signature_def_saved_model(
+      cls,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      backend_info: "BackendInfo",
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: Optional[str] = None):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -338,7 +339,7 @@ class IreeCompiledModule(CompiledModule):
                         module_class: Type[tf.Module],
                         backend_info: "BackendInfo",
                         exported_names: Sequence[str] = (),
-                        artifacts_dir: str = None):
+                        artifacts_dir: Optional[str] = None):
     """Compile a tf.Module subclass to the target backend in backend_info.
 
     Args:
@@ -359,7 +360,7 @@ class IreeCompiledModule(CompiledModule):
                            module_instance: tf.Module,
                            backend_info: "BackendInfo",
                            exported_names: Sequence[str] = (),
-                           artifacts_dir: str = None):
+                           artifacts_dir: Optional[str] = None):
     """Compile a tf.Module instance to the target backend in backend_info.
 
     Args:
@@ -388,15 +389,16 @@ class IreeCompiledModule(CompiledModule):
     return cls(module_name, backend_info, compiled_paths, vm_module, config)
 
   @classmethod
-  def create_from_signature_def_saved_model(cls,
-                                            saved_model_dir: str,
-                                            saved_model_tags: Set[str],
-                                            module_name: str,
-                                            backend_info: "BackendInfo",
-                                            exported_name: str,
-                                            input_names: Sequence[str],
-                                            output_names: Sequence[str],
-                                            artifacts_dir: str = None):
+  def create_from_signature_def_saved_model(
+      cls,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      backend_info: "BackendInfo",
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: Optional[str] = None):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -514,7 +516,7 @@ class TfCompiledModule(CompiledModule):
                         module_class: Type[tf.Module],
                         backend_info: "BackendInfo",
                         exported_names: Sequence[str] = (),
-                        artifacts_dir: str = None):
+                        artifacts_dir: Optional[str] = None):
     """Compile a tf.Module subclass to the target backend in backend_info.
 
     Args:
@@ -530,15 +532,16 @@ class TfCompiledModule(CompiledModule):
     return cls(module_name, backend_info, constructor, exported_names)
 
   @classmethod
-  def create_from_signature_def_saved_model(cls,
-                                            saved_model_dir: str,
-                                            saved_model_tags: Set[str],
-                                            module_name: str,
-                                            backend_info: "BackendInfo",
-                                            exported_name: str,
-                                            input_names: Sequence[str],
-                                            output_names: Sequence[str],
-                                            artifacts_dir: str = None):
+  def create_from_signature_def_saved_model(
+      cls,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      backend_info: "BackendInfo",
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: Optional[str] = None):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -667,7 +670,7 @@ def tf_signature_def_saved_model_to_tflite_module_bytes(
 
 def tflite_module_bytes_to_tflite_interpreters(
     tflite_module_bytes: Dict[str, bytes],
-    artifacts_dir: str = None
+    artifacts_dir: Optional[str] = None
 ) -> Tuple[Dict[str, tf.lite.Interpreter], Union[Dict[str, str], None]]:
   """Compile a dict of TFLite compiled bytes to  TFLite interpreters.
 
@@ -786,7 +789,7 @@ class TfLiteCompiledModule(CompiledModule):
       backend_info: "BackendInfo",
       compiled_paths: Dict[str, str],
       interpreters: Dict[str, tf.lite.Interpreter],
-      output_names: Sequence[str] = None,
+      output_names: Optional[Sequence[str]] = None,
   ):
     """Base constructor – Use one of the named constructors instead.
 
@@ -807,7 +810,7 @@ class TfLiteCompiledModule(CompiledModule):
                         module_class: Type[tf.Module],
                         backend_info: "BackendInfo",
                         exported_names: Sequence[str] = (),
-                        artifacts_dir: str = None):
+                        artifacts_dir: Optional[str] = None):
     """Compile a tf.Module subclass to the target backend in backend_info.
 
     Args:
@@ -827,15 +830,16 @@ class TfLiteCompiledModule(CompiledModule):
     return cls(module_name, backend_info, compiled_paths, interpreters)
 
   @classmethod
-  def create_from_signature_def_saved_model(cls,
-                                            saved_model_dir: str,
-                                            saved_model_tags: Set[str],
-                                            module_name: str,
-                                            backend_info: "BackendInfo",
-                                            exported_name: str,
-                                            input_names: Sequence[str],
-                                            output_names: Sequence[str],
-                                            artifacts_dir: str = None):
+  def create_from_signature_def_saved_model(
+      cls,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      backend_info: "BackendInfo",
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: Optional[str] = None):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -906,7 +910,7 @@ class BackendInfo:
       },
   }
 
-  def __init__(self, backend_name: str, backend_id: str = None):
+  def __init__(self, backend_name: str, backend_id: Optional[str] = None):
     """Creates a BackendInfo with the compilation details for backend_name.
 
     Args:
@@ -939,7 +943,7 @@ class BackendInfo:
   def compile_from_class(self,
                          module_class: Type[tf.Module],
                          exported_names: Sequence[str] = (),
-                         artifacts_dir: str = None) -> CompiledModule:
+                         artifacts_dir: Optional[str] = None) -> CompiledModule:
     """Creates a 'CompiledModule' for this backend."""
     return self._compiled_module_class.create_from_class(
         module_class, self, exported_names, artifacts_dir)
@@ -952,7 +956,7 @@ class BackendInfo:
       exported_name: str,
       input_names: Sequence[str],
       output_names: Sequence[str],
-      artifacts_dir: str = None) -> CompiledModule:
+      artifacts_dir: Optional[str] = None) -> CompiledModule:
     return self._compiled_module_class.create_from_signature_def_saved_model(
         saved_model_dir, saved_model_tags, module_name, self, exported_name,
         input_names, output_names, artifacts_dir)
