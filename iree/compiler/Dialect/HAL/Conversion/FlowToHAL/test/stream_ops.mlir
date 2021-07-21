@@ -502,14 +502,13 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
   return %0 : tensor<3x9xi32>
 }
 
-
 // -----
 
 // Test that when we copy a subspan of a large constant pool into a buffer,
 // we use the correct size.
 
-// CHECK-LABEL: func @clone_from_large_buffer_to_small_buffer
-func @clone_from_large_buffer_to_small_buffer(%input: tensor<2xi32>) -> tensor<7xi32> {
+// CHECK-LABEL: func @cloneFromLargeBufferToSmallBuffer
+func @cloneFromLargeBufferToSmallBuffer(%input: tensor<2xi32>) -> tensor<7xi32> {
   %1 = flow.ex.stream.fragment(%input) : (tensor<2xi32>) -> tensor<7xi32> =
       (%arg0: tensor<2xi32>) -> tensor<7xi32> {
     %c3 = constant 3 : index
@@ -527,3 +526,41 @@ func @clone_from_large_buffer_to_small_buffer(%input: tensor<2xi32>) -> tensor<7
 }
 
 hal.variable @_const_pool_splats : !hal.buffer attributes {sym_visibility = "private"}
+
+// -----
+
+// CHECK-LABEL: func @tensorSplat
+// CHECK-SAME: (%[[VALUE:.+]]: i32)
+func @tensorSplat(%value: i32) -> tensor<2x128xi32> {
+  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c1024}
+  %0 = flow.ex.stream.fragment(%value) : (i32) -> tensor<2x128xi32> =
+      (%arg0: i32) -> tensor<2x128xi32> {
+    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c1024] pattern(%[[VALUE]] : i32)
+    %1 = flow.tensor.splat %arg0 : tensor<2x128xi32>
+    flow.return %1 : tensor<2x128xi32>
+  }
+  return %0 : tensor<2x128xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @tensorSplatDynamic
+// CHECK-SAME: (%[[VALUE:.+]]: i8, %[[DIM:.+]]: index)
+func @tensorSplatDynamic(%value: i8, %dim: index) -> tensor<?x128xi8> {
+  // CHECK: %[[SIZE:.+]] = muli %[[DIM]], %c128 : index
+  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[SIZE]]}
+  %0 = flow.ex.stream.fragment(%value, %dim) : (i8, index) -> tensor<?x128xi8>{%dim} =
+      (%arg0: i8, %arg1: index) -> tensor<?x128xi8> {
+    //  CHECK-DAG: %[[B0:.+]] = zexti %[[VALUE]] : i8 to i32
+    //  CHECK-DAG: %[[B1:.+]] = shift_left %[[B0]], %c8
+    //  CHECK-DAG: %[[B2:.+]] = shift_left %[[B0]], %c16
+    //  CHECK-DAG: %[[B3:.+]] = shift_left %[[B0]], %c24
+    //  CHECK-DAG: %[[ORA:.+]] = or %[[B2]], %[[B3]]
+    //  CHECK-DAG: %[[ORB:.+]] = or %[[B1]], %[[ORA]]
+    //  CHECK-DAG: %[[PATTERN:.+]] = or %[[B0]], %[[ORB]]
+    // CHECK-NEXT: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %[[SIZE]]] pattern(%[[PATTERN]] : i32)
+    %1 = flow.tensor.splat %arg0 : tensor<?x128xi8>{%arg1}
+    flow.return %1 : tensor<?x128xi8>
+  }
+  return %0 : tensor<?x128xi8>
+}
